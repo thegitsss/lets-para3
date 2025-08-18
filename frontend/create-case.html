@@ -1,0 +1,100 @@
+<link rel="stylesheet" href="assets/styles/global.css">
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<script type="module" src="assets/scripts/auth.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<input type="text" id="search" placeholder="Search cases/disputes..." style="width:100%;margin-bottom:1rem;padding:0.8rem;font-size:1rem;" />
+
+  <meta charset="UTF-8">
+  <title>Create New Case</title>
+  <style>
+    :root {
+      --brand-brown: #8c7864;
+      --bg-cream: #f5f2ed;
+      --text-dark: #5c4e3a;
+      --navy: #27394d;
+      --white: #ffffff;
+      --light-gray: #e9eef2;
+    }
+    body { background: var(--bg-cream); color: var(--text-dark); font-family: Georgia, serif; padding: 2rem; }
+    h1 { color: var(--navy); font-size: 2rem; margin-bottom: 1rem; animation: fadeIn 0.8s ease; }
+    label { display: block; margin: 1rem 0 0.5rem; font-weight: bold; }
+    input, textarea, select, button {
+      width: 100%;
+      padding: 0.8rem;
+      font-size: 1rem;
+      border: 1px solid var(--light-gray);
+      border-radius: 4px;
+      margin-bottom: 1rem;
+      transition: opacity 0.3s ease;
+    }
+    button {
+      background: var(--navy);
+      color: var(--white);
+      cursor: pointer;
+      width: auto;
+    }
+    button:hover { opacity: 0.8; }
+    .message { margin-top: 1rem; font-weight: bold; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <h1>Create New Case</h1>
+  <form id="caseForm">
+    <label>Title</label>
+    <input type="text" id="title" required />
+    <label>Description</label>
+    <textarea id="description" rows="4"></textarea>
+    <label>Assign To</label>
+    <select id="assignedTo"><option value="">— Unassigned —</option></select>
+    <button type="submit">Create Case</button>
+  </form>
+  <div class="message" id="msg"></div>
+
+  <script>
+    const form = document.getElementById('caseForm');
+    const msg = document.getElementById('msg');
+    const token = localStorage.getItem('token');
+    const select = document.getElementById('assignedTo');
+
+    // Load list of approved users
+    fetch('http://localhost:5000/api/admin/users', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(users => {
+        users.forEach(u => {
+          if (u.status === 'approved') {
+            select.innerHTML += `<option value="${u._id}">${u.email} (${u.role})</option>`;
+          }
+        });
+      });
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      msg.textContent = 'Creating case...';
+
+      const res = await fetch('http://localhost:5000/api/cases', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: form.title.value,
+          description: form.description.value,
+          assignedTo: form.assignedTo.value
+        })
+      });
+
+      const data = await res.json();
+      msg.textContent = data.msg;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<link rel="stylesheet" href="assets/styles/global.css">
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<script type="module" src="assets/scripts/auth.js"></script>
+<div id="disputesContainer"></div>
+
+<script>
+  const token = localStorage.getItem('token');
+
+  async function loadDisputes() {
+    const res = await fetch('http://localhost:5000/api/disputes/open', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await res.json();
+
+    const container = document.getElementById('disputesContainer');
+    container.innerHTML = data.map(d => `
+      <div class="dispute-box">
+        <h3>Case: ${d.caseId?.title || '(deleted)'}</h3>
+        <p>By: ${d.raisedBy?.email}</p>
+        <p>Message: ${d.message}</p>
+        <button onclick="resolveDispute('${d._id}')">✔️ Resolve</button>
+        <button onclick="rejectDispute('${d._id}')">❌ Reject</button>
+      </div>
+    `).join('');
+  }
+
+  async function resolveDispute(id) {
+    await fetch(`http://localhost:5000/api/disputes/${id}/resolve`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    alert("Marked as resolved");
+    loadDisputes();
+  }
+
+  async function rejectDispute(id) {
+    await fetch(`http://localhost:5000/api/disputes/${id}/reject`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    alert("Marked as rejected");
+    loadDisputes();
+  }
+
+  loadDisputes();
+</script>

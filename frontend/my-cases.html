@@ -1,0 +1,96 @@
+<link rel="stylesheet" href="assets/styles/global.css">
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<script type="module" src="assets/scripts/auth.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Cases</title>
+  <style>
+    :root {
+      --brand-brown: #8c7864;
+      --bg-cream: #f5f2ed;
+      --text-dark: #5c4e3a;
+      --navy: #27394d;
+      --white: #ffffff;
+      --light-gray: #e9eef2;
+    }
+    body {
+      font-family: Georgia, serif;
+      background: var(--bg-cream);
+      color: var(--text-dark);
+      padding: 2rem;
+      animation: fadeIn 0.8s ease;
+    }
+    h1 { color: var(--navy); margin-bottom: 1rem; }
+    .case-card {
+      background: var(--white);
+      border-left: 4px solid var(--brand-brown);
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      transition: opacity 0.3s ease;
+    }
+    .case-card:hover { opacity: 0.9; }
+    button {
+      background: var(--navy);
+      color: var(--white);
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: opacity 0.3s ease;
+    }
+    button:hover { opacity: 0.8; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <h1>My Assigned Cases</h1>
+  <div id="casesContainer">Loading cases...</div>
+
+  <script>
+    const container = document.getElementById('casesContainer');
+    const token = localStorage.getItem('token');
+
+    if (!token) {
+      alert('Please login to see your cases');
+      window.location.href = 'login.html';
+    }
+
+    async function loadCases() {
+      const res = await fetch('http://localhost:5000/api/cases/my', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      container.innerHTML = '';
+      if (data.length === 0) {
+        container.innerHTML = '<p>No cases assigned yet. Check back later!</p>';
+        return;
+      }
+      data.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'case-card';
+        div.innerHTML = `
+          <h2>${c.title}</h2>
+          <p>${c.description || ''}</p>
+          <p><strong>Status:</strong> ${c.status}</p>
+          <p><strong>Created by:</strong> ${c.createdBy?.email}</p>
+          <button onclick="goToCase('${c._id}')">Manage Case</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function goToCase(id) {
+      localStorage.setItem('openCaseId', id);
+      window.location.href = 'case-detail.html';
+    }
+
+    loadCases();
+  </script>
+</body>
+</html>

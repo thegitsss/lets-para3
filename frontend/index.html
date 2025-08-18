@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Lets‑ParaConnect</title>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;700&family=Source+Sans+Pro:wght@300;400;600&display=swap" rel="stylesheet">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="assets/styles/styles.css" />
+
+  <!-- reCAPTCHA -->
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
+  <!-- Auth Script -->
+  <script type="module" src="assets/scripts/auth.js"></script>
+
+  <style>
+    :root {
+      --brand-brown: #8c7864;
+      --bg-cream: #f5f2ed;
+      --text-dark: #4c453d;
+      --text-muted: #9e8f7a;
+      --navy: #27394d;
+      --white: #ffffff;
+      --light-gray: #e9eef2;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Source Sans Pro', sans-serif;
+      background: var(--bg-cream);
+      color: var(--text-dark);
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.2rem 2rem;
+      background: rgba(255,255,255,0.95);
+      border-bottom: 1px solid #ddd;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      text-decoration: none;
+    }
+
+    .nav-logo img {
+      height: 50px;
+      margin-right: 10px;
+    }
+
+    .nav-logo span {
+      font-family: 'EB Garamond', serif;
+      font-size: 1.4rem;
+      color: var(--brand-brown);
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    nav a, nav button {
+      background: transparent;
+      border: none;
+      font-size: 1rem;
+      color: var(--brand-brown);
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      padding: 0.4rem 0.8rem;
+      transition: opacity 0.3s ease;
+    }
+
+    nav a:hover, nav button:hover {
+      opacity: 0.7;
+    }
+
+    .dropdown {
+      position: relative;
+    }
+
+    .dropdown-content {
+      position: absolute;
+      right: 0;
+      top: 100%;
+      background: rgba(39,57,77,0.9);
+      border-radius: 6px;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(10px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+
+    .dropdown-content a {
+      display: block;
+      padding: 0.5rem 1.2rem;
+      color: var(--white);
+      font-size: 0.9rem;
+      text-align: center;
+      text-decoration: none;
+    }
+
+    .dropdown-content a:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    .dropdown:hover .dropdown-content,
+    .dropdown-content:hover {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4rem 2rem;
+      flex-wrap: wrap;
+    }
+
+    .hero-left {
+      max-width: 600px;
+    }
+
+    .hero-left h1 {
+      font-size: 2.5rem;
+      font-family: 'EB Garamond', serif;
+      color: var(--navy);
+      margin-bottom: 1rem;
+    }
+
+    .hero-left p {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+    }
+
+    .cta-buttons {
+      margin-top: 1.5rem;
+    }
+
+    .cta-buttons button {
+      background: var(--navy);
+      color: var(--white);
+      border: none;
+      padding: 0.75rem 1.5rem;
+      margin-right: 1rem;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: opacity 0.5s ease;
+    }
+
+    .card {
+      background: var(--white);
+      padding: 2rem;
+      max-width: 320px;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      text-align: center;
+      margin-top: 2rem;
+    }
+
+    .how-it-works {
+      background: var(--light-gray);
+      padding: 4rem 2rem;
+      text-align: center;
+    }
+
+    .how-it-works h2 {
+      font-size: 2rem;
+      font-family: 'EB Garamond', serif;
+      color: var(--navy);
+      margin-bottom: 2rem;
+    }
+
+    .steps {
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 2rem;
+    }
+
+    .step {
+      flex: 1 1 200px;
+      max-width: 250px;
+      background: var(--white);
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .cta-banner {
+      background: var(--brand-brown);
+      color: var(--white);
+      padding: 3rem 2rem;
+      text-align: center;
+    }
+
+    .cta-banner button {
+      padding: 1rem 2rem;
+      background: var(--white);
+      color: var(--brand-brown);
+      border: none;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: opacity 0.5s ease;
+    }
+
+    .footer {
+      background: var(--navy);
+      color: var(--white);
+      padding: 2rem;
+      text-align: center;
+      font-size: 1rem;
+    }
+
+    .footer a {
+      color: var(--white);
+      text-decoration: none;
+      margin: 0 1rem;
+      transition: opacity 0.5s ease;
+    }
+
+    .footer a:hover {
+      opacity: 0.7;
+    }
+
+    .fade-out {
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
+
+    .fade-in {
+      opacity: 1;
+      transition: opacity 1s ease;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <a href="index.html" class="nav-logo">
+      <img src="assets/transparant logo only.png" alt="Logo" />
+      <span>Lets‑ParaConnect</span>
+    </a>
+    <nav>
+      <a href="login.html">Login</a>
+      <div class="dropdown">
+        <button>Register ▾</button>
+        <div class="dropdown-content">
+          <a href="register-attorney.html">As an Attorney</a>
+          <a href="register-paralegal.html">As a Paralegal</a>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="hero-left">
+      <h1>Connecting Legal Talent with Legal Teams</h1>
+      <p>Trusted freelance paralegals for law firms across the country.</p>
+      <div class="cta-buttons">
+        <button onclick="location.href='signup.html'">Start Hiring</button>
+        <button onclick="location.href='contact.html'">Talk To Us</button>
+      </div>
+    </div>
+    <div class="card testimonial-card">
+      <h2 style="color: var(--navy);">What Attorneys Say</h2>
+      <p id="testimonialText" class="testimonial-text fade-in">“An incredibly easy platform to find certified paralegals.”</p>
+      <strong id="testimonialAuthor" class="testimonial-author fade-in">— Jane D., Attorney</strong>
+    </div>
+  </section>
+
+  <section class="how-it-works">
+    <h2>How It Works</h2>
+    <div class="steps">
+      <div class="step">1️⃣ Post your legal task</div>
+      <div class="step">2️⃣ Match with certified paralegals</div>
+      <div class="step">3️⃣ Review, approve, and pay</div>
+    </div>
+  </section>
+
+  <section class="cta-banner">
+    <h2>Ready to find expert legal support?</h2>
+    <button onclick="location.href='signup.html'">Join Now</button>
+  </section>
+
+  <footer class="footer">
+    <a href="terms.html">Terms & Conditions</a>
+    <a href="privacy.html">Privacy Policy</a>
+    <br><br>© 2025 Lets‑ParaConnect
+  </footer>
+
+  <script>
+    const testimonials = [
+      {
+        text: "“An incredibly easy platform to find certified paralegals.”",
+        author: "— Jane D., Attorney"
+      },
+      {
+        text: "“Reliable, affordable, and super professional.”",
+        author: "— Thomas K., Legal Ops"
+      },
+      {
+        text: "“The best freelance legal talent we’ve ever worked with.”",
+        author: "— Clara M., Law Office Manager"
+      }
+    ];
+
+    let index = 0;
+    const textEl = document.getElementById("testimonialText");
+    const authorEl = document.getElementById("testimonialAuthor");
+
+    setInterval(() => {
+      textEl.classList.add("fade-out");
+      authorEl.classList.add("fade-out");
+
+      setTimeout(() => {
+        index = (index + 1) % testimonials.length;
+        textEl.textContent = testimonials[index].text;
+        authorEl.textContent = testimonials[index].author;
+        textEl.classList.remove("fade-out");
+        authorEl.classList.remove("fade-out");
+      }, 1000);
+    }, 6000);
+  </script>
+</body>
+</html>

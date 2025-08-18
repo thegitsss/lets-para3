@@ -1,0 +1,95 @@
+<link rel="stylesheet" href="assets/styles/global.css">
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<script type="module" src="assets/scripts/auth.js"></script>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Profile</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    body {
+      background: #f5f2ed;
+      font-family: Georgia, serif;
+      padding: 2rem;
+      color: #5c4e3a;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    button {
+      background: #27394d;
+      color: white;
+      padding: 0.5rem 1rem;
+      border: none;
+      font-weight: bold;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.2rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>👤 My Profile</h1>
+
+  <form id="profileForm">
+    <label>Bio</label>
+    <textarea id="bio" rows="4"></textarea>
+
+    <label>Resume URL</label>
+    <input type="url" id="resumeURL" />
+
+    <label>Certificate URL</label>
+    <input type="url" id="certificateURL" />
+
+    <label>Available for work?</label>
+    <input type="checkbox" id="availability" />
+
+    <button type="submit">Save Profile</button>
+  </form>
+
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert("Not logged in.");
+      window.location.href = 'login.html';
+    }
+
+    const form = document.getElementById('profileForm');
+
+    async function loadProfile() {
+      const res = await fetch('http://localhost:5000/api/user/profile', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const user = await res.json();
+      document.getElementById('bio').value = user.bio || '';
+      document.getElementById('resumeURL').value = user.resumeURL || '';
+      document.getElementById('certificateURL').value = user.certificateURL || '';
+      document.getElementById('availability').checked = user.availability;
+    }
+
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const res = await fetch('http://localhost:5000/api/user/profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          bio: document.getElementById('bio').value,
+          resumeURL: document.getElementById('resumeURL').value,
+          certificateURL: document.getElementById('certificateURL').value,
+          availability: document.getElementById('availability').checked
+        })
+      });
+      const data = await res.json();
+      alert(data.msg);
+    };
+
+    loadProfile();
+  </script>
+</body>
+</html>

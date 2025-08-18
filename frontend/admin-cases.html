@@ -1,0 +1,145 @@
+<link rel="stylesheet" href="assets/styles/global.css">
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<script type="module" src="assets/scripts/auth.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin - Manage Cases</title>
+  <style>
+    body {
+      font-family: Georgia, serif;
+      background-color: #fdfaf6;
+      margin: 0;
+      padding: 30px;
+      color: #2e2e2e;
+    }
+
+    h1 {
+      font-size: 2em;
+      margin-bottom: 20px;
+    }
+
+    .case-list {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .case-card {
+      background-color: #fff;
+      border-left: 5px solid #4a4a4a;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+      transition: transform 0.2s ease;
+    }
+
+    .case-card:hover {
+      transform: scale(1.01);
+    }
+
+    .case-card h2 {
+      margin: 0 0 10px;
+      font-size: 1.2em;
+    }
+
+    .case-details {
+      margin: 10px 0;
+      font-size: 0.95em;
+    }
+
+    .action-buttons {
+      margin-top: 10px;
+    }
+
+    .action-buttons button {
+      margin-right: 10px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .approve {
+      background-color: #4caf50;
+      color: white;
+    }
+
+    .reject {
+      background-color: #f44336;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>📂 Admin Case Management</h1>
+
+  <div class="case-list" id="caseList">
+    <!-- Cases will be injected here dynamically -->
+  </div>
+
+  <script>
+    const caseList = document.getElementById('caseList');
+
+    async function fetchCases() {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('http://localhost:5000/api/admin/cases', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await res.json();
+
+        caseList.innerHTML = '';
+
+        data.cases.forEach(singleCase => {
+          const div = document.createElement('div');
+          div.className = 'case-card';
+          div.innerHTML = `
+            <h2>Case #${singleCase._id}</h2>
+            <div class="case-details">
+              <strong>Submitted by:</strong> ${singleCase.submittedBy}<br>
+              <strong>Type:</strong> ${singleCase.type}<br>
+              <strong>Status:</strong> ${singleCase.status}<br>
+              <strong>Submitted:</strong> ${new Date(singleCase.createdAt).toLocaleDateString()}
+            </div>
+            <div class="action-buttons">
+              <button class="approve" onclick="updateCase('${singleCase._id}', 'approved')">Approve</button>
+              <button class="reject" onclick="updateCase('${singleCase._id}', 'rejected')">Reject</button>
+            </div>
+          `;
+          caseList.appendChild(div);
+        });
+
+      } catch (err) {
+        console.error(err);
+        caseList.innerHTML = '<p style="color:red;">Failed to load cases.</p>';
+      }
+    }
+
+    async function updateCase(id, action) {
+      try {
+        const token = localStorage.getItem('token');
+        await fetch(`http://localhost:5000/api/admin/cases/${id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status: action })
+        });
+
+        fetchCases(); // Refresh list
+      } catch (err) {
+        console.error('Update failed', err);
+      }
+    }
+
+    fetchCases();
+  </script>
+</body>
+</html>

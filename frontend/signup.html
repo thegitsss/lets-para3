@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sign Up | Lets-ParaConnect</title>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --brand-brown: #8c7864;
+      --bg-cream: #f5f2ed;
+      --text-dark: #5c4e3a;
+      --text-muted: #9e8f7a;
+      --navy: #27394d;
+      --white: #ffffff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'EB Garamond', serif;
+      background: var(--bg-cream);
+      color: var(--text-dark);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    header {
+      background-color: rgba(255,255,255,0.95);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid #e3e3e3;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .logo-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-wrap img {
+      height: 50px;
+    }
+
+    nav a {
+      text-decoration: none;
+      margin-left: 1.5rem;
+      color: var(--text-dark);
+      font-size: 1rem;
+      transition: opacity 0.3s ease;
+    }
+
+    nav a:hover {
+      opacity: 0.7;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 3rem 1rem;
+    }
+
+    .role-select {
+      text-align: center;
+      margin-bottom: 2rem;
+      animation: fadeIn 0.8s ease;
+    }
+
+    .role-btn {
+      padding: 1rem 2rem;
+      font-size: 1.2rem;
+      margin: 1rem;
+      border: none;
+      border-radius: 6px;
+      background-color: var(--navy);
+      color: white;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+
+    .form-container {
+      display: none;
+      background-color: rgba(39, 57, 77, 0.85);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      border-radius: 10px;
+      padding: 2rem;
+      color: white;
+      max-width: 400px;
+      width: 100%;
+      animation: fadeInUp 0.6s ease both;
+    }
+
+    h2 {
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.6rem;
+      margin-bottom: 1rem;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+
+    input:focus {
+      outline: none;
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
+    }
+
+    button[type="submit"] {
+      width: 100%;
+      padding: 0.6rem;
+      font-size: 1rem;
+      background-color: white;
+      color: var(--navy);
+      font-weight: bold;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .message {
+      text-align: center;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: #fcebc1;
+    }
+
+    footer {
+      background-color: #27394d;
+      color: white;
+      text-align: center;
+      padding: 1.5rem 1rem;
+      font-size: 0.9rem;
+      margin-top: auto;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <a href="index.html" class="logo-wrap">
+      <img src="assets/transparant logo only.png" alt="Logo" />
+      <h2 style="color: var(--brand-brown)">Lets-ParaConnect</h2>
+    </a>
+    <nav>
+      <a href="signup.html">Sign Up</a>
+      <a href="login.html">Login</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="role-select" id="roleSelect">
+      <h2>Sign up as:</h2>
+      <button class="role-btn" onclick="showForm('attorney')">I'm an Attorney</button>
+      <button class="role-btn" onclick="showForm('paralegal')">I'm a Paralegal</button>
+    </div>
+
+    <div class="form-container" id="attorneyForm">
+      <h2>Attorney Registration</h2>
+      <form onsubmit="submitForm(event, 'attorney')">
+        <input type="text" placeholder="Full Name" required />
+        <input type="email" placeholder="Email" required />
+        <input type="password" placeholder="Password" required />
+        <input type="text" placeholder="State Bar Number" required />
+        <button type="submit">Register</button>
+      </form>
+      <div class="message" id="msgAttorney"></div>
+    </div>
+
+    <div class="form-container" id="paralegalForm">
+      <h2>Paralegal Registration</h2>
+      <form onsubmit="submitForm(event, 'paralegal')">
+        <input type="text" placeholder="Full Name" required />
+        <input type="email" placeholder="Email" required />
+        <input type="password" placeholder="Password" required />
+        <input type="text" placeholder="Certificate # or Upload Link" required />
+        <button type="submit">Register</button>
+      </form>
+      <div class="message" id="msgParalegal"></div>
+    </div>
+  </main>
+
+  <footer>
+    &copy; 2025 Lets-ParaConnect. All rights reserved.
+  </footer>
+
+  <script>
+    function showForm(role) {
+      document.getElementById('roleSelect').style.display = 'none';
+      const form = document.getElementById(`${role}Form`);
+      form.style.display = 'block';
+    }
+
+    function submitForm(e, role) {
+      e.preventDefault();
+      const form = e.target;
+      const inputs = form.querySelectorAll('input');
+      const [name, email, password, extra] = [...inputs].map(i => i.value);
+      const msgEl = document.getElementById(role === 'attorney' ? 'msgAttorney' : 'msgParalegal');
+
+      msgEl.textContent = 'Submitting...';
+
+      fetch('http://localhost:5000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          ...(role === 'attorney' ? { barNumber: extra } : { certLink: extra }),
+          role
+        })
+      })
+      .then(res => res.json().then(data => ({ ok: res.ok, msg: data.msg })))
+      .then(({ ok, msg }) => {
+        msgEl.textContent = ok ? 'Submitted. Await admin approval.' : msg;
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+:root {
+  --brand-brown: #8c7864;
+  --bg-cream: #fbf9f5;
+  --text-dark: #5c4e3a;
+  --navy: #27394d;
+  --white: #ffffff;
+  --light-gray: #e9eef2;
+  font-size: 16px;
+  font-family: 'Georgia', serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg-cream);
+  color: var(--text-dark);
+  font-family: inherit;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+body.loaded {
+  opacity: 1;
+}
+
+/* Header/Nav */
+nav, header {
+  background: var(--white);
+  padding: 1rem 2rem;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+nav a, header a {
+  font-family: Georgia, serif;
+  color: var(--navy);
+  text-decoration: none;
+  font-weight: normal;
+  margin-right: 1rem;
+  transition: color 0.3s ease;
+}
+
+nav a:hover,
+header a:hover {
+  color: var(--brand-brown);
+}
+
+nav a.active {
+  color: var(--brand-brown);
+}
+
+/* Typography */
+h1, h2, h3, h4 {
+  font-family: Georgia, serif;
+  font-weight: normal;
+  color: var(--navy);
+}
+
+p {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* Forms & Inputs */
+input, textarea, button, select {
+  font-family: inherit;
+  font-size: 1rem;
+  width: 100%;
+  max-width: 400px;
+  margin: 0.5rem 0;
+  padding: 0.6rem;
+  border: 1px solid var(--light-gray);
+  border-radius: 6px;
+  transition: border 0.3s ease;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--brand-brown);
+}
+
+button {
+  background: var(--navy);
+  color: var(--white);
+  border: none;
+  cursor: pointer;
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+button:hover {
+  background: #1f2e3d;
+  transform: scale(1.03);
+}
+
+/* Utility */
+.card {
+  background: var(--white);
+  margin: 1rem 0;
+  padding: 1rem;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.message {
+  color: var(--brand-brown);
+  font-weight: bold;
+}
+
+.fade {
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* NAV BUTTONS (Login/Register) */
+.nav-buttons {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.nav-btn {
+  font-family: Georgia, serif;
+  font-weight: normal;
+  background: transparent;
+  color: var(--navy);
+  border: 2px solid var(--navy);
+  padding: 0.5rem 1.2rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.nav-btn:hover {
+  background: var(--navy);
+  color: white;
+  transform: scale(1.05);
+}
+
+/* DROPDOWN STYLE */
+.register-dropdown {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.register-dropdown > button {
+  font-family: 'EB Garamond', serif;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--brand-brown);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.6rem 1rem;
+  transition: color 0.3s ease;
+}
+
+.register-menu {
+  position: absolute;
+  top: 120%;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  min-width: 160px;
+  opacity: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  transition: opacity 0.5s ease;
+  z-index: 999;
+}
+
+.register-menu a {
+  padding: 0.5rem 0.5rem;
+  font-size: 1rem;
+  color: var(--text-dark);
+  text-decoration: none;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.register-menu a:hover {
+  background: var(--light-gray);
+  color: var(--navy);
+}
+
+.register-dropdown:hover .register-menu {
+  opacity: 1;
+  pointer-events: auto;
+}

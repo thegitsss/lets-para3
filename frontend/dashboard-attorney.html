@@ -1,0 +1,165 @@
+<link rel="stylesheet" href="assets/styles/global.css">
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<script type="module" src="assets/scripts/auth.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Attorney Dashboard</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <style>
+    :root {
+      --brand-brown: #8c7864;
+      --bg-cream: #f5f2ed;
+      --text-dark: #5c4e3a;
+      --navy: #27394d;
+      --white: #ffffff;
+    }
+    body {
+      background: var(--bg-cream);
+      font-family: Georgia, serif;
+      color: var(--text-dark);
+      padding: 2rem;
+    }
+    h1 {
+      color: var(--navy);
+      margin-bottom: 1.5rem;
+    }
+    .case-card {
+      background: var(--white);
+      border-left: 4px solid var(--brand-brown);
+      padding: 1rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      animation: fadeIn 0.6s ease;
+    }
+    .case-card h2 {
+      margin: 0 0 0.5rem 0;
+    }
+    .applicants {
+      margin-top: 1rem;
+      border-top: 1px dashed #ccc;
+      padding-top: 1rem;
+    }
+    .applicant {
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #eee;
+    }
+    button {
+      background: var(--navy);
+      color: white;
+      padding: 0.4rem 0.8rem;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    button:hover {
+      opacity: 0.85;
+    }
+    .accepted {
+      color: green;
+      font-weight: bold;
+    }
+    .status-label {
+      font-size: 0.9rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      background: #e0e0e0;
+      color: #555;
+      display: inline-block;
+      margin-top: 0.3rem;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📁 My Cases (Attorney View)</h1>
+  <div id="casesContainer">Loading cases...</div>
+
+  <script>
+    const token = localStorage.getItem('token');
+    const container = document.getElementById('casesContainer');
+
+    if (!token) {
+      alert('Login required');
+      location.href = 'login.html';
+    }
+
+    async function loadCases() {
+      const res = await fetch('http://localhost:5000/api/cases/my', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const cases = await res.json();
+      container.innerHTML = '';
+
+      if (!cases.length) {
+        container.innerHTML = '<p>No cases posted yet.</p>';
+        return;
+      }
+
+      for (let c of cases) {
+        const div = document.createElement('div');
+        div.className = 'case-card';
+
+        div.innerHTML = `
+          <h2>${c.title}</h2>
+          <p>${c.details}</p>
+          <p><strong>Status:</strong> <span class="status-label">${c.status}</span></p>
+          <p><strong>Posted:</strong> ${new Date(c.createdAt).toLocaleString()}</p>
+          <div class="applicants" id="applicants-${c._id}">
+            <em>Loading applicants...</em>
+          </div>
+        `;
+
+        container.appendChild(div);
+        loadApplicants(c._id);
+      }
+    }
+
+    async function loadApplicants(caseId) {
+      const res = await fetch(`http://localhost:5000/api/cases/${caseId}/applicants`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const applicants = await res.json();
+      const el = document.getElementById(`applicants-${caseId}`);
+
+      if (!applicants.length) {
+        el.innerHTML = '<p>No applicants yet.</p>';
+        return;
+      }
+
+      el.innerHTML = applicants.map(app => `
+        <div class="applicant">
+          <p><strong>${app.paralegalId.name}</strong> (${app.status})</p>
+          <p>Email: <a href="mailto:${app.paralegalId.email}">${app.paralegalId.email}</a></p>
+          ${app.paralegalId.resumeURL ? `<p><a href="${app.paralegalId.resumeURL}" target="_blank">📄 View Resume</a></p>` : ''}
+          ${app.status === 'pending' ? `
+            <button onclick="acceptParalegal('${caseId}', '${app.paralegalId._id}')">Accept</button>
+          ` : app.status === 'accepted' ? `<p class="accepted">✅ Accepted</p>` : ''}
+        </div>
+      `).join('');
+    }
+
+    async function acceptParalegal(caseId, paralegalId) {
+      if (!confirm("Accept this paralegal? This will auto-reject others.")) return;
+
+      const res = await fetch(`http://localhost:5000/api/cases/${caseId}/accept/${paralegalId}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      alert(data.msg);
+      loadApplicants(caseId);
+    }
+
+    loadCases();
+  </script>
+
+</body>
+</html>

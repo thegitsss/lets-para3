@@ -1,0 +1,86 @@
+<link rel="stylesheet" href="assets/styles/global.css">
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<script type="module" src="assets/scripts/auth.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Dashboard</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+  <nav>
+    <a href="index.html">Home</a> |
+    <a href="admin-dashboard.html" class="active">Admin</a> |
+    <a href="login.html">Login</a>
+  </nav>
+
+  <main>
+    <h1>Admin Dashboard</h1>
+
+<section>
+  <h2>📬 Pending Applications</h2>
+  <div style="margin-bottom: 10px;">
+    <button onclick="bulkDecide('approved')">✅ Approve All</button>
+    <button onclick="bulkDecide('rejected')">❌ Reject All</button>
+  </div>
+  <div id="pending-list">
+    <!-- Filled via JavaScript -->
+  </div>
+</section>
+
+
+    <section>
+      <h2>⚖️ Manage Cases & Disputes</h2>
+      <button onclick="location.href='admin-cases.html'">View All Cases</button>
+      <button onclick="location.href='admin-disputes.html'">View All Disputes</button>
+    </section>
+  </main>
+
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) {
+      window.location.href = 'login.html';
+    }
+
+    fetch('/api/admin/pending-users', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
+    .then(res => res.json())
+    .then(data => {
+      const el = document.getElementById('pending-list');
+      if (!data.length) {
+        el.innerHTML = '<p>No pending requests.</p>';
+      } else {
+        el.innerHTML = data.map(user => `
+          <div class="application-card">
+            <p><strong>${user.fullName}</strong> (${user.role})</p>
+            <p>Email: ${user.email}</p>
+            ${user.barNumber ? `<p>Bar #: ${user.barNumber}</p>` : ''}
+            ${user.resumeURL ? `<p><a href="${user.resumeURL}" target="_blank">📄 View Resume</a></p>` : ''}
+            ${user.certificateURL ? `<p><a href="${user.certificateURL}" target="_blank">📜 View Certificate</a></p>` : ''}
+            <button onclick="decide('${user._id}', 'approved')">✅ Approve</button>
+            <button onclick="decide('${user._id}', 'rejected')">❌ Reject</button>
+          </div>
+        `).join('');
+      }
+    });
+
+function bulkDecide(status) {
+  fetch('http://localhost:5000/api/admin/bulk-update', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + token
+    },
+    body: JSON.stringify({ status })
+  })
+  .then(res => res.json())
+  .then(resp => {
+    alert(resp.msg);
+    location.reload();
+  });
+}
+  </script>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Register as Paralegal | Lets-ParaConnect</title>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600&display=swap" rel="stylesheet" />
+
+  <!-- reCAPTCHA -->
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
+ <!-- Styles -->
+  <style>
+    body {
+      font-family: 'EB Garamond', serif;
+      background: #f5f2ed;
+      margin: 0;
+      padding: 0;
+      color: #2c2c2c;
+    }
+
+    header, footer {
+      text-align: center;
+      padding: 1rem;
+      background-color: #27394d;
+      color: white;
+    }
+
+    .logo-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .logo-wrap img {
+      height: 50px;
+    }
+
+    main {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 80vh;
+      padding: 2rem;
+    }
+
+    .form-container {
+      background-color: #4a5b6a;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+      border-radius: 16px;
+      padding: 2rem 3rem;
+      color: white;
+      width: 100%;
+      max-width: 420px;
+      animation: fadeInUp 0.7s ease-out both;
+    }
+
+    .form-container h2 {
+      margin-bottom: 1.5rem;
+      font-size: 1.7rem;
+      text-align: center;
+    }
+
+    input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-family: 'EB Garamond', serif;
+    }
+
+    input:focus {
+      outline: none;
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
+      transition: box-shadow 0.2s ease-in-out;
+    }
+
+    button {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      font-size: 1rem;
+      background-color: #ffffff;
+      color: #27394d;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      font-family: 'EB Garamond', serif;
+      transition: transform 0.2s ease, background-color 0.2s ease;
+    }
+
+    button:hover {
+      transform: scale(1.03);
+      background-color: #dcdcdc;
+    }
+
+    .message {
+      margin-top: 1rem;
+      font-size: 0.95rem;
+      text-align: center;
+      color: #fcebc1;
+    }
+
+    footer {
+      font-size: 0.9rem;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="logo-wrap">
+      <img src="assets/transparant logo only.png" alt="Logo" />
+      <h1>Lets‑ParaConnect</h1>
+    </div>
+  </header>
+
+  <main>
+    <div class="form-container">
+      <h2>Register as a Paralegal</h2>
+      <form id="regForm">
+        <input type="text" id="name" placeholder="Full Name" required />
+        <input type="email" id="email" placeholder="Email" required />
+        <input type="password" id="password" placeholder="Password" required />
+        <input type="text" id="cert" placeholder="Certification / License (if applicable)" />
+        <button type="submit">Register</button>
+      </form>
+      <div class="message" id="message"></div>
+    </div>
+  </main>
+
+  <footer>
+    &copy; 2025 Lets‑ParaConnect. All rights reserved.
+  </footer>
+
+  <script>
+    const form = document.getElementById('regForm');
+    const msg = document.getElementById('message');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.textContent = 'Submitting...';
+
+      const name = document.getElementById('name').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const cert = document.getElementById('cert').value;
+
+      const res = await fetch('http://localhost:5000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, certification: cert, role: 'paralegal' })
+      });
+
+      const data = await res.json();
+      msg.textContent = res.ok ? 'Application submitted. Await approval.' : data.msg;
+    });
+  </script>
+</body>
+</html>
