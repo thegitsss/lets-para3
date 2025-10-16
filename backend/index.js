@@ -69,7 +69,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Serve Coming Soon page for root requests
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.send('✅ Express is serving this response from /');
 });
 
 // CSRF token endpoint
