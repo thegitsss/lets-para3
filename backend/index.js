@@ -61,8 +61,16 @@ const csrfProtection = csrf({
   }
 });
 
-// Static frontend
+// Static files
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve Coming Soon page for root requests
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Optional: disable frontend directory temporarily
+// app.use(express.static(path.join(__dirname, '../frontend')));
 
 // CSRF token endpoint
 app.get('/api/csrf', csrfProtection, (req, res) => {
