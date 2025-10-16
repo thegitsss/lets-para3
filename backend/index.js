@@ -6,6 +6,7 @@ require('dotenv').config();
 // 1) Core + libs
 const express = require('express');
 const path = require('path');
+const app = express();
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
@@ -18,10 +19,7 @@ const waitlistRouter = require('./routes/waitlist'); // <-- our new route
 // 3) Config
 const PROD = process.env.NODE_ENV === 'production';
 const PORT = process.env.PORT || 5000;
-const PUBLIC_DIR = path.join(__dirname, '../frontend');
-
-// 4) App (create ONCE)
-const app = express();
+const PUBLIC_DIR = path.join(__dirname, 'public');
 
 // 5) Parsers early
 app.use(express.json({ limit: '1mb' }));
@@ -64,7 +62,7 @@ const csrfProtection = csrf({
 });
 
 // Static frontend
-app.use(express.static(PUBLIC_DIR));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // CSRF token endpoint
 app.get('/api/csrf', csrfProtection, (req, res) => {
@@ -84,11 +82,6 @@ app.post('/api/payments/webhook',
   express.raw({ type: 'application/json' }),
   require('./routes/paymentsWebhook')
 );
-
-// Serve Coming Soon at the homepage
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/coming-soon.html'));
-});
 
 // 404 + error handler
 app.use((req, res) => res.status(404).send('Not found'));
