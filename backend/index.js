@@ -1,4 +1,4 @@
-// backend/index.js  (CommonJS, single app)
+console.log("🎯 index.js IS RUNNING from backend/");
 
 // 0) Env
 require('dotenv').config();
