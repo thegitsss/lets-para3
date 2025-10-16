@@ -1,95 +1,294 @@
-<link rel="stylesheet" href="assets/styles/global.css">
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
-<script type="module" src="assets/scripts/auth.js"></script>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>My Profile</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Attorney Profile | Let's ParaConnect</title>
+
   <link rel="stylesheet" href="assets/styles.css" />
   <style>
-    body {
-      background: #f5f2ed;
-      font-family: Georgia, serif;
-      padding: 2rem;
-      color: #5c4e3a;
-    }
-    input, textarea {
-      width: 100%;
-      padding: 0.5rem;
-      margin-bottom: 1rem;
-    }
-    button {
-      background: #27394d;
-      color: white;
-      padding: 0.5rem 1rem;
-      border: none;
-      font-weight: bold;
-    }
-    label {
-      display: block;
-      margin-bottom: 0.2rem;
-    }
+    body { padding:0; }
+    .topbar { background: var(--white); border-bottom: 1px solid var(--light-gray); padding: .9rem 1.25rem; display:flex; align-items:center; justify-content:space-between; position: sticky; top:0; z-index: 10; }
+    .brand { color: var(--navy); font-family: Georgia, serif; font-size:1.1rem; letter-spacing:.3px; }
+    .navlinks a { color: var(--navy); text-decoration:none; margin-left:1rem; padding:.35rem .6rem; border-radius:6px; transition: background .2s ease, color .2s ease; }
+    .navlinks a:hover { background: var(--light-gray); }
+    .navlinks a.active { color: var(--brand-brown); }
+
+    .wrap { max-width:1200px; margin:2rem auto; padding: 0 1.25rem; }
+    .grid { display:grid; grid-template-columns: 320px 1fr; gap: 1.25rem; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+    .card { background: var(--white); border-radius: 12px; box-shadow: 0 8px 16px rgba(0,0,0,.05); padding: 1.25rem 1.25rem 1rem; }
+    .card h2 { margin-bottom: .5rem; }
+    .muted { color:#6b6b6b; font-size:.95rem; }
+
+    .avatar-wrap { display:flex; align-items:center; gap:1rem; margin-top:.5rem; }
+    .avatar { width:96px; height:96px; border-radius:50%; background:#f1f1f1 center/cover no-repeat; border:1px solid var(--light-gray); flex: 0 0 96px; }
+    .btn-outline { background: transparent; color: var(--navy); border: 1px solid var(--navy); padding:.55rem .9rem; }
+    .btn-outline:hover { background: var(--navy); color:#fff; }
+
+    .toggle { position: relative; width: 52px; height: 30px; background:#d6d6d6; border-radius: 999px; cursor:pointer; transition: background .2s ease; }
+    .toggle::after { content:""; position:absolute; top:3px; left:3px; width:24px; height:24px; background:#fff; border-radius:50%; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .2s ease; }
+    .toggle.on { background:#2f855a; }
+    .toggle.on::after { transform: translateX(22px); }
+
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 700px) { .row { grid-template-columns: 1fr; } }
+
+    label { display:block; margin:.3rem 0 .35rem; color:var(--navy); }
+    input[type="url"], input[type="text"], textarea { width:100%; padding:.7rem; border:1px solid var(--light-gray); border-radius:8px; background:#fff; }
+    textarea { min-height: 120px; resize: vertical; }
+
+    .savebar { position: sticky; bottom: 0; margin-top: 1rem; padding: .9rem 1.1rem; background: rgba(255,255,255,.85); backdrop-filter: blur(6px); border:1px solid var(--light-gray); border-radius: 10px; display:flex; justify-content:flex-end; gap:.75rem; }
+
+    .toast { position: fixed; right: 16px; bottom: 16px; z-index: 99; background:#1a1a1a; color:#fff; padding:.7rem .9rem; border-radius:10px; opacity:0; transform: translateY(8px); transition: opacity .2s ease, transform .2s ease; }
+    .toast.show { opacity:1; transform: translateY(0); }
+    .toast.success { background:#2f855a; }
+    .toast.error { background:#b83220; }
+
+    .field-hint { color:#7a7a7a; font-size:.9rem; margin-top:.25rem; }
   </style>
 </head>
 <body>
-  <h1>👤 My Profile</h1>
+  <div class="topbar">
+    <div class="brand">Let’s ParaConnect</div>
+    <div class="navlinks">
+      <a href="dashboard-attorney.html">Dashboard</a>
+      <a href="profile-attorney.html" class="active">My Profile</a>
+      <a href="#" id="logoutLink">Logout</a>
+    </div>
+  </div>
 
-  <form id="profileForm">
-    <label>Bio</label>
-    <textarea id="bio" rows="4"></textarea>
+  <div class="wrap">
+    <div class="grid">
+      <aside class="card">
+        <h2>Profile</h2>
+        <p class="muted">Update your photo and availability.</p>
 
-    <label>Resume URL</label>
-    <input type="url" id="resumeURL" />
+        <div class="avatar-wrap">
+          <div id="avatar" class="avatar"></div>
+          <div>
+            <input type="file" id="avatarInput" accept="image/*" style="display:none">
+            <button type="button" class="btn-outline" id="changePhotoBtn">Change photo</button>
+            <div class="field-hint">Preview only for now.</div>
+          </div>
+        </div>
 
-    <label>Certificate URL</label>
-    <input type="url" id="certificateURL" />
+        <div style="margin-top:1rem; display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <div style="font-weight:bold;" id="displayName">Attorney</div>
+            <div class="muted" id="displayEmail">you@example.com</div>
+          </div>
 
-    <label>Available for work?</label>
-    <input type="checkbox" id="availability" />
+          <div style="text-align:right">
+            <div style="font-size:.85rem; color:var(--navy); margin-bottom:.35rem;">Available for work</div>
+            <div id="availToggle" class="toggle" role="switch" aria-checked="false" tabindex="0"></div>
+          </div>
+        </div>
+      </aside>
 
-    <button type="submit">Save Profile</button>
-  </form>
+      <main class="card">
+        <h2>Public Details</h2>
+        <p class="muted">These appear on your public attorney profile.</p>
+
+        <form id="profileForm" autocomplete="on" novalidate>
+          <label for="bio">Bio</label>
+          <textarea id="bio" placeholder="Short professional summary…"></textarea>
+          <div class="field-hint">Tip: 2–4 sentences about practice areas, states admitted, and approach.</div>
+
+          <div class="row">
+            <div>
+              <label for="barNumber">Bar Number</label>
+              <input type="text" id="barNumber" placeholder="e.g., 123456 (State)" />
+            </div>
+            <div></div>
+          </div>
+
+          <div class="row">
+            <div>
+              <label for="resumeURL">Resume URL</label>
+              <input type="url" id="resumeURL" placeholder="https://…" />
+              <div class="field-hint">Google Drive, Dropbox, or firm website.</div>
+            </div>
+            <div>
+              <label for="certificateURL">Certificate URL</label>
+              <input type="url" id="certificateURL" placeholder="https://…" />
+              <div class="field-hint">CLE/bar certificate link (optional).</div>
+            </div>
+          </div>
+
+          <div class="savebar">
+            <button type="button" class="btn-outline" id="cancelBtn">Cancel</button>
+            <button type="submit" id="saveBtn">Save Profile</button>
+          </div>
+        </form>
+      </main>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script>
-    const token = localStorage.getItem('token');
-    if (!token) {
-      alert("Not logged in.");
-      window.location.href = 'login.html';
+  window.addEventListener('DOMContentLoaded', () => document.body.classList.add('loaded'));
+
+  const API_BASE = location.origin + '/api';
+  const token = localStorage.getItem('token') || '';
+  if (!token) { location.href = 'login.html'; }
+
+  // CSRF bootstrap (matches other pages)
+  fetch('/api/csrf', { credentials:'include' })
+    .then(r=>r.json()).then(d=> window.__CSRF__ = d.csrfToken)
+    .catch(()=>{});
+
+  async function secureFetch(url, opts={}) {
+    const method = (opts.method || 'GET').toUpperCase();
+    const headers = Object.assign({}, opts.headers || {}, { Authorization: 'Bearer ' + token });
+    if (['POST','PUT','PATCH','DELETE'].includes(method)) {
+      headers['X-CSRF-Token'] = window.__CSRF__ || '';
+      headers['Content-Type'] = headers['Content-Type'] || 'application/json';
     }
+    const r = await fetch(url, { credentials:'include', ...opts, headers });
+    if (r.status === 401 || r.status === 419) { localStorage.removeItem('token'); location.href='login.html'; throw new Error('Unauthorized'); }
+    return r;
+  }
 
-    const form = document.getElementById('profileForm');
-
-    async function loadProfile() {
-      const res = await fetch('http://localhost:5000/api/user/profile', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const user = await res.json();
-      document.getElementById('bio').value = user.bio || '';
-      document.getElementById('resumeURL').value = user.resumeURL || '';
-      document.getElementById('certificateURL').value = user.certificateURL || '';
-      document.getElementById('availability').checked = user.availability;
+  const API = {
+    async getMe() {
+      // Try common auth endpoint first
+      let r = await secureFetch(`${API_BASE}/auth/me`);
+      if (r.ok) { const d = await r.json(); return d.user || d; }
+      // Fallbacks
+      r = await secureFetch(`${API_BASE}/users/me`);
+      if (r.ok) { const d = await r.json(); return d.user || d; }
+      r = await secureFetch(`${API_BASE}/user/profile`);
+      if (r.ok) { const d = await r.json(); return d.user || d; }
+      throw new Error('Unable to load profile');
+    },
+    async saveMe(payload) {
+      // Prefer unified PATCH
+      let r = await secureFetch(`${API_BASE}/users/me`, { method:'PATCH', body: JSON.stringify(payload) });
+      if (r.ok) return r.json();
+      // Fallback to legacy POST
+      r = await secureFetch(`${API_BASE}/user/profile`, { method:'POST', body: JSON.stringify(payload) });
+      if (r.ok) return r.json();
+      const t = await r.text().catch(()=> 'Save failed');
+      throw new Error(t || 'Save failed');
     }
+  };
 
-    form.onsubmit = async (e) => {
-      e.preventDefault();
-      const res = await fetch('http://localhost:5000/api/user/profile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          bio: document.getElementById('bio').value,
-          resumeURL: document.getElementById('resumeURL').value,
-          certificateURL: document.getElementById('certificateURL').value,
-          availability: document.getElementById('availability').checked
-        })
-      });
-      const data = await res.json();
-      alert(data.msg);
-    };
+  const displayName = document.getElementById('displayName');
+  const displayEmail = document.getElementById('displayEmail');
+  const avatar = document.getElementById('avatar');
+  const avatarInput = document.getElementById('avatarInput');
+  const changePhotoBtn = document.getElementById('changePhotoBtn');
+  const availToggle = document.getElementById('availToggle');
+  const logoutLink = document.getElementById('logoutLink');
 
-    loadProfile();
-  </script>
+  const form = document.getElementById('profileForm');
+  const bio = document.getElementById('bio');
+  const barNumber = document.getElementById('barNumber');
+  const resumeURL = document.getElementById('resumeURL');
+  const certificateURL = document.getElementById('certificateURL');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const saveBtn = document.getElementById('saveBtn');
+  const toast = document.getElementById('toast');
+
+  function toastMsg(text, type='success') {
+    toast.textContent = text;
+    toast.className = 'toast show ' + (type === 'error' ? 'error' : 'success');
+    setTimeout(() => toast.classList.remove('show'), 2200);
+  }
+
+  function setAvailability(on) {
+    availToggle.classList.toggle('on', !!on);
+    availToggle.setAttribute('aria-checked', String(!!on));
+  }
+
+  function isUrl(u){ try{ const x=new URL(u); return !!x.protocol && !!x.host; }catch{ return false; } }
+
+  async function loadProfile() {
+    try {
+      const u = await API.getMe();
+      displayName.textContent = u.name || 'Attorney';
+      displayEmail.textContent = u.email || '';
+      setAvailability(!!u.availability);
+      bio.value = u.bio || '';
+      barNumber.value = u.barNumber || '';
+      resumeURL.value = u.resumeURL || '';
+      certificateURL.value = u.certificateURL || '';
+      if (u.avatarUrl) avatar.style.backgroundImage = `url('${u.avatarUrl}')`;
+    } catch (e) {
+      console.error(e);
+      toastMsg('Could not load profile', 'error');
+    }
+  }
+
+  // Debounced auto-save for Availability (revert on failure)
+  let availTimer = null;
+  function scheduleAvailSave(prev) {
+    clearTimeout(availTimer);
+    availTimer = setTimeout(async () => {
+      try {
+        await API.saveMe({ availability: availToggle.classList.contains('on') });
+        toastMsg('Availability saved');
+      } catch {
+        setAvailability(prev);
+        toastMsg('Could not save availability', 'error');
+      }
+    }, 350);
+  }
+
+  function toggleAvailability() {
+    const before = availToggle.classList.contains('on');
+    setAvailability(!before);
+    scheduleAvailSave(before);
+  }
+  availToggle.addEventListener('click', toggleAvailability);
+  availToggle.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleAvailability(); }
+  });
+
+  changePhotoBtn.addEventListener('click', () => avatarInput.click());
+  avatarInput.addEventListener('change', () => {
+    const file = avatarInput.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toastMsg('Max 2MB image', 'error'); return; }
+    const url = URL.createObjectURL(file);
+    avatar.style.backgroundImage = `url('${url}')`;
+    // TODO: Implement presigned S3 upload + PATCH avatarUrl on /users/me
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    // light URL validation
+    const r = resumeURL.value.trim();
+    const c = certificateURL.value.trim();
+    if (r && !isUrl(r)) { toastMsg('Resume URL is invalid', 'error'); return; }
+    if (c && !isUrl(c)) { toastMsg('Certificate URL is invalid', 'error'); return; }
+
+    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+    try {
+      const payload = {
+        bio: bio.value.trim(),
+        availability: availToggle.classList.contains('on'),
+        barNumber: barNumber.value.trim(),
+        resumeURL: r,
+        certificateURL: c
+      };
+      await API.saveMe(payload);
+      toastMsg('Profile saved');
+    } catch (err) {
+      console.error(err);
+      toastMsg('Save failed', 'error');
+    } finally {
+      saveBtn.disabled = false; saveBtn.textContent = 'Save Profile';
+    }
+  });
+
+  cancelBtn.addEventListener('click', (e) => { e.preventDefault(); loadProfile(); toastMsg('Reverted changes'); });
+  logoutLink.addEventListener('click', (e) => { e.preventDefault(); localStorage.removeItem('token'); location.href = 'login.html'; });
+
+  loadProfile();
+</script>
 </body>
 </html>

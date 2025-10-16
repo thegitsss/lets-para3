@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <style>body{opacity:1!important;visibility:visible!important}</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Browse Paralegals | Lets-ParaConnect</title>
+  <link rel="stylesheet" href="assets/styles.css" />
+  <!-- Optional: your admin palette works nicely here too -->
+  <link rel="stylesheet" href="assets/styles/admin.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Source+Sans+Pro:wght@400;600&display=swap" rel="stylesheet">
+  <script type="module" src="assets/scripts/auth.js"></script>
+  <style>
+    :root{ --navy:#1E2A38; --bg:#FAF7F3; --line:#e8edf3; }
+    *{ box-sizing:border-box; margin:0; padding:0; }
+    body{ font-family:'Source Sans Pro',sans-serif; background:var(--bg); color:#1E2A38; padding-bottom:80px; }
+
+    header{ background:var(--navy); padding:1rem 2rem; display:flex; justify-content:space-between; align-items:center; }
+    .logo{ color:#fff; font-family:'Playfair Display',serif; font-size:1.5rem; font-weight:700; }
+    .filter-btn{ background:var(--navy); color:#fff; padding:.5rem 1rem; border:1px solid #fff; border-radius:6px; cursor:pointer; font-size:1rem; }
+    .filter-btn:hover{ background:#fff; color:var(--navy); }
+
+    .main-content{ max-width:1100px; margin:2rem auto; padding:0 1rem; }
+    h1{ font-family:'Playfair Display',serif; font-size:2rem; margin-bottom:1rem; text-align:center; }
+
+    .pl-filters{
+      position:sticky; top:68px; z-index:5;
+      display:grid; grid-template-columns:1fr 180px 160px; gap:12px; align-items:center;
+      background:#fff; border:1px solid var(--line); border-radius:14px; padding:12px;
+      box-shadow:0 6px 18px rgba(0,0,0,.06); margin:8px 0 12px;
+    }
+    .pl-filters input[type="search"], .pl-filters select{
+      height:44px; padding:0 12px; border:1px solid var(--line); border-radius:12px; background:#fff; font:inherit; outline:none;
+      transition: box-shadow .18s ease, border-color .18s ease;
+    }
+    .pl-filters input::placeholder{ color:#8a95a6; }
+    .pl-filters input:focus, .pl-filters select:focus{ border-color:#b4975a; box-shadow:0 0 0 4px rgba(180,151,90,.15); }
+    .pl-toggle{ display:flex; align-items:center; gap:8px; padding-left:6px; }
+
+    .pl-count{ color:#596579; margin:0 2px 8px; }
+    .pl-empty{ color:#596579; margin:8px 2px 0; display:none; }
+
+    .profiles{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:2rem; margin-top:1rem; }
+    .profile-card{ background:#fff; padding:1.5rem 1rem; border-radius:14px; box-shadow:0 4px 12px rgba(0,0,0,.08); transition:transform .2s ease, box-shadow .2s ease; border:1px solid var(--line); }
+    .profile-card:hover{ transform:translateY(-3px); box-shadow:0 6px 20px rgba(0,0,0,.12); }
+    .profile-img{ width:96px; height:96px; border-radius:50%; object-fit:cover; margin-bottom:1rem; border:2px solid var(--navy); }
+    .profile-name{ font-family:'Playfair Display',serif; font-size:1.1rem; font-weight:600; }
+    .profile-meta{ font-size:.9rem; color:#444; margin:.3rem 0; }
+    .about{ font-size:.95rem; color:#333; margin:.6rem 0; line-height:1.4; min-height:2.6em; }
+    .skills{ font-size:.85rem; color:#666; margin-bottom:.8rem; }
+    .view-btn{ background:var(--navy); color:#fff; border:0; padding:.5rem 1.2rem; border-radius:8px; cursor:pointer; font-size:.9rem; }
+    .view-btn:hover{ filter:brightness(.95); }
+
+    .pagination{ margin-top:2rem; display:flex; justify-content:center; gap:.6rem; }
+    .pagination button{ border:1px solid var(--line); background:#fff; padding:.4rem .7rem; border-radius:8px; cursor:pointer; }
+    .pagination button.active{ background:#1E2A38; color:#fff; border-color:#1E2A38; }
+
+    @media (max-width:900px){ .pl-filters{ grid-template-columns:1fr 1fr; top:60px; } }
+
+    /* Simple modal */
+    .modal{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); align-items:center; justify-content:center; z-index:1000; }
+    .modal.active{ display:flex; }
+    .modal .panel{ background:#fff; width:min(640px,92vw); border-radius:14px; padding:18px; box-shadow:0 20px 50px rgba(0,0,0,.25); }
+    .modal .row{ display:flex; gap:12px; justify-content:flex-end; }
+    .muted{ color:#64748b; font-size:.95rem; }
+    .badge{ display:inline-block; padding:4px 10px; border-radius:999px; font-size:.84rem; background:#f7f7fb; border:1px solid var(--line); color:#384656; }
+    .btn{ border:1px solid var(--line); border-radius:10px; padding:.55rem .85rem; cursor:pointer; font-weight:600; background:#fff; color:#1f2937; }
+    .btn.primary{ background:#27394d; color:#fff; border:0; }
+    .btn.cta{ background:#b4975a; color:#fff; border:0; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Lets-ParaConnect</div>
+    <button class="filter-btn" onclick="document.getElementById('pl-q').focus()">Filter</button>
+  </header>
+
+  <section class="main-content">
+    <h1>Browse Paralegals</h1>
+
+    <!-- FILTER BAR -->
+    <section id="pl-filters" class="pl-filters" role="region" aria-label="Browse filters">
+      <input id="pl-q" type="search" placeholder="Search name or bio…" aria-label="Search" />
+      <label class="pl-toggle"><input id="pl-avail" type="checkbox" /><span>Available only</span></label>
+      <select id="pl-sort" aria-label="Sort">
+        <option value="">Sort: Newest</option>
+        <option value="name">Name (A–Z)</option>
+      </select>
+    </section>
+
+    <p id="pl-count" class="pl-count" aria-live="polite"></p>
+    <p id="pl-empty" class="pl-empty">No paralegals match your filters.</p>
+
+    <!-- CARDS GRID -->
+    <div id="profiles" class="profiles" aria-live="polite" aria-busy="true"></div>
+
+    <div id="pager" class="pagination" role="navigation" aria-label="Pagination"></div>
+  </section>
+
+  <!-- Profile modal -->
+  <div id="profile-modal" class="modal" aria-hidden="true" aria-modal="true" role="dialog">
+    <div class="panel">
+      <div style="display:flex; gap:14px;">
+        <img id="pm-avatar" class="profile-img" alt="">
+        <div>
+          <div id="pm-name" class="profile-name"></div>
+          <div id="pm-role" class="muted" style="text-transform:capitalize;"></div>
+          <div id="pm-availability" class="badge" style="margin-top:6px;"></div>
+        </div>
+      </div>
+      <div id="pm-bio" class="about" style="margin-top:10px;"></div>
+      <div class="muted" id="pm-links" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
+      <div class="row" style="margin-top:14px;">
+        <button class="btn" id="pm-close">Close</button>
+        <button class="btn cta" id="pm-invite">Invite to Case</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inquiry modal (creates a Case) -->
+  <div id="inquiry-modal" class="modal" aria-hidden="true" aria-modal="true" role="dialog">
+    <div class="panel">
+      <h3 style="margin:0 0 10px;">Submit Inquiry</h3>
+      <form id="inquiry-form" class="profile-grid" style="display:grid; gap:.6rem;">
+        <input type="text" name="title" placeholder="Case Title" required />
+        <textarea name="details" placeholder="Describe the matter…" required></textarea>
+        <div class="row">
+          <button type="button" class="btn" id="iq-cancel">Cancel</button>
+          <button type="submit" class="btn primary">Submit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+  import { secureFetch, fetchCSRF } from './assets/scripts/auth.js';
+
+  (async function(){
+    const API_BASE = '/api';
+
+    // ---- auth/role gate (attorney or admin) ----
+    async function ensureAllowed() {
+      try {
+        const r = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' });
+        if (!r.ok) throw new Error('no session');
+        const { user } = await r.json();
+        const role = (user?.role || '').toLowerCase();
+        if (!(role === 'attorney' || role === 'admin')) throw new Error('forbidden');
+      } catch {
+        location.href = 'login.html';
+        throw new Error('redirecting');
+      }
+    }
+
+    await ensureAllowed();
+    await fetchCSRF().catch(()=>{});
+
+    const $q     = document.getElementById('pl-q');
+    const $avail = document.getElementById('pl-avail');
+    const $sort  = document.getElementById('pl-sort');
+    const $grid  = document.getElementById('profiles');
+    const $count = document.getElementById('pl-count');
+    const $empty = document.getElementById('pl-empty');
+    const $pager = document.getElementById('pager');
+
+    const pm = {
+      wrap: document.getElementById('profile-modal'),
+      name: document.getElementById('pm-name'),
+      role: document.getElementById('pm-role'),
+      avail: document.getElementById('pm-availability'),
+      bio:  document.getElementById('pm-bio'),
+      avatar: document.getElementById('pm-avatar'),
+      links: document.getElementById('pm-links'),
+      inviteBtn: document.getElementById('pm-invite'),
+      closeBtn: document.getElementById('pm-close'),
+      current: null
+    };
+
+    const iq = {
+      wrap: document.getElementById('inquiry-modal'),
+      form: document.getElementById('inquiry-form'),
+      cancel: document.getElementById('iq-cancel'),
+      targetUser: null
+    };
+
+    let page = 1, limit = 12, total = 0, items = [];
+
+    const esc = (s)=> String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    const avatar = (name) => `https://api.dicebear.com/7.x/initials/svg?radius=50&seed=${encodeURIComponent(name||'P')}`;
+    const setBusy = (on) => $grid.setAttribute('aria-busy', on ? 'true' : 'false');
+    const debounce=(fn,ms=220)=>{ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; };
+
+    // ---- data load ----
+    async function load(){
+      setBusy(true);
+      $grid.innerHTML = '<div class="profile-card">Loading…</div>';
+
+      const qs = new URLSearchParams();
+      const search = ($q.value||'').trim();
+      if (search) qs.set('search', search);
+      if ($avail.checked) qs.set('available','true');
+      qs.set('page', String(page));
+      qs.set('limit', String(limit));
+
+      try{
+        const r = await fetch(`${API_BASE}/users/paralegals?${qs.toString()}`, { credentials:'include' });
+        const data = r.ok ? await r.json() : {};
+        items = Array.isArray(data.items) ? data.items : [];
+        total = data.total || 0;
+
+        // client-side sort
+        if ($sort.value === 'name') items.sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+
+        render();
+      }catch{
+        $grid.innerHTML = '<div class="profile-card">Could not load paralegals.</div>';
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function render(){
+      if (!items.length){
+        $grid.innerHTML = '';
+        $count.textContent = '0 results';
+        $empty.style.display = 'block';
+      }else{
+        $empty.style.display = 'none';
+        $count.textContent = `${items.length} result${items.length>1?'s':''}${total>items.length?` of ${total}`:''}`;
+        $grid.innerHTML = items.map(u=>{
+          const img = u.avatar_url || avatar(u.name);
+          const meta = [
+            u.location ? esc(u.location) : '',
+            u.availability ? 'Available' : 'Unavailable'
+          ].filter(Boolean).join(' • ');
+          const bio = esc((u.bio || '').slice(0, 160));
+          const id  = esc(u.id || u._id || '');
+          return `
+            <article class="profile-card" data-id="${id}">
+              <img src="${img}" alt="${esc(u.name || 'Paralegal')}" class="profile-img">
+              <div class="profile-name">${esc(u.name || '(No name)')}</div>
+              <div class="profile-meta">${meta}</div>
+              <div class="about">${bio || '—'}</div>
+              <button class="view-btn" data-view="${id}" aria-label="View profile of ${esc(u.name || 'paralegal')}">View Profile</button>
+            </article>
+          `;
+        }).join('');
+      }
+
+      // pager
+      const pages = Math.max(1, Math.ceil(total / limit));
+      if (pages <= 1){ $pager.innerHTML = ''; return; }
+      let html = '';
+      const clamp = (n,min,max)=> Math.max(min, Math.min(max, n));
+      const start = clamp(page-3, 1, Math.max(1, pages-7));
+      const end   = clamp(start+7, 1, pages);
+      for (let p=start; p<=end; p++){
+        html += `<button data-page="${p}" class="${p===page?'active':''}" aria-label="Go to page ${p}">${p}</button>`;
+      }
+      $pager.innerHTML = html;
+    }
+
+    // ---- profile modal ----
+    function closeProfile(){ pm.wrap.classList.remove('active'); pm.current = null; }
+    pm.closeBtn.addEventListener('click', closeProfile);
+
+    async function openProfile(id){
+      try{
+        const r = await fetch(`${API_BASE}/users/${encodeURIComponent(id)}`, { credentials:'include' });
+        if (!r.ok) throw new Error();
+        const u = await r.json();
+        pm.current = u;
+
+        pm.name.textContent = u.name || '(No name)';
+        pm.role.textContent = u.role || 'paralegal';
+        pm.avail.textContent = u.availability ? 'Available' : 'Unavailable';
+        pm.avatar.src = u.avatar_url || avatar(u.name);
+        pm.avatar.alt = u.name || 'Paralegal';
+        pm.bio.textContent = u.bio || '';
+
+        const links = [];
+        // If your backend returns signed URLs, these will work directly. Otherwise, omit.
+        if (u.resumeURL && /^https?:\/\//i.test(u.resumeURL))      links.push(`<a class="btn" href="${esc(u.resumeURL)}" target="_blank" rel="noopener">Resume</a>`);
+        if (u.certificateURL && /^https?:\/\//i.test(u.certificateURL)) links.push(`<a class="btn" href="${esc(u.certificateURL)}" target="_blank" rel="noopener">Certificate</a>`);
+        pm.links.innerHTML = links.join('');
+
+        pm.inviteBtn.onclick = () => openInquiry(u);
+        pm.wrap.classList.add('active');
+      }catch{ alert('Could not load profile'); }
+    }
+
+    document.addEventListener('click', (e)=>{
+      const id = e.target?.dataset?.view;
+      if (id) openProfile(id);
+    });
+
+    // ---- inquiry modal (create case) ----
+    function closeInquiry(){ iq.wrap.classList.remove('active'); iq.targetUser = null; }
+    iq.cancel.addEventListener('click', closeInquiry);
+
+    function openInquiry(user){
+      iq.targetUser = user;
+      iq.form.title.value = `Inquiry for ${user.name || 'Paralegal'}`;
+      iq.form.details.value = `Hello ${user.name || ''},\n\nI'd like to discuss a potential matter.`;
+      iq.wrap.classList.add('active');
+    }
+
+    iq.form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const title = iq.form.title.value.trim();
+      const details = iq.form.details.value.trim();
+      if (!title || !details) return;
+
+      try{
+        await fetchCSRF();
+        const r = await secureFetch(`${API_BASE}/cases`, {
+          method:'POST',
+          body: { title, details }
+        });
+        const data = await r.json().catch(()=>({}));
+        if (!r.ok) throw new Error(data.msg || 'Failed to submit');
+        alert('Inquiry submitted.');
+        closeInquiry();
+        closeProfile();
+      }catch(err){
+        alert(err.message || 'Could not submit');
+      }
+    });
+
+    // ---- events & boot ----
+    $pager.addEventListener('click', (e)=>{
+      const p = Number(e.target?.dataset?.page);
+      if (!p || p===page) return;
+      page = Math.max(1,p);
+      load();
+    });
+
+    $q.addEventListener('input', debounce(()=>{ page=1; load(); }, 150));
+    $avail.addEventListener('change', ()=>{ page=1; load(); });
+    $sort.addEventListener('change', ()=>{ render(); });
+
+    document.addEventListener('DOMContentLoaded', () => document.body.classList.add('loaded'));
+    await load();
+  })();
+  </script>
+</body>
+</html>

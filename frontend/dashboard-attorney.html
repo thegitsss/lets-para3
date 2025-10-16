@@ -1,165 +1,362 @@
-<link rel="stylesheet" href="assets/styles/global.css">
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
-<script type="module" src="assets/scripts/auth.js"></script>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Attorney Dashboard</title>
-  <link rel="stylesheet" href="assets/styles.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Let’s ParaConnect – Attorney Dashboard</title>
+
+  <!-- CSRF bootstrap + role UI helpers -->
+  <script type="module" src="assets/scripts/auth.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Playfair+Display:wght@500;700&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --brand-brown: #8c7864;
-      --bg-cream: #f5f2ed;
-      --text-dark: #5c4e3a;
-      --navy: #27394d;
-      --white: #ffffff;
-    }
-    body {
-      background: var(--bg-cream);
-      font-family: Georgia, serif;
-      color: var(--text-dark);
-      padding: 2rem;
-    }
-    h1 {
-      color: var(--navy);
-      margin-bottom: 1.5rem;
-    }
-    .case-card {
-      background: var(--white);
-      border-left: 4px solid var(--brand-brown);
-      padding: 1rem;
-      margin-bottom: 2rem;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-      animation: fadeIn 0.6s ease;
-    }
-    .case-card h2 {
-      margin: 0 0 0.5rem 0;
-    }
-    .applicants {
-      margin-top: 1rem;
-      border-top: 1px dashed #ccc;
-      padding-top: 1rem;
-    }
-    .applicant {
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid #eee;
-    }
-    button {
-      background: var(--navy);
-      color: white;
-      padding: 0.4rem 0.8rem;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.95rem;
-    }
-    button:hover {
-      opacity: 0.85;
-    }
-    .accepted {
-      color: green;
-      font-weight: bold;
-    }
-    .status-label {
-      font-size: 0.9rem;
-      padding: 0.2rem 0.6rem;
-      border-radius: 4px;
-      background: #e0e0e0;
-      color: #555;
-      display: inline-block;
-      margin-top: 0.3rem;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
+  :root { --navy:#283044; --ink:#0d1321; --gold:#b4975a; --paper:#f9f6f1; --card:#ffffff; --line:#e9eef2; }
+
+  /* Base */
+  *{ box-sizing:border-box }
+  body{
+    margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--paper) url('https://www.transparenttextures.com/patterns/notebook.png');
+    color:#1a1a1a; overflow:hidden;
+  }
+  header{
+    background:var(--navy); color:#fff; padding:1.1rem 2rem;
+    display:flex; justify-content:space-between; align-items:center;
+    box-shadow:0 2px 6px rgba(0,0,0,.1);
+  }
+  header h1{ margin:0; font-family:'Playfair Display',serif; font-weight:600; letter-spacing:.2px; }
+  nav a{ color:#fff; margin-left:1.25rem; text-decoration:none; font-weight:500; opacity:.95; transition:opacity .2s }
+  nav a:hover{ opacity:1 }
+
+  /* Canvas */
+  .container{ position:relative; height:calc(100vh - 76px); width:100vw; will-change:filter }
+  .bubble{
+    position:absolute; background:rgba(255,255,255,.96); border:1px solid var(--line);
+    border-radius:14px; box-shadow:0 10px 30px rgba(0,0,0,.08);
+    padding:1.1rem; width:290px; min-height:210px; cursor:grab; user-select:none; overflow:hidden;
+    transition: box-shadow .2s ease, transform .15s ease;
+  }
+  .bubble:active{ cursor:grabbing; transform:scale(1.02) }
+  .bubble h3{ margin:.2rem 0 .6rem; font-family:'Playfair Display',serif; color:var(--ink); font-size:1.15rem }
+  .status{ display:inline-block; background:#f3ead8; color:#6f5521; padding:.28rem .7rem; border-radius:999px; font-size:.85rem; font-weight:600 }
+
+  .btn{ background:var(--navy); color:#fff; border:0; border-radius:10px; padding:.55rem .9rem; cursor:pointer; font-weight:500 }
+  .btn:hover{ filter:brightness(.95) }
+  .btn-ghost{ background:#fff; color:#1f2937; border:1px solid var(--line) }
+
+  /* Floating tools */
+  .fab{ position:fixed; bottom:20px; border:0; border-radius:50%; width:56px; height:56px; color:#fff; font-size:22px; cursor:pointer; box-shadow:0 10px 24px rgba(0,0,0,.18) }
+  #addSticky{ right:20px; background:#d9a441 }
+  #autoArrange{ right:92px; background:#6b7a90 }
+  #toggleLock{ right:164px; background:#283044 }
+
+  /* Overlay + Modal */
+  .overlay{ position:fixed; inset:0; display:none; place-items:center; z-index:50 }
+  .overlay.show{ display:grid }
+  .backdrop{ position:absolute; inset:0; background:rgba(18,22,28,.48); animation:fade .18s ease-out forwards }
+  @keyframes fade{ from{opacity:0} to{opacity:1} }
+
+  .modal{
+    position:relative; z-index:1; width:min(760px,92vw); max-height:88vh;
+    background:#fff; border-radius:14px; overflow:hidden;
+    transform: translateY(8px) scale(.985); opacity:0;
+    transition: transform 220ms cubic-bezier(.2,.6,.2,1), opacity 180ms ease-out;
+    box-shadow:0 24px 60px rgba(0,0,0,.25);
+  }
+  .overlay.show .modal{ transform:translateY(0) scale(1); opacity:1 }
+
+  .modal-header{
+    background:#2b3647; color:#fff; padding:1rem 1.25rem; display:flex; justify-content:space-between; align-items:center
+  }
+  .modal-header h2{ margin:0; font-weight:500 }
+  .modal-close{ background:transparent; border:0; color:#fff; font-size:1.25rem; cursor:pointer }
+
+  .modal-body{ padding:1rem 1.25rem .5rem; max-height:calc(88vh - 140px); overflow:auto }
+  .row{ display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem }
+  @media (max-width:760px){ .row{ grid-template-columns:1fr } }
+
+  label span{ display:block; margin:.35rem 0 .35rem; color:#273246; font-weight:600 }
+  input[type="text"],input[type="number"],input[type="date"],textarea{
+    width:100%; padding:.72rem .8rem; border:1px solid var(--line); border-radius:10px; background:#fff; outline:none
+  }
+  input:focus,textarea:focus{ border-color:#8c7864; box-shadow:0 0 0 3px rgba(140,120,100,.15) }
+  textarea{ min-height:110px; resize:vertical }
+
+  .modal-footer{ display:flex; justify-content:flex-end; gap:.6rem; padding:1rem 1.25rem; background:#f6f8fa; border-top:1px solid var(--line) }
+  .btn-outline{ background:#fff; color:#1f2937; border:1px solid var(--line); border-radius:8px; padding:.55rem .9rem; cursor:pointer }
+  #postJobSubmit{ background:linear-gradient(135deg,#283044,#3a475a); color:#fff; border:0; border-radius:8px; padding:.55rem 1rem; cursor:pointer }
+
+  /* Blur canvas while modal open */
+  .blurred{ filter: blur(4px) saturate(92%) brightness(.95); transition:filter .12s ease-out }
+
+  /* Toasts */
+  .toasts{ position:fixed; right:16px; top:16px; display:grid; gap:10px; z-index:60 }
+  .toast{
+    background:#111827; color:#fff; border-radius:10px; padding:.7rem .9rem; box-shadow:0 10px 30px rgba(0,0,0,.25);
+    transform: translateY(-8px); opacity:0; animation:toast-in .2s ease forwards
+  }
+  .toast.ok{ background:#0f5e3c } .toast.err{ background:#7a2f2f }
+  @keyframes toast-in{ to{ transform:translateY(0); opacity:1 } }
   </style>
 </head>
+
 <body>
+  <header>
+    <h1>Let’s ParaConnect</h1>
+    <nav>
+      <a href="#">Dashboard</a>
+      <a href="#">Messages</a>
+      <a href="#">Calendar</a>
+      <a href="payments-escrow.html">Payments</a>
+      <a href="profile-attorney.html">My Profile</a>
+    </nav>
+  </header>
 
-  <h1>📁 My Cases (Attorney View)</h1>
-  <div id="casesContainer">Loading cases...</div>
+  <div class="container" id="canvas">
+    <div class="bubble" style="top:60px;left:60px;">
+      <h3>Active Case</h3>
+      <p><strong>Johnson v. Smith</strong></p>
+      <p>Status: <span class="status">In Progress</span></p>
+      <button class="btn btn-ghost">Upload Docs</button>
+    </div>
 
-  <script>
-    const token = localStorage.getItem('token');
-    const container = document.getElementById('casesContainer');
+    <div class="bubble" style="top:60px;left:380px;">
+      <h3>Open Cases</h3>
+      <p>• Johnson v. Smith — In Progress</p>
+      <button class="btn btn-ghost">View All</button>
+    </div>
 
-    if (!token) {
-      alert('Login required');
+    <div class="bubble" style="top:60px;left:700px;">
+      <h3>Active Paralegal(s)</h3>
+      <ul style="padding-left:1rem;margin:0;line-height:1.4;">
+        <li>A. Paralegal</li><li>B. Justice</li>
+      </ul>
+    </div>
+
+    <div class="bubble" style="top:300px;left:60px;">
+      <h3>Notifications</h3>
+      <p><strong>Paralegal:</strong> Sent updated draft at 10:42 AM</p>
+      <button class="btn btn-ghost">View All</button>
+    </div>
+
+    <div class="bubble" style="top:300px;left:380px;">
+      <h3>Quick Links</h3>
+      <div style="display:flex; flex-direction:column; gap:10px">
+        <button class="btn" id="btnPostJob">Post New Job</button>
+        <button class="btn" onclick="window.location.href='browse-paralegals.html'">Browse Paralegals</button>
+        <button class="btn">View Calendar</button>
+      </div>
+    </div>
+
+    <div class="bubble" style="top:300px;left:700px;">
+      <h3>Time Tracker</h3>
+      <p style="font-size:1.2rem;">00:00:00</p>
+      <button class="btn btn-ghost">Start</button>
+      <button class="btn btn-ghost">Stop</button>
+      <button class="btn btn-ghost">Reset</button>
+    </div>
+
+    <div class="bubble" style="top:540px;left:60px;">
+      <h3>Legal Pad</h3>
+      <textarea style="width:100%;height:120px;border:1px dashed #d8dde6;border-radius:8px;padding:.55rem;resize:vertical" placeholder="Type notes…"></textarea>
+    </div>
+  </div>
+
+  <!-- Floating tools -->
+  <button id="addSticky" class="fab" title="Add note" aria-label="Add note">+</button>
+  <button id="autoArrange" class="fab" style="right:92px" title="Auto arrange" aria-label="Auto arrange">⇄</button>
+  <button id="toggleLock" class="fab" style="right:164px" title="Lock/unlock" aria-label="Lock or unlock drag">🔓</button>
+
+  <!-- Post Job Modal -->
+  <div id="postJobOverlay" class="overlay" aria-hidden="true">
+    <div class="backdrop" id="postJobBackdrop"></div>
+
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="postJobTitle">
+      <header class="modal-header">
+        <h2 id="postJobTitle">Post a New Job</h2>
+        <button type="button" class="modal-close" id="postJobClose" aria-label="Close">✕</button>
+      </header>
+
+      <form id="postJobForm" class="modal-body" autocomplete="on" novalidate>
+        <div class="row">
+          <label><span>Job Title</span><input id="jobTitle" name="title" type="text" placeholder="e.g., Draft Motion to Compel" required /></label>
+          <label><span>Practice Area</span><input id="practiceArea" type="text" placeholder="e.g., Civil Litigation" /></label>
+        </div>
+
+        <label><span>Scope</span><input id="scope" type="text" placeholder="e.g., Research + Drafting + Bluebooking" /></label>
+
+        <div class="row">
+          <label><span>Flat Fee (USD)</span><input id="flatFee" type="number" min="0" step="1" placeholder="e.g., 600" required /></label>
+          <label><span>Deadline</span><input id="deadline" type="date" required /></label>
+        </div>
+
+        <label><span>Jurisdiction / State</span><input id="jurisdiction" type="text" placeholder="e.g., VA" /></label>
+        <label><span>Detailed Description</span><textarea id="description" placeholder="Key facts, deliverables, tone/format, citations, etc." required></textarea></label>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-outline" id="postJobCancel">Cancel</button>
+          <button type="submit" id="postJobSubmit">Create Job</button>
+        </div>
+        <p style="color:#6b7280; font-size:.92rem; padding:0 1.25rem 1rem">Funds will be held in escrow and released on completion.</p>
+      </form>
+    </section>
+  </div>
+
+  <!-- Toasts -->
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <!-- Page logic (module to import secureFetch) -->
+  <script type="module">
+    import { secureFetch, fetchCSRF } from './assets/scripts/auth.js';
+
+    const API_BASE = location.origin + '/api';
+
+    /* ---------- Session gate ---------- */
+    try {
+      const r = await fetch('/api/users/me', { credentials: 'include' });
+      if (!r.ok) throw new Error();
+      const me = await r.json();
+      if (!me?.id) throw new Error();
+    } catch {
       location.href = 'login.html';
     }
+    fetchCSRF().catch(()=>{});
 
-    async function loadCases() {
-      const res = await fetch('http://localhost:5000/api/cases/my', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const cases = await res.json();
-      container.innerHTML = '';
-
-      if (!cases.length) {
-        container.innerHTML = '<p>No cases posted yet.</p>';
-        return;
-      }
-
-      for (let c of cases) {
-        const div = document.createElement('div');
-        div.className = 'case-card';
-
-        div.innerHTML = `
-          <h2>${c.title}</h2>
-          <p>${c.details}</p>
-          <p><strong>Status:</strong> <span class="status-label">${c.status}</span></p>
-          <p><strong>Posted:</strong> ${new Date(c.createdAt).toLocaleString()}</p>
-          <div class="applicants" id="applicants-${c._id}">
-            <em>Loading applicants...</em>
-          </div>
-        `;
-
-        container.appendChild(div);
-        loadApplicants(c._id);
-      }
+    /* ---------- Toast helper ---------- */
+    function toast(msg, type='ok', ms=2200){
+      const box = document.getElementById('toasts');
+      const t = document.createElement('div');
+      t.className = 'toast ' + (type==='err'?'err':'ok');
+      t.textContent = msg;
+      box.appendChild(t);
+      setTimeout(()=>{
+        t.style.opacity='0'; t.style.transform='translateY(-8px)';
+        setTimeout(()=> t.remove(), 220);
+      }, ms);
     }
 
-    async function loadApplicants(caseId) {
-      const res = await fetch(`http://localhost:5000/api/cases/${caseId}/applicants`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const applicants = await res.json();
-      const el = document.getElementById(`applicants-${caseId}`);
+    /* ---------- Draggable bubbles ---------- */
+    (function(){
+      const container = document.getElementById('canvas');
+      const lockBtn = document.getElementById('toggleLock');
+      const addBtn = document.getElementById('addSticky');
+      const arrangeBtn = document.getElementById('autoArrange');
+      const bubbles = [];
+      let locked = false;
 
-      if (!applicants.length) {
-        el.innerHTML = '<p>No applicants yet.</p>';
-        return;
+      function savePositions(){
+        const p={}; bubbles.forEach(b => p[b.dataset.id] = {left:b.style.left, top:b.style.top});
+        localStorage.setItem('ppos', JSON.stringify(p));
+      }
+      function loadPositions(){
+        const p = JSON.parse(localStorage.getItem('ppos')||'{}');
+        bubbles.forEach(b => { if(p[b.dataset.id]){ b.style.left=p[b.dataset.id].left; b.style.top=p[b.dataset.id].top; }});
+      }
+      function makeDraggable(b){
+        let drag=false, offX=0, offY=0, raf, pos={x:0,y:0};
+        b.style.touchAction='none';
+        b.addEventListener('pointerdown', e=>{
+          if (locked) return;
+          if (e.target.closest('button, a, input, textarea, select')) return;
+          if (e.button!==0) return;
+          drag=true; offX=e.clientX-b.offsetLeft; offY=e.clientY-b.offsetTop; pos.x=e.clientX; pos.y=e.clientY;
+          b.setPointerCapture(e.pointerId); b.style.zIndex=10; raf=requestAnimationFrame(move);
+        });
+        b.addEventListener('pointermove', e=>{ if(drag){ pos.x=e.clientX; pos.y=e.clientY; }});
+        b.addEventListener('pointerup', e=>{ if(drag){ drag=false; b.releasePointerCapture(e.pointerId); b.style.zIndex=1; cancelAnimationFrame(raf); savePositions(); }});
+        function move(){ if(drag){ b.style.left=(pos.x-offX)+'px'; b.style.top=(pos.y-offY)+'px'; raf=requestAnimationFrame(move); } }
       }
 
-      el.innerHTML = applicants.map(app => `
-        <div class="applicant">
-          <p><strong>${app.paralegalId.name}</strong> (${app.status})</p>
-          <p>Email: <a href="mailto:${app.paralegalId.email}">${app.paralegalId.email}</a></p>
-          ${app.paralegalId.resumeURL ? `<p><a href="${app.paralegalId.resumeURL}" target="_blank">📄 View Resume</a></p>` : ''}
-          ${app.status === 'pending' ? `
-            <button onclick="acceptParalegal('${caseId}', '${app.paralegalId._id}')">Accept</button>
-          ` : app.status === 'accepted' ? `<p class="accepted">✅ Accepted</p>` : ''}
-        </div>
-      `).join('');
-    }
+      document.querySelectorAll('.bubble').forEach((b,i)=>{ b.dataset.id='b'+i; bubbles.push(b); makeDraggable(b); });
+      loadPositions();
 
-    async function acceptParalegal(caseId, paralegalId) {
-      if (!confirm("Accept this paralegal? This will auto-reject others.")) return;
-
-      const res = await fetch(`http://localhost:5000/api/cases/${caseId}/accept/${paralegalId}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
+      addBtn.addEventListener('click', ()=>{
+        const nb=document.createElement('div');
+        nb.className='bubble'; nb.dataset.id='b'+Date.now();
+        nb.style.left='100px'; nb.style.top='100px';
+        nb.innerHTML='<h3>New Note</h3><p>Write something…</p>';
+        container.append(nb); bubbles.push(nb); makeDraggable(nb); savePositions();
       });
-      const data = await res.json();
-      alert(data.msg);
-      loadApplicants(caseId);
-    }
 
-    loadCases();
+      arrangeBtn.addEventListener('click', ()=>{
+        const cols=4, spX=330, spY=230, sX=60, sY=60;
+        bubbles.forEach((b,i)=>{
+          const c=i%cols, r=Math.floor(i/cols), y=sY+r*spY, x=sX+c*spX;
+          const dur=600+Math.random()*600, dly=Math.random()*220;
+          b.style.transition=`left ${dur}ms cubic-bezier(.2,.6,.2,1) ${dly}ms, top ${dur}ms cubic-bezier(.2,.6,.2,1) ${dly}ms`;
+          b.style.left=x+'px'; b.style.top=y+'px';
+        });
+        setTimeout(()=> bubbles.forEach(b=> b.style.transition=''), 1400);
+        savePositions();
+      });
+
+      lockBtn.addEventListener('click', ()=>{
+        locked=!locked; lockBtn.textContent = locked ? '🔒' : '🔓';
+        toast(locked ? 'Layout locked' : 'Layout unlocked', 'ok', 1400);
+      });
+    })();
+
+    /* ---------- Modal + Create Case (cookie auth + CSRF via secureFetch) ---------- */
+    window.addEventListener('DOMContentLoaded', function(){
+      const overlay   = document.getElementById('postJobOverlay');
+      const backdrop  = document.getElementById('postJobBackdrop');
+      const closeBtn  = document.getElementById('postJobClose');
+      const cancelBtn = document.getElementById('postJobCancel');
+      const postBtn   = document.getElementById('btnPostJob');
+      const form      = document.getElementById('postJobForm');
+      const submitBtn = document.getElementById('postJobSubmit');
+      const canvas    = document.getElementById('canvas');
+
+      const titleEl = document.getElementById('jobTitle');
+      const paEl    = document.getElementById('practiceArea');
+      const scopeEl = document.getElementById('scope');
+      const feeEl   = document.getElementById('flatFee');
+      const dlEl    = document.getElementById('deadline');
+      const jurEl   = document.getElementById('jurisdiction');
+      const descEl  = document.getElementById('description');
+
+      function open(){ overlay.classList.add('show'); overlay.setAttribute('aria-hidden','false'); canvas.classList.add('blurred'); setTimeout(()=>titleEl.focus(), 20); }
+      function close(){ overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); canvas.classList.remove('blurred'); }
+      function onEsc(e){ if(e.key==='Escape') close(); }
+
+      postBtn?.addEventListener('click', open);
+      closeBtn?.addEventListener('click', close);
+      cancelBtn?.addEventListener('click', close);
+      backdrop?.addEventListener('click', close);
+      document.addEventListener('keydown', onEsc);
+
+      form?.addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        if(!titleEl.value.trim() || !descEl.value.trim() || !feeEl.value){ toast('Please fill Title, Fee, Description','err'); return; }
+
+        // Fold extra fields into "details" for now (backend Case has {title, details})
+        const details =
+`Practice Area: ${paEl.value || '-'}
+Scope: ${scopeEl.value || '-'}
+Flat Fee (USD): ${feeEl.value || '-'}
+Deadline: ${dlEl.value || '-'}
+Jurisdiction: ${jurEl.value || '-'}
+
+${descEl.value}`;
+
+        submitBtn.disabled = true;
+        try{
+          await fetchCSRF().catch(()=>{});
+          const res = await secureFetch(`${API_BASE}/cases`, { method:'POST', body: { title: titleEl.value.trim(), details } });
+          const data = await res.json().catch(()=> ({}));
+          if(!res.ok) throw new Error(data?.msg || 'Could not create case');
+
+          close();
+          form.reset();
+          toast('Case created successfully.');
+        }catch(err){
+          console.error(err);
+          toast(err.message || 'Error creating case','err',2800);
+        }finally{
+          submitBtn.disabled = false;
+        }
+      });
+    });
   </script>
-
 </body>
 </html>

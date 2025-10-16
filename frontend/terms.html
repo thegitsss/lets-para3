@@ -1,52 +1,213 @@
-<link rel="stylesheet" href="assets/styles/global.css">
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
-<script type="module" src="assets/scripts/auth.js"></script>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Terms & Conditions</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Georgia&display=swap">
+  <meta charset="utf-8" />
+  <title>Terms & Conditions | Lets-ParaConnect</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    :root { --brand-brown: #8c7864; --bg-cream: #f5f2ed; --text-dark: #5c4e3a; --navy: #27394d; --white: #ffffff; }
-    body { font-family: 'Georgia', serif; background: var(--bg-cream); margin: 0; color: var(--text-dark); }
-    header, footer { background: var(--white); padding: 1.25rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    header img { height: 60px; }
-    .nav-buttons button { margin-left: 1rem; padding: 0.6rem 1.2rem; background: var(--navy); color: var(--white); border: none; border-radius: 4px; font-weight: bold; cursor: pointer; transition: opacity 0.5s ease; }
-    .nav-buttons button:hover { opacity: 0.7; }
-    main { padding: 4rem 2rem; animation: fadeIn 1s ease; max-width: 800px; margin: auto; }
-    h1 { font-size: 2rem; margin-bottom: 1rem; }
-    p { line-height: 1.6; }
-    footer { background: var(--navy); color: white; justify-content: center; flex-direction: column; padding: 2rem; text-align: center; }
-    footer a { color: white; margin: 0 1rem; text-decoration: none; transition: opacity 0.5s ease; }
-    footer a:hover { opacity: 0.6; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    :root{
+      --ink:#1a2230; --muted:#5c6b7a; --gold:#b4975a; --line:#e8edf3; --card:#fff; --bg:#faf7f3; --navy:#27394d;
+      --ok:#1f7a4a; --warn:#946200; --bad:#b04747;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    header,footer{background:#fff}
+    header{
+      position:sticky;top:0;z-index:10;border-bottom:1px solid var(--line);
+      display:flex;align-items:center;justify-content:space-between;padding:14px 20px
+    }
+    .brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+    .brand span{font-family:"EB Garamond",serif;color:var(--gold);font-size:1.25rem}
+    nav a{color:var(--navy);text-decoration:none;margin-left:14px;position:relative}
+    nav a::after{content:"";position:absolute;left:0;bottom:-4px;height:2px;width:0;background:var(--gold);transition:width .25s ease}
+    nav a:hover::after{width:100%}
+    main{max-width:900px;margin:30px auto;padding:0 18px}
+    h1{font-family:"EB Garamond",serif;font-weight:700;letter-spacing:.2px;margin:8px 0 14px}
+    h2{font-family:"EB Garamond",serif;font-weight:600;margin:28px 0 10px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.05);padding:22px}
+    .toc{display:grid;gap:6px;margin:10px 0 4px;padding-left:18px}
+    .toc a{color:var(--navy);text-decoration:none}
+    .muted{color:var(--muted)}
+    code.small{background:#f7f9fc;border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:.9em}
+    footer{margin-top:40px;border-top:1px solid var(--line);padding:18px 20px;text-align:center;color:var(--muted)}
+    .pill{display:inline-block;padding:3px 8px;border:1px solid var(--line);border-radius:999px;font-size:.85rem;color:#3c4b5a;background:#f6f8fb;margin-right:6px}
+    .callout{border-left:4px solid var(--gold);background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;margin:16px 0}
+    .ok{border-left-color:var(--ok)} .warn{border-left-color:var(--warn)} .bad{border-left-color:var(--bad)}
+    ol.alpha{list-style: lower-alpha;padding-left:18px}
+    a.skip{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+    a.skip:focus{left:8px;top:8px;width:auto;height:auto;background:#fff;border:1px solid var(--line);padding:.4rem .6rem;border-radius:8px}
   </style>
 </head>
 <body>
+  <a class="skip" href="#main">Skip to content</a>
   <header>
-<a href="index.html" style="display: flex; align-items: center; text-decoration: none;">
-  <img src="assets/transparant logo only.png" alt="Logo" style="height: 60px; margin-right: 10px;" />
-  <span style="font-size: 1.5rem; font-weight: bold; color: var(--brand-brown);">Lets-ParaConnect</span>
-</a>
-    <div class="nav-buttons">
-      <button onclick="location.href='login.html'">Login</button>
-      <button onclick="location.href='signup.html'">Join Today</button>
-    </div>
+    <a class="brand" href="index.html">
+      <img src="assets/transparant logo only.png" alt="Lets-ParaConnect" height="44">
+      <span>Lets-ParaConnect</span>
+    </a>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="login.html">Login</a>
+    </nav>
   </header>
 
-  <main>
+  <main id="main">
     <h1>Terms & Conditions</h1>
-    <p>This is placeholder content. You can paste in your terms when ready.</p>
+    <p class="muted">Effective date: <strong><!-- update when you publish --> August 22, 2025</strong></p>
+
+    <div class="card">
+      <p>These Terms & Conditions (“<strong>Terms</strong>”) govern your use of the Lets-ParaConnect platform (the “<strong>Platform</strong>”) operated by <strong>Lets-ParaConnect</strong> (“<strong>Company</strong>,” “we,” “us,” or “our”). By creating an account or using the Platform, you agree to these Terms and to our <a href="privacy.html">Privacy Policy</a>. If you accept these Terms on behalf of a law firm or other entity, you represent that you have authority to bind that entity.</p>
+      <p><em>We are not a law firm and do not provide legal services or legal advice.</em> The Platform enables <strong>Attorneys</strong> to engage independent <strong>Paralegals</strong>. All legal work and outcomes are solely between those users.</p>
+      <div class="callout ok" role="note" aria-label="Plain-English summary">
+        <strong>Plain-English summary:</strong> We’re a marketplace + payments layer. Attorneys post scoped, flat-fee work; paralegals deliver; funds are held via Stripe and released on approval. We don’t supervise legal work, and we’re not responsible for results. Disputes are handled on-platform before release.
+      </div>
+    </div>
+
+    <h2>Table of Contents</h2>
+    <div class="toc" aria-label="Table of contents">
+      <a href="#eligibility">1. Eligibility & Accounts</a>
+      <a href="#roles">2. Roles & Responsibilities</a>
+      <a href="#payments">3. Jobs, Escrow & Payments (Stripe)</a>
+      <a href="#delivery">4. Delivery, Approval & Disputes</a>
+      <a href="#fees">5. Fees, Taxes & Chargebacks</a>
+      <a href="#files">6. Confidentiality, Files & IP</a>
+      <a href="#acceptable">7. Acceptable Use</a>
+      <a href="#termination">8. Suspension & Termination</a>
+      <a href="#disclaimers">9. Disclaimers; No Legal Advice</a>
+      <a href="#liability">10. Limitation of Liability</a>
+      <a href="#arbitration">11. Governing Law & Dispute Resolution</a>
+      <a href="#changes">12. Changes to Service or Terms</a>
+      <a href="#misc">13. Miscellaneous</a>
+      <a href="#contact">14. Contact</a>
+    </div>
+
+    <section id="eligibility" class="card">
+      <h2>1) Eligibility & Accounts</h2>
+      <ul>
+        <li>You must be at least 18 and able to form a binding contract. Attorneys remain responsible for complying with all professional conduct rules and licensing requirements.</li>
+        <li>You are responsible for the confidentiality of your credentials and for all activity on your account.</li>
+        <li>We may require identity/credential verification (e.g., bar number, resume/certifications) and may approve, deny, or revoke access at our discretion.</li>
+      </ul>
+    </section>
+
+    <section id="roles" class="card">
+      <h2>2) Roles & Responsibilities</h2>
+      <p><strong>Attorneys.</strong> You supervise legal work; ensure compliance with jurisdictional rules; define accurate scopes, deadlines, and deliverables; and review outputs.</p>
+      <p><strong>Paralegals.</strong> You act as independent contractors—not employees or agents of the Company. You are responsible for quality, timeliness, lawful conduct, and Stripe Connect onboarding (KYC) for payouts.</p>
+      <p><strong>Company.</strong> We provide Platform tooling and payment facilitation. We do not control or guarantee any user’s identity, credentials, quality, or performance.</p>
+    </section>
+
+    <section id="payments" class="card">
+      <h2>3) Jobs, Escrow & Payments (Stripe)</h2>
+      <p>The Platform uses Stripe to process and disburse funds:</p>
+      <ol class="alpha">
+        <li><strong>Funding Escrow.</strong> When an Attorney posts a flat-fee job, payment is authorized via Stripe Checkout or a Stripe <code class="small">payment_intent</code>. Funds are charged and held for that job (“Escrow”). We store Stripe IDs (e.g., <code class="small">checkout.session</code>, <code class="small">payment_intent</code>) and set a shared <code class="small">transfer_group</code> to link later payout.</li>
+        <li><strong>Release & Payout.</strong> On Attorney approval/marking complete, we create a Stripe <em>Transfer</em> to the Paralegal’s Stripe Connect account (less applicable platform fees) using the same <code class="small">transfer_group</code>. If the Paralegal hasn’t completed Connect onboarding, payout is delayed until completion.</li>
+        <li><strong>Payment Model.</strong> Jobs are flat-fee by default unless expressly offered otherwise in the posting flow.</li>
+        <li><strong>Currency & Timing.</strong> Charges are processed in the currency shown at checkout (typically USD). Stripe processing and banking timelines apply.</li>
+      </ol>
+      <p>By using the Platform, you authorize us and Stripe to process, hold, and disburse funds as described. All payments are subject to Stripe’s terms and risk controls.</p>
+    </section>
+
+    <section id="delivery" class="card">
+      <h2>4) Delivery, Approval & Disputes</h2>
+      <ul>
+        <li><strong>Delivery & Review.</strong> After delivery, the Attorney should review promptly.</li>
+        <li><strong>Approval.</strong> Approval/“complete” triggers payout per Section 3.</li>
+        <li><strong>Disputes.</strong> If there’s an issue, the Attorney must open an in-platform dispute within <strong>7 days</strong> of delivery (or the period shown in the job flow). We may request information from both sides.</li>
+        <li><strong>Resolution.</strong> Our role is limited to platform coordination (not legal adjudication). Before release, we may recommend revisions or refunds. After release, resolution typically requires a mutual arrangement between users. We may offset future payouts to address chargebacks or clear errors.</li>
+      </ul>
+    </section>
+
+    <section id="fees" class="card">
+      <h2>5) Fees, Taxes & Chargebacks</h2>
+      <ul>
+        <li><strong>Service/Platform Fees.</strong> Fees are shown in the posting/acceptance flow and may vary by job or account. We may change fees prospectively.</li>
+        <li><strong>Taxes.</strong> Each user is responsible for applicable taxes (e.g., income, sales/use, VAT/GST). Stripe/Connect may collect tax details for payouts.</li>
+        <li><strong>Chargebacks & Reversals.</strong> If a payment is reversed, we may debit, withhold, or offset amounts against your balance or future payouts.</li>
+        <li><strong>Refunds.</strong> Before release, we may process full/partial refunds in our discretion or as required by law/Stripe. After release, refunds are between users unless otherwise required.</li>
+      </ul>
+    </section>
+
+    <section id="files" class="card">
+      <h2>6) Confidentiality, Files & IP</h2>
+      <ul>
+        <li><strong>Confidentiality.</strong> Attorney and Paralegal are responsible for confidentiality and ethical handling of client information. Users may attach NDAs to jobs; the Company is not a party to user NDAs.</li>
+        <li><strong>Uploads & Storage.</strong> Files are stored privately in AWS S3 and accessed via presigned URLs. Upload only content you have rights to share.</li>
+        <li><strong>Work Product & IP.</strong> Unless a different written agreement exists between Attorney and Paralegal, ownership/licensing terms are those stated in the job posting or attached agreement. The Company claims no ownership in work product.</li>
+        <li><strong>Operating License.</strong> You grant us a limited license to host, process, and transmit your content solely to operate and improve the Platform.</li>
+      </ul>
+    </section>
+
+    <section id="acceptable" class="card">
+      <h2>7) Acceptable Use</h2>
+      <p>You agree not to:</p>
+      <ul>
+        <li>Violate law, court orders, or professional conduct rules;</li>
+        <li>Post/transmit unlawful, infringing, defamatory, hateful, or confidential third-party content without authorization;</li>
+        <li>Bypass security, interfere with the Platform, or misuse payments;</li>
+        <li>Use the Platform to offer/seek non-legal illicit services.</li>
+      </ul>
+      <p>We may remove content or suspend accounts that violate these Terms.</p>
+    </section>
+
+    <section id="termination" class="card">
+      <h2>8) Suspension & Termination</h2>
+      <p>We may suspend or terminate access for conduct that violates these Terms, poses risk, or is required by law or payment partners. Upon termination, provisions that by nature should survive will survive (e.g., confidentiality, IP, fees, payment obligations, limitations of liability, arbitration, and governing law).</p>
+    </section>
+
+    <section id="disclaimers" class="card">
+      <h2>9) Disclaimers; No Legal Advice</h2>
+      <p><em>The Company is not a law firm and does not provide legal services or legal advice.</em> We do not warrant any user’s identity, credentials, or performance. The Platform is provided “AS IS” and “AS AVAILABLE,” without warranties of any kind, express or implied.</p>
+    </section>
+
+    <section id="liability" class="card">
+      <h2>10) Limitation of Liability</h2>
+      <p>To the maximum extent permitted by law, the Company will not be liable for any indirect, incidental, consequential, special, punitive, or exemplary damages, or for lost profits, data, or business interruption, arising out of or relating to the Platform or these Terms. Our aggregate liability will not exceed the greater of (a) the fees you paid to us in the 6 months preceding the claim, or (b) USD $100.</p>
+    </section>
+
+    <section id="arbitration" class="card">
+      <h2>11) Governing Law & Dispute Resolution</h2>
+      <p><strong>Governing Law.</strong> These Terms are governed by the laws of <strong>[Your State]</strong>, excluding conflict-of-law rules.</p>
+      <p><strong>Arbitration; Class Action Waiver.</strong> Except for claims seeking injunctive relief or IP claims, any dispute with the Company will be resolved by binding arbitration on an individual basis. <em>You waive the right to participate in a class, consolidated, or representative action.</em> Seat, rules, and administrator (e.g., AAA) may be specified in an arbitration addendum or at the time a dispute arises. If your jurisdiction prohibits mandatory arbitration/class waivers for consumers, your non-waivable rights remain.</p>
+      <div class="callout warn">
+        <strong>Optional opt-out (if you choose to offer one):</strong> You may opt out of arbitration within 30 days of account creation by emailing <a href="mailto:support@lets-paraconnect.com">support@lets-paraconnect.com</a> with subject “Arbitration Opt-Out” and your account email.
+      </div>
+    </section>
+
+    <section id="changes" class="card">
+      <h2>12) Changes to Service or Terms</h2>
+      <p>We may modify the Platform or these Terms from time to time. Material changes will be posted here with an updated Effective Date. Your continued use after changes constitutes acceptance.</p>
+    </section>
+
+    <section id="misc" class="card">
+      <h2>13) Miscellaneous</h2>
+      <ul>
+        <li><strong>Independent Contractors.</strong> Attorney and Paralegal are independent contractors to each other. Nothing creates employment, agency, or joint venture with the Company.</li>
+        <li><strong>Notices.</strong> We may contact you via email or in-app notifications. Keep your contact details current.</li>
+        <li><strong>Assignment.</strong> You may not assign these Terms without our consent. We may assign to an affiliate or in connection with a merger or asset sale.</li>
+        <li><strong>Severability.</strong> If any provision is unenforceable, the remainder remains in effect.</li>
+        <li><strong>Entire Agreement.</strong> These Terms plus referenced policies (e.g., Privacy) are the entire agreement for the Platform.</li>
+      </ul>
+    </section>
+
+    <section id="contact" class="card">
+      <h2>14) Contact</h2>
+      <!-- TODO: replace with your legal entity details -->
+      <p><strong>Lets-ParaConnect</strong><br>
+         Email: <a href="mailto:support@lets-paraconnect.com">support@lets-paraconnect.com</a><br>
+         Address: [Your business address]</p>
+    </section>
+
+    <div class="card muted" style="margin-top:18px">
+      <strong>Heads-up:</strong> This template is product-aligned but not legal advice. Have counsel tailor governing law, arbitration, fees, dispute windows, and tax language to your jurisdictions and use case.
+    </div>
   </main>
 
   <footer>
-    <div>
-      <a href="terms.html">Terms & Conditions</a> |
-      <a href="privacy.html">Privacy Policy</a>
-    </div>
-    <p>© 2025 Lets-ParaConnect</p>
+    © <script>document.write(new Date().getFullYear())</script> Lets-ParaConnect • <a href="terms.html">Terms</a> • <a href="privacy.html">Privacy</a>
   </footer>
 </body>
 </html>

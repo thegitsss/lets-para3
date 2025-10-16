@@ -1,53 +1,229 @@
-<link rel="stylesheet" href="assets/styles/global.css">
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
-<script type="module" src="assets/scripts/auth.js"></script>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Privacy Policy</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Georgia&display=swap">
+  <style>body{opacity:1!important;visibility:visible!important}</style>
+  <meta charset="utf-8" />
+  <title>Privacy Policy • Lets-ParaConnect</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Site-wide styles for consistent palette/components -->
+  <link rel="stylesheet" href="assets/styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
   <style>
-    :root { --brand-brown: #8c7864; --bg-cream: #f5f2ed; --text-dark: #5c4e3a; --navy: #27394d; --white: #ffffff; }
-    body { font-family: 'Georgia', serif; background: var(--bg-cream); margin: 0; color: var(--text-dark); }
-    header, footer { background: var(--white); padding: 1.25rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    header img { height: 60px; }
-    .nav-buttons button { margin-left: 1rem; padding: 0.6rem 1.2rem; background: var(--navy); color: var(--white); border: none; border-radius: 4px; font-weight: bold; cursor: pointer; transition: opacity 0.5s ease; }
-    .nav-buttons button:hover { opacity: 0.7; }
-    main { padding: 4rem 2rem; animation: fadeIn 1s ease; max-width: 800px; margin: auto; }
-    h1 { font-size: 2rem; margin-bottom: 1rem; }
-    p { line-height: 1.6; }
-    footer { background: var(--navy); color: white; justify-content: center; flex-direction: column; padding: 2rem; text-align: center; }
-    footer a { color: white; margin: 0 1rem; text-decoration: none; transition: opacity 0.5s ease; }
-    footer a:hover { opacity: 0.6; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    :root{
+      --ink:#1a2230; --muted:#5c6b7a; --gold:#b4975a; --line:#e8edf3; --card:#fff; --bg:#faf7f3; --navy:#27394d;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    header,footer{background:#fff}
+    header{
+      position:sticky;top:0;z-index:10;border-bottom:1px solid var(--line);
+      display:flex;align-items:center;justify-content:space-between;padding:14px 20px
+    }
+    .brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+    .brand span{font-family:"EB Garamond",serif;color:var(--gold);font-size:1.25rem}
+    nav a{color:var(--navy);text-decoration:none;margin-left:14px}
+    nav a[aria-current="page"]{text-decoration:underline}
+
+    main{max-width:900px;margin:30px auto;padding:0 18px}
+    h1{font-family:"EB Garamond",serif;font-weight:700;letter-spacing:.2px;margin:8px 0 14px}
+    h2{font-family:"EB Garamond",serif;font-weight:600;margin:28px 0 10px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.05);padding:22px}
+    .toc{display:grid;gap:6px;margin:10px 0 4px;padding-left:18px}
+    .toc a{color:var(--navy);text-decoration:none}
+    .toc a:hover{text-decoration:underline}
+    .muted{color:var(--muted)}
+    code.small{background:#f7f9fc;border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:.9em}
+    footer{margin-top:40px;border-top:1px solid var(--line);padding:18px 20px;text-align:center;color:var(--muted)}
+    .pill{display:inline-block;padding:3px 8px;border:1px solid var(--line);border-radius:999px;font-size:.85rem;color:#3c4b5a;background:#f6f8fb;margin-right:6px}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    .back-to-top{display:inline-block;margin-top:8px;font-size:.95rem}
   </style>
 </head>
 <body>
-  <header>
-<a href="index.html" style="display: flex; align-items: center; text-decoration: none;">
-  <img src="assets/transparant logo only.png" alt="Logo" style="height: 60px; margin-right: 10px;" />
-  <span style="font-size: 1.5rem; font-weight: bold; color: var(--brand-brown);">Lets-ParaConnect</span>
-</a>
+  <a class="sr-only" href="#main">Skip to content</a>
 
-    <div class="nav-buttons">
-      <button onclick="location.href='login.html'">Login</button>
-      <button onclick="location.href='signup.html'">Join Today</button>
-    </div>
+  <header>
+    <a class="brand" href="index.html" aria-label="Lets-ParaConnect home">
+      <img src="assets/transparant logo only.png" alt="" height="44">
+      <span>Lets-ParaConnect</span>
+    </a>
+    <nav aria-label="Primary">
+      <a href="index.html">Home</a>
+      <a href="terms.html">Terms</a>
+      <a href="privacy.html" aria-current="page">Privacy</a>
+      <a href="login.html">Login</a>
+    </nav>
   </header>
 
-  <main>
+  <main id="main">
     <h1>Privacy Policy</h1>
-    <p>This is placeholder content. You can paste in your privacy policy here when ready.</p>
+    <p class="muted">Effective date: <strong><!-- update when publishing --> August 22, 2025</strong></p>
+
+    <div class="card" role="region" aria-labelledby="intro">
+      <h2 id="intro" class="sr-only">Introduction</h2>
+      <p>Welcome to <strong>Lets-ParaConnect</strong> (“we,” “us,” “our”). We operate a platform where attorneys can hire and collaborate with certified paralegals. This Privacy Policy explains what information we collect, how we use it, how we share it, and the rights available to you.</p>
+      <p><strong>Quick facts about our stack:</strong></p>
+      <p>
+        <span class="pill">MongoDB Atlas (app data)</span>
+        <span class="pill">AWS S3 (private uploads)</span>
+        <span class="pill">Stripe (Checkout, PaymentIntents &amp; Connect)</span>
+        <span class="pill">Nodemailer (SMTP email)</span>
+        <span class="pill">Google reCAPTCHA</span>
+        <span class="pill">JWT auth + CSRF</span>
+      </p>
+    </div>
+
+    <h2>Table of Contents</h2>
+    <nav class="toc" aria-label="Table of contents">
+      <a href="#info-we-collect">1. Information We Collect</a>
+      <a href="#how-we-use">2. How We Use Information</a>
+      <a href="#legal-bases">3. Legal Bases (EEA/UK)</a>
+      <a href="#sharing">4. Sharing &amp; Service Providers</a>
+      <a href="#payments">5. Payments &amp; Escrow (Stripe)</a>
+      <a href="#cookies">6. Cookies &amp; Local Storage</a>
+      <a href="#retention">7. Data Retention</a>
+      <a href="#security">8. Security</a>
+      <a href="#transfers">9. International Transfers</a>
+      <a href="#your-rights">10. Your Privacy Rights</a>
+      <a href="#children">11. Children’s Privacy</a>
+      <a href="#changes">12. Changes to this Policy</a>
+      <a href="#contact">13. Contact Us</a>
+    </nav>
+
+    <section id="info-we-collect" class="card">
+      <h2>1) Information We Collect</h2>
+      <ul>
+        <li><strong>Account &amp; Profile Data:</strong> name, email, role (attorney/paralegal/admin), bar number (attorneys), resume/certification URLs (paralegals), optional bio, availability, headline, website/LinkedIn.</li>
+        <li><strong>Case &amp; Collaboration Data:</strong> case titles/descriptions, assignments, messages, disputes, checklists, deadlines, Zoom links you choose to store, and related timestamps/audit entries.</li>
+        <li><strong>Uploads:</strong> files you upload via <em>presigned S3 URLs</em> (e.g., resumes, certificates, case documents). Files are stored privately in AWS S3; we keep object keys and metadata in the app database.</li>
+        <li><strong>Payments:</strong> Stripe identifiers like <code class="small">checkout.session</code> IDs, <code class="small">payment_intent</code> IDs, transfer IDs/metadata (e.g., <code class="small">transfer_group</code>). <em>We never store full card numbers.</em></li>
+        <li><strong>System &amp; Security:</strong> hashed passwords, session/JWT identifiers, CSRF tokens, IP addresses, user-agent, timestamps, rate-limit counters, audit logs (e.g., approvals, status changes).</li>
+        <li><strong>reCAPTCHA:</strong> we use Google reCAPTCHA on sign-up/sign-in to reduce abuse. Google may collect device and usage data per Google’s policies.</li>
+      </ul>
+      <a href="#main" class="back-to-top">Back to top ↑</a>
+    </section>
+
+    <section id="how-we-use" class="card">
+      <h2>2) How We Use Information</h2>
+      <ul>
+        <li>Provide and improve the platform (case creation, messaging, file transfers, deadlines, summaries).</li>
+        <li>Authenticate users; enforce roles and access controls.</li>
+        <li>Process payments/escrow and automate releases to paralegals on job completion.</li>
+        <li>Detect/prevent fraud, abuse, and policy violations (rate limits, CSRF, content checks).</li>
+        <li>Send transactional emails (approvals, resets, receipts, dispute updates).</li>
+        <li>Comply with legal obligations and enforce our <a href="terms.html">Terms</a>.</li>
+      </ul>
+      <p>We do not sell your personal information.</p>
+      <a href="#main" class="back-to-top">Back to top ↑</a>
+    </section>
+
+    <section id="legal-bases" class="card">
+      <h2>3) Legal Bases (EEA/UK)</h2>
+      <p>If you are in the EEA/UK, we process personal data under these bases: contract performance (providing the service), legitimate interests (security, fraud prevention, improvements), legal obligations (records, accounting), and consent where required (e.g., optional marketing if used).</p>
+      <a href="#main" class="back-to-top">Back to top ↑</a>
+    </section>
+
+    <section id="sharing" class="card">
+      <h2>4) Sharing &amp; Service Providers</h2>
+      <p>We share information with service providers who help us operate the platform:</p>
+      <ul>
+        <li><strong>MongoDB Atlas</strong> – application database and backups.</li>
+        <li><strong>AWS S3</strong> – private file storage for uploads.</li>
+        <li><strong>Stripe</strong> – Checkout/PaymentIntents for funding; Connect for payouts.</li>
+        <li><strong>Email (SMTP via Nodemailer)</strong> – transactional emails.</li>
+        <li><strong>Google reCAPTCHA</strong> – bot mitigation on auth flows.</li>
+      </ul>
+      <p>We may disclose data to comply with law, protect rights/safety, or in connection with a business transaction (e.g., merger). We do not allow third parties to use your data for their own marketing.</p>
+      <a href="#main" class="back-to-top">Back to top ↑</a>
+    </section>
+
+    <section id="payments" class="card">
+      <h2>5) Payments &amp; Escrow (Stripe)</h2>
+      <p>Payments are processed by Stripe. Card information is handled by Stripe directly; we do not store full card numbers. We store Stripe identifiers and metadata (e.g., <code class="small">payment_intent</code>, <code class="small">checkout.session</code>, <code class="small">transfer</code>, <code class="small">transfer_group</code>) to manage escrow and automate payouts to paralegals via Stripe Connect.</p>
+      <p>Stripe’s own privacy practices apply; see <a href="https://stripe.com/privacy" target="_blank" rel="noopener">stripe.com/privacy</a>.</p>
+      <a href="#main" class="back-to-top">Back to top ↑</a>
+    </section>
+
+    <section id="cookies" class="card">
+      <h2>6) Cookies &amp; Local Storage</h2>
+      <ul>
+        <li><strong>CSRF cookie:</strong> a short-lived, httpOnly cookie used only for cross-site request forgery protection.</li>
+        <li><strong>Auth token (frontend):</strong> in some flows, a JWT may be stored in <em>localStorage</em> to authorize API requests from the browser. You can clear it by logging out or clearing site data.</li>
+        <li><strong>Analytics/ads:</strong> we do not run third-party ads or tracking beacons on the core app.</li>
+      </ul>
+      <a href="#main" class="back-to-top">Back to top ↑</a>
+    </section>
+
+    <section id="retention" class="card">
+      <h2>7) Data Retention</h2>
+      <p>We keep data only as long as needed for the purposes above or as required by law. As a guide (subject to change):</p>
+      <ul>
+        <li><strong>Accounts &amp; profiles:</strong> retained while the account is active; deleted or archived upon verified request, subject to legal holds.</li>
+        <li><strong>Cases, messages, disputes:</strong> retained for the life of the case and at least 24 months after closure, unless longer retention is required for legal, accounting, or audit purposes.</li>
+        <li><strong>Uploads (S3):</strong> retained while associated to open matters; may be archived or purged after case closure per our internal schedules.</li>
+        <li><strong>Audit logs &amp; security records:</strong> typically 12–24 months.</li>
+      </ul>
+      <a href="#main" class="back-to-top">Back to top ↑</a>
+    </section>
+
+    <section id="security" class="card">
+      <h2>8) Security</h2>
+      <ul>
+        <li>Industry-standard password hashing (bcrypt) and role-based authorization.</li>
+        <li>HTTPS required; Content-Security-Policy; rate limiting; CSRF protection.</li>
+        <li>Private S3 ACL for uploads; access via presigned URLs.</li>
+        <li>Webhook signature verification for Stripe events.</li>
+      </ul>
+      <p>No system is 100% secure. If you suspect unauthorized access, contact us immediately at <a href="mailto:support@lets-paraconnect.com">support@lets-paraconnect.com</a>.</p>
+      <a href="#main" class="back-to-top">Back to top ↑</a>
+    </section>
+
+    <section id="transfers" class="card">
+      <h2>9) International Transfers</h2>
+      <p>We primarily process data in the United States. If personal data is transferred internationally, we rely on appropriate safeguards as required by applicable law.</p>
+      <a href="#main" class="back-to-top">Back to top ↑</a>
+    </section>
+
+    <section id="your-rights" class="card">
+      <h2>10) Your Privacy Rights</h2>
+      <p>Depending on your location, you may have rights to access, correct, delete, or download your personal data, and to object or restrict certain processing.</p>
+      <ul>
+        <li><strong>EEA/UK:</strong> GDPR rights (access, rectification, erasure, restriction, portability, objection). You may also lodge a complaint with your local supervisory authority.</li>
+        <li><strong>US (e.g., CA/VA/CO/CT/UT):</strong> state privacy laws may provide similar rights. We do not sell personal information.</li>
+      </ul>
+      <p>To exercise rights, email <a href="mailto:support@lets-paraconnect.com">support@lets-paraconnect.com</a>. We may need to verify your identity.</p>
+      <a href="#main" class="back-to-top">Back to top ↑</a>
+    </section>
+
+    <section id="children" class="card">
+      <h2>11) Children’s Privacy</h2>
+      <p>Our service is not directed to children under 16. We do not knowingly collect personal information from children under 16.</p>
+      <a href="#main" class="back-to-top">Back to top ↑</a>
+    </section>
+
+    <section id="changes" class="card">
+      <h2>12) Changes to this Policy</h2>
+      <p>We may update this Policy from time to time. Material changes will be posted here with a new effective date.</p>
+      <a href="#main" class="back-to-top">Back to top ↑</a>
+    </section>
+
+    <section id="contact" class="card">
+      <h2>13) Contact Us</h2>
+      <!-- TODO: replace with your legal entity name and address -->
+      <p><strong>Lets-ParaConnect</strong><br>
+         Email: <a href="mailto:support@lets-paraconnect.com">support@lets-paraconnect.com</a></p>
+      <a href="#main" class="back-to-top">Back to top ↑</a>
+    </section>
   </main>
 
   <footer>
-    <div>
-      <a href="terms.html">Terms & Conditions</a> |
-      <a href="privacy.html">Privacy Policy</a>
-    </div>
-    <p>© 2025 Lets-ParaConnect</p>
+    © <span id="year"></span> Lets-ParaConnect • <a href="terms.html">Terms</a> • <a href="privacy.html" aria-current="page">Privacy</a>
   </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
 </body>
 </html>

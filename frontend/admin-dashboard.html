@@ -1,86 +1,390 @@
-<link rel="stylesheet" href="assets/styles/global.css">
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
-<script type="module" src="assets/scripts/auth.js"></script>
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <style>body{opacity:1!important;visibility:visible!important}</style>
   <meta charset="UTF-8" />
   <title>Admin Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <link rel="stylesheet" href="assets/styles.css">
+  <script type="module" src="assets/scripts/auth.js"></script>
+
+  <style>
+    :root { --ink:#1a2230; --muted:#5c6b7a; --line:#e8edf3; --card:#ffffff; --bg:#faf7f3; --accent:#b4975a; --navy:#27394d; --ok:#1f7a4a; --bad:#b04747; --info:#1e88e5; }
+    @media (prefers-color-scheme: dark){ :root{ --bg:#0f141b; --card:#121a23; --ink:#e8edf3; --muted:#8ea0b5; --line:#203040; } }
+    body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,sans-serif; }
+
+    header[role="banner"]{ padding:12px 18px; border-bottom:1px solid var(--line); backdrop-filter:saturate(120%) blur(6px); position:sticky; top:0; z-index:20; background:color-mix(in srgb, var(--bg) 88%, transparent); }
+    header nav a{ color:var(--muted); text-decoration:none; margin-right:14px; padding:6px 10px; border-radius:10px; transition:background .2s ease, color .2s ease; }
+    header nav a:hover{ background:color-mix(in srgb, var(--line) 35%, transparent); color:var(--ink); }
+    header nav a.active{ color:var(--ink); background:color-mix(in srgb, var(--line) 55%, transparent); }
+
+    main{ max-width:1100px; margin:0 auto; padding:18px; }
+    h1{ margin:18px 0; font-weight:600; letter-spacing:.2px; }
+
+    /* toolbar */
+    .toolbar{ display:grid; grid-template-columns: 1fr auto auto auto; gap:10px; align-items:center; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow: 0 1px 0 rgba(0,0,0,.03); position:sticky; top:64px; z-index:10; }
+    .toolbar input[type="search"], .toolbar select{ appearance:none; -webkit-appearance:none; font:inherit; color:var(--ink); background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; outline:none; transition:border-color .15s ease, box-shadow .15s ease, background-color .2s ease; }
+    .toolbar input[type="search"]:focus, .toolbar select:focus{ border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent); }
+    .toolbar .switch{ display:inline-flex; gap:8px; align-items:center; color:var(--muted); cursor:pointer; user-select:none; }
+    .toolbar .group{ display:flex; gap:8px; justify-content:flex-end; }
+    .btn{ border:1px solid var(--line); background:var(--card); color:var(--ink); padding:9px 12px; border-radius:10px; cursor:pointer; transition:transform .08s ease, background .18s ease, border-color .18s ease; }
+    .btn:hover{ background:color-mix(in srgb, var(--line) 40%, transparent); }
+    .btn:active{ transform:translateY(1px); }
+    .btn.primary{ background:linear-gradient(180deg, color-mix(in srgb, var(--navy) 12%, var(--card)), var(--card)); border-color:color-mix(in srgb, var(--navy) 45%, var(--line)); color:#fff; }
+    .btn.approve{ background:var(--ok); color:#fff; border-color:transparent; }
+    .btn.reject{ background:var(--bad); color:#fff; border-color:transparent; }
+
+    /* lists/cards */
+    .list{ display:grid; gap:14px; margin-top:14px; }
+    .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; display:grid; gap:8px; box-shadow:0 1px 1px rgba(0,0,0,.03); transition: box-shadow .2s ease, transform .08s ease, border-color .2s ease; }
+    .card:hover{ border-color:color-mix(in srgb, var(--accent) 45%, var(--line)); box-shadow:0 6px 18px rgba(0,0,0,.06); }
+    .title{ font-weight:600; }
+    .meta{ color:var(--muted); font-size:.95rem; display:flex; flex-wrap:wrap; gap:8px 12px; }
+    .badge{ display:inline-block; padding:6px 10px; border-radius:999px; font-size:.84rem; background:color-mix(in srgb, var(--line) 30%, transparent); border:1px solid var(--line); color:var(--muted); }
+    .actions{ display:flex; flex-wrap:wrap; gap:8px; }
+
+    /* skeleton */
+    .skeleton{ position:relative; overflow:hidden; background:#f3f6fb; border:1px solid var(--line); border-radius:12px; height:96px; }
+    .skeleton::after{ content:""; position:absolute; inset:0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent); animation: shimmer 1.1s infinite; }
+    @keyframes shimmer{ 0%{ transform: translateX(-100%);} 100%{ transform: translateX(100%);} }
+    @media (prefers-reduced-motion: reduce){ .skeleton{ animation:none } .btn,.card{ transition:none } }
+
+    /* toast */
+    .toast{ position: fixed; bottom: 18px; right: 18px; background:#111827; color:#fff; padding: 10px 14px; border-radius:10px; box-shadow: 0 6px 20px rgba(0,0,0,.2); opacity:0; transform: translateY(6px); transition: all .18s ease; z-index: 1000; }
+    .toast.show{ opacity:1; transform: translateY(0); }
+    .toast.ok{ background:#0f5132; }
+    .toast.err{ background:#6b1f1f; }
+
+    .small{ color:var(--muted); font-size:.9rem; }
+
+    /* ====== NEW: overview widgets ====== */
+    .kpis{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:8px 0 18px; }
+    .kpi{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:6px; box-shadow:0 1px 0 rgba(0,0,0,.03); }
+    .kpi .label{ color:var(--muted); font-size:.82rem; letter-spacing:.2px; }
+    .kpi .value{ font-weight:700; font-size:1.45rem; }
+    .kpi .sub{ color:var(--muted); font-size:.8rem; }
+    .spark{ width:100%; height:36px; display:block; }
+    .panels{ display:grid; grid-template-columns: 1.2fr .8fr; gap:14px; }
+    .panel{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:10px; }
+    .panel h2{ font-size:1rem; margin:0; font-weight:600; }
+    .listy{ display:grid; gap:8px; max-height:360px; overflow:auto; }
+    .row{ display:grid; grid-template-columns: auto 1fr auto; gap:10px; align-items:center; padding:8px; border:1px solid var(--line); border-radius:10px; }
+    .pill{ border-radius:999px; border:1px solid var(--line); padding:2px 8px; font-size:.78rem; color:var(--muted); }
+
+    @media (max-width: 980px){ .kpis{ grid-template-columns:repeat(2,minmax(0,1fr)); } .panels{ grid-template-columns:1fr; } }
+  </style>
 </head>
 <body>
-  <nav>
-    <a href="index.html">Home</a> |
-    <a href="admin-dashboard.html" class="active">Admin</a> |
-    <a href="login.html">Login</a>
-  </nav>
+  <header role="banner">
+    <nav aria-label="Primary">
+      <a href="index.html">Home</a>
+      <a href="admin-dashboard.html" class="active" aria-current="page">Admin</a>
+      <a href="admin-cases.html">Cases</a>
+      <a href="admin-disputes.html">Disputes</a>
+      <a href="login.html">Login</a>
+    </nav>
+  </header>
 
-  <main>
+  <main role="main">
     <h1>Admin Dashboard</h1>
 
-<section>
-  <h2>📬 Pending Applications</h2>
-  <div style="margin-bottom: 10px;">
-    <button onclick="bulkDecide('approved')">✅ Approve All</button>
-    <button onclick="bulkDecide('rejected')">❌ Reject All</button>
-  </div>
-  <div id="pending-list">
-    <!-- Filled via JavaScript -->
-  </div>
-</section>
-
-
-    <section>
-      <h2>⚖️ Manage Cases & Disputes</h2>
-      <button onclick="location.href='admin-cases.html'">View All Cases</button>
-      <button onclick="location.href='admin-disputes.html'">View All Disputes</button>
+    <!-- KPI band -->
+    <section class="kpis" aria-label="Key metrics">
+      <div class="kpi"><div class="label">Total Users</div><div class="value" id="kpiTotalUsers">—</div><div class="sub">Attorneys + Paralegals</div></div>
+      <div class="kpi"><div class="label">Attorneys</div><div class="value" id="kpiAttorneys">—</div><div class="sub">Verified</div></div>
+      <div class="kpi"><div class="label">Paralegals</div><div class="value" id="kpiParalegals">—</div><div class="sub">Verified</div></div>
+      <div class="kpi"><div class="label">Traffic (7d)</div><div class="value" id="kpiTraffic">—</div><svg id="trafficSpark" class="spark" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"></svg></div>
     </section>
+
+    <!-- Panels -->
+    <section class="panels">
+      <div class="panel" aria-label="Requests and inbox">
+        <h2>New Requests</h2>
+        <div class="listy" id="requestsList"></div>
+        <h2>Inquiries</h2>
+        <div class="listy" id="inquiriesList"></div>
+        <h2>Emails</h2>
+        <div class="listy" id="emailsList"></div>
+      </div>
+      <div class="panel" aria-label="Notifications and action items">
+        <h2>Notifications</h2>
+        <div class="listy" id="notificationsList"></div>
+        <h2>Action Items</h2>
+        <div class="listy" id="actionItemsList"></div>
+      </div>
+    </section>
+
+    <!-- Existing toolbar that controls pending applications -->
+    <div class="toolbar" role="region" aria-label="Filters">
+      <input id="q" type="search" placeholder="Search by name or email…" aria-label="Search users"/>
+      <select id="roleFilter" aria-label="Filter by role">
+        <option value="">All roles</option>
+        <option value="attorney">Attorney</option>
+        <option value="paralegal">Paralegal</option>
+      </select>
+      <select id="sortF" aria-label="Sort applicants">
+        <option value="-createdAt">Newest first</option>
+        <option value="createdAt">Oldest first</option>
+        <option value="name">Name (A–Z)</option>
+        <option value="role">Role</option>
+      </select>
+      <div class="group">
+        <label class="switch" for="autoRefresh" title="Refresh every 30s">
+          <input type="checkbox" id="autoRefresh" />
+          <span>Auto‑refresh</span>
+        </label>
+        <button class="btn primary" id="bulkApprove" type="button">Approve filtered</button>
+        <button class="btn" id="bulkReject" type="button">Reject filtered</button>
+      </div>
+    </div>
+
+    <div class="small" id="count" aria-live="polite"></div>
+
+    <div id="list" class="list" aria-live="polite" aria-busy="true">
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
+    </div>
   </main>
 
-  <script>
-    const token = localStorage.getItem('token');
-    if (!token) {
-      window.location.href = 'login.html';
+  <div id="toast" class="toast" role="status" aria-live="polite">Done</div>
+
+  <script type="module">
+    import { secureFetch, fetchCSRF } from './assets/scripts/auth.js';
+
+    const API_BASE = '/api';
+
+    // DOM refs (pending users section)
+    const listEl = document.getElementById('list');
+    const q = document.getElementById('q');
+    const roleF = document.getElementById('roleFilter');
+    const sortF = document.getElementById('sortF');
+    const countEl = document.getElementById('count');
+    const toastEl = document.getElementById('toast');
+    const autoRefresh = document.getElementById('autoRefresh');
+    const bulkApproveBtn = document.getElementById('bulkApprove');
+    const bulkRejectBtn  = document.getElementById('bulkReject');
+
+    // NEW: KPI + panel refs
+    const kpiTotalUsers = document.getElementById('kpiTotalUsers');
+    const kpiAttorneys  = document.getElementById('kpiAttorneys');
+    const kpiParalegals = document.getElementById('kpiParalegals');
+    const kpiTraffic    = document.getElementById('kpiTraffic');
+    const trafficSpark  = document.getElementById('trafficSpark');
+
+    const requestsList      = document.getElementById('requestsList');
+    const inquiriesList     = document.getElementById('inquiriesList');
+    const emailsList        = document.getElementById('emailsList');
+    const notificationsList = document.getElementById('notificationsList');
+    const actionItemsList   = document.getElementById('actionItemsList');
+
+    let all = []; // pending users
+    let timer = null;
+
+    // utils
+    const toast = (msg, type='ok') => { toastEl.textContent = msg; toastEl.className = 'toast show ' + (type === 'err' ? 'err' : 'ok'); setTimeout(() => toastEl.classList.remove('show'), 1600); };
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    const by = (o,p,fb='') => p.split('.').reduce((a,k)=>a?.[k],o) ?? fb;
+    const debounce = (fn, ms=250) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(() => fn(...a), ms); }; };
+    function setBusy(on){ listEl?.setAttribute('aria-busy', on ? 'true' : 'false'); }
+
+    // helpers for widgets
+    const fmt = (s) => s ? new Date(s).toLocaleString() : '';
+    const limit = (arr, n=10) => Array.isArray(arr) ? arr.slice(0, n) : [];
+    const el = (html) => { const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstElementChild; };
+    function renderSparkline(svg, points){
+      if(!svg) return; svg.innerHTML='';
+      const w=100,h=30; const n=points.length||1; const max=Math.max(...points,1), min=Math.min(...points,0);
+      const norm = v => h - ((v - min) / (max-min || 1)) * (h-4) - 2;
+      const step = w / Math.max(n-1,1);
+      const d = points.map((v,i)=>`${i? 'L':'M'}${(i*step).toFixed(2)},${norm(v).toFixed(2)}`).join(' ');
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('d', d || '');
+      path.setAttribute('fill','none');
+      path.setAttribute('stroke','currentColor');
+      path.setAttribute('stroke-width','1.5');
+      svg.appendChild(path);
     }
 
-    fetch('/api/admin/pending-users', {
-      headers: { 'Authorization': 'Bearer ' + token }
-    })
-    .then(res => res.json())
-    .then(data => {
-      const el = document.getElementById('pending-list');
-      if (!data.length) {
-        el.innerHTML = '<p>No pending requests.</p>';
-      } else {
-        el.innerHTML = data.map(user => `
-          <div class="application-card">
-            <p><strong>${user.fullName}</strong> (${user.role})</p>
-            <p>Email: ${user.email}</p>
-            ${user.barNumber ? `<p>Bar #: ${user.barNumber}</p>` : ''}
-            ${user.resumeURL ? `<p><a href="${user.resumeURL}" target="_blank">📄 View Resume</a></p>` : ''}
-            ${user.certificateURL ? `<p><a href="${user.certificateURL}" target="_blank">📜 View Certificate</a></p>` : ''}
-            <button onclick="decide('${user._id}', 'approved')">✅ Approve</button>
-            <button onclick="decide('${user._id}', 'rejected')">❌ Reject</button>
-          </div>
-        `).join('');
+    // Save/restore filters (per-admin convenience)
+    const KEY='adminDashboardFilters:v1';
+    const saveFilters=()=>{ try{ localStorage.setItem(KEY, JSON.stringify({ q:q.value||'', role:roleF.value||'', sort:sortF.value||'', auto:autoRefresh.checked||false })); }catch{} };
+    const loadFilters=()=>{ try{ const s = JSON.parse(localStorage.getItem(KEY)||'{}'); if(s.q!=null) q.value=s.q; if(s.role!=null) roleF.value=s.role; if(s.sort!=null) sortF.value=s.sort; if(typeof s.auto==='boolean') autoRefresh.checked=s.auto; }catch{} };
+
+    // auth
+    async function ensureAdmin() {
+      try {
+        const r = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' });
+        if (!r.ok) throw new Error('not authed');
+        const { user } = await r.json();
+        if (!user || user.role !== 'admin') throw new Error('not admin');
+        return user;
+      } catch {
+        location.href = 'login.html';
+        throw new Error('redirecting');
       }
+    }
+
+    // data: pending users
+    async function fetchPending() {
+      setBusy(true);
+      listEl.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>`;
+      try {
+        const r = await fetch(`${API_BASE}/admin/pending-users`, { credentials: 'include' });
+        all = r.ok ? await r.json() : [];
+        if (!Array.isArray(all)) all = [];
+        renderPending();
+      } catch {
+        listEl.innerHTML = `<div class="small">Couldn’t load pending applications.</div>`;
+      } finally { setBusy(false); }
+    }
+
+    function applySort(arr){
+      const key = sortF.value || '-createdAt';
+      const dir = key.startsWith('-') ? -1 : 1; const field = key.replace(/^-/,'');
+      const collator = new Intl.Collator(undefined, { numeric:true, sensitivity:'base' });
+      return [...arr].sort((a,b)=>{
+        const av = by(a, field); const bv = by(b, field);
+        if (field === 'createdAt') return dir * ( (new Date(av||0)) - (new Date(bv||0)) );
+        if (typeof av === 'string' && typeof bv === 'string') return dir * collator.compare(av, bv);
+        return dir * ((av>bv)-(av<bv));
+      });
+    }
+
+    function filtered() {
+      const term = (q.value || '').trim().toLowerCase();
+      const role = roleF.value;
+      return all.filter(u => {
+        if (role && u.role !== role) return false;
+        if (!term) return true;
+        const hay = [u.name, u.email].filter(Boolean).join(' ').toLowerCase();
+        return hay.includes(term);
+      });
+    }
+
+    function renderPending() {
+      saveFilters();
+      const items = applySort( filtered() );
+      countEl.textContent = items.length ? `${items.length} pending` : 'No pending applications';
+
+      if (!items.length) { listEl.innerHTML = `<div class="small">Nothing to review.</div>`; return; }
+
+      listEl.innerHTML = items.map(u => {
+        const id   = esc(u._id);
+        const name = esc(u.name || '(No name)');
+        const email = esc(u.email || '');
+        const role = esc(u.role || '');
+        const created = u.createdAt ? new Date(u.createdAt).toLocaleString() : '';
+        const fileBadges = [ u.resumeURL ? `<span class=\"badge\">Resume on file</span>` : '', u.certificateURL ? `<span class=\"badge\">Certificate on file</span>` : '' ].join(' ');
+        const bar = u.barNumber ? `<span class=\"badge\">Bar #: ${esc(u.barNumber)}</span>` : '';
+        return `
+          <div class="card" data-id="${id}" tabindex="0" role="group" aria-label="User ${name}">
+            <div class="title">${name} <span class="small">• ${email}</span></div>
+            <div class="meta">
+              <span class="badge">Role: ${role}</span>
+              ${bar}
+              ${fileBadges}
+              ${created ? `<span class="badge">Applied: ${esc(created)}</span>` : ''}
+            </div>
+            <div class="actions" role="group" aria-label="Actions for ${name}">
+              <button class="btn approve" data-action="approve" aria-label="Approve ${name}">Approve</button>
+              <button class="btn reject"  data-action="reject"  aria-label="Reject ${name}">Reject</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function decide(id, status) {
+      try {
+        await fetchCSRF();
+        const res = await secureFetch(`${API_BASE}/admin/user/${encodeURIComponent(id)}`, { method:'PATCH', body:{ status } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.msg || data?.error || 'Action failed');
+        all = all.filter(u => u._id !== id);
+        renderPending();
+        toast(`User ${status}`);
+      } catch (e) { toast(e?.message || 'Error', 'err'); }
+    }
+
+    async function bulk(status) {
+      const items = filtered();
+      if (!items.length) return toast('Nothing to process');
+      for (const u of items) { await decide(u._id, status); }
+      toast(`Bulk ${status} complete`);
+    }
+
+    // ===== Overview data =====
+    async function fetchOverview(){
+      try{
+        const [statsR, trafficR, inquiriesR, emailsR, notesR, requestsR, actionsR] = await Promise.all([
+          fetch(`${API_BASE}/admin/stats`, { credentials:'include' }),
+          fetch(`${API_BASE}/admin/traffic`, { credentials:'include' }),
+          fetch(`${API_BASE}/admin/inquiries`, { credentials:'include' }),
+          fetch(`${API_BASE}/admin/emails`, { credentials:'include' }),
+          fetch(`${API_BASE}/admin/notifications`, { credentials:'include' }),
+          fetch(`${API_BASE}/admin/requests`, { credentials:'include' }),
+          fetch(`${API_BASE}/admin/action-items`, { credentials:'include' }),
+        ]);
+        const stats       = statsR.ok ? await statsR.json() : {};
+        const traffic     = trafficR.ok ? await trafficR.json() : {};
+        const inquiries   = inquiriesR.ok ? await inquiriesR.json() : [];
+        const emails      = emailsR.ok ? await emailsR.json() : [];
+        const notes       = notesR.ok ? await notesR.json() : [];
+        const requests    = requestsR.ok ? await requestsR.json() : [];
+        const actionItems = actionsR.ok ? await actionsR.json() : [];
+        renderOverview({ stats, traffic, inquiries, emails, notes, requests, actionItems });
+      }catch(e){ console.error(e); }
+    }
+
+    function renderOverview({ stats={}, traffic={}, inquiries=[], emails=[], notes=[], requests=[], actionItems=[] }){
+      // KPIs
+      if(kpiTotalUsers) kpiTotalUsers.textContent = Number(stats.totalUsers ?? 0).toLocaleString();
+      if(kpiAttorneys)  kpiAttorneys.textContent  = Number(stats.attorneys ?? 0).toLocaleString();
+      if(kpiParalegals) kpiParalegals.textContent = Number(stats.paralegals ?? 0).toLocaleString();
+      const spark = Array.isArray(traffic.spark) ? traffic.spark : (traffic.daily||[]).map(d=>d.visits);
+      if(kpiTraffic) kpiTraffic.textContent = (spark?.[spark.length-1] ?? stats.visits7d ?? 0).toLocaleString();
+      renderSparkline(trafficSpark, limit(spark, 30));
+
+      // Lists (compact rows)
+      const mk = (left, mid, right) => `<div class="row"><span class="pill">${left}</span><div>${mid}</div><div class="small">${right}</div></div>`;
+
+      if(requestsList) requestsList.replaceChildren(...limit(requests,8).map(r=> el(mk(esc(r.type||'—'), esc(r.from||''), fmt(r.createdAt)) )));
+      if(inquiriesList) inquiriesList.replaceChildren(...limit(inquiries,8).map(i=> el(mk('Inquiry', esc(i.subject||'—'), fmt(i.createdAt)) )));
+      if(emailsList) emailsList.replaceChildren(...limit(emails,8).map(m=> el(mk(esc(m.status||'Email'), esc(m.subject||'—'), fmt(m.createdAt)) )));
+      if(notificationsList) notificationsList.replaceChildren(...limit(notes,8).map(n=> el(mk(esc(n.level||'Note'), esc(n.message||'—'), fmt(n.createdAt)) )));
+      if(actionItemsList) actionItemsList.replaceChildren(...limit(actionItems,8).map(a=> el(mk(esc(a.status||'Todo'), esc(a.title||'—'), fmt(a.dueAt||a.createdAt)) )));
+    }
+
+    // events
+    document.addEventListener('click', (e) => {
+      const card = e.target.closest('.card');
+      const action = e.target.dataset.action;
+      if (card && action){ decide(card.dataset.id, action === 'approve' ? 'approved' : 'rejected'); }
     });
 
-function bulkDecide(status) {
-  fetch('http://localhost:5000/api/admin/bulk-update', {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + token
-    },
-    body: JSON.stringify({ status })
-  })
-  .then(res => res.json())
-  .then(resp => {
-    alert(resp.msg);
-    location.reload();
-  });
-}
+    q.addEventListener('input', debounce(()=>{ renderPending(); }, 180));
+    roleF.addEventListener('change', renderPending);
+    sortF.addEventListener('change', renderPending);
+
+    autoRefresh.addEventListener('change', () => {
+      clearInterval(timer);
+      if (autoRefresh.checked) timer = setInterval(()=>{ fetchPending(); fetchOverview(); }, 30000);
+      saveFilters();
+    });
+
+    bulkApproveBtn?.addEventListener('click', () => bulk('approved'));
+    bulkRejectBtn?.addEventListener('click', () => bulk('rejected'));
+
+    document.addEventListener('DOMContentLoaded', () => document.body.classList.add('loaded'));
+
+    // boot
+    (async function boot(){
+      loadFilters();
+      await ensureAdmin();
+      await Promise.all([ fetchPending(), fetchOverview() ]);
+      if (autoRefresh.checked) timer = setInterval(()=>{ fetchPending(); fetchOverview(); }, 30000);
+    })();
   </script>
 </body>
 </html>

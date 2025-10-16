@@ -3,245 +3,275 @@
 <head>
   <meta charset="UTF-8" />
   <title>Sign Up | Lets-ParaConnect</title>
-  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond&display=swap" rel="stylesheet" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;600&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <style>
-    :root {
-      --brand-brown: #8c7864;
-      --bg-cream: #f5f2ed;
-      --text-dark: #5c4e3a;
-      --text-muted: #9e8f7a;
-      --navy: #27394d;
-      --white: #ffffff;
-    }
+    :root{ --navy:#27394d; --gold:#b4975a; --ink:#1a1f25; --bg:#f5f2ed; --card:#ffffff; --line:#e8edf3; }
+    *{ box-sizing:border-box }
+    body{ margin:0; min-height:100vh; display:flex; flex-direction:column; background:var(--bg); color:var(--ink); font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    header{ background:#fff; border-bottom:1px solid var(--line); padding:12px 18px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10; }
+    .brand{ display:flex; align-items:center; gap:10px; color:var(--navy); text-decoration:none }
+    .brand img{ height:48px }
+    .brand span{ font-family:'EB Garamond',serif; font-size:1.25rem; letter-spacing:.2px }
+    nav a{ color:var(--navy); text-decoration:none; margin-left:14px; padding:.4rem .6rem; border-radius:8px }
+    nav a:hover{ background:#f6f8fb }
 
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    main{ flex:1; display:grid; place-items:center; padding:24px 12px }
+    .card{ width:min(560px, 94vw); background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px 18px; box-shadow:0 10px 30px rgba(0,0,0,.06); }
+    .title{ text-align:center; margin-bottom:.75rem }
+    .title h1{ margin:.1rem 0 .35rem; font-family:'EB Garamond',serif; font-size:1.8rem; color:var(--navy) }
+    .title p{ color:#4b5563 }
 
-    body {
-      font-family: 'EB Garamond', serif;
-      background: var(--bg-cream);
-      color: var(--text-dark);
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
+    .seg{ display:flex; background:#f6f8fb; border:1px solid var(--line); border-radius:12px; padding:4px; margin:16px 0 8px; }
+    .seg button{
+      flex:1; background:transparent; border:0; border-radius:10px; padding:.6rem .8rem; cursor:pointer; font-weight:600; color:#374151;
+      transition: background .15s ease, color .15s ease, transform .1s ease;
     }
+    .seg button[aria-pressed="true"]{ background:#1f2937; color:#fff; }
+    .seg button:active{ transform: scale(.98) }
 
-    header {
-      background-color: rgba(255,255,255,0.95);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 2rem;
-      border-bottom: 1px solid #e3e3e3;
-      position: sticky;
-      top: 0;
-      z-index: 1000;
+    form{ margin-top:8px }
+    label{ display:block; margin:.5rem 0 .25rem; color:#1f2937; font-size:.95rem }
+    input[type="text"],input[type="email"],input[type="password"]{
+      width:100%; padding:.72rem .8rem; border:1px solid var(--line); border-radius:10px; background:#fff; outline:none; transition:border-color .15s, box-shadow .15s;
     }
+    input:focus{ border-color:#b4975a; box-shadow:0 0 0 3px rgba(180,151,90,.16) }
+    .row{ display:grid; grid-template-columns:1fr; gap:.75rem }
+    .hint{ color:#6b7280; font-size:.9rem; margin:.2rem 0 .1rem }
 
-    .logo-wrap {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+    .pw-wrap{ position:relative }
+    .pw-toggle{ position:absolute; right:.6rem; top:50%; transform:translateY(-50%); font-size:.9rem; color:#334155; cursor:pointer; user-select:none; }
+    .meter{ height:6px; border-radius:999px; background:#eef2f7; overflow:hidden; margin:.35rem 0 .2rem }
+    .meter > i{ display:block; height:100%; width:0%; background:linear-gradient(90deg,#b91c1c,#f59e0b,#16a34a); transition: width .25s ease }
+    .meter-label{ font-size:.85rem; color:#4b5563 }
 
-    .logo-wrap img {
-      height: 50px;
+    .actions{ display:flex; gap:.5rem; align-items:center; margin-top:12px; flex-wrap:wrap }
+    .btn{
+      background:linear-gradient(135deg, var(--navy), #3a475a); color:#fff; border:0; border-radius:10px; padding:.7rem 1.1rem; font-weight:600; cursor:pointer;
+      transition: transform .12s ease, box-shadow .2s ease, opacity .2s ease;
     }
+    .btn:hover{ transform: translateY(-1px); box-shadow:0 10px 20px rgba(0,0,0,.18) }
+    .btn[disabled]{ opacity:.7; cursor:not-allowed; transform:none; box-shadow:none }
+    .link{ color:var(--navy); text-decoration:none }
+    .link:hover{ text-decoration:underline }
 
-    nav a {
-      text-decoration: none;
-      margin-left: 1.5rem;
-      color: var(--text-dark);
-      font-size: 1rem;
-      transition: opacity 0.3s ease;
-    }
+    .msg{ min-height:1.25rem; font-size:.95rem; color:#374151; margin-top:8px }
+    .msg.ok{ color:#166534 } .msg.err{ color:#b91c1c }
 
-    nav a:hover {
-      opacity: 0.7;
-    }
+    footer{ background:var(--navy); color:#fff; text-align:center; padding:16px 10px; font-size:.95rem }
+    footer a{ color:#fff; opacity:.9; text-decoration:none; margin:0 .5rem } footer a:hover{ opacity:1 }
 
-    main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      padding: 3rem 1rem;
-    }
-
-    .role-select {
-      text-align: center;
-      margin-bottom: 2rem;
-      animation: fadeIn 0.8s ease;
-    }
-
-    .role-btn {
-      padding: 1rem 2rem;
-      font-size: 1.2rem;
-      margin: 1rem;
-      border: none;
-      border-radius: 6px;
-      background-color: var(--navy);
-      color: white;
-      cursor: pointer;
-      transition: transform 0.2s ease, opacity 0.2s ease;
-    }
-
-    .form-container {
-      display: none;
-      background-color: rgba(39, 57, 77, 0.85);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-      border-radius: 10px;
-      padding: 2rem;
-      color: white;
-      max-width: 400px;
-      width: 100%;
-      animation: fadeInUp 0.6s ease both;
-    }
-
-    h2 {
-      margin-bottom: 1rem;
-      text-align: center;
-    }
-
-    input {
-      width: 100%;
-      padding: 0.6rem;
-      margin-bottom: 1rem;
-      border: none;
-      border-radius: 4px;
-      font-size: 1rem;
-    }
-
-    input:focus {
-      outline: none;
-      box-shadow: 0 0 6px rgba(255, 255, 255, 0.3);
-    }
-
-    button[type="submit"] {
-      width: 100%;
-      padding: 0.6rem;
-      font-size: 1rem;
-      background-color: white;
-      color: var(--navy);
-      font-weight: bold;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-
-    .message {
-      text-align: center;
-      margin-top: 1rem;
-      font-size: 0.9rem;
-      color: #fcebc1;
-    }
-
-    footer {
-      background-color: #27394d;
-      color: white;
-      text-align: center;
-      padding: 1.5rem 1rem;
-      font-size: 0.9rem;
-      margin-top: auto;
-    }
-
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(30px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
+    .fade-in{ animation: fade .25s ease both } @keyframes fade{ from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none} }
   </style>
+  <!-- Optional: auth.js can also set window.__CSRF__ -->
+  <script type="module" src="assets/scripts/auth.js"></script>
 </head>
 <body>
-
   <header>
-    <a href="index.html" class="logo-wrap">
+    <a class="brand" href="index.html" aria-label="Lets-ParaConnect home">
       <img src="assets/transparant logo only.png" alt="Logo" />
-      <h2 style="color: var(--brand-brown)">Lets-ParaConnect</h2>
+      <span>Lets-ParaConnect</span>
     </a>
     <nav>
-      <a href="signup.html">Sign Up</a>
       <a href="login.html">Login</a>
       <a href="about.html">About</a>
     </nav>
   </header>
 
   <main>
-    <div class="role-select" id="roleSelect">
-      <h2>Sign up as:</h2>
-      <button class="role-btn" onclick="showForm('attorney')">I'm an Attorney</button>
-      <button class="role-btn" onclick="showForm('paralegal')">I'm a Paralegal</button>
-    </div>
+    <section class="card fade-in" role="region" aria-labelledby="signupTitle">
+      <div class="title">
+        <h1 id="signupTitle">Create your account</h1>
+        <p>Choose your role and sign up in seconds.</p>
+      </div>
 
-    <div class="form-container" id="attorneyForm">
-      <h2>Attorney Registration</h2>
-      <form onsubmit="submitForm(event, 'attorney')">
-        <input type="text" placeholder="Full Name" required />
-        <input type="email" placeholder="Email" required />
-        <input type="password" placeholder="Password" required />
-        <input type="text" placeholder="State Bar Number" required />
-        <button type="submit">Register</button>
-      </form>
-      <div class="message" id="msgAttorney"></div>
-    </div>
+      <!-- Role chooser -->
+      <div class="seg" role="tablist" aria-label="Choose role">
+        <button id="btnA" role="tab" aria-selected="true" aria-pressed="true" data-role="attorney">Attorney</button>
+        <button id="btnP" role="tab" aria-selected="false" aria-pressed="false" data-role="paralegal">Paralegal</button>
+      </div>
 
-    <div class="form-container" id="paralegalForm">
-      <h2>Paralegal Registration</h2>
-      <form onsubmit="submitForm(event, 'paralegal')">
-        <input type="text" placeholder="Full Name" required />
-        <input type="email" placeholder="Email" required />
-        <input type="password" placeholder="Password" required />
-        <input type="text" placeholder="Certificate # or Upload Link" required />
-        <button type="submit">Register</button>
+      <!-- Minimal form -->
+      <form id="signupForm" novalidate>
+        <div class="row">
+          <div>
+            <label for="name">Full name</label>
+            <input id="name" type="text" autocomplete="name" required />
+          </div>
+          <div>
+            <label for="email">Email</label>
+            <input id="email" type="email" autocomplete="email" required />
+          </div>
+
+          <div class="pw-wrap">
+            <label for="password">Password</label>
+            <input id="password" type="password" autocomplete="new-password" required placeholder="8+ chars, mix letters & numbers" />
+            <a href="#" id="togglePw" class="pw-toggle" aria-controls="password">Show</a>
+            <div class="meter" aria-hidden="true"><i id="pwBar"></i></div>
+            <div class="meter-label" id="pwLabel">Password strength: —</div>
+          </div>
+
+          <div id="roleFieldWrap"></div>
+        </div>
+
+        <div class="actions">
+          <button id="submitBtn" class="btn" type="submit">Create account</button>
+          <a class="link" href="login.html">I already have an account</a>
+        </div>
+        <div id="msg" class="msg" role="status" aria-live="polite"></div>
+        <p class="hint" style="margin-top:8px">By continuing you agree to our
+          <a class="link" href="terms.html" target="_blank" rel="noopener">Terms</a> and
+          <a class="link" href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.
+        </p>
       </form>
-      <div class="message" id="msgParalegal"></div>
-    </div>
+    </section>
   </main>
 
   <footer>
-    &copy; 2025 Lets-ParaConnect. All rights reserved.
+    <div><a href="terms.html">Terms</a> • <a href="privacy.html">Privacy</a></div>
+    <div style="margin-top:.3rem; opacity:.9;">© <script>document.write(new Date().getFullYear())</script> Lets-ParaConnect</div>
   </footer>
 
   <script>
-    function showForm(role) {
-      document.getElementById('roleSelect').style.display = 'none';
-      const form = document.getElementById(`${role}Form`);
-      form.style.display = 'block';
-    }
+    // -------- Redirect if already signed in --------
+    (function(){ const t = localStorage.getItem('token'); if (t) location.href = 'dashboard-attorney.html'; })();
 
-    function submitForm(e, role) {
-      e.preventDefault();
-      const form = e.target;
-      const inputs = form.querySelectorAll('input');
-      const [name, email, password, extra] = [...inputs].map(i => i.value);
-      const msgEl = document.getElementById(role === 'attorney' ? 'msgAttorney' : 'msgParalegal');
+    // -------- Config --------
+    const API_BASE = location.origin + '/api';
+    // Prime CSRF cookie/value (harmless if your backend does not require it for register)
+    fetch('/api/csrf', { credentials:'include' })
+      .then(r=>r.json()).then(d => window.__CSRF__ = d.csrfToken).catch(()=>{});
 
-      msgEl.textContent = 'Submitting...';
+    // -------- Elements --------
+    const btnA = document.getElementById('btnA');
+    const btnP = document.getElementById('btnP');
+    const form = document.getElementById('signupForm');
+    const msg  = document.getElementById('msg');
+    const submitBtn = document.getElementById('submitBtn');
+    const roleFieldWrap = document.getElementById('roleFieldWrap');
+    const togglePw = document.getElementById('togglePw');
+    const pw = document.getElementById('password');
+    const emailEl = document.getElementById('email');
+    const nameEl = document.getElementById('name');
 
-      fetch('http://localhost:5000/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          email,
-          password,
-          ...(role === 'attorney' ? { barNumber: extra } : { certLink: extra }),
-          role
-        })
-      })
-      .then(res => res.json().then(data => ({ ok: res.ok, msg: data.msg })))
-      .then(({ ok, msg }) => {
-        msgEl.textContent = ok ? 'Submitted. Await admin approval.' : msg;
+    const pwBar = document.getElementById('pwBar');
+    const pwLabel = document.getElementById('pwLabel');
+
+    // Restore last email (nice touch for retries)
+    emailEl.value = localStorage.getItem('lastEmail') || '';
+
+    let role = 'attorney'; // default
+
+    // -------- Role UI --------
+    function setRole(r){
+      role = r;
+      [btnA, btnP].forEach(b => {
+        const on = b.dataset.role === r;
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
       });
+      roleFieldWrap.innerHTML = r === 'attorney'
+        ? `<div>
+             <label for="bar">State Bar Number</label>
+             <input id="bar" type="text" autocomplete="off" required />
+             <div class="hint">We verify bar numbers during review.</div>
+           </div>`
+        : `<div>
+             <label for="cert">Certification / License (optional)</label>
+             <input id="cert" type="text" autocomplete="off" />
+             <div class="hint">Add NALA CP, state license #, etc. You can update later.</div>
+           </div>`;
     }
+    setRole(role);
+
+    btnA.addEventListener('click', () => setRole('attorney'));
+    btnP.addEventListener('click', () => setRole('paralegal'));
+    btnA.addEventListener('keydown', (e)=>{ if(e.key==='ArrowRight'){ e.preventDefault(); btnP.focus(); setRole('paralegal'); }});
+    btnP.addEventListener('keydown', (e)=>{ if(e.key==='ArrowLeft'){ e.preventDefault(); btnA.focus(); setRole('attorney'); }});
+
+    // -------- Password meter + toggle --------
+    function scorePassword(pw){
+      let s=0; if(!pw) return 0;
+      if(pw.length>=8) s+=30;
+      if(/[A-Z]/.test(pw)) s+=20;
+      if(/[a-z]/.test(pw)) s+=20;
+      if(/\d/.test(pw)) s+=20;
+      if(/[^A-Za-z0-9]/.test(pw)) s+=10;
+      return Math.min(100,s);
+    }
+    function updateMeter(){
+      const n = scorePassword(pw.value);
+      pwBar.style.width = n + '%';
+      pwLabel.textContent = 'Password strength: ' + (n<35 ? 'Weak' : n<70 ? 'Okay' : 'Strong');
+    }
+    pw.addEventListener('input', updateMeter); updateMeter();
+
+    togglePw.addEventListener('click', (e) => {
+      e.preventDefault();
+      const show = pw.type === 'password';
+      pw.type = show ? 'text' : 'password';
+      togglePw.textContent = show ? 'Hide' : 'Show';
+    });
+
+    // -------- Helpers --------
+    function say(text, cls=''){ msg.className='msg '+cls; msg.textContent=text||''; }
+    function validEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e||''); }
+
+    // -------- Submit --------
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      say('');
+
+      const name = nameEl.value.trim();
+      const email = emailEl.value.trim().toLowerCase();
+      const password = pw.value;
+
+      if (!name || !email || !password) { say('Please fill all required fields.', 'err'); return; }
+      if (!validEmail(email)) { say('Enter a valid email address.', 'err'); return; }
+      if (scorePassword(password) < 35) { say('Use 8+ chars with a mix of letters/numbers.', 'err'); return; }
+
+      if (role === 'attorney') {
+        const bar = (document.getElementById('bar')?.value || '').trim();
+        if (!bar) { say('State Bar Number is required for attorneys.', 'err'); return; }
+      }
+
+      submitBtn.disabled = true; submitBtn.textContent = 'Creating…';
+
+      try {
+        const payload = { name, email, password, role };
+        if (role === 'attorney') payload.barNumber = document.getElementById('bar').value.trim();
+        else payload.certification = (document.getElementById('cert')?.value || '').trim() || undefined;
+
+        const headers = { 'Content-Type':'application/json' };
+        if (window.__CSRF__) headers['X-CSRF-Token'] = window.__CSRF__;
+
+        const res = await fetch(`${API_BASE}/auth/register`, {
+          method:'POST',
+          credentials:'include',
+          headers,
+          body: JSON.stringify(payload)
+        });
+
+        let data={}; try{ data = await res.json(); }catch{}
+
+        if (!res.ok) {
+          if (res.status === 409) throw new Error('That email is already registered.');
+          if (res.status === 429) throw new Error('Too many attempts. Please wait and try again.');
+          throw new Error(data?.msg || data?.message || 'Could not create account.');
+        }
+
+        // Save for convenience on login page
+        localStorage.setItem('lastEmail', email);
+
+        say('Application submitted. Await approval.', 'ok');
+        setTimeout(()=> location.href = 'login.html', 1000);
+      } catch (err) {
+        console.error(err);
+        say(err.message || 'Network error. Please try again.', 'err');
+      } finally {
+        submitBtn.disabled = false; submitBtn.textContent = 'Create account';
+      }
+    });
   </script>
 </body>
 </html>

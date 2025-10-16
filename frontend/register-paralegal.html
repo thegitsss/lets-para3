@@ -2,174 +2,418 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Register as Paralegal | Lets-ParaConnect</title>
+  <title>Register as a Paralegal | Lets-ParaConnect</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond&display=swap" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;600&family=Source+Sans+Pro:wght@400;600&display=swap" rel="stylesheet" />
 
-  <!-- reCAPTCHA -->
+  <!-- reCAPTCHA (optional). Remove this and the widget <div> if unused -->
   <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 
- <!-- Styles -->
+  <!-- CSRF/bootstrap helpers (should populate window.__CSRF__) -->
+  <script type="module" src="assets/scripts/auth.js"></script>
+
   <style>
-    body {
-      font-family: 'EB Garamond', serif;
-      background: #f5f2ed;
-      margin: 0;
-      padding: 0;
-      color: #2c2c2c;
+    :root{
+      --navy:#27394d; --ink:#1f242b; --gold:#b4975a; --bg:#f5f2ed; --line:#e8edf3;
+      --ok:#1f7a4a; --bad:#b04747;
+    }
+    *{ box-sizing:border-box }
+    body{
+      margin:0; min-height:100vh; display:flex; flex-direction:column; background:var(--bg);
+      color:var(--ink); font-family:'Source Sans Pro', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+    header, footer{ background:var(--navy); color:#fff; text-align:center; padding:1rem }
+    header .brand{ display:inline-flex; align-items:center; gap:.6rem; font-family:'EB Garamond',serif; font-weight:600; letter-spacing:.2px }
+    header img{ height:44px }
+    main{ flex:1; display:grid; place-items:center; padding:2rem }
+
+    .card{
+      width:min(520px,94vw); background:rgba(39,57,77,.9); color:#fff; border-radius:14px;
+      box-shadow:0 16px 40px rgba(0,0,0,.28); padding:1.5rem 1.6rem 1.25rem; animation:pop .5s ease;
+    }
+    .card h2{ margin:.2rem 0 1rem; font-family:'EB Garamond',serif; font-weight:600; text-align:center }
+
+    label{ display:block; font-size:.95rem; margin:.35rem 0 .35rem; opacity:.95 }
+    input, select, textarea{
+      width:100%; padding:.7rem .85rem; border:1px solid rgba(255,255,255,.2); background:rgba(255,255,255,.08);
+      border-radius:10px; color:#fff; outline:none; transition:border-color .2s, box-shadow .2s;
+    }
+    input::placeholder, textarea::placeholder{ color:#d9dee6 }
+    input:focus, select:focus, textarea:focus{ border-color:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.18) }
+    .row{ display:grid; grid-template-columns:1fr 1fr; gap:.8rem }
+    @media (max-width:560px){ .row{ grid-template-columns:1fr } }
+
+    .pw-wrap{ position:relative }
+    .toggle{
+      position:absolute; right:.6rem; top:50%; transform:translateY(-50%); cursor:pointer; user-select:none;
+      font-size:.92rem; color:#f1f5f9; opacity:.85;
     }
 
-    header, footer {
-      text-align: center;
-      padding: 1rem;
-      background-color: #27394d;
-      color: white;
-    }
+    .hint{ font-size:.85rem; color:#e8e9ed; opacity:.9; margin:.15rem 0 .4rem }
+    .errors{ color:#ffe4d6; background:rgba(176,71,71,.15); border:1px solid rgba(176,71,71,.35); padding:.6rem .7rem; border-radius:8px; margin:.3rem 0 .6rem; display:none }
+    .ok{ color:#e6ffef; background:rgba(31,122,74,.15); border:1px solid rgba(31,122,74,.35); padding:.6rem .7rem; border-radius:8px; margin:.4rem 0 .6rem; display:none }
 
-    .logo-wrap {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-    }
+    .meter{ height:6px; border-radius:999px; background:rgba(255,255,255,.18); overflow:hidden; margin:.35rem 0 .2rem }
+    .meter > i{ display:block; height:100%; width:0%; background:linear-gradient(90deg,#b04747,#ffb347,#1f7a4a); transition: width .25s ease }
+    .meter-label{ font-size:.85rem; opacity:.9 }
 
-    .logo-wrap img {
-      height: 50px;
+    /* Dropzone */
+    .drop{
+      border:2px dashed rgba(255,255,255,.35); border-radius:12px; padding:1rem; text-align:center;
+      background:rgba(255,255,255,.05); transition: border-color .2s ease, background .2s ease;
     }
+    .drop.dragover{ border-color:#fff; background:rgba(255,255,255,.1); }
+    .drop .actions { display:flex; gap:.5rem; justify-content:center; margin-top:.7rem; flex-wrap:wrap }
+    .drop .btn { background:#fff; color:var(--navy); border:0; border-radius:10px; padding:.55rem .9rem; cursor:pointer; font-weight:600 }
+    .drop small { display:block; opacity:.85; margin-top:.35rem }
 
-    main {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 80vh;
-      padding: 2rem;
-    }
+    .file-row{ display:flex; align-items:center; justify-content:space-between; gap:.6rem; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2); padding:.6rem .7rem; border-radius:10px; margin-top:.6rem }
+    .file-row .name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .file-row .controls{ display:flex; gap:.4rem }
+    .link-btn{ background:transparent; color:#fff; border:1px solid rgba(255,255,255,.5); border-radius:8px; padding:.35rem .6rem; cursor:pointer }
 
-    .form-container {
-      background-color: #4a5b6a;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-      border-radius: 16px;
-      padding: 2rem 3rem;
-      color: white;
-      width: 100%;
-      max-width: 420px;
-      animation: fadeInUp 0.7s ease-out both;
+    .actions{ margin-top:.8rem }
+    button[type="submit"]{
+      width:100%; padding:.9rem 1rem; background:#fff; color:var(--navy); border:0; border-radius:10px; font-weight:600; cursor:pointer;
+      transition:transform .15s ease, box-shadow .2s ease, opacity .2s ease;
     }
+    button[type="submit"]:hover{ transform:translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.18) }
+    button:disabled{ opacity:.6; cursor:not-allowed; transform:none; box-shadow:none }
 
-    .form-container h2 {
-      margin-bottom: 1.5rem;
-      font-size: 1.7rem;
-      text-align: center;
-    }
+    footer a{ color:#fff; text-decoration:none; margin:0 .5rem; opacity:.9 }
+    footer a:hover{ opacity:1 }
 
-    input {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      margin-bottom: 1rem;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-family: 'EB Garamond', serif;
-    }
-
-    input:focus {
-      outline: none;
-      box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
-      transition: box-shadow 0.2s ease-in-out;
-    }
-
-    button {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      font-size: 1rem;
-      background-color: #ffffff;
-      color: #27394d;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: bold;
-      font-family: 'EB Garamond', serif;
-      transition: transform 0.2s ease, background-color 0.2s ease;
-    }
-
-    button:hover {
-      transform: scale(1.03);
-      background-color: #dcdcdc;
-    }
-
-    .message {
-      margin-top: 1rem;
-      font-size: 0.95rem;
-      text-align: center;
-      color: #fcebc1;
-    }
-
-    footer {
-      font-size: 0.9rem;
-    }
-
-    @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(30px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
+    @keyframes pop{ from{ transform:translateY(6px); opacity:0 } to{ transform:none; opacity:1 } }
   </style>
 </head>
 
 <body>
   <header>
-    <div class="logo-wrap">
+    <div class="brand">
       <img src="assets/transparant logo only.png" alt="Logo" />
-      <h1>Lets‑ParaConnect</h1>
+      <span>Lets-ParaConnect</span>
     </div>
   </header>
 
   <main>
-    <div class="form-container">
-      <h2>Register as a Paralegal</h2>
-      <form id="regForm">
-        <input type="text" id="name" placeholder="Full Name" required />
-        <input type="email" id="email" placeholder="Email" required />
-        <input type="password" id="password" placeholder="Password" required />
-        <input type="text" id="cert" placeholder="Certification / License (if applicable)" />
-        <button type="submit">Register</button>
+    <section class="card" role="region" aria-labelledby="title">
+      <h2 id="title">Register as a Paralegal</h2>
+
+      <div class="errors" id="errors" role="alert" aria-live="polite"></div>
+      <div class="ok" id="ok" aria-live="polite"></div>
+
+      <form id="regForm" novalidate>
+        <label for="name">Full Name</label>
+        <input id="name" name="name" autocomplete="name" placeholder="Alexis M. Paralegal" required />
+
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" required />
+
+        <label for="password">Password</label>
+        <div class="pw-wrap">
+          <input id="password" name="password" type="password" autocomplete="new-password" placeholder="8+ chars, mix letters & numbers" required />
+          <span class="toggle" id="showPw" role="button" tabindex="0" aria-controls="password" aria-label="Toggle password visibility">Show</span>
+        </div>
+        <div class="meter" aria-hidden="true"><i id="pwBar"></i></div>
+        <div class="meter-label" id="pwLabel">Password strength: —</div>
+
+        <label for="cert">Certification / License (optional)</label>
+        <input id="cert" name="cert" placeholder="e.g., NALA CP, State license #" />
+
+        <div class="row">
+          <div>
+            <label for="expYears">Years of Experience (optional)</label>
+            <input id="expYears" name="expYears" type="number" min="0" step="1" placeholder="e.g., 3" />
+          </div>
+          <div>
+            <label for="availability">Availability</label>
+            <select id="availability" name="availability">
+              <option value="">Select…</option>
+              <option>Available</option>
+              <option>Partial</option>
+              <option>Fully Booked</option>
+            </select>
+          </div>
+        </div>
+
+        <label for="specialties">Practice Areas (optional, comma separated)</label>
+        <input id="specialties" name="specialties" placeholder="e.g., Litigation, Immigration, Real Estate" />
+
+        <label for="linkedin">LinkedIn (optional)</label>
+        <input id="linkedin" name="linkedin" type="url" placeholder="https://www.linkedin.com/in/…" />
+
+        <!-- Resume upload -->
+        <label>Resume (PDF, optional)</label>
+        <div id="drop" class="drop" tabindex="0" aria-label="Resume upload dropzone">
+          <div>Drag & drop PDF here, or</div>
+          <div class="actions">
+            <button type="button" class="btn" id="pickBtn">Choose PDF</button>
+            <small>Max 5&nbsp;MB</small>
+          </div>
+          <input id="fileInput" type="file" accept="application/pdf" hidden />
+        </div>
+        <div id="fileRow" class="file-row" style="display:none;">
+          <div class="name" id="fileName"></div>
+          <div class="controls">
+            <a class="link-btn" id="viewBtn" href="#" target="_blank" rel="noopener">View</a>
+            <button type="button" class="link-btn" id="removeBtn">Remove</button>
+          </div>
+        </div>
+        <div class="hint" id="uploadStatus" style="display:none;"></div>
+
+        <!-- Optional reCAPTCHA widget -->
+        <div class="g-recaptcha" data-sitekey="<!-- paste site key or remove this div -->"></div>
+
+        <div class="actions">
+          <button id="submitBtn" type="submit">Submit Application</button>
+        </div>
+        <div class="hint" style="margin-top:.6rem;">You’ll receive an email after admin review.</div>
       </form>
-      <div class="message" id="message"></div>
-    </div>
+    </section>
   </main>
 
   <footer>
-    &copy; 2025 Lets‑ParaConnect. All rights reserved.
+    <div>
+      <a href="terms.html">Terms</a> • <a href="privacy.html">Privacy</a> • <a href="login.html">Login</a>
+    </div>
+    <div style="margin-top:.35rem; opacity:.85;">© <script>document.write(new Date().getFullYear())</script> Lets-ParaConnect</div>
   </footer>
 
   <script>
+    // ---------- Config ----------
+    const API_BASE = location.origin + '/api';
+    const MAX_PDF_MB = 5;
+
+    // Prime CSRF (auth.js should also do this; harmless to double-call)
+    fetch('/api/csrf', { credentials:'include' })
+      .then(r => r.json()).then(d => window.__CSRF__ = d.csrfToken)
+      .catch(()=>{});
+
+    // ---------- Elements ----------
     const form = document.getElementById('regForm');
-    const msg = document.getElementById('message');
+    const errors = document.getElementById('errors');
+    const ok = document.getElementById('ok');
+    const submitBtn = document.getElementById('submitBtn');
 
-    form.addEventListener('submit', async (e) => {
+    const nameEl = document.getElementById('name');
+    const emailEl = document.getElementById('email');
+    const pwEl = document.getElementById('password');
+    const certEl = document.getElementById('cert');
+    const expEl = document.getElementById('expYears');
+    const availEl = document.getElementById('availability');
+    const specEl = document.getElementById('specialties');
+    const linkedinEl = document.getElementById('linkedin');
+
+    const pwBar = document.getElementById('pwBar');
+    const pwLabel = document.getElementById('pwLabel');
+    const showPwBtn = document.getElementById('showPw');
+
+    // Upload widgets
+    const drop = document.getElementById('drop');
+    const pickBtn = document.getElementById('pickBtn');
+    const fileInput = document.getElementById('fileInput');
+    const fileRow = document.getElementById('fileRow');
+    const fileName = document.getElementById('fileName');
+    const viewBtn = document.getElementById('viewBtn');
+    const removeBtn = document.getElementById('removeBtn');
+    const uploadStatus = document.getElementById('uploadStatus');
+
+    let selectedFile = null, previewUrl = null, uploadedResumeUrl = null;
+
+    // ---------- PW helpers ----------
+    function scorePassword(pw){
+      let s=0; if(!pw) return 0;
+      if(pw.length>=8) s+=30;
+      if(/[A-Z]/.test(pw)) s+=20;
+      if(/[a-z]/.test(pw)) s+=20;
+      if(/\d/.test(pw)) s+=20;
+      if(/[^A-Za-z0-9]/.test(pw)) s+=10;
+      return Math.min(100,s);
+    }
+    function updateMeter(){
+      const n = scorePassword(pwEl.value);
+      pwBar.style.width = n + '%';
+      pwLabel.textContent = 'Password strength: ' + (n<35 ? 'Weak' : n<70 ? 'Okay' : 'Strong');
+    }
+    pwEl.addEventListener('input', updateMeter); updateMeter();
+
+    function togglePwVis(){
+      const pw = pwEl.type === 'password';
+      pwEl.type = pw ? 'text' : 'password';
+      showPwBtn.textContent = pw ? 'Hide' : 'Show';
+    }
+    showPwBtn.addEventListener('click', togglePwVis);
+    showPwBtn.addEventListener('keydown', (e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); togglePwVis(); } });
+
+    // ---------- Messaging ----------
+    function showError(msgs){
+      errors.style.display = msgs ? 'block' : 'none';
+      ok.style.display = 'none';
+      if (!msgs) { errors.innerHTML=''; return; }
+      errors.innerHTML = Array.isArray(msgs) ? msgs.map(m=>`<div>• ${m}</div>`).join('') : msgs;
+    }
+    function showOk(text){
+      ok.style.display = 'block';
+      errors.style.display = 'none';
+      ok.textContent = text || 'Submitted.';
+    }
+    const validEmail = (e)=> /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e||'');
+    const isValidUrl = (u)=> { if(!u) return true; try{ new URL(u); return true; }catch{ return false; } };
+    const toTags = (csv)=> (csv||'').split(',').map(s=>s.trim()).filter(Boolean);
+
+    async function maybeGetRecaptcha(){
+      try{
+        if (window.grecaptcha && typeof grecaptcha.getResponse === 'function') {
+          return grecaptcha.getResponse() || '';
+        }
+      }catch{}
+      return '';
+    }
+
+    // ---------- Upload helpers ----------
+    function handleFile(f){
+      if (!f) return;
+      const errs = [];
+      if (f.type !== 'application/pdf' && !/\.pdf$/i.test(f.name)) errs.push('Resume must be a PDF.');
+      if (f.size > MAX_PDF_MB * 1024 * 1024) errs.push(`Max size is ${MAX_PDF_MB} MB.`);
+      if (errs.length) { showError(errs); return; }
+      showError('');
+
+      selectedFile = f; uploadedResumeUrl = null;
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = URL.createObjectURL(f);
+      fileName.textContent = f.name + ` (${(f.size/1024/1024).toFixed(2)} MB)`;
+      viewBtn.href = previewUrl;
+      fileRow.style.display = '';
+      uploadStatus.style.display = 'none';
+    }
+
+    pickBtn.addEventListener('click', ()=> fileInput.click());
+    fileInput.addEventListener('change', ()=> handleFile(fileInput.files?.[0]));
+    ['dragenter','dragover'].forEach(ev => drop.addEventListener(ev, (e)=>{ e.preventDefault(); drop.classList.add('dragover'); }));
+    ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, (e)=>{ e.preventDefault(); drop.classList.remove('dragover'); }));
+    drop.addEventListener('drop', (e)=> {
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) handleFile(f);
+    });
+    // Keyboard activation
+    drop.addEventListener('keydown', (e)=>{
+      if (e.key==='Enter' || e.key===' ') { e.preventDefault(); fileInput.click(); }
+    });
+
+    removeBtn.addEventListener('click', ()=>{
+      selectedFile = null; uploadedResumeUrl = null;
+      fileRow.style.display = 'none';
+      fileInput.value = '';
+      if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
+    });
+
+    async function uploadResumePDF(file){
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('folder', 'resumes');
+      const headers = { 'X-CSRF-Token': window.__CSRF__ || '' };
+
+      const endpoints = [`${API_BASE}/uploads/resume`, `${API_BASE}/uploads`];
+      let lastErr;
+      for (const ep of endpoints) {
+        try {
+          const r = await fetch(ep, { method:'POST', body: fd, credentials:'include', headers });
+          let data={}; try{ data = await r.json(); }catch{}
+          if (r.ok) return data.url || data.publicUrl || data.path || data.file?.url || data.location || null;
+          lastErr = new Error(data?.msg || data?.message || `Upload failed (${r.status})`);
+        } catch(e) { lastErr = e; }
+      }
+      throw lastErr || new Error('Upload failed');
+    }
+
+    // ---------- Submit ----------
+    form.addEventListener('submit', async (e)=>{
       e.preventDefault();
-      msg.textContent = 'Submitting...';
 
-      const name = document.getElementById('name').value;
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      const cert = document.getElementById('cert').value;
+      const errs = [];
+      const name = (nameEl.value||'').trim();
+      const email = (emailEl.value||'').trim().toLowerCase();
+      const password = pwEl.value||'';
+      const cert = (certEl.value||'').trim();
+      const expYears = expEl.value ? Number(expEl.value) : undefined;
+      const availability = (availEl.value||'').trim();
+      const specialties = toTags(specEl.value);
+      const linkedin = (linkedinEl.value||'').trim();
 
-      const res = await fetch('http://localhost:5000/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, certification: cert, role: 'paralegal' })
-      });
+      if (!name) errs.push('Full name is required.');
+      if (!validEmail(email)) errs.push('Enter a valid email address.');
+      if (scorePassword(password) < 35) errs.push('Use 8+ chars with a mix of letters/numbers.');
+      if (linkedin && !isValidUrl(linkedin)) errs.push('LinkedIn must be a valid URL.');
+      if (errs.length){ showError(errs); return; }
 
-      const data = await res.json();
-      msg.textContent = res.ok ? 'Application submitted. Await approval.' : data.msg;
+      const rcToken = await maybeGetRecaptcha();
+      if (document.querySelector('.g-recaptcha') && window.grecaptcha && !rcToken) {
+        showError('Please verify you are not a robot.'); return;
+      }
+
+      showError(''); ok.style.display='none';
+      submitBtn.disabled = true; submitBtn.textContent = 'Submitting…';
+
+      try {
+        if (selectedFile && !uploadedResumeUrl) {
+          uploadStatus.style.display = 'block';
+          uploadStatus.textContent = 'Uploading resume…';
+          const url = await uploadResumePDF(selectedFile);
+          if (!url) throw new Error('Server did not return a file URL.');
+          uploadedResumeUrl = url;
+          uploadStatus.textContent = 'Resume uploaded ✓';
+        }
+      } catch (err) {
+        submitBtn.disabled = false; submitBtn.textContent = 'Submit Application';
+        uploadStatus.style.display = 'block';
+        uploadStatus.textContent = 'Resume upload failed. You can submit without a resume or try again.';
+        showError(err.message || 'Resume upload failed.');
+        return;
+      }
+
+      const payload = {
+        name, email, password, role:'paralegal',
+        certification: cert || undefined,
+        yearsExperience: typeof expYears === 'number' && !Number.isNaN(expYears) ? expYears : undefined,
+        availability: availability || undefined,
+        specialties: specialties.length ? specialties : undefined,
+        linkedin: linkedin || undefined,
+        resumeURL: uploadedResumeUrl || undefined,
+        recaptchaToken: rcToken || undefined
+      };
+
+      try{
+        const res = await fetch(API_BASE + '/auth/register', {
+          method:'POST',
+          credentials:'include',
+          headers:{
+            'Content-Type':'application/json',
+            'X-CSRF-Token': window.__CSRF__ || ''
+          },
+          body: JSON.stringify(payload)
+        });
+        let data={}; try{ data = await res.json(); }catch{}
+
+        if (!res.ok) {
+          if (res.status === 409) throw new Error('That email is already registered.');
+          if (res.status === 429) throw new Error('Too many attempts. Please wait a minute and try again.');
+          throw new Error(data?.msg || data?.message || 'Registration failed.');
+        }
+
+        showOk('Application submitted. Await admin approval.');
+        submitBtn.textContent = 'Submitted';
+        setTimeout(()=> { window.location.href = 'login.html'; }, 1500);
+      } catch (err) {
+        if (err?.name === 'TypeError') {
+          showError('Network error. Check your connection and try again.');
+        } else {
+          showError(err.message || 'Could not submit application.');
+        }
+        submitBtn.disabled = false; submitBtn.textContent = 'Submit Application';
+      }
     });
   </script>
 </body>

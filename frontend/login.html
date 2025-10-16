@@ -1,135 +1,107 @@
-<link rel="stylesheet" href="assets/styles/global.css">
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
-<script type="module" src="assets/scripts/auth.js"></script>
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <style>body{opacity:1!important;visibility:visible!important}</style>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Login | Lets-ParaConnect</title>
+
+  <!-- Global styles -->
   <link rel="stylesheet" href="assets/styles.css" />
+
+  <!-- Page polish -->
   <style>
-    body {
-      font-family: Georgia, serif;
-      background: var(--bg-cream);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-      animation: fadeIn 1s ease;
+    :root { --brand-brown:#8c7864; --bg-cream:#f5f2ed; --text-dark:#5c4e3a; --navy:#27394d; --line:#e8edf3; }
+    body{
+      font-family: Georgia, serif; background: var(--bg-cream);
+      min-height:100vh; margin:0; display:grid; place-items:center;
     }
+    .login-card{
+      width:min(440px, 92vw); background:#fff; border:1px solid var(--line);
+      border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.08); padding:22px;
+    }
+    h1{ color:var(--navy); margin:0 0 12px; font-weight:700; font-size:1.35rem; text-align:center; }
 
-    .login-card {
-      background: #ffffff;
-      padding: 2rem;
-      border-radius: 10px;
-      box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-      width: 100%;
-      max-width: 400px;
-      text-align: center;
-      animation: slideUp 0.6s ease;
+    .form-group{ margin:10px 0; }
+    label{ display:block; margin:0 0 6px; font-weight:600; color:#334155; }
+    input{
+      width:100%; padding:.7rem .8rem; border:1px solid #d9dee5; border-radius:8px; font-size:1rem;
+      outline:none; transition:border-color .15s, box-shadow .15s; background:#fff;
     }
+    input:focus{ border-color:var(--brand-brown); box-shadow:0 0 0 3px rgba(140,120,100,.14); }
 
-    h1 {
-      color: var(--navy);
-      margin-bottom: 1.5rem;
-      font-weight: normal;
-    }
+  .pw-wrap{ position:relative; }
+  /* Give the input room so the Show/Hide button doesn’t overlap text/caret */
+  .pw-wrap input{ padding-right:4.5rem; }
 
-    .form-group {
-      margin-bottom: 1rem;
-      text-align: left;
-    }
+  .show-toggle{
+    position:absolute; right:.6rem; top:50%; transform:translateY(-50%);
+    background:transparent; border:0; font:inherit; font-weight:600;
+    color:var(--text-dark); cursor:pointer; padding:.2rem .35rem; border-radius:6px;
+  }
+  .show-toggle:focus{ outline:2px solid rgba(39,57,77,.45); outline-offset:2px; }
 
-    label {
-      display: block;
-      font-weight: normal;
-      margin-bottom: 0.4rem;
+    .login-btn{
+      width:100%; margin-top:.5rem; background:var(--navy); color:#fff; border:0; padding:.78rem;
+      border-radius:10px; cursor:pointer; font-weight:700;
     }
+    .login-btn[disabled]{ opacity:.7; cursor:progress; }
 
-    input {
-      width: 100%;
-      padding: 0.7rem;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      font-size: 1rem;
-      transition: border 0.3s ease;
-    }
-
-    input:focus {
-      border-color: var(--brand-brown);
-      outline: none;
-    }
-
-    .login-btn {
-      width: 100%;
-      margin-top: 1rem;
-      background: var(--navy);
-      color: white;
-      border: none;
-      padding: 0.75rem;
-      font-family: Georgia, serif;
-      font-weight: normal;
-      font-size: 1rem;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: background 0.3s ease;
-    }
-
-    .login-btn:hover {
-      background: #1f2e3d;
-    }
-
-    .show-toggle {
-      font-size: 0.9rem;
-      color: var(--text-dark);
-      cursor: pointer;
-      float: right;
-      margin-top: -1.5rem;
-      margin-right: 0.5rem;
-    }
-
-    @keyframes slideUp {
-      from { transform: translateY(30px); opacity: 0; }
-      to   { transform: translateY(0); opacity: 1; }
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to   { opacity: 1; }
-    }
+    .msg{ margin-top:.75rem; min-height:1.2em; color:#7a5e25; }
+    .muted{ color:#64748b; font-size:.9rem; text-align:center; }
   </style>
+
+  <!-- CSRF bootstrap + role UI helpers (adds body.loaded, fetches /api/csrf) -->
+  <script type="module" src="assets/scripts/auth.js"></script>
 </head>
 <body>
-  <div class="login-card">
-    <h1>Login to Lets-ParaConnect</h1>
-    <form>
+  <main class="login-card" aria-labelledby="loginTitle">
+    <h1 id="loginTitle">Login to Lets-ParaConnect</h1>
+
+    <form id="loginForm" novalidate>
       <div class="form-group">
         <label for="email">Email</label>
-        <input type="email" id="email" placeholder="you@example.com" required />
+        <input id="email" name="email" type="email" inputmode="email" autocomplete="email"
+               placeholder="you@example.com" required aria-required="true" />
       </div>
-      <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" placeholder="••••••••" required />
-        <span class="show-toggle" onclick="togglePassword()">Show</span>
-      </div>
-      <button type="submit" class="login-btn">Login</button>
-    </form>
-  </div>
 
+      <div class="form-group pw-wrap">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password"
+               placeholder="••••••••" required aria-required="true" />
+        <button type="button" class="show-toggle" aria-controls="password" aria-label="Show or hide password"
+                onclick="window.togglePassword?.()">Show</button>
+      </div>
+
+      <button type="submit" class="login-btn">Login</button>
+      <div id="msg" class="msg" role="status" aria-live="polite"></div>
+
+      <p class="muted" style="margin-top:12px">
+        Just previewing?
+        <a href="#" id="devBypass">Dev bypass</a>
+      </p>
+    </form>
+  </main>
+
+  <!-- Page logic: uses your cookie-auth flow (/api/auth/login) with CSRF + redirects -->
+  <script type="module" src="assets/scripts/login.js"></script>
   <script>
-    function togglePassword() {
-      const input = document.getElementById("password");
-      const toggle = document.querySelector(".show-toggle");
-      if (input.type === "password") {
-        input.type = "text";
-        toggle.textContent = "Hide";
-      } else {
-        input.type = "password";
-        toggle.textContent = "Show";
-      }
-    }
-  </script>
+  // Accessible Show/Hide password toggle
+  window.togglePassword = function () {
+    const input = document.getElementById('password');
+    const btn   = document.querySelector('.show-toggle');
+    const isHidden = input.type === 'password';
+
+    input.type = isHidden ? 'text' : 'password';
+    btn.textContent = isHidden ? 'Hide' : 'Show';
+    btn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+    btn.setAttribute('aria-pressed', String(isHidden));
+
+    // keep focus/caret in place
+    input.focus({ preventScroll: true });
+    const end = input.value.length;
+    try { input.setSelectionRange(end, end); } catch {}
+  };
+</script>
 </body>
 </html>

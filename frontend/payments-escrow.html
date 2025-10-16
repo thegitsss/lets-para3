@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <style>body{opacity:1!important;visibility:visible!important}</style>
+  <meta charset="utf-8" />
+  <title>Payments & Escrow • Lets-ParaConnect</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- Site styles (for consistent palette/components) -->
+  <link rel="stylesheet" href="assets/styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --ink:#1a2230; --muted:#5c6b7a; --gold:#b4975a; --line:#e8edf3; --card:#fff; --bg:#faf7f3; --navy:#27394d;
+      --ok:#1f7a4a; --warn:#946200; --bad:#b04747;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    header{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:14px 20px}
+    .brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+    .brand span{font-family:"EB Garamond",serif;color:var(--gold);font-size:1.25rem}
+    nav a{color:var(--navy);text-decoration:none;margin-left:14px;position:relative}
+    nav a::after{content:"";position:absolute;left:0;bottom:-4px;height:2px;width:0;background:var(--gold);transition:width .25s ease}
+    nav a:hover::after{width:100%}
+
+    main{max-width:980px;margin:28px auto;padding:0 18px}
+    h1,h2,h3{font-family:"EB Garamond",serif}
+    h1{font-weight:700;margin:6px 0 10px}
+    .lead{color:var(--muted);margin:0 0 14px}
+    .pill{display:inline-block;padding:4px 10px;border:1px solid var(--line);border-radius:999px;font-size:.85rem;color:#3c4b5a;background:#f6f8fb;margin:0 6px 10px 0}
+
+    .grid{display:grid;gap:16px}
+    @media(min-width:860px){ .grid.cols-3{grid-template-columns:repeat(3,1fr)} .grid.cols-2{grid-template-columns:repeat(2,1fr)} }
+
+    .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 22px rgba(0,0,0,.06);padding:18px;transition:transform .15s ease, box-shadow .15s ease}
+    .card:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,.1)}
+    .step-num{width:28px;height:28px;border-radius:50%;display:inline-grid;place-items:center;background:#f3efe6;color:#5c4b2a;font-weight:700;margin-right:8px}
+
+    .callout{border-left:4px solid var(--gold);background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;margin:14px 0}
+    .ok{border-left-color:var(--ok)}
+    .warn{border-left-color:var(--warn)}
+    .bad{border-left-color:var(--bad)}
+
+    details{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;transition:background .2s}
+    details:hover{background:#fdfbf7}
+    summary{cursor:pointer;font-weight:600;color:#27394d;list-style:none}
+    summary::-webkit-details-marker{display:none}
+    summary::after{content:"+";float:right;color:#8c7a63;transition:transform .2s}
+    details[open] summary::after{content:"–"}
+    .faq{display:grid;gap:12px}
+
+    footer{margin:28px 0 40px;text-align:center;color:var(--muted)}
+    .btn{display:inline-block;background:var(--navy);color:#fff;text-decoration:none;border-radius:10px;padding:.6rem 1rem;transition:transform .15s ease, filter .15s ease}
+    .btn:hover{transform:translateY(-1px);filter:brightness(.95)}
+    .btn-outline{border:1px solid var(--navy);color:var(--navy);background:transparent}
+    .btn-row{display:flex;gap:10px;flex-wrap:wrap}
+
+    /* a11y helpers */
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+  </style>
+</head>
+<body>
+  <a class="sr-only" href="#main">Skip to content</a>
+
+  <header>
+    <a class="brand" href="index.html" aria-label="Lets-ParaConnect home">
+      <img src="assets/transparant logo only.png" alt="" height="44" />
+      <span>Lets-ParaConnect</span>
+    </a>
+    <nav aria-label="Primary">
+      <a href="dashboard-attorney.html">Dashboard</a>
+      <a href="admin-dashboard.html">Admin</a>
+      <a href="terms.html">Terms</a>
+      <a href="privacy.html">Privacy</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <h1>Payments & Escrow</h1>
+    <p class="lead">How funds move safely between Attorneys and Paralegals using Stripe.</p>
+    <div aria-label="Payment primitives" role="group">
+      <span class="pill">Stripe</span>
+      <span class="pill">Escrow-style Hold</span>
+      <span class="pill">Connect Payouts</span>
+      <span class="pill">Disputes & Refunds</span>
+    </div>
+
+    <!-- High-level steps -->
+    <section class="grid cols-3" style="margin-top:14px" aria-label="High-level steps">
+      <article class="card">
+        <div><span class="step-num" aria-hidden="true">1</span><strong>Fund Escrow</strong></div>
+        <p style="margin:.5rem 0 0">When a job is posted with a flat fee, the Attorney pays through Stripe. Funds are charged and held for that job.</p>
+      </article>
+      <article class="card">
+        <div><span class="step-num" aria-hidden="true">2</span><strong>Do the Work</strong></div>
+        <p style="margin:.5rem 0 0">Paralegal delivers per scope. Attorney reviews and can request revisions or open a dispute before release.</p>
+      </article>
+      <article class="card">
+        <div><span class="step-num" aria-hidden="true">3</span><strong>Release &amp; Payout</strong></div>
+        <p style="margin:.5rem 0 0">On approval, funds are released and automatically transferred to the Paralegal’s Stripe Connect account.</p>
+      </article>
+    </section>
+
+    <!-- The mechanics -->
+    <section class="card" style="margin-top:16px" aria-labelledby="mechanicsTitle">
+      <h2 id="mechanicsTitle" style="margin:0 0 10px">How it works under the hood</h2>
+      <div class="grid cols-2">
+        <div>
+          <h3>Funding</h3>
+          <ul>
+            <li>We create a Stripe <em>Payment Intent</em> or <em>Checkout Session</em> and attach a shared <code style="background:#f7f9fc;border:1px solid var(--line);border-radius:6px;padding:1px 6px">transfer_group</code>.</li>
+            <li>Once paid, the job shows as <em>Funded</em>. The card is charged; funds are held pending completion.</li>
+          </ul>
+          <div class="callout ok"><strong>Security:</strong> Cards are processed by Stripe. We never store card numbers.</div>
+        </div>
+        <div>
+          <h3>Payouts</h3>
+          <ul>
+            <li>Paralegals complete <strong>Stripe Connect</strong> onboarding (KYC). Payouts go to their connected account.</li>
+            <li>On “Release,” we create a <em>Transfer</em> using the same <code>transfer_group</code> so Stripe links the flow end-to-end.</li>
+            <li>If onboarding isn’t finished yet, the payout waits until it is.</li>
+          </ul>
+          <div class="callout warn"><strong>Timing:</strong> Bank clearing and Stripe payout schedules may add 1–3 business days.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Fees & taxes -->
+    <section class="card" style="margin-top:16px" aria-labelledby="feesTitle">
+      <h2 id="feesTitle" style="margin:0 0 10px">Fees, taxes &amp; refunds</h2>
+      <ul>
+        <li><strong>Platform/service fees</strong> are shown in the posting flow (Attorney and/or Paralegal). Fees are deducted automatically.</li>
+        <li><strong>Stripe fees</strong> apply per transaction under Stripe’s pricing.</li>
+        <li><strong>Taxes:</strong> Users are responsible for applicable taxes. Stripe/Connect may collect tax information and issue forms where required.</li>
+        <li><strong>Refunds:</strong> Before release, we can process refunds (e.g., job cancelled). After release, refunds are between the parties unless otherwise required.</li>
+        <li><strong>Chargebacks:</strong> If a payment is reversed, we may debit/withhold amounts or offset future payouts to resolve balances.</li>
+      </ul>
+    </section>
+
+    <!-- Disputes -->
+    <section class="card" style="margin-top:16px" aria-labelledby="disputesTitle">
+      <h2 id="disputesTitle" style="margin:0 0 10px">Approval, revisions &amp; disputes</h2>
+      <ul>
+        <li><strong>Review window:</strong> Attorneys should review promptly and either approve or request revisions.</li>
+        <li><strong>Open a dispute</strong> in the platform prior to release if the work doesn’t meet scope.</li>
+        <li><strong>Resolution:</strong> We coordinate as a platform (not a law firm). We may recommend revisions or a refund prior to release.</li>
+      </ul>
+      <div class="callout bad"><strong>Heads-up:</strong> After funds are released, reversing a payout is limited and may require mutual agreement.</div>
+    </section>
+
+    <!-- FAQ -->
+    <section style="margin-top:16px" aria-labelledby="faqTitle">
+      <h2 id="faqTitle">FAQ</h2>
+      <div class="faq">
+        <details>
+          <summary>Do you store card numbers?</summary>
+          <div class="muted" style="margin-top:8px">No. All card data is handled by Stripe. We store only Stripe IDs needed to link funding and payout.</div>
+        </details>
+        <details>
+          <summary>What if a Paralegal hasn’t completed Stripe Connect?</summary>
+          <div class="muted" style="margin-top:8px">They’ll be prompted to onboard. Funds remain unreleased until onboarding is complete.</div>
+        </details>
+        <details>
+          <summary>Can I pay hourly?</summary>
+          <div class="muted" style="margin-top:8px">Jobs are flat-fee by default in v1 to keep billing simple and predictable.</div>
+        </details>
+        <details>
+          <summary>How long do payouts take?</summary>
+          <div class="muted" style="margin-top:8px">After release, Stripe typically pays out within 1–3 business days depending on bank and country.</div>
+        </details>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <section class="card" style="margin-top:16px">
+      <div class="btn-row">
+        <a class="btn" href="dashboard-attorney.html">Back to Dashboard</a>
+        <a class="btn btn-outline" href="terms.html">Read Terms</a>
+      </div>
+      <p class="muted" style="margin:.8rem 0 0">This page explains how payments work on the platform. It isn’t legal or tax advice.</p>
+    </section>
+
+    <footer>
+      © <span id="year"></span> Lets-ParaConnect
+    </footer>
+  </main>
+
+  <script>
+    // Footer year
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
+```

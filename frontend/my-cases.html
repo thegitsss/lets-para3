@@ -1,96 +1,252 @@
-<link rel="stylesheet" href="assets/styles/global.css">
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
-<script type="module" src="assets/scripts/auth.js"></script>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>My Cases</title>
+  <title>My Cases | Lets-ParaConnect</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <!-- Global styles + CSRF/role helpers -->
+  <link rel="stylesheet" href="assets/styles.css" />
+  <script type="module" src="assets/scripts/auth.js"></script>
+
   <style>
-    :root {
-      --brand-brown: #8c7864;
-      --bg-cream: #f5f2ed;
-      --text-dark: #5c4e3a;
-      --navy: #27394d;
-      --white: #ffffff;
-      --light-gray: #e9eef2;
+    :root{
+      --brand-brown:#8c7864; --bg-cream:#fbf9f5; --text:#3b342c; --muted:#6b7280;
+      --navy:#27394d; --line:#e9eef2; --card:#ffffff;
     }
-    body {
-      font-family: Georgia, serif;
-      background: var(--bg-cream);
-      color: var(--text-dark);
-      padding: 2rem;
-      animation: fadeIn 0.8s ease;
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family: Georgia, serif; background:var(--bg-cream); color:var(--text);
+      min-height:100vh;
     }
-    h1 { color: var(--navy); margin-bottom: 1rem; }
-    .case-card {
-      background: var(--white);
-      border-left: 4px solid var(--brand-brown);
-      padding: 1rem;
-      margin-bottom: 1rem;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      transition: opacity 0.3s ease;
+    header{
+      position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid var(--line);
+      padding:14px 18px; display:flex; justify-content:space-between; align-items:center;
     }
-    .case-card:hover { opacity: 0.9; }
-    button {
-      background: var(--navy);
-      color: var(--white);
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: opacity 0.3s ease;
+    header .title{ font-size:1.25rem; color:var(--navy); font-weight:700; }
+    header a{ color:var(--navy); text-decoration:none; }
+
+    main{ max-width:1100px; margin:24px auto; padding:0 16px; }
+
+    /* Toolbar */
+    .toolbar{
+      display:grid; grid-template-columns: 1fr 200px 160px auto; gap:10px; align-items:center; margin-bottom:14px;
     }
-    button:hover { opacity: 0.8; }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+    .toolbar input[type="search"], .toolbar select{
+      padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:#fff; font:inherit; outline:none;
+      transition:border-color .15s, box-shadow .15s;
     }
+    .toolbar input:focus, .toolbar select:focus{ border-color:#c7b7a5; box-shadow:0 0 0 3px rgba(199,183,165,.25); }
+    .toolbar .refresh{
+      background:var(--navy); color:#fff; border:0; padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:700;
+    }
+    .toolbar .refresh:hover{ filter:brightness(.95) }
+    .count{ color:var(--muted); margin:6px 0 12px; }
+
+    /* Cards */
+    .grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px; }
+    .card{
+      background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px;
+      box-shadow:0 2px 10px rgba(0,0,0,.05); transition:transform .18s ease, box-shadow .18s ease;
+    }
+    .card:hover{ transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,.08); }
+    .card h3{ margin:0 0 .35rem; font-size:1.05rem; color:#1f2937; }
+    .meta{ display:flex; flex-wrap:wrap; gap:8px; margin:.25rem 0 .6rem; color:#445; font-size:.92rem; }
+    .pill{ padding:3px 10px; border-radius:999px; background:#f5f7fb; border:1px solid var(--line); font-size:.82rem; color:#374151; }
+    .actions{ display:flex; gap:8px; }
+    .btn{ border:0; border-radius:9px; padding:8px 10px; cursor:pointer; font-weight:700; }
+    .btn-primary{ background:var(--navy); color:#fff; }
+    .btn-outline{ background:#fff; color:#1f2937; border:1px solid var(--line); }
+
+    /* Status accents */
+    .status-open{ background:#eef4ff; color:#264a9b; border-color:#cfe0ff; }
+    .status-in_review{ background:#fbf3e2; color:#6a4d12; border-color:#f1dfb9; }
+    .status-approved{ background:#eaf7ef; color:#0f6b3b; border-color:#c9e7d4; }
+    .status-rejected{ background:#fdeeee; color:#7a2f2f; border-color:#f6cdcd; }
+    .status-closed{ background:#eef0f3; color:#45505e; border-color:#d8dfe7; }
+
+    /* Skeletons */
+    .skeleton{ border-radius:10px; height:120px; background:linear-gradient(90deg,#f1f3f6, #e9edf3, #f1f3f6); background-size:200% 100%;
+      animation:shimmer 1.2s infinite; border:1px solid var(--line);
+    }
+    @keyframes shimmer{ to{ background-position: -200% 0; } }
+
+    .empty, .error{ color:var(--muted); padding:12px 2px; }
   </style>
 </head>
 <body>
-  <h1>My Assigned Cases</h1>
-  <div id="casesContainer">Loading cases...</div>
+  <header>
+    <div class="title">My Cases</div>
+    <nav>
+      <a href="dashboard-attorney.html">Dashboard</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="toolbar" role="region" aria-label="Filters">
+      <input id="q" type="search" placeholder="Search title, type, creator…" aria-label="Search cases" />
+      <select id="status" aria-label="Filter by status">
+        <option value="">All statuses</option>
+        <option value="open">Open</option>
+        <option value="in_review">In Review</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+        <option value="closed">Closed</option>
+      </select>
+      <select id="sort" aria-label="Sort cases">
+        <option value="">Sort: Recently created</option>
+        <option value="title">Title (A–Z)</option>
+        <option value="status">Status</option>
+      </select>
+      <button class="refresh" id="refresh" type="button">Refresh</button>
+    </div>
+
+    <div id="count" class="count" role="status" aria-live="polite"></div>
+
+    <div id="grid" class="grid" aria-live="polite">
+      <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+    </div>
+    <p id="empty" class="empty" style="display:none">No cases match your filters.</p>
+    <p id="err" class="error" style="display:none">Couldn’t load your cases.</p>
+  </main>
 
   <script>
-    const container = document.getElementById('casesContainer');
-    const token = localStorage.getItem('token');
+    const API_BASE = '/api';
 
-    if (!token) {
-      alert('Please login to see your cases');
-      window.location.href = 'login.html';
+    const grid = document.getElementById('grid');
+    const countEl = document.getElementById('count');
+    const emptyEl = document.getElementById('empty');
+    const errEl = document.getElementById('err');
+    const qEl = document.getElementById('q');
+    const statusEl = document.getElementById('status');
+    const sortEl = document.getElementById('sort');
+    const refreshBtn = document.getElementById('refresh');
+
+    let all = [];
+
+    // Session check (cookie-based)
+    (async function ensureSession(){
+      try{
+        const r = await fetch('/api/users/me', { credentials:'include' });
+        if (!r.ok) throw new Error();
+      }catch{
+        location.href = 'login.html';
+      }
+    })();
+
+    const safe = (v, f='') => (v ?? f);
+    const byPath = (obj, path, f='') => {
+      try { return path.split('.').reduce((o,k)=>o?.[k], obj) ?? f; } catch { return f; }
+    };
+    const clsFor = (s) => `pill status-${String(s||'open').replace(/\s+/g,'_')}`;
+
+    async function fetchCases(){
+      errEl.style.display = 'none';
+      emptyEl.style.display = 'none';
+      grid.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
+      countEl.textContent = '';
+
+      try{
+        const r = await fetch(`${API_BASE}/cases/my`, { credentials:'include' });
+        const data = await r.json().catch(()=> ({}));
+        if (!r.ok) throw new Error(data?.msg || 'Load failed');
+
+        // accept array or {cases:[]}
+        all = Array.isArray(data) ? data : (data.cases || []);
+        render();
+      }catch(e){
+        console.error(e);
+        grid.innerHTML = '';
+        errEl.style.display = 'block';
+      }
     }
 
-    async function loadCases() {
-      const res = await fetch('http://localhost:5000/api/cases/my', {
-        headers: { Authorization: `Bearer ${token}` }
+    function render(){
+      const term = (qEl.value || '').toLowerCase().trim();
+      const st   = statusEl.value;
+
+      let list = all.filter(c => {
+        const okStatus = !st || c.status === st;
+        if (!okStatus) return false;
+        if (!term) return true;
+        const hay = [
+          safe(c.title).toLowerCase(),
+          safe(c.type).toLowerCase(),
+          safe(c.party).toLowerCase(),
+          byPath(c, 'createdBy.email','').toLowerCase(),
+          byPath(c, 'createdBy.name','').toLowerCase()
+        ].join(' ');
+        return hay.includes(term);
       });
-      const data = await res.json();
-      container.innerHTML = '';
-      if (data.length === 0) {
-        container.innerHTML = '<p>No cases assigned yet. Check back later!</p>';
+
+      // sort
+      const sort = sortEl.value;
+      if (sort === 'title') list.sort((a,b)=> (a.title||'').localeCompare(b.title||''));
+      if (sort === 'status') list.sort((a,b)=> (a.status||'').localeCompare(b.status||''));
+      if (!sort) list.sort((a,b)=> new Date(b.createdAt||0) - new Date(a.createdAt||0)); // default: recent first
+
+      countEl.textContent = `${list.length} case${list.length===1?'':'s'}`;
+
+      if (!list.length){
+        grid.innerHTML = '';
+        emptyEl.style.display = 'block';
         return;
       }
-      data.forEach(c => {
-        const div = document.createElement('div');
-        div.className = 'case-card';
-        div.innerHTML = `
-          <h2>${c.title}</h2>
-          <p>${c.description || ''}</p>
-          <p><strong>Status:</strong> ${c.status}</p>
-          <p><strong>Created by:</strong> ${c.createdBy?.email}</p>
-          <button onclick="goToCase('${c._id}')">Manage Case</button>
+      emptyEl.style.display = 'none';
+
+      grid.innerHTML = list.map(c => {
+        const created = c.createdAt ? new Date(c.createdAt).toLocaleString() : '';
+        const createdBy = byPath(c,'createdBy.name') || byPath(c,'createdBy.email') || 'Unknown';
+        const assigned = byPath(c,'assignedTo.name') || byPath(c,'assignedTo.email') || 'Unassigned';
+        const desc = c.description || c.details || '';
+
+        return `
+          <article class="card" data-id="${c._id || c.id}">
+            <h3>${safe(c.title,'Untitled Case')}</h3>
+            <p style="margin:.25rem 0 .5rem; color:#4b5563;">${safe(desc,'')}</p>
+            <div class="meta">
+              <span class="pill ${clsFor(c.status)}">${safe(c.status,'open')}</span>
+              ${c.type ? `<span class="pill">Type: ${c.type}</span>` : ''}
+              <span class="pill">Created by: ${createdBy}</span>
+              <span class="pill">Assigned: ${assigned}</span>
+              ${created ? `<span class="pill">Created: ${created}</span>` : ''}
+            </div>
+            <div class="actions">
+              <button class="btn btn-primary" data-open="${c._id || c.id}">Open</button>
+              <button class="btn btn-outline" data-msg="${c._id || c.id}">Messages</button>
+            </div>
+          </article>
         `;
-        container.appendChild(div);
-      });
+      }).join('');
     }
 
-    function goToCase(id) {
+    // Navigation (persist for pages expecting localStorage; also pass ?id=)
+    function openCase(id){
       localStorage.setItem('openCaseId', id);
-      window.location.href = 'case-detail.html';
+      location.href = `case-detail.html?id=${encodeURIComponent(id)}`;
+    }
+    function toMessages(id){
+      localStorage.setItem('openCaseId', id);
+      location.href = `messages.html#case=${encodeURIComponent(id)}`;
     }
 
-    loadCases();
+    // Delegate button clicks
+    document.addEventListener('click', (e)=>{
+      const idOpen = e.target?.dataset?.open;
+      const idMsg  = e.target?.dataset?.msg;
+      if (idOpen) openCase(idOpen);
+      if (idMsg)  toMessages(idMsg);
+    });
+
+    // Debounce helpers
+    let t; const debounce = (fn,ms=220)=> (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); };
+    qEl.addEventListener('input', debounce(render, 150));
+    statusEl.addEventListener('change', render);
+    sortEl.addEventListener('change', render);
+    refreshBtn.addEventListener('click', fetchCases);
+
+    // Initial load
+    fetchCases();
   </script>
 </body>
 </html>

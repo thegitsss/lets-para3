@@ -1,35 +1,46 @@
-<link rel="stylesheet" href="assets/styles/global.css">
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
-<script type="module" src="assets/scripts/auth.js"></script>
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <style>body{opacity:1!important;visibility:visible!important}</style>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Contact Us</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Georgia&display=swap">
+  <title>Contact Us • Lets-ParaConnect</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="assets/styles.css" />
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+  <script type="module" src="assets/scripts/auth.js"></script>
   <style>
-    :root { --brand-brown: #8c7864; --bg-cream: #f5f2ed; --text-dark: #5c4e3a; --navy: #27394d; --white: #ffffff; }
-    body { font-family: 'Georgia', serif; background: var(--bg-cream); margin: 0; color: var(--text-dark); }
-    header, footer { background: var(--white); padding: 1.25rem 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    header img { height: 60px; }
-    .nav-buttons button { margin-left: 1rem; padding: 0.6rem 1.2rem; background: var(--navy); color: var(--white); border: none; border-radius: 4px; font-weight: bold; cursor: pointer; transition: opacity 0.5s ease; }
-    .nav-buttons button:hover { opacity: 0.7; }
-    main { padding: 4rem 2rem; animation: fadeIn 1s ease; text-align: center; }
-    h1 { font-size: 2rem; margin-bottom: 1rem; }
-    p { font-size: 1.1rem; color: var(--brand-brown); }
-    footer { background: var(--navy); color: white; justify-content: center; flex-direction: column; padding: 2rem; text-align: center; }
-    footer a { color: white; margin: 0 1rem; text-decoration: none; transition: opacity 0.5s ease; }
-    footer a:hover { opacity: 0.6; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    :root { --navy:#27394d; --brown:#8c7864; --line:#e8edf3; --bg:#f5f2ed; --ink:#5c4e3a; }
+    body { background:var(--bg); color:var(--ink); font-family: Georgia, serif; }
+    header, footer { background:#fff; border-bottom:1px solid var(--line); padding:14px 18px;
+                     display:flex; align-items:center; justify-content:space-between; }
+    header a { color:var(--brown); text-decoration:none; font-weight:700; }
+    .nav-buttons button{ background:var(--navy); color:#fff; border:0; border-radius:8px; padding:.5rem 1rem; cursor:pointer }
+    main { max-width:980px; margin:28px auto; padding:0 16px; }
+    .grid { display:grid; grid-template-columns: 1.15fr .85fr; gap:18px; }
+    @media (max-width:900px){ .grid{ grid-template-columns:1fr; } }
+    .card { background:#fff; border:1px solid var(--line); border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.04); padding:16px; }
+    h1 { color:var(--navy); margin:0 0 12px; }
+    .field{ display:grid; gap:6px; margin:8px 0; }
+    .field input,.field textarea,.field select{ padding:.7rem .8rem; border:1px solid var(--line); border-radius:10px; font:inherit; background:#fff; outline:none; transition:border-color .2s ease, box-shadow .2s ease; }
+    .field input:focus,.field textarea:focus,.field select:focus{ border-color:var(--brown); box-shadow:0 0 0 4px rgba(140,120,100,.15); }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .btn{ border:0; border-radius:10px; padding:.65rem 1.1rem; cursor:pointer; font-weight:600; }
+    .btn.primary{ background:var(--navy); color:#fff; }
+    .btn.secondary{ background:#fff; border:1px solid var(--line); }
+    .muted{ color:#64748b; }
+    .hint{ font-size:.9rem; color:#6b7280; min-height:1.2rem; }
+    .ok{ color:#1f7a4a; }
+    .bad{ color:#b04747; }
+    .fade-in{ animation:fade .3s ease; } @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .contact-hero{ margin-bottom:10px; }
   </style>
 </head>
 <body>
   <header>
-<a href="index.html" style="display: flex; align-items: center; text-decoration: none;">
-  <img src="assets/transparant logo only.png" alt="Logo" style="height: 60px; margin-right: 10px;" />
-  <span style="font-size: 1.5rem; font-weight: bold; color: var(--brand-brown);">Lets-ParaConnect</span>
-</a>
+    <a href="index.html" style="display:flex;align-items:center;gap:10px">
+      <img src="assets/transparant logo only.png" alt="" style="height:48px" />
+      <span>Lets-ParaConnect</span>
+    </a>
     <div class="nav-buttons">
       <button onclick="location.href='login.html'">Login</button>
       <button onclick="location.href='signup.html'">Join Today</button>
@@ -37,16 +48,148 @@
   </header>
 
   <main>
-    <h1>Contact Us</h1>
-    <p>This page will include your contact form and booking links.</p>
+    <div class="contact-hero">
+      <h1>Contact Us</h1>
+      <p class="muted">Questions, partnerships, or support—send us a note and we’ll get back quickly.</p>
+    </div>
+
+    <div class="grid">
+      <!-- Form -->
+      <section class="card fade-in">
+        <form id="contactForm" novalidate>
+          <div class="row">
+            <div class="field" style="flex:1; min-width:220px">
+              <label for="name">Full name</label>
+              <input id="name" name="name" required maxlength="120" autocomplete="name" />
+            </div>
+            <div class="field" style="flex:1; min-width:220px">
+              <label for="email">Email</label>
+              <input id="email" name="email" type="email" required maxlength="160" autocomplete="email" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field" style="flex:1; min-width:220px">
+              <label for="role">I am a</label>
+              <select id="role" name="role">
+                <option value="">— Select —</option>
+                <option value="attorney">Attorney</option>
+                <option value="paralegal">Paralegal</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="field" style="flex:1; min-width:220px">
+              <label for="subject">Subject</label>
+              <input id="subject" name="subject" placeholder="How can we help?" required maxlength="140" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="message">Message</label>
+            <textarea id="message" name="message" rows="6" placeholder="Type your message…" required maxlength="2000"></textarea>
+            <div class="hint"><span id="charCount" aria-live="polite">0</span>/2000</div>
+          </div>
+
+          <!-- reCAPTCHA (visible checkbox) -->
+          <div class="g-recaptcha" data-sitekey="6Lfmq1orAAAAAEfFBDqDFpXtHMGld5aesRFjvIEM"></div>
+
+          <div id="formMsg" class="hint" role="status" aria-live="polite"></div>
+          <div class="row" style="justify-content:flex-end">
+            <button type="button" class="btn secondary" id="resetBtn">Reset</button>
+            <button type="submit" class="btn primary" id="sendBtn">Send</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Sidebar -->
+      <aside class="card fade-in">
+        <h3 style="margin:4px 0 10px; color:#27394d">Quick Info</h3>
+        <p class="muted">Business hours: Mon–Fri, 9am–6pm (ET)</p>
+        <p class="muted">Email: <a href="mailto:support@lets-paraconnect.com">support@lets-paraconnect.com</a></p>
+        <p class="muted">We typically respond within one business day.</p>
+      </aside>
+    </div>
   </main>
 
-  <footer>
-    <div>
-      <a href="terms.html">Terms & Conditions</a> |
-      <a href="privacy.html">Privacy Policy</a>
-    </div>
-    <p>© 2025 Lets-ParaConnect</p>
+  <footer style="background:#fff; border-top:1px solid var(--line); padding:24px; text-align:center">
+    <a href="terms.html">Terms & Conditions</a> •
+    <a href="privacy.html">Privacy Policy</a>
+    <div class="muted" style="margin-top:8px">© 2025 Lets-ParaConnect</div>
   </footer>
+
+  <script type="module">
+    import { secureFetch, fetchCSRF, isRecaptchaValid, showMsg } from './assets/scripts/auth.js';
+
+    const form    = document.getElementById('contactForm');
+    const msgEl   = document.getElementById('formMsg');
+    const sendBtn = document.getElementById('sendBtn');
+    const resetBtn= document.getElementById('resetBtn');
+    const message = document.getElementById('message');
+    const countEl = document.getElementById('charCount');
+
+    // warm CSRF (server sets cookie; token returned for header)
+    fetchCSRF().catch(()=>{});
+
+    // live character counter
+    const updateCount = () => { countEl.textContent = String(message.value.length); };
+    message.addEventListener('input', updateCount); updateCount();
+
+    // reset
+    resetBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      form.reset(); updateCount();
+      showMsg(msgEl, '');
+      if (window.grecaptcha) grecaptcha.reset();
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      showMsg(msgEl, '');
+
+      // simple client validation
+      const payload = {
+        name:    form.name.value.trim(),
+        email:   form.email.value.trim(),
+        role:    form.role.value.trim(),
+        subject: form.subject.value.trim(),
+        message: form.message.value.trim(),
+        recaptchaToken: ''
+      };
+      if (!payload.name || !payload.email || !payload.subject || !payload.message) {
+        msgEl.className = 'bad'; showMsg(msgEl, 'Please fill all required fields.'); return;
+      }
+
+      // reCAPTCHA gate (dev-safe: returns true if grecaptcha not present)
+      if (!isRecaptchaValid('', msgEl)) return;
+      if (window.grecaptcha && typeof grecaptcha.getResponse === 'function') {
+        payload.recaptchaToken = grecaptcha.getResponse();
+      }
+
+      // disable while sending
+      sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
+
+      try {
+        await fetchCSRF().catch(()=>{});
+        const res = await secureFetch('/api/public/contact', {
+          method: 'POST',
+          body: payload
+        });
+
+        // parse response safely
+        let data = {};
+        try { data = await res.json(); } catch {}
+        if (!res.ok) throw new Error(data?.msg || data?.error || 'Unable to send message');
+
+        msgEl.className = 'ok'; showMsg(msgEl, 'Thanks! Your message has been sent.');
+        form.reset(); updateCount();
+        if (window.grecaptcha) grecaptcha.reset();
+      } catch (err) {
+        msgEl.className = 'bad';
+        showMsg(msgEl, err?.message || 'Something went wrong. Please email support@lets-paraconnect.com');
+      } finally {
+        sendBtn.disabled = false; sendBtn.textContent = 'Send';
+      }
+    });
+  </script>
 </body>
 </html>
