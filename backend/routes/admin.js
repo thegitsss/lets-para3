@@ -5,7 +5,7 @@ const verifyToken = require("../utils/verifyToken");
 const { requireRole } = require("../utils/authz");
 const User = require("../models/User");
 const Case = require("../models/Case");
-const AuditLog = require("../models/AuditLogs"); // NOTE: file name fix
+const AuditLog = require("../models/AuditLog"); // NOTE: file name fix
 const sendEmail = require("../utils/email");
 
 // -----------------------------------------

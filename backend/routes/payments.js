@@ -5,7 +5,7 @@ const verifyToken = require("../utils/verifyToken");
 const { requireRole, requireCaseAccess } = require("../utils/authz");
 const stripe = require("../utils/stripe");
 const Case = require("../models/Case");
-const AuditLog = require("../models/AuditLogs"); // match your filename
+const AuditLog = require("../models/AuditLog"); // match your filename
 
 // ----------------------------------------
 // Helpers

@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
 const { requireRole, requireCaseAccess } = require("../utils/authz");
 const Case = require("../models/Case");
-const AuditLog = require("../models/AuditLogs");
+const AuditLog = require("../models/AuditLog");
 
 // ----------------------------------------
 // Helpers

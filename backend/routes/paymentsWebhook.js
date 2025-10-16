@@ -12,7 +12,7 @@ const router = require("express").Router();
 const stripe = require("../utils/stripe");
 const mongoose = require("mongoose");
 const Case = require("../models/Case");
-const AuditLog = require("../models/AuditLogs"); // match filename
+const AuditLog = require("../models/AuditLog"); // match filename
 
 // ----------------------------------------
 // Lightweight, per-process dedupe (use Redis/db in prod)

@@ -1,7 +1,7 @@
 // backend/utils/audit.js
 // Lightweight helpers to write structured audit logs consistently.
 
-const AuditLog = require("../models/AuditLogs"); // match your filename
+const AuditLog = require("../models/AuditLog"); // match your filename
 
 /**
  * Pull a stable actor id/role from the request (works with your verifyToken).

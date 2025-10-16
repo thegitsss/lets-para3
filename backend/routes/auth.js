@@ -7,7 +7,7 @@ const axios = require("axios");
 const mongoose = require("mongoose");
 
 const User = require("../models/User");
-const AuditLog = require("../models/AuditLogs"); // audit trail hooks
+const AuditLog = require("../models/AuditLog"); // audit trail hooks
 const sendEmail = require("../utils/email");
 
 // ----------------------------------------

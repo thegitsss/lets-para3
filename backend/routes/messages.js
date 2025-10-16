@@ -5,7 +5,7 @@ const verifyToken = require("../utils/verifyToken");
 const { requireCaseAccess } = require("../utils/authz");
 const Message = require("../models/Message");
 const Case = require("../models/Case");
-const AuditLog = require("../models/AuditLogs"); // match filename
+const AuditLog = require("../models/AuditLog"); // match filename
 const { containsProfanity, maskProfanity } = require("../utils/badWords");
 
 // ----------------------------------------
