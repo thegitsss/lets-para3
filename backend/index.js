@@ -15,7 +15,7 @@ const app = express();
 
 // 2) Config
 const PROD = process.env.NODE_ENV === 'production';
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5050;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
 // 3) Middleware
@@ -71,9 +71,13 @@ app.get('/api/csrf', csrfProtection, (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
 
-// Placeholder homepage
-app.get('/', (_req, res) => {
-  res.send('✅ Express backend is running and serving responses.');
+// Serve frontend files
+const FRONTEND_DIR = path.join(__dirname, '../frontend');
+app.use(express.static(FRONTEND_DIR));
+
+// All other routes → index.html
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
 });
 
 // 404 handler
