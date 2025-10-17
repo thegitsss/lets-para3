@@ -429,4 +429,38 @@ body.compact .btn{padding-top:10px;padding-bottom:10px}
   background: #27394d; color: #fff; font-weight: 700;
 }
 header nav, .nav-wrap { position: relative; }
+/* === Responsive Header Behavior === */
 
+/* Normal desktop (everything visible) */
+@media (min-width: 801px) {
+  .site-header nav,
+  .site-header .pill {
+    display: flex;
+  }
+}
+
+/* Tablet and smaller: gradually space things tighter */
+@media (max-width: 800px) {
+  .site-header {
+    justify-content: center;
+  }
+
+  .site-header nav ul {
+    gap: 20px;
+  }
+}
+
+/* Mobile and very narrow screens: hide nav + sign-in, keep only brand */
+@media (max-width: 640px) {
+  .site-header nav,
+  .site-header .pill {
+    display: none;
+  }
+
+  .brand {
+    position: relative;
+    left: auto;
+    transform: none;
+    margin: 0 auto;
+  }
+}

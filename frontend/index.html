@@ -1,471 +1,670 @@
 <!DOCTYPE html>
-<html lang="en" class="lpc">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Let’s-ParaConnect</title>
-  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
   <style>
-    :root{
-      --ink:#1a2230; --muted:#5c6b7a; --gold:#b4975a; --cream:#f5f2ed; --line:#e7e3db;
-      --space-hero: clamp(96px, 10vw, 160px);
-      --space-section: clamp(56px, 7vw, 96px);
-      --radius: 18px;
-      --e1:cubic-bezier(.2,.8,.2,1);
-      --dur-quick:.25s; --dur-slow:.6s;
-      --elev-1:0 10px 30px rgba(0,0,0,.06);
-      --elev-2:0 24px 60px rgba(0,0,0,.10);
+    :root {
+      --ink: #f6f7fb;
+      --muted: #d6dbe3;
+      --bg: #0a0f14;
+      --line: rgba(255,255,255,.16);
+      --accent: #ffffff;
+      --alpha-header: 0.14;
+      --e1: cubic-bezier(.2,.7,.2,1);
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font: 16px/1.5 Inter, system-ui, -apple-system, Roboto, Arial, sans-serif;
     }
 
-    .lpc body{margin:0;background:var(--cream);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
-    .lpc .wrap{max-width:1180px;margin:0 auto;padding:0 24px;}
-
-    .lpc .nav-wrap{position:sticky;top:0;z-index:50;backdrop-filter:saturate(160%) blur(10px);background:color-mix(in hsl, white 60%, transparent);border-bottom:1px solid rgba(0,0,0,.06);}
-    .lpc .nav{display:flex;align-items:center;justify-content:space-between;height:68px;}
-    .lpc .brand{font-family:"EB Garamond",serif;font-weight:700;letter-spacing:.3px}
-    .lpc .brand a{color:var(--ink);text-decoration:none;font-size:22px}
-    .lpc .nav a{color:var(--ink);text-decoration:none;margin-left:22px;position:relative}
-    .lpc .nav a::after{content:"";position:absolute;left:50%;bottom:-6px;width:0;height:2px;background:var(--gold);transform:translateX(-50%);transition:width var(--dur-quick) var(--e1);}
-    .lpc .nav a:hover::after{width:100%}
-    .lpc .scrollbar{position:absolute;left:0;top:0;height:2px;background:var(--gold);width:0;transition:width .1s linear;}
-    .lpc .nav-shadow{box-shadow:var(--elev-1)}
-
-    .lpc .grain::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/ filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E");mix-blend-mode:multiply;}
-
-    .lpc .hero{position:relative;padding:var(--space-hero) 0;isolation:isolate}
-    .lpc .hero .wrap{display:grid;grid-template-columns:1fr;gap:48px;align-items:center;text-align:center}
-
-    .lpc .eyebrow{color:var(--muted);letter-spacing:.12em;text-transform:uppercase;font-size:12px;margin-bottom:10px}
-    .lpc h1{font-family:"EB Garamond",serif;font-weight:700;line-height:1.05;margin:0 0 16px;font-size: clamp(36px, 6vw, 64px);letter-spacing:.2px;}
-    .lpc .sub{color:var(--muted);font-size:18px;line-height:1.6;max-width:60ch;margin:0 auto 28px}
-
-    .lpc .cta-row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
-    .lpc .btn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:14px 20px;border-radius:999px;font-weight:600;cursor:pointer;user-select:none;transition:box-shadow var(--dur-quick) var(--e1), background var(--dur-quick) var(--e1);}
-    .lpc .btn-primary{background:var(--ink);color:#fff;box-shadow:0 10px 24px rgba(26,34,48,.18)}
-    .lpc .btn-primary:hover{box-shadow:0 6px 18px rgba(26,34,48,.24)}
-    .lpc .btn-outline{border:1px solid var(--ink);color:var(--ink);background:transparent}
-    .lpc .btn-outline:hover{background:rgba(26,34,48,.04)}
-    .lpc .btn .ripple{position:absolute;border-radius:50%;transform:scale(0);opacity:.3;animation:lpc-ripple .6s ease-out;pointer-events:none;background:#fff}
-    @keyframes lpc-ripple{to{transform:scale(14);opacity:0}}
-
-    .lpc footer{margin-top:var(--space-section);background:#11161e;color:#d9dde3}
-    .lpc .foot{padding: clamp(48px, 8vw, 96px) 0; display:grid;grid-template-columns:2fr 1fr 1fr;gap:36px}
-    @media (max-width: 900px){ .lpc .foot{grid-template-columns:1fr;gap:24px} }
-    .lpc .foot h4{margin:0 0 16px;font-family:"EB Garamond",serif;font-size:22px;color:#fff}
-    .lpc .foot p{margin:0;color:#9aa3af;line-height:1.7;max-width:56ch}
-    .lpc .foot a{color:#cbd2da;text-decoration:none}
-    .lpc .foot a:hover{color:#fff}
-    .lpc .foot .links{display:grid;gap:10px}
-    .lpc .copyright{border-top:1px solid rgba(255,255,255,.08);padding:18px 0;color:#8f98a4;font-size:14px}
-
-    .lpc .reveal{opacity:0;transform:translateY(10px);transition:opacity var(--dur-slow) var(--e1), transform var(--dur-slow) var(--e1)}
-    .lpc .reveal.in{opacity:1;transform:none}
-
-    @media (prefers-reduced-motion: reduce){.lpc *{transition:none!important;animation:none!important}}
-  /* Nav login button styled like link */
-    .lpc .nav .nav-login-btn{background:none;border:0;padding:0;margin-left:22px;font:inherit;color:var(--ink);cursor:pointer;position:relative}
-    .lpc .nav .nav-login-btn::after{content:"";position:absolute;left:50%;bottom:-6px;width:0;height:2px;background:var(--gold);transform:translateX(-50%);transition:width var(--dur-quick) var(--e1);}
-    .lpc .nav .nav-login-btn:hover::after{width:100%}
-
-    /* Login popover (glass) — more translucent + inputs fixed width */
-    .lpc .login-pop{
-      position:absolute; right:24px; top:76px; z-index:60;
-      width:min(340px, 92vw);
-  /* much lighter glass */
-      background:linear-gradient(180deg, rgba(255,255,255,.20), rgba(255,255,255,.10));
-      backdrop-filter: blur(18px) saturate(160%);
-      -webkit-backdrop-filter: blur(18px) saturate(160%);
-      border:1px solid rgba(255,255,255,.26);
-      border-radius:14px;
-      box-shadow:0 18px 40px rgba(26,34,48,.16);
-      padding:14px; opacity:0; transform:translateY(-6px);
-      transition:opacity .18s var(--e1), transform .18s var(--e1);
+/* Header */
+.site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 68px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* centers the brand horizontally */
+  background: rgba(10,15,20, var(--alpha-header));
+  backdrop-filter: saturate(160%) blur(10px);
+  border-bottom: 1px solid var(--line);
 }
-    .lpc .login-pop.open{opacity:1; transform:translateY(0)}
-    .lpc .login-pop .form-group{ margin:8px 0; }
-    .lpc .login-pop label{ display:block; margin-bottom:4px; font-weight:600; color:#334155; font-size:.95rem; }
-    .lpc .login-pop input{
-      width:100%; box-sizing:border-box; padding:.58rem .7rem; border:1px solid #d9dee5; border-radius:10px;
-      font-size:.95rem; background:rgba(255,255,255,.88); outline:none;
-      transition:border-color .15s, box-shadow .15s, background .15s;
+/* Smooth dark fade on narrow screens */
+@media (max-width: 800px) {
+  .site-header {
+    background: rgba(10, 15, 20, 0.45); /* slightly darker */
+    transition: background 0.5s ease;
+  }
+}
+
+@media (max-width: 640px) {
+  .site-header {
+    background: rgba(10, 15, 20, 0.6); /* even darker on small screens */
+  }
+}
+/* Banner font: Sarabun-Regular */
+.site-header,
+.site-header nav a {
+  font-family: 'Sarabun-Regular', sans-serif;
+  font-weight: 100;
+  letter-spacing: 0.03em;
+}
+
+.brand {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%); /* keeps it centered even when window resizes */
+  font-family: 'Playfair Display', serif;
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: 0.05em;
+  color: #ffffff; /* white text */
+  text-decoration: none; /* removes underline */
+  text-transform: none; /* prevents all caps */
+}
+  .brand:hover {
+    color: #f6f7fb;             /* optional subtle hover effect */
+   text-decoration: none;      /* ensure it stays clean on hover */
+}
+    .header-inner {
+      width: min(1200px, 92vw);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-    .lpc .login-pop input:focus{ border-color:var(--gold); box-shadow:0 0 0 3px rgba(180,151,90,.18); background:#fff; }
-    .lpc .login-pop .pw-wrap{ position:relative; }
-    .lpc .login-pop .pw-wrap input{ padding-right:3rem; }
-    .lpc .login-pop .show-toggle{
-      position:absolute; right:.5rem; top:50%; transform:translateY(-50%);
-      background:transparent; border:0; cursor:pointer; color:var(--ink);
-      width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:8px; line-height:0;
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      letter-spacing: .08em;
+      font-weight: 500;
+      text-transform: none !important;
     }
-    .lpc .login-pop .show-toggle:hover svg{ opacity:1 }
-    .lpc .login-pop .show-toggle svg{ width:18px; height:18px; opacity:.9; display:block }
-    .lpc .login-pop .show-toggle:focus{ outline:2px solid rgba(39,57,77,.45); outline-offset:2px; }
-    .lpc .login-pop .login-btn{ width:100%; margin-top:.45rem; background:var(--ink); color:#fff; border:0; padding:.64rem; border-radius:10px; cursor:pointer; font-weight:700; font-size:.95rem; }
-    .lpc .login-pop .msg{ margin-top:.6rem; min-height:1.1em; color:#7a5e25; }
-  /* Register menu (tiny dropdown) */
-    .lpc .nav .nav-register-btn{background:none;border:0;padding:0;margin-left:22px;font:inherit;color:var(--ink);cursor:pointer;position:relative}
-    .lpc .nav .nav-register-btn::after{content:"";position:absolute;left:50%;bottom:-6px;width:0;height:2px;background:var(--gold);transform:translateX(-50%);transition:width var(--dur-quick) var(--e1);}
-    .lpc .nav .nav-register-btn:hover::after{width:100%}
+    .brand-mark {
+      width: 26px; height: 26px;
+      display: grid; place-items: center;
+      border: 2px solid var(--ink);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 28px;
+      padding: 0;
+      margin: 0;
+    }
+    nav a {
+      color: var(--ink);
+      text-decoration: none;
+      opacity: .88;
+      font-weight: 500;
+    }
+    nav a:hover {
+      opacity: 1;
+    }
+    .header-actions .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: var(--ink);
+      text-decoration: none;
+    }
 
-    /* Register menu (same glass/colors as login) */
-.lpc .menu-pop{
-  position:absolute; right:24px; top:76px; z-index:61; width:min(120px,70vw);
-  background:linear-gradient(180deg, rgba(255,255,255,.20), rgba(255,255,255,.10));
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  border:1px solid rgba(255,255,255,.26);
-  border-radius:10px;
-  box-shadow:0 18px 40px rgba(26,34,48,.16);
-  padding:8px; opacity:0; transform:translateY(-6px);
-  transition:opacity .18s var(--e1), transform .18s var(--e1);
-}
-.lpc .menu-pop.open{opacity:1;transform:translateY(0)}
+    /* Hero Slider */
+    .slider {
+      position: relative;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .slides {
+      position: absolute;
+      inset: 0;
+      display: grid;
+    }
+    .slide {
+      grid-area: 1/1;
+      width: 100%;
+      height: 100%;
+      position: relative;
+      opacity: 0;
+      transition: opacity .8s var(--e1);
+    }
+    .slide.active {
+      opacity: 1;
+    }
+    .slide::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,.45) 50%, rgba(0,0,0,.58) 100%);
+    }
+    .slide > img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.04);
+      filter: saturate(95%);
+      transition: transform 8s linear;
+    }
+    .slide.active > img {
+      transform: scale(1);
+    }
+    .caption {
+      position: absolute;
+      inset: auto 0 15vh 0;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 0 24px;
+    }
+    .kicker {
+      color: var(--muted);
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      font-size: 12px;
+      margin-bottom: 14px;
+    }
+    .headline {
+      font-family: "Playfair Display", serif;
+      font-size: clamp(40px, 8vw, 92px);
+      line-height: 1.04;
+      font-weight: 700;
+      margin: 0 0 22px;
+      letter-spacing: .01em;
+    }
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 22px;
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+    }
+    .cta:hover {
+      background: rgba(255,255,255, .08);
+    }
+    .arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 46px;
+      height: 46px;
+      border: 2px solid var(--accent);
+      border-radius: 999px;
+      background: rgba(0,0,0, .18);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      z-index: 3;
+    }
+    .arrow:hover {
+      background: rgba(255,255,255, .1);
+    }
+    .arrow.left { left: 24px; }
+    .arrow.right { right: 24px; }
+    .bullets {
+      position: absolute;
+      left: 50%;
+      bottom: 26px;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+    }
+    .dot {
+      width: 10px; height: 10px;
+      border: 2px solid var(--accent);
+      border-radius: 999px;
+      background: transparent;
+      opacity: .7;
+      cursor: pointer;
+    }
+    .dot.active {
+      background: var(--accent);
+      opacity: 1;
+    }
 
-.lpc .menu-pop .menu-btn{
-  display:block; width:100%; box-sizing:border-box; text-align:center; text-decoration:none;
-  font-weight:600; color:var(--ink);
-  border:1px solid #d9dee5; border-radius:8px;
-  padding:.42rem .5rem; margin:4px 0;
-  background:rgba(255,255,255,.88);
-  font-size:.82rem; letter-spacing:.01em;
-  transition:background .15s, border-color .15s, transform .12s var(--e1), color .15s;
-}
-.lpc .menu-pop .menu-btn:hover{
-  background:#fff; border-color:var(--gold); transform:translateY(-1px); color:var(--ink);
+    /* Below-fold sections */
+    .section {
+      padding: 80px 0;
+    }
+    .wrap {
+      width: min(1200px, 92vw);
+      margin: auto;
+    }
+    .about {
+      text-align: center;
+      color: var(--ink);
+    }
+    .about h2 {
+      font-family: "Playfair Display", serif;
+      font-size: clamp(28px, 4vw, 44px);
+      margin: 0 0 16px;
+    }
+    .about p {
+      color: var(--muted);
+      margin: 0 auto;
+      max-width: 60ch;
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+    .cards {
+      margin-top: 60px;
+      display: grid;
+      gap: 32px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+    .card {
+      background: #0d131a;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform .3s var(--e1), box-shadow .3s var(--e1);
+    }
+    .card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 8px 24px rgba(0,0,0, .4);
+    }
+    .card img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      display: block;
+    }
+    .card .pad {
+      padding: 20px;
+    }
+    .card h3 {
+      margin: 4px 0 8px;
+      font-size: 20px;
+      color: var(--ink);
+    }
+    .card p {
+      color: var(--muted);
+      margin: 0;
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+    .card .read {
+      margin-top: 14px;
+      display: inline-block;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 12px;
+      letter-spacing: .12em;
+      opacity: .9;
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--line);
+      padding: 40px 0;
+      color: var(--muted);
+      text-align: center;
+    }
+    /* Apple-style minimalist footer */
+.footer {
+  border-top: 1px solid var(--line);
+  background: #0b0f13;
+  padding: 24px 0;
+  font-size: 14px;
+  color: #9ca3af;
 }
 
+.footer-inner {
+  width: min(1200px, 92vw);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr; /* creates perfect left, center, right zones */
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
+.footer p {
+  justify-self: start;
+  margin: 0;
+  color: #9ca3af;
+  font-family: 'Sarabun-Regular', sans-serif;
+}
+
+.footer nav {
+  justify-self: center; /* keeps it centered regardless of link width */
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  font-family: 'Sarabun-Regular', sans-serif;
+}
+
+.footer nav a {
+  color: #9ca3af;
+  text-decoration: none;
+  transition: color 0.25s ease;
+}
+
+.footer nav a:hover {
+  color: #ffffff;
+}
+
+.footer nav span {
+  color: #5f6771;
+}
+
+.footer .region {
+  justify-self: end;
+  color: #9ca3af;
+  font-family: 'Sarabun-Regular', sans-serif;
+}
+
+/* Mobile adjustment */
+@media (max-width: 700px) {
+  .footer-inner {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .footer p,
+  .footer nav,
+  .footer .region {
+    justify-self: center;
+  }
+}
+    /* === Responsive Header Behavior === */
+
+/* Normal desktop (everything visible) */
+@media (min-width: 801px) {
+  .site-header nav,
+  .site-header .pill {
+    display: flex;
+  }
+}
+
+/* Tablet and smaller: gradually space things tighter */
+@media (max-width: 800px) {
+  .site-header {
+    justify-content: center;
+  }
+
+  .site-header nav ul {
+    gap: 20px;
+  }
+}
+
+/* Mobile and very narrow screens: hide nav + sign-in, keep only brand */
+@media (max-width: 640px) {
+  .site-header nav,
+  .site-header .pill {
+    display: none;
+  }
+
+  .brand {
+    position: relative;
+    left: auto;
+    transform: none;
+    margin: 0 auto;
+  }
+}
+/* === Responsive Header Behavior (Apple-style smooth collapse) === */
+
+/* Default (desktop) */
+.site-header {
+  transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.site-header nav,
+.header-actions {
+  transition: opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+              visibility 0.45s ease;
+  will-change: opacity, transform;
+}
+
+/* Smooth spacing for large viewports */
+.header-inner {
+  gap: 40px;
+  transition: gap 0.4s ease;
+}
+
+/* Tablet shrink (gradual fade and scale) */
+@media (max-width: 950px) {
+  .site-header nav,
+  .header-actions {
+    opacity: 0.6;
+    transform: scale(0.96);
+  }
+  .header-inner {
+    gap: 28px;
+  }
+}
+
+/* Narrow view: fully fade out before overlap */
+@media (max-width: 780px) {
+  .site-header nav,
+  .header-actions {
+    opacity: 0;
+    transform: scale(0.9);
+    visibility: hidden;
+    pointer-events: none;
+    position: absolute;
+  }
+
+  .header-inner {
+    justify-content: center;
+  }
+
+  .brand {
+    position: relative;
+    left: auto;
+    transform: none;
+    margin: 0 auto;
+    font-size: 22px;
+    transition: font-size 0.3s ease;
+  }
+}
+/* === Smooth fade + scale for responsive header === */
+.site-header nav,
+.header-actions {
+  transition: opacity 0.35s ease, transform 0.4s ease;
+  will-change: opacity, transform;
+}
+
+/* Tablet shrink */
+@media (max-width: 800px) {
+  .site-header nav,
+  .header-actions {
+    opacity: 0.6;
+    transform: scale(0.96);
+  }
+}
+
+/* Phone collapse */
+@media (max-width: 640px) {
+  .site-header nav,
+  .header-actions {
+    opacity: 0;
+    transform: scale(0.9);
+    pointer-events: none;
+  }
+}
   </style>
 </head>
-<body class="grain">
-  <div class="scrollbar" id="lpc-scrollbar"></div>
-
-  <div class="nav-wrap" id="lpc-nav">
-    <div class="wrap nav">
-      <div class="brand"><a href="index.html">Let’s-ParaConnect</a></div>
-      <nav>
-        <a href="browse-paralegals.html">Browse Paralegals</a>
-        <button id="loginToggle" class="nav-login-btn" type="button">Login</button>
-        <button id="registerToggle" class="nav-register-btn" type="button">Register</button>
+<body>
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <nav aria-label="Primary">
+        <ul>
+          <li><a href="#about">About</a></li>
+          <li><a href="#services">Services</a></li>
+          <li><a href="#how">How It Works</a></li>
+        </ul>
       </nav>
+      <a class="brand" href="index.html">
+        Let’s-ParaConnect
+      </a>
+      <div class="header-actions">
+        <a class="pill" href="#signin">Sign In</a>
+      </div>
     </div>
-  </div>
+  </header>
 
-  <!-- Login Popover -->
-  <div id="loginPopover" class="login-pop" role="dialog" aria-modal="false" aria-labelledby="loginPopoverTitle" hidden>
-    <!-- removed visible "Login" word per request -->
-    <form id="loginForm" novalidate>
-      <div class="form-group">
-        <label for="popEmail">Email</label>
-        <input id="popEmail" name="email" type="email" inputmode="email" autocomplete="email" required placeholder="you@example.com">
+  <!-- Hero Slider -->
+  <section class="slider" aria-label="Featured banners">
+    <button class="arrow left" aria-label="Previous slide" data-dir="-1">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <button class="arrow right" aria-label="Next slide" data-dir="1">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+
+    <div class="slides" id="slides">
+      <article class="slide active" data-idx="0">
+        <img src="./hero-mountain.jpg" alt="Snow-capped mountain peak" />
+        <div class="caption">
+          <div class="kicker">On-demand paralegal support to</div>
+          <h1 class="headline">Discover the Talent</h1>
+          <a class="cta" href="#services">Explore the Marketplace
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+      </article>
+
+      <article class="slide" data-idx="1">
+        <img src="./hero-city.jpg" alt="City skyline at dusk with river and bridges" />
+        <div class="caption">
+          <div class="kicker">Scale your practice with</div>
+          <h1 class="headline">On-Demand Expertise</h1>
+          <a class="cta" href="#how">How It Works
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+      </article>
+    </div>
+
+    <div class="bullets" id="bullets" role="tablist" aria-label="Slide navigation">
+      <button class="dot active" data-go="0" aria-selected="true" role="tab"></button>
+      <button class="dot" data-go="1" role="tab"></button>
+    </div>
+  </section>
+
+  <!-- About / Mission Section -->
+  <section class="section about wrap" id="about">
+    <h2>Who We Are</h2>
+    <p>Let’s-ParaConnect empowers law firms and attorneys with high-quality paralegal talent, vetted and ready on demand. Reduce overhead, maintain compliance, and scale your practice smartly.</p>
+  </section>
+
+  <!-- Feature Cards Section -->
+  <section class="section wrap" id="services">
+    <div class="cards">
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1588670238387-cdb414f7ae91?q=80&w=800&auto=format&fit=crop" alt="Vetting process." />
+        <div class="pad">
+          <h3>Vetted Talent</h3>
+          <p>Every paralegal goes through stringent screening and compliance checks so you can trust the work delivered.</p>
+          <a class="read" href="#how">Learn More →</a>
+        </div>
       </div>
-      <div class="form-group pw-wrap">
-        <label for="popPassword">Password</label>
-        <input id="popPassword" name="password" type="password" autocomplete="current-password" required placeholder="••••••••">
-        <button type="button" id="popShow" class="show-toggle" aria-controls="popPassword" aria-label="Show password" aria-pressed="false" data-state="hidden">
-          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1560264280-6bde0adf5c92?q=80&w=800&auto=format&fit=crop" alt="Flexible workflow." />
+        <div class="pad">
+          <h3>Flexible Engagements</h3>
+          <p>From short-term support to long-term contracts — scale your team on your terms.</p>
+          <a class="read" href="#how">View Options →</a>
+        </div>
       </div>
-      <button type="submit" class="login-btn">Login</button>
-      <div id="msg" class="msg" role="status" aria-live="polite"></div>
-    </form>
-  </div>
-
-  <!-- Register tiny menu -->
-  <div id="registerMenu" class="menu-pop" role="menu" aria-label="Register options" hidden>
-    <a class="menu-btn" href="register-attorney.html" role="menuitem">As an Attorney</a>
-    <a class="menu-btn" href="register-paralegal.html" role="menuitem">As a Paralegal</a>
-  </div>
-
-  <section class="hero">
-    <div class="wrap">
-      <div>
-        <div class="eyebrow reveal">Vetted Paralegals • Escrow • Secure Workspace</div>
-        <h1 class="reveal" style="transition-delay:.06s">Trusted paralegals, ready to work with you.</h1>
-        <p class="sub reveal" style="transition-delay:.12s">
-          Hire vetted paralegals with escrow protection and a private case workspace that keeps everything—messages, files, and deadlines—organized in one secure hub.
-        </p>
-        <div class="cta-row reveal" style="transition-delay:.18s">
-          <button id="startHiringBtn" class="btn btn-primary">Start Hiring</button>
-          <a class="btn btn-outline" href="browse-paralegals.html">Browse Paralegals</a>
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1526378727958-0f8b2ec984bf?q=80&w=800&auto=format&fit=crop" alt="Secure & compliant." />
+        <div class="pad">
+          <h3>Security & Compliance</h3>
+          <p>Everything is built to be HIPAA/ethical rule–compliant, with secure data handling and confidentiality baked in.</p>
+          <a class="read" href="#how">Read More →</a>
         </div>
       </div>
     </div>
   </section>
 
-  <footer>
-    <div class="wrap foot">
-      <div>
-        <h4>Work, secured by design.</h4>
-        <p>Every engagement is held in escrow until completion, with a tamper-evident activity log on each action. You focus on the case—we’ll handle the rails.</p>
-      </div>
-      <div>
-        <h4>Platform</h4>
-        <div class="links">
-          <a href="browse-paralegals.html">Browse Paralegals</a>
-          <a href="register-attorney.html">For Attorneys</a>
-          <a href="register-paralegal.html">For Paralegals</a>
-        </div>
-      </div>
-      <div>
-        <h4>Company</h4>
-        <div class="links">
-          <a href="contact.html">Contact</a>
-          <a href="terms.html">Terms</a>
-          <a href="privacy.html">Privacy</a>
-        </div>
-      </div>
-    </div>
-    <div class="wrap copyright">© <span id="lpc-year"></span> Let’s-ParaConnect. All rights reserved.</div>
-  </footer>
+<footer class="footer">
+  <div class="footer-inner">
+    <p>© 2025 Let’s-ParaConnect. All rights reserved.</p>
+    <nav>
+      <a href="#privacy">Privacy Policy</a>
+      <span>|</span>
+      <a href="#terms">Terms of Use</a>
+      <span>|</span>
+      <a href="#legal">Legal</a>
+      <span>|</span>
+      <a href="#contact">Contact</a>
+      <span>|</span>
+      <a href="#sitemap">Site Map</a>
+    </nav>
+    <div class="region">United States</div>
+  </div>
+</footer>
 
   <script>
-    document.getElementById('lpc-year').textContent = new Date().getFullYear();
-    const bar = document.getElementById('lpc-scrollbar');
-    const nav = document.getElementById('lpc-nav');
-    const onScroll = () => {
-      const s = window.scrollY;
-      const h = document.documentElement.scrollHeight - window.innerHeight;
-      const pct = Math.max(0, Math.min(1, s / h));
-      bar.style.width = (pct * 100) + '%';
-      nav.classList.toggle('nav-shadow', s > 2);
-    };
-    window.addEventListener('scroll', onScroll, {passive:true}); onScroll();
+    // Slider JS
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const dots = Array.from(document.querySelectorAll('.dot'));
+    const arrows = Array.from(document.querySelectorAll('.arrow'));
+    const slider = document.querySelector('.slider');
+    let idx = 0, timer = null, delay = 6500;
 
-    const io = new IntersectionObserver((ents)=>{
-      ents.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }});
-    },{threshold:.12});
-    document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
-
-    // Ripple effect only (no magnetic hover)
-    document.querySelectorAll('.btn').forEach(btn=>{
-      btn.addEventListener('click', (e)=>{
-        const r=document.createElement('span'); r.className='ripple';
-        const d=Math.max(btn.offsetWidth,btn.offsetHeight);
-        r.style.width=r.style.height=d+'px';
-        r.style.left=(e.offsetX-d/2)+'px';
-        r.style.top=(e.offsetY-d/2)+'px';
-        btn.appendChild(r);
-        r.addEventListener('animationend',()=>r.remove());
+    function show(n) {
+      idx = (n + slides.length) % slides.length;
+      slides.forEach((s,i) => s.classList.toggle('active', i === idx));
+      dots.forEach((d,i) => {
+        d.classList.toggle('active', i === idx);
+        d.setAttribute('aria-selected', i === idx);
       });
+    }
+    function next(delta = 1) { show(idx + delta); }
+    function play() { stop(); timer = setInterval(() => next(1), delay); }
+    function stop() { if (timer) clearInterval(timer); }
+
+    dots.forEach(d => d.addEventListener('click', e => { show(+e.currentTarget.dataset.go); play(); }));
+    arrows.forEach(a => a.addEventListener('click', e => { next(+e.currentTarget.dataset.dir); play(); }));
+    slider.addEventListener('mouseenter', stop);
+    slider.addEventListener('mouseleave', play);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') next(1);
+      if (e.key === 'ArrowLeft') next(-1);
     });
-    // === Login popover
-    (function(){
-      const pop = document.getElementById('loginPopover');
-      const toggleBtn = document.getElementById('loginToggle');
-      if(pop && toggleBtn){
-        let onScrollClose;
-        function openPop(){
-          window.lpcCloseRegister?.();
-          pop.hidden = false;
-          requestAnimationFrame(()=> pop.classList.add('open'));
-          document.addEventListener('click', onDocClick);
-          document.addEventListener('keydown', onEsc);
-          onScrollClose = () => closePop(); // fade away on scroll
-          window.addEventListener('scroll', onScrollClose, { passive:true });
-          const email = document.getElementById('popEmail');
-          if (email) setTimeout(()=> email.focus(), 50);
-          alignEye();
-        }
-        function closePop(){
-          window.lpcCloseLogin = closePop;
-          pop.classList.remove('open');
-          setTimeout(()=> { pop.hidden = true; }, 150);
-          document.removeEventListener('click', onDocClick);
-          document.removeEventListener('keydown', onEsc);
-          if (onScrollClose) window.removeEventListener('scroll', onScrollClose);
-        }
-        
-        function onDocClick(e){ if(!(pop.contains(e.target) || toggleBtn.contains(e.target))) closePop(); }
-        function onEsc(e){ if(e.key === 'Escape') closePop(); }
-        toggleBtn.addEventListener('click', ()=>{
-          const isOpen = !pop.hidden && pop.classList.contains('open');
-          isOpen ? closePop() : openPop();
-        });
 
-        // password toggle (icon)
-        const pwBtn = document.getElementById('popShow');
-        const pwInput = document.getElementById('popPassword');
-        if(pwBtn && pwInput){
-          const EYE = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7"/><circle cx="12" cy="12" r="3"/></svg>';
-          const EYE_OFF = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C5 20 1 12 1 12a21.8 21.8 0 0 1 5.06-6.94"/><path d="M9.88 3.88A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.82 21.82 0 0 1-3.22 4.12"/><path d="M1 1l22 22"/></svg>';
-          function updateIcon(){
-            const hidden = pwInput.type === 'password';
-            pwBtn.innerHTML = hidden ? EYE : EYE_OFF;
-            pwBtn.setAttribute('aria-label', hidden ? 'Show password' : 'Hide password');
-            pwBtn.setAttribute('aria-pressed', String(!hidden));
-          }
-          pwBtn.addEventListener('click', (e)=>{
-            e.stopPropagation();
-            e.preventDefault();
-            const hidden = pwInput.type === 'password';
-            pwInput.type = hidden ? 'text' : 'password';
-            updateIcon();
-            pwInput.focus({preventScroll:true});
-            try{ const end = pwInput.value.length; pwInput.setSelectionRange(end, end);}catch{}
-          });
-          updateIcon();
-          // --- precise vertical centering for the eye inside the password input
-function alignEye() {
-  if (!pwInput || !pwBtn) return;
-  // position relative to the .pw-wrap (which is position:relative)
-  const top = pwInput.offsetTop + (pwInput.offsetHeight / 2);
-  pwBtn.style.top = top + 'px';
-  pwBtn.style.transform = 'translateY(-50%)'; // keep perfect centering
-}
-
-// re-align on open (fonts/layout may shift) and on resize
-alignEye();
-window.addEventListener('resize', alignEye, { passive: true });
-
-// also re-align after a tick in case fonts load late
-setTimeout(alignEye, 0);
-
-        }
-      }
-    })();
-      // === Register menu
-  (function(){
-    const menu = document.getElementById('registerMenu');
-    const toggle = document.getElementById('registerToggle');
-    if(!(menu && toggle)) return;
-
-    let onScrollClose;
-
-    function openMenu(){
-      window.lpcCloseLogin?.();
-      menu.hidden = false;
-      requestAnimationFrame(()=> menu.classList.add('open'));
-      document.addEventListener('click', onDocClick);
-      document.addEventListener('keydown', onEsc);
-      onScrollClose = () => {
-        // don't close if user is interacting inside
-        if (menu.matches(':hover') || menu.contains(document.activeElement)) return;
-        closeMenu();
-      };
-      window.addEventListener('scroll', onScrollClose, { passive:true });
-    }
-
-    function closeMenu(){
-      window.lpcCloseRegister = closeMenu;
-      menu.classList.remove('open');
-      setTimeout(()=> { menu.hidden = true; }, 150);
-      document.removeEventListener('click', onDocClick);
-      document.removeEventListener('keydown', onEsc);
-      if (onScrollClose) window.removeEventListener('scroll', onScrollClose);
-    }
-
-    function onDocClick(e){
-      const path = e.composedPath ? e.composedPath() : [];
-      const inside = path.includes(menu) || path.includes(toggle) ||
-                     menu.contains(e.target) || toggle.contains(e.target);
-      if(!inside) closeMenu();
-    }
-    function onEsc(e){ if(e.key === 'Escape') closeMenu(); }
-
-    toggle.addEventListener('click', (e)=>{
-      e.stopPropagation();
-      const isOpen = !menu.hidden && menu.classList.contains('open');
-      isOpen ? closeMenu() : openMenu();
-    });
-    menu.addEventListener('click', (e)=> e.stopPropagation());
-    menu.addEventListener('pointerdown', (e)=> e.stopPropagation());
-  })();
-
-    // === Start Hiring behavior
-    (function(){
-      const btn = document.getElementById('startHiringBtn');
-      const loginToggle = document.getElementById('loginToggle');
-      if(!btn) return;
-      const isAuthed = () => /(session|auth|token)=/i.test(document.cookie);
-      btn.addEventListener('click', (e)=>{
-        // Let ripple run but prevent default nav
-        e.preventDefault();
-        if(isAuthed()){
-          // If already authenticated, send to attorney onboarding (adjust to your real route if different)
-          window.location.href = 'register-attorney.html';
-        } else {
-          // Not authed: open the glass login popover
-          loginToggle?.click();
-        }
-      });
-    })();
+    play();
   </script>
-  <script type="module" src="assets/scripts/auth.js"></script>
-  <script type="module" src="assets/scripts/login.js"></script>
-  <script type="module">
-  const trigger = document.getElementById('loginTrigger');
-  const dropdown = document.getElementById('loginDropdown');
-  const form = document.getElementById('loginForm');
-  const pwInput = document.getElementById('password');
-  const pwToggle = dropdown.querySelector('.show-toggle');
-
-  function openDropdown(){
-    dropdown.classList.remove('closing');
-    dropdown.classList.add('open');
-    dropdown.setAttribute('aria-hidden', 'false');
-    trigger.setAttribute('aria-expanded', 'true');
-    // autofocus the email input when opening
-    const email = dropdown.querySelector('#email');
-    if (email) email.focus({ preventScroll: true });
-  }
-
-  function closeDropdown(){
-    if (!dropdown.classList.contains('open')) return;
-    dropdown.classList.add('closing');
-    dropdown.addEventListener('transitionend', () => {
-      dropdown.classList.remove('open','closing');
-      dropdown.setAttribute('aria-hidden', 'true');
-      trigger.setAttribute('aria-expanded', 'false');
-    }, { once: true });
-  }
-
-  function isInsideDropdown(target){
-    return dropdown.contains(target) || target === trigger;
-  }
-
-  // Toggle open/close on click
-  trigger?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const isOpen = dropdown.classList.contains('open');
-    isOpen ? closeDropdown() : openDropdown();
-  });
-
-  // Click outside closes
-  document.addEventListener('click', (e) => {
-    if (!dropdown.classList.contains('open')) return;
-    if (!isInsideDropdown(e.target)) closeDropdown();
-  });
-
-  // ESC closes
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeDropdown();
-  });
-
-  // Any scroll closes (with slight debounce)
-  let scrollTimer;
-  window.addEventListener('scroll', () => {
-    if (!dropdown.classList.contains('open')) return;
-    clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(closeDropdown, 0);
-  }, { passive: true });
-
-  // Show/Hide password (doesn't close)
-  pwToggle?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const hidden = pwInput.type === 'password';
-    pwInput.type = hidden ? 'text' : 'password';
-    pwToggle.textContent = hidden ? 'Hide' : 'Show';
-    pwToggle.setAttribute('aria-label', hidden ? 'Hide password' : 'Show password');
-    pwInput.focus({ preventScroll: true });
-    const end = pwInput.value.length;
-    try { pwInput.setSelectionRange(end, end); } catch {}
-  });
-
-  // Submit (keep your existing /api/auth/login flow in assets/scripts/login.js)
-  form?.addEventListener('submit', (e) => {
-    // let your existing login.js handle the auth; this block just prevents accidental bubble-close
-    e.stopPropagation();
-  });
-</script>
 </body>
 </html>

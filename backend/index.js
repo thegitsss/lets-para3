@@ -3,56 +3,41 @@ console.log("🎯 index.js IS RUNNING from backend/");
 // 0) Env
 require('dotenv').config();
 
-// 1) Core + libs
+// 1) Core + Libs
 const express = require('express');
 const path = require('path');
-const app = express();
+const mongoose = require('mongoose');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const csrf = require('csurf');
-const mongoose = require('mongoose');
+const app = express();
 
-// 2) Routers
-const waitlistRouter = require('./routes/waitlist'); // <-- our new route
-
-// 3) Config
+// 2) Config
 const PROD = process.env.NODE_ENV === 'production';
 const PORT = process.env.PORT || 5000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
-// 5) Parsers early
+// 3) Middleware
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
-
-// 6) Security headers (kept from your file)
 app.use(helmet({
   hsts: PROD ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
-  referrerPolicy: { policy: 'no-referrer' },
+  referrerPolicy: { policy: 'no-referrer' }
 }));
 app.use(helmet.contentSecurityPolicy({
   useDefaults: true,
   directives: {
     "img-src": ["'self'", "data:", "https://*.stripe.com"],
-    "connect-src": ["'self'", "https://api.stripe.com"], // add more origins here if needed
+    "connect-src": ["'self'", "https://api.stripe.com"],
     "script-src": ["'self'", "https://js.stripe.com"],
-    "style-src":  ["'self'", "'unsafe-inline'"],
-    "frame-src":  ["'self'", "https://js.stripe.com"],
-    "font-src": ["'self'", "https://fonts.gstatic.com"],
-  },
+    "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+    "frame-src": ["'self'", "https://js.stripe.com"],
+    "font-src": ["'self'", "https://fonts.gstatic.com", "data:"]
+  }
 }));
 
-// 7) Mount /api/waitlist BEFORE CSRF (so curl works without token)
-app.use('/api/waitlist', waitlistRouter);
-
-// 8) Other routes/middleware (your existing order)
-app.use('/api/public', require('./routes/public'));
-
-// Rate limits
-app.use('/api/auth/login', rateLimit({ windowMs: 10 * 60 * 1000, max: 50 }));
-app.use('/api/', rateLimit({ windowMs: 60 * 1000, max: 300 }));
-
-// CSRF cookie config
+// 4) CSRF Setup
 const csrfProtection = csrf({
   cookie: {
     httpOnly: true,
@@ -61,23 +46,13 @@ const csrfProtection = csrf({
   }
 });
 
-// ❌ Do NOT serve frontend yet
-// app.use(express.static(path.join(__dirname, '../frontend')));
+// 5) Rate Limiting
+app.use('/api/auth/login', rateLimit({ windowMs: 10 * 60 * 1000, max: 50 }));
+app.use('/api/', rateLimit({ windowMs: 60 * 1000, max: 300 }));
 
-// Static files
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Serve Coming Soon page for root requests
-app.get('/', (req, res) => {
-  res.send('✅ Express is serving this response from /');
-});
-
-// CSRF token endpoint
-app.get('/api/csrf', csrfProtection, (req, res) => {
-  res.json({ csrfToken: req.csrfToken() });
-});
-
-// API routes
+// 6) Routes
+app.use('/api/waitlist', require('./routes/waitlist')); // non-CSRF
+app.use('/api/public', require('./routes/public'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/cases', require('./routes/cases'));
@@ -91,21 +66,36 @@ app.post('/api/payments/webhook',
   require('./routes/paymentsWebhook')
 );
 
-// 404 + error handler
+// CSRF token route (for frontend fetches)
+app.get('/api/csrf', csrfProtection, (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
+
+// Placeholder homepage
+app.get('/', (_req, res) => {
+  res.send('✅ Express backend is running and serving responses.');
+});
+
+// 404 handler
 app.use((req, res) => res.status(404).send('Not found'));
+
+// Error handler
 app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).send('Server error');
 });
 
-// Mongo
+// MongoDB Connection
 const raw = process.env.MONGO_URI || '';
-const MONGO = /<cluster>/.test(raw) || !raw ? 'mongodb://127.0.0.1:27017/lets-para' : raw;
+const MONGO = /<cluster>/.test(raw) || !raw
+  ? 'mongodb://127.0.0.1:27017/lets-para'
+  : raw;
+
 mongoose.connect(MONGO)
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ MongoDB error:', err));
 
-// Start
+// Start Server
 app.listen(PORT, () => {
-  console.log(`🚀 Server listening at http://localhost:${PORT}`);
+  console.log(`🚀 Server is live at http://localhost:${PORT}`);
 });
