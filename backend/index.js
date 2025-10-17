@@ -16,19 +16,19 @@ const app = express();
 // 2) Config
 const PROD = process.env.NODE_ENV === 'production';
 const PORT = process.env.PORT || 5050;
-const FRONTEND_DIR = path.join(__dirname, '../frontend'); // ✅ Corrected path
+const FRONTEND_DIR = path.join(__dirname, '../frontend'); // ✅ serve correct directory
 
 // 3) Middleware
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
+
 app.use(
   helmet({
-    hsts: PROD
-      ? { maxAge: 31536000, includeSubDomains: true, preload: true }
-      : false,
+    hsts: PROD ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
     referrerPolicy: { policy: 'no-referrer' },
   })
 );
+
 app.use(
   helmet.contentSecurityPolicy({
     useDefaults: true,
@@ -73,29 +73,27 @@ app.post(
   require('./routes/paymentsWebhook')
 );
 
-// 7) CSRF token route
+// 7) CSRF Token Route
 app.get('/api/csrf', csrfProtection, (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
 
-// 8) Serve Frontend (✅ Moved below APIs, before 404)
+// === Serve Frontend for Render ===
 app.use(express.static(FRONTEND_DIR));
 
-// 9) Catch-all: send frontend index.html for any non-API routes
+// Handle SPA or direct routes by serving index.html
 app.get('*', (req, res) => {
-  // prevent clashing with API routes
-  if (req.path.startsWith('/api')) return res.status(404).send('API route not found');
   res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
 });
 
-// 10) Error + 404 Handlers
+// 8) Error + 404 Handlers
 app.use((req, res) => res.status(404).send('Not found'));
 app.use((err, _req, res, _next) => {
   console.error(err);
   res.status(500).send('Server error');
 });
 
-// 11) Database Connection
+// 9) Database Connection
 const raw = process.env.MONGO_URI || '';
 const MONGO =
   /<cluster>/.test(raw) || !raw
@@ -107,7 +105,7 @@ mongoose
   .then(() => console.log('✅ MongoDB connected'))
   .catch((err) => console.error('❌ MongoDB error:', err));
 
-// 12) Start Server
+// 10) Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Server is live at http://localhost:${PORT}`);
 });
