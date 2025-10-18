@@ -86,6 +86,19 @@ app.get(/.*/, (req, res) => {
   res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
 });
 
+// Serve frontend (Render + mobile-friendly)
+app.use(express.static(FRONTEND_DIR));
+
+// Catch-all route for SPA paths (prevents mobile 404s)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(FRONTEND_DIR, 'index.html'), (err) => {
+    if (err) {
+      console.error('Error serving index.html:', err);
+      res.status(500).send('Server error while serving frontend');
+    }
+  });
+});
+
 // 9) Error + 404 Handlers
 app.use((req, res) => res.status(404).send('Not found'));
 app.use((err, _req, res, _next) => {
