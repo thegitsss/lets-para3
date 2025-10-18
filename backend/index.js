@@ -90,7 +90,7 @@ app.get(/.*/, (req, res) => {
 app.use(express.static(FRONTEND_DIR));
 
 // Catch-all route for SPA paths (prevents mobile 404s)
-app.get('*', (req, res) => {
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(FRONTEND_DIR, 'index.html'), (err) => {
     if (err) {
       console.error('Error serving index.html:', err);
