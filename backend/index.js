@@ -11,24 +11,25 @@ const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 const rateLimit = require('express-rate-limit');
 const csrf = require('csurf');
+
 const app = express();
 
 // 2) Config
 const PROD = process.env.NODE_ENV === 'production';
 const PORT = process.env.PORT || 5050;
-const FRONTEND_DIR = path.join(__dirname, '../frontend'); // ✅ serve correct directory
+const FRONTEND_DIR = path.join(__dirname, '../frontend');
 
 // 3) Middleware
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
-
 app.use(
   helmet({
-    hsts: PROD ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
+    hsts: PROD
+      ? { maxAge: 31536000, includeSubDomains: true, preload: true }
+      : false,
     referrerPolicy: { policy: 'no-referrer' },
   })
 );
-
 app.use(
   helmet.contentSecurityPolicy({
     useDefaults: true,
@@ -58,7 +59,6 @@ app.use('/api/', rateLimit({ windowMs: 60 * 1000, max: 300 }));
 
 // 6) API Routes
 app.use('/api/waitlist', require('./routes/waitlist'));
-app.use('/api/public', require('./routes/public'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/cases', require('./routes/cases'));
@@ -73,27 +73,27 @@ app.post(
   require('./routes/paymentsWebhook')
 );
 
-// 7) CSRF Token Route
+// 7) CSRF token route
 app.get('/api/csrf', csrfProtection, (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
 
-// === Serve Frontend for Render ===
+// 8) Serve frontend
 app.use(express.static(FRONTEND_DIR));
 
-// Handle SPA or direct routes by serving index.html
-app.get('*', (req, res) => {
+// ✅ Express v5 compatible catch-all route
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
 });
 
-// 8) Error + 404 Handlers
+// 9) Error + 404 Handlers
 app.use((req, res) => res.status(404).send('Not found'));
 app.use((err, _req, res, _next) => {
-  console.error(err);
+  console.error('❌ Uncaught error:', err);
   res.status(500).send('Server error');
 });
 
-// 9) Database Connection
+// 10) MongoDB Connection
 const raw = process.env.MONGO_URI || '';
 const MONGO =
   /<cluster>/.test(raw) || !raw
@@ -105,7 +105,7 @@ mongoose
   .then(() => console.log('✅ MongoDB connected'))
   .catch((err) => console.error('❌ MongoDB error:', err));
 
-// 10) Start Server
+// 11) Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Server is live at http://localhost:${PORT}`);
 });
