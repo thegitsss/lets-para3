@@ -291,6 +291,17 @@
       flex-direction: column;
       transition: transform .3s var(--e1), box-shadow .3s var(--e1);
     }
+    .card {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.card.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
     .card:hover {
       transform: translateY(-8px);
       box-shadow: 0 8px 24px rgba(0,0,0, .4);
@@ -304,11 +315,26 @@
     .card .pad {
       padding: 20px;
     }
-    .card h3 {
-      margin: 4px 0 8px;
-      font-size: 20px;
-      color: var(--ink);
-    }
+.card h3 {
+  font-size: 1.25rem;
+  margin-top: 1.2rem;
+  color: #f5f2ed;
+  font-family: 'EB Garamond', serif;
+}
+
+.card p {
+  color: #b5b5b5;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 1rem 0;
+}
+
+.card a {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #b4975a;
+  text-decoration: none;
+}
     .card p {
       color: var(--muted);
       margin: 0;
@@ -536,7 +562,7 @@
         Let’s-ParaConnect
       </a>
       <div class="header-actions">
-        <a class="pill" href="#signin">Sign In</a>
+        <a class="pill" href="login.html">Sign In</a>
       </div>
     </div>
   </header>
@@ -666,5 +692,105 @@
 
     play();
   </script>
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const cards = document.querySelectorAll('.card');
+
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('show');
+            observer.unobserve(entry.target); // optional: animate only once
+          }
+        });
+      });
+
+      cards.forEach((card) => observer.observe(card));
+    } else {
+      // Fallback if IntersectionObserver is not supported
+      cards.forEach((card) => card.classList.add('show'));
+    }
+  });
+</script>
+
+<script>
+  const signInBtn = document.querySelector('#signInBtn'); // your top-right navbar button
+  const modal = document.querySelector('#loginModal');
+  const form = document.querySelector('#loginForm');
+
+  // Toggle modal
+  signInBtn.addEventListener('click', () => {
+    modal.classList.toggle('hidden');
+  });
+
+  // Handle login submission
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.querySelector('#email').value.trim();
+    const password = document.querySelector('#password').value.trim();
+
+    try {
+      const res = await fetch('https://lets-paraconnect.com/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include'
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        if (data.role === 'attorney') {
+          window.location.href = '/frontend/dashboard-attorney.html';
+        } else {
+          window.location.href = '/frontend/dashboard-paralegal.html';
+        }
+      } else {
+        alert('Invalid credentials.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error logging in.');
+    }
+  });
+</script>
+
+<style>
+  .login-modal {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center; justify-content: center;
+    z-index: 999;
+  }
+  .login-modal.hidden { display: none; }
+  .login-box {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 5px 25px rgba(0,0,0,0.2);
+    width: 320px;
+  }
+  .login-box input {
+    display: block;
+    width: 100%;
+    margin: 0.5rem 0;
+    padding: 0.6rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+  .login-box button {
+    width: 100%;
+    margin-top: 1rem;
+    background: var(--gold, #b4975a);
+    border: none;
+    padding: 0.7rem;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+</style>
 </body>
 </html>

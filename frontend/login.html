@@ -1,107 +1,211 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <style>body{opacity:1!important;visibility:visible!important}</style>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Login | Lets-ParaConnect</title>
-
-  <!-- Global styles -->
-  <link rel="stylesheet" href="assets/styles.css" />
-
-  <!-- Page polish -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
-    :root { --brand-brown:#8c7864; --bg-cream:#f5f2ed; --text-dark:#5c4e3a; --navy:#27394d; --line:#e8edf3; }
-    body{
-      font-family: Georgia, serif; background: var(--bg-cream);
-      min-height:100vh; margin:0; display:grid; place-items:center;
+    :root {
+      --gold: #b4975a;
+      --navy: #27394d;
+      --line: #e8edf3;
+      --bg-cream: #f5f2ed;
+      --muted: #64748b;
     }
-    .login-card{
-      width:min(440px, 92vw); background:#fff; border:1px solid var(--line);
-      border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,.08); padding:22px;
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Sarabun', sans-serif;
+      background: var(--bg-cream);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
     }
-    h1{ color:var(--navy); margin:0 0 12px; font-weight:700; font-size:1.35rem; text-align:center; }
 
-    .form-group{ margin:10px 0; }
-    label{ display:block; margin:0 0 6px; font-weight:600; color:#334155; }
-    input{
-      width:100%; padding:.7rem .8rem; border:1px solid #d9dee5; border-radius:8px; font-size:1rem;
-      outline:none; transition:border-color .15s, box-shadow .15s; background:#fff;
+    .login-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: 100%;
+      height: 100%;
     }
-    input:focus{ border-color:var(--brand-brown); box-shadow:0 0 0 3px rgba(140,120,100,.14); }
 
-  .pw-wrap{ position:relative; }
-  /* Give the input room so the Show/Hide button doesn’t overlap text/caret */
-  .pw-wrap input{ padding-right:4.5rem; }
-
-  .show-toggle{
-    position:absolute; right:.6rem; top:50%; transform:translateY(-50%);
-    background:transparent; border:0; font:inherit; font-weight:600;
-    color:var(--text-dark); cursor:pointer; padding:.2rem .35rem; border-radius:6px;
-  }
-  .show-toggle:focus{ outline:2px solid rgba(39,57,77,.45); outline-offset:2px; }
-
-    .login-btn{
-      width:100%; margin-top:.5rem; background:var(--navy); color:#fff; border:0; padding:.78rem;
-      border-radius:10px; cursor:pointer; font-weight:700;
+    .form-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 40px;
+      background: #fff;
+      position: relative;
     }
-    .login-btn[disabled]{ opacity:.7; cursor:progress; }
 
-    .msg{ margin-top:.75rem; min-height:1.2em; color:#7a5e25; }
-    .muted{ color:#64748b; font-size:.9rem; text-align:center; }
+    .brand {
+      position: absolute;
+      top: 24px;
+      left: 32px;
+      font-family: 'Playfair Display', serif;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--navy);
+      text-decoration: none;
+      letter-spacing: 0.03em;
+    }
+
+    .form-inner {
+      max-width: 400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.8rem;
+      color: var(--navy);
+      margin-bottom: 24px;
+    }
+
+    label {
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 6px;
+      display: block;
+      color: var(--navy);
+    }
+
+    input {
+      width: 100%;
+      padding: 0.75rem 0.9rem;
+      font-size: 1rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-family: inherit;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(180, 151, 90, 0.15);
+      outline: none;
+    }
+
+    .pw-wrap {
+      position: relative;
+    }
+
+    .show-toggle {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: 0;
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .login-btn {
+      width: 100%;
+      background: var(--gold);
+      color: white;
+      border: none;
+      padding: 0.9rem;
+      font-weight: 600;
+      font-size: 1rem;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.25s, box-shadow 0.25s, transform 0.2s;
+    }
+
+    .login-btn:hover {
+      background: #a6894d;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .extra-links {
+      text-align: center;
+      margin-top: 14px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .extra-links a {
+      color: var(--gold);
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    .extra-links a:hover {
+      text-decoration: underline;
+    }
+
+    .image-panel {
+      background-image: url('./hero-mountain.jpg');
+      background-size: cover;
+      background-position: center;
+    }
+
+    @media (max-width: 768px) {
+      .login-container {
+        grid-template-columns: 1fr;
+      }
+      .image-panel {
+        display: none;
+      }
+      .brand {
+        left: 24px;
+        top: 18px;
+      }
+    }
   </style>
-
-  <!-- CSRF bootstrap + role UI helpers (adds body.loaded, fetches /api/csrf) -->
-  <script type="module" src="assets/scripts/auth.js"></script>
 </head>
 <body>
-  <main class="login-card" aria-labelledby="loginTitle">
-    <h1 id="loginTitle">Login to Lets-ParaConnect</h1>
+  <div class="login-container">
+    <div class="form-panel">
+      <a href="/" class="brand">Let’s ParaConnect</a>
+      <div class="form-inner">
+        <h1>Login to Lets-ParaConnect</h1>
+        <form id="loginForm" novalidate>
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" placeholder="you@example.com" required />
 
-    <form id="loginForm" novalidate>
-      <div class="form-group">
-        <label for="email">Email</label>
-        <input id="email" name="email" type="email" inputmode="email" autocomplete="email"
-               placeholder="you@example.com" required aria-required="true" />
+          <label for="password">Password</label>
+          <div class="pw-wrap">
+            <input id="password" name="password" type="password" placeholder="••••••••" required />
+            <button type="button" class="show-toggle" onclick="togglePassword()">Show</button>
+          </div>
+
+          <button type="submit" class="login-btn">Log In</button>
+
+          <div class="extra-links">
+            <p><a href="#">Forgot password?</a></p>
+            <p>Just previewing? <a href="#" id="devBypass">Dev bypass</a></p>
+          </div>
+        </form>
       </div>
+    </div>
+    <div class="image-panel" aria-hidden="true"></div>
+  </div>
 
-      <div class="form-group pw-wrap">
-        <label for="password">Password</label>
-        <input id="password" name="password" type="password" autocomplete="current-password"
-               placeholder="••••••••" required aria-required="true" />
-        <button type="button" class="show-toggle" aria-controls="password" aria-label="Show or hide password"
-                onclick="window.togglePassword?.()">Show</button>
-      </div>
-
-      <button type="submit" class="login-btn">Login</button>
-      <div id="msg" class="msg" role="status" aria-live="polite"></div>
-
-      <p class="muted" style="margin-top:12px">
-        Just previewing?
-        <a href="#" id="devBypass">Dev bypass</a>
-      </p>
-    </form>
-  </main>
-
-  <!-- Page logic: uses your cookie-auth flow (/api/auth/login) with CSRF + redirects -->
-  <script type="module" src="assets/scripts/login.js"></script>
+  <!-- Password toggle -->
   <script>
-  // Accessible Show/Hide password toggle
-  window.togglePassword = function () {
-    const input = document.getElementById('password');
-    const btn   = document.querySelector('.show-toggle');
-    const isHidden = input.type === 'password';
+    function togglePassword() {
+      const input = document.getElementById('password');
+      const toggle = document.querySelector('.show-toggle');
+      const isHidden = input.type === 'password';
 
-    input.type = isHidden ? 'text' : 'password';
-    btn.textContent = isHidden ? 'Hide' : 'Show';
-    btn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
-    btn.setAttribute('aria-pressed', String(isHidden));
+      input.type = isHidden ? 'text' : 'password';
+      toggle.textContent = isHidden ? 'Hide' : 'Show';
+    }
+  </script>
 
-    // keep focus/caret in place
-    input.focus({ preventScroll: true });
-    const end = input.value.length;
-    try { input.setSelectionRange(end, end); } catch {}
-  };
-</script>
+  <!-- Optional login handler -->
+  <script type="module" src="assets/scripts/login.js"></script>
 </body>
 </html>
