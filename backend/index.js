@@ -20,6 +20,12 @@ const PORT = process.env.PORT || 5050;
 const FRONTEND_DIR = path.join(__dirname, '../frontend');
 
 // 3) Middleware
+app.use((req, res, next) => {
+  if (req.hostname === 'lets-paraconnect.com') {
+    return res.redirect(301, 'https://www.lets-paraconnect.com' + req.url);
+  }
+  next();
+});
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 app.use(
