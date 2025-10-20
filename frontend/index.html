@@ -463,11 +463,11 @@
 }
 
 /* Mobile and very narrow screens: hide nav + sign-in, keep only brand */
-@media (max-width: 640px) {
-  /* hide nav links but keep the brand centered */
-  .site-header nav {
-    display: none !important;
-  }
+.header-actions {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  position: relative !important;
 
   .site-header .pill {
     display: inline-flex !important;
@@ -484,10 +484,21 @@
     font-weight: 600;
     z-index: 1000;
     border: none;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    text-decoration: none;
   }
 
   .site-header .pill:hover {
     background: #a6894d;
+  }
+
+    .site-header .header-actions {
+    display: block !important;
+    opacity: 1 !important;
+    pointer-events: all !important;
+    transform: none !important;
+    position: relative !important;
+    visibility: visible !important;
   }
 
   /* center the brand */
@@ -496,6 +507,7 @@
     left: auto;
     transform: none;
     margin: 0 auto;
+    text-align: center;
   }
 }
 
@@ -520,30 +532,6 @@
   transition: gap 0.4s ease;
 }
 
-/* Narrow view: fully fade out before overlap */
-@media (max-width: 780px) {
-  .site-header nav,
-  .header-actions {
-    opacity: 0;
-    transform: scale(0.9);
-    visibility: hidden;
-    pointer-events: none;
-    position: absolute;
-  }
-
-  .header-inner {
-    justify-content: center;
-  }
-
-  .brand {
-    position: relative;
-    left: auto;
-    transform: none;
-    margin: 0 auto;
-    font-size: 22px;
-    transition: font-size 0.3s ease;
-  }
-}
 /* === Smooth fade + scale for responsive header === */
 .site-header nav,
 .header-actions {
@@ -551,79 +539,21 @@
   will-change: opacity, transform;
 }
 
-/* Tablet shrink */
+/* Tablet & mobile: Hide nav links, keep Sign In visible */
 @media (max-width: 800px) {
-  .site-header nav,
+  .site-header nav {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+  }
+
   .header-actions {
-    opacity: 0.6;
     transform: scale(0.96);
+    opacity: 1;
   }
 }
-@media (max-width: 640px) {
-  .site-header nav {
-    display: none !important; /* hide nav links only */
-  }
 
-  .site-header .pill {
-    display: inline-flex !important;
-    position: absolute;
-    top: 14px;
-    right: 14px;
-    background: var(--gold);
-    color: white;
-    padding: 8px 14px;
-    border-radius: 999px;
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-weight: 600;
-    border: none;
-    z-index: 1000;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-  }
-
-  .site-header .pill:hover {
-    background: #a6894d;
-  }
-
-  .site-header .header-actions {
-    opacity: 1 !important;
-    pointer-events: all !important;
-    transform: none !important;
-  }
-}
-/* Force Sign In button to always show on all screen sizes */
-@media (max-width: 640px) {
-  .site-header nav {
-    display: none !important; /* hide just the nav menu */
-  }
-
-  .header-actions {
-    display: block !important;
-    opacity: 1 !important;
-    transform: none !important;
-    pointer-events: auto !important;
-  }
-
-  .pill {
-    display: inline-block !important;
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    padding: 10px 16px;
-    font-size: 13px;
-    background-color: var(--gold);
-    color: white;
-    border-radius: 999px;
-    font-weight: 600;
-    z-index: 1000;
-    text-decoration: none;
-  }
-
-  .pill:hover {
-    background-color: #a6894d;
-  }
-}
   </style>
 </head>
 <body>
@@ -874,7 +804,6 @@
     border-radius: 6px;
     cursor: pointer;
   }
-  
 </style>
 </body>
 </html>
