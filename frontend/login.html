@@ -3,42 +3,51 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Login | Lets-ParaConnect</title>
+  <title>Login | Let’s ParaConnect</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
     :root {
       --gold: #b4975a;
       --navy: #27394d;
       --line: #e8edf3;
-      --bg-cream: #f5f2ed;
       --muted: #64748b;
+      --cream: #f5f2ed;
     }
 
-    * { box-sizing: border-box; }
-
-    body {
+    * {
       margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
       font-family: 'Sarabun', sans-serif;
-      background: var(--bg-cream);
+      background: url('./hero-mountain.jpg') no-repeat center center fixed;
+      background-size: cover;
+    }
+
+    .overlay {
       display: flex;
       height: 100vh;
-      overflow: hidden;
+      width: 100vw;
+      backdrop-filter: blur(5px);
+      background-color: rgba(0, 0, 0, 0.2); /* subtle dim layer over the mountain */
     }
 
-    .login-container {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      width: 100%;
-      height: 100%;
-    }
-
-    .form-panel {
+    .left-panel {
+      width: 50%;
+      background-color: rgba(255, 255, 255, 0.95);
+      padding: 60px;
       display: flex;
-      flex-direction: column;
       justify-content: center;
-      padding: 40px;
-      background: #fff;
-      position: relative;
+      align-items: center;
+    }
+
+    .form-container {
+      max-width: 420px;
+      width: 100%;
     }
 
     .brand {
@@ -53,11 +62,6 @@
       letter-spacing: 0.03em;
     }
 
-    .form-inner {
-      max-width: 400px;
-      width: 100%;
-      margin: 0 auto;
-    }
 
     h1 {
       font-family: 'Playfair Display', serif;
@@ -82,7 +86,6 @@
       border-radius: 8px;
       margin-bottom: 20px;
       font-family: inherit;
-      transition: border-color 0.2s, box-shadow 0.2s;
     }
 
     input:focus {
@@ -145,31 +148,25 @@
       text-decoration: underline;
     }
 
-    .image-panel {
-      background-image: url('./hero-mountain.jpg');
-      background-size: cover;
-      background-position: center;
-    }
-
     @media (max-width: 768px) {
-      .login-container {
-        grid-template-columns: 1fr;
+      .overlay {
+        flex-direction: column;
       }
-      .image-panel {
-        display: none;
-      }
-      .brand {
-        left: 24px;
-        top: 18px;
+
+      .left-panel {
+        width: 100%;
+        padding: 40px;
       }
     }
   </style>
 </head>
+
 <body>
-  <div class="login-container">
-    <div class="form-panel">
-      <a href="/" class="brand">Let’s ParaConnect</a>
-      <div class="form-inner">
+  <div class="overlay">
+    <!-- LEFT PANEL -->
+    <div class="left-panel">
+      <div class="form-container">
+        <a href="/" class="brand">Let’s ParaConnect</a>
         <h1>Login to Lets-ParaConnect</h1>
         <form id="loginForm" novalidate>
           <label for="email">Email</label>
@@ -190,22 +187,20 @@
         </form>
       </div>
     </div>
-    <div class="image-panel" aria-hidden="true"></div>
+
+    <!-- RIGHT PANEL: implicitly handled by mountain background -->
   </div>
 
-  <!-- Password toggle -->
   <script>
     function togglePassword() {
       const input = document.getElementById('password');
       const toggle = document.querySelector('.show-toggle');
       const isHidden = input.type === 'password';
-
       input.type = isHidden ? 'text' : 'password';
       toggle.textContent = isHidden ? 'Hide' : 'Show';
     }
   </script>
 
-  <!-- Optional login handler -->
   <script type="module" src="assets/scripts/login.js"></script>
 </body>
 </html>
