@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Login | Let’s ParaConnect</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400&display=swap" rel="stylesheet">
   <style>
     :root {
       --gold: #b4975a;
@@ -24,6 +25,7 @@
       height: 100%;
       width: 100%;
       font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
       background: url('./hero-mountain.jpg') no-repeat center center fixed;
       background-size: cover;
     }
@@ -51,29 +53,38 @@
     }
 
     .brand {
-      position: absolute;
-      top: 24px;
-      left: 32px;
-      font-family: 'Playfair Display', serif;
-      font-size: 1.25rem;
-      font-weight: 600;
-      color: var(--navy);
-      text-decoration: none;
-      letter-spacing: 0.03em;
-    }
+  position: absolute;
+  top: 24px;
+  left: 32px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.25rem;
+  font-weight: 300;
+  color: var(--navy);
+  text-decoration: none;
+  letter-spacing: 0.03em;
+}
 
+h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.8rem;
+  font-weight: 300;
+  color: var(--navy);
+  margin-bottom: 24px;
+}
 
-    h1 {
-      font-family: 'Playfair Display', serif;
-      font-size: 1.8rem;
-      color: var(--navy);
-      margin-bottom: 24px;
-    }
+h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.8rem;
+  font-weight: 300;
+  color: var(--navy);
+  margin-bottom: 24px;
+}
 
     label {
-      font-weight: 600;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
       font-size: 0.95rem;
-      margin-bottom: 6px;
+      margin-bottom:4px;
       display: block;
       color: var(--navy);
     }
@@ -101,7 +112,7 @@
     .show-toggle {
       position: absolute;
       right: 12px;
-      top: 50%;
+      top: 33%;
       transform: translateY(-50%);
       background: transparent;
       border: 0;
@@ -112,25 +123,32 @@
       cursor: pointer;
     }
 
-    .login-btn {
-      width: 100%;
-      background: var(--gold);
-      color: white;
-      border: none;
-      padding: 0.9rem;
-      font-weight: 600;
-      font-size: 1rem;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: background 0.25s, box-shadow 0.25s, transform 0.2s;
-    }
+    button[type="submit"] {
+      all: unset;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.9rem;
+      letter-spacing: 0.12em;
+      text-transform: none;
+      color: #1a2230;
+      background-color: transparent;
+      padding: 0.75rem 1rem;
+      width: 100%; /* 🔥 full width */
+      border:0.02px solid transparent;
+      transition: background-color 0.4s ease, transform 0.3s ease, border-color 0.3s ease;
+      text-align: center;
+      box-sizing: border-box;
+  }
 
-    .login-btn:hover {
-      background: #a6894d;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-      transform: translateY(-1px);
-    }
+button[type="submit"]:hover {
+  background-color: #ffffff;
+  color: #1a2230;
+  border-color: #1a2230;
+  box-shadow: none;
+  transform: scale(1.01);
+}
 
+    
     .extra-links {
       text-align: center;
       margin-top: 14px;
@@ -158,6 +176,50 @@
         padding: 40px;
       }
     }
+    .back-link {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.back-link a {
+  color: var(--muted);
+  font-size: 14px;
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.back-link a:hover {
+  color: var(--ink);
+}
+.login-actions {
+  margin-top: 2.5rem; /* pushes everything downward */
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.forgot {
+  color: #b4975a;
+  font-weight: 400;
+}
+
+.previewing {
+  color: #6b7280; /* muted tone */
+  font-weight: 200;
+}
+
+.bypass {
+  color: #b4975a;
+  font-weight: 400;
+}
+
+.cancel-login {
+  display: inline-block;
+  margin-top: 1.5rem;
+  color: #475569;
+  text-decoration: none;
+  font-weight: 300;
+  font-size: 0.95rem;
+}
   </style>
 </head>
 
@@ -166,13 +228,16 @@
     <!-- LEFT PANEL -->
     <div class="left-panel">
       <div class="form-container">
-        <a href="/" class="brand">Let’s ParaConnect</a>
-        <h1>Login to Lets-ParaConnect</h1>
+<h1>
+  <a href="index.html" class="brand">Let’s ParaConnect</a>
+</h1>
+<h2>Login to Let’s ParaConnect</h2>
+
         <form id="loginForm" novalidate>
-          <label for="email">Email</label>
+          <label for="email">Enter e-mail</label>
           <input id="email" name="email" type="email" placeholder="you@example.com" required />
 
-          <label for="password">Password</label>
+          <label for="password">Enter your password</label>
           <div class="pw-wrap">
             <input id="password" name="password" type="password" placeholder="••••••••" required />
             <button type="button" class="show-toggle" onclick="togglePassword()">Show</button>
@@ -180,10 +245,15 @@
 
           <button type="submit" class="login-btn">Log In</button>
 
-          <div class="extra-links">
-            <p><a href="#">Forgot password?</a></p>
-            <p>Just previewing? <a href="#" id="devBypass">Dev bypass</a></p>
-          </div>
+          <div class="login-actions">
+  <p>
+    <a href="forgot-password.html" class="forgot">Forgotten password?</a><br />
+    Just previewing? <a href="/dev-bypass" class="bypass">Dev bypass</a>
+  </p>
+<a href="index.html" class="cancel-login">← Cancel Log In</a>
+</div>
+
+
         </form>
       </div>
     </div>
@@ -202,5 +272,19 @@
   </script>
 
   <script type="module" src="assets/scripts/login.js"></script>
+  <!-- Forgot Password Modal -->
+<div id="forgotModal" class="modal hidden">
+  <div class="modal-content">
+    <span id="closeModal" class="close">&times;</span>
+    <h2>Reset Your Password</h2>
+    <p>Enter your email and we'll send you a reset link.</p>
+    <input type="email" id="resetEmail" placeholder="Your email" required />
+    <button id="sendResetBtn">Send Reset Link</button>
+    <p id="resetStatus" style="margin-top:10px;"></p>
+    <p class="forgot-password">
+  <a href="forgot-password.html">Forgot password?</a>
+</p>
+  </div>
+</div>
 </body>
 </html>

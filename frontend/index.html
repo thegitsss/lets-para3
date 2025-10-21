@@ -6,9 +6,9 @@
   <title>Let’s-ParaConnect</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&display=swap" rel="stylesheet">
   <style>
     :root {
       --ink: #f6f7fb;
@@ -59,23 +59,24 @@
 /* Banner font: Sarabun-Regular */
 .site-header,
 .site-header nav a {
-  font-family: 'Sarabun-Regular', sans-serif;
-  font-weight: 100;
+  font-family: 'Sarabun', sans-serif;
+  font-weight: 200;
   letter-spacing: 0.03em;
 }
 
 .brand {
   position: absolute;
   left: 50%;
-  transform: translateX(-50%); /* keeps it centered even when window resizes */
-  font-family: 'Playfair Display', serif;
-  font-weight: 600;
+  transform: translateX(-50%);
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 300;
   font-size: 20px;
   letter-spacing: 0.05em;
-  color: #ffffff; /* white text */
-  text-decoration: none; /* removes underline */
-  text-transform: none; /* prevents all caps */
+  color: #ffffff;
+  text-decoration: none;
+  text-transform: none;
 }
+
   .brand:hover {
     color: #f6f7fb;             /* optional subtle hover effect */
    text-decoration: none;      /* ensure it stays clean on hover */
@@ -188,13 +189,13 @@
       margin-bottom: 14px;
     }
     .headline {
-      font-family: "Playfair Display", serif;
-      font-size: clamp(40px, 8vw, 92px);
-      line-height: 1.04;
-      font-weight: 700;
-      margin: 0 0 22px;
-      letter-spacing: .01em;
-    }
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(40px, 8vw, 92px);
+  font-weight: 300;
+  line-height: 1.04;
+  margin: 0 0 22px;
+  letter-spacing: 0.02em;
+}
     .cta {
       display: inline-flex;
       align-items: center;
@@ -278,10 +279,11 @@
       color: var(--ink);
     }
     .about h2 {
-      font-family: "Playfair Display", serif;
-      font-size: clamp(28px, 4vw, 44px);
-      margin: 0 0 16px;
-    }
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 300;
+  margin: 0 0 16px;
+}
     .about p {
       color: var(--muted);
       margin: 0 auto;
@@ -396,7 +398,8 @@
   justify-self: start;
   margin: 0;
   color: #9ca3af;
-  font-family: 'Sarabun-Regular', sans-serif;
+  font-family: 'Sarabun', sans-serif;
+  font-weight: 200;
 }
 
 .footer nav {
@@ -405,7 +408,8 @@
   flex-wrap: wrap;
   gap: 8px;
   justify-content: center;
-  font-family: 'Sarabun-Regular', sans-serif;
+  font-family: 'Sarabun', sans-serif;
+  font-weight: 200;
 }
 
 .footer nav a {
@@ -425,7 +429,8 @@
 .footer .region {
   justify-self: end;
   color: #9ca3af;
-  font-family: 'Sarabun-Regular', sans-serif;
+  font-family: 'Sarabun', sans-serif;
+  font-weight: 200;
 }
 
 /* Mobile adjustment */

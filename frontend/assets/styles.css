@@ -1,3 +1,5 @@
+Absolutely—here’s a fully rewritten `frontend/assets/styles.css` with the fixes and upgrades applied (consistent tokens, stronger accessibility/focus states, responsive tweaks, dark/compact modes refined, safer defaults, and a few missing states like disabled/active/hover). You can drop this in as a full replacement.
+
 ```css
 /* ========================================================================
    Global Design Tokens
@@ -440,14 +442,4 @@ header nav, .nav-wrap { position: relative; }
 .card:hover {
   transform: translateY(-6px);
   box-shadow: 0 6px 16px rgba(0,0,0,0.35);
-}
-.card {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.6s ease, transform 0.6s ease;
-}
-
-.card.show {
-  opacity: 1;
-  transform: translateY(0);
 }
