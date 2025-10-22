@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Accessibility Statement</title>
+  <link href="assets/styles.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=Sarabun:wght@200;300&display=swap" rel="stylesheet"/>
+  <style>
+    body {
+      font-family: 'Sarabun', sans-serif;
+      margin: 0;
+      background-color: white;
+      color: #1a2230;
+    }
+
+    header, footer {
+      font-family: 'Cormorant Garamond', serif;
+    }
+     header {
+      border-bottom: 1px solid var(--line);
+      background: white;
+    }
+
+    .header-inner {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .header-inner nav {
+      display: flex;
+      gap: 40px;
+    }
+
+    .header-inner nav a,
+    .header-inner a.login-btn {
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 300;
+      font-size: 16px;
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .header-logo {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'EB Garamond', serif;
+      text-decoration: none;
+      color: inherit;
+      font-size: 20px;
+      letter-spacing: 1px;
+    }
+
+    .hero {
+      background-image: url("hero-mountain.jpg");
+      background-size: cover;
+      background-position: center;
+      height: 300px;
+      width: 100%;
+    }
+
+    .content {
+      padding: 4rem 2rem;
+      max-width: 900px;
+      margin: auto;
+    }
+
+    .content h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300S;
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .content h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 1.5rem;
+      margin-top: 2rem;
+    }
+
+    .content p {
+      font-size: 1rem;
+      font-weight: 200;
+      line-height: 1.8;
+      margin-bottom: 1rem;
+    }
+
+    footer {
+      border-top: 1px solid #ddd;
+      padding: 0.2rem;
+      font-size: 0.9rem;
+      color: #5c6b7a;
+      text-align: center;
+    }
+
+    .footer-links {
+      margin-top: 0.5rem;
+    }
+
+    .footer-links a {
+      color: #5c6b7a;
+      text-decoration: none;
+      margin: 0 0.8rem;
+      font-weight: 300;
+    }
+
+    .footer-links a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 600px) {
+      .content {
+        padding: 2rem 1rem;
+      }
+
+      .footer-links {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .footer-links a {
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div class="header-inner">
+      <nav>
+        <a href="about.html">About</a>
+        <a href="services.html">Services</a>
+        <a href="how-it-works.html">How It Works</a>
+      </nav>
+        <a href="index.html" class="header-logo">Let<span class="gold">’</span>s ParaConnect</a>
+      <a href="login.html" class="login-btn">Sign In</a>
+    </div>
+  </header>
+  <!-- HERO IMAGE -->
+  <div class="hero"></div>
+
+  <!-- MAIN CONTENT -->
+  <main class="content">
+    <h1>Web Accessibility Statement</h1>
+
+    <h2>General</h2>
+    <p>
+      Let’s-ParaConnect cares about all users and is committed to making our platform accessible to everyone,
+      including individuals with disabilities. We strive to ensure that our site follows the Web Content
+      Accessibility Guidelines (WCAG), and adheres to applicable laws such as the Americans with Disabilities Act (ADA).
+    </p>
+
+    <p>
+      We use accessibility testing tools and user feedback to identify and fix issues that may interfere with
+      access. Features include screen-reader support, keyboard navigation, and sufficient color contrast.
+    </p>
+
+    <h2>Disclaimer</h2>
+    <p>
+      While we strive to make our platform as accessible as possible, some third-party integrations may not be fully compliant.
+      We continue to work towards a more inclusive experience for all users.
+    </p>
+
+    <p>
+      If you experience difficulty accessing any part of our site, please contact us at
+      <a href="mailto:support@lets-paraconnect.com">support@lets-paraconnect.com</a>.
+    </p>
+  </main>
+
+  <!-- FOOTER -->
+  <footer>
+    <div>© 2025 Let’s-ParaConnect. All rights reserved.</div>
+    <div class="footer-links">
+      <a href="privacy.html">Privacy Policy</a> |
+      <a href="terms.html">Terms & Conditions</a> |
+      <a href="legal.html">Legal</a> |
+      <a href="contact.html">Contact</a> |
+          <div class="region">United States</div>
+    </div>
+  </footer>
+</body>
+</html>

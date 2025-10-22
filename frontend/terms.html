@@ -2,88 +2,186 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Terms & Conditions | Lets-ParaConnect</title>
+  <title>Terms & Conditions • Let’s‑ParaConnect</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300&family=Sarabun:wght@200&display=swap" rel="stylesheet" />
+
   <style>
-    :root{
-      --ink:#1a2230; --muted:#5c6b7a; --gold:#b4975a; --line:#e8edf3; --card:#fff; --bg:#faf7f3; --navy:#27394d;
-      --ok:#1f7a4a; --warn:#946200; --bad:#b04747;
+    :root {
+      --ink: #1a2230;
+      --muted: #5c6b7a;
+      --line: #e8edf3;
+      --gold: #b4975a;
     }
-    *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-    header,footer{background:#fff}
-    header{
-      position:sticky;top:0;z-index:10;border-bottom:1px solid var(--line);
-      display:flex;align-items:center;justify-content:space-between;padding:14px 20px
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #ffffff;
+      color: var(--ink);
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 16px;
+      line-height: 1.7;
     }
-    .brand{display:flex;align-items:center;gap:10px;text-decoration:none}
-    .brand span{font-family:"EB Garamond",serif;color:var(--gold);font-size:1.25rem}
-    nav a{color:var(--navy);text-decoration:none;margin-left:14px;position:relative}
-    nav a::after{content:"";position:absolute;left:0;bottom:-4px;height:2px;width:0;background:var(--gold);transition:width .25s ease}
-    nav a:hover::after{width:100%}
-    main{max-width:900px;margin:30px auto;padding:0 18px}
-    h1{font-family:"EB Garamond",serif;font-weight:700;letter-spacing:.2px;margin:8px 0 14px}
-    h2{font-family:"EB Garamond",serif;font-weight:600;margin:28px 0 10px}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.05);padding:22px}
-    .toc{display:grid;gap:6px;margin:10px 0 4px;padding-left:18px}
-    .toc a{color:var(--navy);text-decoration:none}
-    .muted{color:var(--muted)}
-    code.small{background:#f7f9fc;border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:.9em}
-    footer{margin-top:40px;border-top:1px solid var(--line);padding:18px 20px;text-align:center;color:var(--muted)}
-    .pill{display:inline-block;padding:3px 8px;border:1px solid var(--line);border-radius:999px;font-size:.85rem;color:#3c4b5a;background:#f6f8fb;margin-right:6px}
-    .callout{border-left:4px solid var(--gold);background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;margin:16px 0}
-    .ok{border-left-color:var(--ok)} .warn{border-left-color:var(--warn)} .bad{border-left-color:var(--bad)}
-    ol.alpha{list-style: lower-alpha;padding-left:18px}
-    a.skip{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
-    a.skip:focus{left:8px;top:8px;width:auto;height:auto;background:#fff;border:1px solid var(--line);padding:.4rem .6rem;border-radius:8px}
+
+
+    header {
+      border-bottom: 1px solid var(--line);
+      background: white;
+    }
+
+    .header-inner {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 24px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .header-inner nav {
+      display: flex;
+      gap: 40px;
+    }
+
+    .header-inner nav a,
+    .header-inner a.login-btn {
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 300;
+      font-size: 16px;
+      color: var(--ink);
+      text-decoration: none;
+    }
+
+    .header-logo {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Cormorant Garamond', serif;
+      text-decoration: none;
+      color: inherit;
+      font-size: 20px;
+      letter-spacing: 1px;
+    }
+
+    /* MAIN CONTENT */
+    main {
+      max-width: 900px;
+      margin: 60px auto 80px;
+      padding: 0 24px;
+    }
+
+    h1, h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      letter-spacing: 0.4px;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 2.3rem;
+      margin-bottom: 24px;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      margin-top: 48px;
+    }
+
+    p, ul, ol {
+      margin-bottom: 18px;
+    }
+
+    ul, ol {
+      padding-left: 20px;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 15px;
+      margin-bottom: 30px;
+    }
+
+    /* TABLE OF CONTENTS */
+    .toc-list {
+      list-style: none;
+      padding-left: 0;
+      margin: 2rem 0;
+    }
+
+    .toc-list li {
+      margin: 0.5rem 0;
+    }
+
+    .toc-list a {
+      color: var(--ink);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    .toc-list a:hover {
+      color: var(--gold);
+    }
+
+    footer {
+      border-top: 1px solid var(--line);
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    footer a {
+      color: var(--muted);
+      text-decoration: none;
+      margin: 0 8px;
+    }
   </style>
 </head>
+
 <body>
-  <a class="skip" href="#main">Skip to content</a>
   <header>
-    <a class="brand" href="index.html">
-      <img src="assets/transparant logo only.png" alt="Lets-ParaConnect" height="44">
-      <span>Lets-ParaConnect</span>
-    </a>
-    <nav>
-      <a href="index.html">Home</a>
-      <a href="privacy.html">Privacy</a>
-      <a href="login.html">Login</a>
-    </nav>
+    <div class="header-inner">
+      <nav>
+        <a href="about.html">About</a>
+        <a href="services.html">Services</a>
+        <a href="how-it-works.html">How It Works</a>
+      </nav>
+        <a href="index.html" class="header-logo">Let<span class="gold">’</span>s ParaConnect</a>
+      <a href="login.html" class="login-btn">Sign In</a>
+    </div>
   </header>
 
-  <main id="main">
+  <main>
     <h1>Terms & Conditions</h1>
-    <p class="muted">Effective date: <strong><!-- update when you publish --> August 22, 2025</strong></p>
+    <p class="muted">Effective date: <strong>August 22, 2025</strong></p>
 
-    <div class="card">
-      <p>These Terms & Conditions (“<strong>Terms</strong>”) govern your use of the Lets-ParaConnect platform (the “<strong>Platform</strong>”) operated by <strong>Lets-ParaConnect</strong> (“<strong>Company</strong>,” “we,” “us,” or “our”). By creating an account or using the Platform, you agree to these Terms and to our <a href="privacy.html">Privacy Policy</a>. If you accept these Terms on behalf of a law firm or other entity, you represent that you have authority to bind that entity.</p>
-      <p><em>We are not a law firm and do not provide legal services or legal advice.</em> The Platform enables <strong>Attorneys</strong> to engage independent <strong>Paralegals</strong>. All legal work and outcomes are solely between those users.</p>
-      <div class="callout ok" role="note" aria-label="Plain-English summary">
-        <strong>Plain-English summary:</strong> We’re a marketplace + payments layer. Attorneys post scoped, flat-fee work; paralegals deliver; funds are held via Stripe and released on approval. We don’t supervise legal work, and we’re not responsible for results. Disputes are handled on-platform before release.
-      </div>
-    </div>
+    <p>These Terms & Conditions (“Terms”) govern your use of the Let’s‑ParaConnect platform (the “Platform”) operated by Let’s‑ParaConnect (“Company,” “we,” “us,” or “our”). By creating an account or using the Platform, you agree to these Terms and to our <a href="privacy.html">Privacy Policy</a>.</p>
 
-    <h2>Table of Contents</h2>
-    <div class="toc" aria-label="Table of contents">
-      <a href="#eligibility">1. Eligibility & Accounts</a>
-      <a href="#roles">2. Roles & Responsibilities</a>
-      <a href="#payments">3. Jobs, Escrow & Payments (Stripe)</a>
-      <a href="#delivery">4. Delivery, Approval & Disputes</a>
-      <a href="#fees">5. Fees, Taxes & Chargebacks</a>
-      <a href="#files">6. Confidentiality, Files & IP</a>
-      <a href="#acceptable">7. Acceptable Use</a>
-      <a href="#termination">8. Suspension & Termination</a>
-      <a href="#disclaimers">9. Disclaimers; No Legal Advice</a>
-      <a href="#liability">10. Limitation of Liability</a>
-      <a href="#arbitration">11. Governing Law & Dispute Resolution</a>
-      <a href="#changes">12. Changes to Service or Terms</a>
-      <a href="#misc">13. Miscellaneous</a>
-      <a href="#contact">14. Contact</a>
-    </div>
+    <p><em>We are not a law firm and do not provide legal services or legal advice.</em> The Platform enables Attorneys to engage independent Paralegals. All legal work and outcomes are solely between those users.</p>
 
-    <section id="eligibility" class="card">
+    <h2>Table of Contents</h2>
+    <ul class="toc-list">
+      <li><a href="#eligibility">1. Eligibility & Accounts</a></li>
+      <li><a href="#roles">2. Roles & Responsibilities</a></li>
+      <li><a href="#payments">3. Jobs, Escrow & Payments (Stripe)</a></li>
+      <li><a href="#delivery">4. Delivery, Approval & Disputes</a></li>
+      <li><a href="#fees">5. Fees, Taxes & Chargebacks</a></li>
+      <li><a href="#files">6. Confidentiality, Files & IP</a></li>
+      <li><a href="#acceptable">7. Acceptable Use</a></li>
+      <li><a href="#termination">8. Suspension & Termination</a></li>
+      <li><a href="#disclaimers">9. Disclaimers; No Legal Advice</a></li>
+      <li><a href="#liability">10. Limitation of Liability</a></li>
+      <li><a href="#arbitration">11. Governing Law & Dispute Resolution</a></li>
+      <li><a href="#changes">12. Changes to Service or Terms</a></li>
+      <li><a href="#misc">13. Miscellaneous</a></li>
+      <li><a href="#contact">14. Contact</a></li>
+    </ul>
+
+     <section id="eligibility" class="card">
       <h2>1) Eligibility & Accounts</h2>
       <ul>
         <li>You must be at least 18 and able to form a binding contract. Attorneys remain responsible for complying with all professional conduct rules and licensing requirements.</li>
@@ -198,16 +296,18 @@
       <!-- TODO: replace with your legal entity details -->
       <p><strong>Lets-ParaConnect</strong><br>
          Email: <a href="mailto:support@lets-paraconnect.com">support@lets-paraconnect.com</a><br>
-         Address: [Your business address]</p>
+         </p>
     </section>
 
     <div class="card muted" style="margin-top:18px">
-      <strong>Heads-up:</strong> This template is product-aligned but not legal advice. Have counsel tailor governing law, arbitration, fees, dispute windows, and tax language to your jurisdictions and use case.
+      This template is product-aligned but not legal advice. Have counsel tailor governing law, arbitration, fees, dispute windows, and tax language to your jurisdictions and use case.
     </div>
   </main>
 
   <footer>
-    © <script>document.write(new Date().getFullYear())</script> Lets-ParaConnect • <a href="terms.html">Terms</a> • <a href="privacy.html">Privacy</a>
+    © <script>document.write(new Date().getFullYear());</script> Let’s‑ParaConnect • 
+    <a href="terms.html">Terms</a> • 
+    <a href="privacy.html">Privacy</a>
   </footer>
 </body>
 </html>
