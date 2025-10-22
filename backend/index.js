@@ -38,14 +38,12 @@ app.use(
 );
 app.use(
   helmet.contentSecurityPolicy({
-    useDefaults: true,
     directives: {
-      "img-src": ["'self'", "data:", "https://*.stripe.com"],
-      "connect-src": ["'self'", "https://api.stripe.com"],
-      "script-src": ["'self'", "https://js.stripe.com"],
-      "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      "frame-src": ["'self'", "https://js.stripe.com"],
-      "font-src": ["'self'", "https://fonts.gstatic.com", "data:"],
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https://images.unsplash.com"],
     },
   })
 );
