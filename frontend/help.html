@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Let's ParaConnect – FAQ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&display=swap" rel="stylesheet">  <style>
+    :root {
+      --ink: #1a1a1a;
+      --muted: #8a8a8a;
+      --bg: #ffffff;
+      --accent: #b6a47a;
+      --line: rgba(0, 0, 0, 0.05);
+    }
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background-color: var(--bg);
+      color: var(--ink);
+      margin: 0;
+      padding: 0;
+    }
+
+    .faq-container {
+      max-width: 800px;
+      margin: 80px auto 120px;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 32px;
+      color: var(--ink);
+    }
+
+    .faq-item {
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 16px;
+    }
+
+    .faq-item h2 {
+      font-size: 1.2rem;
+      font-weight: 300;
+      margin-bottom: 8px;
+    }
+
+    .faq-item p {
+      font-size: 1rem;
+      color: var(--muted);
+    }
+
+    .contact-toggle {
+      margin-top: 64px;
+      text-align: center;
+      font-size: 0.9rem;
+    }
+
+    .contact-toggle button {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .contact-form {
+      display: none;
+      margin-top: 32px;
+      border-top: 1px solid var(--line);
+      padding-top: 24px;
+    }
+
+    .contact-form label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+    }
+
+    .contact-form input,
+    .contact-form textarea {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 16px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-family: 'Cormorant Garamond', sans-serif;
+    }
+
+    .contact-form button {
+      background-color: var(--accent);
+      border: none;
+      color: white;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .logo-header {
+  text-align: center;
+  padding: 1.25rem 0;
+  font-family: Cormorant Garamond;
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: var(--ink);
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.4); /* light frosted glass */
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 2rem;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.logo-header a {
+  text-decoration: none;
+  color: inherit;
+  transition: opacity 0.3s ease;
+}
+
+.logo-header a:hover {
+  opacity: 0.8;
+}
+
+  </style>
+</head>
+<body>
+<div class="logo-header">
+  <a href="dashboard-attorney.html">Let’s‑ParaConnect</a>
+</div>
+
+  <div class="faq-container">
+    <h1>Frequently Asked Questions</h1>
+
+    <div class="faq-item">
+      <h2>How do I post a job?</h2>
+      <p>Attorneys can post jobs after logging into their dashboard by clicking “Create New Case” and following the steps provided.</p>
+    </div>
+
+    <div class="faq-item">
+      <h2>How does payment work?</h2>
+      <p>Payments are held in escrow through Stripe until the paralegal marks the job as complete and the attorney confirms. Then, funds are released.</p>
+    </div>
+
+    <div class="faq-item">
+      <h2>Can I edit my profile?</h2>
+      <p>Yes. Visit your profile section from your dashboard and click “Edit Profile” to update your details.</p>
+    </div>
+
+    <div class="contact-toggle">
+      <p>Have a different question?</p>
+      <button onclick="toggleForm()">Contact Us</button>
+    </div>
+
+    <div class="contact-form" id="contactForm">
+      <form>
+        <label for="name">Your Name</label>
+        <input type="text" id="name" name="name">
+
+        <label for="email">Your Email</label>
+        <input type="email" id="email" name="email">
+
+        <label for="question">Your Question</label>
+        <textarea id="question" name="question" rows="5"></textarea>
+
+        <button type="submit">Submit</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function toggleForm() {
+      const form = document.getElementById('contactForm');
+      form.style.display = form.style.display === 'block' ? 'none' : 'block';
+    }
+  </script>
+</body>
+</html>
