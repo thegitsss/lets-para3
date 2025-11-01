@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link href="assets/styles.css" rel="stylesheet" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Privacy Policy – Let’s-ParaConnect</title>
@@ -19,14 +20,6 @@
       line-height: 1.6;
     }
 
-    header {
-      padding: 20px 40px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-bottom: 1px solid #e5e5e5;
-    }
-
     .header-logo {
       font-family: 'Cormorant Garamond', serif;
       font-weight: 300;
@@ -37,13 +30,6 @@
     .header-logo a {
       text-decoration: none;
       color: #1a1a1a;
-    }
-
-    nav a {
-      margin-left: 24px;
-      text-decoration: none;
-      color: #1a1a1a;
-      font-weight: 200;
     }
 
     main {
@@ -70,13 +56,6 @@
     p {
       margin-bottom: 20px;
     }
-
-    footer {
-      text-align: center;
-      padding: 40px;
-      font-size: 0.9rem;
-      color: #999;
-    }
     .toc-list {
   list-style: none;
   padding-left: 0;
@@ -98,23 +77,30 @@
 .toc-list a:hover {
   color: var(--gold);
 }
+html {
+  scroll-behavior: smooth;
+}
   </style>
 </head>
 
 <body>
-  <header>
-    <div class="header-logo">
-      <a href="index.html">Let’s-ParaConnect</a>
-    </div>
-    <nav>
+    <!-- Header -->
+<header>
+  <div class="header-inner">
+    <nav class="nav-left">
       <a href="about.html">About</a>
       <a href="services.html">Services</a>
       <a href="how-it-works.html">How It Works</a>
-      <a href="login.html">Sign In</a>
     </nav>
-  </header>
 
-  <main id="main">
+    <a href="index.html" class="header-logo">
+      Let<span class="gold">’</span>s ParaConnect
+    </a>
+
+    <a href="login.html" class="login-btn">Sign In</a>
+  </div>
+</header>
+
  <main id="main">
     <h1>Privacy Policy</h1>
     <p class="muted">Effective date: <strong><!-- update when publishing --> August 22, 2025</strong></p>
@@ -136,17 +122,18 @@
 <section>
   <h2>Table of Contents</h2>
   <ul class="toc-list">
-    <li><a href="#information-we-collect">1. Information We Collect</a></li>
-    <li><a href="#how-we-use-information">2. How We Use Your Information</a></li>
-    <li><a href="#sharing-information">3. Sharing of Information</a></li>
-    <li><a href="#data-retention">4. Data Retention</a></li>
-    <li><a href="#data-security">5. Data Security</a></li>
-    <li><a href="#third-party-links">6. Third-Party Links</a></li>
-    <li><a href="#childrens-privacy">7. Children’s Privacy</a></li>
-    <li><a href="#user-rights">8. Your Rights & Choices</a></li>
-    <li><a href="#policy-updates">9. Updates to This Policy</a></li>
-    <li><a href="#contact-us">10. Contact Us</a></li>
-  </ul>
+  <li><a href="#info-we-collect">1. Information We Collect</a></li>
+  <li><a href="#how-we-use">2. How We Use Your Information</a></li>
+  <li><a href="#sharing">3. Sharing of Information</a></li>
+  <li><a href="#retention">4. Data Retention</a></li>
+  <li><a href="#security">5. Data Security</a></li>
+  <li><a href="#cookies">6. Cookies & Local Storage</a></li>
+  <li><a href="#transfers">7. International Transfers</a></li>
+  <li><a href="#your-rights">8. Your Privacy Rights</a></li>
+  <li><a href="#children">9. Children’s Privacy</a></li>
+  <li><a href="#changes">10. Updates to This Policy</a></li>
+  <li><a href="#contact">11. Contact Us</a></li>
+</ul>
 </section>
 
     <section id="info-we-collect" class="card">
@@ -263,15 +250,25 @@
   </main>
   </main>
 
-  <footer>
-    <div>© <span id="year"></span> Lets-ParaConnect</div>
-    <div>
-      <a href="privacy.html">Privacy Policy</a> |
-      <a href="terms.html">Terms</a> |
-      <a href="contact.html">Contact</a> |
-      <a href="#">United States</a>
-    </div>
-  </footer>
+ <footer class="footer">
+  <div class="footer-inner">
+    <p>© 2025 Let’s-ParaConnect. All rights reserved.</p>
+    <nav>
+      <a href="privacy.html">Privacy Policy</a>
+      <span>|</span>
+      <a href="terms.html">Terms</a>
+      <span>|</span>
+      <a href="legal.html">Legal</a>
+      <span>|</span>
+      <a href="contact.html">Contact</a>
+      <span>|</span>
+      <a href="accessibility.html">Accessibility</a>
+    </nav>
+    <div class="region">United States</div>
+  </div>
+</footer>
+
+
 
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();

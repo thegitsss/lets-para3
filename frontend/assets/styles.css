@@ -4,228 +4,100 @@ Absolutely—here’s a fully rewritten `frontend/assets/styles.css` with the fi
 /* ========================================================================
    Global Design Tokens
    ===================================================================== */
-:root{
-  /* Brand */
-  --brand-brown:#8c7864;
-  --bg-cream:#fbf9f5;
-  --text-dark:#5c4e3a;
-  --navy:#27394d;
-  --white:#ffffff;
-  --light-gray:#e9eef2;
 
-  /* UI neutrals */
-  --border:#e5e7eb;
-  --muted:#6b7280;
-  --ok:#065f46;
-  --err:#b91c1c;
+///new styles///
 
-  /* Effects */
-  --shadow-sm:0 2px 6px rgba(0,0,0,.05);
-  --shadow-md:0 8px 24px rgba(0,0,0,.12);
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400&family=Cormorant+Garamond:wght@300;400&display=swap');
 
-  /* Layout */
-  --container:1100px;
-
-  font-size:16px;
-  font-family:'Georgia', serif;
-}
-
-/* Dark theme tokens (opt-in via :root.dark or [data-theme="dark"]) */
-:root.dark, :root[data-theme="dark"]{
-  --bg-cream:#0b0d12;
-  --text-dark:#e5e7eb;
-  --white:#0f131a;
-  --light-gray:#1f2630;
-  --border:#1f2630;
-  --muted:#a3a7ae;
-  --navy:#9fb7ce;
-  --shadow-sm:none;
-  --shadow-md:none;
-}
-
-/* ========================================================================
-   Resets & Base
-   ===================================================================== */
-*{box-sizing:border-box;margin:0;padding:0}
-
-html, body{min-height:100%}
-
-body{
-  background:var(--bg-cream);
-  color:var(--text-dark);
-  font-family:inherit;
-  opacity:0;
-  transition:opacity .4s ease;
-}
-body.loaded{opacity:1}
-
-/* Visible focus for keyboard users */
-:where(a,button,input,select,textarea,[tabindex]:not([tabindex="-1"])):focus-visible{
-  outline:3px solid rgba(39,57,77,.45);
-  outline-offset:2px;
-  border-radius:6px;
-}
-
-/* Container helper (optional) */
-.container{max-width:var(--container);margin:0 auto;padding:0 16px}
-
-/* Motion safety */
-@media (prefers-reduced-motion: reduce){
-  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
-}
-
-/* ========================================================================
-   Header / Navigation
-   ===================================================================== */
-
-
-/* --- Header --- */
-.lpc-header {
+///header///
+header {
+  border-bottom: 1px solid var(--line, #e5e7eb);
+  background: white;
   width: 100%;
-  background-color: #fff;
-  border-bottom: 1px solid #e5e5e5;
-  position: sticky;
-  top: 0;
-  z-index: 999;
 }
 
-.lpc-nav {
+.header-inner {
   max-width: 1440px;
   margin: 0 auto;
-  padding: 10px 28px; /* reduced padding for thinner height */
-  display: flex;
+  padding: 24px 40px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   position: relative;
 }
 
-/* Flex Container */
-.lpc-nav {
-  max-width:1440px;
-  margin: 0 auto;
-  padding: 10px 28px;
+.nav-left {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  position: relative;
-}
-/* Left links */
-.lpc-left {
-  display: flex;
-  align-items: center;
-  gap: 32px;
-  flex: 1;
+  gap: 40px;
+  justify-content: flex-start;
 }
 
-.lpc-left a {
-  font-family: 'Sarabun', sans-serif;
-  font-weight: 300;
-  font-size: 0.95rem;
-  color: #1a2230;
-  text-decoration: none;
-  transition: opacity 0.25s ease;
-}
-
-.lpc-left a:hover {
-  opacity: 0.6;
-}
-
-/* Center Logo */
-.lpc-logo {
-  position: absolute;
-  left: 50%
-  transform: translateX(-50%);
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 300;
-  font-size: 1.25rem;
-  color: #1a2230;
-  text-decoration: none;
-  letter-spacing: 0.2px;
-  white-space: nowrap;
-}
-/* Right button */
-.signin {
-  border: 1px solid #1a2230;
-  border-radius: 9999px;
-  padding: 4px 16px;
+.header-inner nav a,
+.header-inner a.login-btn {
   font-family: 'Sarabun', sans-serif;
   font-weight: 200;
-  font-size: 0.9rem;
+  font-size: 16px;
   color: #1a2230;
   text-decoration: none;
-  transition: all 0.25s ease;
 }
 
-.signin:hover {
-  background-color: #1a2230;
-  color: #fff;
-  opacity: 1;
+.header-logo {
+  font-family: 'Cormorant Garamond', serif;
+  text-decoration: none;
+  color: #1a2230;
+  font-size: 20px;
+  letter-spacing: 1px;
+  justify-self: center;
 }
 
-/* --- Responsive --- */
-@media (max-width: 700px) {
-  .lpc-nav {
-    flex-direction: column;
+.login-btn {
+  justify-self: end;
+}
+
+.gold {
+  color: #b6a47a;
+}
+@media (max-width: 768px) {
+  .header-inner {
+    grid-template-columns: 1fr;
+    text-align: center;
     gap: 12px;
   }
 
-  .lpc-logo {
-    position: static;
-    transform: none;
-    margin-bottom: 6px;
+  .nav-left {
+    display: none;
   }
 
-  .lpc-left {
-    justify-content: center;
+  .login-btn {
+    justify-self: center;
   }
 }
-/* Nav links */
-.lpc-links {
-  display: flex;
-  align-items: center;
-  gap: 32px;
+/* Smooth spacing for large viewports */
+.header-inner {
+  gap: 40px;
+  transition: gap 0.4s ease;
 }
 
-.lpc-links a {
-  font-family: 'Sarabun', sans-serif;
-  font-weight: 300;
-  font-size: 0.95rem;
-  color: #1a2230;
-  text-decoration: none;
-  transition: opacity 0.25s ease;
+/* === Smooth fade + scale for responsive header === */
+.site-header nav,
+.header-actions {
+  transition: opacity 0.35s ease, transform 0.4s ease;
+  will-change: opacity, transform;
 }
 
-.lpc-links a:hover {
-  opacity: 0.6;
-}
-
-/* Sign In pill */
-.lpc-links .signin {
-  border: 1px solid #1a2230;
-  border-radius: 9999px;
-  padding: 4px 16px; /* smaller for better proportions */
-  font-size: 0.9rem;
-  font-weight: 400;
-}
-
-.lpc-links .signin:hover {
-  background-color: #1a2230;
-  color: #fff;
-  opacity: 1;
-}
-
-/* --- Responsive --- */
-@media (max-width: 700px) {
-  .lpc-links {
-    gap: 20px;
+/* Tablet & mobile: Hide nav links, keep Sign In visible */
+@media (max-width: 800px) {
+  .site-header nav {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
   }
-}
-    /* Footer */
-.footer {
-  border-top: 1px solid var(--line);
-  padding: 40px 0;
-  color: var(--muted);
-  text-align: center;
+
+  .header-actions {
+    transform: scale(0.96);
+    opacity: 1;
+  }
 }
     /* Apple-style minimalist footer */
 .footer {
@@ -234,37 +106,6 @@ body.loaded{opacity:1}
   padding: 24px 0;
   font-size: 14px;
   color: #9ca3af;
-}
-.footer-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 300;
-  font-size: 15px;
-  padding: 0 24px;
-}
-
-.footer-nav {
-  margin-top: 20px;
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 300;
-  font-size: 15px;
-}
-
-footer {
-  background: #fff;
-  padding: 40px 24px;
-  border-top: 1px solid #e6e6e6;
-  color: #5c6b7a;
-}
-
-footer a {
-  color: #5c6b7a;
-  text-decoration: none;
 }
 
 .footer-inner {
@@ -330,348 +171,18 @@ footer a {
   }
 }
 
-/* ========================================================================
-   Typography
-   ===================================================================== */
-h1,h2,h3,h4{font-family:Georgia, serif;font-weight:normal;color:var(--navy)}
-p{font-size:1rem;line-height:1.6}
-.muted{color:var(--muted)}
-.ok{color:var(--ok)}
-.err{color:var(--err)}
-
-/* ========================================================================
-   Sections / Blocks
-   ===================================================================== */
-.section{padding:18px}
-.section-title{font-weight:700;color:var(--navy);margin-bottom:12px}
-
-.block{
-  background:#fff;border:1px solid var(--border);
-  border-radius:12px;padding:14px;box-shadow:var(--shadow-sm);
-}
-.block-title{font-weight:700;margin-bottom:8px;color:var(--navy)}
-
-/* Simple grids used by views */
-.grid.two{display:grid;gap:16px}
-@media(min-width:960px){.grid.two{grid-template-columns:1fr 1fr}}
-.grid.one{display:grid;gap:16px}
-
-/* ========================================================================
-   Cards / Badges / Utility chips
-   ===================================================================== */
-.card{
-  background:var(--white);
-  margin:1rem 0;
-  padding:1rem;
-  border-radius:12px;
-  border:1px solid var(--border);
-  box-shadow:var(--shadow-sm);
-  transition:transform .15s ease, box-shadow .15s ease;
-}
-.card:hover{transform:translateY(-1px);box-shadow:var(--shadow-md)}
-.card:focus-within{box-shadow:0 0 0 2px rgba(39,57,77,.25) inset}
-
-.badge{
-  display:inline-block;min-width:22px;padding:1px 6px;border-radius:999px;
-  background:#111827;color:#fff;font-size:.75rem;vertical-align:middle
-}
-.tag{
-  display:inline-block;border:1px solid var(--border);border-radius:8px;
-  padding:2px 6px;font-size:.8rem;background:#fff
+main h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 36px;
+  font-weight: 300;
+  letter-spacing: 1.2px;
+  margin-bottom: 16px;
+  margin-top: 80px;
+  text-align: left;
 }
 
-/* Status chips used in Overview */
-.status{font-size:.8rem;border-radius:999px;padding:2px 8px;border:1px solid var(--border);text-transform:capitalize}
-.status.open{background:#eef2ff;border-color:#c7d2fe}
-.status.in\ progress{background:#ecfeff;border-color:#a5f3fc}
-.status.closed{background:#ecfdf5;border-color:#a7f3d0}
-
-/* ========================================================================
-   Forms / Inputs
-   ===================================================================== */
-input,textarea,button,select{
-  font-family:inherit;font-size:1rem;width:100%;max-width:400px;margin:.5rem 0;
-  padding:.6rem;border:1px solid var(--border);border-radius:8px;background:#fff;
-  transition:border .2s ease, box-shadow .2s ease, background .2s ease, color .2s ease;
-}
-input:focus,textarea:focus,select:focus{
-  outline:none;border-color:var(--brand-brown);
-  box-shadow:0 0 0 3px rgba(140,120,100,.18);
-}
-input[disabled],textarea[disabled],select[disabled]{opacity:.6;cursor:not-allowed}
-
-/* Field hints / errors */
-.form-hint{font-size:.9rem;color:var(--muted)}
-.form-error{font-size:.9rem;color:var(--err)}
-
-/* Buttons */
-.btn{
-  display:inline-flex;align-items:center;justify-content:center;
-  padding:.6rem 1rem;border:1px solid var(--border);border-radius:8px;
-  background:#fff;color:#111827;cursor:pointer;user-select:none;
-  transition:transform .12s ease, background .2s ease, border-color .2s ease, opacity .2s ease;
-}
-.btn:hover{transform:translateY(-1px)}
-.btn:active{transform:translateY(0)}
-.btn:focus-visible{outline:3px solid rgba(39,57,77,.45);outline-offset:2px}
-.btn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
-.btn.primary:hover{background:#1f2e3d}
-.btn.secondary{background:#f8fafc}
-.btn.light{background:#fff}
-.btn.danger{background:#fff5f5;border-color:#fecaca}
-.btn[disabled], .btn.disabled{opacity:.6;pointer-events:none}
-
-/* Toggle switch (used in Settings/Profile) */
-.switch{position:relative;display:inline-block;width:48px;height:28px;vertical-align:middle}
-.switch input{opacity:0;width:0;height:0}
-.slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#e5e7eb;transition:.2s;border-radius:999px}
-.slider:before{position:absolute;content:"";height:22px;width:22px;left:3px;top:3px;background:#fff;transition:.2s;border-radius:50%}
-input:checked + .slider{background:#111827}
-input:checked + .slider:before{transform:translateX(20px)}
-
-/* Messages (generic utilities) */
-.message{color:var(--brand-brown);font-weight:bold}
-.fade{animation:fadeIn .5s ease}
-@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-
-/* ========================================================================
-   Sidebar (if present)
-   ===================================================================== */
-.sidebar{padding:12px}
-.sidebar a[data-route]{
-  display:block;padding:.55rem .7rem;margin:.2rem 0;border-radius:8px;color:var(--navy);text-decoration:none;
-  transition:background .15s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease;
-}
-.sidebar a[data-route].active,
-.sidebar a[data-route][aria-current="page"]{
-  background:#fff;border:1px solid var(--border);box-shadow:var(--shadow-sm);color:var(--brand-brown)
-}
-
-/* ========================================================================
-   Nav Buttons (Login/Register)
-   ===================================================================== */
-.nav-buttons{display:flex;gap:1rem;align-items:center}
-.nav-btn{
-  font-family:Georgia, serif;font-weight:normal;background:transparent;color:var(--navy);
-  border:2px solid var(--navy);padding:.5rem 1.2rem;border-radius:6px;cursor:pointer;transition:all .2s ease;
-}
-.nav-btn:hover{background:var(--navy);color:#fff;transform:translateY(-1px)}
-.nav-btn:active{transform:translateY(0)}
-.nav-btn[disabled]{opacity:.6;pointer-events:none}
-
-/* ========================================================================
-   Register dropdown
-   ===================================================================== */
-.register-dropdown{position:relative;display:flex;flex-direction:column;align-items:center}
-.register-dropdown > button{
-  font-family:'Cormorant Garamond', serif;font-size:1.1rem;font-weight:500;color:var(--brand-brown);
-  background:none;border:none;cursor:pointer;padding:.6rem 1rem;transition:color .2s ease;
-}
-.register-dropdown > button:focus-visible{outline:3px solid rgba(39,57,77,.45);border-radius:8px}
-.register-menu{
-  position:absolute;top:120%;background:rgba(255,255,255,.92);box-shadow:var(--shadow-md);
-  border-radius:8px;min-width:160px;opacity:0;pointer-events:none;display:flex;flex-direction:column;text-align:center;transition:opacity .2s ease, transform .2s ease;z-index:999;
-  transform:translateY(-4px);
-}
-.register-menu a{
-  padding:.5rem .5rem;font-size:1rem;color:var(--text-dark);text-decoration:none;transition:background .2s ease,color .2s ease;
-}
-.register-menu a:hover{background:var(--light-gray);color:var(--navy)}
-.register-dropdown:hover .register-menu,
-.register-dropdown:focus-within .register-menu{opacity:1;pointer-events:auto;transform:translateY(0)}
-
-/* ========================================================================
-   Modal (View Jobs)
-   ===================================================================== */
-#viewJobsModal{
-  display:none;position:fixed;inset:0;justify-content:center;align-items:center;
-  backdrop-filter:blur(12px);background:rgba(0,0,0,.35);opacity:0;transition:opacity .25s ease;z-index:1000;
-}
-#viewJobsModal.active{opacity:1;display:flex}
-#viewJobsModal .modal-content{
-  background:#fff;padding:28px 34px;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.25);
-  font-family:'Inter',sans-serif;max-width:650px;width:90%;text-align:left;transform:translateY(-18px);transition:transform .25s ease,opacity .25s ease;opacity:0;
-}
-#viewJobsModal.active .modal-content{transform:translateY(0);opacity:1}
-#viewJobsModal h2{font-family:'Cormorant Garamond', serif;font-size:1.6rem;margin-bottom:18px}
-#viewJobsModal ul{list-style:none;padding:0;margin:0}
-#viewJobsModal li{padding:10px 0;border-bottom:1px solid #eee;font-size:1rem}
-@media(max-width:560px){
-  #viewJobsModal .modal-content{padding:20px 16px;border-radius:12px}
-}
-
-/* ========================================================================
-   Paralegal register form alignment
-   ===================================================================== */
-#paralegalForm input,
-#paralegalForm select,
-#paralegalForm textarea,
-#paralegalForm button[type="submit"]{
-  width:100%;max-width:none;box-sizing:border-box;display:block;
-}
-#paralegalForm button[type="submit"]{
-  height:56px;border-radius:12px;line-height:1;-webkit-appearance:none;
-}
-
-/* ========================================================================
-   Paralegal browse filters
-   ===================================================================== */
-.pl-filters{
-  display:grid;grid-template-columns:1fr 180px 160px 160px;gap:10px;align-items:center;margin:12px 0 16px;
-}
-.pl-filters input[type="search"],
-.pl-filters select{
-  padding:10px 12px;border:1px solid #e8edf3;border-radius:12px;background:#fff;font:inherit;
-}
-.pl-toggle{display:flex;align-items:center;gap:8px}
-.pl-count{color:#596579;margin:0 0 10px}
-.pl-empty{color:#596579;margin:8px 0 0}
-@media(max-width:800px){.pl-filters{grid-template-columns:1fr 1fr}}
-
-/* CTA for browse */
-.cta-primary{background:#b4975a;color:#fff;border:0;padding:.6rem 1rem;border-radius:6px;font-weight:600;cursor:pointer;transition:filter .15s ease,transform .12s ease}
-.cta-primary:hover{filter:brightness(1.05);transform:translateY(-1px)}
-.cta-primary:active{transform:translateY(0)}
-.cta-primary[disabled]{opacity:.6;pointer-events:none}
-
-/* ========================================================================
-   Deadline list (Overview)
-   ===================================================================== */
-.dl-list{display:grid;gap:8px}
-.dl-row{
-  display:grid;grid-template-columns:160px 1fr auto;gap:10px;align-items:center;
-  border:1px solid var(--border);border-radius:10px;background:#fff;padding:10px
-}
-.dl-row.overdue{background:#fee2e2}
-.dl-row.today{background:#eef2ff}
-.when{font-family:ui-monospace, SFMono-Regular, Menlo, monospace}
-
-/* ========================================================================
-   Notifications (Overview)
-   ===================================================================== */
-.notif-list{display:grid;gap:8px}
-.notif-item{
-  display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;
-  border:1px solid var(--border);border-radius:10px;background:#fff;padding:10px
-}
-.notif-item.warn{border-color:#fca5a5;background:#fff7f7}
-.notif-item.info{border-color:#bfdbfe;background:#f8fbff}
-.notif-item.hint{border-color:var(--border);background:#fff}
-.ic{font-size:18px;line-height:1}
-.n-title{font-weight:600}
-.n-detail{font-size:.85rem;color:var(--muted)}
-.n-cta{white-space:nowrap}
-
-/* ========================================================================
-   Accessibility & States
-   ===================================================================== */
-/* visible by default everywhere */
-body { opacity: 1; visibility: visible; }
-
-/* optional preloader you can opt into */
-body.loading { opacity: 0; visibility: hidden; }
-body.loading.loaded { opacity: 1; visibility: visible; transition: opacity .25s ease; }
-
-/* ========================================================================
-   Dark mode adjustments
-   ===================================================================== */
-:root.dark{color-scheme:dark}
-:root.dark body{background:#0b0d12;color:#e5e7eb}
-:root.dark nav, :root.dark header, :root.dark .block, :root.dark .card, :root.dark .notif-item, :root.dark .dl-row{
-  background:#0f131a;border-color:#1f2630;box-shadow:none
-}
-:root.dark .section-title, :root.dark .block-title{color:#e5e7eb}
-:root.dark .btn{background:#111827;color:#e5e7eb;border-color:#1f2630}
-:root.dark .btn.primary{background:#1f2e3d;border-color:#1f2e3d}
-:root.dark .sidebar a[data-route].active{background:#0f131a;border-color:#1f2630}
-:root.dark .register-menu{background:rgba(17,24,39,.95)}
-:root.dark .tag{background:#0f131a;color:#e5e7eb;border-color:#1f2630}
-
-/* ========================================================================
-   Compact mode
-   ===================================================================== */
-body.compact .section,
-body.compact .block,
-body.compact .btn{padding-top:10px;padding-bottom:10px}
-```
-/* Trigger button look (optional) */
-.btn-login{
-  background: transparent; border: 1px solid rgba(255,255,255,.35);
-  padding: .55rem .9rem; border-radius: 999px; cursor: pointer;
-  color: #fff; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-  transition: opacity .2s ease;
-}
-.btn-login:hover{ opacity: .85; }
-
-/* Dropdown container (anchored to the trigger's nearest positioned ancestor) */
-#loginDropdown{
-  position: absolute; top: calc(100% + 10px); right: 0;
-  width: 320px; max-width: min(92vw, 360px);
-  padding: 16px; border-radius: 14px;
-  /* Glass effect */
-  background: rgba(255,255,255,.16);
-  border: 1px solid rgba(255,255,255,.28);
-  box-shadow: 0 16px 40px rgba(0,0,0,.18);
-  backdrop-filter: blur(14px) saturate(130%); 
-  -webkit-backdrop-filter: blur(14px) saturate(130%);
-  /* Animation */
-  opacity: 0; transform: translateY(-6px) scale(.98); pointer-events: none;
-  transition: opacity .18s ease, transform .18s ease, visibility 0s linear .18s;
-  visibility: hidden; z-index: 1000;
-}
-
-/* When open */
-#loginDropdown.open{
-  opacity: 1; transform: translateY(0) scale(1);
-  pointer-events: auto; visibility: visible; transition-delay: 0s;
-}
-
-/* Fade-out helper (optional – used on scroll/click close) */
-#loginDropdown.closing{ opacity: 0; transform: translateY(-6px) scale(.98); }
-
-/* Form fields */
-#loginDropdown .field{ margin-bottom: 12px; }
-#loginDropdown label{
-  display: block; margin-bottom: 6px; font-weight: 600; color: #27394d;
-  font-size: .92rem;
-}
-#loginDropdown input{
-  width: 100%; padding: .7rem .85rem; font-size: 1rem;
-  border: 1px solid #d9dee5; border-radius: 10px; outline: none;
-  background: rgba(255,255,255,.9);
-  transition: border-color .15s, box-shadow .15s;
-}
-#loginDropdown input:focus{
-  border-color: #8c7864; box-shadow: 0 0 0 3px rgba(140,120,100,.16);
-}
-
-/* Password show/hide */
-#loginDropdown .pw-wrap{ position: relative; }
-#loginDropdown .pw-wrap input{ padding-right: 4.5rem; }
-#loginDropdown .show-toggle{
-  position: absolute; right: .5rem; top: 50%; transform: translateY(-50%);
-  background: transparent; border: 0; font-weight: 600; cursor: pointer;
-  color: #5c4e3a; padding: .25rem .4rem; border-radius: 8px;
-}
-#loginDropdown .show-toggle:focus{ outline: 2px solid rgba(39,57,77,.45); outline-offset: 2px; }
-
-/* Submit button */
-#loginDropdown .login-btn{
-  width: 100%; padding: .8rem; border: 0; border-radius: 10px; cursor: pointer;
-  background: #27394d; color: #fff; font-weight: 700;
-}
-header nav, .nav-wrap { position: relative; }
-
-.card {
-  background-color: #1c1f26; /* richer than pitch black */
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  padding: 2rem;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+main .muted {
+  font-size: 16px;
+  color: #5c6b7a;
+  margin-bottom: 40px;
 }

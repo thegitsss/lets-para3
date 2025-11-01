@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href="assets/styles.css" rel="stylesheet" />  
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Let’s-ParaConnect</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #0a0f14;
+      --muted: #d6dbe3;
+      --bg: #0a0f14;
+      --line: rgba(255,255,255,.16);
+      --accent: #ffffff;
+      --alpha-header: 0.14;
+      --e1: cubic-bezier(.2,.7,.2,1);
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+  background: #ffffff;
+  color: #1a2230;
+  font: 16px/1.5 Inter, system-ui, Sarabun, sans-serif;
+}
+
+/* Header */
+.site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 68px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* centers the brand horizontally */
+  background: rgba(10,15,20, var(--alpha-header));
+  backdrop-filter: saturate(160%) blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+/* Smooth dark fade on narrow screens */
+@media (max-width: 800px) {
+  .site-header {
+    background: rgba(10, 15, 20, 0.45); /* slightly darker */
+    transition: background 0.5s ease;
+  }
+}
+
+@media (max-width: 640px) {
+  .site-header {
+    background: rgba(10, 15, 20, 0.6); /* even darker on small screens */
+  }
+}
+/* Banner font: Sarabun-Regular */
+.site-header,
+.site-header nav a {
+  font-family: 'Sarabun', sans-serif;
+  font-weight: 200;
+  letter-spacing: 0.03em;
+}
+
+.brand {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 300;
+  font-size: 20px;
+  letter-spacing: 0.05em;
+  color: #ffffff;
+  text-decoration: none;
+  text-transform: none;
+
+}
+    .header-inner {
+      width: min(1200px, 92vw);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      letter-spacing: .08em;
+      font-weight: 300;
+      text-transform: none !important;
+    }
+    .brand-mark {
+      width: 26px; height: 26px;
+      display: grid; place-items: center;
+      border: 2px solid var(--ink);
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 28px;
+      padding: 0;
+      margin: 0;
+    }
+    nav a {
+      color: #f8f9fa;
+      text-decoration: none;
+      opacity: .88;
+      font-weight: 300;
+    }
+    nav a:hover {
+      opacity: 1;
+    }
+    .header-actions .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: #f8f9fa;
+      text-decoration: none;
+    }
+
+    .hero-section {
+      position: relative;
+      height: 100vh;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .hero-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+  }
+
+    /* Hero Slider */
+    .slider {
+      position: relative;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .slides {
+      position: absolute;
+      inset: 0;
+      display: grid;
+    }
+    .slide {
+      grid-area: 1/1;
+      width: 100%;
+      height: 100%;
+      position: relative;
+      opacity: 0;
+      transition: opacity .4s ease-in-out;
+    }
+    .slide.active {
+      opacity: 1;
+    }
+    .slide::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,.45) 50%, rgba(0,0,0,.58) 100%);
+    }
+    .slide > img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transform: scale(1.04);
+      filter: saturate(95%);
+      transition: transform 8s linear;
+    }
+    .slide.active > img {
+      transform: scale(1);
+    }
+    .caption {
+      position: absolute;
+      inset: auto 0 15vh 0;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 0 24px;
+    }
+    .kicker {
+      color: var(--muted);
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      font-size: 12px;
+      margin-bottom: 14px;
+    }
+    .headline {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(40px, 8vw, 92px);
+  font-weight: 300;
+  line-height: 1.04;
+  margin: 0 0 22px;
+  letter-spacing: 0.02em;
+  color: #f8f9fa !important;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 300;
+}
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 22px;
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 300;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+    }
+    .cta:hover {
+      background: rgba(255,255,255, .08);
+    }
+    .arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 46px;
+      height: 46px;
+      border: 2px solid var(--accent);
+      border-radius: 999px;
+      background: rgba(0,0,0, .18);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      z-index: 3;
+    }
+    .arrow:hover {
+      background: rgba(255,255,255, .1);
+    }
+    .arrow.left { left: 24px; }
+    .arrow.right { right: 24px; }
+    .bullets {
+      position: absolute;
+      left: 50%;
+      bottom: 26px;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+    }
+    .dot {
+      width: 10px; height: 10px;
+      border: 2px solid var(--accent);
+      border-radius: 999px;
+      background: transparent;
+      opacity: .7;
+      cursor: pointer;
+    }
+    .dot.active {
+      background: var(--accent);
+      opacity: 1;
+    }
+    .hero-bg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.hero-bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+    /* Below-fold sections */
+    .section {
+      padding: 80px 0;
+    }
+    .wrap {
+      width: min(1200px, 92vw);
+      margin: auto;
+    }
+    .about {
+      text-align: center;
+      color: var(--ink);
+    }
+    .about h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 300;
+  margin: 0 0 16px;
+}
+    .about p {
+      color: var(--muted);
+      margin: 0 auto;
+      max-width: 60ch;
+      font-size: 1rem;
+      line-height: 1.6;
+    }
+    .cards {
+      margin-top: 60px;
+      display: grid;
+      gap: 32px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+    .card {
+      background: #ffffff;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform .3s var(--e1), box-shadow .3s var(--e1);
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      color: #1a2230; /* dark ink tone */
+    }
+    
+    .card {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.card.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+    .card:hover {
+      transform: translateY(-8px);
+    }
+    .card img {
+      width: 100%;
+      height: 180px;
+      object-fit: cover;
+      display: block;
+    }
+    .card .pad {
+      padding: 20px;
+    }
+.card h3 {
+  font-size: 1.25rem;
+  margin-top: 1.2rem;
+}
+
+.card p {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 1rem 0;
+  color: var(--muted);
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.card a {
+  font-weight: 300;
+  font-size: 0.9rem;
+  color: #b4975a;
+  text-decoration: none;
+}
+
+    .card .read {
+      margin-top: 14px;
+      display: inline-block;
+      font-weight: 300;
+      text-transform: uppercase;
+      font-size: 12px;
+      letter-spacing: .12em;
+      opacity: .9;
+      color: var(--ink);
+      text-decoration: none;
+    }
+    
+
+
+    /* === Responsive Header Behavior === */
+
+/* Normal desktop (everything visible) */
+@media (min-width: 801px) {
+  .site-header nav,
+  .site-header .pill {
+    display: flex;
+  }
+}
+
+/* Tablet and smaller: gradually space things tighter */
+@media (max-width: 800px) {
+  .site-header {
+    justify-content: center;
+  }
+
+  .site-header nav ul {
+    gap: 20px;
+  }
+}
+
+/* Mobile and very narrow screens: hide nav + sign-in, keep only brand */
+.header-actions {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  position: relative !important;
+
+  .site-header .pill {
+    display: inline-flex !important;
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: var(--gold);
+    color: white;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 300;
+    z-index: 1000;
+    border: none;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+    text-decoration: none;
+  }
+
+  .site-header .pill:hover {
+    background: #a6894d;
+  }
+
+    .site-header .header-actions {
+    display: block !important;
+    opacity: 1 !important;
+    pointer-events: all !important;
+    transform: none !important;
+    position: relative !important;
+    visibility: visible !important;
+  }
+
+  /* center the brand */
+  .brand {
+    position: relative;
+    left: auto;
+    transform: none;
+    margin: 0 auto;
+    text-align: center;
+  }
+}
+
+/* === Responsive Header Behavior (Apple-style smooth collapse) === */
+
+/* Default (desktop) */
+.site-header {
+  transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.site-header nav,
+.header-actions {
+  transition: opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+              visibility 0.45s ease;
+  will-change: opacity, transform;
+
+}
+.hero-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  color: #f8f9fa !important;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2rem, 6vw, 4rem);
+  font-weight: 300;
+  letter-spacing: 0.05em;
+  text-align: center;
+  max-width: 90vw;
+  opacity: 1;
+}
+
+/* Smooth spacing for large viewports */
+.header-inner {
+  gap: 40px;
+  transition: gap 0.4s ease;
+}
+
+/* === Smooth fade + scale for responsive header === */
+.site-header nav,
+.header-actions {
+  transition: opacity 0.35s ease, transform 0.4s ease;
+  will-change: opacity, transform;
+}
+
+/* Tablet & mobile: Hide nav links, keep Sign In visible */
+@media (max-width: 800px) {
+  .site-header nav {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+  }
+
+  .header-actions {
+    transform: scale(0.96);
+    opacity: 1;
+  }
+}
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <nav aria-label="Primary">
+        <ul>
+          <li><a href="#about">About</a></li>
+          <li><a href="#services">Services</a></li>
+          <li><a href="#how">How It Works</a></li>
+        </ul>
+      </nav>
+      <a class="brand" href="index.html">
+        Let’s-ParaConnect
+      </a>
+      <div class="header-actions">
+        <a class="pill" href="login.html">Sign In</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Slider -->
+  <section class="slider" aria-label="Featured banners">
+    <button class="arrow left" aria-label="Previous slide" data-dir="-1">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <button class="arrow right" aria-label="Next slide" data-dir="1">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+    <section class="hero-section">
+  <img src="assets/your-hero.jpg" alt="Hero" class="hero-img">
+</section>
+
+<!-- CTA Section (Final Call to Action) -->
+<section class="section about wrap" style="text-align: center; background-color: #f8f9fa;" id="cta">
+  <h2 style="color: #f5f2ed;">Ready to Get Started?</h2>
+  <p style="color: #d6dbe3; max-width: 600px; margin: 0 auto 1.5rem;">
+    Whether you're an attorney seeking reliable help, or a paralegal looking for your next great opportunity, Let's ParaConnect is where your journey begins.
+  </p>
+  <a class="cta" href="contact.html" style="margin-top: 1rem;">Contact Us</a>
+</section>
+
+<!-- Fade-in JS + Section Observer -->
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const sections = document.querySelectorAll('.section');
+
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1 });
+
+      sections.forEach((section) => observer.observe(section));
+    } else {
+      sections.forEach(section => section.classList.add('visible'));
+    }
+  });
+</script>
+
+<style>
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 80px;
+  }
+
+  .section {
+    opacity: 0;
+    transform: translateY(60px);
+    transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+    will-change: opacity, transform;
+  }
+
+  .section.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>
+
+<div class="slides" id="slides">
+  <article class="slide active" data-idx="0">
+    <div class="hero-bg">
+      <img src="./hero-mountain.jpg" alt="Snow-capped mountain peak" />
+    </div>
+    <div class="caption">
+      <div class="kicker">On-demand paralegal support to</div>
+      <h1 class="headline">Discover the Talent</h1>
+      <a class="cta" href="#services">Explore the Marketplace
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14M13 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
+  </article>
+
+      <article class="slide" data-idx="1">
+        <img src="./hero-city.jpg" alt="City skyline at dusk with river and bridges" />
+        <div class="caption">
+          <div class="kicker">Scale your practice with</div>
+          <h1 class="headline">On-Demand Expertise</h1>
+          <a class="cta" href="#how">How It Works
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </a>
+        </div>
+      </article>
+    </div>
+
+    <div class="bullets" id="bullets" role="tablist" aria-label="Slide navigation">
+      <button class="dot active" data-go="0" aria-selected="true" role="tab"></button>
+      <button class="dot" data-go="1" role="tab"></button>
+    </div>
+  </section>
+
+  <!-- About / Mission Section -->
+  <section class="section about wrap" id="about">
+    <h2>Who We Are</h2>
+    <p>Let’s-ParaConnect empowers law firms and attorneys with high-quality paralegal talent, vetted and ready on demand. Reduce overhead, maintain compliance, and scale your practice smartly.</p>
+  </section>
+
+  <!-- Feature Cards Section -->
+  <section class="section wrap" id="services">
+    <div class="cards">
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1588670238387-cdb414f7ae91?q=80&w=800&auto=format&fit=crop" alt="Vetting process." />
+        <div class="pad">
+          <h3>Vetted Talent</h3>
+          <p>Every paralegal goes through stringent screening and compliance checks so you can trust the work delivered.</p>
+          <a class="read" href="#how">Learn More →</a>
+        </div>
+      </div>
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1560264280-6bde0adf5c92?q=80&w=800&auto=format&fit=crop" alt="Flexible workflow." />
+        <div class="pad">
+          <h3>Flexible Engagements</h3>
+          <p>From short-term support to long-term contracts — scale your team on your terms.</p>
+          <a class="read" href="#how">View Options →</a>
+        </div>
+      </div>
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1526378727958-0f8b2ec984bf?q=80&w=800&auto=format&fit=crop" alt="Secure & compliant." />
+        <div class="pad">
+          <h3>Security & Compliance</h3>
+          <p>Everything is built to be HIPAA/ethical rule–compliant, with secure data handling and confidentiality baked in.</p>
+          <a class="read" href="#how">Read More →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- ✅ Insert this block directly after your closing </section> for the hero slider -->
+<!-- Parallax Container -->
+<section class="parallax-section" id="how">
+  <div class="parallax-bg"></div>
+
+  <div class="how-it-works-bg">
+    <h2>How It Works</h2>
+    <p>Let’s ParaConnect is designed to be intuitive, fair, and efficient — for both attorneys and paralegals.</p>
+
+    <div class="cards">
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1581090700227-1e37b190418e?q=80&w=800&auto=format&fit=crop" alt="Post a Job" />
+        <div class="pad">
+          <h3>Post a Job</h3>
+          <p>Attorneys quickly post what they need: timelines, type of law, and case details.</p>
+          <a class="read" href="#">Learn More →</a>
+        </div>
+      </div>
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1612832020574-9f3d5d51065e?q=80&w=800&auto=format&fit=crop" alt="Paralegals Apply" />
+        <div class="pad">
+          <h3>Paralegals Apply</h3>
+          <p>Vetted freelance paralegals submit proposals. You pick the best fit.</p>
+          <a class="read" href="#">Browse Talent →</a>
+        </div>
+      </div>
+      <div class="card">
+        <img src="https://images.unsplash.com/photo-1554224154-22dec7ec8818?q=80&w=800&auto=format&fit=crop" alt="Get to Work" />
+        <div class="pad">
+          <h3>Work Begins</h3>
+          <p>Funds are held in escrow. Once the job is marked complete, payment is released.</p>
+          <a class="read" href="#">Escrow Details →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA Section (Final Call to Action) -->
+<section class="section about wrap" style="text-align: center; background-color: #ffffff;" id="cta">
+  <h2 style="color: #1a2230; font-family: 'Cormorant Garamond', sans-serif; font-weight: 200;">Ready to Get Started?</h2>
+  <p style="color: #333333; font-family: 'Sarabun', sans-serif; font-weight: 200; max-width: 600px; margin: 0 auto 1.5rem;">
+    Whether you're an attorney seeking reliable help, or a paralegal looking for your next great opportunity, Let's ParaConnect is where your journey begins.
+  </p>
+<a class="cta" href="contact.html" style="
+  margin-top: 1rem;
+  border: 1.5px solid #1a2230;
+  color: #1a2230;
+  font-family: 'Sarabun', sans-serif;
+  font-weight: 200;
+  padding: 0.75rem 2rem;
+  border-radius: 6px;
+  display: inline-block;
+  text-decoration: none;
+  transition: all 0.3s ease;
+">Contact Us</a>
+</section>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <p>© 2025 Let’s-ParaConnect. All rights reserved.</p>
+    <nav>
+      <a href="privacy.html">Privacy Policy</a>
+      <span>|</span>
+      <a href="terms.html">Terms</a>
+      <span>|</span>
+      <a href="legal.html">Legal</a>
+      <span>|</span>
+      <a href="contact.html">Contact</a>
+      <span>|</span>
+      <a href="accessibility.html">Accessibility</a>
+    </nav>
+    <div class="region">United States</div>
+  </div>
+</footer>
+
+  <script>
+    // Slider JS
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const dots = Array.from(document.querySelectorAll('.dot'));
+    const arrows = Array.from(document.querySelectorAll('.arrow'));
+    const slider = document.querySelector('.slider');
+    let idx = 0, timer = null, delay = 5500;
+
+    function show(n) {
+      idx = (n + slides.length) % slides.length;
+      slides.forEach((s,i) => s.classList.toggle('active', i === idx));
+      dots.forEach((d,i) => {
+        d.classList.toggle('active', i === idx);
+        d.setAttribute('aria-selected', i === idx);
+      });
+    }
+    function next(delta = 1) { show(idx + delta); }
+    function play() { stop(); timer = setInterval(() => next(1), delay); }
+    function stop() { if (timer) clearInterval(timer); }
+
+    dots.forEach(d => d.addEventListener('click', e => { show(+e.currentTarget.dataset.go); play(); }));
+    arrows.forEach(a => a.addEventListener('click', e => { next(+e.currentTarget.dataset.dir); play(); }));
+    slider.addEventListener('mouseenter', stop);
+    slider.addEventListener('mouseleave', play);
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') next(1);
+      if (e.key === 'ArrowLeft') next(-1);
+    });
+
+    play();
+  </script>
+  <script>
+    // Header scroll effect
+const header = document.querySelector('.site-header');
+window.addEventListener('scroll', () => {
+  if (window.scrollY > 10) {
+    header.style.backgroundColor = 'rgba(10, 15, 20, 0.85)';
+  } else {
+    header.style.backgroundColor = 'rgba(10, 15, 20, var(--alpha-header))';
+  }
+});
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const cards = document.querySelectorAll('.card');
+
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('show');
+            observer.unobserve(entry.target); // optional: animate only once
+          }
+        });
+      });
+
+      cards.forEach((card) => observer.observe(card));
+    } else {
+      // Fallback if IntersectionObserver is not supported
+      cards.forEach((card) => card.classList.add('show'));
+    }
+  });
+</script>
+
+<style>
+  .login-modal {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center; justify-content: center;
+    z-index: 999;
+  }
+  .login-modal.hidden { display: none; }
+  .login-box {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 5px 25px rgba(0,0,0,0.2);
+    width: 320px;
+  }
+  .login-box input {
+    display: block;
+    width: 100%;
+    margin: 0.5rem 0;
+    padding: 0.6rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+  .login-box button {
+    width: 100%;
+    margin-top: 1rem;
+    background: var(--gold, #b4975a);
+    border: none;
+    padding: 0.7rem;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+ .how-it-works-bg {
+  background-image: url('desert.jpg');
+  background-size: cover;
+  background-position: center;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background-attachment: fixed;
+  position: relative;
+  z-index: 1;
+}
+
+.how-it-works-bg * {
+  position: relative;
+  z-index: 1;
+}
+.parallax-section {
+  position: relative;
+  overflow: hidden;
+  height: 150vh; /* taller so movement is visible */
+  z-index: 1;
+  background: #fff;
+}
+
+.parallax-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 120%;              /* was 160%, reduced for natural framing */
+  background-image: url('desert.jpg');
+  background-size: cover;     /* fills but keeps proportions */
+  background-position: center center;
+  background-repeat: no-repeat;
+  z-index: 0;
+  will-change: transform;
+  transform: translateY(0);   /* neutral starting point */
+  filter: brightness(0.98);
+}
+
+/* === Foreground Content === */
+.how-it-works-bg {
+  position: relative;
+  z-index: 3;
+  text-align: center;
+  padding: 8rem 0;
+  color: #1a2230;
+  background: transparent;
+}
+
+.how-it-works-bg h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 300;
+  font-size: clamp(28px, 4vw, 44px);
+  margin-bottom: 1rem;
+}
+
+.how-it-works-bg p {
+  font-family: 'Sarabun', sans-serif;
+  font-weight: 200;
+  color: #333;
+  margin: 0 auto 4rem;
+  max-width: 60ch;
+}
+
+/* === Cards === */
+.how-it-works-bg .cards {
+  display: grid;
+  gap: 32px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.how-it-works-bg .card {
+  background: rgba(255,255,255,0.9);
+  border: none;
+  border-radius: 0;
+  transform: translateY(0);
+  opacity: 100%;
+  will-change: transform, opacity;
+  transition: transform 0.6s ease-out, opacity 0.6s ease-out;
+}
+
+</style>
+
+<!-- === Floating Parallax Scroll === -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.38/bundled/lenis.min.js"></script>
+
+<script>
+gsap.registerPlugin(ScrollTrigger);
+
+// === Smooth scrolling ===
+const lenis = new Lenis({
+  duration: 1.2,
+  easing: t => 1 - Math.pow(2, -10 * t),
+  smooth: true
+});
+
+function raf(time) {
+  lenis.raf(time);
+  requestAnimationFrame(raf);
+}
+requestAnimationFrame(raf);
+lenis.on('scroll', ScrollTrigger.update);
+
+// === Background Layer (slowest drift) ===
+gsap.to(".parallax-bg", {
+  yPercent:15,
+  ease: "none",
+  scrollTrigger: {
+    trigger: ".parallax-section",
+    start: "top bottom",
+    end: "bottom top",
+    scrub: true
+  }
+});
+
+// === Heading & Paragraph (light float) ===
+gsap.utils.toArray(".how-it-works-bg h2, .how-it-works-bg p").forEach((el) => {
+  gsap.fromTo(el,
+    { y: 60, opacity: 0, scale: 0.99 },
+    {
+      y: -40,
+      opacity: 1,
+      ease: "power2.out",
+      scrollTrigger: {
+        trigger: el,
+        start: "top 95%",
+        end: "bottom 60%",
+        scrub: true
+      }
+    }
+  );
+});
+
+// === Cards (medium float) ===
+gsap.utils.toArray(".how-it-works-bg .card").forEach((card, i) => {
+  gsap.fromTo(card,
+    { y: 100, opacity: 0, scale: 0.98 },
+    {
+      y: -60,
+      opacity: 1,
+      scale: 1,
+      ease: "power1.out",
+      scrollTrigger: {
+        trigger: card,
+        start: "top 95%",
+        end: "bottom 50%",
+        scrub: true
+      }
+    }
+  );
+});
+</script>
+
+<script>
+  window.addEventListener('scroll', () => {
+    const section = document.getElementById('how');
+    const bg = section.querySelector('.parallax-bg');
+    const scrollY = window.scrollY;
+    const offsetTop = section.offsetTop;
+    const height = section.offsetHeight;
+
+    if (scrollY + window.innerHeight > offsetTop && scrollY < offsetTop + height) {
+      const progress = (scrollY - offsetTop) / height;
+      const yPos = progress * 50;  // adjust “50” for more/less effect
+      bg.style.transform = `translateY(${yPos}px)`;
+    }
+  });
+</script>
+</body>
+</html>

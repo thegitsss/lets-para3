@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link href="assets/styles.css" rel="stylesheet" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Contact Us • Let’s‑ParaConnect</title>
-  <link rel="stylesheet" href="assets/styles.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,500&family=Sarabun:wght@300;400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,500&family=Sarabun:wght@200;300&display=swap" rel="stylesheet" />
   <style>
     :root {
       --ink: #1a2230;
@@ -20,52 +20,16 @@
       color: var(--ink);
       font-family: 'Sarabun', sans-serif;
       font-weight: 300;
-    }
-
-    header {
-      border-bottom: 1px solid var(--line);
-      background: white;
-    }
-
-    .header-inner {
-      max-width: 1440px;
-      margin: 0 auto;
-      padding: 24px 40px;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: relative;
-    }
-
-    .header-inner nav {
-      display: flex;
-      gap: 40px;
-    }
-
-    .header-inner nav a,
-    .header-inner a.login-btn {
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 300;
-      font-size: 16px;
-      color: var(--ink);
-      text-decoration: none;
-    }
-
-    .header-logo {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      font-family: 'Cormorant Garamond', serif;
-      text-decoration: none;
-      color: inherit;
-      font-size: 20px;
-      letter-spacing: 1px;
+      flex-direction: column;
+      min-height: 100vh;
     }
 
     main {
       max-width: 880px;
       margin: 80px auto;
       padding: 0 24px;
+      flex: 1;
     }
 
     h1 {
@@ -105,6 +69,11 @@
       font-size: 14px;
     }
 
+    footer {
+      border-top: none !important;
+      margin-top: 0;
+    }
+
     input, select, textarea {
       font-family: 'Sarabun', sans-serif;
       padding: 12px;
@@ -141,36 +110,7 @@
       background: var(--ink);
       color: white;
     }
-
-    footer {
-      margin-top: 80px;
-      padding: 40px 24px;
-      text-align: center;
-      border-top: 1px solid var(--line);
-      font-size: 14px;
-    }
-
-    footer nav a {
-      color: var(--ink);
-      text-decoration: none;
-      margin: 0 12px;
-    }
-
     @media (max-width: 768px) {
-      .header-inner nav {
-        display: none;
-      }
-
-      .header-logo {
-        position: static;
-        transform: none;
-      }
-
-      .header-inner {
-        flex-direction: column;
-        align-items: center;
-        gap: 12px;
-      }
 
       .actions {
         flex-direction: column;
@@ -185,17 +125,22 @@
 </head>
 <body>
 
-  <header>
-    <div class="header-inner">
-      <nav>
-        <a href="about.html">About</a>
-        <a href="services.html">Services</a>
-        <a href="how-it-works.html">How It Works</a>
-      </nav>
-        <a href="index.html" class="header-logo">Let<span class="gold">’</span>s ParaConnect</a>
-      <a href="login.html" class="login-btn">Sign In</a>
-    </div>
-  </header>
+    <!-- Header -->
+<header>
+  <div class="header-inner">
+    <nav class="nav-left">
+      <a href="about.html">About</a>
+      <a href="services.html">Services</a>
+      <a href="how-it-works.html">How It Works</a>
+    </nav>
+
+    <a href="index.html" class="header-logo">
+      Let<span class="gold">’</span>s ParaConnect
+    </a>
+
+    <a href="login.html" class="login-btn">Sign In</a>
+  </div>
+</header>
 
   <main>
     <h1>Contact Us</h1>
@@ -241,13 +186,22 @@
     </form>
   </main>
 
-  <footer>
+  <footer class="footer">
+  <div class="footer-inner">
+    <p>© 2025 Let’s-ParaConnect. All rights reserved.</p>
     <nav>
-      <a href="terms.html">Terms & Conditions</a> •
       <a href="privacy.html">Privacy Policy</a>
+      <span>|</span>
+      <a href="terms.html">Terms</a>
+      <span>|</span>
+      <a href="legal.html">Legal</a>
+      <span>|</span>
+      <a href="contact.html">Contact</a>
+      <span>|</span>
+      <a href="accessibility.html">Accessibility</a>
     </nav>
-    <div style="margin-top: 12px;">© 2025 Let’s‑ParaConnect</div>
-  </footer>
-
+    <div class="region">United States</div>
+  </div>
+</footer>
 </body>
 </html>
