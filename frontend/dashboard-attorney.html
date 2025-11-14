@@ -157,6 +157,15 @@
       font-size: 0.95rem;
       flex: 1;
     }
+    .message-box {
+      cursor:pointer;
+      transition:background .25s ease, transform .15s ease;
+    }
+    .message-box:hover {
+      background:rgba(182,164,122,0.08);
+      border-color:var(--accent);
+      transform:scale(1.02);
+    }
 
     .section-title {
       font-family: var(--font-serif);
@@ -247,6 +256,26 @@
     .case-actions {
       margin-top: 1rem;
     }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 30px;
+      transform: translate(-50%, 20px);
+      background: rgba(17, 17, 17, 0.92);
+      color: #fff;
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 3000;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
   </style>
 </head>
 <body>
@@ -254,9 +283,11 @@
     <div class="logo">Dashboard</div>
     <nav>
       <a href="#" class="active">Home</a>
-      <a href="#">Cases</a>
+      <a href="active-cases.html">Cases</a>
       <a href="#">Messages</a>
-      <a href="#">Documents</a>
+      <a href="documents.html">Documents</a>
+      <a href="review.html">Review</a>
+      <a href="case-files.html">Case Files</a>
       <a href="#">Billing</a>
       <a href="#">Tasks</a>
       <a href="help.html">Help</a>
@@ -287,7 +318,9 @@
 
     <section class="summary">
       <div class="info-box">2 open cases</div>
-      <div class="info-box">1 message waiting</div>
+      <div class="info-box message-box" id="messageBox">
+        <span id="messageCount">1</span> message<span id="plural"> waiting</span>
+      </div>
       <div class="info-box">0 overdue tasks</div>
       <div class="info-box">$1,200 held in escrow</div>
     </section>
@@ -354,5 +387,55 @@
       </div>
     </section>
   </main>
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script>
+const toastHelper = window.toastUtils;
+const stagedToast = toastHelper?.consume();
+if (stagedToast?.message) {
+  toastHelper.show(stagedToast.message, { targetId: 'toastBanner', type: stagedToast.type });
+}
+
+// === Dynamic Message Count and Click Behavior ===
+const messageBox = document.getElementById('messageBox');
+const messageCountSpan = document.getElementById('messageCount');
+const pluralSpan = document.getElementById('plural');
+
+// Simulated unread messages (replace with API later)
+let unreadMessages = 1;
+
+// Update display
+function updateMessageBubble() {
+  messageCountSpan.textContent = unreadMessages;
+  pluralSpan.textContent = unreadMessages === 1 ? " waiting" : "s waiting";
+}
+
+// Make bubble clickable → go to messages.html
+messageBox.addEventListener('click', () => {
+  window.location.href = 'messages.html';
+});
+
+// Optional: example API logic
+// Replace this with real data from backend once connected
+async function fetchUnreadMessages() {
+  try {
+    const res = await fetch('/api/messages/unread-count'); // example endpoint
+    if (res.ok) {
+      const data = await res.json();
+      unreadMessages = data.count || 0;
+      updateMessageBubble();
+    }
+  } catch {
+    console.warn("Message count fetch failed, using default value");
+  }
+}
+
+// Initialize count on load
+updateMessageBubble();
+// Uncomment once backend endpoint is live:
+// fetchUnreadMessages();
+
+  loadUserHeaderInfo();
+</script>
 </body>
 </html>

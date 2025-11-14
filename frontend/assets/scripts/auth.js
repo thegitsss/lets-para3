@@ -128,3 +128,37 @@ window.addEventListener("DOMContentLoaded", async () => {
     // non-fatal for public/unauthenticated pages
   }
 });
+// === Auto-inject logged-in user's name + avatar globally ===
+window.loadUserHeaderInfo = async function () {
+  try {
+    // 1. Show cached info instantly
+    const cachedUser = JSON.parse(localStorage.getItem("userInfo") || "{}");
+    const nameEl = document.getElementById("user-name");
+    const avatarEl = document.querySelector(".user-profile img");
+
+    if (cachedUser.name && nameEl) nameEl.textContent = cachedUser.name;
+    if (cachedUser.profileImage && avatarEl) avatarEl.src = cachedUser.profileImage;
+
+    // 2. Refresh with live data
+    const res = await fetch("/api/users/me", { credentials: "include" });
+    if (!res.ok) return;
+
+    const user = await res.json();
+    if (!user || !user.name) return;
+
+    // 3. Update UI
+    if (nameEl) nameEl.textContent = user.name;
+    if (avatarEl && user.profileImage) avatarEl.src = user.profileImage;
+
+    // 4. Cache for next load
+    localStorage.setItem(
+      "userInfo",
+      JSON.stringify({
+        name: user.name,
+        profileImage: user.profileImage || cachedUser.profileImage || ""
+      })
+    );
+  } catch (err) {
+    console.warn("Could not load user header info:", err);
+  }
+};

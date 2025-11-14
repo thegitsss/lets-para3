@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link href="assets/styles.css" rel="stylesheet" />  
+  <link href="assets/styles/styles.css" rel="stylesheet" />  
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Let’s-ParaConnect</title>
@@ -37,22 +37,10 @@
   display: flex;
   align-items: center;
   justify-content: center; /* centers the brand horizontally */
-  background: rgba(10,15,20, var(--alpha-header));
+  background: transparent;
+  border-bottom: none;
   backdrop-filter: saturate(160%) blur(10px);
-  border-bottom: 1px solid var(--line);
-}
-/* Smooth dark fade on narrow screens */
-@media (max-width: 800px) {
-  .site-header {
-    background: rgba(10, 15, 20, 0.45); /* slightly darker */
-    transition: background 0.5s ease;
-  }
-}
-
-@media (max-width: 640px) {
-  .site-header {
-    background: rgba(10, 15, 20, 0.6); /* even darker on small screens */
-  }
+  transition: background-color 0.45s ease, box-shadow 0.45s ease, border-color 0.45s ease;
 }
 /* Banner font: Sarabun-Regular */
 .site-header,
@@ -70,7 +58,7 @@
   font-weight: 300;
   font-size: 20px;
   letter-spacing: 0.05em;
-  color: #ffffff;
+  color: #1a2230;
   text-decoration: none;
   text-transform: none;
 
@@ -104,7 +92,7 @@
       margin: 0;
     }
     nav a {
-      color: #f8f9fa;
+      color: #1a2230;
       text-decoration: none;
       opacity: .88;
       font-weight: 300;
@@ -117,13 +105,22 @@
       align-items: center;
       gap: 8px;
       padding: 8px 14px;
-      border: 1px solid var(--line);
+      border: 1px solid rgba(26,34,48,0.2);
       border-radius: 999px;
       font-size: 12px;
       text-transform: uppercase;
       letter-spacing: .12em;
-      color: #f8f9fa;
+      color: #1a2230;
       text-decoration: none;
+    }
+
+    .site-header.over-image .brand,
+    .site-header.over-image nav a,
+    .site-header.over-image .header-actions .pill {
+      color: #f8f9fa;
+    }
+    .site-header.over-image .header-actions .pill {
+      border-color: rgba(255,255,255,0.6);
     }
 
     .hero-section {
@@ -144,11 +141,15 @@
       position: relative;
       height: 100vh;
       overflow: hidden;
+      background-color: #ffffff;
+      z-index: 0;
     }
     .slides {
       position: absolute;
       inset: 0;
       display: grid;
+      background-color: #ffffff;
+      z-index: 0;
     }
     .slide {
       grid-area: 1/1;
@@ -156,10 +157,15 @@
       height: 100%;
       position: relative;
       opacity: 0;
-      transition: opacity .4s ease-in-out;
+      pointer-events: none;
+      transition: opacity 1s ease;
+      background-color: transparent;
+      z-index: 0;
     }
     .slide.active {
       opacity: 1;
+      pointer-events: auto;
+      z-index: 1;
     }
     .slide::before {
       content: "";
@@ -167,18 +173,16 @@
       inset: 0;
       background: linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,.45) 50%, rgba(0,0,0,.58) 100%);
     }
-    .slide > img {
+    .slide > img,
+    .slide .hero-bg img {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transform: scale(1.04);
+      transform: scale(1.08);
       filter: saturate(95%);
       transition: transform 8s linear;
-    }
-    .slide.active > img {
-      transform: scale(1);
     }
     .caption {
       position: absolute;
@@ -187,6 +191,7 @@
       place-items: center;
       text-align: center;
       padding: 0 24px;
+      z-index: 3;
     }
     .kicker {
       color: var(--muted);
@@ -202,6 +207,7 @@
   line-height: 1.04;
   margin: 0 0 22px;
   letter-spacing: 0.02em;
+  z-index: 4;
   color: #f8f9fa !important;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   font-family: 'Cormorant Garamond', serif;
@@ -320,15 +326,10 @@
     }
     
     .card {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
-}
-
-.card.show {
-  opacity: 1;
-  transform: translateY(0);
-}
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+    }
 
     .card:hover {
       transform: translateY(-8px);
@@ -467,9 +468,8 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 10;
-  color: #f8f9fa !important;
+  transform: translateZ(0);
+  z-index: 20;
   font-family: 'Cormorant Garamond', serif;
   font-size: clamp(2rem, 6vw, 4rem);
   font-weight: 300;
@@ -477,6 +477,24 @@
   text-align: center;
   max-width: 90vw;
   opacity: 1;
+  text-shadow: 0px 8px 20px rgba(0, 0, 0, 0.35);
+
+}
+.hero-content::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.02); /* VERY subtle */
+  filter: blur(30px);
+  z-index: -1;
+}
+.hero-content .btn {
+  position: relative;
+  z-index: 25;
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.25),
+    0 4px 10px rgba(0, 0, 0, 0.15);
+  transform: translateZ(20px);   /* actual 3D depth */
 }
 
 /* Smooth spacing for large viewports */
@@ -490,6 +508,11 @@
 .header-actions {
   transition: opacity 0.35s ease, transform 0.4s ease;
   will-change: opacity, transform;
+}
+.next-section {
+  position: relative;
+  z-index: 10;
+  margin-top: -12vh;   /* pulls it up over the hero */
 }
 
 /* Tablet & mobile: Hide nav links, keep Sign In visible */
@@ -529,16 +552,13 @@
   </header>
 
   <!-- Hero Slider -->
-  <section class="slider" aria-label="Featured banners">
+  <section class="slider" aria-label="Featured banners" data-image-bg>
     <button class="arrow left" aria-label="Previous slide" data-dir="-1">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
     </button>
     <button class="arrow right" aria-label="Next slide" data-dir="1">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
     </button>
-    <section class="hero-section">
-  <img src="assets/your-hero.jpg" alt="Hero" class="hero-img">
-</section>
 
 <!-- CTA Section (Final Call to Action) -->
 <section class="section about wrap" style="text-align: center; background-color: #f8f9fa;" id="cta">
@@ -568,6 +588,72 @@
     } else {
       sections.forEach(section => section.classList.add('visible'));
     }
+
+    const slides = document.querySelectorAll('.slide');
+    if (!slides.length) return;
+
+    const imageSpeed = 0.28;
+    const textSpeed = 0.12;
+    const smoothing = 0.12;
+    const zoomIn = 1.12;
+    const zoomOut = 1.0;
+
+    const parallaxItems = Array.from(slides).map((slide) => {
+      const img = slide.querySelector('.hero-bg img');
+      const caption = slide.querySelector('.caption');
+      if (!img && !caption) return null;
+      return {
+        slide,
+        img,
+        caption,
+        targetImg: 0,
+        currentImg: 0,
+        targetText: 0,
+        currentText: 0,
+        targetZoom: slide.classList.contains('active') ? zoomOut : zoomIn,
+        currentZoom: slide.classList.contains('active') ? zoomOut : zoomIn,
+      };
+    }).filter(Boolean);
+
+    if (!parallaxItems.length) return;
+
+    const updateTargets = () => {
+      parallaxItems.forEach((item) => {
+        const rect = item.slide.getBoundingClientRect();
+        if (rect.bottom < 0 || rect.top > window.innerHeight) {
+          item.targetImg = 0;
+          item.targetText = 0;
+          item.targetZoom = zoomOut;
+          return;
+        }
+
+        const offset = rect.top + rect.height / 2 - window.innerHeight / 2;
+        item.targetImg = -offset * imageSpeed;
+        item.targetText = -offset * textSpeed;
+        item.targetZoom = item.slide.classList.contains('active') ? zoomOut : zoomIn;
+      });
+    };
+
+    const render = () => {
+      parallaxItems.forEach((item) => {
+        if (item.img) {
+          item.currentImg += (item.targetImg - item.currentImg) * smoothing;
+          item.currentZoom += (item.targetZoom - item.currentZoom) * smoothing;
+          item.img.style.transform = `translate3d(0, ${item.currentImg}px, 0) scale(${item.currentZoom})`;
+        }
+        if (item.caption) {
+          item.currentText += (item.targetText - item.currentText) * smoothing;
+          item.caption.style.transform = `translate3d(0, ${item.currentText}px, 0)`;
+        }
+      });
+      requestAnimationFrame(render);
+    };
+
+    updateTargets();
+    render();
+    window.addEventListener('scroll', updateTargets, { passive: true });
+    window.addEventListener('resize', updateTargets);
+    window.addEventListener('heroSlideChanged', updateTargets);
   });
 </script>
 
@@ -588,6 +674,14 @@
     opacity: 1;
     transform: translateY(0);
   }
+  .slide .hero-bg img {
+    will-change: transform;
+  }
+
+  .slide .caption {
+    will-change: transform;
+    transition: transform 0.2s ease-out;
+  }
 </style>
 
 <div class="slides" id="slides">
@@ -607,7 +701,9 @@
   </article>
 
       <article class="slide" data-idx="1">
-        <img src="./hero-city.jpg" alt="City skyline at dusk with river and bridges" />
+        <div class="hero-bg">
+          <img src="./hero-city.jpg" alt="City skyline at dusk with river and bridges" />
+        </div>
         <div class="caption">
           <div class="kicker">Scale your practice with</div>
           <h1 class="headline">On-Demand Expertise</h1>
@@ -631,7 +727,7 @@
   </section>
 
   <!-- Feature Cards Section -->
-  <section class="section wrap" id="services">
+  <section class="section services wrap floating-panel">
     <div class="cards">
       <div class="card">
         <img src="https://images.unsplash.com/photo-1588670238387-cdb414f7ae91?q=80&w=800&auto=format&fit=crop" alt="Vetting process." />
@@ -661,7 +757,7 @@
   </section>
   <!-- ✅ Insert this block directly after your closing </section> for the hero slider -->
 <!-- Parallax Container -->
-<section class="parallax-section" id="how">
+<section class="parallax-section" id="how" data-image-bg>
   <div class="parallax-bg"></div>
 
   <div class="how-it-works-bg">
@@ -670,24 +766,24 @@
 
     <div class="cards">
       <div class="card">
-        <img src="https://images.unsplash.com/photo-1581090700227-1e37b190418e?q=80&w=800&auto=format&fit=crop" alt="Post a Job" />
         <div class="pad">
+          <span class="card-icon" aria-hidden="true">*</span>
           <h3>Post a Job</h3>
           <p>Attorneys quickly post what they need: timelines, type of law, and case details.</p>
           <a class="read" href="#">Learn More →</a>
         </div>
       </div>
       <div class="card">
-        <img src="https://images.unsplash.com/photo-1612832020574-9f3d5d51065e?q=80&w=800&auto=format&fit=crop" alt="Paralegals Apply" />
         <div class="pad">
+          <span class="card-icon" aria-hidden="true">*</span>
           <h3>Paralegals Apply</h3>
           <p>Vetted freelance paralegals submit proposals. You pick the best fit.</p>
           <a class="read" href="#">Browse Talent →</a>
         </div>
       </div>
       <div class="card">
-        <img src="https://images.unsplash.com/photo-1554224154-22dec7ec8818?q=80&w=800&auto=format&fit=crop" alt="Get to Work" />
         <div class="pad">
+          <span class="card-icon" aria-hidden="true">*</span>
           <h3>Work Begins</h3>
           <p>Funds are held in escrow. Once the job is marked complete, payment is released.</p>
           <a class="read" href="#">Escrow Details →</a>
@@ -741,24 +837,72 @@
     const dots = Array.from(document.querySelectorAll('.dot'));
     const arrows = Array.from(document.querySelectorAll('.arrow'));
     const slider = document.querySelector('.slider');
-    let idx = 0, timer = null, delay = 5500;
+    let idx = slides.findIndex((slide) => slide.classList.contains('active'));
+    if (idx < 0) idx = 0;
+    let timer = null;
+    const delay = 9000;
+
+    function updateDots(prev, next) {
+      if (!dots.length) return;
+      if (dots[prev]) {
+        dots[prev].classList.remove('active');
+        dots[prev].setAttribute('aria-selected', 'false');
+      }
+      if (dots[next]) {
+        dots[next].classList.add('active');
+        dots[next].setAttribute('aria-selected', 'true');
+      }
+    }
 
     function show(n) {
+      if (!slides.length) return;
+      const prevIdx = idx;
       idx = (n + slides.length) % slides.length;
-      slides.forEach((s,i) => s.classList.toggle('active', i === idx));
-      dots.forEach((d,i) => {
-        d.classList.toggle('active', i === idx);
-        d.setAttribute('aria-selected', i === idx);
-      });
-    }
-    function next(delta = 1) { show(idx + delta); }
-    function play() { stop(); timer = setInterval(() => next(1), delay); }
-    function stop() { if (timer) clearInterval(timer); }
+      if (prevIdx === idx) return;
 
-    dots.forEach(d => d.addEventListener('click', e => { show(+e.currentTarget.dataset.go); play(); }));
-    arrows.forEach(a => a.addEventListener('click', e => { next(+e.currentTarget.dataset.dir); play(); }));
-    slider.addEventListener('mouseenter', stop);
-    slider.addEventListener('mouseleave', play);
+      slides[idx].classList.add('active');
+      slides[idx].setAttribute('aria-hidden', 'false');
+
+      if (slides[prevIdx]) {
+        slides[prevIdx].setAttribute('aria-hidden', 'true');
+        requestAnimationFrame(() => slides[prevIdx].classList.remove('active'));
+      }
+
+      updateDots(prevIdx, idx);
+      window.dispatchEvent(new Event('heroSlideChanged'));
+    }
+
+    function next(delta = 1) {
+      show(idx + delta);
+    }
+
+    function play() {
+      stop();
+      timer = setInterval(() => next(1), delay);
+    }
+
+    function stop() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    }
+
+    dots.forEach((dot) => dot.addEventListener('click', (e) => {
+      const targetIndex = Number(e.currentTarget.dataset.go);
+      show(targetIndex);
+      play();
+    }));
+
+    arrows.forEach((arrow) => arrow.addEventListener('click', (e) => {
+      next(Number(e.currentTarget.dataset.dir));
+      play();
+    }));
+
+    if (slider) {
+      slider.addEventListener('mouseenter', stop);
+      slider.addEventListener('mouseleave', play);
+    }
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight') next(1);
@@ -770,13 +914,37 @@
   <script>
     // Header scroll effect
 const header = document.querySelector('.site-header');
-window.addEventListener('scroll', () => {
-  if (window.scrollY > 10) {
-    header.style.backgroundColor = 'rgba(10, 15, 20, 0.85)';
+const imageBgSections = Array.from(document.querySelectorAll('[data-image-bg]'));
+
+function headerOverImage() {
+  if (!header || !imageBgSections.length) return false;
+  const scrollTop = window.scrollY;
+  const headerBottom = scrollTop + header.offsetHeight;
+  return imageBgSections.some(section => {
+    const top = section.offsetTop;
+    const bottom = top + section.offsetHeight;
+    return headerBottom > top && scrollTop < bottom;
+  });
+}
+
+function updateHeaderAppearance() {
+  if (!header) return;
+  if (headerOverImage()) {
+    header.style.backgroundColor = 'transparent';
+    header.style.boxShadow = 'none';
+    header.style.borderColor = 'rgba(255,255,255,0.25)';
+    header.classList.add('over-image');
   } else {
-    header.style.backgroundColor = 'rgba(10, 15, 20, var(--alpha-header))';
+    header.style.backgroundColor = 'rgba(255, 255, 255, 0.78)';
+    header.style.boxShadow = '0 4px 18px rgba(15, 23, 42, 0.06)';
+    header.style.borderColor = 'rgba(15,23,42,0.05)';
+    header.classList.remove('over-image');
   }
-});
+}
+
+['scroll', 'resize'].forEach(evt => window.addEventListener(evt, updateHeaderAppearance));
+window.addEventListener('DOMContentLoaded', updateHeaderAppearance);
+updateHeaderAppearance();
 
   document.addEventListener('DOMContentLoaded', () => {
     const cards = document.querySelectorAll('.card');
@@ -842,20 +1010,23 @@ window.addEventListener('scroll', () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  background-attachment: fixed;
+  background-attachment: scroll;
   position: relative;
-  z-index: 1;
+  z-index: 5;
 }
 
 .how-it-works-bg * {
   position: relative;
-  z-index: 1;
+  z-index: 4;
 }
 .parallax-section {
   position: relative;
   overflow: hidden;
-  height: 150vh; /* taller so movement is visible */
-  z-index: 1;
+  min-height: 150vh; /* allow content to dictate extra space */
+  padding-bottom: 8rem;
+  z-index: 500;
+  margin-top: -18vh;
+  padding-top: 18vh;
   background: #fff;
 }
 
@@ -864,14 +1035,14 @@ window.addEventListener('scroll', () => {
   top: 0;
   left: 0;
   width: 100%;
-  height: 120%;              /* was 160%, reduced for natural framing */
+  height: 170%;              /* extend so cards stay within backdrop */
   background-image: url('desert.jpg');
   background-size: cover;     /* fills but keeps proportions */
   background-position: center center;
   background-repeat: no-repeat;
-  z-index: 0;
+  z-index: 1;
   will-change: transform;
-  transform: translateY(0);   /* neutral starting point */
+  transform: translateY(-80px);   /* neutral starting point */
   filter: brightness(0.98);
 }
 
@@ -880,7 +1051,7 @@ window.addEventListener('scroll', () => {
   position: relative;
   z-index: 3;
   text-align: center;
-  padding: 8rem 0;
+  padding: 3.5rem 0 9rem;
   color: #1a2230;
   background: transparent;
 }
@@ -903,19 +1074,115 @@ window.addEventListener('scroll', () => {
 /* === Cards === */
 .how-it-works-bg .cards {
   display: grid;
+  grid-template-columns: 1fr;
   gap: 32px;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 0;
 }
 
 .how-it-works-bg .card {
-  background: rgba(255,255,255,0.9);
-  border: none;
+  background: #ffffff;
   border-radius: 0;
+  border: 1px solid rgba(10,15,20,0.06);
+  box-shadow: 0 16px 60px rgba(10,15,20,0.12);
+  padding: 2.5rem 2rem;
   transform: translateY(0);
-  opacity: 100%;
+  opacity: 1;
   will-change: transform, opacity;
   transition: transform 0.6s ease-out, opacity 0.6s ease-out;
+  width: 100%;
+  text-align: left;
 }
+
+.how-it-works-bg .card .pad {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.how-it-works-bg .card-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 0;
+  background: #0a0f14;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-family: 'Cormorant Garamond', serif;
+  letter-spacing: 0.08em;
+}
+
+.how-it-works-bg .card h3 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 300;
+  color: #0a0f14;
+}
+
+.how-it-works-bg .card p {
+  margin: 0;
+  line-height: 1.7;
+  color: #4b5664;
+}
+
+.how-it-works-bg .card .read {
+  margin-top: auto;
+}
+
+@media (min-width: 960px) {
+  .how-it-works-bg .cards {
+    grid-template-columns: repeat(2, minmax(300px, 360px));
+    gap: 80px 120px;
+    max-width: 960px;
+    padding: 0 1.5rem;
+  }
+
+  .how-it-works-bg .card {
+    margin: 0;
+    padding: 3rem 2.5rem;
+    box-shadow: 0 24px 80px rgba(10,15,20,0.12);
+  }
+
+  .how-it-works-bg .card:nth-child(1) {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: flex-start;
+  }
+
+  .how-it-works-bg .card:nth-child(2) {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: center;
+    margin-top: -60px;
+  }
+
+  .how-it-works-bg .card:nth-child(3) {
+    grid-column: 1;
+    grid-row: 3;
+    align-self: flex-end;
+    margin-top: -40px;
+    z-index: 8;
+  }
+}
+.floating-panel {
+  position: relative;
+  z-index: 10;
+  background: white;
+}
+.slider, .slides, .slide {
+  will-change: opacity, transform;
+  transform: translateZ(0);
+}
+.how-cards,
+.intro,
+.white-section {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
 
 </style>
 
@@ -927,23 +1194,9 @@ window.addEventListener('scroll', () => {
 <script>
 gsap.registerPlugin(ScrollTrigger);
 
-// === Smooth scrolling ===
-const lenis = new Lenis({
-  duration: 1.2,
-  easing: t => 1 - Math.pow(2, -10 * t),
-  smooth: true
-});
-
-function raf(time) {
-  lenis.raf(time);
-  requestAnimationFrame(raf);
-}
-requestAnimationFrame(raf);
-lenis.on('scroll', ScrollTrigger.update);
-
 // === Background Layer (slowest drift) ===
 gsap.to(".parallax-bg", {
-  yPercent:15,
+  yPercent: 35,
   ease: "none",
   scrollTrigger: {
     trigger: ".parallax-section",
@@ -953,41 +1206,50 @@ gsap.to(".parallax-bg", {
   }
 });
 
-// === Heading & Paragraph (light float) ===
-gsap.utils.toArray(".how-it-works-bg h2, .how-it-works-bg p").forEach((el) => {
-  gsap.fromTo(el,
-    { y: 60, opacity: 0, scale: 0.99 },
-    {
-      y: -40,
-      opacity: 1,
-      ease: "power2.out",
+function registerDriftAnimation(selector, {
+  trigger = selector,
+  baseOffset = -20,
+  offsetStep = 6,
+  scaleAmount = 1.05,
+  start = "top bottom",
+  end = "bottom top"
+} = {}) {
+  const elements = gsap.utils.toArray(selector);
+  if (!elements.length) return;
+
+  elements.forEach((el, idx) => {
+    const offset = baseOffset - (idx * offsetStep);
+    gsap.to(el, {
+      yPercent: offset,
+      scale: scaleAmount,
+      ease: "none",
       scrollTrigger: {
-        trigger: el,
-        start: "top 95%",
-        end: "bottom 60%",
+        trigger,
+        start,
+        end,
         scrub: true
       }
-    }
-  );
+    });
+  });
+}
+
+registerDriftAnimation(".how-it-works-bg .card", {
+  trigger: ".parallax-section"
 });
 
-// === Cards (medium float) ===
-gsap.utils.toArray(".how-it-works-bg .card").forEach((card, i) => {
-  gsap.fromTo(card,
-    { y: 100, opacity: 0, scale: 0.98 },
-    {
-      y: -60,
-      opacity: 1,
-      scale: 1,
-      ease: "power1.out",
-      scrollTrigger: {
-        trigger: card,
-        start: "top 95%",
-        end: "bottom 50%",
-        scrub: true
-      }
-    }
-  );
+registerDriftAnimation(".slider .slide", {
+  trigger: ".slider",
+  start: "top top",
+  end: "bottom top"
+});
+
+registerDriftAnimation(".slider .caption", {
+  trigger: ".slider",
+  baseOffset: 25,
+  offsetStep: 0,
+  scaleAmount: 1.02,
+  start: "top top",
+  end: "bottom top"
 });
 </script>
 
@@ -1001,10 +1263,66 @@ gsap.utils.toArray(".how-it-works-bg .card").forEach((card, i) => {
 
     if (scrollY + window.innerHeight > offsetTop && scrollY < offsetTop + height) {
       const progress = (scrollY - offsetTop) / height;
-      const yPos = progress * 50;  // adjust “50” for more/less effect
+      const yPos = progress * 400 - 100;  // adjust “50” for more/less effect
       bg.style.transform = `translateY(${yPos}px)`;
     }
   });
+</script>
+<!-- Smooth Scroll + GSAP Core -->
+<script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.38/bundled/lenis.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+<script>
+gsap.registerPlugin(ScrollTrigger);
+
+// Initialize Lenis smooth scroll
+const lenis = new Lenis({
+  duration: 1.2,
+  easing: t => 1 - Math.pow(2, -10 * t),
+  smooth: true,
+});
+
+// Sync GSAP + Lenis
+function raf(time) {
+  lenis.raf(time);
+  ScrollTrigger.update();
+  requestAnimationFrame(raf);
+}
+requestAnimationFrame(raf);
+
+lenis.on('scroll', ScrollTrigger.update);
+</script>
+<script>
+// FADE-IN for elements with [fade]
+document.querySelectorAll('[fade]').forEach((el) => {
+  gsap.from(el, {
+    autoAlpha: 0,
+    y: 40,
+    duration: 0.8,
+    ease: "power2.out",
+    scrollTrigger: {
+      trigger: el,
+      start: "top 90%",
+      toggleActions: "play none none reverse"
+    }
+  });
+});
+
+// FLOATING DRIFT for elements with [data-scroll]
+document.querySelectorAll('[data-scroll]').forEach((el) => {
+  let speed = parseFloat(el.getAttribute('data-scroll-speed')) || 0.2;
+
+  gsap.to(el, {
+    y: speed * 60,
+    ease: "none",
+    scrollTrigger: {
+      trigger: el,
+      start: "top bottom",
+      end: "bottom top",
+      scrub: true
+    }
+  });
+});
 </script>
 </body>
 </html>

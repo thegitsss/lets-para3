@@ -2,168 +2,282 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Sign Up | Lets-ParaConnect</title>
+  <title>Sign Up | Let’s ParaConnect</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="preload" as="image" href="hero-mountain.jpg" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400&display=swap" rel="stylesheet" />
+  <link href="assets/styles/styles.css" rel="stylesheet" />
+
   <style>
-    :root{ --navy:#27394d; --gold:#b4975a; --ink:#1a1f25; --bg:#f5f2ed; --card:#ffffff; --line:#e8edf3; }
-    *{ box-sizing:border-box }
-    body{ margin:0; min-height:100vh; display:flex; flex-direction:column; background:var(--bg); color:var(--ink); font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
-    header{ background:#fff; border-bottom:1px solid var(--line); padding:12px 18px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10; }
-    .brand{ display:flex; align-items:center; gap:10px; color:var(--navy); text-decoration:none }
-    .brand img{ height:48px }
-    .brand span{ font-family:'Cormorant Garamond',serif; font-size:1.25rem; letter-spacing:.2px }
-    nav a{ color:var(--navy); text-decoration:none; margin-left:14px; padding:.4rem .6rem; border-radius:8px }
-    nav a:hover{ background:#f6f8fb }
-
-    main{ flex:1; display:grid; place-items:center; padding:24px 12px }
-    .card{ width:min(560px, 94vw); background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px 18px; box-shadow:0 10px 30px rgba(0,0,0,.06); }
-    .title{ text-align:center; margin-bottom:.75rem }
-    .title h1{ margin:.1rem 0 .35rem; font-family:'Cormorant Garamond',serif; font-size:1.8rem; color:var(--navy) }
-    .title p{ color:#4b5563 }
-
-    .seg{ display:flex; background:#f6f8fb; border:1px solid var(--line); border-radius:12px; padding:4px; margin:16px 0 8px; }
-    .seg button{
-      flex:1; background:transparent; border:0; border-radius:10px; padding:.6rem .8rem; cursor:pointer; font-weight:600; color:#374151;
-      transition: background .15s ease, color .15s ease, transform .1s ease;
+    :root {
+      --gold: #b4975a;
+      --navy: #27394d;
+      --line: #e8edf3;
+      --muted: #64748b;
+      --cream: #f5f2ed;
     }
-    .seg button[aria-pressed="true"]{ background:#1f2937; color:#fff; }
-    .seg button:active{ transform: scale(.98) }
 
-    form{ margin-top:8px }
-    label{ display:block; margin:.5rem 0 .25rem; color:#1f2937; font-size:.95rem }
-    input[type="text"],input[type="email"],input[type="password"]{
-      width:100%; padding:.72rem .8rem; border:1px solid var(--line); border-radius:10px; background:#fff; outline:none; transition:border-color .15s, box-shadow .15s;
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      background: url('hero-mountain.jpg') no-repeat center center fixed;
+      background-size: cover;
     }
-    input:focus{ border-color:#b4975a; box-shadow:0 0 0 3px rgba(180,151,90,.16) }
-    .row{ display:grid; grid-template-columns:1fr; gap:.75rem }
-    .hint{ color:#6b7280; font-size:.9rem; margin:.2rem 0 .1rem }
 
-    .pw-wrap{ position:relative }
-    .pw-toggle{ position:absolute; right:.6rem; top:50%; transform:translateY(-50%); font-size:.9rem; color:#334155; cursor:pointer; user-select:none; }
-    .meter{ height:6px; border-radius:999px; background:#eef2f7; overflow:hidden; margin:.35rem 0 .2rem }
-    .meter > i{ display:block; height:100%; width:0%; background:linear-gradient(90deg,#b91c1c,#f59e0b,#16a34a); transition: width .25s ease }
-    .meter-label{ font-size:.85rem; color:#4b5563 }
-
-    .actions{ display:flex; gap:.5rem; align-items:center; margin-top:12px; flex-wrap:wrap }
-    .btn{
-      background:linear-gradient(135deg, var(--navy), #3a475a); color:#fff; border:0; border-radius:10px; padding:.7rem 1.1rem; font-weight:600; cursor:pointer;
-      transition: transform .12s ease, box-shadow .2s ease, opacity .2s ease;
+    /* darker backdrop for contrast */
+    .overlay {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      backdrop-filter: blur(8px);
+      background-color: rgba(0, 0, 0, 0.45);
     }
-    .btn:hover{ transform: translateY(-1px); box-shadow:0 10px 20px rgba(0,0,0,.18) }
-    .btn[disabled]{ opacity:.7; cursor:not-allowed; transform:none; box-shadow:none }
-    .link{ color:var(--navy); text-decoration:none }
-    .link:hover{ text-decoration:underline }
 
-    .msg{ min-height:1.25rem; font-size:.95rem; color:#374151; margin-top:8px }
-    .msg.ok{ color:#166534 } .msg.err{ color:#b91c1c }
+    /* left panel — narrower, stronger opacity */
+    .left-panel {
+      width: 40%;
+      background-color: rgba(255, 255, 255, 0.96);
+      padding: 60px 50px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.25);
+    }
 
-    footer{ background:var(--navy); color:#fff; text-align:center; padding:16px 10px; font-size:.95rem }
-    footer a{ color:#fff; opacity:.9; text-decoration:none; margin:0 .5rem } footer a:hover{ opacity:1 }
+    /* tighter form container */
+    .form-container {
+      max-width: 360px;
+      width: 100%;
+    }
 
-    .fade-in{ animation: fade .25s ease both } @keyframes fade{ from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none} }
+    .brand {
+      position: absolute;
+      top: 24px;
+      left: 32px;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.25rem;
+      font-weight: 300;
+      color: var(--navy);
+      text-decoration: none;
+      letter-spacing: 0.03em;
+    }
+
+    h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 1.8rem;
+      color: var(--navy);
+      margin-bottom: 0.90rem;
+      text-align: center;
+    }
+
+    p.subtitle {
+      color: var(--muted);
+      margin-bottom: 1.75rem;
+    }
+
+    label {
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.95rem;
+      margin-bottom: 4px;
+      display: block;
+      color: var(--navy);
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      padding: 0.7rem 0.85rem;
+      font-size: 0.95rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-family: Sarabun;
+      font-weight: 300;
+      transition: border-color 0.3s ease, box-shadow 0.1s ease;
+      background-color: #ffffff;
+    }
+
+    input:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(180, 151, 90, 0.15);
+      outline: none;
+    }
+
+    .seg {
+      display: flex;
+      background: #f6f8fb;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 22px;
+    }
+
+    .seg button {
+      flex: 1;
+      background: transparent;
+      border: 0;
+      border-radius: 10px;
+      padding: 0.6rem 0.8rem;
+      cursor: pointer;
+      font-weight: 200;
+      color: #374151;
+      transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+    }
+
+    .seg button[aria-pressed="true"] {
+      background: var(--navy);
+      color: #fff;
+    }
+
+    .pw-wrap {
+      position: relative;
+    }
+
+    .pw-toggle {
+      position: absolute;
+      right: 12px;
+      top: 37%;
+      transform: translateY(-50%);
+      font-family: Sarabun;
+      font-size: 0.9rem;
+      font-weight: 200;
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+    }
+
+    .btn {
+      background-color: transparent;
+      color: var(--navy);
+      border: 0.02px solid transparent;
+      padding: 0.75rem 1rem;
+      display: block;
+      margin: 1.2rem auto 0;
+      width: auto;
+      text-align: center;
+      font-size: 0.95rem;
+      font-family: Sarabun;
+      font-weight: 200;
+      transition: background-color 0.4s ease, transform 0.3s ease, border-color 0.3s ease;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+    }
+
+    .btn:hover {
+      background-color: #ffffff;
+      color: #1a2230;
+      border-color: #1a2230;
+      transform: scale(1.01);
+    }
+
+    .hint {
+      color: #6b7280;
+      font-size: 0.85rem;
+      margin-top: -10px;
+      margin-bottom: 14px;
+    }
+
+    .extra-links {
+      text-align: center;
+      margin-top: 14px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .extra-links a {
+      color: var(--gold);
+      text-decoration: none;
+    }
+
+    .extra-links a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 768px) {
+      .overlay {
+        flex-direction: column;
+      }
+
+      .left-panel {
+        width: 100%;
+        padding: 40px;
+      }
+    }
   </style>
-  <!-- Optional: auth.js can also set window.__CSRF__ -->
+
   <script type="module" src="assets/scripts/auth.js"></script>
 </head>
+
 <body>
-  <header>
-    <a class="brand" href="index.html" aria-label="Lets-ParaConnect home">
-      <img src="assets/transparant logo only.png" alt="Logo" />
-      <span>Lets-ParaConnect</span>
-    </a>
-    <nav>
-      <a href="login.html">Login</a>
-      <a href="about.html">About</a>
-    </nav>
-  </header>
+  <div class="overlay">
+    <div class="left-panel">
+      <div class="form-container fade-in">
+        <a href="index.html" class="brand">Let’s-ParaConnect</a>
+        <h1>Create your account</h1>
 
-  <main>
-    <section class="card fade-in" role="region" aria-labelledby="signupTitle">
-      <div class="title">
-        <h1 id="signupTitle">Create your account</h1>
-        <p>Choose your role and sign up in seconds.</p>
-      </div>
+        <div class="seg" role="tablist" aria-label="Choose role">
+          <button id="btnA" role="tab" aria-selected="true" aria-pressed="true" data-role="attorney">Attorney</button>
+          <button id="btnP" role="tab" aria-selected="false" aria-pressed="false" data-role="paralegal">Paralegal</button>
+        </div>
 
-      <!-- Role chooser -->
-      <div class="seg" role="tablist" aria-label="Choose role">
-        <button id="btnA" role="tab" aria-selected="true" aria-pressed="true" data-role="attorney">Attorney</button>
-        <button id="btnP" role="tab" aria-selected="false" aria-pressed="false" data-role="paralegal">Paralegal</button>
-      </div>
+        <form id="signupForm" novalidate>
+          <label for="name">Full name</label>
+          <input id="name" type="text" autocomplete="name" required />
 
-      <!-- Minimal form -->
-      <form id="signupForm" novalidate>
-        <div class="row">
-          <div>
-            <label for="name">Full name</label>
-            <input id="name" type="text" autocomplete="name" required />
-          </div>
-          <div>
-            <label for="email">Email</label>
-            <input id="email" type="email" autocomplete="email" required />
-          </div>
+          <label for="email">Email</label>
+          <input id="email" type="email" autocomplete="email" required />
 
+          <label for="password">Password</label>
           <div class="pw-wrap">
-            <label for="password">Password</label>
-            <input id="password" type="password" autocomplete="new-password" required placeholder="8+ chars, mix letters & numbers" />
-            <a href="#" id="togglePw" class="pw-toggle" aria-controls="password">Show</a>
-            <div class="meter" aria-hidden="true"><i id="pwBar"></i></div>
-            <div class="meter-label" id="pwLabel">Password strength: —</div>
+            <input id="password" type="password" autocomplete="new-password" placeholder="8+ characters" required />
+            <button id="togglePw" class="pw-toggle" aria-controls="password">Show</button>
           </div>
 
           <div id="roleFieldWrap"></div>
-        </div>
 
-        <div class="actions">
-          <button id="submitBtn" class="btn" type="submit">Create account</button>
-          <a class="link" href="login.html">I already have an account</a>
-        </div>
-        <div id="msg" class="msg" role="status" aria-live="polite"></div>
-        <p class="hint" style="margin-top:8px">By continuing you agree to our
-          <a class="link" href="terms.html" target="_blank" rel="noopener">Terms</a> and
-          <a class="link" href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.
-        </p>
-      </form>
-    </section>
-  </main>
+          <button id="submitBtn" class="btn" type="submit">Create Account</button>
+          <div id="msg" class="msg" role="status" aria-live="polite"></div>
 
-  <footer>
-    <div><a href="terms.html">Terms</a> • <a href="privacy.html">Privacy</a></div>
-    <div style="margin-top:.3rem; opacity:.9;">© <script>document.write(new Date().getFullYear())</script> Lets-ParaConnect</div>
-  </footer>
+          <div class="extra-links">
+            <p>Already have an account? <a href="login.html">Log in</a></p>
+            <p style="margin-top:8px">By continuing you agree to our <a href="terms.html" target="_blank">Terms</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>.</p>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 
   <script>
-    // -------- Redirect if already signed in --------
-    (function(){ const t = localStorage.getItem('token'); if (t) location.href = 'dashboard-attorney.html'; })();
-
-    // -------- Config --------
     const API_BASE = location.origin + '/api';
-    // Prime CSRF cookie/value (harmless if your backend does not require it for register)
-    fetch('/api/csrf', { credentials:'include' })
-      .then(r=>r.json()).then(d => window.__CSRF__ = d.csrfToken).catch(()=>{});
+    fetch('/api/csrf', { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => window.__CSRF__ = d.csrfToken)
+      .catch(() => {});
 
-    // -------- Elements --------
     const btnA = document.getElementById('btnA');
     const btnP = document.getElementById('btnP');
     const form = document.getElementById('signupForm');
-    const msg  = document.getElementById('msg');
+    const msg = document.getElementById('msg');
     const submitBtn = document.getElementById('submitBtn');
     const roleFieldWrap = document.getElementById('roleFieldWrap');
     const togglePw = document.getElementById('togglePw');
     const pw = document.getElementById('password');
     const emailEl = document.getElementById('email');
     const nameEl = document.getElementById('name');
-
-    const pwBar = document.getElementById('pwBar');
-    const pwLabel = document.getElementById('pwLabel');
-
-    // Restore last email (nice touch for retries)
     emailEl.value = localStorage.getItem('lastEmail') || '';
 
-    let role = 'attorney'; // default
+    let role = 'attorney';
 
-    // -------- Role UI --------
-    function setRole(r){
+    function setRole(r) {
       role = r;
       [btnA, btnP].forEach(b => {
         const on = b.dataset.role === r;
@@ -171,40 +285,17 @@
         b.setAttribute('aria-selected', on ? 'true' : 'false');
       });
       roleFieldWrap.innerHTML = r === 'attorney'
-        ? `<div>
-             <label for="bar">State Bar Number</label>
-             <input id="bar" type="text" autocomplete="off" required />
-             <div class="hint">We verify bar numbers during review.</div>
-           </div>`
-        : `<div>
-             <label for="cert">Certification / License (optional)</label>
-             <input id="cert" type="text" autocomplete="off" />
-             <div class="hint">Add NALA CP, state license #, etc. You can update later.</div>
-           </div>`;
+        ? `<label for="bar">State Bar Number</label>
+           <input id="bar" type="text" autocomplete="off" required />
+           <div class="hint">We verify bar numbers during review.</div>`
+        : `<label for="cert">Certification / License (optional)</label>
+           <input id="cert" type="text" autocomplete="off" />
+           <div class="hint">Add NALA CP, state license #, etc. You can update later.</div>`;
     }
     setRole(role);
 
     btnA.addEventListener('click', () => setRole('attorney'));
     btnP.addEventListener('click', () => setRole('paralegal'));
-    btnA.addEventListener('keydown', (e)=>{ if(e.key==='ArrowRight'){ e.preventDefault(); btnP.focus(); setRole('paralegal'); }});
-    btnP.addEventListener('keydown', (e)=>{ if(e.key==='ArrowLeft'){ e.preventDefault(); btnA.focus(); setRole('attorney'); }});
-
-    // -------- Password meter + toggle --------
-    function scorePassword(pw){
-      let s=0; if(!pw) return 0;
-      if(pw.length>=8) s+=30;
-      if(/[A-Z]/.test(pw)) s+=20;
-      if(/[a-z]/.test(pw)) s+=20;
-      if(/\d/.test(pw)) s+=20;
-      if(/[^A-Za-z0-9]/.test(pw)) s+=10;
-      return Math.min(100,s);
-    }
-    function updateMeter(){
-      const n = scorePassword(pw.value);
-      pwBar.style.width = n + '%';
-      pwLabel.textContent = 'Password strength: ' + (n<35 ? 'Weak' : n<70 ? 'Okay' : 'Strong');
-    }
-    pw.addEventListener('input', updateMeter); updateMeter();
 
     togglePw.addEventListener('click', (e) => {
       e.preventDefault();
@@ -213,11 +304,15 @@
       togglePw.textContent = show ? 'Hide' : 'Show';
     });
 
-    // -------- Helpers --------
-    function say(text, cls=''){ msg.className='msg '+cls; msg.textContent=text||''; }
-    function validEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e||''); }
+    function say(text, cls='') {
+      msg.className = 'msg ' + cls;
+      msg.textContent = text || '';
+    }
 
-    // -------- Submit --------
+    function validEmail(e) {
+      return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(e || '');
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       say('');
@@ -228,31 +323,33 @@
 
       if (!name || !email || !password) { say('Please fill all required fields.', 'err'); return; }
       if (!validEmail(email)) { say('Enter a valid email address.', 'err'); return; }
-      if (scorePassword(password) < 35) { say('Use 8+ chars with a mix of letters/numbers.', 'err'); return; }
+      if (password.length < 8) { say('Use 8+ characters with letters and numbers.', 'err'); return; }
 
       if (role === 'attorney') {
         const bar = (document.getElementById('bar')?.value || '').trim();
         if (!bar) { say('State Bar Number is required for attorneys.', 'err'); return; }
       }
 
-      submitBtn.disabled = true; submitBtn.textContent = 'Creating…';
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Creating…';
 
       try {
         const payload = { name, email, password, role };
         if (role === 'attorney') payload.barNumber = document.getElementById('bar').value.trim();
         else payload.certification = (document.getElementById('cert')?.value || '').trim() || undefined;
 
-        const headers = { 'Content-Type':'application/json' };
+        const headers = { 'Content-Type': 'application/json' };
         if (window.__CSRF__) headers['X-CSRF-Token'] = window.__CSRF__;
 
         const res = await fetch(`${API_BASE}/auth/register`, {
-          method:'POST',
-          credentials:'include',
+          method: 'POST',
+          credentials: 'include',
           headers,
           body: JSON.stringify(payload)
         });
 
-        let data={}; try{ data = await res.json(); }catch{}
+        let data = {};
+        try { data = await res.json(); } catch {}
 
         if (!res.ok) {
           if (res.status === 409) throw new Error('That email is already registered.');
@@ -260,16 +357,15 @@
           throw new Error(data?.msg || data?.message || 'Could not create account.');
         }
 
-        // Save for convenience on login page
         localStorage.setItem('lastEmail', email);
-
         say('Application submitted. Await approval.', 'ok');
-        setTimeout(()=> location.href = 'login.html', 1000);
+        setTimeout(() => location.href = 'login.html', 1000);
       } catch (err) {
         console.error(err);
         say(err.message || 'Network error. Please try again.', 'err');
       } finally {
-        submitBtn.disabled = false; submitBtn.textContent = 'Create account';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Create Account';
       }
     });
   </script>

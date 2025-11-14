@@ -20,10 +20,57 @@
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
     body {
-  background: #ffffff;
-  color: #1a2230;
-  font: 16px/1.5 Inter, system-ui, Sarabun, sans-serif;
-}
+      background: #ffffff;
+      color: #1a2230;
+      font: 16px/1.5 Inter, system-ui, Sarabun, sans-serif;
+    }
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 80px;
+    }
+    .section {
+      position: relative;
+      opacity: 1;
+      transform: translateZ(0);
+      transition: opacity 0.6s ease, transform 0.6s ease;
+    }
+    body.motion-ready {
+      perspective: 1500px;
+      perspective-origin: center 35vh;
+    }
+    body.motion-ready .section {
+      opacity: 0;
+      transform: translate3d(0, 70px, -60px);
+      transform-style: preserve-3d;
+      will-change: opacity, transform;
+    }
+    body.motion-ready .section::after {
+      content: "";
+      position: absolute;
+      inset: 4% 6%;
+      border-radius: var(--radius);
+      background: rgba(10,15,20,0.05);
+      filter: blur(20px);
+      opacity: 0;
+      transition: opacity 0.6s ease;
+      pointer-events: none;
+    }
+    body.motion-ready .section.revealed::after {
+      opacity: 1;
+    }
+    .parallax-media {
+      will-change: transform;
+    }
+    body.motion-ready .card {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body.motion-ready .section {
+        opacity: 1;
+        transform: none;
+      }
+    }
 
 /* Header */
 .site-header {
@@ -143,11 +190,13 @@
       position: relative;
       height: 100vh;
       overflow: hidden;
+      background-color: #04070f;
     }
     .slides {
       position: absolute;
       inset: 0;
       display: grid;
+      background-color: #04070f;
     }
     .slide {
       grid-area: 1/1;
@@ -156,6 +205,7 @@
       position: relative;
       opacity: 0;
       transition: opacity .4s ease-in-out;
+      background-color: #04070f;
     }
     .slide.active {
       opacity: 1;
@@ -313,18 +363,6 @@
       font-weight: 200;
       color: #1a2230; /* dark ink tone */
     }
-    
-    .card {
-  opacity: 0;
-  transform: translateY(20px);
-  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
-}
-
-.card.show {
-  opacity: 1;
-  transform: translateY(0);
-}
-
     .card:hover {
       transform: translateY(-8px);
     }
@@ -616,95 +654,54 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
     </button>
     <section class="hero-section">
-  <img src="assets/images/your-hero.jpg" alt="Hero" class="hero-img">
+  <img src="assets/images/your-hero.jpg" alt="Hero" class="hero-img" data-bg>
 </section>
 
 <!-- ✅ Dramatic Fade-In Sections + Call to Action -->
-<section class="section about wrap" id="how">
-  <h2>How It Works</h2>
-  <p>Let’s ParaConnect is designed to be intuitive, fair, and efficient — for both attorneys and paralegals.</p>
+<section class="section about wrap" id="how" data-panel>
+  <h2 data-float>How It Works</h2>
+  <p data-float>Let’s ParaConnect is designed to be intuitive, fair, and efficient — for both attorneys and paralegals.</p>
   <div class="cards">
-    <div class="card">
-      <img src="https://images.unsplash.com/photo-1581090700227-1e37b190418e?q=80&w=800&auto=format&fit=crop" alt="Post a Job" />
+    <div class="card" data-card>
+      <img src="https://images.unsplash.com/photo-1581090700227-1e37b190418e?q=80&w=800&auto=format&fit=crop" alt="Post a Job" data-bg />
       <div class="pad">
-        <h3>Post a Job</h3>
-        <p>Attorneys quickly post what they need: timelines, type of law, and case details.</p>
-        <a class="read" href="#">Learn More →</a>
+        <h3 data-float>Post a Job</h3>
+        <p data-float>Attorneys quickly post what they need: timelines, type of law, and case details.</p>
+        <a class="read" href="#" data-btn>Learn More →</a>
       </div>
     </div>
-    <div class="card">
-      <img src="https://images.unsplash.com/photo-1612832020574-9f3d5d51065e?q=80&w=800&auto=format&fit=crop" alt="Paralegals Apply" />
+    <div class="card" data-card>
+      <img src="https://images.unsplash.com/photo-1612832020574-9f3d5d51065e?q=80&w=800&auto=format&fit=crop" alt="Paralegals Apply" data-bg />
       <div class="pad">
-        <h3>Paralegals Apply</h3>
-        <p>Vetted freelance paralegals submit proposals. You pick the best fit.</p>
-        <a class="read" href="#">Browse Talent →</a>
+        <h3 data-float>Paralegals Apply</h3>
+        <p data-float>Vetted freelance paralegals submit proposals. You pick the best fit.</p>
+        <a class="read" href="#" data-btn>Browse Talent →</a>
       </div>
     </div>
-    <div class="card">
-      <img src="https://images.unsplash.com/photo-1554224154-22dec7ec8818?q=80&w=800&auto=format&fit=crop" alt="Get to Work" />
+    <div class="card" data-card>
+      <img src="https://images.unsplash.com/photo-1554224154-22dec7ec8818?q=80&w=800&auto=format&fit=crop" alt="Get to Work" data-bg />
       <div class="pad">
-        <h3>Work Begins</h3>
-        <p>Funds are held in escrow. Once the job is marked complete, payment is released.</p>
-        <a class="read" href="#">Escrow Details →</a>
+        <h3 data-float>Work Begins</h3>
+        <p data-float>Funds are held in escrow. Once the job is marked complete, payment is released.</p>
+        <a class="read" href="#" data-btn>Escrow Details →</a>
       </div>
     </div>
   </div>
 </section>
 
 <!-- CTA Section (Final Call to Action) -->
-<section class="section about wrap" style="text-align: center; background-color: #f8f9fa;" id="cta">
-  <h2 style="color: #f5f2ed;">Ready to Get Started?</h2>
-  <p style="color: #d6dbe3; max-width: 600px; margin: 0 auto 1.5rem;">
+<section class="section about wrap" style="text-align: center; background-color: #f8f9fa;" id="cta" data-panel>
+  <h2 style="color: #f5f2ed;" data-float>Ready to Get Started?</h2>
+  <p style="color: #d6dbe3; max-width: 600px; margin: 0 auto 1.5rem;" data-float>
     Whether you're an attorney seeking reliable help, or a paralegal looking for your next great opportunity, Let's ParaConnect is where your journey begins.
   </p>
-  <a class="cta" href="contact.html" style="margin-top: 1rem;">Contact Us</a>
+  <a class="cta" href="contact.html" style="margin-top: 1rem;" data-btn>Contact Us</a>
 </section>
-
-<!-- Fade-in JS + Section Observer -->
-<script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const sections = document.querySelectorAll('.section');
-
-    if ('IntersectionObserver' in window) {
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('visible');
-            observer.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.1 });
-
-      sections.forEach((section) => observer.observe(section));
-    } else {
-      sections.forEach(section => section.classList.add('visible'));
-    }
-  });
-</script>
-
-<style>
-  html {
-    scroll-behavior: smooth;
-    scroll-padding-top: 80px;
-  }
-
-  .section {
-    opacity: 0;
-    transform: translateY(60px);
-    transition: opacity 0.8s ease-out, transform 0.8s ease-out;
-    will-change: opacity, transform;
-  }
-
-  .section.visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-</style>
 
 <div class="slides" id="slides">
   <article class="slide active" data-idx="0">
     <div class="hero-bg">
-      <img src="./hero-mountain.jpg" alt="Snow-capped mountain peak" />
+      <img src="./hero-mountain.jpg" alt="Snow-capped mountain peak" data-bg />
     </div>
     <div class="caption">
       <div class="kicker">On-demand paralegal support to</div>
@@ -718,7 +715,9 @@
   </article>
 
       <article class="slide" data-idx="1">
-        <img src="./hero-city.jpg" alt="City skyline at dusk with river and bridges" />
+        <div class="hero-bg">
+          <img src="./hero-city.jpg" alt="City skyline at dusk with river and bridges" data-bg />
+        </div>
         <div class="caption">
           <div class="kicker">Scale your practice with</div>
           <h1 class="headline">On-Demand Expertise</h1>
@@ -736,76 +735,76 @@
   </section>
 
   <!-- About / Mission Section -->
-  <section class="section about wrap" id="about">
-    <h2>Who We Are</h2>
-    <p>Let’s-ParaConnect empowers law firms and attorneys with high-quality paralegal talent, vetted and ready on demand. Reduce overhead, maintain compliance, and scale your practice smartly.</p>
+  <section class="section about wrap" id="about" data-panel>
+    <h2 data-float>Who We Are</h2>
+    <p data-float>Let’s-ParaConnect empowers law firms and attorneys with high-quality paralegal talent, vetted and ready on demand. Reduce overhead, maintain compliance, and scale your practice smartly.</p>
   </section>
 
   <!-- Feature Cards Section -->
-  <section class="section wrap" id="services">
+  <section class="section wrap" id="services" data-panel>
     <div class="cards">
-      <div class="card">
-        <img src="https://images.unsplash.com/photo-1588670238387-cdb414f7ae91?q=80&w=800&auto=format&fit=crop" alt="Vetting process." />
+      <div class="card" data-card>
+        <img src="https://images.unsplash.com/photo-1588670238387-cdb414f7ae91?q=80&w=800&auto=format&fit=crop" alt="Vetting process." data-bg />
         <div class="pad">
-          <h3>Vetted Talent</h3>
-          <p>Every paralegal goes through stringent screening and compliance checks so you can trust the work delivered.</p>
-          <a class="read" href="#how">Learn More →</a>
+          <h3 data-float>Vetted Talent</h3>
+          <p data-float>Every paralegal goes through stringent screening and compliance checks so you can trust the work delivered.</p>
+          <a class="read" href="#how" data-btn>Learn More →</a>
         </div>
       </div>
-      <div class="card">
-        <img src="https://images.unsplash.com/photo-1560264280-6bde0adf5c92?q=80&w=800&auto=format&fit=crop" alt="Flexible workflow." />
+      <div class="card" data-card>
+        <img src="https://images.unsplash.com/photo-1560264280-6bde0adf5c92?q=80&w=800&auto=format&fit=crop" alt="Flexible workflow." data-bg />
         <div class="pad">
-          <h3>Flexible Engagements</h3>
-          <p>From short-term support to long-term contracts — scale your team on your terms.</p>
-          <a class="read" href="#how">View Options →</a>
+          <h3 data-float>Flexible Engagements</h3>
+          <p data-float>From short-term support to long-term contracts — scale your team on your terms.</p>
+          <a class="read" href="#how" data-btn>View Options →</a>
         </div>
       </div>
-      <div class="card">
-        <img src="https://images.unsplash.com/photo-1526378727958-0f8b2ec984bf?q=80&w=800&auto=format&fit=crop" alt="Secure & compliant." />
+      <div class="card" data-card>
+        <img src="https://images.unsplash.com/photo-1526378727958-0f8b2ec984bf?q=80&w=800&auto=format&fit=crop" alt="Secure & compliant." data-bg />
         <div class="pad">
-          <h3>Security & Compliance</h3>
-          <p>Everything is built to be HIPAA/ethical rule–compliant, with secure data handling and confidentiality baked in.</p>
-          <a class="read" href="#how">Read More →</a>
+          <h3 data-float>Security & Compliance</h3>
+          <p data-float>Everything is built to be HIPAA/ethical rule–compliant, with secure data handling and confidentiality baked in.</p>
+          <a class="read" href="#how" data-btn>Read More →</a>
         </div>
       </div>
     </div>
   </section>
   <!-- ✅ Insert this block directly after your closing </section> for the hero slider -->
-<section class="section about wrap" id="how">
-  <h2>How It Works</h2>
-  <p>Let’s ParaConnect is designed to be intuitive, fair, and efficient — for both attorneys and paralegals.</p>
+<section class="section about wrap" id="how" data-panel>
+  <h2 data-float>How It Works</h2>
+  <p data-float>Let’s ParaConnect is designed to be intuitive, fair, and efficient — for both attorneys and paralegals.</p>
   <div class="cards">
-    <div class="card">
-      <img src="https://images.unsplash.com/photo-1581090700227-1e37b190418e?q=80&w=800&auto=format&fit=crop" alt="Post a Job" />
+    <div class="card" data-card>
+      <img src="https://images.unsplash.com/photo-1581090700227-1e37b190418e?q=80&w=800&auto=format&fit=crop" alt="Post a Job" data-bg />
       <div class="pad">
-        <h3>Post a Job</h3>
-        <p>Attorneys quickly post what they need: timelines, type of law, and case details.</p>
-        <a class="read" href="#">Learn More →</a>
+        <h3 data-float>Post a Job</h3>
+        <p data-float>Attorneys quickly post what they need: timelines, type of law, and case details.</p>
+        <a class="read" href="#" data-btn>Learn More →</a>
       </div>
     </div>
-    <div class="card">
-      <img src="https://images.unsplash.com/photo-1612832020574-9f3d5d51065e?q=80&w=800&auto=format&fit=crop" alt="Paralegals Apply" />
+    <div class="card" data-card>
+      <img src="https://images.unsplash.com/photo-1612832020574-9f3d5d51065e?q=80&w=800&auto=format&fit=crop" alt="Paralegals Apply" data-bg />
       <div class="pad">
-        <h3>Paralegals Apply</h3>
-        <p>Vetted freelance paralegals submit proposals. You pick the best fit.</p>
-        <a class="read" href="#">Browse Talent →</a>
+        <h3 data-float>Paralegals Apply</h3>
+        <p data-float>Vetted freelance paralegals submit proposals. You pick the best fit.</p>
+        <a class="read" href="#" data-btn>Browse Talent →</a>
       </div>
     </div>
-    <div class="card">
-      <img src="https://images.unsplash.com/photo-1554224154-22dec7ec8818?q=80&w=800&auto=format&fit=crop" alt="Get to Work" />
+    <div class="card" data-card>
+      <img src="https://images.unsplash.com/photo-1554224154-22dec7ec8818?q=80&w=800&auto=format&fit=crop" alt="Get to Work" data-bg />
       <div class="pad">
-        <h3>Work Begins</h3>
-        <p>Funds are held in escrow. Once the job is marked complete, payment is released.</p>
-        <a class="read" href="#">Escrow Details →</a>
+        <h3 data-float>Work Begins</h3>
+        <p data-float>Funds are held in escrow. Once the job is marked complete, payment is released.</p>
+        <a class="read" href="#" data-btn>Escrow Details →</a>
       </div>
     </div>
   </div>
 </section>
 
 <!-- CTA Section (Final Call to Action) -->
-<section class="section about wrap" style="text-align: center; background-color: #ffffff;" id="cta">
-  <h2 style="color: #1a2230; font-family: 'Cormorant Garamond', sans-serif; font-weight: 200;">Ready to Get Started?</h2>
-  <p style="color: #333333; font-family: 'Sarabun', sans-serif; font-weight: 200; max-width: 600px; margin: 0 auto 1.5rem;">
+<section class="section about wrap" style="text-align: center; background-color: #ffffff;" id="cta" data-panel>
+  <h2 style="color: #1a2230; font-family: 'Cormorant Garamond', sans-serif; font-weight: 200;" data-float>Ready to Get Started?</h2>
+  <p style="color: #333333; font-family: 'Sarabun', sans-serif; font-weight: 200; max-width: 600px; margin: 0 auto 1.5rem;" data-float>
     Whether you're an attorney seeking reliable help, or a paralegal looking for your next great opportunity, Let's ParaConnect is where your journey begins.
   </p>
 <a class="cta" href="contact.html" style="
@@ -819,7 +818,8 @@
   display: inline-block;
   text-decoration: none;
   transition: all 0.3s ease;
-">Contact Us</a>
+"
+data-btn>Contact Us</a>
 </section>
 
 <footer class="footer">
@@ -846,24 +846,71 @@
     const dots = Array.from(document.querySelectorAll('.dot'));
     const arrows = Array.from(document.querySelectorAll('.arrow'));
     const slider = document.querySelector('.slider');
-    let idx = 0, timer = null, delay = 5500;
+    let idx = slides.findIndex((slide) => slide.classList.contains('active'));
+    if (idx < 0) idx = 0;
+    let timer = null;
+    const delay = 4000;
+
+    function updateDots(prev, next) {
+      if (!dots.length) return;
+      if (dots[prev]) {
+        dots[prev].classList.remove('active');
+        dots[prev].setAttribute('aria-selected', 'false');
+      }
+      if (dots[next]) {
+        dots[next].classList.add('active');
+        dots[next].setAttribute('aria-selected', 'true');
+      }
+    }
 
     function show(n) {
+      if (!slides.length) return;
+      const prevIdx = idx;
       idx = (n + slides.length) % slides.length;
-      slides.forEach((s,i) => s.classList.toggle('active', i === idx));
-      dots.forEach((d,i) => {
-        d.classList.toggle('active', i === idx);
-        d.setAttribute('aria-selected', i === idx);
-      });
-    }
-    function next(delta = 1) { show(idx + delta); }
-    function play() { stop(); timer = setInterval(() => next(1), delay); }
-    function stop() { if (timer) clearInterval(timer); }
+      if (prevIdx === idx) return;
 
-    dots.forEach(d => d.addEventListener('click', e => { show(+e.currentTarget.dataset.go); play(); }));
-    arrows.forEach(a => a.addEventListener('click', e => { next(+e.currentTarget.dataset.dir); play(); }));
-    slider.addEventListener('mouseenter', stop);
-    slider.addEventListener('mouseleave', play);
+      slides[idx].classList.add('active');
+      slides[idx].setAttribute('aria-hidden', 'false');
+
+      if (slides[prevIdx]) {
+        slides[prevIdx].setAttribute('aria-hidden', 'true');
+        requestAnimationFrame(() => slides[prevIdx].classList.remove('active'));
+      }
+
+      updateDots(prevIdx, idx);
+    }
+
+    function next(delta = 1) {
+      show(idx + delta);
+    }
+
+    function play() {
+      stop();
+      timer = setInterval(() => next(1), delay);
+    }
+
+    function stop() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    }
+
+    dots.forEach((dot) => dot.addEventListener('click', (e) => {
+      const targetIndex = Number(e.currentTarget.dataset.go);
+      show(targetIndex);
+      play();
+    }));
+
+    arrows.forEach((arrow) => arrow.addEventListener('click', (e) => {
+      next(Number(e.currentTarget.dataset.dir));
+      play();
+    }));
+
+    if (slider) {
+      slider.addEventListener('mouseenter', stop);
+      slider.addEventListener('mouseleave', play);
+    }
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight') next(1);
@@ -874,35 +921,138 @@
   </script>
   <script>
     // Header scroll effect
-const header = document.querySelector('.site-header');
-window.addEventListener('scroll', () => {
-  if (window.scrollY > 10) {
-    header.style.backgroundColor = 'rgba(10, 15, 20, 0.85)';
-  } else {
-    header.style.backgroundColor = 'rgba(10, 15, 20, var(--alpha-header))';
-  }
-});
+    const header = document.querySelector('.site-header');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 10) {
+        header.style.backgroundColor = 'rgba(10, 15, 20, 0.85)';
+      } else {
+        header.style.backgroundColor = 'rgba(10, 15, 20, var(--alpha-header))';
+      }
+    });
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" integrity="sha512-WwKk0DMlgpNZFwXk4Hknc0aF4Pjk6HoydxHDBPPfQtbDNRsTA70vsK1tnE+bBZ5qTqL0+8nyCLlcsoFVJkrhHQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" integrity="sha512-v4zvRmBsB1bt0osLOYTdSd5quN4dStEUAkknqzPaWY5AvzkdxlIo0NGdisz8Iky3Uczdlz7YTlDo1i4ezgmzTg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.gsap || !window.ScrollTrigger) return;
+      document.body.classList.add('motion-ready');
+      gsap.registerPlugin(ScrollTrigger);
+      ScrollTrigger.config({ ignoreMobileResize: true });
 
-  document.addEventListener('DOMContentLoaded', () => {
-    const cards = document.querySelectorAll('.card');
+      const sections = gsap.utils.toArray('.section');
 
-    if ('IntersectionObserver' in window) {
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('show');
-            observer.unobserve(entry.target); // optional: animate only once
+      sections.forEach((section, index) => {
+        const depth = 0.75 + index * 0.12;
+        const depthValue = depth.toFixed(2);
+        section.dataset.depth = depthValue;
+        section.style.setProperty('--depth', depthValue);
+        gsap.set(section, { transformOrigin: 'center top', transformStyle: 'preserve-3d' });
+
+        const reveal = gsap.timeline({
+          scrollTrigger: {
+            trigger: section,
+            start: 'top 80%',
+            end: 'bottom 55%',
+            toggleActions: 'play none none reverse',
+            onEnter: () => section.classList.add('revealed'),
+            onLeaveBack: () => section.classList.remove('revealed')
+          }
+        });
+
+        reveal.fromTo(section,
+          { autoAlpha: 0, y: 120, z: -140, rotateX: -6 },
+          { autoAlpha: 1, y: 0, z: 0, rotateX: 0, duration: 1.35, ease: 'power3.out' }
+        );
+
+        gsap.to(section, {
+          yPercent: -depth * 4,
+          ease: 'none',
+          scrollTrigger: {
+            trigger: section,
+            start: 'top bottom',
+            end: 'bottom top',
+            scrub: true
+          }
+        });
+
+        const media = section.querySelectorAll('img, video');
+        media.forEach((asset, mediaIndex) => {
+          asset.classList.add('parallax-media');
+          gsap.to(asset, {
+            yPercent: -12 - mediaIndex * 6,
+            scale: 1.02 + mediaIndex * 0.015,
+            ease: 'none',
+            scrollTrigger: {
+              trigger: section,
+              start: 'top bottom',
+              end: 'bottom top',
+              scrub: true
+            }
+          });
+        });
+
+        const layeredContent = section.querySelectorAll('h2, h3, p, .cta, .card, .info, li, .pad, .details');
+        if (layeredContent.length) {
+          gsap.from(layeredContent, {
+            y: 40,
+            autoAlpha: 0,
+            stagger: 0.08,
+            duration: 0.9,
+            ease: 'power2.out',
+            scrollTrigger: {
+              trigger: section,
+              start: 'top 78%',
+              toggleActions: 'play none none reverse'
+            }
+          });
+        }
+      });
+
+      gsap.utils.toArray('.cards .card img').forEach((img) => {
+        gsap.to(img, {
+          scale: 1.08,
+          yPercent: -18,
+          ease: 'none',
+          scrollTrigger: {
+            trigger: img.closest('.card'),
+            start: 'top bottom',
+            end: 'bottom top',
+            scrub: true
           }
         });
       });
 
-      cards.forEach((card) => observer.observe(card));
-    } else {
-      // Fallback if IntersectionObserver is not supported
-      cards.forEach((card) => card.classList.add('show'));
-    }
-  });
-</script>
+      gsap.utils.toArray('.cta').forEach((cta) => {
+        gsap.fromTo(cta,
+          { y: 24, autoAlpha: 0 },
+          {
+            y: 0,
+            autoAlpha: 1,
+            duration: 0.8,
+            ease: 'power2.out',
+            scrollTrigger: {
+              trigger: cta,
+              start: 'top 85%',
+              toggleActions: 'play none none reverse'
+            }
+          }
+        );
+      });
+
+      ScrollTrigger.matchMedia({
+        '(prefers-reduced-motion: reduce)': function () {
+          ScrollTrigger.getAll().forEach(trigger => trigger.kill());
+          gsap.globalTimeline.clear();
+          document.body.classList.remove('motion-ready');
+          sections.forEach(section => {
+            section.style.removeProperty('opacity');
+            section.style.removeProperty('transform');
+            section.classList.add('revealed');
+          });
+        }
+      });
+    });
+  </script>
 
 <script>
   const signInBtn = document.querySelector('#signInBtn'); // your top-right navbar button

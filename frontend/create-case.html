@@ -1,261 +1,551 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <style>body{opacity:1!important;visibility:visible!important}</style>
   <meta charset="UTF-8" />
-  <title>Create New Case • Lets-ParaConnect</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="assets/styles.css" />
-  <script type="module" src="assets/scripts/auth.js"></script>
-  <script src="https://js.stripe.com/v3"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Case | Let’s-ParaConnect</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
   <style>
-    :root{ --navy:#27394d; --brown:#8c7864; --bg:#f5f2ed; --line:#e8edf3; --ink:#5c4e3a; }
-    body{ background:var(--bg); color:var(--ink); font-family:Georgia,serif; }
-    header{ background:#fff; border-bottom:1px solid var(--line); padding:14px 18px; display:flex; align-items:center; justify-content:space-between; }
-    header a{ color:var(--brown); text-decoration:none; font-weight:700; }
-    main{ max-width:840px; margin:28px auto; padding:0 16px; }
-    h1{ color:var(--navy); margin:0 0 10px; }
-    .card{ background:#fff; border:1px solid var(--line); border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.04); padding:16px; }
+    :root {
+      --bg:#ffffff;
+      --sidebar-bg:#f5f5f5e6;
+      --accent:#b6a47a;
+      --ink:#1a1a1a;
+      --muted:#8a8a8a;
+      --line:rgba(0,0,0,0.08);
+      --panel:#fcfcfc;
+      --radius:14px;
+      --font-serif:'Cormorant Garamond',serif;
+      --font-sans:'Sarabun',sans-serif;
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{
+      font-family:'Sarabun',serif;
+      background:var(--bg);
+      color:var(--ink);
+      display:flex;
+      height:100vh;
+      overflow:hidden;
+      font-weight:200;
+    }
 
-    .field{ display:grid; gap:6px; margin:10px 0; }
-    .field input,.field textarea{ padding:.8rem; border:1px solid var(--line); border-radius:10px; font:inherit; outline:none; background:#fff; }
-    .field input:focus,.field textarea:focus{ border-color:var(--brown); box-shadow:0 0 0 4px rgba(140,120,100,.15); }
+    /* Sidebar */
+    .sidebar{
+      width:240px;
+      background:var(--sidebar-bg);
+      display:flex;
+      flex-direction:column;
+      border-right:1px solid var(--line);
+      padding:24px 16px;
+    }
+    .logo{
+      font-family:var(--font-serif);
+      font-size:1.6rem;
+      font-weight:300;
+      text-align:center;
+      margin-bottom:36px;
+    }
+    nav{display:flex;flex-direction:column;gap:14px;}
+    nav a{
+      text-decoration:none;
+      color:var(--ink);
+      font-size:0.95rem;
+      padding:10px 14px;
+      border-radius:var(--radius);
+      transition:background .3s;
+    }
+    nav a.active,nav a:hover{background:rgba(0,0,0,0.04);}
+    .sidebar-footer{
+      margin-top:auto;
+      font-size:0.7rem;
+      color:var(--muted);
+      text-align:center;
+    }
+    /* uniform style for step bubbles across all create-case pages */
+.steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 700px;
+  margin: 0 auto 2.5rem;
+  position: relative;
+}
 
-    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    .btn{ border:0; border-radius:10px; padding:.7rem 1.1rem; cursor:pointer; font-weight:600; }
-    .btn.primary{ background:var(--navy); color:#fff; }
-    .btn.secondary{ background:#fff; border:1px solid var(--line); }
-    .hint{ color:#64748b; }
-    .ok{ color:#1f7a4a; }
-    .bad{ color:#b04747; }
+.steps::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--line);
+}
 
-    .fade-in{ animation:fade .25s ease; } @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.step {
+  text-align: center;
+  flex: 1;
+  position: relative;
+}
 
-    /* Modal */
-    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.35); backdrop-filter:blur(6px); }
-    .modal.active{ display:flex; }
-    .modal-card{ width:min(560px,92vw); background:#fff; border-radius:16px; box-shadow:0 16px 44px rgba(0,0,0,.28); padding:18px; }
-    .modal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-    .x{ background:transparent; border:0; font-size:20px; cursor:pointer; }
-    .grid{ display:grid; gap:12px; }
-    #payment-element{ margin-top:8px; }
+.circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  transition: all 0.3s ease;
+}
+
+.step.active .circle {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.step span {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+    /* Main */
+    .main{flex:1;padding:40px;overflow-y:auto;}
+    .topbar{display:flex;justify-content:flex-end;align-items:center;margin-bottom:2rem;gap:1.5rem;}
+    .notification-icon svg{width:20px;height:20px;color:var(--ink);}
+    .notification-badge{
+      position:absolute;top:-6px;right:-6px;
+      background:red;color:white;border-radius:50%;
+      font-size:0.7rem;width:16px;height:16px;
+      display:flex;align-items:center;justify-content:center;font-weight:bold;
+    }
+    .user-profile{display:flex;align-items:center;gap:.75rem;cursor:pointer;}
+    .user-profile img{width:36px;height:36px;border-radius:50%;}
+    .user-profile span{font-weight:400;font-size:.95rem;}
+
+    header h1{
+      font-family:var(--font-serif);
+      font-weight:300;
+      font-size:2rem;
+      margin-bottom:1rem;
+    }
+    header p{font-weight:200;color:var(--muted);margin-bottom:2rem;}
+
+    /* Wizard steps */
+    .steps{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      max-width:700px;
+      margin:0 auto 2.5rem;
+      position:relative;
+    }
+    .step{
+      text-align:center;
+      flex:1;
+      position:relative;
+    }
+    .step:not(:first-child)::before{
+      content:"";
+      position:absolute;
+      top:14px;
+      left:0;
+      width:100%;
+      height:2px;
+      background:var(--line);
+      z-index:0;
+    }
+    .circle{
+      position:relative;
+      z-index:1;
+      width:28px;
+      height:28px;
+      border-radius:50%;
+      background:#fff;
+      border:2px solid var(--line);
+      margin:0 auto 8px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:0.8rem;
+    }
+    .active .circle{
+      background:var(--accent);
+      border-color:var(--accent);
+      color:#fff;
+    }
+    .step span{font-size:0.85rem;color:var(--muted);}
+
+    /* Form */
+    form{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:2rem;
+      max-width:800px;
+      margin:0 auto;
+      box-shadow:0 2px 6px rgba(0,0,0,0.03);
+    }
+    .field{margin-bottom:1.25rem;}
+    .field label{
+      display:block;
+      margin-bottom:6px;
+      font-size:0.9rem;
+      color:var(--ink);
+    }
+    input,select,textarea{
+      width:100%;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:6px;
+      font-family:inherit;
+      font-size:0.9rem;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    input:focus,select:focus,textarea:focus{
+      border-color:var(--accent);
+      box-shadow:0 0 0 3px rgba(182,164,122,0.15);
+      outline:none;
+    }
+
+    .actions{
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      margin-top:1.5rem;
+    }
+    .btn{
+      border:none;
+      border-radius:6px;
+      padding:0.6rem 1.1rem;
+      font-size:0.9rem;
+      cursor:pointer;
+      transition:all .2s;
+    }
+    .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
+    .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
+    .btn.primary{background:var(--accent);color:#fff;}
+    .btn.primary:hover{background:#a0854d;}
+    .comp-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.dollar-sign {
+  position: absolute;
+  left: 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+#comp {
+  padding-left: 24px;
+  width: 120px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem 0.5rem 1.4rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+#comp:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(182,164,122,0.15);
+  outline: none;
+}
+
+.comp-type {
+  display: flex;
+  gap: 6px;
+}
+
+.type-btn {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.type-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.type-btn:hover:not(.active) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.steps a {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.steps a:hover .circle {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.steps a:hover span {
+  color: var(--accent);
+}
+
   </style>
 </head>
 <body>
-  <header>
-    <a href="index.html">← Back to App</a>
-    <a href="my-cases.html">My Cases</a>
-  </header>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">Dashboard</div>
+    <nav>
+      <a href="dashboard-attorney.html">Home</a>
+      <a href="active-cases.html">Cases</a>
+      <a href="create-case.html" class="active">Create Case</a>
+      <a href="#">Messages</a>
+      <a href="#">Documents</a>
+      <a href="#">Billing</a>
+      <a href="#">Tasks</a>
+      <a href="help.html">Help</a>
+    </nav>
+    <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
+  </aside>
 
-  <main>
-    <h1>Create New Case</h1>
-    <p class="hint" style="margin:4px 0 14px">
-      Provide a clear title and concise details. You can fund escrow now or later.
-    </p>
-
-    <section class="card fade-in">
-      <form id="caseForm" novalidate>
-        <div class="field">
-          <label for="title">Title <span class="hint">(required)</span></label>
-          <input id="title" name="title" maxlength="140" required placeholder="e.g., Draft Motion for Summary Judgment" />
-        </div>
-
-        <div class="field">
-          <label for="details">Details <span class="hint">(required)</span></label>
-          <textarea id="details" name="details" rows="6" maxlength="4000" placeholder="Scope, key facts, deadlines, preferred experience…" required></textarea>
-          <div class="hint"><span id="charCount" aria-live="polite">0</span>/4000</div>
-        </div>
-
-        <div id="msg" class="hint" role="status" aria-live="polite" style="min-height:1.2rem; margin:.25rem 0 .5rem"></div>
-
-        <div class="row" style="justify-content:flex-end">
-          <button type="button" class="btn secondary" id="resetBtn">Reset</button>
-          <button type="submit" class="btn primary" id="submitBtn">Create Case</button>
-        </div>
-      </form>
-    </section>
-  </main>
-
-  <!-- Escrow modal -->
-  <div id="escrowModal" class="modal" aria-hidden="true">
-    <div class="modal-card">
-      <div class="modal-head">
-        <h2 style="margin:0">Fund Escrow</h2>
-        <button class="x" id="closeModal" aria-label="Close">×</button>
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <div class="notification-icon" style="position:relative;">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+        <span class="notification-badge">2</span>
       </div>
-      <div class="grid">
-        <p class="hint" id="escrowMsg" aria-live="polite">Enter the total budget to deposit for this case.</p>
-        <div class="row" style="gap:8px">
-          <label for="amountUsd" style="min-width:120px">Amount (USD)</label>
-          <input id="amountUsd" type="number" min="1" step="1" placeholder="e.g., 500 (=$500)" style="max-width:180px" />
-        </div>
-
-        <!-- Stripe Payment Element will mount here -->
-        <div id="payment-element" style="display:none"></div>
-
-        <div class="row" style="justify-content:flex-end">
-          <button class="btn secondary" id="fundLater">Fund later</button>
-          <button class="btn primary" id="continuePay">Continue</button>
-        </div>
+      <div class="user-profile">
+        <img src="https://via.placeholder.com/36" alt="User avatar" />
+        <span>Samantha</span>
       </div>
     </div>
+
+    <header>
+      <h1>Create a New Case</h1>
+      <p>Provide details to post your case and invite paralegals to apply.</p>
+    </header>
+
+    <!-- Step Progress -->
+    <div class="steps">
+  <a href="create-case.html" class="step active">
+    <div class="circle">1</div><span>Case details</span>
+  </a>
+  <a href="create-case-step2.html" class="step">
+    <div class="circle">2</div><span>Description</span>
+  </a>
+  <a href="create-case-step3.html" class="step">
+    <div class="circle">3</div><span>Requirements</span>
+  </a>
+  <a href="create-case-step4.html" class="step">
+    <div class="circle">4</div><span>Questions</span>
+  </a>
+  <a href="create-case-step5.html" class="step">
+    <div class="circle">5</div><span>Review & Post</span>
+  </a>
+</div>
+
+    <!-- Form -->
+    <form>
+      <div class="field">
+        <label for="title">Case Title</label>
+        <input id="title" placeholder="e.g., Draft Motion for Summary Judgment" required />
+      </div>
+
+      <div class="field">
+        <label for="specialty">Field of Law</label>
+        <select id="specialty">
+              <option value="">Select…</option>
+    <option>Administrative Law</option>
+    <option>Admiralty & Maritime Law</option>
+    <option>Antitrust Law</option>
+    <option>Appellate Law</option>
+    <option>Banking Law</option>
+    <option>Bankruptcy Law</option>
+    <option>Business / Corporate Law</option>
+    <option>Civil Rights Law</option>
+    <option>Class Action Law</option>
+    <option>Commercial Law</option>
+    <option>Communications Law</option>
+    <option>Construction Law</option>
+    <option>Consumer Protection Law</option>
+    <option>Contract Law</option>
+    <option>Criminal Defense Law</option>
+    <option>Education Law</option>
+    <option>Elder Law</option>
+    <option>Election Law</option>
+    <option>Employment & Labor Law</option>
+    <option>Energy Law</option>
+    <option>Entertainment Law</option>
+    <option>Environmental Law</option>
+    <option>Estate Planning & Probate</option>
+    <option>Family Law</option>
+    <option>Franchise Law</option>
+    <option>Government Contracts Law</option>
+    <option>Health Care Law</option>
+    <option>Immigration Law</option>
+    <option>Insurance Law</option>
+    <option>Intellectual Property (IP) Law</option>
+    <option>International Law</option>
+    <option>Land Use & Zoning Law</option>
+    <option>Litigation</option>
+    <option>Media Law</option>
+    <option>Medical Malpractice</option>
+    <option>Military Law</option>
+    <option>Municipal Law</option>
+    <option>Personal Injury Law</option>
+    <option>Product Liability Law</option>
+    <option>Real Estate Law</option>
+    <option>Securities Law</option>
+    <option>Social Security / Disability Law</option>
+    <option>Sports Law</option>
+    <option>Tax Law</option>
+    <option>Technology Law</option>
+    <option>Telecommunications Law</option>
+    <option>Torts</option>
+    <option>Transportation Law</option>
+    <option>Trusts & Estates</option>
+    <option>White Collar Crime</option>
+    <option>Workers’ Compensation</option>
+  </select>
+</div>
+
+      <div class="field">
+  <label for="state">Location (State)</label>
+  <select id="state">
+    <option value="">Select…</option>
+    <option>Alabama</option>
+    <option>Alaska</option>
+    <option>Arizona</option>
+    <option>Arkansas</option>
+    <option>California</option>
+    <option>Colorado</option>
+    <option>Connecticut</option>
+    <option>Delaware</option>
+    <option>District of Columbia</option>
+    <option>Florida</option>
+    <option>Georgia</option>
+    <option>Hawaii</option>
+    <option>Idaho</option>
+    <option>Illinois</option>
+    <option>Indiana</option>
+    <option>Iowa</option>
+    <option>Kansas</option>
+    <option>Kentucky</option>
+    <option>Louisiana</option>
+    <option>Maine</option>
+    <option>Maryland</option>
+    <option>Massachusetts</option>
+    <option>Michigan</option>
+    <option>Minnesota</option>
+    <option>Mississippi</option>
+    <option>Missouri</option>
+    <option>Montana</option>
+    <option>Nebraska</option>
+    <option>Nevada</option>
+    <option>New Hampshire</option>
+    <option>New Jersey</option>
+    <option>New Mexico</option>
+    <option>New York</option>
+    <option>North Carolina</option>
+    <option>North Dakota</option>
+    <option>Ohio</option>
+    <option>Oklahoma</option>
+    <option>Oregon</option>
+    <option>Pennsylvania</option>
+    <option>Rhode Island</option>
+    <option>South Carolina</option>
+    <option>South Dakota</option>
+    <option>Tennessee</option>
+    <option>Texas</option>
+    <option>Utah</option>
+    <option>Vermont</option>
+    <option>Virginia</option>
+    <option>Washington</option>
+    <option>West Virginia</option>
+    <option>Wisconsin</option>
+    <option>Wyoming</option>
+  </select>
+</div>
+
+      <div class="field">
+        <label for="employment">Engagement Type</label>
+        <select id="employment">
+          <option value="">Select…</option>
+          <option>One-time Project</option>
+          <option>Ongoing Support</option>
+          <option>Temporary Contract</option>
+        </select>
+      </div>
+
+      <div class="field">
+  <label for="comp">Compensation</label>
+  <div class="comp-wrapper">
+    <span class="dollar-sign">$</span>
+    <input id="comp" type="number" min="0" placeholder="Amount" />
+    <div class="comp-type">
+      <button type="button" class="type-btn active" data-type="hourly">Hourly</button>
+      <button type="button" class="type-btn" data-type="flat">Flat Fee</button>
+    </div>
   </div>
+</div>
 
-  <script type="module">
-    import { secureFetch, fetchCSRF } from './assets/scripts/auth.js';
-    import { ensureIntent, createElements, mountPaymentElement, confirmPayment } from './assets/scripts/payments.js';
+      <div class="field">
+        <label for="experience">Preferred Experience (Optional)</label>
+        <input id="experience" placeholder="e.g., 3+ years litigation experience" />
+      </div>
 
-    // Gate: must be authenticated via cookie session
-    try {
-      const r = await fetch('/api/users/me', { credentials:'include' });
-      if (!r.ok) throw new Error();
-      const me = await r.json();
-      if (!me?.id) throw new Error();
-    } catch {
-      location.href = 'login.html';
-    }
+      <div class="actions">
+  <button type="button" class="btn secondary" onclick="window.location.href='dashboard-attorney.html'">Cancel</button>
+  <button type="button" class="btn primary" onclick="window.location.href='create-case-step2.html'">Next Step</button>
+</div>
+    </form>
+  </main>
+  <script>
+document.querySelector('.btn.primary').addEventListener('click', () => {
+  localStorage.setItem('caseTitle', document.getElementById('title').value);
+  localStorage.setItem('caseSpecialty', document.getElementById('specialty').value);
+  localStorage.setItem('caseState', document.getElementById('state').value);
+  localStorage.setItem('caseEmployment', document.getElementById('employment').value);
+  localStorage.setItem('caseComp', document.getElementById('comp').value);
+  localStorage.setItem('caseExperience', document.getElementById('experience').value);
+});
+</script>
+<script>
+const compBtns = document.querySelectorAll('.type-btn');
+compBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    compBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    localStorage.setItem('caseCompType', btn.dataset.type);
+  });
+});
 
-    // Warm CSRF
-    fetchCSRF().catch(()=>{});
-
-    // Elements
-    const form       = document.getElementById('caseForm');
-    const titleEl    = document.getElementById('title');
-    const detailsEl  = document.getElementById('details');
-    const msgEl      = document.getElementById('msg');
-    const submitBtn  = document.getElementById('submitBtn');
-    const resetBtn   = document.getElementById('resetBtn');
-    const countEl    = document.getElementById('charCount');
-
-    // Modal bits
-    const modal      = document.getElementById('escrowModal');
-    const closeModal = document.getElementById('closeModal');
-    const fundLater  = document.getElementById('fundLater');
-    const continueBtn= document.getElementById('continuePay');
-    const amountEl   = document.getElementById('amountUsd');
-    const escrowMsg  = document.getElementById('escrowMsg');
-    const payHost    = document.getElementById('payment-element');
-
-    let createdCaseId = null;
-    let elements = null;
-
-    // live counter
-    const updateCount = () => { countEl.textContent = String((detailsEl.value || '').length); };
-    detailsEl.addEventListener('input', updateCount); updateCount();
-
-    resetBtn.addEventListener('click', (e)=>{
-      e.preventDefault();
-      form.reset(); updateCount(); msgEl.textContent=''; msgEl.className='hint';
-    });
-
-    // Create case
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const title = titleEl.value.trim();
-      const details = detailsEl.value.trim();
-      if (!title || !details) { msgEl.className='bad'; msgEl.textContent='Title and details are required.'; return; }
-
-      msgEl.className='hint'; msgEl.textContent='Creating case…';
-      submitBtn.disabled = true;
-
-      try {
-        await fetchCSRF().catch(()=>{});
-        const res = await secureFetch('/api/cases', { method:'POST', body: { title, details }});
-        const data = await res.json().catch(()=> ({}));
-        if (!res.ok) throw new Error(data?.msg || 'Unable to create case');
-
-        createdCaseId = data.id || data._id;
-        msgEl.className='ok';
-        msgEl.textContent = data.msg || 'Case created.';
-
-        // Open escrow modal
-        modal.classList.add('active');
-        modal.setAttribute('aria-hidden','false');
-      } catch (err) {
-        msgEl.className='bad';
-        msgEl.textContent = err?.message || 'Something went wrong.';
-        submitBtn.disabled = false;
-      }
-    });
-
-    // Navigation helpers
-    function goToCase(){
-      if (createdCaseId) {
-        localStorage.setItem('openCaseId', createdCaseId);
-        location.href = 'case-detail.html';
-      } else {
-        location.href = 'my-cases.html';
-      }
-    }
-    closeModal.onclick = () => { modal.classList.remove('active'); modal.setAttribute('aria-hidden','true'); goToCase(); };
-    fundLater.onclick  = (e) => { e.preventDefault(); modal.classList.remove('active'); goToCase(); };
-
-    // Continue → save budget → create PI → mount Payment Element
-    continueBtn.addEventListener('click', async (e)=>{
-      e.preventDefault();
-      if (!createdCaseId) return;
-
-      const amt = Number(amountEl.value || 0);
-      if (!amt || amt < 1) { escrowMsg.className='bad'; escrowMsg.textContent='Enter a valid USD amount (minimum $1).'; return; }
-
-      escrowMsg.className='hint'; escrowMsg.textContent='Saving budget…';
-      continueBtn.disabled = true;
-
-      try {
-        await fetchCSRF().catch(()=>{});
-        // Step 1: save budget on the case
-        const r1 = await secureFetch(`/api/cases/${encodeURIComponent(createdCaseId)}/budget`, {
-          method:'PATCH', body: { amountUsd: amt, currency: 'usd' }
-        });
-        const b = await r1.json().catch(()=> ({}));
-        if (!r1.ok) throw new Error(b?.msg || 'Failed to save budget');
-
-        // Step 2: ensure a PaymentIntent and get client_secret
-        const clientSecret = await ensureIntent(createdCaseId, secureFetch);
-
-        // Step 3: mount Stripe Payment Element
-        elements = await createElements(clientSecret);
-        mountPaymentElement(elements, payHost);
-        escrowMsg.className='hint';
-        escrowMsg.textContent = 'Enter your payment details to fund escrow.';
-
-        // Swap button action to confirm
-        continueBtn.textContent = 'Fund Escrow';
-        continueBtn.disabled = false;
-        continueBtn.onclick = doConfirmPayment;
-      } catch (err) {
-        escrowMsg.className='bad';
-        escrowMsg.textContent = err?.message || 'Unable to start payment.';
-        continueBtn.disabled = false;
-      }
-    });
-
-    async function doConfirmPayment(e){
-      e.preventDefault();
-      if (!elements) return;
-      continueBtn.disabled = true;
-      escrowMsg.className='hint';
-      escrowMsg.textContent = 'Confirming payment…';
-
-      const { error, paymentIntent } = await confirmPayment(elements);
-
-      if (error) {
-        escrowMsg.className='bad';
-        escrowMsg.textContent = error.message || 'Payment failed.';
-        continueBtn.disabled = false;
-        return;
-      }
-
-      if (paymentIntent && paymentIntent.status === 'succeeded') {
-        escrowMsg.className='ok';
-        escrowMsg.textContent = 'Escrow funded. Redirecting…';
-        setTimeout(goToCase, 800);
-      } else {
-        escrowMsg.className='hint';
-        escrowMsg.textContent = `Payment status: ${paymentIntent?.status || 'processing'}. Redirecting…`;
-        setTimeout(goToCase, 800);
-      }
-    }
-  </script>
+const compInput = document.getElementById('comp');
+compInput.addEventListener('input', () => {
+  localStorage.setItem('caseCompAmount', compInput.value);
+});
+</script>
+<script>
+  loadUserHeaderInfo();
+</script>
 </body>
 </html>

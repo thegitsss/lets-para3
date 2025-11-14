@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Review | Let’s-ParaConnect</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #ffffff;
+      --sidebar-bg: #f5f5f5e6;
+      --accent: #b6a47a;
+      --ink: #1a1a1a;
+      --muted: #8a8a8a;
+      --line: rgba(0, 0, 0, 0.08);
+      --panel: #fcfcfc;
+      --radius: 14px;
+      --font-serif: 'Cormorant Garamond', serif;
+      --font-sans: 'Sarabun', sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--font-sans);
+      font-weight: 200;
+      background: var(--bg);
+      color: var(--ink);
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 240px;
+      background: var(--sidebar-bg);
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+      padding: 24px 16px;
+    }
+    .logo {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+      margin-bottom: 36px;
+      text-align: center;
+    }
+    nav { display: flex; flex-direction: column; gap: 14px; }
+    nav a {
+      text-decoration: none;
+      color: var(--ink);
+      font-weight: 400;
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      transition: background 0.3s ease;
+    }
+    nav a.active,
+    nav a:hover { background: rgba(0, 0, 0, 0.04); }
+    .sidebar-footer {
+      margin-top: auto;
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .main {
+      flex: 1;
+      padding: 40px;
+      overflow-y: auto;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 2rem;
+      gap: 1.5rem;
+    }
+    .notification-icon svg { width: 20px; height: 20px; color: var(--ink); }
+    .notification-icon { position: relative; }
+    .notification-badge {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: red;
+      color: white;
+      border-radius: 50%;
+      font-size: 0.7rem;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+    }
+    .user-profile img { width: 36px; height: 36px; border-radius: 50%; }
+    .user-profile span { font-weight: 400; font-size: 0.95rem; }
+
+    header h1 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 2.2rem;
+      margin-bottom: 0.5rem;
+    }
+    header p { font-weight: 200; color: var(--muted); margin-bottom: 2rem; }
+
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 0.6rem 1.1rem;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn.primary { background: var(--accent); color: #fff; }
+    .btn.primary:hover { background: #a38e5f; }
+    .btn.secondary { background: #fff; border: 1px solid var(--line); color: var(--ink); }
+    .btn.secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+    .review-container { display: flex; flex-direction: column; gap: 2rem; }
+    .case-review { border: 1px solid var(--line); border-radius: var(--radius); padding: 1.5rem; background: var(--panel); }
+    .case-title { font-family: var(--font-serif); font-size: 1.4rem; font-weight: 600; margin-bottom: 1rem; }
+    .review-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      background: #fff;
+      transition: background 0.2s ease;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .review-item:hover { background: #f8f8f8; }
+    .review-info h3 { font-family: var(--font-serif); margin-bottom: 0.25rem; }
+    .review-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+    .modal.hidden { display: none; }
+    .modal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-content {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 10px;
+      min-width: 320px;
+      text-align: center;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.2);
+    }
+    .modal-content input[type=file] {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    @media (max-width: 900px) {
+      body { flex-direction: column; }
+      .sidebar { width: 100%; flex-direction: column; align-items: center; gap: 12px; }
+      .sidebar nav { width: 100%; flex-direction: row; flex-wrap: wrap; justify-content: center; }
+      .sidebar nav a { flex: 1 1 120px; text-align: center; }
+      .main { padding: 24px; }
+      .review-actions { width: 100%; justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="logo">Dashboard</div>
+    <nav>
+      <a href="dashboard-attorney.html">Home</a>
+      <a href="active-cases.html">Cases</a>
+      <a href="messages.html">Messages</a>
+      <a href="documents.html">Documents</a>
+      <a href="review.html" class="active">Review</a>
+      <a href="case-files.html">Case Files</a>
+      <a href="payments-escrow.html">Billing</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="help.html">Help</a>
+    </nav>
+    <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="notification-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+        <span class="notification-badge">2</span>
+      </div>
+      <div class="user-profile">
+        <img src="https://via.placeholder.com/36" alt="User avatar" />
+        <span>Samantha</span>
+      </div>
+    </div>
+
+    <header>
+      <h1>Review</h1>
+      <p>Review all paralegal submissions by case. Approve, request revisions, or upload your own revised version. Approved files automatically move to Case Files → Approved Documents.</p>
+    </header>
+
+    <div class="review-container">
+      <section class="case-review">
+        <h2 class="case-title">Motion for Summary Judgment</h2>
+
+        <div class="review-item">
+          <div class="review-info">
+            <h3>Draft_Motion.docx</h3>
+            <p>Submitted by J. Stone · Nov 10 2025 · Status: Pending Review</p>
+          </div>
+          <div class="review-actions">
+            <button class="btn secondary" onclick="viewDoc('Draft_Motion.docx')">View</button>
+            <button class="btn primary" onclick="approveDoc(this)">Approve</button>
+            <button class="btn secondary" onclick="requestRevisions(this)">Request Revisions</button>
+            <button class="btn secondary" onclick="openUploadModal(this)">Upload Revised Version</button>
+          </div>
+        </div>
+
+        <div class="review-item">
+          <div class="review-info">
+            <h3>Exhibit_List.pdf</h3>
+            <p>Submitted by J. Stone · Nov 9 2025 · Status: Approved</p>
+          </div>
+          <div class="review-actions">
+            <button class="btn secondary" onclick="viewDoc('Exhibit_List.pdf')">View</button>
+            <button class="btn secondary" onclick="downloadDoc('Exhibit_List.pdf')">Download</button>
+            <button class="btn secondary" onclick="printDoc('Exhibit_List.pdf')">Print</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="case-review">
+        <h2 class="case-title">Anderson Merger Filing</h2>
+
+        <div class="review-item">
+          <div class="review-info">
+            <h3>Lease_Addendum.docx</h3>
+            <p>Submitted by A. Bennett · Nov 11 2025 · Status: Pending Review</p>
+          </div>
+          <div class="review-actions">
+            <button class="btn secondary" onclick="viewDoc('Lease_Addendum.docx')">View</button>
+            <button class="btn primary" onclick="approveDoc(this)">Approve</button>
+            <button class="btn secondary" onclick="requestRevisions(this)">Request Revisions</button>
+            <button class="btn secondary" onclick="openUploadModal(this)">Upload Revised Version</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="uploadModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Upload Revised Version</h3>
+      <input type="file" id="revisedFile" accept=".doc,.docx,.pdf,.txt" />
+      <div style="margin-top:1rem; display:flex; justify-content:center; gap:0.75rem;">
+        <button class="btn secondary" onclick="closeUploadModal()">Cancel</button>
+        <button class="btn primary" onclick="submitRevised()">Upload</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  let selectedReviewItem = null;
+
+  function approveDoc(btn) {
+    const item = btn.closest('.review-item');
+    const info = item.querySelector('p');
+    info.textContent = info.textContent.replace('Pending Review', 'Approved');
+    item.querySelector('.review-actions').innerHTML = `
+      <button class="btn secondary" onclick="viewDoc()">View</button>
+      <button class="btn secondary" onclick="downloadDoc()">Download</button>
+      <button class="btn secondary" onclick="printDoc()">Print</button>`;
+    alert('Document approved and moved to Case Files → Approved Documents.');
+  }
+
+  function requestRevisions(btn) {
+    const item = btn.closest('.review-item');
+    const name = item.querySelector('h3').textContent;
+    alert('Revision requested for ' + name + '. The paralegal will be notified.');
+  }
+
+  function openUploadModal(btn) {
+    selectedReviewItem = btn.closest('.review-item');
+    document.getElementById('uploadModal').classList.remove('hidden');
+  }
+  function closeUploadModal() {
+    document.getElementById('uploadModal').classList.add('hidden');
+    selectedReviewItem = null;
+  }
+  function submitRevised() {
+    const file = document.getElementById('revisedFile').files[0];
+    if (!file) return alert('Please choose a file.');
+    const caseTitle = selectedReviewItem.closest('.case-review').querySelector('.case-title').textContent;
+    alert(`Revised version (${file.name}) uploaded for ${caseTitle}.`);
+    closeUploadModal();
+  }
+
+  function viewDoc(name){ alert('Opening document: ' + (name || 'selected file')); }
+  function downloadDoc(name){ alert('Downloading ' + (name || 'selected file')); }
+  function printDoc(name){ alert('Printing ' + (name || 'selected file')); }
+  </script>
+</body>
+</html>

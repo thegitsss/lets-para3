@@ -5,6 +5,7 @@
   <title>Terms & Conditions • Let’s‑ParaConnect</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+  <link href="assets/styles/styles.css" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300&family=Sarabun:wght@200&display=swap" rel="stylesheet" />
 
   <style>
@@ -26,46 +27,6 @@
       line-height: 1.7;
     }
 
-
-    header {
-      border-bottom: 1px solid var(--line);
-      background: white;
-    }
-
-    .header-inner {
-      max-width: 1440px;
-      margin: 0 auto;
-      padding: 24px 40px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: relative;
-    }
-
-    .header-inner nav {
-      display: flex;
-      gap: 40px;
-    }
-
-    .header-inner nav a,
-    .header-inner a.login-btn {
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 300;
-      font-size: 16px;
-      color: var(--ink);
-      text-decoration: none;
-    }
-
-    .header-logo {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      font-family: 'Cormorant Garamond', serif;
-      text-decoration: none;
-      color: inherit;
-      font-size: 20px;
-      letter-spacing: 1px;
-    }
 
     /* MAIN CONTENT */
     main {
@@ -145,12 +106,16 @@
 <body>
   <header>
     <div class="header-inner">
-      <nav>
+      <nav class="nav-left">
         <a href="about.html">About</a>
         <a href="services.html">Services</a>
         <a href="how-it-works.html">How It Works</a>
       </nav>
-        <a href="index.html" class="header-logo">Let<span class="gold">’</span>s ParaConnect</a>
+
+      <a href="index.html" class="header-logo">
+        Let<span class="gold">’</span>s ParaConnect
+      </a>
+
       <a href="login.html" class="login-btn">Sign In</a>
     </div>
   </header>
