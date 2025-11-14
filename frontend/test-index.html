@@ -659,7 +659,7 @@
 
 <style>
   html {
-    scroll-behavior: smooth;
+    scroll-behavior: auto; /* Lenis handles smoothness */
     scroll-padding-top: 80px;
   }
 
@@ -1277,9 +1277,11 @@ gsap.registerPlugin(ScrollTrigger);
 
 // Initialize Lenis smooth scroll
 const lenis = new Lenis({
-  duration: 1.2,
+  duration: 1.35,
   easing: t => 1 - Math.pow(2, -10 * t),
-  smooth: true,
+  smoothWheel: true,
+  smoothTouch: false,
+  touchMultiplier: 1.4,
 });
 
 // Sync GSAP + Lenis
@@ -1290,7 +1292,24 @@ function raf(time) {
 }
 requestAnimationFrame(raf);
 
+window.lenis = lenis;
 lenis.on('scroll', ScrollTrigger.update);
+
+document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+  anchor.addEventListener('click', (event) => {
+    const targetId = anchor.getAttribute('href');
+    if (!targetId || !targetId.startsWith('#') || targetId === '#') return;
+    const target = document.querySelector(targetId);
+    if (!target) return;
+
+    event.preventDefault();
+    lenis.scrollTo(target, {
+      offset: -60,
+      duration: 1.2,
+      easing: t => 1 - Math.pow(2, -10 * t)
+    });
+  });
+});
 </script>
 <script>
 // FADE-IN for elements with [fade]
