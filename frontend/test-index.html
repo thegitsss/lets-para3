@@ -7,529 +7,7 @@
   <title>Let’s-ParaConnect</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --ink: #0a0f14;
-      --muted: #d6dbe3;
-      --bg: #0a0f14;
-      --line: rgba(255,255,255,.16);
-      --accent: #ffffff;
-      --alpha-header: 0.14;
-      --e1: cubic-bezier(.2,.7,.2,1);
-      --radius: 14px;
-    }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; margin: 0; }
-    body {
-  background: #ffffff;
-  color: #1a2230;
-  font: 16px/1.5 Inter, system-ui, Sarabun, sans-serif;
-}
-
-/* Header */
-.site-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 68px;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  justify-content: center; /* centers the brand horizontally */
-  background: transparent;
-  border-bottom: none;
-  backdrop-filter: saturate(160%) blur(10px);
-  transition: background-color 0.45s ease, box-shadow 0.45s ease, border-color 0.45s ease;
-}
-/* Banner font: Sarabun-Regular */
-.site-header,
-.site-header nav a {
-  font-family: 'Sarabun', sans-serif;
-  font-weight: 200;
-  letter-spacing: 0.03em;
-}
-
-.brand {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 300;
-  font-size: 20px;
-  letter-spacing: 0.05em;
-  color: #1a2230;
-  text-decoration: none;
-  text-transform: none;
-
-}
-    .header-inner {
-      width: min(1200px, 92vw);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      letter-spacing: .08em;
-      font-weight: 300;
-      text-transform: none !important;
-    }
-    .brand-mark {
-      width: 26px; height: 26px;
-      display: grid; place-items: center;
-      border: 2px solid var(--ink);
-      border-radius: 6px;
-      font-size: 12px;
-    }
-    nav ul {
-      list-style: none;
-      display: flex;
-      gap: 28px;
-      padding: 0;
-      margin: 0;
-    }
-    nav a {
-      color: #1a2230;
-      text-decoration: none;
-      opacity: .88;
-      font-weight: 300;
-    }
-    nav a:hover {
-      opacity: 1;
-    }
-    .header-actions .pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 14px;
-      border: 1px solid rgba(26,34,48,0.2);
-      border-radius: 999px;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: .12em;
-      color: #1a2230;
-      text-decoration: none;
-    }
-
-    .site-header.over-image .brand,
-    .site-header.over-image nav a,
-    .site-header.over-image .header-actions .pill {
-      color: #f8f9fa;
-    }
-    .site-header.over-image .header-actions .pill {
-      border-color: rgba(255,255,255,0.6);
-    }
-
-    .hero-section {
-      position: relative;
-      height: 100vh;
-      width: 100%;
-      overflow: hidden;
-    }
-
-    .hero-img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-  }
-
-    /* Hero Slider */
-    .slider {
-      position: relative;
-      height: 100vh;
-      overflow: hidden;
-      background-color: #ffffff;
-      z-index: 0;
-    }
-    .slides {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      background-color: #ffffff;
-      z-index: 0;
-    }
-    .slide {
-      grid-area: 1/1;
-      width: 100%;
-      height: 100%;
-      position: relative;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 1s ease;
-      background-color: transparent;
-      z-index: 0;
-    }
-    .slide.active {
-      opacity: 1;
-      pointer-events: auto;
-      z-index: 1;
-    }
-    .slide::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,.45) 50%, rgba(0,0,0,.58) 100%);
-    }
-    .slide > img,
-    .slide .hero-bg img {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transform: scale(1.08);
-      filter: saturate(95%);
-      transition: transform 8s linear;
-    }
-    .caption {
-      position: absolute;
-      inset: auto 0 15vh 0;
-      display: grid;
-      place-items: center;
-      text-align: center;
-      padding: 0 24px;
-      z-index: 3;
-    }
-    .kicker {
-      color: var(--muted);
-      letter-spacing: .28em;
-      text-transform: uppercase;
-      font-size: 12px;
-      margin-bottom: 14px;
-    }
-    .headline {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(40px, 8vw, 92px);
-  font-weight: 300;
-  line-height: 1.04;
-  margin: 0 0 22px;
-  letter-spacing: 0.02em;
-  z-index: 4;
-  color: #f8f9fa !important;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 300;
-}
-    .cta {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      padding: 14px 22px;
-      border: 2px solid var(--accent);
-      border-radius: 8px;
-      background: transparent;
-      color: var(--ink);
-      text-decoration: none;
-      font-weight: 300;
-      text-transform: uppercase;
-      letter-spacing: .12em;
-    }
-    .cta:hover {
-      background: rgba(255,255,255, .08);
-    }
-    .arrow {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 46px;
-      height: 46px;
-      border: 2px solid var(--accent);
-      border-radius: 999px;
-      background: rgba(0,0,0, .18);
-      display: grid;
-      place-items: center;
-      cursor: pointer;
-      z-index: 3;
-    }
-    .arrow:hover {
-      background: rgba(255,255,255, .1);
-    }
-    .arrow.left { left: 24px; }
-    .arrow.right { right: 24px; }
-    .bullets {
-      position: absolute;
-      left: 50%;
-      bottom: 26px;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 10px;
-    }
-    .dot {
-      width: 10px; height: 10px;
-      border: 2px solid var(--accent);
-      border-radius: 999px;
-      background: transparent;
-      opacity: .7;
-      cursor: pointer;
-    }
-    .dot.active {
-      background: var(--accent);
-      opacity: 1;
-    }
-    .hero-bg {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.hero-bg img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-}
-
-    /* Below-fold sections */
-    .section {
-      padding: 80px 0;
-    }
-    .wrap {
-      width: min(1200px, 92vw);
-      margin: auto;
-    }
-    .about {
-      text-align: center;
-      color: var(--ink);
-    }
-    .about h2 {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(28px, 4vw, 44px);
-  font-weight: 300;
-  margin: 0 0 16px;
-}
-    .about p {
-      color: var(--muted);
-      margin: 0 auto;
-      max-width: 60ch;
-      font-size: 1rem;
-      line-height: 1.6;
-    }
-    .cards {
-      margin-top: 60px;
-      display: grid;
-      gap: 32px;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    }
-    .card {
-      background: #ffffff;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      transition: transform .3s var(--e1), box-shadow .3s var(--e1);
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      color: #1a2230; /* dark ink tone */
-    }
-    
-    .card {
-      opacity: 1;
-      transform: translateY(0);
-      transition: opacity 0.6s ease-out, transform 0.6s ease-out;
-    }
-
-    .card:hover {
-      transform: translateY(-8px);
-    }
-    .card img {
-      width: 100%;
-      height: 180px;
-      object-fit: cover;
-      display: block;
-    }
-    .card .pad {
-      padding: 20px;
-    }
-.card h3 {
-  font-size: 1.25rem;
-  margin-top: 1.2rem;
-}
-
-.card p {
-  font-size: 0.95rem;
-  line-height: 1.6;
-  margin: 1rem 0;
-  color: var(--muted);
-  margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.4;
-}
-
-.card a {
-  font-weight: 300;
-  font-size: 0.9rem;
-  color: #b4975a;
-  text-decoration: none;
-}
-
-    .card .read {
-      margin-top: 14px;
-      display: inline-block;
-      font-weight: 300;
-      text-transform: uppercase;
-      font-size: 12px;
-      letter-spacing: .12em;
-      opacity: .9;
-      color: var(--ink);
-      text-decoration: none;
-    }
-    
-
-
-    /* === Responsive Header Behavior === */
-
-/* Normal desktop (everything visible) */
-@media (min-width: 801px) {
-  .site-header nav,
-  .site-header .pill {
-    display: flex;
-  }
-}
-
-/* Tablet and smaller: gradually space things tighter */
-@media (max-width: 800px) {
-  .site-header {
-    justify-content: center;
-  }
-
-  .site-header nav ul {
-    gap: 20px;
-  }
-}
-
-/* Mobile and very narrow screens: hide nav + sign-in, keep only brand */
-.header-actions {
-  opacity: 1 !important;
-  visibility: visible !important;
-  pointer-events: auto !important;
-  position: relative !important;
-
-  .site-header .pill {
-    display: inline-flex !important;
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    background: var(--gold);
-    color: white;
-    padding: 8px 14px;
-    border-radius: 999px;
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-weight: 300;
-    z-index: 1000;
-    border: none;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-    text-decoration: none;
-  }
-
-  .site-header .pill:hover {
-    background: #a6894d;
-  }
-
-    .site-header .header-actions {
-    display: block !important;
-    opacity: 1 !important;
-    pointer-events: all !important;
-    transform: none !important;
-    position: relative !important;
-    visibility: visible !important;
-  }
-
-  /* center the brand */
-  .brand {
-    position: relative;
-    left: auto;
-    transform: none;
-    margin: 0 auto;
-    text-align: center;
-  }
-}
-
-/* === Responsive Header Behavior (Apple-style smooth collapse) === */
-
-/* Default (desktop) */
-.site-header {
-  transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.site-header nav,
-.header-actions {
-  transition: opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1),
-              transform 0.45s cubic-bezier(0.4, 0, 0.2, 1),
-              visibility 0.45s ease;
-  will-change: opacity, transform;
-
-}
-.hero-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translateZ(0);
-  z-index: 20;
-  font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(2rem, 6vw, 4rem);
-  font-weight: 300;
-  letter-spacing: 0.05em;
-  text-align: center;
-  max-width: 90vw;
-  opacity: 1;
-  text-shadow: 0px 8px 20px rgba(0, 0, 0, 0.35);
-
-}
-.hero-content::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.02); /* VERY subtle */
-  filter: blur(30px);
-  z-index: -1;
-}
-.hero-content .btn {
-  position: relative;
-  z-index: 25;
-  box-shadow:
-    0 12px 30px rgba(0, 0, 0, 0.25),
-    0 4px 10px rgba(0, 0, 0, 0.15);
-  transform: translateZ(20px);   /* actual 3D depth */
-}
-
-/* Smooth spacing for large viewports */
-.header-inner {
-  gap: 40px;
-  transition: gap 0.4s ease;
-}
-
-/* === Smooth fade + scale for responsive header === */
-.site-header nav,
-.header-actions {
-  transition: opacity 0.35s ease, transform 0.4s ease;
-  will-change: opacity, transform;
-}
-.next-section {
-  position: relative;
-  z-index: 10;
-  margin-top: -12vh;   /* pulls it up over the hero */
-}
-
-/* Tablet & mobile: Hide nav links, keep Sign In visible */
-@media (max-width: 800px) {
-  .site-header nav {
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    transition: opacity 0.4s ease, visibility 0.4s ease;
-  }
-
-  .header-actions {
-    transform: scale(0.96);
-    opacity: 1;
-  }
-}
-  </style>
+  
 </head>
 <body>
   <!-- Header -->
@@ -611,7 +89,10 @@
         targetText: 0,
         currentText: 0,
         targetZoom: slide.classList.contains('active') ? zoomOut : zoomIn,
-        currentZoom: slide.classList.contains('active') ? zoomOut : zoomIn,
+        currentZoom: zoomIn,
+        zoomComplete: false,
+        isActive: slide.classList.contains('active'),
+        leadDeadline: slide.classList.contains('active') ? performance.now() + 500 : null,
       };
     }).filter(Boolean);
 
@@ -620,26 +101,46 @@
     const updateTargets = () => {
       parallaxItems.forEach((item) => {
         const rect = item.slide.getBoundingClientRect();
+        const isActive = item.slide.classList.contains('active');
+        if (isActive !== item.isActive) {
+          item.isActive = isActive;
+          item.zoomComplete = false;
+          item.leadDeadline = isActive ? performance.now() + 500 : null;
+        }
+
         if (rect.bottom < 0 || rect.top > window.innerHeight) {
           item.targetImg = 0;
           item.targetText = 0;
-          item.targetZoom = zoomOut;
+          item.targetZoom = isActive ? zoomOut : zoomIn;
           return;
         }
 
         const offset = rect.top + rect.height / 2 - window.innerHeight / 2;
         item.targetImg = -offset * imageSpeed;
         item.targetText = -offset * textSpeed;
-        item.targetZoom = item.slide.classList.contains('active') ? zoomOut : zoomIn;
+        item.targetZoom = isActive ? zoomOut : zoomIn;
+        if (item.targetZoom === zoomOut && !item.leadDeadline) {
+          item.leadDeadline = performance.now() + 500;
+        }
       });
     };
 
     const render = () => {
+      const now = performance.now();
       parallaxItems.forEach((item) => {
         if (item.img) {
           item.currentImg += (item.targetImg - item.currentImg) * smoothing;
           item.currentZoom += (item.targetZoom - item.currentZoom) * smoothing;
           item.img.style.transform = `translate3d(0, ${item.currentImg}px, 0) scale(${item.currentZoom})`;
+          if (
+            item.targetZoom === zoomOut &&
+            !item.zoomComplete &&
+            ((item.leadDeadline && now >= item.leadDeadline) ||
+            Math.abs(item.currentZoom - zoomOut) < 0.003)
+          ) {
+            item.zoomComplete = true;
+            window.dispatchEvent(new CustomEvent('heroZoomComplete', { detail: { slide: item.slide } }));
+          }
         }
         if (item.caption) {
           item.currentText += (item.targetText - item.currentText) * smoothing;
@@ -653,36 +154,31 @@
     render();
     window.addEventListener('scroll', updateTargets, { passive: true });
     window.addEventListener('resize', updateTargets);
-    window.addEventListener('heroSlideChanged', updateTargets);
+    window.addEventListener('heroSlideChanged', (event) => {
+      const activeSlide = event.detail?.activeSlide;
+      if (activeSlide) {
+        const item = parallaxItems.find((entry) => entry.slide === activeSlide);
+        if (item) {
+          item.currentZoom = zoomIn;
+          item.targetZoom = zoomOut;
+          item.zoomComplete = false;
+          item.leadDeadline = performance.now() + 500;
+        }
+      }
+      updateTargets();
+    });
+
+    const initialActive = parallaxItems.find((entry) => entry.slide.classList.contains('active'));
+    if (initialActive) {
+      initialActive.currentZoom = zoomIn;
+      initialActive.targetZoom = zoomOut;
+      initialActive.zoomComplete = false;
+      initialActive.leadDeadline = performance.now() + 500;
+    }
   });
 </script>
 
-<style>
-  html {
-    scroll-behavior: auto; /* Lenis handles smoothness */
-    scroll-padding-top: 80px;
-  }
 
-  .section {
-    opacity: 0;
-    transform: translateY(60px);
-    transition: opacity 0.8s ease-out, transform 0.8s ease-out;
-    will-change: opacity, transform;
-  }
-
-  .section.visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  .slide .hero-bg img {
-    will-change: transform;
-  }
-
-  .slide .caption {
-    will-change: transform;
-    transition: transform 0.2s ease-out;
-  }
-</style>
 
 <div class="slides" id="slides">
   <article class="slide active" data-idx="0">
@@ -839,8 +335,8 @@
     const slider = document.querySelector('.slider');
     let idx = slides.findIndex((slide) => slide.classList.contains('active'));
     if (idx < 0) idx = 0;
-    let timer = null;
-    const delay = 9000;
+    let autoplayEnabled = true;
+    let queuedAdvance = false;
 
     function updateDots(prev, next) {
       if (!dots.length) return;
@@ -869,7 +365,8 @@
       }
 
       updateDots(prevIdx, idx);
-      window.dispatchEvent(new Event('heroSlideChanged'));
+      window.dispatchEvent(new CustomEvent('heroSlideChanged', { detail: { activeSlide: slides[idx] } }));
+      queuedAdvance = false;
     }
 
     function next(delta = 1) {
@@ -877,15 +374,15 @@
     }
 
     function play() {
-      stop();
-      timer = setInterval(() => next(1), delay);
+      autoplayEnabled = true;
+      if (queuedAdvance) {
+        queuedAdvance = false;
+        next(1);
+      }
     }
 
     function stop() {
-      if (timer) {
-        clearInterval(timer);
-        timer = null;
-      }
+      autoplayEnabled = false;
     }
 
     dots.forEach((dot) => dot.addEventListener('click', (e) => {
@@ -907,6 +404,16 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight') next(1);
       if (e.key === 'ArrowLeft') next(-1);
+    });
+
+    window.addEventListener('heroZoomComplete', (event) => {
+      const slide = event.detail?.slide;
+      if (!slide || slide !== slides[idx]) return;
+      if (autoplayEnabled) {
+        next(1);
+      } else {
+        queuedAdvance = true;
+      }
     });
 
     play();
@@ -967,224 +474,7 @@ updateHeaderAppearance();
   });
 </script>
 
-<style>
-  .login-modal {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0,0,0,0.4);
-    display: flex;
-    align-items: center; justify-content: center;
-    z-index: 999;
-  }
-  .login-modal.hidden { display: none; }
-  .login-box {
-    background: white;
-    padding: 2rem;
-    border-radius: 12px;
-    box-shadow: 0 5px 25px rgba(0,0,0,0.2);
-    width: 320px;
-  }
-  .login-box input {
-    display: block;
-    width: 100%;
-    margin: 0.5rem 0;
-    padding: 0.6rem;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-  }
-  .login-box button {
-    width: 100%;
-    margin-top: 1rem;
-    background: var(--gold, #b4975a);
-    border: none;
-    padding: 0.7rem;
-    color: white;
-    border-radius: 6px;
-    cursor: pointer;
-  }
- .how-it-works-bg {
-  background-image: url('desert.jpg');
-  background-size: cover;
-  background-position: center;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  background-attachment: scroll;
-  position: relative;
-  z-index: 5;
-}
 
-.how-it-works-bg * {
-  position: relative;
-  z-index: 4;
-}
-.parallax-section {
-  position: relative;
-  overflow: hidden;
-  min-height: 150vh; /* allow content to dictate extra space */
-  padding-bottom: 8rem;
-  z-index: 500;
-  margin-top: -18vh;
-  padding-top: 18vh;
-  background: #fff;
-}
-
-.parallax-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 170%;              /* extend so cards stay within backdrop */
-  background-image: url('desert.jpg');
-  background-size: cover;     /* fills but keeps proportions */
-  background-position: center center;
-  background-repeat: no-repeat;
-  z-index: 1;
-  will-change: transform;
-  transform: translateY(-80px);   /* neutral starting point */
-  filter: brightness(0.98);
-}
-
-/* === Foreground Content === */
-.how-it-works-bg {
-  position: relative;
-  z-index: 3;
-  text-align: center;
-  padding: 3.5rem 0 9rem;
-  color: #1a2230;
-  background: transparent;
-}
-
-.how-it-works-bg h2 {
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 300;
-  font-size: clamp(28px, 4vw, 44px);
-  margin-bottom: 1rem;
-}
-
-.how-it-works-bg p {
-  font-family: 'Sarabun', sans-serif;
-  font-weight: 200;
-  color: #333;
-  margin: 0 auto 4rem;
-  max-width: 60ch;
-}
-
-/* === Cards === */
-.how-it-works-bg .cards {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 32px;
-  max-width: 700px;
-  margin: 0 auto;
-  padding: 0;
-}
-
-.how-it-works-bg .card {
-  background: #ffffff;
-  border-radius: 0;
-  border: 1px solid rgba(10,15,20,0.06);
-  box-shadow: 0 16px 60px rgba(10,15,20,0.12);
-  padding: 2.5rem 2rem;
-  transform: translateY(0);
-  opacity: 1;
-  will-change: transform, opacity;
-  transition: transform 0.6s ease-out, opacity 0.6s ease-out;
-  width: 100%;
-  text-align: left;
-}
-
-.how-it-works-bg .card .pad {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.how-it-works-bg .card-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 0;
-  background: #0a0f14;
-  color: #ffffff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.4rem;
-  font-family: 'Cormorant Garamond', serif;
-  letter-spacing: 0.08em;
-}
-
-.how-it-works-bg .card h3 {
-  margin: 0;
-  font-size: 1.4rem;
-  font-weight: 300;
-  color: #0a0f14;
-}
-
-.how-it-works-bg .card p {
-  margin: 0;
-  line-height: 1.7;
-  color: #4b5664;
-}
-
-.how-it-works-bg .card .read {
-  margin-top: auto;
-}
-
-@media (min-width: 960px) {
-  .how-it-works-bg .cards {
-    grid-template-columns: repeat(2, minmax(300px, 360px));
-    gap: 80px 120px;
-    max-width: 960px;
-    padding: 0 1.5rem;
-  }
-
-  .how-it-works-bg .card {
-    margin: 0;
-    padding: 3rem 2.5rem;
-    box-shadow: 0 24px 80px rgba(10,15,20,0.12);
-  }
-
-  .how-it-works-bg .card:nth-child(1) {
-    grid-column: 1;
-    grid-row: 1;
-    align-self: flex-start;
-  }
-
-  .how-it-works-bg .card:nth-child(2) {
-    grid-column: 2;
-    grid-row: 2;
-    align-self: center;
-    margin-top: -60px;
-  }
-
-  .how-it-works-bg .card:nth-child(3) {
-    grid-column: 1;
-    grid-row: 3;
-    align-self: flex-end;
-    margin-top: -40px;
-    z-index: 8;
-  }
-}
-.floating-panel {
-  position: relative;
-  z-index: 10;
-  background: white;
-}
-.slider, .slides, .slide {
-  will-change: opacity, transform;
-  transform: translateZ(0);
-}
-.how-cards,
-.intro,
-.white-section {
-  transform: translateZ(0);
-  will-change: transform;
-}
-
-
-</style>
 
 <!-- === Floating Parallax Scroll === -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
@@ -1269,7 +559,6 @@ registerDriftAnimation(".slider .caption", {
   });
 </script>
 <!-- Smooth Scroll + GSAP Core -->
-<script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.38/bundled/lenis.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
 <script>
@@ -1277,11 +566,13 @@ gsap.registerPlugin(ScrollTrigger);
 
 // Initialize Lenis smooth scroll
 const lenis = new Lenis({
-  duration: 1.35,
+  duration: 1.5,
   easing: t => 1 - Math.pow(2, -10 * t),
+  lerp: 0.08,
   smoothWheel: true,
-  smoothTouch: false,
-  touchMultiplier: 1.4,
+  smoothTouch: true,
+  wheelMultiplier: 0.9,
+  touchMultiplier: 1.2,
 });
 
 // Sync GSAP + Lenis

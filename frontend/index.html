@@ -17,6 +17,11 @@
       --alpha-header: 0.14;
       --e1: cubic-bezier(.2,.7,.2,1);
       --radius: 14px;
+      --hero-slide-duration: 6000ms;
+      --hero-transition-duration: 1200ms;
+      --hero-zoom-start: 1.08;
+      --hero-zoom-end: 1;
+      --hero-zoom-duration: 7000ms;
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
@@ -158,14 +163,14 @@
       position: relative;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 1s ease;
-      background-color: transparent;
+      transition: opacity var(--hero-transition-duration) cubic-bezier(.4, 0, .2, 1);
+      background-color: #ffffff;
       z-index: 0;
     }
     .slide.active {
       opacity: 1;
       pointer-events: auto;
-      z-index: 1;
+      z-index: 3;
     }
     .slide::before {
       content: "";
@@ -173,16 +178,27 @@
       inset: 0;
       background: linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,.45) 50%, rgba(0,0,0,.58) 100%);
     }
-    .slide > img,
+    .slide .hero-bg {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      will-change: transform;
+      transform-origin: center;
+      transition: transform 0.2s ease-out;
+      transform: scale(var(--hero-zoom-end));
+    }
     .slide .hero-bg img {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
-      transform: scale(1.08);
+      object-position: center;
       filter: saturate(95%);
-      transition: transform 8s linear;
+      will-change: transform;
+      transition: transform 0.2s ease-out;
+      transform: translate3d(0, var(--hero-parallax-offset, 0px), 0);
     }
     .caption {
       position: absolute;
@@ -595,23 +611,19 @@
     const imageSpeed = 0.28;
     const textSpeed = 0.12;
     const smoothing = 0.12;
-    const zoomIn = 1.12;
-    const zoomOut = 1.0;
 
     const parallaxItems = Array.from(slides).map((slide) => {
-      const img = slide.querySelector('.hero-bg img');
+      const heroImage = slide.querySelector('.hero-bg img');
       const caption = slide.querySelector('.caption');
-      if (!img && !caption) return null;
+      if (!heroImage && !caption) return null;
       return {
         slide,
-        img,
+        heroImage,
         caption,
-        targetImg: 0,
-        currentImg: 0,
+        targetHero: 0,
+        currentHero: 0,
         targetText: 0,
         currentText: 0,
-        targetZoom: slide.classList.contains('active') ? zoomOut : zoomIn,
-        currentZoom: slide.classList.contains('active') ? zoomOut : zoomIn,
       };
     }).filter(Boolean);
 
@@ -621,25 +633,22 @@
       parallaxItems.forEach((item) => {
         const rect = item.slide.getBoundingClientRect();
         if (rect.bottom < 0 || rect.top > window.innerHeight) {
-          item.targetImg = 0;
+          item.targetHero = 0;
           item.targetText = 0;
-          item.targetZoom = zoomOut;
           return;
         }
 
         const offset = rect.top + rect.height / 2 - window.innerHeight / 2;
-        item.targetImg = -offset * imageSpeed;
+        item.targetHero = -offset * imageSpeed;
         item.targetText = -offset * textSpeed;
-        item.targetZoom = item.slide.classList.contains('active') ? zoomOut : zoomIn;
       });
     };
 
     const render = () => {
       parallaxItems.forEach((item) => {
-        if (item.img) {
-          item.currentImg += (item.targetImg - item.currentImg) * smoothing;
-          item.currentZoom += (item.targetZoom - item.currentZoom) * smoothing;
-          item.img.style.transform = `translate3d(0, ${item.currentImg}px, 0) scale(${item.currentZoom})`;
+        if (item.heroImage) {
+          item.currentHero += (item.targetHero - item.currentHero) * smoothing;
+          item.heroImage.style.setProperty('--hero-parallax-offset', `${item.currentHero}px`);
         }
         if (item.caption) {
           item.currentText += (item.targetText - item.currentText) * smoothing;
@@ -653,13 +662,12 @@
     render();
     window.addEventListener('scroll', updateTargets, { passive: true });
     window.addEventListener('resize', updateTargets);
-    window.addEventListener('heroSlideChanged', updateTargets);
   });
 </script>
 
 <style>
   html {
-    scroll-behavior: auto; /* Lenis handles smoothness */
+    scroll-behavior: smooth;
     scroll-padding-top: 80px;
   }
 
@@ -674,6 +682,11 @@
     opacity: 1;
     transform: translateY(0);
   }
+  .slide .hero-bg {
+    will-change: transform;
+    transition: transform 0.2s ease-out;
+  }
+
   .slide .hero-bg img {
     will-change: transform;
   }
@@ -837,10 +850,27 @@
     const dots = Array.from(document.querySelectorAll('.dot'));
     const arrows = Array.from(document.querySelectorAll('.arrow'));
     const slider = document.querySelector('.slider');
+    const timingStyles = getComputedStyle(document.documentElement);
+    const slideDuration = parseFloat(timingStyles.getPropertyValue('--hero-slide-duration')) || 6000;
+    const delay = slideDuration;
+    const zoomStart = parseFloat(timingStyles.getPropertyValue('--hero-zoom-start')) || 1.12;
+    const zoomEnd = parseFloat(timingStyles.getPropertyValue('--hero-zoom-end')) || 1;
+    const zoomDuration = parseFloat(timingStyles.getPropertyValue('--hero-zoom-duration')) || 6000;
     let idx = slides.findIndex((slide) => slide.classList.contains('active'));
     if (idx < 0) idx = 0;
     let timer = null;
-    const delay = 9000;
+    if (slides[idx]) {
+      const initialHeroBg = slides[idx].querySelector('.hero-bg');
+      if (initialHeroBg) {
+        requestAnimationFrame(() => {
+          initialHeroBg.style.transition = 'none';
+          initialHeroBg.style.transform = `scale(${zoomStart})`;
+          void initialHeroBg.offsetWidth;
+          initialHeroBg.style.transition = `transform ${zoomDuration}ms ease-out`;
+          initialHeroBg.style.transform = `scale(${zoomEnd})`;
+        });
+      }
+    }
 
     function updateDots(prev, next) {
       if (!dots.length) return;
@@ -854,26 +884,35 @@
       }
     }
 
-    function show(n) {
+    function showSlide(target) {
       if (!slides.length) return;
       const prevIdx = idx;
-      idx = (n + slides.length) % slides.length;
+      idx = (target + slides.length) % slides.length;
       if (prevIdx === idx) return;
 
-      slides[idx].classList.add('active');
-      slides[idx].setAttribute('aria-hidden', 'false');
+      slides.forEach((slide, slideIndex) => {
+        const heroBg = slide.querySelector('.hero-bg');
+        slide.classList.remove('active');
+        slide.setAttribute('aria-hidden', 'true');
 
-      if (slides[prevIdx]) {
-        slides[prevIdx].setAttribute('aria-hidden', 'true');
-        requestAnimationFrame(() => slides[prevIdx].classList.remove('active'));
-      }
+        if (!heroBg || slideIndex !== idx) return;
+
+        requestAnimationFrame(() => {
+          heroBg.style.transition = 'none';
+          heroBg.style.transform = `scale(${zoomStart})`;
+          void heroBg.offsetWidth;
+          heroBg.style.transition = `transform ${zoomDuration}ms ease-out`;
+          heroBg.style.transform = `scale(${zoomEnd})`;
+          slide.classList.add('active');
+          slide.setAttribute('aria-hidden', 'false');
+        });
+      });
 
       updateDots(prevIdx, idx);
-      window.dispatchEvent(new Event('heroSlideChanged'));
     }
 
     function next(delta = 1) {
-      show(idx + delta);
+      showSlide(idx + delta);
     }
 
     function play() {
@@ -890,7 +929,7 @@
 
     dots.forEach((dot) => dot.addEventListener('click', (e) => {
       const targetIndex = Number(e.currentTarget.dataset.go);
-      show(targetIndex);
+      showSlide(targetIndex);
       play();
     }));
 
@@ -1277,11 +1316,9 @@ gsap.registerPlugin(ScrollTrigger);
 
 // Initialize Lenis smooth scroll
 const lenis = new Lenis({
-  duration: 1.35,
+  duration: 1.2,
   easing: t => 1 - Math.pow(2, -10 * t),
-  smoothWheel: true,
-  smoothTouch: false,
-  touchMultiplier: 1.4,
+  smooth: true,
 });
 
 // Sync GSAP + Lenis
@@ -1292,24 +1329,7 @@ function raf(time) {
 }
 requestAnimationFrame(raf);
 
-window.lenis = lenis;
 lenis.on('scroll', ScrollTrigger.update);
-
-document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-  anchor.addEventListener('click', (event) => {
-    const targetId = anchor.getAttribute('href');
-    if (!targetId || !targetId.startsWith('#') || targetId === '#') return;
-    const target = document.querySelector(targetId);
-    if (!target) return;
-
-    event.preventDefault();
-    lenis.scrollTo(target, {
-      offset: -60,
-      duration: 1.2,
-      easing: t => 1 - Math.pow(2, -10 * t)
-    });
-  });
-});
 </script>
 <script>
 // FADE-IN for elements with [fade]
