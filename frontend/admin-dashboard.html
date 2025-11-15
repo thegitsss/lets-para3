@@ -680,6 +680,10 @@ nav a.active {background:rgba(255,255,255,0.25);}
 // Sidebar navigation toggle
 const navLinks=document.querySelectorAll("nav a");
 const sections=document.querySelectorAll(".section");
+const refreshCharts=()=>{
+  if(!window.dashboardCharts?.length) return;
+  window.dashboardCharts.forEach(chart=>chart.resize());
+};
 
 navLinks.forEach(link=>{
   link.addEventListener("click",e=>{
@@ -689,6 +693,7 @@ navLinks.forEach(link=>{
     const id="section-"+link.dataset.section;
     sections.forEach(s=>s.classList.remove("visible"));
     document.getElementById(id).classList.add("visible");
+    requestAnimationFrame(refreshCharts);
   });
 });
 
@@ -712,6 +717,7 @@ setInterval(fetchWeather,300000);
 
 <script>
 function togglePanel(id){document.getElementById(id).classList.toggle('collapsed');}
+const dashboardCharts=window.dashboardCharts||(window.dashboardCharts=[]);
 
 /* -------- Live Weather (Tysons VA) -------- */
 async function fetchWeather() {
@@ -746,13 +752,13 @@ fetchWeather();
 setInterval(fetchWeather, 300000); // Refresh every 5 minutes
 
 /* -------- Charts (0 until data) -------- */
-new Chart(document.getElementById("userChart"),{type:"line",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],borderColor:"#b6a47a",backgroundColor:"rgba(182,164,122,0.15)",fill:true,tension:.4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
-new Chart(document.getElementById("revChart"),{type:"bar",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],backgroundColor:"#b6a47a"}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
-new Chart(document.getElementById("escrowChart"),{type:"doughnut",data:{labels:["Held","Released","Pending"],datasets:[{data:[0,0,0],backgroundColor:["#b6a47a","#e6d9b8","#dcd5c0"]}]},options:{plugins:{legend:{position:"bottom"}}}});
+dashboardCharts.push(new Chart(document.getElementById("userChart"),{type:"line",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],borderColor:"#b6a47a",backgroundColor:"rgba(182,164,122,0.15)",fill:true,tension:.4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}));
+dashboardCharts.push(new Chart(document.getElementById("revChart"),{type:"bar",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],backgroundColor:"#b6a47a"}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}));
+dashboardCharts.push(new Chart(document.getElementById("escrowChart"),{type:"doughnut",data:{labels:["Held","Released","Pending"],datasets:[{data:[0,0,0],backgroundColor:["#b6a47a","#e6d9b8","#dcd5c0"]}]},options:{plugins:{legend:{position:"bottom"}}}}));
 
 /* -------- User Management Combo Chart -------- */
 const ctx = document.getElementById("userMgmtComboChart");
-new Chart(ctx,{
+dashboardCharts.push(new Chart(ctx,{
   type:"bar",
   data:{
     labels:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct"],
@@ -784,10 +790,10 @@ new Chart(ctx,{
       y:{beginAtZero:true,title:{display:true,text:"Users"}},
       y1:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"Growth %"}}}
   }
-});
+}));
 
 /* -------- Escrow Charts -------- */
-new Chart(document.getElementById("escrowReportChart"), {
+dashboardCharts.push(new Chart(document.getElementById("escrowReportChart"), {
   type:"line",
   data:{
     labels:["Mar 05","Mar 10","Mar 15","Mar 16","Mar 18"],
@@ -801,9 +807,9 @@ new Chart(document.getElementById("escrowReportChart"), {
     }]
   },
   options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
-});
+}));
 
-new Chart(document.getElementById("dailyLoginChart"), {
+dashboardCharts.push(new Chart(document.getElementById("dailyLoginChart"), {
   type:"line",
   data:{
     labels:["Feb 27","Mar 01","Mar 02","Mar 04","Mar 05","Mar 10","Mar 15","Mar 16","Mar 18"],
@@ -817,7 +823,7 @@ new Chart(document.getElementById("dailyLoginChart"), {
     }]
   },
   options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
-});
+}));
 
 /* -------- Escrow Details Modal Logic -------- */
 function openEscrowDetails(){
@@ -834,7 +840,7 @@ document.querySelectorAll(".tickets tbody tr td a").forEach(a=>{
 });
 
 /* -------- Revenue Charts -------- */
-new Chart(document.getElementById("revMainChart"),{
+dashboardCharts.push(new Chart(document.getElementById("revMainChart"),{
   type:"bar",
   data:{
     labels:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov"],
@@ -863,9 +869,9 @@ new Chart(document.getElementById("revMainChart"),{
       y1:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"Margin %"}}
     }
   }
-});
+}));
 
-new Chart(document.getElementById("revExpenseChart"),{
+dashboardCharts.push(new Chart(document.getElementById("revExpenseChart"),{
   type:"doughnut",
   data:{
     labels:["Platform Fees","Taxes","Operational Costs","Payouts"],
@@ -875,7 +881,7 @@ new Chart(document.getElementById("revExpenseChart"),{
     }]
   },
   options:{plugins:{legend:{position:"bottom"}}}
-});
+}));
 
 /* -------- Accounting Download -------- */
 function downloadCSV(){
@@ -895,7 +901,7 @@ function downloadCSV(){
 }
 
 /* -------- Post Analytics Charts -------- */
-new Chart(document.getElementById("postCategoryChart"),{
+dashboardCharts.push(new Chart(document.getElementById("postCategoryChart"),{
   type:"doughnut",
   data:{
     labels:["Corporate","Litigation","Family","Real Estate","Criminal"],
@@ -905,9 +911,9 @@ new Chart(document.getElementById("postCategoryChart"),{
     }]
   },
   options:{plugins:{legend:{position:"bottom"}}}
-});
+}));
 
-new Chart(document.getElementById("postStateChart"),{
+dashboardCharts.push(new Chart(document.getElementById("postStateChart"),{
   type:"bar",
   data:{
     labels:["VA","MD","DC","PA","NC"],
@@ -919,7 +925,7 @@ new Chart(document.getElementById("postStateChart"),{
     }]
   },
   options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
-});
+}));
 
 /* -------- Post Moderation Logic -------- */
 function approvePost(btn){
@@ -995,7 +1001,7 @@ if(flaggedList){
 }
 
 /* Quality Score Chart */
-new Chart(document.getElementById("qualityScoreChart"),{
+dashboardCharts.push(new Chart(document.getElementById("qualityScoreChart"),{
   type:"bar",
   data:{
     labels:postData.map(p=>p.title),
@@ -1013,7 +1019,7 @@ new Chart(document.getElementById("qualityScoreChart"),{
       x:{ticks:{autoSkip:false}}
     }
   }
-});
+}));
 
 /* -------- Pause & Report -------- */
 function pauseReportActivity(id){

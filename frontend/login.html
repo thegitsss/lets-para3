@@ -220,19 +220,141 @@ button[type="submit"]:hover {
   font-weight: 200;
 }
 
-.bypass {
-  color: #b4975a;
-  font-weight: 400;
-}
+    .bypass {
+      color: #b4975a;
+      font-weight: 400;
+    }
 
-.cancel-login {
+    .cancel-login {
   display: inline-block;
   margin-top: 1.5rem;
-  color: #475569;
-  text-decoration: none;
-  font-weight: 300;
-  font-size: 0.95rem;
-}
+      color: #475569;
+      text-decoration: none;
+      font-weight: 300;
+      font-size: 0.95rem;
+    }
+
+    body.bypass-open {
+      overflow: hidden;
+    }
+
+    .bypass-screen {
+      position: fixed;
+      inset: 0;
+      background: rgba(7, 13, 20, 0.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(1.5rem, 4vw, 3rem);
+      z-index: 1200;
+    }
+
+    .bypass-screen.active {
+      display: flex;
+    }
+
+    .bypass-card {
+      background: rgba(255, 255, 255, 0.97);
+      border-radius: 20px;
+      box-shadow: 0 30px 90px rgba(15, 23, 42, 0.35);
+      max-width: 540px;
+      width: min(540px, 100%);
+      padding: clamp(2rem, 4vw, 3rem);
+      position: relative;
+      text-align: left;
+      font-family: 'Sarabun', sans-serif;
+    }
+
+    .bypass-card h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: clamp(1.5rem, 4vw, 2.35rem);
+      color: var(--navy);
+      margin: 0.4rem 0 0.5rem;
+    }
+
+    .bypass-hint {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .bypass-pretitle {
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+
+    .role-options {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+    }
+
+    .role-option {
+      border: 1px solid rgba(39, 57, 77, 0.15);
+      border-radius: 14px;
+      padding: 1.1rem 1.25rem;
+      background: #fff;
+      text-decoration: none;
+      color: var(--navy);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .role-option:hover {
+      border-color: var(--gold);
+      box-shadow: 0 18px 35px rgba(15, 23, 42, 0.12);
+      transform: translateY(-3px);
+    }
+
+    .role-option:focus-visible {
+      outline: 3px solid rgba(180, 151, 90, 0.5);
+      outline-offset: 3px;
+    }
+
+    .role-label {
+      font-weight: 500;
+      font-size: 1.05rem;
+    }
+
+    .role-description {
+      display: block;
+      margin-top: 0.2rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .role-arrow {
+      font-size: 1.35rem;
+      color: var(--gold);
+    }
+
+    .close-bypass {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      border: 0;
+      background: none;
+      font-size: 1.35rem;
+      cursor: pointer;
+      color: #94a3b8;
+      transition: color 0.2s ease;
+    }
+
+    .close-bypass:hover {
+      color: var(--navy);
+    }
+
+    @media (max-width: 520px) {
+      .role-options {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 
@@ -261,7 +383,7 @@ button[type="submit"]:hover {
           <div class="login-actions">
   <p>
     <a href="forgot-password.html" class="forgot">Forgotten password?</a><br />
-    Just previewing? <a href="/dev-bypass" class="bypass">Dev bypass</a>
+    Just previewing? <a href="#dev-bypass" class="bypass" data-bypass-trigger>Dev bypass</a>
   </p>
 <a href="index.html" class="cancel-login">← Cancel Log In</a>
 </div>
@@ -274,6 +396,38 @@ button[type="submit"]:hover {
     <!-- RIGHT PANEL: implicitly handled by mountain background -->
   </div>
 
+  <div class="bypass-screen" id="bypassPanel" aria-hidden="true">
+    <div class="bypass-card" role="dialog" aria-modal="true" aria-labelledby="bypassTitle" tabindex="-1">
+      <button type="button" class="close-bypass" id="closeBypass" aria-label="Close dev bypass">&times;</button>
+      <p class="bypass-pretitle">Dev Bypass</p>
+      <h2 id="bypassTitle">Jump into a workspace</h2>
+      <p class="bypass-hint">Pick a role to open its dashboard without completing the full login.</p>
+      <div class="role-options">
+        <a class="role-option" href="dashboard-attorney.html">
+          <div>
+            <span class="role-label">Attorney</span>
+            <span class="role-description">Review matters, invoices, and hiring tools.</span>
+          </div>
+          <span class="role-arrow" aria-hidden="true">→</span>
+        </a>
+        <a class="role-option" href="case-dashboard.html">
+          <div>
+            <span class="role-label">Paralegal</span>
+            <span class="role-description">Enter the paralegal dashboard and task views.</span>
+          </div>
+          <span class="role-arrow" aria-hidden="true">→</span>
+        </a>
+        <a class="role-option" href="admin-dashboard.html">
+          <div>
+            <span class="role-label">Admin</span>
+            <span class="role-description">Monitor disputes, payouts, and compliance.</span>
+          </div>
+          <span class="role-arrow" aria-hidden="true">→</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
   <script>
     function togglePassword() {
       const input = document.getElementById('password');
@@ -282,9 +436,49 @@ button[type="submit"]:hover {
       input.type = isHidden ? 'text' : 'password';
       toggle.textContent = isHidden ? 'Hide' : 'Show';
     }
+
+    (function initDevBypass() {
+      const trigger = document.querySelector('[data-bypass-trigger]');
+      const panel = document.getElementById('bypassPanel');
+      const closeBtn = document.getElementById('closeBypass');
+      const card = panel ? panel.querySelector('.bypass-card') : null;
+      let lastFocused = null;
+
+      if (!trigger || !panel || !card) return;
+
+      const openBypass = (event) => {
+        event.preventDefault();
+        lastFocused = document.activeElement;
+        panel.classList.add('active');
+        panel.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('bypass-open');
+        card.focus();
+      };
+
+      const closeBypass = () => {
+        panel.classList.remove('active');
+        panel.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('bypass-open');
+        if (lastFocused) {
+          lastFocused.focus();
+        }
+      };
+
+      trigger.addEventListener('click', openBypass);
+      closeBtn?.addEventListener('click', closeBypass);
+      panel.addEventListener('click', (event) => {
+        if (event.target === panel) {
+          closeBypass();
+        }
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && panel.classList.contains('active')) {
+          closeBypass();
+        }
+      });
+    })();
   </script>
-</p>
-  </div>
-</div>
+
 </body>
 </html>

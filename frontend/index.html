@@ -18,7 +18,7 @@
       --e1: cubic-bezier(.2,.7,.2,1);
       --radius: 14px;
       --hero-slide-duration: 6000ms;
-      --hero-transition-duration: 1200ms;
+      --hero-transition-duration: 900ms;
       --hero-zoom-start: 1.08;
       --hero-zoom-end: 1;
       --hero-zoom-duration: 7000ms;
@@ -73,14 +73,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      letter-spacing: .08em;
-      font-weight: 300;
-      text-transform: none !important;
+
     }
     .brand-mark {
       width: 26px; height: 26px;
@@ -146,14 +139,14 @@
       position: relative;
       height: 100vh;
       overflow: hidden;
-      background-color: #ffffff;
+      background-color: #05080f;
       z-index: 0;
     }
     .slides {
       position: absolute;
       inset: 0;
       display: grid;
-      background-color: #ffffff;
+      background-color: #05080f;
       z-index: 0;
     }
     .slide {
@@ -164,7 +157,7 @@
       opacity: 0;
       pointer-events: none;
       transition: opacity var(--hero-transition-duration) cubic-bezier(.4, 0, .2, 1);
-      background-color: #ffffff;
+      background-color: #05080f;
       z-index: 0;
     }
     .slide.active {
@@ -172,11 +165,22 @@
       pointer-events: auto;
       z-index: 3;
     }
+    .slide.leaving {
+      z-index: 2;
+    }
     .slide::before {
       content: "";
       position: absolute;
       inset: 0;
       background: linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,.45) 50%, rgba(0,0,0,.58) 100%);
+    }
+    @keyframes heroZoomOut {
+      from {
+        transform: scale(var(--hero-zoom-start));
+      }
+      to {
+        transform: scale(var(--hero-zoom-end));
+      }
     }
     .slide .hero-bg {
       position: relative;
@@ -184,9 +188,7 @@
       height: 100%;
       overflow: hidden;
       will-change: transform;
-      transform-origin: center;
       transition: transform 0.2s ease-out;
-      transform: scale(var(--hero-zoom-end));
     }
     .slide .hero-bg img {
       position: absolute;
@@ -195,11 +197,15 @@
       height: 100%;
       object-fit: cover;
       object-position: center;
+      transform-origin: center;
+      transform: scale(var(--hero-zoom-start));
       filter: saturate(95%);
-      will-change: transform;
-      transition: transform 0.2s ease-out;
-      transform: translate3d(0, var(--hero-parallax-offset, 0px), 0);
     }
+    .hero-bg img.hero-zooming {
+      animation: heroZoomOut var(--hero-zoom-duration) ease-in-out forwards;
+    }
+
+
     .caption {
       position: absolute;
       inset: auto 0 15vh 0;
@@ -207,7 +213,7 @@
       place-items: center;
       text-align: center;
       padding: 0 24px;
-      z-index: 3;
+      z-index: 60;
     }
     .kicker {
       color: var(--muted);
@@ -290,6 +296,7 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
+  background: #ffffff;
 }
 
 .hero-bg img {
@@ -339,9 +346,6 @@
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
       color: #1a2230; /* dark ink tone */
-    }
-    
-    .card {
       opacity: 1;
       transform: translateY(0);
       transition: opacity 0.6s ease-out, transform 0.6s ease-out;
@@ -576,15 +580,6 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
     </button>
 
-<!-- CTA Section (Final Call to Action) -->
-<section class="section about wrap" style="text-align: center; background-color: #f8f9fa;" id="cta">
-  <h2 style="color: #f5f2ed;">Ready to Get Started?</h2>
-  <p style="color: #d6dbe3; max-width: 600px; margin: 0 auto 1.5rem;">
-    Whether you're an attorney seeking reliable help, or a paralegal looking for your next great opportunity, Let's ParaConnect is where your journey begins.
-  </p>
-  <a class="cta" href="contact.html" style="margin-top: 1rem;">Contact Us</a>
-</section>
-
 <!-- Fade-in JS + Section Observer -->
 <script>
   document.addEventListener('DOMContentLoaded', () => {
@@ -608,20 +603,15 @@
     const slides = document.querySelectorAll('.slide');
     if (!slides.length) return;
 
-    const imageSpeed = 0.28;
-    const textSpeed = 0.12;
-    const smoothing = 0.12;
+    const textSpeed = 0.06;
+    const smoothing = 0.1;
 
     const parallaxItems = Array.from(slides).map((slide) => {
-      const heroImage = slide.querySelector('.hero-bg img');
       const caption = slide.querySelector('.caption');
-      if (!heroImage && !caption) return null;
+      if (!caption) return null;
       return {
         slide,
-        heroImage,
         caption,
-        targetHero: 0,
-        currentHero: 0,
         targetText: 0,
         currentText: 0,
       };
@@ -633,27 +623,19 @@
       parallaxItems.forEach((item) => {
         const rect = item.slide.getBoundingClientRect();
         if (rect.bottom < 0 || rect.top > window.innerHeight) {
-          item.targetHero = 0;
           item.targetText = 0;
           return;
         }
 
         const offset = rect.top + rect.height / 2 - window.innerHeight / 2;
-        item.targetHero = -offset * imageSpeed;
         item.targetText = -offset * textSpeed;
       });
     };
 
     const render = () => {
       parallaxItems.forEach((item) => {
-        if (item.heroImage) {
-          item.currentHero += (item.targetHero - item.currentHero) * smoothing;
-          item.heroImage.style.setProperty('--hero-parallax-offset', `${item.currentHero}px`);
-        }
-        if (item.caption) {
-          item.currentText += (item.targetText - item.currentText) * smoothing;
-          item.caption.style.transform = `translate3d(0, ${item.currentText}px, 0)`;
-        }
+        item.currentText += (item.targetText - item.currentText) * smoothing;
+        item.caption.style.transform = `translate3d(0, ${item.currentText}px, 0)`;
       });
       requestAnimationFrame(render);
     };
@@ -846,31 +828,39 @@
 
   <script>
     // Slider JS
+    const HERO_ZOOM_CLASS = 'hero-zooming';
     const slides = Array.from(document.querySelectorAll('.slide'));
     const dots = Array.from(document.querySelectorAll('.dot'));
     const arrows = Array.from(document.querySelectorAll('.arrow'));
     const slider = document.querySelector('.slider');
     const timingStyles = getComputedStyle(document.documentElement);
     const slideDuration = parseFloat(timingStyles.getPropertyValue('--hero-slide-duration')) || 6000;
+    const transitionDuration = parseFloat(timingStyles.getPropertyValue('--hero-transition-duration')) || 1200;
     const delay = slideDuration;
-    const zoomStart = parseFloat(timingStyles.getPropertyValue('--hero-zoom-start')) || 1.12;
-    const zoomEnd = parseFloat(timingStyles.getPropertyValue('--hero-zoom-end')) || 1;
-    const zoomDuration = parseFloat(timingStyles.getPropertyValue('--hero-zoom-duration')) || 6000;
     let idx = slides.findIndex((slide) => slide.classList.contains('active'));
     if (idx < 0) idx = 0;
     let timer = null;
-    if (slides[idx]) {
-      const initialHeroBg = slides[idx].querySelector('.hero-bg');
-      if (initialHeroBg) {
-        requestAnimationFrame(() => {
-          initialHeroBg.style.transition = 'none';
-          initialHeroBg.style.transform = `scale(${zoomStart})`;
-          void initialHeroBg.offsetWidth;
-          initialHeroBg.style.transition = `transform ${zoomDuration}ms ease-out`;
-          initialHeroBg.style.transform = `scale(${zoomEnd})`;
-        });
+
+    const triggerZoom = (slide) => {
+      if (!slide) return;
+      const img = slide.querySelector('.hero-bg img');
+      if (!img) return;
+      img.classList.remove(HERO_ZOOM_CLASS);
+      // force reflow to restart animation
+      void img.offsetWidth;
+      img.classList.add(HERO_ZOOM_CLASS);
+    };
+
+    const handleSlideFade = (event) => {
+      if (event.propertyName !== 'opacity') return;
+      const img = event.currentTarget.querySelector('.hero-bg img');
+      event.currentTarget.classList.remove('leaving');
+      if (img) {
+        img.classList.remove(HERO_ZOOM_CLASS);
+        img.style.transform = `scale(var(--hero-zoom-start))`;
       }
-    }
+      event.currentTarget.removeEventListener('transitionend', handleSlideFade);
+    };
 
     function updateDots(prev, next) {
       if (!dots.length) return;
@@ -884,35 +874,31 @@
       }
     }
 
-    function showSlide(target) {
+    function show(n) {
       if (!slides.length) return;
       const prevIdx = idx;
-      idx = (target + slides.length) % slides.length;
+      idx = (n + slides.length) % slides.length;
       if (prevIdx === idx) return;
 
-      slides.forEach((slide, slideIndex) => {
-        const heroBg = slide.querySelector('.hero-bg');
-        slide.classList.remove('active');
-        slide.setAttribute('aria-hidden', 'true');
+      const nextSlide = slides[idx];
+      const prevSlide = slides[prevIdx];
 
-        if (!heroBg || slideIndex !== idx) return;
+      nextSlide.classList.add('active');
+      triggerZoom(nextSlide);
+      nextSlide.setAttribute('aria-hidden', 'false');
 
-        requestAnimationFrame(() => {
-          heroBg.style.transition = 'none';
-          heroBg.style.transform = `scale(${zoomStart})`;
-          void heroBg.offsetWidth;
-          heroBg.style.transition = `transform ${zoomDuration}ms ease-out`;
-          heroBg.style.transform = `scale(${zoomEnd})`;
-          slide.classList.add('active');
-          slide.setAttribute('aria-hidden', 'false');
-        });
-      });
+      if (prevSlide && prevSlide !== nextSlide) {
+        prevSlide.setAttribute('aria-hidden', 'true');
+        prevSlide.classList.add('leaving');
+        prevSlide.addEventListener('transitionend', handleSlideFade);
+        requestAnimationFrame(() => prevSlide.classList.remove('active'));
+      }
 
       updateDots(prevIdx, idx);
     }
 
     function next(delta = 1) {
-      showSlide(idx + delta);
+      show(idx + delta);
     }
 
     function play() {
@@ -927,9 +913,11 @@
       }
     }
 
+    triggerZoom(slides[idx]);
+
     dots.forEach((dot) => dot.addEventListener('click', (e) => {
       const targetIndex = Number(e.currentTarget.dataset.go);
-      showSlide(targetIndex);
+      show(targetIndex);
       play();
     }));
 
@@ -1276,20 +1264,32 @@ registerDriftAnimation(".how-it-works-bg .card", {
   trigger: ".parallax-section"
 });
 
-registerDriftAnimation(".slider .slide", {
-  trigger: ".slider",
-  start: "top top",
-  end: "bottom top"
-});
+</script>
 
-registerDriftAnimation(".slider .caption", {
-  trigger: ".slider",
-  baseOffset: 25,
-  offsetStep: 0,
-  scaleAmount: 1.02,
-  start: "top top",
-  end: "bottom top"
-});
+<script>
+  (function initSmoothScroll() {
+    if (typeof Lenis === 'undefined') return;
+
+    const lenis = new Lenis({
+      duration: 4.5,
+      easing: (t) => 1 - Math.pow(1 - t, 4),
+      smoothWheel: true,
+      wheelMultiplier: 0.15,
+      gestureOrientation: 'vertical',
+    });
+
+    if (typeof ScrollTrigger !== 'undefined') {
+      lenis.on('scroll', ScrollTrigger.update);
+    }
+
+    function raf(time) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+
+    requestAnimationFrame(raf);
+    window.lenis = lenis;
+  })();
 </script>
 
 <script>
@@ -1306,62 +1306,6 @@ registerDriftAnimation(".slider .caption", {
       bg.style.transform = `translateY(${yPos}px)`;
     }
   });
-</script>
-<!-- Smooth Scroll + GSAP Core -->
-<script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.38/bundled/lenis.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
-<script>
-gsap.registerPlugin(ScrollTrigger);
-
-// Initialize Lenis smooth scroll
-const lenis = new Lenis({
-  duration: 1.2,
-  easing: t => 1 - Math.pow(2, -10 * t),
-  smooth: true,
-});
-
-// Sync GSAP + Lenis
-function raf(time) {
-  lenis.raf(time);
-  ScrollTrigger.update();
-  requestAnimationFrame(raf);
-}
-requestAnimationFrame(raf);
-
-lenis.on('scroll', ScrollTrigger.update);
-</script>
-<script>
-// FADE-IN for elements with [fade]
-document.querySelectorAll('[fade]').forEach((el) => {
-  gsap.from(el, {
-    autoAlpha: 0,
-    y: 40,
-    duration: 0.8,
-    ease: "power2.out",
-    scrollTrigger: {
-      trigger: el,
-      start: "top 90%",
-      toggleActions: "play none none reverse"
-    }
-  });
-});
-
-// FLOATING DRIFT for elements with [data-scroll]
-document.querySelectorAll('[data-scroll]').forEach((el) => {
-  let speed = parseFloat(el.getAttribute('data-scroll-speed')) || 0.2;
-
-  gsap.to(el, {
-    y: speed * 60,
-    ease: "none",
-    scrollTrigger: {
-      trigger: el,
-      start: "top bottom",
-      end: "bottom top",
-      scrub: true
-    }
-  });
-});
 </script>
 </body>
 </html>
