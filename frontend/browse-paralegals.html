@@ -93,15 +93,15 @@ header {
       flex-shrink: 0;
       background: #fff;
       border: 1px solid var(--line);
-      border-radius: 10px;
+      border-radius: 0;
       padding: 1.5rem;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
 
 
     .filter h2 {
       font-family: 'Cormorant Garamond', serif;
       font-size: 1.3rem;
+      font-weight: 300;
       margin-bottom: 1rem;
     }
 
@@ -125,10 +125,10 @@ header {
       font-size: 0.9rem;
       color: var(--muted);
       border: 1px solid var(--line);
-      border-radius: 6px;
+      border-radius: 0;
       background: #fff;
       outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      transition: border-color 0.2s;
       appearance: none;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='%2364748b' d='M0 0l5 6 5-6H0z'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
@@ -140,7 +140,6 @@ header {
 
     select:focus, input[type="text"]:focus, #stateInput:focus {
       border-color: var(--gold);
-      box-shadow: 0 0 0 2px rgba(180,151,90,0.15);
     }
 
 
@@ -163,7 +162,7 @@ header {
       background: #fff;
       border: 1px solid var(--line);
       border-top: none;
-      border-radius: 0 0 6px 6px;
+      border-radius: 0;
       max-height: 200px;
       overflow-y: auto;
       list-style: none;
@@ -212,64 +211,108 @@ header {
 
     .paralegal-card {
       display: flex;
-      gap: 1rem;
+      gap: 2rem;
       align-items: center;
-      padding: 1rem 0;
-      border-bottom: 1px solid transparent;
-      position: relative;
-    }
-
-
-    .paralegal-card::after {
-      content: "";
-      position: absolute;
-      bottom: 0;
-      left: 10%;
-      right: 10%;
-      height: 1px;
-      background: var(--line);
+      padding: 1.75rem 2rem;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--gold);
+      background: #fdfdfb;
     }
 
 
     .paralegal-card img {
-      width: 75px;
-      height: 75px;
-      border-radius: 6px;
-      object-fit: cover;
+      width: 150px;
+      aspect-ratio: 2 / 3;
+      height: auto;
+      border-radius: 0;
+      object-fit: contain;
+      background: #f5f5f5;
+      border: 1px solid #c0c0c0;
       flex-shrink: 0;
+      display: block;
     }
 
 
     .card-content {
       flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
     }
 
 
     .card-content h3 {
       font-family: 'Cormorant Garamond', serif;
-      font-size: 1.15rem;
-      margin: 0 0 0.25rem;
+      font-size: 1.5rem;
+      font-weight: 300;
+      margin: 0 0 0.4rem;
     }
 
 
     .card-content p {
+      font-size: 1.05rem;
+      color: var(--muted);
+      font-weight: 300;
+      margin: 0.25rem 0;
+    }
+
+
+    .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.2rem;
+    }
+
+
+    .card-meta span {
       font-size: 0.85rem;
       color: var(--muted);
-      margin: 0.2rem 0;
+      border: 1px solid var(--line);
+      padding: 0.2rem 0.6rem;
+      font-weight: 400;
+      letter-spacing: 0.3px;
     }
 
 
-    .view-profile {
-      display: inline-block;
-      margin-top: 0.3rem;
-      font-size: 0.8rem;
+    .card-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      align-items: flex-end;
+      margin-left: 2rem;
+    }
+
+
+    .action-btn {
+      padding: 0.45rem 1.4rem;
+      font-size: 0.95rem;
+      font-weight: 300;
+      border: 1px solid var(--gold);
+      background: transparent;
       color: var(--gold);
       text-decoration: none;
+      cursor: pointer;
+      font-family: 'Sarabun', sans-serif;
+      transition: background 0.2s, color 0.2s;
     }
 
 
-    .view-profile:hover {
-      text-decoration: underline;
+    .action-btn:hover {
+      background: var(--gold);
+      color: #fff;
+    }
+
+
+    .inquire-btn {
+      border-color: var(--navy);
+      color: var(--navy);
+    }
+
+
+    .inquire-btn:hover {
+      background: var(--navy);
+      color: #fff;
     }
 
 
@@ -447,27 +490,232 @@ footer {
 
 
     <section class="results" id="paralegalResults">
-      <div class="paralegal-card">
-        <img src="https://source.unsplash.com/90x90/?person,portrait" alt="Paralegal photo" />
-        <div class="paralegal-card"
-          data-experience="5+ years"
-          data-specialty="Family Law"
-          data-state="California"
-          data-availability="Available Now">
-          <a href="profile-paralegal.html" class="view-profile">View Profile →</a>
+      <div class="paralegal-card"
+        data-experience="5+ years"
+        data-specialty="Family Law"
+        data-state="California"
+        data-availability="Available Now">
+        <img src="assets/images/paralegal.jpg" alt="Portrait of Ava Martinez" />
+        <div class="card-content">
+          <h3>Ava Martinez</h3>
+          <p>Family Law Specialist · Los Angeles, CA</p>
+          <p>Guides complex custody matters with bilingual filings and lightning-fast drafting help.</p>
+          <div class="card-meta">
+            <span>Experience: 5+ years</span>
+            <span>Specialty: Family Law</span>
+            <span>Availability: Available Now</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a href="profile-paralegal.html" class="action-btn">View Profile</a>
+          <button type="button" class="action-btn inquire-btn">Inquire</button>
         </div>
       </div>
 
 
-      <div class="paralegal-card">
-        <img src="https://source.unsplash.com/90x90/?woman,professional" alt="Paralegal photo" />
+      <div class="paralegal-card"
+        data-experience="3+ years"
+        data-specialty="Litigation"
+        data-state="New York"
+        data-availability="Weekends">
+        <img src="assets/images/paralegal.jpg" alt="Portrait of Liam O'Connor" />
         <div class="card-content">
-        <div class="paralegal-card"
-          data-experience="5+ years"
-          data-specialty="Family Law"
-          data-state="Virginia"
-          data-availability="Available Now">
-          <a href="profile-paralegal.html" class="view-profile">View Profile →</a>
+          <h3>Liam O’Connor</h3>
+          <p>Litigation Support · New York, NY</p>
+          <p>Runs discovery timelines, trial binders, and depo prep for multi-party commercial disputes.</p>
+          <div class="card-meta">
+            <span>Experience: 3+ years</span>
+            <span>Specialty: Litigation</span>
+            <span>Availability: Weekends</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a href="profile-paralegal.html" class="action-btn">View Profile</a>
+          <button type="button" class="action-btn inquire-btn">Inquire</button>
+        </div>
+      </div>
+
+
+      <div class="paralegal-card"
+        data-experience="5+ years"
+        data-specialty="Business / Corporate Law"
+        data-state="Washington"
+        data-availability="Available Now">
+        <img src="assets/images/paralegal.jpg" alt="Portrait of Naomi Chen" />
+        <div class="card-content">
+          <h3>Naomi Chen</h3>
+          <p>Corporate & Commercial · Seattle, WA</p>
+          <p>Drafts MSAs/SAAS agreements, tracks cap tables, and coordinates venture diligence rooms.</p>
+          <div class="card-meta">
+            <span>Experience: 5+ years</span>
+            <span>Specialty: Business / Corporate Law</span>
+            <span>Availability: Available Now</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a href="profile-paralegal.html" class="action-btn">View Profile</a>
+          <button type="button" class="action-btn inquire-btn">Inquire</button>
+        </div>
+      </div>
+
+
+      <div class="paralegal-card"
+        data-experience="5+ years"
+        data-specialty="Immigration Law"
+        data-state="Texas"
+        data-availability="Weekends">
+        <img src="assets/images/paralegal.jpg" alt="Portrait of Javier Reyes" />
+        <div class="card-content">
+          <h3>Javier Reyes</h3>
+          <p>Immigration Paralegal · Austin, TX</p>
+          <p>Prepares PERM, TN, and family-based petitions with bilingual interviews and QC reviews.</p>
+          <div class="card-meta">
+            <span>Experience: 5+ years</span>
+            <span>Specialty: Immigration Law</span>
+            <span>Availability: Weekends</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a href="profile-paralegal.html" class="action-btn">View Profile</a>
+          <button type="button" class="action-btn inquire-btn">Inquire</button>
+        </div>
+      </div>
+
+
+      <div class="paralegal-card"
+        data-experience="1+ years"
+        data-specialty="Personal Injury"
+        data-state="Florida"
+        data-availability="Available Now">
+        <img src="assets/images/paralegal.jpg" alt="Portrait of Emily Stone" />
+        <div class="card-content">
+          <h3>Emily Stone</h3>
+          <p>Personal Injury Support · Miami, FL</p>
+          <p>Tracks medical records, negotiates liens, and builds settlement statements for PI claims.</p>
+          <div class="card-meta">
+            <span>Experience: 1+ years</span>
+            <span>Specialty: Personal Injury</span>
+            <span>Availability: Available Now</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a href="profile-paralegal.html" class="action-btn">View Profile</a>
+          <button type="button" class="action-btn inquire-btn">Inquire</button>
+        </div>
+      </div>
+
+
+      <div class="paralegal-card"
+        data-experience="3+ years"
+        data-specialty="Intellectual Property"
+        data-state="Massachusetts"
+        data-availability="Available Now">
+        <img src="assets/images/paralegal.jpg" alt="Portrait of Priya Desai" />
+        <div class="card-content">
+          <h3>Priya Desai</h3>
+          <p>IP & Trademark · Boston, MA</p>
+          <p>Files USPTO applications, responds to office actions, and manages international mark portfolios.</p>
+          <div class="card-meta">
+            <span>Experience: 3+ years</span>
+            <span>Specialty: Intellectual Property</span>
+            <span>Availability: Available Now</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a href="profile-paralegal.html" class="action-btn">View Profile</a>
+          <button type="button" class="action-btn inquire-btn">Inquire</button>
+        </div>
+      </div>
+
+
+      <div class="paralegal-card"
+        data-experience="5+ years"
+        data-specialty="Criminal Defense"
+        data-state="Georgia"
+        data-availability="Available Now">
+        <img src="assets/images/paralegal.jpg" alt="Portrait of Marcus Reed" />
+        <div class="card-content">
+          <h3>Marcus Reed</h3>
+          <p>Criminal Defense · Atlanta, GA</p>
+          <p>Handles motions practice, witness logistics, and speedy arraignment filings across Fulton courts.</p>
+          <div class="card-meta">
+            <span>Experience: 5+ years</span>
+            <span>Specialty: Criminal Defense</span>
+            <span>Availability: Available Now</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a href="profile-paralegal.html" class="action-btn">View Profile</a>
+          <button type="button" class="action-btn inquire-btn">Inquire</button>
+        </div>
+      </div>
+
+
+      <div class="paralegal-card"
+        data-experience="3+ years"
+        data-specialty="Real Estate Law"
+        data-state="Colorado"
+        data-availability="Weekends">
+        <img src="assets/images/paralegal.jpg" alt="Portrait of Sofia Alvarez" />
+        <div class="card-content">
+          <h3>Sofia Alvarez</h3>
+          <p>Real Estate Paralegal · Denver, CO</p>
+          <p>Prepares closing packets, coordinates title curatives, and supports commercial lease reviews.</p>
+          <div class="card-meta">
+            <span>Experience: 3+ years</span>
+            <span>Specialty: Real Estate Law</span>
+            <span>Availability: Weekends</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a href="profile-paralegal.html" class="action-btn">View Profile</a>
+          <button type="button" class="action-btn inquire-btn">Inquire</button>
+        </div>
+      </div>
+
+
+      <div class="paralegal-card"
+        data-experience="5+ years"
+        data-specialty="Employment / Labor Law"
+        data-state="Illinois"
+        data-availability="Available Now">
+        <img src="assets/images/paralegal.jpg" alt="Portrait of Daniel Brooks" />
+        <div class="card-content">
+          <h3>Daniel Brooks</h3>
+          <p>Employment & Labor · Chicago, IL</p>
+          <p>Drafts EEOC responses, audits handbooks, and manages wage-and-hour class discovery.</p>
+          <div class="card-meta">
+            <span>Experience: 5+ years</span>
+            <span>Specialty: Employment / Labor Law</span>
+            <span>Availability: Available Now</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a href="profile-paralegal.html" class="action-btn">View Profile</a>
+          <button type="button" class="action-btn inquire-btn">Inquire</button>
+        </div>
+      </div>
+
+
+      <div class="paralegal-card"
+        data-experience="3+ years"
+        data-specialty="Technology Law"
+        data-state="Oregon"
+        data-availability="Available Now">
+        <img src="assets/images/paralegal.jpg" alt="Portrait of Harper Nguyen" />
+        <div class="card-content">
+          <h3>Harper Nguyen</h3>
+          <p>Technology Transactions · Portland, OR</p>
+          <p>Builds DPAs, open-source reviews, and privacy compliance trackers for SaaS clients.</p>
+          <div class="card-meta">
+            <span>Experience: 3+ years</span>
+            <span>Specialty: Technology Law</span>
+            <span>Availability: Available Now</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <a href="profile-paralegal.html" class="action-btn">View Profile</a>
+          <button type="button" class="action-btn inquire-btn">Inquire</button>
         </div>
       </div>
     </section>
