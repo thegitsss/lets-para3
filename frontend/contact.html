@@ -25,6 +25,14 @@
       min-height: 100vh;
     }
 
+    .hero {
+      background-image: url("hero-mountain.jpg");
+      background-size: cover;
+      background-position: center;
+      height: 300px;
+      width: 100%;
+    }
+
     main {
       max-width: 880px;
       margin: 80px auto;
@@ -138,9 +146,11 @@
       Let<span class="gold">’</span>s ParaConnect
     </a>
 
-    <a href="login.html" class="login-btn">Sign In</a>
-  </div>
-</header>
+      <a href="login.html" class="login-btn">Sign In</a>
+    </div>
+  </header>
+
+  <div class="hero" aria-hidden="true"></div>
 
   <main>
     <h1>Contact Us</h1>
@@ -186,15 +196,13 @@
     </form>
   </main>
 
-  <footer class="footer">
+<footer class="footer">
   <div class="footer-inner">
     <p>© 2025 Let’s-ParaConnect. All rights reserved.</p>
     <nav>
       <a href="privacy.html">Privacy Policy</a>
       <span>|</span>
       <a href="terms.html">Terms</a>
-      <span>|</span>
-      <a href="legal.html">Legal</a>
       <span>|</span>
       <a href="contact.html">Contact</a>
       <span>|</span>
@@ -203,5 +211,22 @@
     <div class="region">United States</div>
   </div>
 </footer>
+<script>
+  (function () {
+    const hero = document.querySelector('.hero');
+    if (!hero) return;
+
+    hero.style.backgroundPosition = 'center center';
+
+    const updateHeroParallax = () => {
+      const offset = window.scrollY * 0.2;
+      hero.style.backgroundPosition = `center calc(50% + ${offset}px)`;
+    };
+
+    window.addEventListener('scroll', updateHeroParallax, { passive: true });
+    window.addEventListener('resize', updateHeroParallax);
+    updateHeroParallax();
+  })();
+</script>
 </body>
 </html>

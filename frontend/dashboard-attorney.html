@@ -88,11 +88,28 @@
       gap: 1.5rem;
     }
 
+    .notification-icon {
+      position: relative;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      transition: background 0.2s ease;
+    }
+
+
+    .notification-icon:hover {
+      background: rgba(0,0,0,0.05);
+    }
+
+
     .notification-icon svg {
       width: 20px;
       height: 20px;
       color: var(--ink);
-      position: relative;
     }
 
     .notification-badge {
@@ -276,6 +293,57 @@
       opacity: 1;
       transform: translate(-50%, 0);
     }
+
+
+    .notification-panel {
+      position: absolute;
+      top: 40px;
+      right: 0;
+      width: 280px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 15px 35px rgba(15, 23, 42, 0.18);
+      padding: 1rem;
+      display: none;
+      flex-direction: column;
+      gap: 0.75rem;
+      z-index: 100;
+    }
+
+
+    .notification-panel.show {
+      display: flex;
+    }
+
+
+    .notification-panel h4 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+
+    .notification-panel p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+
+    .notification-item {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 0.9rem;
+      line-height: 1.4;
+      color: var(--ink);
+    }
+
+
+    .notification-item:last-child {
+      border-bottom: none;
+    }
   </style>
 </head>
 <body>
@@ -299,11 +367,19 @@
   </aside>
   <main class="main">
     <div class="topbar">
-      <div class="notification-icon" style="position: relative;">
+      <div class="notification-icon" id="notificationBell">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
         <span class="notification-badge">2</span>
+        <div class="notification-panel" id="notificationPanel">
+          <h4>Notifications</h4>
+          <div class="notification-item"><strong>Case Update:</strong> Jones LLC sent a new document.</div>
+          <div class="notification-item"><strong>Payment:</strong> Escrow release scheduled for Nov 30.</div>
+          <div class="notification-item"><strong>Reminder:</strong> Assign paralegal to Anderson Merger.</div>
+          <h4>Recent Activity</h4>
+          <p>Samantha vs. Jones LLC · Exhibit upload pending review.</p>
+        </div>
       </div>
       <div class="user-profile">
         <img src="https://via.placeholder.com/36" alt="User avatar" />
@@ -400,6 +476,8 @@ if (stagedToast?.message) {
 const messageBox = document.getElementById('messageBox');
 const messageCountSpan = document.getElementById('messageCount');
 const pluralSpan = document.getElementById('plural');
+const notificationBell = document.getElementById('notificationBell');
+const notificationPanel = document.getElementById('notificationPanel');
 
 // Simulated unread messages (replace with API later)
 let unreadMessages = 1;
@@ -434,6 +512,22 @@ async function fetchUnreadMessages() {
 updateMessageBubble();
 // Uncomment once backend endpoint is live:
 // fetchUnreadMessages();
+
+function toggleNotifications(force) {
+  const show = typeof force === 'boolean' ? force : !notificationPanel.classList.contains('show');
+  notificationPanel.classList.toggle('show', show);
+}
+
+notificationBell.addEventListener('click', e => {
+  e.stopPropagation();
+  toggleNotifications();
+});
+
+document.addEventListener('click', e => {
+  if (!notificationBell.contains(e.target)) {
+    notificationPanel.classList.remove('show');
+  }
+});
 
   loadUserHeaderInfo();
 </script>

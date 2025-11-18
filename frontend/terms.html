@@ -28,6 +28,15 @@
     }
 
 
+    .hero {
+      background-image: url("hero-mountain.jpg");
+      background-size: cover;
+      background-position: center;
+      height: 300px;
+      width: 100%;
+    }
+
+
     /* MAIN CONTENT */
     main {
       max-width: 900px;
@@ -119,6 +128,8 @@
       <a href="login.html" class="login-btn">Sign In</a>
     </div>
   </header>
+
+  <div class="hero" aria-hidden="true"></div>
 
   <main>
     <h1>Terms & Conditions</h1>
@@ -270,6 +281,23 @@
     © <script>document.write(new Date().getFullYear());</script> Let’s‑ParaConnect • 
     <a href="terms.html">Terms</a> • 
     <a href="privacy.html">Privacy</a>
-  </footer>
+</footer>
 </body>
+<script>
+  (function () {
+    const hero = document.querySelector('.hero');
+    if (!hero) return;
+
+    hero.style.backgroundPosition = 'center center';
+
+    const updateHeroParallax = () => {
+      const offset = window.scrollY * 0.2;
+      hero.style.backgroundPosition = `center calc(50% + ${offset}px)`;
+    };
+
+    window.addEventListener('scroll', updateHeroParallax, { passive: true });
+    window.addEventListener('resize', updateHeroParallax);
+    updateHeroParallax();
+  })();
+</script>
 </html>

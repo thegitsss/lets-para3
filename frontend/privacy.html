@@ -32,6 +32,14 @@
       color: #1a1a1a;
     }
 
+    .hero {
+      background-image: url("hero-mountain.jpg");
+      background-size: cover;
+      background-position: center;
+      height: 300px;
+      width: 100%;
+    }
+
     main {
       padding: 60px 40px;
       max-width: 800px;
@@ -100,6 +108,8 @@ html {
     <a href="login.html" class="login-btn">Sign In</a>
   </div>
 </header>
+
+  <div class="hero" aria-hidden="true"></div>
 
  <main id="main">
     <h1>Privacy Policy</h1>
@@ -258,8 +268,6 @@ html {
       <span>|</span>
       <a href="terms.html">Terms</a>
       <span>|</span>
-      <a href="legal.html">Legal</a>
-      <span>|</span>
       <a href="contact.html">Contact</a>
       <span>|</span>
       <a href="accessibility.html">Accessibility</a>
@@ -272,6 +280,23 @@ html {
 
   <script>
     document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+  <script>
+    (function () {
+      const hero = document.querySelector('.hero');
+      if (!hero) return;
+
+      hero.style.backgroundPosition = 'center center';
+
+      const updateHeroParallax = () => {
+        const offset = window.scrollY * 0.2;
+        hero.style.backgroundPosition = `center calc(50% + ${offset}px)`;
+      };
+
+      window.addEventListener('scroll', updateHeroParallax, { passive: true });
+      window.addEventListener('resize', updateHeroParallax);
+      updateHeroParallax();
+    })();
   </script>
 </body>
 </html>

@@ -192,6 +192,9 @@
     }
     .status.public{background:rgba(31,122,74,.1);color:#1f7a4a;}
     .status.private{background:rgba(176,71,71,.1);color:#b04747;}
+    .status.pending{background:rgba(182,164,122,0.15);color:#7a5a1f;}
+    .status.accepted{background:rgba(32,131,87,0.12);color:#1e6d45;}
+    .status.declined{background:rgba(176,71,71,.12);color:#a93232;}
     .actions{text-align:right;}
     .actions button{
       background:none;
@@ -293,9 +296,10 @@
     </div>
 
     <div class="filter-tabs">
-  <button class="filter-tab active" data-target="activeCases">Active (4)</button>
-  <button class="filter-tab" data-target="draftCases">Draft (0)</button>
-  <button class="filter-tab" data-target="archivedCases">Archived (1)</button>
+      <button class="filter-tab active" data-target="activeCases">Active (4)</button>
+      <button class="filter-tab" data-target="draftCases">Draft (0)</button>
+      <button class="filter-tab" data-target="archivedCases">Archived (1)</button>
+      <button class="filter-tab" data-target="inquiryCases">Inquiries (3)</button>
     </div>
 <div class="case-table" id="activeCases">
     <table>
@@ -424,6 +428,72 @@
             <div class="case-menu" role="menu">
               <button class="menu-item" data-action="download">Download Case</button>
               <button class="menu-item danger" data-action="delete">Delete Case</button>
+            </div>
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- INQUIRY RECORDS -->
+<div class="case-table" id="inquiryCases" style="display:none;">
+  <table>
+    <thead>
+      <tr>
+        <th>Paralegal</th>
+        <th>Case / Client</th>
+        <th>Specialty</th>
+        <th>Sent On</th>
+        <th>Status</th>
+        <th class="actions"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="profile-paralegal.html">Ava Martinez</a></td>
+        <td>Family Settlement Agreement<br/><small>Johnson Law Group</small></td>
+        <td>Family Law</td>
+        <td>Nov 18 2025</td>
+        <td><span class="status pending">PENDING</span></td>
+        <td class="actions">
+          <div class="case-actions" data-case="Inquiry to Ava Martinez">
+            <button class="menu-trigger" aria-haspopup="true" aria-expanded="false">⋯</button>
+            <div class="case-menu" role="menu">
+              <button class="menu-item" data-action="download">View Thread</button>
+              <button class="menu-item danger" data-action="delete">Withdraw Inquiry</button>
+            </div>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="profile-paralegal.html">Liam O’Connor</a></td>
+        <td>Discovery Responses<br/><small>Anderson & Reed</small></td>
+        <td>Litigation</td>
+        <td>Nov 12 2025</td>
+        <td><span class="status accepted">ACCEPTED</span></td>
+        <td class="actions">
+          <div class="case-actions" data-case="Inquiry to Liam OConnor">
+            <button class="menu-trigger" aria-haspopup="true" aria-expanded="false">⋯</button>
+            <div class="case-menu" role="menu">
+              <button class="menu-item" data-action="download">Open Messages</button>
+              <button class="menu-item danger" data-action="delete">Close Inquiry</button>
+            </div>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="profile-paralegal.html">Naomi Chen</a></td>
+        <td>Corporate Bylaws Update<br/><small>Brightpath LLC</small></td>
+        <td>Corporate</td>
+        <td>Nov 05 2025</td>
+        <td><span class="status declined">DECLINED</span></td>
+        <td class="actions">
+          <div class="case-actions" data-case="Inquiry to Naomi Chen">
+            <button class="menu-trigger" aria-haspopup="true" aria-expanded="false">⋯</button>
+            <div class="case-menu" role="menu">
+              <button class="menu-item" data-action="download">Review Feedback</button>
+              <button class="menu-item danger" data-action="delete">Remove Record</button>
             </div>
           </div>
         </td>

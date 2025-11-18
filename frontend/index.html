@@ -816,8 +816,6 @@
       <span>|</span>
       <a href="terms.html">Terms</a>
       <span>|</span>
-      <a href="legal.html">Legal</a>
-      <span>|</span>
       <a href="contact.html">Contact</a>
       <span>|</span>
       <a href="accessibility.html">Accessibility</a>
@@ -926,10 +924,29 @@
       play();
     }));
 
+    let pointerMoved = false;
+    window.addEventListener('pointermove', () => {
+      pointerMoved = true;
+    }, { once: true });
+
     if (slider) {
-      slider.addEventListener('mouseenter', stop);
-      slider.addEventListener('mouseleave', play);
+      slider.addEventListener('mouseenter', () => {
+        if (!pointerMoved) return;
+        stop();
+      });
+      slider.addEventListener('mouseleave', () => {
+        if (!pointerMoved) return;
+        play();
+      });
     }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        stop();
+      } else if (!timer) {
+        play();
+      }
+    });
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight') next(1);
@@ -937,6 +954,9 @@
     });
 
     play();
+    setTimeout(() => {
+      if (!timer) play();
+    }, 1000);
   </script>
   <script>
     // Header scroll effect
@@ -1270,11 +1290,16 @@ registerDriftAnimation(".how-it-works-bg .card", {
   (function initSmoothScroll() {
     if (typeof Lenis === 'undefined') return;
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (prefersReducedMotion.matches) return;
+
     const lenis = new Lenis({
-      duration: 4.5,
-      easing: (t) => 1 - Math.pow(1 - t, 4),
+      duration: 1.8,
+      easing: (t) => 1 - Math.pow(1 - t, 3),
       smoothWheel: true,
-      wheelMultiplier: 0.15,
+      smoothTouch: true,
+      normalizeWheel: true,
+      wheelMultiplier: 0.6,
       gestureOrientation: 'vertical',
     });
 
@@ -1286,6 +1311,14 @@ registerDriftAnimation(".how-it-works-bg .card", {
       lenis.raf(time);
       requestAnimationFrame(raf);
     }
+
+    prefersReducedMotion.addEventListener('change', (event) => {
+      if (event.matches) {
+        lenis.stop();
+      } else {
+        lenis.start();
+      }
+    });
 
     requestAnimationFrame(raf);
     window.lenis = lenis;
