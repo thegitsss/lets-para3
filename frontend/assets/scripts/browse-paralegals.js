@@ -23,7 +23,6 @@ const specialties = [
 ];
 
 const selectedSpecialties = new Set();
-const isPublicView = !localStorage.getItem("lpc_name");
 
 const elements = {
   results: document.getElementById("paralegalResults"),

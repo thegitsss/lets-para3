@@ -55,11 +55,15 @@ const state = {
 let openCaseMenu = null;
 let chatMenuWrapper = null;
 
-document.addEventListener("DOMContentLoaded", bootstrap);
+document.addEventListener("DOMContentLoaded", () => {
+  bootstrap();
+});
 
 async function bootstrap() {
   try {
-    window.checkSession?.("attorney");
+    if (typeof window.checkSession === "function") {
+      await window.checkSession("attorney");
+    }
   } catch {
     return;
   }

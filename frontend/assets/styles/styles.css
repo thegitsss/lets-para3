@@ -32,6 +32,13 @@ header {
   justify-content: flex-start;
 }
 
+.header-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
 .header-inner nav a,
 .header-inner a.login-btn {
   font-family: 'Sarabun', sans-serif;
@@ -39,6 +46,29 @@ header {
   font-size: 16px;
   color: #1a2230;
   text-decoration: none;
+}
+
+.header-actions .login-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1px solid rgba(26, 34, 48, 0.25);
+  font-size: 12px;
+}
+
+.header-actions .login-btn.primary {
+  background: #1a2230;
+  color: #fff;
+  border-color: #1a2230;
+}
+
+.header-actions .login-btn.secondary {
+  background: transparent;
+  color: #1a2230;
 }
 
 .header-logo {
@@ -68,8 +98,10 @@ header {
     display: none;
   }
 
-  .login-btn {
-    justify-self: center;
+  .header-actions {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
   }
 }
 /* Smooth spacing for large viewports */

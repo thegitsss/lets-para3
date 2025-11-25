@@ -153,10 +153,17 @@ router.post(
     }
 
     const token = signAccess(user);
+    res.cookie("access", token, {
+      httpOnly: true,
+      secure: PROD,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
     await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
 
     return res.json({
-      token,
+      success: true,
       user: {
         _id: user._id,
         id: user._id,
@@ -205,7 +212,16 @@ router.get(
 // LOGOUT (stateless JWT – client deletes token)
 // POST /api/auth/logout
 // ----------------------------------------
-router.post("/logout", (_req, res) => res.json({ ok: true }));
+router.post("/logout", (_req, res) => {
+  res.cookie("access", "", {
+    httpOnly: true,
+    secure: PROD,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  res.json({ success: true });
+});
 
 // ----------------------------------------
 // EMAIL VERIFICATION (optional but handy)

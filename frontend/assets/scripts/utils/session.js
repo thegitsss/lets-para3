@@ -1,8 +1,8 @@
-(function(){
-  const TOKEN_KEY = "lpc_token";
-  const USER_KEY = "lpc_user";
+(function () {
   let hasRedirected = false;
   let nukedOnRedirect = false;
+  let cachedUser = null;
+  let sessionPromise = null;
 
   function redirectToLogin() {
     if (hasRedirected) return;
@@ -12,36 +12,35 @@
     } catch (_) {}
   }
 
-  function readToken() {
-    try {
-      return localStorage.getItem(TOKEN_KEY) || "";
-    } catch {
-      return "";
+  async function fetchSession(force = false) {
+    if (force) sessionPromise = null;
+    if (!sessionPromise) {
+      sessionPromise = fetch("/api/auth/me", { credentials: "include" })
+        .then(async (res) => {
+          if (!res.ok) {
+            if (res.status === 401) return null;
+            const payload = await res.json().catch(() => ({}));
+            return payload?.user || null;
+          }
+          const data = await res.json().catch(() => ({}));
+          return data?.user || null;
+        })
+        .catch(() => null)
+        .then((user) => {
+          cachedUser = user;
+          return user;
+        });
     }
+    return sessionPromise;
   }
 
-  function readUser() {
-    try {
-      const raw = localStorage.getItem(USER_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
-  }
-
-  function getSessionData() {
-    const user = readUser();
-    const token = readToken();
-    const role = String(user?.role || "").toLowerCase();
-    const status = String(user?.status || "").toLowerCase();
-    return { token, user, role, status };
+  function getCachedUser() {
+    return cachedUser;
   }
 
   function clearStoredSession() {
-    try {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
-    } catch {}
+    cachedUser = null;
+    sessionPromise = null;
   }
 
   function invalidateAndRedirect() {
@@ -52,9 +51,16 @@
     redirectToLogin();
   }
 
-  function checkSession(expectedRole) {
-    const { token, user, role, status } = getSessionData();
-    if (!token || !user) {
+  async function getSessionData(force = false) {
+    const user = await fetchSession(force);
+    const role = String(user?.role || "").toLowerCase();
+    const status = String(user?.status || "").toLowerCase();
+    return { user, role, status };
+  }
+
+  async function checkSession(expectedRole) {
+    const { user, role, status } = await getSessionData();
+    if (!user) {
       invalidateAndRedirect();
       throw new Error("Authentication required");
     }
@@ -67,27 +73,29 @@
       throw new Error("Not approved");
     }
     nukedOnRedirect = false;
-    return { token, role, status, user };
+    return { user, role, status };
   }
 
   function redirectUserDashboard(roleOverride) {
-    let role = roleOverride;
-    if (!role) {
-      const user = readUser();
-      role = user?.role || "attorney";
-    }
-    const norm = String(role).toLowerCase();
-    const target = norm === "admin" ? "admin-dashboard.html" : norm === "paralegal"
-      ? "dashboard-paralegal.html" : "dashboard-attorney.html";
+    const roleValue = roleOverride || cachedUser?.role || "attorney";
+    const norm = String(roleValue).toLowerCase();
+    const target =
+      norm === "admin"
+        ? "admin-dashboard.html"
+        : norm === "paralegal"
+        ? "dashboard-paralegal.html"
+        : "dashboard-attorney.html";
     try {
       window.location.href = target;
     } catch (_) {}
   }
 
+  fetchSession().catch(() => {});
+
   window.checkSession = checkSession;
   window.redirectUserDashboard = redirectUserDashboard;
   window.clearStoredSession = clearStoredSession;
-  window.getSessionToken = readToken;
+  window.getSessionToken = () => "";
   window.getSessionData = getSessionData;
-  window.getStoredUser = readUser;
+  window.getStoredUser = getCachedUser;
 })();

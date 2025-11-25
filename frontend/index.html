@@ -551,12 +551,13 @@
 }
   </style>
 </head>
-<body>
+<body id="top">
   <!-- Header -->
   <header class="site-header">
     <div class="header-inner">
       <nav aria-label="Primary">
         <ul>
+          <li><a href="#top">Home</a></li>
           <li><a href="#about">About</a></li>
           <li><a href="#services">Services</a></li>
           <li><a href="#how">How It Works</a></li>
@@ -567,6 +568,7 @@
       </a>
       <div class="header-actions">
         <a class="pill" href="login.html" id="authAction">Sign In</a>
+        <a class="pill" href="signup.html" id="signupAction">Sign Up</a>
         <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
       </div>
     </div>
@@ -1382,6 +1384,7 @@ updateHeaderAppearance();
     function updateAuthLink() {
       const link = document.getElementById("authAction");
       const logoutBtn = document.getElementById("logoutAction");
+      const signupLink = document.getElementById("signupAction");
       if (!link) return;
       const token = readStoredToken();
       const user = readStoredUser();
@@ -1392,11 +1395,16 @@ updateHeaderAppearance();
         link.href = dashboard;
         link.setAttribute("data-authenticated", "true");
         if (logoutBtn) logoutBtn.style.display = "inline-flex";
+        if (signupLink) signupLink.style.display = "none";
       } else {
         link.textContent = "Sign In";
         link.href = "login.html";
         link.removeAttribute("data-authenticated");
         if (logoutBtn) logoutBtn.style.display = "none";
+        if (signupLink) {
+          signupLink.style.display = "inline-flex";
+          signupLink.href = "signup.html";
+        }
       }
     }
 

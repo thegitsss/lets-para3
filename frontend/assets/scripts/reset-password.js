@@ -14,6 +14,17 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
+  async function fetchCsrfToken() {
+    try {
+      const res = await fetch("/api/csrf", { credentials: "include" });
+      if (!res.ok) return "";
+      const data = await res.json().catch(() => ({}));
+      return data?.csrfToken || "";
+    } catch {
+      return "";
+    }
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -26,9 +37,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
+      const csrfToken = await fetchCsrfToken();
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+        },
+        credentials: "include",
         body: JSON.stringify({ token, newPassword })
       });
 

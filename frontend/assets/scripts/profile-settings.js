@@ -5,25 +5,22 @@
   const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
   const els = {};
-  let authToken = "";
   let currentUser = null;
   let pendingAvatarURL = "";
   let uploadingAvatar = false;
   let notificationPanelOpen = false;
 
-  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("DOMContentLoaded", () => {
+    init();
+  });
 
-  function init() {
+  async function init() {
     try {
-      window.checkSession && window.checkSession("attorney");
+      if (window.checkSession) {
+        await window.checkSession("attorney");
+      }
     } catch (err) {
       console.warn("[settings] session invalid", err);
-      return;
-    }
-
-    authToken = (window.getSessionToken && window.getSessionToken()) || safeLocal("lpc_token");
-    if (!authToken) {
-      window.redirectUserDashboard ? window.redirectUserDashboard() : (window.location.href = "login.html");
       return;
     }
 
@@ -558,12 +555,32 @@
     el.value = value;
   }
 
+  let csrfToken = "";
+
+  async function ensureCsrfToken(force = false) {
+    if (force) csrfToken = "";
+    if (csrfToken) return csrfToken;
+    try {
+      const res = await fetch("/api/csrf", { credentials: "include" });
+      if (!res.ok) return "";
+      const data = await res.json().catch(() => ({}));
+      csrfToken = data?.csrfToken || "";
+      return csrfToken;
+    } catch {
+      return "";
+    }
+  }
+
   async function authorizedFetch(path, options = {}) {
     const opts = { ...options };
-    opts.headers = {
-      ...(opts.headers || {}),
-      Authorization: `Bearer ${authToken}`,
-    };
+    const method = String(opts.method || "GET").toUpperCase();
+    const headers = { ...(opts.headers || {}) };
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+      const token = await ensureCsrfToken();
+      if (token) headers["X-CSRF-Token"] = token;
+    }
+    opts.headers = headers;
+    opts.credentials = "include";
     const res = await fetch(`${API_BASE}${path}`, opts);
     if (res.status === 401) {
       handleUnauthorized();
@@ -577,11 +594,4 @@
     window.location.href = "login.html";
   }
 
-  function safeLocal(key) {
-    try {
-      return localStorage.getItem(key) || "";
-    } catch {
-      return "";
-    }
-  }
 })();

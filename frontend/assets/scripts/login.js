@@ -9,12 +9,11 @@ const clearLocalSession = () => {
 
 let skipInit = false;
 try {
-  const token = localStorage.getItem("lpc_token");
   const rawUser = localStorage.getItem("lpc_user");
   const parsedUser = rawUser ? JSON.parse(rawUser) : null;
   const role = (parsedUser?.role || "").toLowerCase();
   const status = (parsedUser?.status || "").toLowerCase();
-  if (token && role && status === "approved") {
+  if (role && status === "approved") {
     if (window.redirectUserDashboard) {
       window.redirectUserDashboard(role);
     } else {
@@ -44,6 +43,17 @@ if (stagedSignupToast) {
   }
 }
 
+async function fetchCsrfToken() {
+  try {
+    const res = await fetch(`${API_BASE}/csrf`, { credentials: "include" });
+    if (!res.ok) return "";
+    const data = await res.json().catch(() => ({}));
+    return data?.csrfToken || "";
+  } catch {
+    return "";
+  }
+}
+
 if (!skipInit) {
   clearLocalSession();
 
@@ -54,9 +64,14 @@ if (!skipInit) {
     const password = document.getElementById("password").value.trim();
 
     try {
+      const csrfToken = await fetchCsrfToken();
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+        },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
 
@@ -76,7 +91,6 @@ if (!skipInit) {
         return;
       }
 
-      localStorage.setItem("lpc_token", data.token);
       localStorage.setItem("lpc_user", JSON.stringify(data.user || {}));
 
       if (data.user.role === "admin") {

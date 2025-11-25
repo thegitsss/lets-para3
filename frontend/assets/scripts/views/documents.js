@@ -99,7 +99,10 @@ async function presign({ contentType, ext, folder }) {
   const r = await fetch(API_PRESIGN, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRF-Token": await getCSRF(),
+    },
     body: JSON.stringify({ contentType, ext, folder })
   });
   if (!r.ok) throw new Error("Failed to presign");

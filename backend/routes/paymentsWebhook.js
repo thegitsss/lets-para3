@@ -57,7 +57,7 @@ async function findCaseForPaymentIntent(pi) {
 // ----------------------------------------
 // Core webhook endpoint
 // ----------------------------------------
-router.post("/stripe", async (req, res) => {
+router.post("/", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const secret = pickSecret(req);
 

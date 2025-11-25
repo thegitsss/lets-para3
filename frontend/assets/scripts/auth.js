@@ -7,26 +7,8 @@
 
 export let CSRF_TOKEN = "";
 
-const TOKEN_KEY = "lpc_token";
 const USER_KEY = "lpc_user";
 let redirectingToLogin = false;
-
-function readStorage(key) {
-  try {
-    return localStorage.getItem(key) || "";
-  } catch {
-    return "";
-  }
-}
-
-function writeStorage(key, value) {
-  try {
-    if (!value) localStorage.removeItem(key);
-    else localStorage.setItem(key, value);
-  } catch {
-    /* noop */
-  }
-}
 
 function redirectToLoginOnce() {
   if (redirectingToLogin) return;
@@ -50,42 +32,46 @@ function readStoredUser() {
 }
 
 export function getStoredSession() {
-  const token = readStorage(TOKEN_KEY);
   const user = readStoredUser();
   return {
-    token,
     user,
     role: String(user?.role || ""),
     status: String(user?.status || ""),
   };
 }
 
-export function persistSession({ token, user } = {}) {
-  if (typeof token !== "undefined") writeStorage(TOKEN_KEY, token);
-  if (typeof user !== "undefined") {
+export function persistSession({ user } = {}) {
+  if (typeof user === "undefined") return;
+  try {
+    const payload = user ? JSON.stringify(user) : "";
+    if (payload) localStorage.setItem(USER_KEY, payload);
+    else localStorage.removeItem(USER_KEY);
+  } catch {
     try {
-      const payload = user ? JSON.stringify(user) : "";
-      writeStorage(USER_KEY, payload);
+      localStorage.removeItem(USER_KEY);
     } catch {
-      writeStorage(USER_KEY, "");
+      /* noop */
     }
   }
 }
 
 export function clearSession() {
-  writeStorage(TOKEN_KEY, "");
-  writeStorage(USER_KEY, "");
+  try {
+    localStorage.removeItem(USER_KEY);
+  } catch {
+    /* noop */
+  }
 }
 
 export function requireAuth(expectedRole) {
   const session = getStoredSession();
-  const token = session.token;
+  const user = session.user;
   const role = String(session.role || "");
   const status = String(session.status || "");
   const normalizedRole = role.toLowerCase();
   const expected = typeof expectedRole === "string" ? expectedRole.toLowerCase() : "";
 
-  if (!token || !role) {
+  if (!user || !role) {
     clearSession();
     redirectToLoginOnce();
     throw new Error("Authentication required");
@@ -131,10 +117,6 @@ export async function secureFetch(url, opts = {}) {
   const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
 
   const headers = new Headers(opts.headers || {});
-  const session = getStoredSession();
-  if (session.token && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${session.token}`);
-  }
   let body = opts.body;
 
   if (isMutation) {

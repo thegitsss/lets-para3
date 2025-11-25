@@ -21,26 +21,19 @@ const minExpValue = document.getElementById("minExpValue");
 const applyFiltersBtn = document.getElementById("applyFilters");
 const clearFiltersBtn = document.getElementById("clearFilters");
 
-const sessionReady = (() => {
+let sessionReady = false;
+async function ensureSession() {
+  if (sessionReady) return true;
   try {
-    window.checkSession?.("paralegal");
+    if (typeof window.checkSession === "function") {
+      await window.checkSession("paralegal");
+    }
+    sessionReady = true;
     return true;
   } catch (err) {
     console.warn("Paralegal session required", err);
     return false;
   }
-})();
-
-function authHeaders() {
-  const token =
-    (window.getSessionToken && window.getSessionToken()) ||
-    localStorage.getItem("lpc_token") ||
-    "";
-  return token
-    ? {
-        Authorization: `Bearer ${token}`,
-      }
-    : {};
 }
 
 // Toggle filter menu
@@ -240,7 +233,7 @@ async function fetchJobs() {
   if (!sessionReady) return;
   try {
     const res = await fetch("/api/cases/open", {
-      headers: Object.assign({ Accept: "application/json" }, authHeaders()),
+      headers: { Accept: "application/json" },
       credentials: "include",
     });
 
@@ -268,9 +261,9 @@ async function fetchJobs() {
   }
 }
 
-if (sessionReady) {
-  fetchJobs();
-}
+ensureSession().then((ready) => {
+  if (ready) fetchJobs();
+});
 
 sortSelect?.addEventListener("change", () => {
   applySort();

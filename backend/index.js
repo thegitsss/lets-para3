@@ -1,5 +1,3 @@
-console.log("🎯 index.js IS RUNNING from backend/");
-
 // 0) Env
 require("dotenv").config();
 
@@ -64,6 +62,7 @@ const casesRouter = require("./routes/cases");
 const messagesRouter = require("./routes/messages");
 const uploadsRouter = require("./routes/uploads");
 const paymentsRouter = require("./routes/payments");
+const paymentsWebhookHandler = require("./routes/paymentsWebhook");
 const usersRouter = require("./routes/users");
 const disputesRouter = require("./routes/disputes");
 const paymentsWebhookHandler = require("./routes/paymentsWebhook");
@@ -75,6 +74,8 @@ const chatRouter = require("./routes/chat");
 const checklistRouter = require("./routes/checklist");
 const eventsRouter = require("./routes/events");
 
+app.use("/api/payments/webhook", express.raw({ type: "application/json" }), paymentsWebhookHandler);
+app.use(express.json({ limit: "1mb" }));
 app.use("/api/waitlist", waitlistRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);
@@ -94,11 +95,6 @@ if (usersRouter?.paralegalRouter) {
   app.use("/api/paralegals", usersRouter.paralegalRouter);
 }
 app.use("/api/disputes", disputesRouter);
-app.post(
-  "/api/payments/webhook",
-  express.raw({ type: "application/json" }),
-  paymentsWebhookHandler
-);
 
 // 5) CSRF token route
 app.get("/api/csrf", csrfProtection, (req, res) => {

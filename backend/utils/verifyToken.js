@@ -4,24 +4,6 @@ const jwt = require("jsonwebtoken");
 // -------------------------------
 // Helpers
 // -------------------------------
-function parseCookie(name, req) {
-  const hdr = req.headers?.cookie;
-  if (!hdr) return null;
-  const wanted = `${name}=`;
-  for (const part of hdr.split(";")) {
-    const kv = part.trim();
-    if (kv.startsWith(wanted)) {
-      const v = kv.slice(wanted.length);
-      try {
-        return decodeURIComponent(v);
-      } catch {
-        return v;
-      }
-    }
-  }
-  return null;
-}
-
 function normalizePem(val) {
   if (!val) return null;
   let s = String(val).trim();
@@ -70,16 +52,9 @@ const ALGORITHMS = ALGS.length ? ALGS : ["RS256", "HS256"];
 // Token extraction
 // -------------------------------
 function getToken(req) {
-  const hdr = req.headers?.authorization || "";
-  if (hdr.startsWith("Bearer ")) return hdr.slice(7).trim();
-  if (hdr.startsWith("Token ")) return hdr.slice(6).trim();
-  if (hdr.includes(" ")) {
-    // e.g. "Bearer <token>" or "JWT <token>"
-    const parts = hdr.split(" ");
-    if (parts.length === 2) return parts[1].trim();
-  }
-  // Support HttpOnly cookie (default: "access")
-  return parseCookie(COOKIE_NAME, req);
+  if (req?.cookies?.token) return req.cookies.token;
+  if (req?.cookies?.[COOKIE_NAME]) return req.cookies[COOKIE_NAME];
+  return null;
 }
 
 // -------------------------------
@@ -156,7 +131,7 @@ function makeVerifier(required = true) {
 
     if (!token) {
       if (!required) return next();
-      return res.status(401).json({ msg: "No token" });
+      return res.status(401).json({ message: "Not authenticated" });
     }
 
     const payload = verifyTokenString(token);

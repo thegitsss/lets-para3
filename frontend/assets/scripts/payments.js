@@ -25,13 +25,6 @@ export async function getStripe() {
  * Ensure a PaymentIntent exists for the case and return its client_secret.
  * Pass in your authenticated fetch (e.g., secureFetch from auth.js) so cookies/CSRF are handled.
  */
-export async function ensureIntent(caseId, secureFetch) {
-  if (!caseId) throw new Error('caseId required');
-  const res = await secureFetch(`/api/payments/intent/${encodeURIComponent(caseId)}`, { method: 'POST' });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.clientSecret) throw new Error(data.error || 'Could not create PaymentIntent');
-  return data.clientSecret;
-}
 export async function ensureIntent(caseId, secureFetch, idemKey) {
   if (!caseId) throw new Error('caseId required');
   const headers = idemKey ? { 'X-Idempotency-Key': idemKey } : undefined;
@@ -46,15 +39,8 @@ export async function ensureIntent(caseId, secureFetch, idemKey) {
 export async function createElements(clientSecret, appearance = { theme: 'stripe' }) {
   if (!clientSecret) throw new Error('clientSecret required');
   const stripe = await getStripe();
-  return stripe.elements({ clientSecret, appearance });
-}
-/**
- * Create Stripe Elements bound to a client_secret.
- */
-export async function createElements(clientSecret) {
-  if (!clientSecret) throw new Error('clientSecret required');
-  const stripe = await getStripe();
-  return stripe.elements({ clientSecret });
+  const options = appearance ? { clientSecret, appearance } : { clientSecret };
+  return stripe.elements(options);
 }
 
 /**
@@ -63,16 +49,8 @@ export async function createElements(clientSecret) {
 export function mountPaymentElement(elements, container) {
   const host = typeof container === 'string' ? document.querySelector(container) : container;
   if (!host) throw new Error('Mount container not found');
-  host.style.display = '';
-  const el = elements.create('payment');
-  el.mount(host);
-  return el;
-}
-export function mountPaymentElement(elements, container) {
-  const host = typeof container === 'string' ? document.querySelector(container) : container;
-  if (!host) throw new Error('Mount container not found');
-  // Clear previous
   host.innerHTML = '';
+  host.style.display = '';
   const el = elements.create('payment');
   el.mount(host);
   return el;
