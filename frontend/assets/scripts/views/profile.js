@@ -195,7 +195,7 @@ async function presignedUpload(file, folder) {
   try {
     ({ url, key } = await j("/api/uploads/presign", {
       method: "POST",
-      body: { contentType: file.type, ext, folder },
+      body: { contentType: file.type, ext, folder, size: file.size },
     }));
   } catch {
     throw new Error("Could not get an upload link. Please try again.");

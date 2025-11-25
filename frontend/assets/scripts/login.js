@@ -1,4 +1,21 @@
 const API_BASE = "/api";
+const RECAPTCHA_SITE_KEY = window.RECAPTCHA_SITE_KEY || "";
+
+function getRecaptchaToken(action) {
+  if (!RECAPTCHA_SITE_KEY || !window.grecaptcha) return Promise.resolve("");
+  return new Promise((resolve) => {
+    try {
+      window.grecaptcha.ready(() => {
+        window.grecaptcha
+          .execute(RECAPTCHA_SITE_KEY, { action })
+          .then((token) => resolve(token))
+          .catch(() => resolve(""));
+      });
+    } catch {
+      resolve("");
+    }
+  });
+}
 
 const clearLocalSession = () => {
   if (window.clearStoredSession) window.clearStoredSession();
@@ -57,14 +74,21 @@ async function fetchCsrfToken() {
 if (!skipInit) {
   clearLocalSession();
 
-  document.getElementById("loginForm").addEventListener("submit", async (e) => {
+  const loginForm = document.getElementById("loginForm");
+  const loginButton = loginForm?.querySelector("button[type=\"submit\"]");
+  loginForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value.trim();
 
     try {
+      if (loginButton) {
+        loginButton.disabled = true;
+        loginButton.textContent = "Logging in…";
+      }
       const csrfToken = await fetchCsrfToken();
+      const recaptchaToken = await getRecaptchaToken("login");
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: {
@@ -72,7 +96,7 @@ if (!skipInit) {
           ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
         },
         credentials: "include",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, recaptchaToken }),
       });
 
       let data = {};
@@ -107,6 +131,11 @@ if (!skipInit) {
         toastHelper.show("Network error during login", { targetId: "toastBanner", type: "err" });
       } else {
         alert("Network error during login");
+      }
+    } finally {
+      if (loginButton) {
+        loginButton.disabled = false;
+        loginButton.textContent = "Log In";
       }
     }
   });

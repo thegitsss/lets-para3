@@ -95,7 +95,7 @@ async function fetchCase(caseId) {
   return r.json(); // expect { files: [...] }
 }
 
-async function presign({ contentType, ext, folder }) {
+async function presign({ contentType, ext, folder, size }) {
   const r = await fetch(API_PRESIGN, {
     method: "POST",
     credentials: "include",
@@ -103,7 +103,7 @@ async function presign({ contentType, ext, folder }) {
       "Content-Type": "application/json",
       "X-CSRF-Token": await getCSRF(),
     },
-    body: JSON.stringify({ contentType, ext, folder })
+    body: JSON.stringify({ contentType, ext, folder, size })
   });
   if (!r.ok) throw new Error("Failed to presign");
   return r.json(); // { url, key }
@@ -419,7 +419,7 @@ export async function render(el) {
     const qi = makeQueueItem(`${file.name} — ${formatBytes(file.size)}`);
 
     // 1) presign
-    const { url, key } = await presign({ contentType: file.type, ext, folder });
+    const { url, key } = await presign({ contentType: file.type, ext, folder, size: file.size });
 
     // 2) PUT to S3 with progress (fetch has no progress; use XHR for progress)
     await new Promise((resolve, reject) => {

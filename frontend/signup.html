@@ -8,6 +8,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&display=swap" rel="stylesheet" />
   <link href="assets/styles/styles.css" rel="stylesheet" />
+  <script>
+    window.RECAPTCHA_SITE_KEY = "6Lfmq1orAAAAAEfFBDqDFpXtHMGld5aesRFjvIEM";
+  </script>
+  <script src="https://www.google.com/recaptcha/api.js?render=6Lfmq1orAAAAAEfFBDqDFpXtHMGld5aesRFjvIEM" defer></script>
 
   <style>
     :root {
@@ -266,6 +270,23 @@
       .then(d => window.__CSRF__ = d.csrfToken)
       .catch(() => {});
 
+    const SITE_KEY = window.RECAPTCHA_SITE_KEY || "";
+    function getRecaptchaToken(action) {
+      if (!SITE_KEY || !window.grecaptcha) return Promise.resolve("");
+      return new Promise((resolve) => {
+        try {
+          window.grecaptcha.ready(() => {
+            window.grecaptcha
+              .execute(SITE_KEY, { action })
+              .then((token) => resolve(token))
+              .catch(() => resolve(""));
+          });
+        } catch {
+          resolve("");
+        }
+      });
+    }
+
     const btnA = document.getElementById('btnA');
     const btnP = document.getElementById('btnP');
     const form = document.getElementById('signupForm');
@@ -342,6 +363,7 @@
         const payload = { firstName, lastName, email, password, role };
         if (role === 'attorney') payload.barNumber = document.getElementById('bar').value.trim();
         else payload.certificateURL = (document.getElementById('cert')?.value || '').trim() || undefined;
+        payload.recaptchaToken = await getRecaptchaToken('signup');
 
         const headers = { 'Content-Type': 'application/json' };
         if (window.__CSRF__) headers['X-CSRF-Token'] = window.__CSRF__;

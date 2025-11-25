@@ -51,7 +51,11 @@ const csrfProtection = csrf({
   },
 });
 
-app.use("/api/auth/login", rateLimit({ windowMs: 10 * 60 * 1000, max: 50 }));
+app.use("/api/auth/login", rateLimit({ windowMs: 60 * 1000, max: 10 }));
+app.use("/api/auth/signup", rateLimit({ windowMs: 60 * 1000, max: 10 }));
+app.use("/api/messages", rateLimit({ windowMs: 10 * 1000, max: 5 }));
+app.use("/api/uploads", rateLimit({ windowMs: 10 * 1000, max: 2 }));
+app.use("/api/cases", rateLimit({ windowMs: 60 * 1000, max: 5 }));
 app.use("/api/", rateLimit({ windowMs: 60 * 1000, max: 300 }));
 
 // 4) Routers

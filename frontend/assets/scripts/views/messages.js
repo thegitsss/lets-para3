@@ -242,16 +242,29 @@ async function summarize(mode) {
 }
 
 // ---- Voice Notes: recorder + presign + upload + message ---------------------
-async function presignUpload({ contentType, ext, folder }) {
+async function presignUpload({ contentType, ext, folder, size }) {
   return j("/api/uploads/presign", {
     method: "POST",
-    body: { contentType, ext, folder },
+    body: { contentType, ext, folder, size },
   });
 }
 
-async function uploadToS3(url, blob, contentType) {
-  const r = await fetch(url, { method: "PUT", headers: { "Content-Type": contentType }, body: blob });
-  if (!r.ok) throw new Error("S3 upload failed");
+async function uploadToS3(url, blob, contentType, onProgress) {
+  await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", contentType);
+    if (onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          onProgress((event.loaded / event.total) * 100);
+        }
+      };
+    }
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("S3 upload failed")));
+    xhr.onerror = () => reject(new Error("S3 upload error"));
+    xhr.send(blob);
+  });
 }
 
 async function createVoiceMessage(caseId, { fileKey, fileName, mimeType, transcript }) {
@@ -407,16 +420,23 @@ async function startRecording() {
         setStatus("Uploading…");
         const blob = new Blob(chunks, { type: "audio/webm" });
         const fileName = `voice-${Date.now()}.webm`;
+        const progressEl = document.createElement("div");
+        progressEl.className = "voice-progress";
+        progressEl.textContent = "Uploading 0%";
+        aiPanel?.appendChild(progressEl);
 
         // 1) presign
         const { url, key } = await presignUpload({
           contentType: "audio/webm",
           ext: "webm",
           folder: "voice-notes",
+          size: blob.size,
         });
 
         // 2) PUT to S3
-        await uploadToS3(url, blob, "audio/webm");
+        await uploadToS3(url, blob, "audio/webm", (pct) => {
+          if (progressEl) progressEl.textContent = `Uploading ${pct.toFixed(0)}%`;
+        });
 
         // 3) create message with fileKey + transcript
         const transcript = (recTextFinal + (recTextInterim ? " " + recTextInterim : "")).trim();
@@ -434,6 +454,8 @@ async function startRecording() {
       } catch (e) {
         out.textContent = "Failed to add voice note.";
       } finally {
+        const prog = document.querySelector(".voice-progress");
+        prog?.remove();
         cleanupRecording();
       }
     };

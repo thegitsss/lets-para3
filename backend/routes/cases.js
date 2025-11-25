@@ -7,6 +7,7 @@ const verifyToken = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
 const { requireCaseAccess } = require("../utils/authz");
 const Case = require("../models/Case");
+const { cleanText, cleanTitle, cleanMessage } = require("../utils/sanitize");
 const { logAction } = require("../utils/audit");
 
 // ----------------------------------------
@@ -26,6 +27,31 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
 const isObjId = (id) => mongoose.isValidObjectId(id);
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const FILE_STATUS = ["pending_review", "approved", "attorney_revision"];
+const PRACTICE_AREAS = [
+  "administrative law",
+  "bankruptcy",
+  "business law",
+  "civil litigation",
+  "commercial litigation",
+  "contract law",
+  "corporate law",
+  "criminal defense",
+  "employment law",
+  "estate planning",
+  "family law",
+  "immigration",
+  "intellectual property",
+  "labor law",
+  "personal injury",
+  "real estate",
+  "tax law",
+  "technology",
+  "trusts & estates",
+];
+const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
+  acc[name.toLowerCase()] = name;
+  return acc;
+}, {});
 
 const S3_BUCKET = process.env.S3_BUCKET || "";
 const s3 = new S3Client({
@@ -68,6 +94,22 @@ function parseListField(value) {
   return source
     .map((entry) => cleanString(entry, { len: 500 }))
     .filter(Boolean);
+}
+
+function normalizePracticeArea(value) {
+  const cleaned = cleanString(value || "", { len: 200 }).toLowerCase();
+  if (!cleaned) return "";
+  return PRACTICE_AREA_LOOKUP[cleaned] || "";
+}
+
+function parseDeadline(raw) {
+  if (!raw) return null;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return null;
+  const now = Date.now();
+  const maxFuture = now + 365 * 24 * 60 * 60 * 1000;
+  if (date.getTime() < now - 60 * 60 * 1000 || date.getTime() > maxFuture) return null;
+  return date;
 }
 
 function buildDetails(description, requirements = [], questions = []) {
@@ -218,14 +260,32 @@ router.post(
   requireRole(["admin", "attorney"]),
   csrfProtection,
   asyncHandler(async (req, res) => {
-    const { title, practiceArea, description, details, requirements, questions, employmentType, experience } =
-      req.body || {};
-    const safeTitle = cleanString(title || "", { len: 300 });
+    const {
+      title,
+      practiceArea,
+      description,
+      details,
+      requirements,
+      questions,
+      employmentType,
+      experience,
+      instructions,
+      deadline,
+    } = req.body || {};
+    const safeTitle = cleanTitle(title || "", 300);
     const requirementList = parseListField(requirements);
     const questionList = parseListField(questions);
-    const narrative = buildDetails(details || description, requirementList, questionList);
-    if (!safeTitle || !narrative) {
+    const combinedDetails = [details || description, instructions]
+      .filter(Boolean)
+      .map((entry) => cleanText(entry, { max: 100_000 }))
+      .join("\n\n");
+    const narrative = cleanText(buildDetails(combinedDetails, requirementList, questionList), { max: 100_000 });
+    if (!safeTitle || safeTitle.length < 5 || !narrative || narrative.length < 50) {
       return res.status(400).json({ error: "Title and description are required." });
+    }
+    const normalizedPractice = normalizePracticeArea(practiceArea);
+    if (!normalizedPractice) {
+      return res.status(400).json({ error: "Select a valid practice area." });
     }
 
     const currency = cleanString(req.body?.currency || "usd", { len: 8 }).toLowerCase() || "usd";
@@ -238,15 +298,21 @@ router.post(
       req.body?.compensation;
     const amountCents = dollarsToCents(amountInput);
 
+    const deadlineDate = parseDeadline(deadline);
+    if (deadline && !deadlineDate) {
+      return res.status(400).json({ error: "Invalid deadline provided." });
+    }
+
     const created = await Case.create({
       title: safeTitle,
-      practiceArea: cleanString(practiceArea || "", { len: 200 }),
+      practiceArea: normalizedPractice,
       details: narrative,
       attorney: req.user.id,
       attorneyId: req.user.id,
       status: "open",
       totalAmount: typeof amountCents === "number" && amountCents > 0 ? amountCents : 0,
       currency,
+      deadline: deadlineDate,
       briefSummary: buildBriefSummary({ state, employmentType, experience }),
       updates: [
         {
@@ -362,19 +428,53 @@ router.patch(
     }
     const doc = req.case;
     const body = req.body || {};
+    const forbiddenKeys = ["applicants", "paralegal", "paralegalId", "attorney", "attorneyId"];
+    if (forbiddenKeys.some((key) => Object.prototype.hasOwnProperty.call(body, key))) {
+      return res.status(400).json({ error: "One or more fields cannot be modified." });
+    }
+    let touched = false;
 
     if (typeof body.title === "string" && body.title.trim()) {
-      doc.title = cleanString(body.title, { len: 300 });
+      const nextTitle = cleanString(body.title, { len: 300 });
+      if (nextTitle.length < 5) {
+        return res.status(400).json({ error: "Title must be at least 5 characters." });
+      }
+      doc.title = nextTitle;
+      touched = true;
     }
     const updatedDetails = typeof body.details === "string" ? body.details : typeof body.description === "string" ? body.description : null;
     if (updatedDetails) {
-      doc.details = cleanString(updatedDetails, { len: 100_000 });
+      const sanitizedDetails = cleanString(updatedDetails, { len: 100_000 });
+      if (sanitizedDetails.length < 20) {
+        return res.status(400).json({ error: "Description is too short." });
+      }
+      doc.details = sanitizedDetails;
+      touched = true;
     }
     if (typeof body.practiceArea === "string") {
-      doc.practiceArea = cleanString(body.practiceArea, { len: 200 });
+      const nextPractice = normalizePracticeArea(body.practiceArea);
+      if (!nextPractice) {
+        return res.status(400).json({ error: "Select a valid practice area." });
+      }
+      doc.practiceArea = nextPractice;
+      touched = true;
     }
     if (typeof body.briefSummary === "string") {
       doc.briefSummary = cleanString(body.briefSummary, { len: 1000 });
+      touched = true;
+    }
+    if (typeof body.deadline !== "undefined") {
+      if (!body.deadline) {
+        doc.deadline = null;
+        touched = true;
+      } else {
+        const nextDeadline = parseDeadline(body.deadline);
+        if (!nextDeadline) {
+          return res.status(400).json({ error: "Invalid deadline provided." });
+        }
+        doc.deadline = nextDeadline;
+        touched = true;
+      }
     }
     const amountInput =
       body.totalAmount ?? body.budget ?? body.compensationAmount ?? body.compAmount;
@@ -382,10 +482,16 @@ router.patch(
       const cents = dollarsToCents(amountInput);
       if (cents !== null && cents >= 0) {
         doc.totalAmount = cents;
+        touched = true;
       }
     }
     if (typeof body.currency === "string" && body.currency.trim()) {
       doc.currency = cleanString(body.currency, { len: 8 }).toLowerCase();
+       touched = true;
+    }
+
+    if (!touched) {
+      return res.status(400).json({ error: "No valid changes provided." });
     }
 
     await doc.save();
@@ -704,16 +810,19 @@ router.post(
     if (doc.paralegal) return res.status(400).json({ error: "A paralegal has already been hired" });
     if (doc.status !== "open") return res.status(400).json({ error: "Applications are closed for this case" });
 
-    const note = cleanString(req.body?.note || req.body?.coverLetter || "", { len: 4000 });
+    const rawNote = cleanString(req.body?.note || req.body?.coverLetter || "", { len: 2000 });
+    if (rawNote && rawNote.length < 20) {
+      return res.status(400).json({ error: "Please provide more detail in your note (20+ characters)." });
+    }
     try {
-      doc.addApplicant(req.user.id, note);
+      doc.addApplicant(req.user.id, rawNote);
     } catch (err) {
       return res.status(400).json({ error: err?.message || "You have already applied to this case" });
     }
 
     await doc.save();
     try {
-      await logAction(req, "case.apply", { targetType: "case", targetId: doc._id, meta: { note: Boolean(note) } });
+      await logAction(req, "case.apply", { targetType: "case", targetId: doc._id, meta: { note: Boolean(rawNote) } });
     } catch {}
 
     res.status(201).json({ ok: true, applicants: doc.applicants.length });

@@ -27,8 +27,10 @@ const isObjId = (id) => mongoose.isValidObjectId(id);
 
 function sanitizeText(s) {
   if (typeof s !== "string") return "";
-  const trimmed = s.trim().replace(/[\u0000-\u001F\u007F]/g, "").slice(0, 20000);
-  return containsProfanity(trimmed) ? maskProfanity(trimmed) : trimmed;
+  const stripped = s.replace(/<[^>]*>/g, "").replace(/[\u0000-\u001F\u007F]/g, "").trim();
+  if (!stripped) return "";
+  const limited = stripped.slice(0, 2000);
+  return containsProfanity(limited) ? maskProfanity(limited) : limited;
 }
 
 function buildCaseAccessFilter(user) {

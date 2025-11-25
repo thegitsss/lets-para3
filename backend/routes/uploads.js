@@ -103,17 +103,13 @@ function sseParams() {
 // Allowed content types (expand if needed)
 const ALLOWED = new Set([
   "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "image/png",
   "image/jpeg",
-  "audio/mpeg",
-  "audio/webm",
-  "audio/wav",
-  "audio/mp4",
-  // Uncomment if you want docs/text:
-  // "application/msword",
-  // "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  // "text/plain",
 ]);
+const BLOCKED = [/html/i, /javascript/i, /zip/i, /x-msdownload/i, /octet-stream/i];
+const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
 // ----------------------------------------
 // All routes require auth
@@ -146,11 +142,25 @@ router.post(
   
   async (req, res) => {
     try {
-      const { contentType, ext, folder, caseId, checksumSha256, contentDisposition } = req.body || {};
+      const { contentType, ext, folder, caseId, checksumSha256, contentDisposition, size } = req.body || {};
       if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
 
+      if (!contentType || typeof contentType !== "string") {
+        return res.status(400).json({ msg: "contentType required" });
+      }
       if (!ALLOWED.has(contentType)) {
         return res.status(400).json({ msg: "Type not allowed" });
+      }
+      if (BLOCKED.some((rx) => rx.test(contentType))) {
+        return res.status(400).json({ msg: "Type not allowed" });
+      }
+
+      const declaredSize = Number(size);
+      if (!Number.isFinite(declaredSize) || declaredSize <= 0) {
+        return res.status(400).json({ msg: "File size is required" });
+      }
+      if (declaredSize > MAX_FILE_BYTES) {
+        return res.status(400).json({ msg: "File exceeds maximum allowed size" });
       }
 
       const safeFolder = safeSegment(folder || "uploads", { allowSlash: true }) || "uploads";
@@ -168,6 +178,7 @@ router.post(
         Bucket: BUCKET,
         Key: key,
         ContentType: contentType,
+        ContentLength: declaredSize,
         ACL: "private",
         ...sseParams(),
       };

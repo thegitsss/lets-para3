@@ -2876,6 +2876,7 @@ async function uploadToS3(file, caseId) {
     ext,
     folder: "cases",
     caseId,
+    size: file.size,
   };
   const presignRes = await secureFetch("/api/uploads/presign", {
     method: "POST",

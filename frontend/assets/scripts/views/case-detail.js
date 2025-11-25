@@ -326,6 +326,8 @@ async function hireParalegal(caseId, paralegalId, button) {
     return;
   }
   button?.setAttribute("disabled", "disabled");
+  button?.setAttribute("data-btn-text", button.textContent || "Hire");
+  if (button) button.textContent = "Hiring…";
   try {
     await j(`/api/cases/${encodeURIComponent(caseId)}/hire/${encodeURIComponent(paralegalId)}`, {
       method: "POST",
@@ -333,10 +335,16 @@ async function hireParalegal(caseId, paralegalId, button) {
     if (button) {
       button.textContent = "Hired";
       button.classList.add("success");
+      button.removeAttribute("data-btn-text");
     }
     notify("Paralegal hired successfully.", "success");
   } catch (err) {
-    button?.removeAttribute("disabled");
+    if (button) {
+      button.removeAttribute("disabled");
+      const original = button.getAttribute("data-btn-text") || "Hire";
+      button.textContent = original;
+      button.removeAttribute("data-btn-text");
+    }
     notify(err?.message || "Unable to hire paralegal.", "error");
   }
 }

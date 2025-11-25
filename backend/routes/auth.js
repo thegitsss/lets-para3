@@ -4,6 +4,8 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
+const axios = require("axios");
+const { URLSearchParams } = require("url");
 
 const User = require("../models/User");
 const AuditLog = require("../models/AuditLog"); // audit trail hooks
@@ -38,6 +40,25 @@ function isObjId(id) {
   return mongoose.isValidObjectId(id);
 }
 
+async function verifyRecaptcha(token, expectedAction) {
+  const secret = process.env.RECAPTCHA_SECRET || "";
+  if (!secret) return true;
+  if (!token) return false;
+  try {
+    const params = new URLSearchParams();
+    params.append("secret", secret);
+    params.append("response", token);
+    const { data } = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);
+    if (!data?.success) return false;
+    if (expectedAction && data.action && data.action !== expectedAction) return false;
+    if (typeof data.score === "number" && data.score < 0.3) return false;
+    return true;
+  } catch (err) {
+    console.error("[recaptcha] verify error", err?.message || err);
+    return false;
+  }
+}
+
 // ----------------------------------------
 // REGISTER
 // POST /api/auth/register
@@ -54,7 +75,13 @@ router.post(
       barNumber,
       resumeURL,
       certificateURL,
+      recaptchaToken,
     } = req.body || {};
+
+    const captchaOk = await verifyRecaptcha(recaptchaToken, "signup");
+    if (!captchaOk) {
+      return res.status(400).json({ msg: "reCAPTCHA failed. Please try again." });
+    }
 
     const safeFirst = String(firstName || "").trim();
     const safeLast = String(lastName || "").trim();
@@ -124,7 +151,12 @@ router.post(
 router.post(
   "/login",
   asyncHandler(async (req, res) => {
-    const { email, password } = req.body || {};
+    const { email, password, recaptchaToken } = req.body || {};
+
+    const captchaOk = await verifyRecaptcha(recaptchaToken, "login");
+    if (!captchaOk) {
+      return res.status(400).json({ msg: "reCAPTCHA failed. Please try again." });
+    }
 
     if (!isEmail(email) || !password) {
       return res.status(400).json({ msg: "Invalid credentials" });
