@@ -3,6 +3,10 @@
 .env.local
 .env.development
 .env.production
+*.env
+.env.*
+backend/.env
+backend/.env.*
 
 # --- NODE ---
 node_modules/
