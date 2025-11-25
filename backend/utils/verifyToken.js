@@ -170,7 +170,7 @@ function makeVerifier(required = true) {
       return res.status(403).json({ msg: "Invalid token" });
     }
 
-    req.user = user;
+    req.user = Object.assign({ _id: user.id }, user);
     req.auth = { token, payload };
     return next();
   };

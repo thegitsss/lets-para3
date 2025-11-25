@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Active Cases | Let’s-ParaConnect</title>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <script src="assets/scripts/utils/session.js"></script>
   <style>
     :root {
       --bg: #ffffff;
@@ -25,11 +26,9 @@
       background:var(--bg);
       color:var(--ink);
       display:flex;
-      height:100vh;
-      overflow:hidden;
+      min-height:100vh;
     }
 
-    /* Sidebar */
     .sidebar{
       width:240px;
       background:var(--sidebar-bg);
@@ -62,14 +61,12 @@
       text-align:center;
     }
 
-    /* Main */
     .main{
       flex:1;
       padding:40px;
       overflow-y:auto;
     }
 
-    /* Topbar */
     .topbar{
       display:flex;
       justify-content:flex-end;
@@ -77,18 +74,50 @@
       margin-bottom:2rem;
       gap:1.5rem;
     }
-    .notification-icon svg{width:20px;height:20px;color:var(--ink);}
-    .notification-badge{
-      position:absolute;top:-6px;right:-6px;
-      background:red;color:white;border-radius:50%;
-      font-size:0.7rem;width:16px;height:16px;
-      display:flex;align-items:center;justify-content:center;font-weight:bold;
-    }
-    .user-profile{display:flex;align-items:center;gap:.75rem;cursor:pointer;}
-    .user-profile img{width:36px;height:36px;border-radius:50%;}
-    .user-profile span{font-weight:400;font-size:.95rem;}
 
-    /* Page header */
+    .notification-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #fff;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .notification-icon:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .notification-icon svg {
+      width: 22px;
+      height: 22px;
+      color: var(--ink);
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: #c0392b;
+      color: #fff;
+      font-size: 0.75rem;
+      border-radius: 999px;
+      padding: 2px 6px;
+      line-height: 1;
+      display: none;
+      font-weight: 600;
+    }
+
+    .notification-badge.show {
+      display: inline-flex;
+    }
+
     header h1{
       font-family:var(--font-serif);
       font-weight:300;
@@ -97,7 +126,6 @@
     }
     header p{font-weight:200;color:var(--muted);margin-bottom:2rem;}
 
-    /* Active Cases layout */
     .page-header{
       display:flex;
       justify-content:space-between;
@@ -128,8 +156,8 @@
     .add-btn{
       background:var(--accent);
       color:#fff;
-      font-family: Sarabun;
-      font-weight: 300;
+      font-family:Sarabun;
+      font-weight:300;
       border:none;
       border-radius:6px;
       padding:9px 14px;
@@ -139,7 +167,6 @@
     }
     .add-btn:hover{background:#a0854d;}
 
-    /* Tabs */
     .filter-tabs{display:flex;gap:8px;margin-bottom:1.5rem;flex-wrap:wrap;}
     .filter-tab{
       padding:6px 14px;
@@ -157,7 +184,6 @@
       border-color:var(--accent);
     }
 
-    /* Table */
     table{
       width:100%;
       border-collapse:collapse;
@@ -181,7 +207,7 @@
     td a{
       color:var(--ink);
       text-decoration:none;
-      font-weight:400;
+      font-weight:200;
     }
     td a:hover{color:var(--accent);}
     .status{
@@ -189,6 +215,8 @@
       padding:3px 8px;
       border-radius:6px;
       font-weight:500;
+      display:inline-flex;
+      align-items:center;
     }
     .status.public{background:rgba(31,122,74,.1);color:#1f7a4a;}
     .status.private{background:rgba(176,71,71,.1);color:#b04747;}
@@ -196,16 +224,6 @@
     .status.accepted{background:rgba(32,131,87,0.12);color:#1e6d45;}
     .status.declined{background:rgba(176,71,71,.12);color:#a93232;}
     .actions{text-align:right;}
-    .actions button{
-      background:none;
-      border:none;
-      color:var(--muted);
-      cursor:pointer;
-      font-size:1.1rem;
-      padding:4px;
-      transition:color .2s;
-    }
-    .actions button:hover{color:var(--accent);}
     .case-actions {position:relative; display:inline-block;}
     .case-actions.open .case-menu {display:block;}
     .menu-trigger {
@@ -228,7 +246,7 @@
       border-radius:10px;
       box-shadow:0 12px 24px rgba(0,0,0,0.12);
       display:none;
-      min-width:170px;
+      min-width:200px;
       z-index:10;
     }
     .case-menu button {
@@ -247,10 +265,34 @@
     .case-menu button:hover {background:rgba(182,164,122,0.1); color:var(--accent);}
     .case-menu .danger {color:#b04747;}
     .case-menu .danger:hover {color:#b04747;}
+    .case-table.hidden {display:none;}
+    .empty-row {
+      text-align:center;
+      color:var(--muted);
+      font-style:italic;
+    }
+    .toast {
+      position:fixed;
+      left:50%;
+      bottom:30px;
+      transform:translate(-50%,20px);
+      background:rgba(17,17,17,0.92);
+      color:#fff;
+      padding:0.85rem 1.25rem;
+      border-radius:12px;
+      font-size:0.9rem;
+      opacity:0;
+      pointer-events:none;
+      transition:opacity 0.25s ease, transform 0.25s ease;
+      z-index:2000;
+    }
+    .toast.show {
+      opacity:1;
+      transform:translate(-50%,0);
+    }
   </style>
 </head>
 <body>
-  <!-- Sidebar -->
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
     <nav>
@@ -260,329 +302,116 @@
       <a href="documents.html">Documents</a>
       <a href="review.html">Review</a>
       <a href="case-files.html">Case Files</a>
-      <a href="payments-escrow.html">Billing</a>
+      <a href="billing-attorney.html">Billing</a>
       <a href="tasks.html">Tasks</a>
       <a href="help.html">Help</a>
     </nav>
-    <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
+    <div class="sidebar-footer">© Let’s‑ParaConnect 2025</div>
   </aside>
 
-  <!-- Main Content -->
   <main class="main">
-    <div class="topbar">
-      <div class="notification-icon" style="position:relative;">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-        </svg>
-        <span class="notification-badge">2</span>
-      </div>
-      <div class="user-profile">
-        <img src="https://via.placeholder.com/36" alt="User avatar" />
-        <span>Samantha</span>
-      </div>
-    </div>
+    <div class="topbar" data-attorney-header></div>
 
     <header>
       <h1>Active Cases</h1>
-      <p>Manage and monitor your open cases below.</p>
+      <p>Manage and monitor your open matters below.</p>
     </header>
 
     <div class="page-header">
       <h2>All Active Cases</h2>
       <div class="actions">
-        <input type="search" placeholder="Search cases..." />
-        <button class="add-btn" onclick="location.href='create-case.html'">＋ New Case</button>
+        <input type="search" placeholder="Search cases..." data-cases-search />
+        <button class="add-btn" type="button" data-case-quick="create">＋ New Case</button>
       </div>
     </div>
 
     <div class="filter-tabs">
-      <button class="filter-tab active" data-target="activeCases">Active (4)</button>
-      <button class="filter-tab" data-target="draftCases">Draft (0)</button>
-      <button class="filter-tab" data-target="archivedCases">Archived (1)</button>
-      <button class="filter-tab" data-target="inquiryCases">Inquiries (3)</button>
+      <button class="filter-tab active" data-case-filter="active">Active (<span data-case-count="active">0</span>)</button>
+      <button class="filter-tab" data-case-filter="draft">Draft (<span data-case-count="draft">0</span>)</button>
+      <button class="filter-tab" data-case-filter="archived">Archived (<span data-case-count="archived">0</span>)</button>
+      <button class="filter-tab" data-case-filter="inquiries">Inquiries (<span data-case-count="inquiries">0</span>)</button>
     </div>
-<div class="case-table" id="activeCases">
-    <table>
-      <thead>
-        <tr>
-          <th>Title</th>
-          <th>Client</th>
-          <th>Specialty</th>
-          <th>Status</th>
-          <th>Posted</th>
-          <th class="actions"></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><a href="case-detail.html">Motion for Summary Judgment</a></td>
-          <td>Smith & Co.</td>
-          <td>Litigation</td>
-          <td><span class="status public">OPEN</span></td>
-          <td>Nov 1 2025</td>
-          <td class="actions">
-            <div class="case-actions" data-case="Motion for Summary Judgment">
-              <button class="menu-trigger" aria-haspopup="true" aria-expanded="false">⋯</button>
-              <div class="case-menu" role="menu">
-                <button class="menu-item" data-action="download">Download Case</button>
-                <button class="menu-item danger" data-action="delete">Delete Case</button>
-              </div>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td><a href="case-detail.html">Family Settlement Agreement</a></td>
-          <td>Johnson Law Group</td>
-          <td>Family Law</td>
-          <td><span class="status private">IN PROGRESS</span></td>
-          <td>Oct 28 2025</td>
-          <td class="actions">
-            <div class="case-actions" data-case="Family Settlement Agreement">
-              <button class="menu-trigger" aria-haspopup="true" aria-expanded="false">⋯</button>
-              <div class="case-menu" role="menu">
-                <button class="menu-item" data-action="download">Download Case</button>
-                <button class="menu-item danger" data-action="delete">Delete Case</button>
-              </div>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td><a href="case-detail.html">Corporate Bylaws Update</a></td>
-          <td>Brightpath LLC</td>
-          <td>Corporate</td>
-          <td><span class="status public">OPEN</span></td>
-          <td>Oct 15 2025</td>
-          <td class="actions">
-            <div class="case-actions" data-case="Corporate Bylaws Update">
-              <button class="menu-trigger" aria-haspopup="true" aria-expanded="false">⋯</button>
-              <div class="case-menu" role="menu">
-                <button class="menu-item" data-action="download">Download Case</button>
-                <button class="menu-item danger" data-action="delete">Delete Case</button>
-              </div>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td><a href="case-detail.html">Discovery Responses</a></td>
-          <td>Anderson & Reed</td>
-          <td>Litigation</td>
-          <td><span class="status private">IN PROGRESS</span></td>
-          <td>Sep 30 2025</td>
-          <td class="actions">
-            <div class="case-actions" data-case="Discovery Responses">
-              <button class="menu-trigger" aria-haspopup="true" aria-expanded="false">⋯</button>
-              <div class="case-menu" role="menu">
-                <button class="menu-item" data-action="download">Download Case</button>
-                <button class="menu-item danger" data-action="delete">Delete Case</button>
-              </div>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-</div>
-<!-- DRAFT CASES -->
-<div class="case-table" id="draftCases" style="display:none;">
-  <table>
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Client</th>
-        <th>Specialty</th>
-        <th>Status</th>
-        <th>Last Edited</th>
-        <th class="actions"></th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td colspan="6" style="text-align:center; color:var(--muted); font-style:italic;">No draft cases yet.</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
 
-<!-- ARCHIVED CASES -->
-<div class="case-table" id="archivedCases" style="display:none;">
-  <table>
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Client</th>
-        <th>Specialty</th>
-        <th>Status</th>
-        <th>Completed</th>
-        <th class="actions"></th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a href="#">Estate Planning Packet</a></td>
-        <td>Hamilton & Ross</td>
-        <td>Estate Law</td>
-        <td><span class="status public">COMPLETED</span></td>
-        <td>Aug 20 2025</td>
-        <td class="actions">
-          <div class="case-actions" data-case="Estate Planning Packet">
-            <button class="menu-trigger" aria-haspopup="true" aria-expanded="false">⋯</button>
-            <div class="case-menu" role="menu">
-              <button class="menu-item" data-action="download">Download Case</button>
-              <button class="menu-item danger" data-action="delete">Delete Case</button>
-            </div>
-          </div>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+    <div data-cases-wrapper>
+      <div class="case-table" data-case-table="active">
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Client</th>
+              <th>Specialty</th>
+              <th>Status</th>
+              <th>Posted</th>
+              <th class="actions"></th>
+            </tr>
+          </thead>
+          <tbody data-table-body="active">
+            <tr><td colspan="6" class="empty-row">Loading cases…</td></tr>
+          </tbody>
+        </table>
+      </div>
 
-<!-- INQUIRY RECORDS -->
-<div class="case-table" id="inquiryCases" style="display:none;">
-  <table>
-    <thead>
-      <tr>
-        <th>Paralegal</th>
-        <th>Case / Client</th>
-        <th>Specialty</th>
-        <th>Sent On</th>
-        <th>Status</th>
-        <th class="actions"></th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a href="profile-paralegal.html">Ava Martinez</a></td>
-        <td>Family Settlement Agreement<br/><small>Johnson Law Group</small></td>
-        <td>Family Law</td>
-        <td>Nov 18 2025</td>
-        <td><span class="status pending">PENDING</span></td>
-        <td class="actions">
-          <div class="case-actions" data-case="Inquiry to Ava Martinez">
-            <button class="menu-trigger" aria-haspopup="true" aria-expanded="false">⋯</button>
-            <div class="case-menu" role="menu">
-              <button class="menu-item" data-action="download">View Thread</button>
-              <button class="menu-item danger" data-action="delete">Withdraw Inquiry</button>
-            </div>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td><a href="profile-paralegal.html">Liam O’Connor</a></td>
-        <td>Discovery Responses<br/><small>Anderson & Reed</small></td>
-        <td>Litigation</td>
-        <td>Nov 12 2025</td>
-        <td><span class="status accepted">ACCEPTED</span></td>
-        <td class="actions">
-          <div class="case-actions" data-case="Inquiry to Liam OConnor">
-            <button class="menu-trigger" aria-haspopup="true" aria-expanded="false">⋯</button>
-            <div class="case-menu" role="menu">
-              <button class="menu-item" data-action="download">Open Messages</button>
-              <button class="menu-item danger" data-action="delete">Close Inquiry</button>
-            </div>
-          </div>
-        </td>
-      </tr>
-      <tr>
-        <td><a href="profile-paralegal.html">Naomi Chen</a></td>
-        <td>Corporate Bylaws Update<br/><small>Brightpath LLC</small></td>
-        <td>Corporate</td>
-        <td>Nov 05 2025</td>
-        <td><span class="status declined">DECLINED</span></td>
-        <td class="actions">
-          <div class="case-actions" data-case="Inquiry to Naomi Chen">
-            <button class="menu-trigger" aria-haspopup="true" aria-expanded="false">⋯</button>
-            <div class="case-menu" role="menu">
-              <button class="menu-item" data-action="download">Review Feedback</button>
-              <button class="menu-item danger" data-action="delete">Remove Record</button>
-            </div>
-          </div>
-        </td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+      <div class="case-table hidden" data-case-table="draft">
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Client</th>
+              <th>Specialty</th>
+              <th>Status</th>
+              <th>Last Edited</th>
+              <th class="actions"></th>
+            </tr>
+          </thead>
+          <tbody data-table-body="draft">
+            <tr><td colspan="6" class="empty-row">Loading draft cases…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="case-table hidden" data-case-table="archived">
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Client</th>
+              <th>Specialty</th>
+              <th>Status</th>
+              <th>Archived</th>
+              <th class="actions"></th>
+            </tr>
+          </thead>
+          <tbody data-table-body="archived">
+            <tr><td colspan="6" class="empty-row">Loading archived cases…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="case-table hidden" data-case-table="inquiries">
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Client</th>
+              <th>Specialty</th>
+              <th>Status</th>
+              <th>Posted</th>
+              <th class="actions"></th>
+            </tr>
+          </thead>
+          <tbody data-table-body="inquiries">
+            <tr><td colspan="6" class="empty-row">Loading inquiries…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </main>
-<script>
-  // ===== Tab Switching Logic =====
-  const filterTabs = document.querySelectorAll('.filter-tab');
-  const caseTables = document.querySelectorAll('.case-table');
 
-  filterTabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      filterTabs.forEach(btn => btn.classList.remove('active'));
-      caseTables.forEach(table => table.style.display = 'none');
-      tab.classList.add('active');
-      const target = tab.dataset.target;
-      const tableToShow = document.getElementById(target);
-      if (tableToShow) tableToShow.style.display = 'block';
-    });
-  });
-
-  // ===== Case Actions Menu =====
-  const actionContainers = document.querySelectorAll('.case-actions');
-
-  function closeMenus() {
-    actionContainers.forEach(container => {
-      container.classList.remove('open');
-      const trigger = container.querySelector('.menu-trigger');
-      if (trigger) trigger.setAttribute('aria-expanded', 'false');
-    });
-  }
-
-  document.addEventListener('click', closeMenus);
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeMenus();
-  });
-
-  actionContainers.forEach(container => {
-    const trigger = container.querySelector('.menu-trigger');
-    const menu = container.querySelector('.case-menu');
-    if (!trigger || !menu) return;
-
-    trigger.addEventListener('click', e => {
-      e.stopPropagation();
-      const isOpen = container.classList.contains('open');
-      closeMenus();
-      if (!isOpen) {
-        container.classList.add('open');
-        trigger.setAttribute('aria-expanded', 'true');
-      }
-    });
-
-    menu.addEventListener('click', e => {
-      e.stopPropagation();
-      const actionBtn = e.target.closest('button[data-action]');
-      if (!actionBtn) return;
-      handleCaseAction(actionBtn.dataset.action, container.closest('tr'), container.dataset.case);
-      closeMenus();
-    });
-  });
-
-  function handleCaseAction(action, row, caseNameFallback) {
-    if (!row) return;
-    const titleCell = row.querySelector('td a');
-    const caseName = caseNameFallback || (titleCell ? titleCell.textContent.trim() : row.cells[0].textContent.trim());
-
-    if (action === 'download') {
-      const details = Array.from(row.cells)
-        .slice(0, row.cells.length - 1)
-        .map((cell, idx) => `${row.closest('table').querySelectorAll('th')[idx].textContent.trim()}: ${cell.textContent.trim()}`)
-        .join('\n');
-      const bundle = `Case Export\n${caseName}\n\n${details}\n\nFiles: [placeholder]\nMessages: [placeholder]\nPayments: [placeholder]`;
-      const blob = new Blob([bundle], { type: 'text/plain' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `${caseName.replace(/\\s+/g,'_')}_export.txt`;
-      a.click();
-    }
-
-    if (action === 'delete') {
-      const confirmed = confirm(`Delete “${caseName}”? This action cannot be undone.`);
-      if (confirmed) {
-        row.remove();
-      }
-    }
-  }
-</script>
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script>
+    window.__ATTORNEY_PAGE__ = "cases";
+  </script>
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script type="module" src="assets/scripts/attorney-tabs.js"></script>
 </body>
 </html>

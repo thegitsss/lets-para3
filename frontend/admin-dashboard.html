@@ -4,8 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Admin Dashboard | Let's-ParaConnect</title>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="assets/scripts/utils/session.js"></script>
+<script type="module" src="assets/scripts/auth.js"></script>
 <style>
 :root{
   --accent:#b6a47a;
@@ -62,6 +64,21 @@ nav a{
   transition:background .3s;
 }
 nav a.active,nav a:hover{background:rgba(255,255,255,0.15);}
+.sidebar-link{
+  display:block;
+  width:100%;
+  border:none;
+  background:none;
+  color:#fff;
+  font-size:.95rem;
+  font-family:var(--font-sans);
+  font-weight:200;
+  text-align:left;
+  padding:10px 14px;
+  border-radius:8px;
+  cursor:pointer;
+}
+.sidebar-link:hover,.sidebar-link:focus{background:rgba(255,255,255,0.15);outline:none;}
 .sidebar-footer{
   margin-top:auto;
   font-size:.7rem;
@@ -157,6 +174,17 @@ header p{color:var(--muted);font-size:.95rem;margin-bottom:2rem;}
 .flagged-list{list-style:none;padding:0;margin:0;}
 .flagged-list li{padding:.6rem .4rem;border-bottom:1px solid var(--line);font-size:.95rem;}
 .flagged-list li:last-child{border-bottom:none;}
+#section-user-management,
+#section-user-management *{
+  font-family:var(--font-sans);
+  font-weight:200;
+}
+#section-user-management h1,
+#section-user-management h2,
+#section-user-management h3{
+  font-family:var(--font-serif);
+  font-weight:300;
+}
 .quality-bar{height:10px;background:#e8e8e8;border-radius:6px;overflow:hidden;}
 .quality-fill{height:10px;background:var(--accent);border-radius:6px 0 0 6px;}
 .btn.danger{background:#ffebeb;color:#c0392b;border:1px solid #f8d7da;}
@@ -171,7 +199,7 @@ header p{color:var(--muted);font-size:.95rem;margin-bottom:2rem;}
 .tax-summary strong{color:var(--ink);}
 .payout-schedule li:last-child,.tax-summary li:last-child{border-bottom:none;}
 .metric h3{font-family:var(--font-serif);font-weight:400;font-size:1.1rem;margin-bottom:.25rem;}
-.metric p{font-size:1.6rem;color:var(--accent);font-weight:400;}
+.metric p{font-size:1.6rem;color:var(--accent);font-weight:200;}
 
 /* Panels */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:1.5rem;margin-bottom:2rem;}
@@ -197,7 +225,7 @@ header p{color:var(--muted);font-size:.95rem;margin-bottom:2rem;}
 .panel.collapsed .panel-content{display:none;}
 table{width:100%;border-collapse:collapse;font-size:.9rem;}
 th,td{text-align:left;padding:10px 6px;border-bottom:1px solid var(--line);}
-th{color:var(--muted);font-weight:400;}
+th{color:var(--muted);font-weight:200;}
 .btn{border:none;border-radius:6px;padding:6px 12px;font-size:.9rem;cursor:pointer;transition:all .2s ease;}
 .btn.primary{background:var(--accent);color:#fff;}
 .btn.primary:hover{background:#a38e5f;}
@@ -205,6 +233,34 @@ th{color:var(--muted);font-weight:400;}
 .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
 .weather{display:flex;align-items:center;justify-content:space-between;}
 .weather h3{font-family:var(--font-serif);font-weight:400;}
+.toast{
+  position:fixed;
+  right:24px;
+  bottom:24px;
+  background:#111827;
+  color:#fff;
+  padding:12px 18px;
+  border-radius:999px;
+  opacity:0;
+  transform:translateY(20px);
+  transition:opacity .2s ease,transform .2s ease;
+  z-index:2000;
+  font-size:.95rem;
+}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast[data-toast-type="ok"]{background:#1abc9c;}
+.toast[data-toast-type="err"]{background:#c0392b;}
+.pending-controls{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem;align-items:flex-start;}
+.pending-controls .search{flex:1;min-width:220px;}
+.pending-controls select{padding:.55rem .8rem;border:1px solid var(--line);border-radius:6px;background:#fff;font-family:var(--font-sans);font-size:.95rem;}
+.pending-count{color:var(--muted);font-size:.9rem;}
+.pending-empty{padding:1rem;text-align:center;color:var(--muted);}
+.pending-users-table td.actions{width:140px;}
+.pending-users-table td.actions .btn{width:100%;}
+.pending-modal-actions{display:flex;justify-content:flex-end;gap:.75rem;margin-top:1.5rem;}
+#pendingUserModal .details-content{max-width:900px;}
+#pendingUserModal .details-table td:first-child{width:200px;font-weight:600;}
+#pendingUserModal .details-table td:last-child{white-space:pre-line;}
 </style>
 </head>
 
@@ -220,6 +276,7 @@ th{color:var(--muted);font-weight:400;}
     <a href="#" data-section="activity-logs">Activity Logs</a>
     <a href="#" data-section="settings">Settings</a>
   </nav>
+  <button type="button" class="sidebar-link" id="sidebarLogoutBtn">Log Out</button>
   <div id="weatherSidebar">Loading weather…</div>
   <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
 </aside>
@@ -237,6 +294,19 @@ th{color:var(--muted);font-weight:400;}
       <div class="metric"><h3>Funds in Escrow</h3><p id="escrowTotal">$0</p></div>
       <div class="metric"><h3>Active Cases</h3><p id="activeCases">0</p></div>
       <div class="metric"><h3>Pending Approvals</h3><p id="pendingUsers">0</p></div>
+    </div>
+
+    <div class="grid-four" style="margin-bottom:1.5rem;">
+      <div class="card" id="payoutCard">
+        <h3>Payouts</h3>
+        <p style="font-size:1.6rem;font-weight:600;color:var(--accent);" id="payoutTotal">$0</p>
+        <p class="small" id="payoutCount">0 payouts recorded</p>
+      </div>
+      <div class="card" id="incomeCard">
+        <h3>Platform Income</h3>
+        <p style="font-size:1.6rem;font-weight:600;color:var(--accent);" id="incomeTotal">$0</p>
+        <p class="small" id="incomeCount">0 income records</p>
+      </div>
     </div>
 
     <div class="grid">
@@ -325,10 +395,10 @@ th{color:var(--muted);font-weight:400;}
       </div>
 
       <div class="stats-cards">
-        <div class="metric pink"><h3>Attorneys</h3><p>2 455</p></div>
-        <div class="metric blue"><h3>Paralegals</h3><p>1 870</p></div>
-        <div class="metric purple"><h3>Pending Approvals</h3><p>36</p></div>
-        <div class="metric teal"><h3>Suspended Users</h3><p>4</p></div>
+        <div class="metric pink"><h3>Attorneys</h3><p id="metricAttorneys">0</p></div>
+        <div class="metric blue"><h3>Paralegals</h3><p id="metricParalegals">0</p></div>
+        <div class="metric purple"><h3>Pending Approvals</h3><p id="metricPending">0</p></div>
+        <div class="metric teal"><h3>Suspended Users</h3><p id="metricSuspended">0</p></div>
       </div>
     </div>
 
@@ -337,19 +407,16 @@ th{color:var(--muted);font-weight:400;}
       <div class="panel new-users">
         <h2>New Users</h2>
         <input type="text" placeholder="Search…" class="search" />
-        <ul class="user-list">
-          <li><strong>Jhon Smith</strong> <span>Customer</span></li>
-          <li><strong>Sarah Lee</strong> <span>Admin</span></li>
-          <li><strong>Michael Reed</strong> <span>Paralegal</span></li>
+        <ul class="user-list" id="newUsersList">
+          <li style="color:var(--muted)">Loading…</li>
         </ul>
       </div>
 
       <div class="panel weekly-sales">
         <h2>Sales of the Last Week</h2>
-        <div class="circle-progress">74% Progress</div>
-        <ul>
-          <li><strong>Most Sales</strong> – Authors with best sales</li>
-          <li><strong>Total Sales Lead</strong> – +40% Week over Week</li>
+        <div class="circle-progress" id="weeklySalesProgress">0% Progress</div>
+        <ul id="weeklySalesList">
+          <li style="color:var(--muted)">Loading…</li>
         </ul>
       </div>
 
@@ -361,6 +428,39 @@ th{color:var(--muted);font-weight:400;}
           <div><strong>$49</strong><span>Average Bid</span></div>
           <div><strong>$5.8 M</strong><span>All-Time Sales</span></div>
         </div>
+      </div>
+    </div>
+
+    <div class="panel" id="pendingUsersPanel">
+      <div class="panel-header">
+        <h2>Pending User Approvals</h2>
+        <p id="pendingUsersCountLabel" class="pending-count">0 pending users</p>
+      </div>
+      <div class="pending-controls">
+        <input type="search" id="pendingSearch" class="search" placeholder="Search name, email, or specialty…" aria-label="Search pending users" />
+        <select id="pendingRoleFilter" aria-label="Filter by role">
+          <option value="all">All Roles</option>
+          <option value="attorney">Attorneys</option>
+          <option value="paralegal">Paralegals</option>
+        </select>
+        <button class="btn secondary" type="button" id="refreshPendingUsers">Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table class="pending-users-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Role</th>
+              <th>Email</th>
+              <th>Submitted</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pendingUsersBody">
+            <tr><td colspan="6" class="pending-empty">Loading pending users…</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </section>
@@ -666,9 +766,30 @@ th{color:var(--muted);font-weight:400;}
   <section id="section-settings" class="section">
     <h2>Settings</h2>
     <p>Manage site preferences, API keys, and notifications.</p>
-  </section>
+</section>
 
 </main>
+
+<div id="pendingUserModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="pendingModalTitle">
+  <div class="details-content">
+    <div class="details-header">
+      <div>
+        <h2 id="pendingModalTitle">Applicant Details</h2>
+        <p id="pendingModalSubhead" class="pending-count"></p>
+      </div>
+      <button type="button" class="btn secondary" id="closePendingModal">Close ✕</button>
+    </div>
+    <table class="details-table">
+      <tbody id="pendingUserDetails"></tbody>
+    </table>
+    <div class="pending-modal-actions">
+      <button type="button" class="btn danger" id="denyUserBtn">Deny</button>
+      <button type="button" class="btn primary" id="approveUserBtn">Approve</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
 
 <style>
 .section {display:none;opacity:0;transition:opacity .4s ease;}
@@ -676,80 +797,117 @@ th{color:var(--muted);font-weight:400;}
 nav a.active {background:rgba(255,255,255,0.25);}
 </style>
 
+<script src="assets/scripts/utils/toast.js"></script>
 <script>
-// Sidebar navigation toggle
+const adminSession = window.checkSession('admin');
 const navLinks=document.querySelectorAll("nav a");
 const sections=document.querySelectorAll(".section");
+const logoutButton=document.getElementById("sidebarLogoutBtn");
 const refreshCharts=()=>{
   if(!window.dashboardCharts?.length) return;
   window.dashboardCharts.forEach(chart=>chart.resize());
 };
 
+function activateSection(sectionName){
+  if(!sectionName) return;
+  navLinks.forEach(link=>{
+    const match=link.dataset.section===sectionName;
+    link.classList.toggle("active",match);
+  });
+  sections.forEach(section=>{
+    section.classList.toggle("visible",section.id===`section-${sectionName}`);
+  });
+  requestAnimationFrame(refreshCharts);
+}
+window.activateAdminSection = activateSection;
+
 navLinks.forEach(link=>{
   link.addEventListener("click",e=>{
     e.preventDefault();
-    navLinks.forEach(l=>l.classList.remove("active"));
-    link.classList.add("active");
-    const id="section-"+link.dataset.section;
-    sections.forEach(s=>s.classList.remove("visible"));
-    document.getElementById(id).classList.add("visible");
-    requestAnimationFrame(refreshCharts);
+    const target=link.dataset.section;
+    if(target) activateSection(target);
   });
 });
 
-/* Weather in Fahrenheit */
-async function fetchWeather(){
-  const el=document.getElementById("weatherSidebar");
+const pendingMetricCard=document.getElementById("pendingUsers")?.closest(".metric");
+if(pendingMetricCard){
+  pendingMetricCard.addEventListener("click",()=>{
+    activateSection("user-management");
+    setTimeout(()=>document.getElementById("pendingUsersPanel")?.scrollIntoView({behavior:"smooth",block:"start"}),60);
+  });
+}
+
+async function loadSidebarWeather(){
+  const weatherEl=document.getElementById("weatherSidebar");
+  if(!weatherEl) return;
   try{
     const res=await fetch("https://api.open-meteo.com/v1/forecast?latitude=38.918&longitude=-77.231&current_weather=true");
-    if(!res.ok) throw new Error();
+    if(!res.ok) throw new Error("weather");
     const data=await res.json();
-    const tempC=data.current_weather.temperature;
-    const tempF=Math.round(tempC*9/5+32);
-    const codes={0:"Clear",1:"Mainly Clear",2:"Partly Cloudy",3:"Cloudy",45:"Fog",51:"Drizzle",61:"Rain",71:"Snow",95:"Storms"};
-    el.textContent=`${tempF}°F ${codes[data.current_weather.weathercode]||"Fair"}`;
-  }catch{el.textContent="Weather unavailable";}
+    const tempC=data?.current_weather?.temperature;
+    const code=data?.current_weather?.weathercode;
+    const conditionMap={0:"Clear",1:"Mostly Clear",2:"Partly Cloudy",3:"Cloudy",45:"Fog",48:"Fog",51:"Drizzle",53:"Drizzle",55:"Drizzle",61:"Rain",63:"Rain",65:"Heavy Rain",71:"Snow",73:"Snow",75:"Snow",80:"Showers",81:"Showers",82:"Showers",95:"Storms",96:"Storms",99:"Storms"};
+    const tempF=Math.round((Number(tempC)||0)*9/5+32);
+    const label=conditionMap[code]||"Fair";
+    weatherEl.textContent=`${tempF}°F ${label}`;
+  }catch(err){
+    weatherEl.textContent="Weather unavailable";
+  }
 }
-fetchWeather();
-setInterval(fetchWeather,300000);
+loadSidebarWeather();
+
+document.querySelector(".sidebar-footer")?.addEventListener("click",()=>{
+  window.location.href="index.html";
+});
+
 </script>
 
 
-<script>
+<script type="module">
+import { secureFetch, fetchCSRF, logout as authLogout } from './assets/scripts/auth.js';
+const toastHelper = window.toastUtils;
+const toastTarget = 'toastBanner';
+
 function togglePanel(id){document.getElementById(id).classList.toggle('collapsed');}
 const dashboardCharts=window.dashboardCharts||(window.dashboardCharts=[]);
+const payoutTotalEl=document.getElementById("payoutTotal");
+const payoutCountEl=document.getElementById("payoutCount");
+const incomeTotalEl=document.getElementById("incomeTotal");
+const incomeCountEl=document.getElementById("incomeCount");
 
-/* -------- Live Weather (Tysons VA) -------- */
-async function fetchWeather() {
-  const el = document.getElementById("weatherSidebar");
+async function fetchAdminJSON(url, fallback = null) {
   try {
-    const res = await fetch("https://api.open-meteo.com/v1/forecast?latitude=38.918&longitude=-77.231&current_weather=true");
-    if (!res.ok) throw new Error();
-    const data = await res.json();
-
-    // Convert Celsius → Fahrenheit
-    const f = Math.round((data.current_weather.temperature * 9) / 5 + 32);
-
-    const codes = {
-      0: "Clear",
-      1: "Mainly Clear",
-      2: "Partly Cloudy",
-      3: "Cloudy",
-      45: "Fog",
-      51: "Drizzle",
-      61: "Rain",
-      71: "Snow",
-      95: "Storms",
-    };
-
-    el.textContent = `${f}°F ${codes[data.current_weather.weathercode] || "Fair"}`;
-  } catch {
-    el.textContent = "Weather unavailable";
+    const res = await secureFetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } catch (err) {
+    console.warn(`Unable to fetch ${url}`, err);
+    return fallback;
   }
 }
 
-fetchWeather();
-setInterval(fetchWeather, 300000); // Refresh every 5 minutes
+function formatCurrencyFromCents(value) {
+  const dollars = Number(value || 0) / 100;
+  return dollars.toLocaleString(undefined, { style: "currency", currency: "USD" });
+}
+
+async function loadFinanceCards() {
+  if (!payoutTotalEl || !incomeTotalEl) return;
+  try {
+    const [payoutData, incomeData] = await Promise.all([
+      fetchAdminJSON("/api/admin/payouts", { totalAmount: 0, count: 0 }),
+      fetchAdminJSON("/api/admin/income", { totalAmount: 0, count: 0 }),
+    ]);
+    payoutTotalEl.textContent = formatCurrencyFromCents(payoutData.totalAmount);
+    payoutCountEl.textContent = `${payoutData.count || 0} payout${(payoutData.count || 0) === 1 ? "" : "s"} recorded`;
+    incomeTotalEl.textContent = formatCurrencyFromCents(incomeData.totalAmount);
+    incomeCountEl.textContent = `${incomeData.count || 0} income record${(incomeData.count || 0) === 1 ? "" : "s"}`;
+  } catch (err) {
+    console.warn("Unable to load finance cards", err);
+    payoutCountEl.textContent = "Unable to load payouts";
+    incomeCountEl.textContent = "Unable to load income";
+  }
+}
 
 /* -------- Charts (0 until data) -------- */
 dashboardCharts.push(new Chart(document.getElementById("userChart"),{type:"line",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],borderColor:"#b6a47a",backgroundColor:"rgba(182,164,122,0.15)",fill:true,tension:.4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}));
@@ -936,6 +1094,7 @@ function approvePost(btn){
 function flagPost(btn){
   btn.closest("tr").querySelector(".status").className="status pending";
   btn.closest("tr").querySelector(".status").textContent="Flagged";
+  btn.closest("tr").dataset.flagged="true";
   alert("Post flagged for review.");
 }
 function editPost(btn){
@@ -952,11 +1111,43 @@ function savePostEdits(){
   alert("Post updated successfully!");
   closeEditModal();
 }
-document.getElementById("postSearch").addEventListener("keyup",function(){
-  const filter=this.value.toLowerCase();
-  document.querySelectorAll("#postsList tr").forEach(row=>{
-    row.style.display=row.innerText.toLowerCase().includes(filter)?"":"none";
+const postsTableState=(() => {
+  const rows=Array.from(document.querySelectorAll("#postsList tr")).map(row=>{
+    const statusText=row.querySelector(".status")?.textContent?.toLowerCase()||"";
+    const isFlagged=/flagged/.test(statusText)||row.dataset.flagged==="true";
+    return {row,status:statusText,isFlagged};
   });
+  const state={search:"",mode:"all"};
+  const apply=()=>{
+    rows.forEach(({row,status,isFlagged})=>{
+      const matchesMode=
+        state.mode==="pending"
+          ? status.includes("pending")||status.includes("awaiting")
+          : state.mode==="flagged"
+          ? isFlagged
+          : true;
+      const matchesSearch=!state.search||row.innerText.toLowerCase().includes(state.search);
+      row.style.display=matchesMode&&matchesSearch?"":"none";
+    });
+  };
+  return {
+    setSearch(value){
+      state.search=value.trim().toLowerCase();
+      apply();
+    },
+    setMode(mode){
+      state.mode=mode;
+      apply();
+    },
+    getMode(){
+      return state.mode;
+    },
+    apply,
+  };
+})();
+
+document.getElementById("postSearch")?.addEventListener("input",function(){
+  postsTableState.setSearch(this.value || "");
 });
 
 /* -------- Post Quality + Auto-Flagging -------- */
@@ -996,10 +1187,31 @@ if(flaggedList){
   flaggedItems.forEach(f=>{
     const li=document.createElement("li");
     li.innerHTML=`<strong>${f.title}</strong> – quality score <b>${f.score}</b> (needs review)`;
-    flaggedList.appendChild(li);
+flaggedList.appendChild(li);
   });
 }
 
+const postsSection=document.getElementById("section-posts");
+const postsSummaryCards=postsSection?Array.from(postsSection.querySelectorAll(".grid-four .card")):[];
+function focusPostsSection(mode){
+  const nextMode=postsTableState.getMode()===mode?"all":mode;
+  postsTableState.setMode(nextMode);
+  window.activateAdminSection?.("posts");
+  setTimeout(()=>postsSection?.scrollIntoView({behavior:"smooth",block:"start"}),60);
+}
+const pendingReviewCard=postsSummaryCards.find(card=>/pending review/i.test(card.textContent));
+const flaggedCard=postsSummaryCards.find(card=>/flagged/i.test(card.textContent));
+pendingReviewCard?.addEventListener("click",()=>focusPostsSection("pending"));
+flaggedCard?.addEventListener("click",()=>focusPostsSection("flagged"));
+postsTableState.apply();
+
+loadFinanceCards();
+
+logoutButton?.addEventListener("click",(event)=>{
+  event.preventDefault();
+  event.stopPropagation();
+  authLogout("login.html");
+});
 /* Quality Score Chart */
 dashboardCharts.push(new Chart(document.getElementById("qualityScoreChart"),{
   type:"bar",
@@ -1029,6 +1241,310 @@ function pauseReportActivity(id){
 
 /* -------- Auto-Refresh every 5 min -------- */
 setInterval(()=>location.reload(),300000);
+
+window.togglePanel = togglePanel;
+window.pauseReportActivity = pauseReportActivity;
+window.approvePost = approvePost;
+window.flagPost = flagPost;
+window.editPost = editPost;
+window.closeEditModal = closeEditModal;
+window.savePostEdits = savePostEdits;
+window.openEscrowDetails = openEscrowDetails;
+window.closeEscrowDetails = closeEscrowDetails;
+const pendingTableBody = document.getElementById('pendingUsersBody');
+const pendingMetric = document.getElementById('pendingUsers');
+const pendingCountLabel = document.getElementById('pendingUsersCountLabel');
+const pendingSearch = document.getElementById('pendingSearch');
+const pendingRoleFilter = document.getElementById('pendingRoleFilter');
+const refreshPendingBtn = document.getElementById('refreshPendingUsers');
+const modal = document.getElementById('pendingUserModal');
+const modalTitle = document.getElementById('pendingModalTitle');
+const modalSubhead = document.getElementById('pendingModalSubhead');
+const modalDetails = document.getElementById('pendingUserDetails');
+const closeModalBtn = document.getElementById('closePendingModal');
+const approveBtn = document.getElementById('approveUserBtn');
+const denyBtn = document.getElementById('denyUserBtn');
+
+let pendingUsers = [];
+let pendingRequestId = 0;
+let activeUserId = null;
+
+const showToast = (message, type = 'info') => {
+  if (toastHelper?.show) {
+    toastHelper.show(message, { targetId: toastTarget, type });
+  } else {
+    alert(message);
+  }
+};
+
+const toTitle = (value) => {
+  if (!value) return '—';
+  return String(value)
+    .split(/[\s_-]+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+const formatDate = (value) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString();
+};
+
+const listText = (list) => {
+  if (!Array.isArray(list) || !list.length) return '—';
+  return list.join(', ');
+};
+
+const richListText = (entries = []) => {
+  if (!Array.isArray(entries) || !entries.length) return '—';
+  return entries
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      const title = item.title || item.degree || '';
+      const years = item.years ? ` (${item.years})` : '';
+      const desc = item.description ? ` — ${item.description}` : '';
+      const combined = `${title}${years}${desc}`.trim();
+      return combined || JSON.stringify(item);
+    })
+    .join('\n');
+};
+
+const updatePendingCount = (count = 0) => {
+  if (pendingMetric) pendingMetric.textContent = count;
+  if (pendingCountLabel) {
+    pendingCountLabel.textContent =
+      count === 1 ? '1 pending user' : `${count} pending users`;
+  }
+};
+
+const setPendingLoading = (loading) => {
+  if (!refreshPendingBtn) return;
+  refreshPendingBtn.disabled = loading;
+  refreshPendingBtn.textContent = loading ? 'Refreshing…' : 'Refresh';
+};
+
+const displayName = (user = {}) => {
+  return (
+    user.name ||
+    `${user.firstName || ''} ${user.lastName || ''}`.trim() ||
+    '—'
+  );
+};
+
+const renderPendingUsers = () => {
+  if (!pendingTableBody) return;
+  if (!pendingUsers.length) {
+    pendingTableBody.innerHTML =
+      '<tr><td colspan="6" class="pending-empty">No pending applications found.</td></tr>';
+    return;
+  }
+  pendingTableBody.innerHTML = '';
+  pendingUsers.forEach((user) => {
+    const tr = document.createElement('tr');
+
+    const nameTd = document.createElement('td');
+    nameTd.textContent = displayName(user);
+
+    const roleTd = document.createElement('td');
+    roleTd.textContent = toTitle(user.role);
+
+    const emailTd = document.createElement('td');
+    emailTd.textContent = user.email || '—';
+
+    const submittedTd = document.createElement('td');
+    submittedTd.textContent = formatDate(user.createdAt);
+
+    const statusTd = document.createElement('td');
+    const badge = document.createElement('span');
+    const statusValue = (user.status || 'pending').toLowerCase();
+    badge.className = `status ${statusValue}`;
+    badge.textContent = toTitle(statusValue);
+    statusTd.appendChild(badge);
+
+    const actionsTd = document.createElement('td');
+    actionsTd.className = 'actions';
+    const viewBtn = document.createElement('button');
+    viewBtn.type = 'button';
+    viewBtn.className = 'btn secondary';
+    viewBtn.textContent = 'View';
+    viewBtn.addEventListener('click', () => openPendingModal(user.id));
+    actionsTd.appendChild(viewBtn);
+
+    [nameTd, roleTd, emailTd, submittedTd, statusTd, actionsTd].forEach((td) =>
+      tr.appendChild(td)
+    );
+    pendingTableBody.appendChild(tr);
+  });
+};
+
+const appendDetailRow = (label, value, options = {}) => {
+  if (!modalDetails) return;
+  const tr = document.createElement('tr');
+  const labelTd = document.createElement('td');
+  labelTd.textContent = label;
+  const valueTd = document.createElement('td');
+
+  if (options.link && value) {
+    const link = document.createElement('a');
+    link.href = value;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = options.linkLabel || 'View';
+    valueTd.appendChild(link);
+  } else {
+    const hasValue =
+      value !== undefined && value !== null && String(value).trim() !== '';
+    valueTd.textContent = hasValue ? String(value) : '—';
+  }
+
+  tr.appendChild(labelTd);
+  tr.appendChild(valueTd);
+  modalDetails.appendChild(tr);
+};
+
+const openPendingModal = (userId) => {
+  const user = pendingUsers.find((item) => String(item.id) === String(userId));
+  if (!user || !modal || !modalDetails) return;
+  activeUserId = user.id;
+  modalDetails.innerHTML = '';
+  modalTitle.textContent = displayName(user);
+  modalSubhead.textContent = `${toTitle(user.role)} • Submitted ${formatDate(
+    user.createdAt
+  )}`;
+
+  appendDetailRow('Email', user.email);
+  appendDetailRow('Role', toTitle(user.role));
+  appendDetailRow('Status', toTitle(user.status));
+  appendDetailRow('Availability', user.availability);
+  appendDetailRow('Timezone', user.timezone);
+  appendDetailRow('Location', user.location);
+  appendDetailRow('Bar Number', user.barNumber);
+  appendDetailRow('Resume', user.resumeURL, { link: true, linkLabel: 'Open' });
+  appendDetailRow('Certification', user.certificateURL, {
+    link: true,
+    linkLabel: 'Open',
+  });
+  appendDetailRow('Practice Areas', listText(user.practiceAreas));
+  appendDetailRow('Specialties', listText(user.specialties));
+  appendDetailRow('Jurisdictions', listText(user.jurisdictions));
+  appendDetailRow('Skills', listText(user.skills));
+  appendDetailRow('Languages', listText(user.languages));
+  appendDetailRow('Years Experience', user.yearsExperience ?? '—');
+  appendDetailRow('Bio', user.bio || '—');
+  appendDetailRow('About', user.about || '—');
+  appendDetailRow('Experience', richListText(user.experience));
+  appendDetailRow('Education', richListText(user.education));
+
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+};
+
+const closePendingModal = () => {
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+  activeUserId = null;
+  if (modalDetails) modalDetails.innerHTML = '';
+};
+
+const submitDecision = async (action) => {
+  if (!activeUserId) return;
+  const isApprove = action === 'approve';
+  const btn = isApprove ? approveBtn : denyBtn;
+  if (!btn) return;
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = isApprove ? 'Approving…' : 'Denying…';
+
+  try {
+    await fetchCSRF();
+    const res = await secureFetch(
+      `/api/admin/users/${encodeURIComponent(activeUserId)}/${isApprove ? 'approve' : 'deny'}`,
+      { method: 'POST', body: {} }
+    );
+    let payload = {};
+    try {
+      payload = await res.json();
+    } catch (_) {
+      payload = {};
+    }
+    if (!res.ok) {
+      throw new Error(payload?.msg || payload?.error || 'Unable to update user.');
+    }
+    showToast(
+      isApprove ? 'User approved.' : 'User denied.',
+      isApprove ? 'ok' : 'info'
+    );
+    closePendingModal();
+    await loadPendingUsers();
+  } catch (err) {
+    showToast(err?.message || 'Unable to update user.', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+};
+
+const loadPendingUsers = async () => {
+  if (!pendingTableBody) return;
+  const requestId = ++pendingRequestId;
+  setPendingLoading(true);
+  pendingTableBody.innerHTML =
+    '<tr><td colspan="6" class="pending-empty">Loading pending users…</td></tr>';
+  const params = new URLSearchParams({ status: 'pending', limit: '50' });
+  const roleValue = (pendingRoleFilter?.value || '').toLowerCase();
+  if (roleValue && roleValue !== 'all') params.set('role', roleValue);
+  const query = pendingSearch?.value.trim();
+  if (query) params.set('q', query);
+
+  try {
+    const res = await secureFetch(`/api/admin/pending-users?${params.toString()}`, {
+      headers: { Accept: 'application/json' },
+    });
+    const data = res.ok ? await res.json() : { users: [] };
+    if (requestId !== pendingRequestId) return;
+    pendingUsers = Array.isArray(data.users) ? data.users : [];
+    renderPendingUsers();
+    updatePendingCount(
+      typeof data.total === 'number' ? data.total : pendingUsers.length
+    );
+  } catch (err) {
+    if (requestId !== pendingRequestId) return;
+    pendingUsers = [];
+    updatePendingCount(0);
+    pendingTableBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${err?.message || 'Unable to load pending users.'}</td></tr>`;
+  } finally {
+    if (requestId === pendingRequestId) setPendingLoading(false);
+  }
+};
+
+const debounce = (fn, wait = 320) => {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn.apply(null, args), wait);
+  };
+};
+
+pendingRoleFilter?.addEventListener('change', () => loadPendingUsers());
+refreshPendingBtn?.addEventListener('click', () => loadPendingUsers());
+pendingSearch?.addEventListener('input', debounce(() => loadPendingUsers()));
+closeModalBtn?.addEventListener('click', () => closePendingModal());
+modal?.addEventListener('click', (event) => {
+  if (event.target === modal) closePendingModal();
+});
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !modal?.classList.contains('hidden')) {
+    closePendingModal();
+  }
+});
+approveBtn?.addEventListener('click', () => submitDecision('approve'));
+denyBtn?.addEventListener('click', () => submitDecision('deny'));
+
+loadPendingUsers();
 </script>
+<script type="module" src="assets/scripts/admin-dashboard.js"></script>
 </body>
 </html>

@@ -2,6 +2,7 @@
 const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
+const requireRole = require("../middleware/requireRole");
 const { requireCaseAccess } = require("../utils/authz");
 const Message = require("../models/Message");
 const Case = require("../models/Case");
@@ -30,8 +31,45 @@ function sanitizeText(s) {
   return containsProfanity(trimmed) ? maskProfanity(trimmed) : trimmed;
 }
 
+function buildCaseAccessFilter(user) {
+  if (!user) return {};
+  if (user.role === "admin") return {};
+  return { $or: [{ attorney: user.id }, { paralegal: user.id }] };
+}
+
+function buildUnreadClause(userObjectId) {
+  return {
+    $and: [
+      { readBy: { $not: { $elemMatch: { $eq: userObjectId } } } },
+      { readReceipts: { $not: { $elemMatch: { user: userObjectId } } } },
+    ],
+  };
+}
+
 // All message routes require auth
 router.use(verifyToken);
+router.use(requireRole(["admin", "attorney", "paralegal"]));
+
+router.get(
+  "/unread-count",
+  asyncHandler(async (req, res) => {
+    const caseFilter = buildCaseAccessFilter(req.user);
+    const caseDocs = await Case.find(caseFilter).select("_id").lean();
+    if (!caseDocs.length) {
+      return res.json({ count: 0 });
+    }
+    const caseIds = caseDocs.map((doc) => doc._id);
+    const requesterObjectId = new mongoose.Types.ObjectId(req.user.id);
+    const unreadClause = buildUnreadClause(requesterObjectId);
+    const aggregateResult = await Message.aggregate([
+      { $match: { caseId: { $in: caseIds }, deleted: { $ne: true } } },
+      { $match: unreadClause },
+      { $count: "count" },
+    ]);
+    const totalUnread = aggregateResult[0]?.count || 0;
+    res.json({ count: totalUnread });
+  })
+);
 
 /**
  * GET /api/messages/threads?q=&page=&limit=
@@ -46,10 +84,7 @@ router.get(
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip = (page - 1) * limit;
 
-    const caseFilter =
-      req.user.role === "admin"
-        ? {}
-        : { $or: [{ attorney: req.user.id }, { paralegal: req.user.id }] };
+    const caseFilter = buildCaseAccessFilter(req.user);
     if (q.trim()) caseFilter.title = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
 
     const [caseItems, totalCases] = await Promise.all([
@@ -64,33 +99,23 @@ router.get(
 
     // Last message per case (aggregation to avoid N+1)
     const lastMsgs = await Message.aggregate([
-      { $match: { case: { $in: caseIds }, deleted: { $ne: true } } },
+      { $match: { caseId: { $in: caseIds }, deleted: { $ne: true } } },
       { $sort: { createdAt: -1 } },
       {
         $group: {
-          _id: "$case",
-          last: { $first: { type: "$type", content: "$content", createdAt: "$createdAt" } },
+          _id: "$caseId",
+          last: { $first: { type: "$type", text: "$text", fileName: "$fileName", createdAt: "$createdAt" } },
         },
       },
     ]);
 
     // Unread counts per case (checks both legacy readBy and new readReceipts.user)
+    const requesterObjectId = new mongoose.Types.ObjectId(req.user.id);
+    const unreadClause = buildUnreadClause(requesterObjectId);
     const unreadAgg = await Message.aggregate([
-      { $match: { case: { $in: caseIds }, deleted: { $ne: true } } },
-      {
-        $match: {
-          $and: [
-            { $or: [{ readBy: { $ne: req.user.id } }, { readBy: { $exists: false } }] },
-            {
-              $or: [
-                { "readReceipts.user": { $ne: new mongoose.Types.ObjectId(req.user.id) } },
-                { readReceipts: { $exists: false } },
-              ],
-            },
-          ],
-        },
-      },
-      { $group: { _id: "$case", count: { $sum: 1 } } },
+      { $match: { caseId: { $in: caseIds }, deleted: { $ne: true } } },
+      { $match: unreadClause },
+      { $group: { _id: "$caseId", count: { $sum: 1 } } },
     ]);
 
     const lastByCase = new Map(lastMsgs.map((d) => [String(d._id), d.last]));
@@ -98,8 +123,13 @@ router.get(
 
     const threads = caseItems.map((c) => {
       const last = lastByCase.get(String(c._id));
-      const snippet =
-        last?.type === "text" ? (last.content || "").slice(0, 140) : last ? `[${last.type}]` : "";
+      let snippet = "";
+      if (last) {
+        if (last.type === "text") snippet = (last.text || "").slice(0, 140);
+        else if (last.type === "file") snippet = last.fileName ? `[file] ${last.fileName}` : "[file]";
+        else if (last.type === "audio") snippet = "[audio message]";
+        else snippet = `[${last.type}]`;
+      }
       return {
         id: String(c._id),
         title: c.title,
@@ -132,8 +162,9 @@ router.get(
     const after = req.query.after ? new Date(req.query.after) : null;
     let limit = Number(req.query.limit) || 50;
     limit = Math.max(1, Math.min(100, limit));
+    const caseObjectId = new mongoose.Types.ObjectId(caseId);
 
-    const q = { case: caseId, deleted: { $ne: true } };
+    const q = { caseId: caseObjectId, deleted: { $ne: true } };
     if (req.query.threadRoot && isObjId(req.query.threadRoot)) {
       q.$or = [
         { _id: new mongoose.Types.ObjectId(req.query.threadRoot) },
@@ -145,7 +176,13 @@ router.get(
     if (before) q.createdAt = { ...(q.createdAt || {}), $lte: before };
     if (!after && !before) q.createdAt = { $lte: new Date() };
 
-    const items = await Message.find(q).sort({ createdAt: -1 }).limit(limit).lean();
+    const items = await Message.find(q)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate("senderId", "firstName lastName email role")
+      .populate("replyTo")
+      .populate("threadRoot")
+      .lean();
     res.json({ messages: items.reverse() });
   })
 );
@@ -169,16 +206,18 @@ router.post(
     if (!content) return res.status(400).json({ error: "content required" });
 
     const payload = {
-      case: caseId,
-      sender: req.user.id,
+      caseId,
+      senderId: req.user.id,
       senderRole: req.user.role,
       type: "text",
+      text: content,
       content,
     };
 
     // threading
     if (req.body.replyTo && isObjId(req.body.replyTo)) payload.replyTo = req.body.replyTo;
     if (req.body.threadRoot && isObjId(req.body.threadRoot)) payload.threadRoot = req.body.threadRoot;
+    else if (payload.replyTo) payload.threadRoot = payload.replyTo;
 
     const msg = await Message.create(payload);
 
@@ -196,6 +235,7 @@ router.post(
 /**
  * POST /api/messages/:caseId/file
  * Body: { fileKey, fileName, fileSize?, mimeType }
+ * NOTE: kept for future attachment workflows even if unused today.
  */
 router.post(
   "/:caseId/file",
@@ -205,15 +245,20 @@ router.post(
     const { fileKey, fileName, mimeType, fileSize } = req.body || {};
     if (!fileKey || !fileName) return res.status(400).json({ error: "fileKey and fileName required" });
 
+    const size = Number.isFinite(+fileSize) ? +fileSize : undefined;
     const msg = await Message.create({
-      case: req.params.caseId,
-      sender: req.user.id,
+      caseId: req.params.caseId,
+      senderId: req.user.id,
       senderRole: req.user.role,
       type: "file",
+      text: fileName,
       fileKey,
       fileName,
-      fileSize: Number.isFinite(+fileSize) ? +fileSize : undefined,
+      fileSize: size ?? null,
       mimeType,
+      content: {
+        size,
+      },
     });
 
     await AuditLog.logFromReq(req, "message.file.create", {
@@ -241,15 +286,18 @@ router.post(
       return res.status(400).json({ error: "mimeType must be audio/*" });
     }
 
+    const safeTranscript = sanitizeText(transcript);
     const msg = await Message.create({
-      case: req.params.caseId,
-      sender: req.user.id,
+      caseId: req.params.caseId,
+      senderId: req.user.id,
       senderRole: req.user.role,
       type: "audio",
+      text: safeTranscript,
       fileKey,
       fileName,
       mimeType,
-      transcript: sanitizeText(transcript),
+      transcript: safeTranscript,
+      content: { transcript: safeTranscript },
     });
 
     await AuditLog.logFromReq(req, "message.audio.create", {
@@ -259,6 +307,14 @@ router.post(
     });
 
     res.status(201).json({ message: msg });
+  })
+);
+
+router.post(
+  "/:caseId/summary",
+  requireCaseAccess("caseId"),
+  asyncHandler(async (_req, res) => {
+    res.json({ summary: "Summary endpoint placeholder." });
   })
 );
 
@@ -274,23 +330,25 @@ router.post(
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
     const upTo = req.body.upTo ? new Date(req.body.upTo) : new Date();
+    const readerId = new mongoose.Types.ObjectId(req.user.id);
+    const caseObjectId = new mongoose.Types.ObjectId(caseId);
 
     // Mark legacy readBy
     const res1 = await Message.updateMany(
-      { case: caseId, createdAt: { $lte: upTo }, deleted: { $ne: true } },
-      { $addToSet: { readBy: req.user.id } }
+      { caseId: caseObjectId, createdAt: { $lte: upTo }, deleted: { $ne: true } },
+      { $addToSet: { readBy: readerId } }
     );
 
     // Add rich readReceipts without duplicates: set by user with $addToSet + fixed timestamp bucket
     const now = new Date();
     const res2 = await Message.updateMany(
       {
-        case: caseId,
+        caseId: caseObjectId,
         createdAt: { $lte: upTo },
         deleted: { $ne: true },
-        "readReceipts.user": { $ne: new mongoose.Types.ObjectId(req.user.id) },
+        "readReceipts.user": { $ne: readerId },
       },
-      { $push: { readReceipts: { user: req.user.id, at: now } } }
+      { $push: { readReceipts: { user: readerId, at: now } } }
     );
 
     await AuditLog.logFromReq(req, "message.read.mark", {
@@ -317,17 +375,19 @@ router.patch(
     const { caseId, messageId } = req.params;
     if (!isObjId(messageId)) return res.status(400).json({ error: "Invalid messageId" });
 
-    const msg = await Message.findOne({ _id: messageId, case: caseId });
+    const msg = await Message.findOne({ _id: messageId, caseId });
     if (!msg) return res.status(404).json({ error: "Not found" });
 
-    const isOwner = String(msg.sender) === String(req.user.id);
+    const isOwner = String(msg.senderId) === String(req.user.id);
     const canEdit = isOwner || req.user.role === "admin";
 
     const { content, pin, unpin } = req.body || {};
 
     if (typeof content === "string") {
       if (!canEdit) return res.status(403).json({ error: "Not allowed to edit" });
-      msg.content = sanitizeText(content);
+      const nextText = sanitizeText(content);
+      msg.text = nextText;
+      msg.content = nextText;
       msg.markEdited?.(req.user.id);
     }
 
@@ -367,7 +427,7 @@ router.post(
     if (!isObjId(messageId)) return res.status(400).json({ error: "Invalid messageId" });
     if (!emoji || !String(emoji).trim()) return res.status(400).json({ error: "emoji required" });
 
-    const msg = await Message.findOne({ _id: messageId, case: caseId });
+    const msg = await Message.findOne({ _id: messageId, caseId });
     if (!msg) return res.status(404).json({ error: "Not found" });
 
     msg.addReaction?.(String(emoji).trim(), req.user.id);
@@ -393,7 +453,7 @@ router.delete(
     const { emoji } = req.body || {};
     if (!isObjId(messageId)) return res.status(400).json({ error: "Invalid messageId" });
 
-    const msg = await Message.findOne({ _id: messageId, case: caseId });
+    const msg = await Message.findOne({ _id: messageId, caseId });
     if (!msg) return res.status(404).json({ error: "Not found" });
 
     if (emoji) msg.removeReaction?.(String(emoji).trim(), req.user.id);
@@ -422,10 +482,10 @@ router.delete(
     const { caseId, messageId } = req.params;
     if (!isObjId(messageId)) return res.status(400).json({ error: "Invalid messageId" });
 
-    const msg = await Message.findOne({ _id: messageId, case: caseId });
+    const msg = await Message.findOne({ _id: messageId, caseId });
     if (!msg) return res.status(404).json({ error: "Not found" });
 
-    const isOwner = String(msg.sender) === String(req.user.id);
+    const isOwner = String(msg.senderId) === String(req.user.id);
     if (!isOwner && req.user.role !== "admin") {
       return res.status(403).json({ error: "Not allowed to delete" });
     }

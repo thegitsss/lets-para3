@@ -8,7 +8,7 @@ const TARGET_ENUM = ["user", "case", "message", "payment", "dispute", "document"
 const AuditLogSchema = new Schema(
   {
     // Who did it
-    actor: { type: Types.ObjectId, ref: "User", required: true, index: true },
+    actor: { type: Types.ObjectId, ref: "User", required: false, index: true },
     actorRole: { type: String, enum: ROLE_ENUM, required: true },
 
     // What happened

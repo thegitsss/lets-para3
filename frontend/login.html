@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
   <link rel="preload" as="image" href="hero-mountain.jpg">
-  <link href="assets/styles/styles.css" rel="stylesheet" />
+<link href="assets/styles/styles.css" rel="stylesheet" />
+<script src="assets/scripts/utils/session.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Login | Let’s ParaConnect</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&display=swap" rel="stylesheet">
   <style>
     html, body {
       margin: 0;
@@ -179,6 +180,27 @@ button[type="submit"]:hover {
       text-decoration: underline;
     }
 
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 30px;
+      transform: translate(-50%, 20px);
+      background: rgba(17,17,17,0.92);
+      color: #fff;
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 3000;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
     @media (max-width: 768px) {
       .overlay {
         flex-direction: column;
@@ -212,7 +234,7 @@ button[type="submit"]:hover {
 
 .forgot {
   color: #b4975a;
-  font-weight: 400;
+  font-weight: 200;
 }
 
 .previewing {
@@ -222,7 +244,7 @@ button[type="submit"]:hover {
 
     .bypass {
       color: #b4975a;
-      font-weight: 400;
+      font-weight: 200;
     }
 
     .cancel-login {
@@ -368,7 +390,7 @@ button[type="submit"]:hover {
 </h1>
 <h2>Login to Let’s ParaConnect</h2>
 
-        <form id="loginForm" novalidate>
+        <form id="loginForm">
           <label for="email">Enter e-mail</label>
           <input id="email" name="email" type="email" placeholder="you@example.com" required />
 
@@ -380,7 +402,7 @@ button[type="submit"]:hover {
 
           <button type="submit" class="login-btn">Log In</button>
 
-          <div class="login-actions">
+<div class="login-actions">
   <p>
     <a href="forgot-password.html" class="forgot">Forgotten password?</a><br />
     Just previewing? <a href="#dev-bypass" class="bypass" data-bypass-trigger>Dev bypass</a>
@@ -388,6 +410,9 @@ button[type="submit"]:hover {
 <a href="index.html" class="cancel-login">← Cancel Log In</a>
 </div>
 
+          <div class="extra-links">
+            Don't have an account? <a href="signup.html">Sign up</a>
+          </div>
 
         </form>
       </div>
@@ -403,21 +428,21 @@ button[type="submit"]:hover {
       <h2 id="bypassTitle">Jump into a workspace</h2>
       <p class="bypass-hint">Pick a role to open its dashboard without completing the full login.</p>
       <div class="role-options">
-        <a class="role-option" href="dashboard-attorney.html">
+        <a class="role-option" href="dashboard-attorney.html" data-bypass-role="attorney">
           <div>
             <span class="role-label">Attorney</span>
             <span class="role-description">Review matters, invoices, and hiring tools.</span>
           </div>
           <span class="role-arrow" aria-hidden="true">→</span>
         </a>
-        <a class="role-option" href="case-dashboard.html">
+        <a class="role-option" href="dashboard-paralegal.html" data-bypass-role="paralegal">
           <div>
             <span class="role-label">Paralegal</span>
             <span class="role-description">Enter the paralegal dashboard and task views.</span>
           </div>
           <span class="role-arrow" aria-hidden="true">→</span>
         </a>
-        <a class="role-option" href="admin-dashboard.html">
+        <a class="role-option" href="admin-dashboard.html" data-bypass-role="admin">
           <div>
             <span class="role-label">Admin</span>
             <span class="role-description">Monitor disputes, payouts, and compliance.</span>
@@ -427,6 +452,8 @@ button[type="submit"]:hover {
       </div>
     </div>
   </div>
+
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
 
   <script>
     function togglePassword() {
@@ -442,6 +469,7 @@ button[type="submit"]:hover {
       const panel = document.getElementById('bypassPanel');
       const closeBtn = document.getElementById('closeBypass');
       const card = panel ? panel.querySelector('.bypass-card') : null;
+      const options = card ? card.querySelectorAll('[data-bypass-role]') : [];
       let lastFocused = null;
 
       if (!trigger || !panel || !card) return;
@@ -477,8 +505,73 @@ button[type="submit"]:hover {
           closeBypass();
         }
       });
+
+      const DASHBOARD_TARGETS = {
+        admin: "admin-dashboard.html",
+        attorney: "dashboard-attorney.html",
+        paralegal: "dashboard-paralegal.html",
+      };
+
+      const DEV_USERS = {
+        admin: {
+          _id: "dev-admin",
+          id: "dev-admin",
+          role: "admin",
+          status: "approved",
+          email: "dev-admin@example.com",
+          firstName: "Dev",
+          lastName: "Admin",
+        },
+        attorney: {
+          _id: "dev-attorney",
+          id: "dev-attorney",
+          role: "attorney",
+          status: "approved",
+          email: "dev-attorney@example.com",
+          firstName: "Dev",
+          lastName: "Attorney",
+        },
+        paralegal: {
+          _id: "dev-paralegal",
+          id: "dev-paralegal",
+          role: "paralegal",
+          status: "approved",
+          email: "dev-paralegal@example.com",
+          firstName: "Dev",
+          lastName: "Paralegal",
+        },
+      };
+
+      const seedDevSession = (role) => {
+        const user = DEV_USERS[role];
+        if (!user) return;
+        if (window.clearStoredSession) {
+          window.clearStoredSession();
+        } else {
+          try {
+            localStorage.removeItem("lpc_token");
+            localStorage.removeItem("lpc_user");
+          } catch (_) {}
+        }
+        try {
+          localStorage.setItem("lpc_token", `dev-${role}-${Date.now()}`);
+          localStorage.setItem("lpc_user", JSON.stringify(user));
+        } catch (_) {}
+        const target = DASHBOARD_TARGETS[role] || "index.html";
+        window.location.href = target;
+      };
+
+      options.forEach((option) => {
+        option.addEventListener("click", (event) => {
+          event.preventDefault();
+          const role = option.dataset.bypassRole;
+          seedDevSession(role);
+        });
+      });
     })();
   </script>
 
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script type="module" src="assets/scripts/login.js"></script>
 </body>
 </html>

@@ -59,7 +59,7 @@
   <header role="banner">
     <nav aria-label="Primary">
       <a href="index.html">Home</a>
-      <a href="admin-dashboard.html">Admin</a>
+      <a href="index.html#admin-pending-users">Admin</a>
       <a href="admin-cases.html">Cases</a>
       <a href="admin-disputes.html" class="active" aria-current="page">Disputes</a>
       <a href="login.html">Login</a>
@@ -91,170 +91,101 @@
 
     <div id="count" class="small" aria-live="polite"></div>
 
-    <div id="list" class="list" aria-live="polite" aria-busy="true">
-      <div class="skeleton"></div><div class="skeleton"></div>
+    <div id="disputeList" class="list" aria-live="polite" aria-busy="true">
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
     </div>
   </main>
 
   <div id="toast" class="toast" role="status" aria-live="polite">Saved</div>
 
-  <script type="module">
+    <script type="module">
     import { secureFetch, fetchCSRF } from './assets/scripts/auth.js';
 
     const API_BASE = '/api';
+    const listEl = document.getElementById('disputeList');
+    const countEl = document.getElementById('count');
+    const toastEl = document.getElementById('toast');
 
-    const listEl   = document.getElementById('list');
-    const q        = document.getElementById('q');
-    const statusF  = document.getElementById('statusF');
-    const sortF    = document.getElementById('sortF');
-    const countEl  = document.getElementById('count');
-    const toastEl  = document.getElementById('toast');
-    const refreshB = document.getElementById('refresh');
-    const autoRefresh = document.getElementById('autoRefresh');
+    const esc = (value) => String(value ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] || c));
+    const fmt = (val) => (val ? new Date(val).toLocaleString() : '');
 
-    let all = [];
-    let timer = null;
+    const toast = (message, type = 'ok') => {
+      toastEl.textContent = message;
+      toastEl.className = 'toast show ' + (type === 'err' ? 'err' : 'ok');
+      setTimeout(() => toastEl.classList.remove('show'), 1800);
+    };
 
-    // ---------- utils ----------
-    const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-    const by  = (o,p,fb='') => p.split('.').reduce((a,k)=>a?.[k],o) ?? fb;
-    const fmt = (s) => s ? new Date(s).toLocaleString() : '';
-    const toast = (m, t='ok') => { toastEl.textContent = m; toastEl.className = 'toast show ' + (t === 'err' ? 'err' : 'ok'); setTimeout(() => toastEl.classList.remove('show'), 1500); };
-    const debounce = (fn, ms=250) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; };
-    const setBusy = (on) => listEl.setAttribute('aria-busy', on ? 'true' : 'false');
-
-    // persist filters locally
-    const KEY='adminDisputesFilters:v1';
-    const saveFilters=()=>{ try{ localStorage.setItem(KEY, JSON.stringify({ q:q.value||'', st:statusF.value||'open', sort:sortF.value||'-createdAt', auto:autoRefresh.checked||false })); }catch{} };
-    const loadFilters=()=>{ try{ const s=JSON.parse(localStorage.getItem(KEY)||'{}'); if(s.q!=null) q.value=s.q; if(s.st!=null) statusF.value=s.st; if(s.sort!=null) sortF.value=s.sort; if(typeof s.auto==='boolean') autoRefresh.checked=s.auto; }catch{} };
-
-    function applySort(arr){
-      const key = sortF.value || '-createdAt';
-      const dir = key.startsWith('-') ? -1 : 1; const field = key.replace(/^-/,'');
-      const collator = new Intl.Collator(undefined, { numeric:true, sensitivity:'base' });
-      return [...arr].sort((a,b)=>{
-        const av = by(a, field); const bv = by(b, field);
-        if (field === 'createdAt') return dir * ( (new Date(av||0)) - (new Date(bv||0)) );
-        if (typeof av === 'string' && typeof bv === 'string') return dir * collator.compare(av, bv);
-        return dir * ((av>bv)-(av<bv));
-      });
+    function renderDisputeCard(item) {
+      const filedByName = item?.raisedBy?.name || item?.raisedBy?.email || 'Unknown user';
+      const filedByRole = (item?.raisedBy?.role || 'user').replace(/_/g, ' ');
+      const statusText = (item?.status || 'open').replace(/_/g, ' ');
+      return `
+        <div class="card" data-id="${esc(item.id || '')}">
+          <div class="title">${esc(item.caseTitle || 'Case')}</div>
+          <div class="meta">
+            <span class="badge">Filed by: ${esc(filedByName)} (${esc(filedByRole)})</span>
+            ${item.createdAt ? `<span class="badge">${esc(fmt(item.createdAt))}</span>` : ''}
+            <span class="badge">Status: ${esc(statusText)}</span>
+          </div>
+          <div class="message">${esc(item.reason || '')}</div>
+          <div class="actions">
+            ${statusText.toLowerCase() !== 'resolved'
+              ? `<button class="btn ok" data-resolve-id="${esc(item.id || '')}">Resolve Dispute</button>`
+              : ''}
+          </div>
+        </div>
+      `;
     }
 
-    async function ensureAdmin() {
+    async function loadDisputes() {
+      if (!listEl) return;
+      listEl.setAttribute('aria-busy', 'true');
+      listEl.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
       try {
-        const r = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' });
-        if (!r.ok) throw new Error('not authed');
-        const { user } = await r.json();
-        if (!user || user.role !== 'admin') throw new Error('not admin');
-        return user;
-      } catch {
-        location.href = 'login.html';
-        throw new Error('redirecting');
+        await fetchCSRF();
+        const response = await secureFetch(`${API_BASE}/disputes/all`);
+        const disputes = response.ok ? await response.json() : [];
+        if (!Array.isArray(disputes) || disputes.length === 0) {
+          countEl.textContent = 'No disputes to review.';
+          listEl.innerHTML = '<div class="small">No disputes found.</div>';
+          return;
+        }
+        countEl.textContent = `${disputes.length} disputes`;
+        listEl.innerHTML = disputes.map(renderDisputeCard).join('');
+      } catch (err) {
+        countEl.textContent = '';
+        listEl.innerHTML = `<div class="small">${esc(err?.message || 'Unable to load disputes.')}</div>`;
+      } finally {
+        listEl.setAttribute('aria-busy', 'false');
       }
     }
 
-    // ---------- data ----------
-    async function fetchDisputes() {
-      setBusy(true);
-      listEl.innerHTML = `<div class="skeleton"></div><div class="skeleton"></div>`;
-      try {
-        // status filter drives endpoint: open vs all
-        const endpoint = statusF.value === 'open' ? `${API_BASE}/disputes/open` : `${API_BASE}/disputes`;
-        const r = await fetch(endpoint, { credentials: 'include' });
-        let data = r.ok ? await r.json() : [];
-        if (!Array.isArray(data)) data = [];
-        all = data;
-        render();
-      } catch {
-        listEl.innerHTML = `<div class="small">Failed to load disputes.</div>`;
-      } finally { setBusy(false); }
-    }
-
-    function filtered() {
-      const term = (q.value || '').trim().toLowerCase();
-      const st = statusF.value;
-      return all.filter(d => {
-        if (st && d.status !== st && st !== 'open') return false; // when 'open', endpoint already filtered
-        if (!term) return true;
-        const hay = [ String(by(d,'caseId.title','')).toLowerCase(), String(by(d,'raisedBy.email','')).toLowerCase(), String(d.message||'').toLowerCase(), String(d._id||'').toLowerCase() ].join(' ');
-        return hay.includes(term);
-      });
-    }
-
-    function render() {
-      saveFilters();
-      const items = applySort( filtered() );
-      countEl.textContent = items.length ? `${items.length} ${statusF.value || ''}`.trim() : `No ${statusF.value || ''} disputes.`.trim();
-      if (!items.length) { listEl.innerHTML = `<div class="small">Nothing to review.</div>`; return; }
-
-      listEl.innerHTML = items.map(d => {
-        const id     = esc(d._id);
-        const title  = esc(by(d,'caseId.title') || '(Deleted case)');
-        const email  = esc(by(d,'raisedBy.email') || 'Unknown');
-        const when   = d.createdAt ? esc(fmt(d.createdAt)) : '';
-        const status = esc(d.status || 'open');
-        const msg    = esc(d.message || '');
-        return `
-          <div class="card" data-id="${id}" tabindex="0" role="group" aria-label="Dispute ${id}">
-            <div class="title">${title}</div>
-            <div class="meta">
-              <span class="badge">From: ${email}</span>
-              ${when ? `<span class="badge">Created: ${when}</span>` : ''}
-              <span class="badge">Status: ${status}</span>
-            </div>
-            <div class="message">${msg}</div>
-            <div class="actions" role="group" aria-label="Actions">
-              ${status!== 'resolved' ? `<button class="btn ok"  data-action="resolve" aria-label="Mark resolved">Mark Resolved</button>` : ''}
-              ${status!== 'rejected' ? `<button class="btn bad" data-action="reject"  aria-label="Reject">Reject</button>` : ''}
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    async function act(id, action) {
-      const url = action === 'resolve'
-        ? `${API_BASE}/disputes/${encodeURIComponent(id)}/resolve`
-        : `${API_BASE}/disputes/${encodeURIComponent(id)}/reject`;
+    async function resolveDispute(disputeId, button) {
+      if (!disputeId) return;
+      button?.setAttribute('disabled', 'disabled');
       try {
         await fetchCSRF();
-        const r = await secureFetch(url, { method: 'POST' });
-        if (!r.ok) throw new Error('Action failed');
-        // Update local list depending on active filter
-        if (statusF.value === 'open') all = all.filter(x => x._id !== id);
-        else {
-          const i = all.findIndex(x=>x._id===id); if(i>-1) all[i] = { ...all[i], status: action==='resolve' ? 'resolved' : 'rejected' };
-        }
-        render();
-        toast(action === 'resolve' ? 'Marked resolved' : 'Rejected');
-      } catch (e) { toast(e?.message || 'Error', 'err'); }
+        const response = await secureFetch(`${API_BASE}/disputes/resolve/${encodeURIComponent(disputeId)}`, { method: 'POST' });
+        if (!response.ok) throw new Error('Unable to resolve dispute');
+        toast('Dispute resolved');
+        await loadDisputes();
+      } catch (err) {
+        toast(err?.message || 'Unable to resolve dispute', 'err');
+        button?.removeAttribute('disabled');
+      }
     }
 
-    // ---------- events ----------
-    document.addEventListener('click', (e) => {
-      const card = e.target.closest('.card'); if (!card) return;
-      if (e.target.dataset.action === 'resolve') act(card.dataset.id, 'resolve');
-      if (e.target.dataset.action === 'reject')  act(card.dataset.id, 'reject');
+    listEl?.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-resolve-id]');
+      if (!button) return;
+      resolveDispute(button.dataset.resolveId, button);
     });
 
-    refreshB?.addEventListener('click', fetchDisputes);
-    q.addEventListener('input', debounce(render, 180));
-    statusF.addEventListener('change', () => { fetchDisputes(); });
-    sortF.addEventListener('change', render);
-    autoRefresh.addEventListener('change', () => { clearInterval(timer); if (autoRefresh.checked) timer = setInterval(fetchDisputes, 30000); saveFilters(); });
-
-    // improve keyboard UX
-    q.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); render(); }});
-
-    document.addEventListener('DOMContentLoaded', () => document.body.classList.add('loaded'));
-
-    // ---------- boot ----------
-    (async function boot() {
-      loadFilters();
-      await ensureAdmin();
-      await fetchDisputes();
-      if (autoRefresh.checked) timer = setInterval(fetchDisputes, 30000);
-    })();
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.classList.add('loaded');
+      loadDisputes();
+    });
   </script>
 </body>
 </html>

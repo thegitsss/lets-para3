@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <link href="assets/styles/styles.css" rel="stylesheet" />
+  <link href="assets/styles/hero-pages.css" rel="stylesheet" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Privacy Policy – Let’s-ParaConnect</title>
@@ -30,14 +31,6 @@
     .header-logo a {
       text-decoration: none;
       color: #1a1a1a;
-    }
-
-    .hero {
-      background-image: url("hero-mountain.jpg");
-      background-size: cover;
-      background-position: center;
-      height: 300px;
-      width: 100%;
     }
 
     main {
@@ -109,10 +102,10 @@ html {
   </div>
 </header>
 
-  <div class="hero" aria-hidden="true"></div>
+  <div class="hero-banner" role="presentation" aria-hidden="true"></div>
 
- <main id="main">
-    <h1>Privacy Policy</h1>
+ <main id="main" aria-labelledby="privacy-title">
+    <h1 id="privacy-title">Privacy Policy</h1>
     <p class="muted">Effective date: <strong><!-- update when publishing --> August 22, 2025</strong></p>
 
     <div class="card" role="region" aria-labelledby="intro">
@@ -253,11 +246,9 @@ html {
 
     <section id="contact" class="card">
       <h2>13) Contact Us</h2>
-      <!-- TODO: replace with your legal entity name and address -->
       <p><strong>Lets-ParaConnect</strong><br>
          Email: <a href="mailto:admin@lets-paraconnect.com">admin@lets-paraconnect.com</a></p>
     </section>
-  </main>
   </main>
 
  <footer class="footer">
@@ -278,25 +269,6 @@ html {
 
 
 
-  <script>
-    document.getElementById('year').textContent = new Date().getFullYear();
-  </script>
-  <script>
-    (function () {
-      const hero = document.querySelector('.hero');
-      if (!hero) return;
-
-      hero.style.backgroundPosition = 'center center';
-
-      const updateHeroParallax = () => {
-        const offset = window.scrollY * 0.2;
-        hero.style.backgroundPosition = `center calc(50% + ${offset}px)`;
-      };
-
-      window.addEventListener('scroll', updateHeroParallax, { passive: true });
-      window.addEventListener('resize', updateHeroParallax);
-      updateHeroParallax();
-    })();
-  </script>
+  <script type="module" src="assets/scripts/hero-parallax.js"></script>
 </body>
 </html>

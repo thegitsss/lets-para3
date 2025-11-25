@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <link href="assets/styles/styles.css" rel="stylesheet" />
+  <link href="assets/styles/hero-pages.css" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300&family=Sarabun:wght@200&display=swap" rel="stylesheet" />
 
   <style>
@@ -26,16 +27,6 @@
       font-size: 16px;
       line-height: 1.7;
     }
-
-
-    .hero {
-      background-image: url("hero-mountain.jpg");
-      background-size: cover;
-      background-position: center;
-      height: 300px;
-      width: 100%;
-    }
-
 
     /* MAIN CONTENT */
     main {
@@ -129,10 +120,10 @@
     </div>
   </header>
 
-  <div class="hero" aria-hidden="true"></div>
+  <div class="hero-banner" role="presentation" aria-hidden="true"></div>
 
-  <main>
-    <h1>Terms & Conditions</h1>
+  <main aria-labelledby="terms-title" id="main">
+      <h1 id="terms-title">Terms & Conditions</h1>
     <p class="muted">Effective date: <strong>August 22, 2025</strong></p>
 
     <p>These Terms & Conditions (“Terms”) govern your use of the Let’s‑ParaConnect platform (the “Platform”) operated by Let’s‑ParaConnect (“Company,” “we,” “us,” or “our”). By creating an account or using the Platform, you agree to these Terms and to our <a href="privacy.html">Privacy Policy</a>.</p>
@@ -269,7 +260,6 @@
 
     <section id="contact" class="card">
       <h2>14) Contact</h2>
-      <!-- TODO: replace with your legal entity details -->
       <p><strong>Lets-ParaConnect</strong><br>
          Email: <a href="mailto:admin@lets-paraconnect.com">admin@lets-paraconnect.com</a><br>
          </p>
@@ -277,27 +267,21 @@
 
   </main>
 
-  <footer>
-    © <script>document.write(new Date().getFullYear());</script> Let’s‑ParaConnect • 
-    <a href="terms.html">Terms</a> • 
-    <a href="privacy.html">Privacy</a>
-</footer>
+  <footer class="footer">
+    <div class="footer-inner">
+      <p>© <script>document.write(new Date().getFullYear());</script> Let’s-ParaConnect. All rights reserved.</p>
+      <nav>
+        <a href="privacy.html">Privacy Policy</a>
+        <span>|</span>
+        <a href="terms.html">Terms</a>
+        <span>|</span>
+        <a href="contact.html">Contact</a>
+        <span>|</span>
+        <a href="accessibility.html">Accessibility</a>
+      </nav>
+      <div class="region">United States</div>
+    </div>
+  </footer>
+<script type="module" src="assets/scripts/hero-parallax.js"></script>
 </body>
-<script>
-  (function () {
-    const hero = document.querySelector('.hero');
-    if (!hero) return;
-
-    hero.style.backgroundPosition = 'center center';
-
-    const updateHeroParallax = () => {
-      const offset = window.scrollY * 0.2;
-      hero.style.backgroundPosition = `center calc(50% + ${offset}px)`;
-    };
-
-    window.addEventListener('scroll', updateHeroParallax, { passive: true });
-    window.addEventListener('resize', updateHeroParallax);
-    updateHeroParallax();
-  })();
-</script>
 </html>

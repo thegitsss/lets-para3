@@ -15,6 +15,17 @@ const sumEnd = $("#sum-end");
 
 let currentThread = null;
 let CSRF = null;
+const CURRENT_USER_ID = (() => {
+  try {
+    const user = typeof window.getStoredUser === "function" ? window.getStoredUser() : null;
+    return user?.id || user?._id || "";
+  } catch {
+    return "";
+  }
+})();
+
+const MESSAGE_JUMP_KEY = "lpc_message_jump";
+let pendingJump = consumeMessageJump();
 
 async function getCSRF() {
   if (CSRF) return CSRF;
@@ -63,7 +74,7 @@ async function ensureAuthed() {
 
 // --- Threads / Messages ------------------------------------------------------
 async function loadThreads(q = "") {
-  if (!threadListEl) return;
+  if (!threadListEl) return [];
   threadListEl.textContent = "Loading…";
   try {
     const data = await j(`${API_BASE}/messages/threads${q ? `?q=${encodeURIComponent(q)}` : ""}`);
@@ -78,8 +89,10 @@ async function loadThreads(q = "") {
         </button>`
         )
         .join("") || "<div>No threads</div>";
+    return list;
   } catch {
     threadListEl.innerHTML = "<div>Couldn’t load threads</div>";
+    return [];
   }
 }
 
@@ -97,7 +110,7 @@ async function openThread(id) {
   }
 }
 
-function messageRow(caseId, m, isMine) {
+function messageRow(caseId, m, isMine, senderName = "Unknown User") {
   const when = new Date(m.createdAt || m._createdAt || Date.now()).toLocaleString();
   let bodyHTML = "";
   if (m.type === "audio") {
@@ -122,6 +135,7 @@ function messageRow(caseId, m, isMine) {
     <div class="msg" style="display:flex;gap:.5rem;margin:.4rem 0;${isMine ? "flex-direction:row-reverse;" : ""}">
       <input type="checkbox" class="pick" data-id="${m.id || m._id}" style="margin-top:.5rem;">
       <div style="background:${isMine ? "#f0f5ff" : "#fff"};border:1px solid #eee;border-radius:14px;padding:.55rem .7rem;max-width:75%;">
+        <div style="font-weight:600;margin-bottom:.2rem;">${escapeHtml(senderName)}</div>
         ${bodyHTML}
         <div style="color:#888;font-size:.78rem;margin-top:.25rem;">${when}</div>
       </div>
@@ -129,11 +143,17 @@ function messageRow(caseId, m, isMine) {
 }
 
 function renderMessages(caseId, list) {
-  const uid = window.__me?.id || window.__me?._id; // optional global if you set it elsewhere
+  const uid = CURRENT_USER_ID;
   msgListEl.innerHTML = (list || [])
     .map((m) => {
-      const isMine = String(m.sender) === String(uid);
-      return messageRow(caseId, m, isMine);
+      const sender = m.senderId;
+      const senderId = typeof sender === "object" ? sender?._id || sender?.id : sender;
+      const isMine = uid && senderId ? String(senderId) === String(uid) : false;
+      const senderName =
+        (typeof sender === "object"
+          ? `${sender?.firstName || ""} ${sender?.lastName || ""}`.trim()
+          : "") || "Unknown User";
+      return messageRow(caseId, m, isMine, senderName);
     })
     .join("");
   // delegate play buttons
@@ -146,7 +166,7 @@ function renderMessages(caseId, list) {
         const u = new URL("/api/uploads/signed-get", location.origin);
         u.searchParams.set("caseId", btn.dataset.case || "");
         u.searchParams.set("key", btn.dataset.key || "");
-        const jres = await j(u, { method: "GET" });
+        const jres = await j(u.toString(), { method: "GET" });
         const url = jres.url;
         holder.innerHTML = `<audio controls src="${escapeHtml(url)}" style="margin-top:.25rem;max-width:100%"></audio>`;
       } catch {
@@ -168,12 +188,14 @@ async function sendMessage() {
   const now = Date.now();
   const optimistic = {
     id: `tmp-${now}`,
-    sender: "__me__", // placeholder
+    senderId: CURRENT_USER_ID
+      ? { _id: CURRENT_USER_ID, firstName: "You" }
+      : "me",
     type: "text",
     content: text,
     createdAt: now,
   };
-  msgListEl.insertAdjacentHTML("beforeend", messageRow(currentThread, optimistic, true));
+  msgListEl.insertAdjacentHTML("beforeend", messageRow(currentThread, optimistic, true, "You"));
   msgListEl.scrollTop = msgListEl.scrollHeight;
   inputEl.value = "";
 
@@ -552,7 +574,23 @@ function wireEvents() {
 async function init() {
   if (!threadListEl || !msgListEl) return;
   await ensureAuthed();
-  await loadThreads();
+  const threads = await loadThreads();
+  const targetId = (pendingJump && pendingJump.caseId) || threads[0]?.id;
+  pendingJump = null;
+  if (targetId) {
+    openThread(targetId);
+  }
   wireEvents();
 }
 document.addEventListener("DOMContentLoaded", init);
+
+function consumeMessageJump() {
+  try {
+    const raw = sessionStorage.getItem(MESSAGE_JUMP_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(MESSAGE_JUMP_KEY);
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}

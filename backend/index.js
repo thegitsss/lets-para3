@@ -1,39 +1,36 @@
 console.log("🎯 index.js IS RUNNING from backend/");
 
 // 0) Env
-require('dotenv').config();
+require("dotenv").config();
 
 // 1) Core + Libs
-const express = require('express');
-const path = require('path');
-const mongoose = require('mongoose');
-const helmet = require('helmet');
-const cookieParser = require('cookie-parser');
-const rateLimit = require('express-rate-limit');
-const csrf = require('csurf');
+const express = require("express");
+const path = require("path");
+const mongoose = require("mongoose");
+const helmet = require("helmet");
+const cookieParser = require("cookie-parser");
+const rateLimit = require("express-rate-limit");
+const csrf = require("csurf");
 
+// 2) App Init + Config
 const app = express();
+const PROD = process.env.NODE_ENV === "production";
+const PORT = 5050;
+const FRONTEND_DIR = path.join(__dirname, "../frontend");
 
-// 2) Config
-const PROD = process.env.NODE_ENV === 'production';
-const PORT = process.env.PORT || 5050;
-const FRONTEND_DIR = path.join(__dirname, '../frontend');
-
-// 3) Middleware
+// 3) Global Middleware
 app.use((req, res, next) => {
-  if (req.hostname === 'lets-paraconnect.com') {
-    return res.redirect(301, 'https://www.lets-paraconnect.com' + req.url);
+  if (req.hostname === "lets-paraconnect.com") {
+    return res.redirect(301, "https://www.lets-paraconnect.com" + req.url);
   }
   next();
 });
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(
   helmet({
-    hsts: PROD
-      ? { maxAge: 31536000, includeSubDomains: true, preload: true }
-      : false,
-    referrerPolicy: { policy: 'no-referrer' },
+    hsts: PROD ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
+    referrerPolicy: { policy: "no-referrer" },
   })
 );
 app.use(
@@ -48,88 +45,99 @@ app.use(
   })
 );
 
-// 4) CSRF Setup
 const csrfProtection = csrf({
   cookie: {
     httpOnly: true,
-    sameSite: PROD ? 'strict' : 'lax',
+    sameSite: PROD ? "strict" : "lax",
     secure: PROD,
   },
 });
 
-// 5) Rate Limiting
-app.use('/api/auth/login', rateLimit({ windowMs: 10 * 60 * 1000, max: 50 }));
-app.use('/api/', rateLimit({ windowMs: 60 * 1000, max: 300 }));
+app.use("/api/auth/login", rateLimit({ windowMs: 10 * 60 * 1000, max: 50 }));
+app.use("/api/", rateLimit({ windowMs: 60 * 1000, max: 300 }));
 
-// 6) API Routes
-app.use('/api/waitlist', require('./routes/waitlist'));
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/admin', require('./routes/admin'));
-app.use('/api/cases', require('./routes/cases'));
-app.use('/api/messages', require('./routes/messages'));
-app.use('/api/uploads', require('./routes/uploads'));
-app.use('/api/payments', require('./routes/payments'));
-app.use('/api/users', require('./routes/users'));
-app.use('/api/disputes', require('./routes/disputes'));
+// 4) Routers
+const waitlistRouter = require("./routes/waitlist");
+const authRouter = require("./routes/auth");
+const adminRouter = require("./routes/admin");
+const casesRouter = require("./routes/cases");
+const messagesRouter = require("./routes/messages");
+const uploadsRouter = require("./routes/uploads");
+const paymentsRouter = require("./routes/payments");
+const usersRouter = require("./routes/users");
+const disputesRouter = require("./routes/disputes");
+const paymentsWebhookHandler = require("./routes/paymentsWebhook");
+const jobsRouter = require("./routes/jobs");
+const applicationsRouter = require("./routes/applications");
+const attorneyDashboardRouter = require("./routes/attorneyDashboard");
+const paralegalDashboardRouter = require("./routes/paralegalDashboard");
+const chatRouter = require("./routes/chat");
+const checklistRouter = require("./routes/checklist");
+const eventsRouter = require("./routes/events");
+
+app.use("/api/waitlist", waitlistRouter);
+app.use("/api/auth", authRouter);
+app.use("/api/admin", adminRouter);
+app.use("/api/cases", casesRouter);
+app.use("/api/messages", messagesRouter);
+app.use("/api/uploads", uploadsRouter);
+app.use("/api/payments", paymentsRouter);
+app.use("/api/checklist", checklistRouter);
+app.use("/api/events", eventsRouter);
+app.use("/api/jobs", jobsRouter);
+app.use("/api/applications", applicationsRouter);
+app.use("/api/attorney/dashboard", attorneyDashboardRouter);
+app.use("/api/paralegal/dashboard", paralegalDashboardRouter);
+app.use("/api/chat", chatRouter);
+app.use("/api/users", usersRouter);
+if (usersRouter?.paralegalRouter) {
+  app.use("/api/paralegals", usersRouter.paralegalRouter);
+}
+app.use("/api/disputes", disputesRouter);
 app.post(
-  '/api/payments/webhook',
-  express.raw({ type: 'application/json' }),
-  require('./routes/paymentsWebhook')
+  "/api/payments/webhook",
+  express.raw({ type: "application/json" }),
+  paymentsWebhookHandler
 );
 
-// 7) CSRF token route
-app.get('/api/csrf', csrfProtection, (req, res) => {
+// 5) CSRF token route
+app.get("/api/csrf", csrfProtection, (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
 
+app.get("/ping", (_req, res) => {
+  res.json({ ping: "pong" });
+});
+
 app.use((req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
   next();
 });
 
-// 8) Serve frontend
+// 6) Static + SPA fallback
 app.use(express.static(FRONTEND_DIR));
-
-// ✅ Express v5 compatible catch-all route
 app.get(/.*/, (req, res) => {
-  res.sendFile(path.join(FRONTEND_DIR, 'index.html'));
+  res.sendFile(path.join(__dirname, "../frontend/index.html"));
 });
 
-// Serve frontend (Render + mobile-friendly)
-app.use(express.static(FRONTEND_DIR));
-
-// Catch-all route for SPA paths (prevents mobile 404s)
-app.get(/.*/, (req, res) => {
-  res.sendFile(path.join(FRONTEND_DIR, 'index.html'), (err) => {
-    if (err) {
-      console.error('Error serving index.html:', err);
-      res.status(500).send('Server error while serving frontend');
-    }
-  });
-});
-
-// 9) Error + 404 Handlers
-app.use((req, res) => res.status(404).send('Not found'));
+// 7) Error + 404 Handlers
+app.use((req, res) => res.status(404).send("Not found"));
 app.use((err, _req, res, _next) => {
-  console.error('❌ Uncaught error:', err);
-  res.status(500).send('Server error');
+  console.error("❌ Uncaught error:", err);
+  res.status(500).send("Server error");
 });
 
-// 10) MongoDB Connection
-const raw = process.env.MONGO_URI || '';
-const MONGO =
-  /<cluster>/.test(raw) || !raw
-    ? 'mongodb://127.0.0.1:27017/lets-para'
-    : raw;
+// 8) MongoDB Connection & Server start
+const raw = process.env.MONGO_URI || "";
+const MONGO = /<cluster>/.test(raw) || !raw ? "mongodb://127.0.0.1:27017/lets-para" : raw;
 
 mongoose
   .connect(MONGO)
-  .then(() => console.log('✅ MongoDB connected'))
-  .catch((err) => console.error('❌ MongoDB error:', err));
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch((err) => console.error("❌ MongoDB error:", err));
 
-// 11) Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Server is live at http://localhost:${PORT}`);
 });

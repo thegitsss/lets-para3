@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const verifyToken = require("../utils/verifyToken");
+const requireRole = require("../middleware/requireRole");
 const { requireCaseAccess } = require("../utils/authz");
 
 // ----------------------------------------
@@ -58,10 +59,34 @@ function buildCasePrefix(caseId) {
   return `cases/${caseId}/`;
 }
 
+function normalizeKeyPath(key) {
+  return String(key || "").replace(/^\/+/, "");
+}
+
 function userOwnsKey(user, key) {
-  // Must live under user's personal prefix OR a case prefix where they have access
   const prefix = buildUserPrefix(user);
-  return key.startsWith(prefix);
+  return normalizeKeyPath(key).includes(prefix);
+}
+
+function extractCaseIdFromKey(key) {
+  const match = normalizeKeyPath(key).match(/cases\/([a-f0-9]{24})\//i);
+  return match ? match[1] : null;
+}
+
+async function ensureKeyAccess(req, key, explicitCaseId) {
+  if (!req.user) return false;
+  const cleaned = normalizeKeyPath(key);
+  if (!cleaned) return false;
+  if (req.user.role === "admin") return true;
+
+  const caseId = explicitCaseId || extractCaseIdFromKey(cleaned);
+  if (caseId) {
+    if (explicitCaseId && !cleaned.includes(buildCasePrefix(caseId))) {
+      return false;
+    }
+    return hasCaseAccess(req, caseId);
+  }
+  return userOwnsKey(req.user, cleaned);
 }
 
 function sseParams() {
@@ -94,6 +119,7 @@ const ALLOWED = new Set([
 // All routes require auth
 // ----------------------------------------
 router.use(verifyToken);
+router.use(requireRole(["admin", "attorney", "paralegal"]));
 
 /**
  * POST /api/uploads/presign
@@ -168,6 +194,11 @@ router.post(
   }
 );
 
+// Temporary stub for legacy attachment probes
+router.post("/attach", csrfProtection, (_req, res) => {
+  res.json({ ok: true });
+});
+
 /**
  * GET /api/uploads/download?key=<s3key>
  * Returns a short-lived GET URL to download a private object the user has rights to.
@@ -175,43 +206,30 @@ router.post(
  * - If the key is under cases/<caseId>/..., we verify case access.
  */
 // GET /api/uploads/signed-get?caseId=...&key=...
-router.get('/signed-get', verifyToken, async (req, res) => {
+router.get("/signed-get", async (req, res) => {
   try {
     const { caseId, key } = req.query;
-    if (!key) return res.status(400).json({ msg: 'Missing key' });
+    if (!key) return res.status(400).json({ msg: "Missing key" });
 
-    // 🔐 Optional: restrict to a case the user has access to
-    // (reuse your requireCaseAccess if you want stricter checking)
-    // For now: just allow if logged in
-    if (!req.user) return res.status(401).json({ msg: 'Unauthorized' });
+    const allowed = await ensureKeyAccess(req, key, caseId);
+    if (!allowed) return res.status(403).json({ msg: "Forbidden" });
 
-    const get = new GetObjectCommand({ Bucket: BUCKET, Key: key });
-    const url = await getSignedUrl(s3, get, { expiresIn: 60 }); // 1 minute
+    const get = new GetObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(key) });
+    const url = await getSignedUrl(s3, get, { expiresIn: 60 });
     res.json({ url });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ msg: 'signed-get error' });
+    res.status(500).json({ msg: "signed-get error" });
   }
 });
 router.get("/download", csrfProtection, async (req, res) => {
   try {
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
-    const key = String(req.query.key || "").replace(/^\/+/, "");
+    const key = normalizeKeyPath(req.query.key);
     if (!key) return res.status(400).json({ msg: "Missing key" });
 
-    // If it's a case file, enforce case access
-    const caseMatch = key.match(/^.*\/cases\/([a-f0-9]{24})\//i);
-    if (caseMatch && caseMatch[1]) {
-      const caseId = caseMatch[1];
-      // quick inline access check
-      const ok = await hasCaseAccess(req, caseId);
-      if (!ok) return res.status(403).json({ msg: "Forbidden" });
-    } else {
-      // Else require user-owned path
-      if (!userOwnsKey(req.user, key)) {
-        return res.status(403).json({ msg: "Forbidden" });
-      }
-    }
+    const allowed = await ensureKeyAccess(req, key, req.query.caseId);
+    if (!allowed) return res.status(403).json({ msg: "Forbidden" });
 
     const expiresIn = 60; // seconds
     const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });

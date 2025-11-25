@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Messages | Let’s-ParaConnect</title>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <script src="assets/scripts/utils/session.js"></script>
   <style>
     :root {
       --bg:#fff;
@@ -47,7 +48,7 @@
     nav a {
       text-decoration:none;
       color:var(--ink);
-      font-weight:400;
+      font-weight:200;
       font-size:.95rem;
       padding:10px 14px;
       border-radius:8px;
@@ -63,6 +64,36 @@
       display:flex;
       flex-direction:column;
     }
+
+    .notification-icon{
+      width:46px;
+      height:46px;
+      border-radius:50%;
+      border:1px solid var(--line);
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      background:#fff;
+      cursor:pointer;
+      position:relative;
+      transition:border-color .2s ease, transform .2s ease;
+    }
+    .notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
+    .notification-icon svg{width:22px;height:22px;color:var(--ink);}
+    .notification-badge{
+      position:absolute;
+      top:-4px;
+      right:-4px;
+      background:#c0392b;
+      color:#fff;
+      font-size:.75rem;
+      border-radius:999px;
+      padding:2px 6px;
+      line-height:1;
+      display:none;
+      font-weight:600;
+    }
+    .notification-badge.show{display:inline-flex;}
 
     header h1 {
       font-family:var(--font-serif);
@@ -103,7 +134,8 @@
     }
     .case-item:last-child {border-bottom:none;}
     .case-item:hover{background:rgba(182,164,122,0.1);} 
-    .case-item.active{background:rgba(182,164,122,0.15);font-weight:400;}
+    .case-item.active{background:rgba(182,164,122,0.15);font-weight:200;}
+    .case-label {font-size:.82rem;color:var(--muted);margin-top:.2rem;display:flex;justify-content:space-between;gap:.5rem;}
 
     .thread-item {
       border-bottom:1px solid var(--line);
@@ -169,6 +201,9 @@
     }
     .chat-msg.them {background:#f2f2f2;color:var(--ink);align-self:flex-start;}
     .chat-msg.you {background:var(--accent);color:#fff;align-self:flex-end;}
+    .chat-msg .meta {display:block;font-size:.75rem;color:rgba(255,255,255,0.8);margin-top:.35rem;}
+    .chat-msg.them .meta {color:#6f6f6f;}
+
     .chat-input {
       display:flex;
       border-top:1px solid var(--line);
@@ -191,6 +226,11 @@
       cursor:pointer;
       font-size:.9rem;
       transition:background .2s ease;
+    }
+    .chat-input button:disabled,
+    .chat-input input:disabled {
+      opacity:0.6;
+      cursor:not-allowed;
     }
     .chat-input button:hover{background:#a38e5f;}
 
@@ -287,7 +327,7 @@
       <a href="documents.html">Documents</a>
       <a href="review.html">Review</a>
       <a href="case-files.html">Case Files</a>
-      <a href="payments-escrow.html">Billing</a>
+      <a href="billing-attorney.html">Billing</a>
       <a href="tasks.html">Tasks</a>
       <a href="help.html">Help</a>
     </nav>
@@ -295,6 +335,7 @@
   </aside>
 
   <main class="main">
+    <div class="topbar" data-attorney-header></div>
     <header>
       <h1>Messages</h1>
       <p>View and respond to all case communications. Newest messages appear at the top.</p>
@@ -302,9 +343,13 @@
 
     <div class="messages-layout">
 
-      <div class="cases-list" id="casesList"></div>
+      <div class="cases-list" data-message-cases>
+        <p style="color:var(--muted);font-size:.9rem;">Loading cases…</p>
+      </div>
 
-      <div class="threads-list" id="threadsList"></div>
+      <div class="threads-list" data-message-threads>
+        <p style="color:var(--muted);font-size:.9rem;">Select a case to see conversations.</p>
+      </div>
 
       <div class="chat-panel" id="chatPanel">
         <div class="chat-header">
@@ -312,223 +357,28 @@
           <div class="chat-actions" id="chatActions">
             <button class="chat-menu-trigger" aria-label="Conversation actions" aria-expanded="false">⋯</button>
             <div class="chat-menu" role="menu">
-              <button data-chat-action="print">Print Conversation</button>
-              <button data-chat-action="download">Download Conversation</button>
+              <button type="button" data-chat-action="print">Print Conversation</button>
+              <button type="button" data-chat-action="download">Download Conversation</button>
             </div>
           </div>
         </div>
-        <div class="chat-body" id="chatBody"></div>
+        <div class="chat-body" data-chat-body>
+          <p style="color:var(--muted);">Select a case to view messages.</p>
+        </div>
         <div class="chat-input">
-          <input id="chatInput" type="text" placeholder="Type a message..." />
-          <button id="sendBtn">Send</button>
+          <input data-chat-input type="text" placeholder="Type a message..." disabled />
+          <button type="button" data-chat-send disabled>Send</button>
         </div>
       </div>
 
     </div>
   </main>
 
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script src="assets/scripts/utils/toast.js"></script>
   <script>
-    const casesData = [
-      {
-        id:'case1',
-        title:'Motion for Summary Judgment',
-        threads:[
-          {
-            id:'thread1',
-            title:'J. Stone',
-            snippet:'Uploaded revised exhibits.',
-            updated:'2h ago',
-            messages:[
-              {sender:'them', text:'Uploaded revised exhibits.'},
-              {sender:'you', text:'Reviewing now, thank you.'},
-              {sender:'them', text:'Perfect! Let me know if any edits are needed.'}
-            ]
-          },
-          {
-            id:'thread2',
-            title:'T. Nguyen',
-            snippet:'Draft motion ready for review.',
-            updated:'5h ago',
-            messages:[
-              {sender:'them', text:'Draft motion ready for review.'},
-              {sender:'you', text:'Received, reviewing later today.'}
-            ]
-          }
-        ]
-      },
-      {
-        id:'case2',
-        title:'Anderson Merger Filing',
-        threads:[
-          {
-            id:'thread3',
-            title:'Client Services',
-            snippet:'Escrow release briefing Friday.',
-            updated:'Yesterday',
-            messages:[
-              {sender:'them', text:'Reminder: Escrow release briefing set for Friday at 10am PT.'},
-              {sender:'you', text:'Confirmed. Will attend.'}
-            ]
-          }
-        ]
-      }
-    ];
-
-    const casesList = document.getElementById('casesList');
-    const threadsList = document.getElementById('threadsList');
-    const chatBody = document.getElementById('chatBody');
-    const chatTitle = document.getElementById('chatTitle');
-    const chatInput = document.getElementById('chatInput');
-    const sendBtn = document.getElementById('sendBtn');
-    const chatActions = document.getElementById('chatActions');
-    const chatMenuTrigger = chatActions.querySelector('.chat-menu-trigger');
-    const chatMenu = chatActions.querySelector('.chat-menu');
-
-    let activeCase = null;
-    let activeThread = null;
-
-    function renderCases(){
-      casesList.innerHTML = '';
-      casesData.forEach((c,idx)=>{
-        const div=document.createElement('div');
-        div.className='case-item'+(idx===0?' active':'');
-        div.textContent = c.title;
-        div.dataset.caseId = c.id;
-        div.addEventListener('click',()=>selectCase(c.id));
-        casesList.appendChild(div);
-      });
-    }
-
-    function renderThreads(caseId){
-      threadsList.innerHTML='';
-      const currentCase = casesData.find(c=>c.id===caseId);
-      if(!currentCase) return;
-      currentCase.threads.forEach((t,idx)=>{
-        const div=document.createElement('div');
-        div.className='thread-item'+(idx===0?' active':'');
-        div.dataset.threadId = t.id;
-        div.innerHTML = `<div><strong>${t.title}</strong><div class="thread-meta">${t.snippet}</div></div><button class="reply-btn">Reply</button>`;
-        div.addEventListener('click',()=>selectThread(caseId, t.id));
-        threadsList.appendChild(div);
-        const replyBtn = div.querySelector('.reply-btn');
-        replyBtn.addEventListener('click',(e)=>{
-          e.stopPropagation();
-          chatInput.focus();
-        });
-      });
-    }
-
-    function renderChat(caseId, threadId){
-      const currentCase = casesData.find(c=>c.id===caseId);
-      if(!currentCase) return;
-      const thread = currentCase.threads.find(t=>t.id===threadId);
-      if(!thread) return;
-      chatTitle.textContent = `${thread.title} · ${currentCase.title}`;
-      chatBody.innerHTML='';
-      thread.messages.slice().forEach(m=>{
-        const div=document.createElement('div');
-        div.className=`chat-msg ${m.sender}`;
-        div.textContent = (m.sender==='you'? 'You: ':'') + m.text;
-        chatBody.appendChild(div);
-      });
-      chatBody.scrollTop = chatBody.scrollHeight;
-    }
-
-    function selectCase(caseId){
-      activeCase = caseId;
-      activeThread = null;
-      document.querySelectorAll('.case-item').forEach(el=>{
-        el.classList.toggle('active', el.dataset.caseId===caseId);
-      });
-      renderThreads(caseId);
-      const firstThread = casesData.find(c=>c.id===caseId)?.threads[0];
-      if(firstThread){
-        selectThread(caseId, firstThread.id);
-      } else {
-        chatBody.innerHTML = '<p style="color:var(--muted);">No threads yet.</p>';
-        chatTitle.textContent = 'Chat';
-      }
-    }
-
-    function selectThread(caseId, threadId){
-      activeCase = caseId;
-      activeThread = threadId;
-      document.querySelectorAll('.thread-item').forEach(el=>{
-        el.classList.toggle('active', el.dataset.threadId===threadId);
-      });
-      renderChat(caseId, threadId);
-    }
-
-    sendBtn.addEventListener('click', sendMessage);
-    chatInput.addEventListener('keydown', e=>{
-      if(e.key==='Enter') sendMessage();
-    });
-
-    function sendMessage(){
-      const text = chatInput.value.trim();
-      if(!text || !activeCase || !activeThread) return;
-      const currentCase = casesData.find(c=>c.id===activeCase);
-      const thread = currentCase.threads.find(t=>t.id===activeThread);
-      thread.messages.unshift({sender:'you', text});
-      renderChat(activeCase, activeThread);
-      const threadDiv = Array.from(document.querySelectorAll('.thread-item')).find(el=>el.dataset.threadId===activeThread);
-      if(threadDiv){
-        threadDiv.querySelector('.thread-meta').textContent = text;
-      }
-      chatInput.value='';
-    }
-
-    function closeChatMenu(){
-      chatActions.classList.remove('open');
-      chatMenuTrigger.setAttribute('aria-expanded','false');
-    }
-
-    chatMenuTrigger.addEventListener('click', e=>{
-      e.stopPropagation();
-      const open = chatActions.classList.contains('open');
-      closeChatMenu();
-      if(!open){
-        chatActions.classList.add('open');
-        chatMenuTrigger.setAttribute('aria-expanded','true');
-      }
-    });
-
-    document.addEventListener('click', e=>{
-      if(!chatActions.contains(e.target)) closeChatMenu();
-    });
-    document.addEventListener('keydown', e=>{
-      if(e.key==='Escape') closeChatMenu();
-    });
-    chatMenu.addEventListener('click', e=>{
-      const btn = e.target.closest('button[data-chat-action]');
-      if(!btn) return;
-      handleChatAction(btn.dataset.chatAction);
-      closeChatMenu();
-    });
-
-    function handleChatAction(action){
-      if(action==='print'){
-        window.print();
-        return;
-      }
-      if(action==='download'){
-        if(!activeCase || !activeThread) return;
-        const currentCase = casesData.find(c=>c.id===activeCase);
-        const thread = currentCase?.threads.find(t=>t.id===activeThread);
-        if(!currentCase || !thread) return;
-        const content = thread.messages.map(m => `${m.sender === 'you' ? 'You' : thread.title}: ${m.text}`).join('\n');
-        const blob = new Blob([content], {type:'text/plain'});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `${currentCase.title.replace(/\s+/g,'_')}_${thread.title.replace(/\s+/g,'_')}.txt`;
-        a.click();
-      }
-    }
-
-    renderCases();
-    if(casesData.length){
-      selectCase(casesData[0].id);
-    }
+    window.__ATTORNEY_PAGE__ = "messages";
   </script>
+  <script type="module" src="assets/scripts/attorney-tabs.js"></script>
 </body>
 </html>

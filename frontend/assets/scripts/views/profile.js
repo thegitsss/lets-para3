@@ -1,6 +1,8 @@
 // frontend/assets/scripts/views/profile.js
 // Backend-aligned profile editor (Express/Mongo + S3 presign). No Supabase / localStorage.
 
+import { j } from "../helpers.js";
+
 export async function render(el) {
   ensureStylesOnce();
   el.innerHTML = skeleton();
@@ -76,7 +78,7 @@ function draw(root, me) {
             <div class="field">
               <label>Available for work</label>
               <label class="switch">
-                <input type="checkbox" id="pfAvail" ${me.availability ? "checked" : ""}>
+                <input type="checkbox" id="pfAvail" ${isAvailable(me.availability) ? "checked" : ""}>
                 <span class="slider"></span>
               </label>
             </div>
@@ -118,7 +120,7 @@ function wire(root, me) {
     ev.preventDefault();
     const payload = {
       bio: (bioEl.value || "").trim(),
-      availability: !!availEl.checked,
+      availability: availEl.checked ? "Available Now" : "Unavailable",
     };
     // Paralegals: resumeURL / certificateURL are ONLY patched by upload handlers (avoid accidental clearing).
     if (me.role === "attorney") {
@@ -176,31 +178,8 @@ function wire(root, me) {
 
 /* -------------------------- data helpers -------------------------- */
 
-async function j(url, opts = {}) {
-  const o = { credentials: "include", headers: {}, ...opts };
-  if (o.body && typeof o.body === "object" && !(o.body instanceof FormData)) {
-    o.headers["Content-Type"] = "application/json";
-    o.body = JSON.stringify(o.body);
-  }
-  const r = await fetch(url, o);
-  if (!r.ok) throw new Error(`${r.status}`);
-  const ct = r.headers.get("content-type") || "";
-  return ct.includes("application/json") ? r.json() : r.text();
-}
-
-let _csrf;
-async function getCSRF() {
-  if (_csrf) return _csrf;
-  const r = await fetch("/api/csrf", { credentials: "include" });
-  const j = await r.json();
-  _csrf = j.csrfToken;
-  return _csrf;
-}
-
 async function patchMe(fields) {
-  const token = await getCSRF().catch(() => null);
-  const headers = token ? { "X-CSRF-Token": token } : {};
-  await j("/api/users/me", { method: "PATCH", headers, body: fields });
+  await j("/api/users/me", { method: "PATCH", body: fields });
 }
 
 /**
@@ -212,12 +191,10 @@ async function presignedUpload(file, folder) {
   const ext = (file.name.split(".").pop() || "bin").toLowerCase();
 
   // 1) Ask backend for a signed PUT URL (private ACL)
-  const headers = { "Content-Type": "application/json" }; // CSRF not required for presign endpoint
   let url, key;
   try {
     ({ url, key } = await j("/api/uploads/presign", {
       method: "POST",
-      headers,
       body: { contentType: file.type, ext, folder },
     }));
   } catch {
@@ -232,6 +209,11 @@ async function presignedUpload(file, folder) {
 
   // 3) Return the private object key (store on user)
   return key;
+}
+
+function isAvailable(value) {
+  if (typeof value === "string") return /available|open/i.test(value);
+  return !!value;
 }
 
 /* -------------------------- UI helpers --------------------------- */

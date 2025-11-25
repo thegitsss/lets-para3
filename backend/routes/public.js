@@ -1,7 +1,6 @@
 // backend/routes/public.js
 const express = require("express");
 const router = express.Router();
-const axios = require("axios");
 const rateLimit = require("express-rate-limit");
 
 const sendEmail = require("../utils/email");
@@ -46,24 +45,10 @@ function sanitizeSubject(s = "") {
   // prevent header injection (\r or \n). Keep short.
   return String(s).replace(/[\r\n]/g, " ").trim().slice(0, 140);
 }
-function needRecaptcha() {
-  return process.env.NODE_ENV !== "development" && !!process.env.RECAPTCHA_SECRET;
-}
-async function verifyRecaptcha(token) {
-  if (!needRecaptcha()) return true;
-  if (!token) return false;
-  const resp = await axios.post(
-    `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${encodeURIComponent(
-      token
-    )}`
-  );
-  return !!resp.data?.success;
-}
-
 // ----------------------------------------
 // POST /api/public/contact
 // Body:
-//   { name, email, role?, subject, message, recaptchaToken?, hp? }
+//   { name, email, role?, subject, message, hp? }
 //   - hp is a honeypot field (should be empty)
 // ----------------------------------------
 router.post(
@@ -77,7 +62,6 @@ router.post(
         role = "",
         subject = "",
         message = "",
-        recaptchaToken,
         hp = "", // honeypot (bots often fill every field)
       } = req.body || {};
 
@@ -93,9 +77,7 @@ router.post(
         return res.status(400).json({ msg: "Message too long (max 2000 chars)" });
       }
 
-      // reCAPTCHA (prod only or when secret set)
-      const human = await verifyRecaptcha(recaptchaToken);
-      if (!human) return res.status(400).json({ msg: "reCAPTCHA verification failed" });
+      // reCAPTCHA disabled in localhost/dev mode
 
       const safeSubject = `[Contact] ${sanitizeSubject(subject)}`;
       const html = `

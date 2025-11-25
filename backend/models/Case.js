@@ -6,16 +6,21 @@ const { Schema, Types } = mongoose;
  * Enums & Helpers
  * -----------------------------------------*/
 const CASE_STATUS = [
-  "open",         // posted and visible
-  "assigned",     // paralegal chosen, not started
-  "in_progress",  // work underway
-  "completed",    // work marked complete (awaiting release)
-  "disputed",     // buyer/seller dispute opened
-  "closed"        // funds released or refunded, case closed
+  "open",                // posted and visible
+  "assigned",            // paralegal chosen, not started
+  "active",              // work started (legacy alias)
+  "awaiting_documents",  // pending uploads/info
+  "reviewing",           // under review
+  "in_progress",         // work underway
+  "completed",           // work marked complete
+  "disputed",            // dispute opened
+  "cancelled",           // cancelled matter
+  "closed",              // final closed state
 ];
 
 const DISPUTE_STATUS = ["open", "resolved", "rejected"];
 const APPLICANT_STATUS = ["pending", "accepted", "rejected"];
+const FILE_STATUS = ["pending_review", "approved", "attorney_revision"];
 
 const ZOOM_REGEX = /^https:\/\/.*zoom\.us\/[^\s]+$/i;
 
@@ -56,6 +61,19 @@ const fileSchema = new Schema(
     mime: { type: String, trim: true },
     size: { type: Number, min: 0 },
     uploadedBy: { type: Types.ObjectId, ref: "User", index: true },
+    uploadedByRole: { type: String, enum: ["attorney", "paralegal", "admin"], default: "attorney" },
+    status: { type: String, enum: FILE_STATUS, default: "pending_review", index: true },
+    version: { type: Number, default: 1 },
+    revisionNotes: { type: String, trim: true, maxlength: 2000, default: "" },
+    revisionRequestedAt: { type: Date, default: null },
+    approvedAt: { type: Date, default: null },
+    replacedAt: { type: Date, default: null },
+    history: [
+      {
+        key: { type: String, trim: true },
+        replacedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: { createdAt: true, updatedAt: false } }
 );
@@ -76,16 +94,25 @@ const applicantSchema = new Schema(
 const caseSchema = new Schema(
   {
     // Parties (aligned with access control)
+    jobId: { type: Types.ObjectId, ref: "Job", default: null, index: true },
     attorney: { type: Types.ObjectId, ref: "User", required: true, index: true }, // creator / owner
+    attorneyId: { type: Types.ObjectId, ref: "User", required: true, index: true }, // alias for compatibility
     paralegal: { type: Types.ObjectId, ref: "User", default: null, index: true }, // accepted paralegal
+    paralegalId: { type: Types.ObjectId, ref: "User", default: null, index: true }, // alias for compatibility
 
     // Core
     title: { type: String, required: true, trim: true, index: true, maxlength: 300 },
+    practiceArea: { type: String, default: "", trim: true, maxlength: 200 },
     details: { type: String, required: true, trim: true, maxlength: 100_000 },
     status: { type: String, enum: CASE_STATUS, default: "open", index: true },
 
     // Timeline
     deadline: { type: Date, default: null }, // optional target date
+    hiredAt: { type: Date, default: null },  // when a paralegal was hired
+    completedAt: { type: Date, default: null },
+    briefSummary: { type: String, trim: true, maxlength: 1000, default: "" },
+    archived: { type: Boolean, default: false, index: true },
+    downloadUrl: [{ type: String, trim: true }],
 
     // Zoom / meeting info
     zoomLink: {
@@ -117,8 +144,10 @@ const caseSchema = new Schema(
     totalAmount: { type: Number, default: 0, min: 0 }, // in cents
     escrowIntentId: { type: String, default: null, index: true },
     escrowSessionId: { type: String, default: null, index: true }, // if using Checkout
+    paymentIntentId: { type: String, default: null, index: true },
     paymentReleased: { type: Boolean, default: false }, // funds released to paralegal
     paidOutAt: { type: Date, default: null },
+    paymentStatus: { type: String, default: "pending", trim: true },
 
     // Platform fee snapshots (computed at funding time)
     feeAttorneyPct: { type: Number, default: 15, min: 0, max: 100 }, // %
@@ -150,15 +179,17 @@ const caseSchema = new Schema(
  * -----------------------------------------*/
 caseSchema.index({ createdAt: -1 });
 caseSchema.index({ attorney: 1, createdAt: -1 });
+caseSchema.index({ attorneyId: 1, createdAt: -1 });
 caseSchema.index({ paralegal: 1, createdAt: -1 });
+caseSchema.index({ paralegalId: 1, createdAt: -1 });
 caseSchema.index({ status: 1, createdAt: -1 });
 caseSchema.index({ "applicants.paralegalId": 1, createdAt: -1 }); // helpful when showing "my applications"
 
 /** ----------------------------------------
  * Virtuals (aliases for legacy/front-end naming)
  * -----------------------------------------*/
-caseSchema.virtual("createdBy").get(function () { return this.attorney; });
-caseSchema.virtual("acceptedParalegal").get(function () { return this.paralegal; });
+caseSchema.virtual("createdBy").get(function () { return this.attorney || this.attorneyId; });
+caseSchema.virtual("acceptedParalegal").get(function () { return this.paralegal || this.paralegalId; });
 
 // Counts for quick UI badges (not persisted)
 caseSchema.virtual("disputeCount").get(function () { return (this.disputes || []).length; });
@@ -169,12 +200,17 @@ caseSchema.virtual("fileCount").get(function () { return (this.files || []).leng
  * -----------------------------------------*/
 // Prevent duplicate applicants for the same paralegal
 caseSchema.pre("validate", function (next) {
+  if (!this.attorney && this.attorneyId) this.attorney = this.attorneyId;
+  if (!this.attorneyId && this.attorney) this.attorneyId = this.attorney;
+  if (!this.paralegal && this.paralegalId) this.paralegal = this.paralegalId;
+  if (!this.paralegalId && this.paralegal) this.paralegalId = this.paralegal;
+
   if (Array.isArray(this.applicants) && this.applicants.length > 1) {
     const seen = new Set();
     for (const a of this.applicants) {
       const key = String(a.paralegalId);
-      if (seen.has(key)) return next(new Error("Duplicate applicant for the same paralegalId."));
-      seen.add(key);
+      if (key && seen.has(key)) return next(new Error("Duplicate applicant for the same paralegalId."));
+      if (key) seen.add(key);
     }
   }
   next();
@@ -193,12 +229,16 @@ caseSchema.pre("save", function (next) {
  * -----------------------------------------*/
 // Enforce simple status transitions to avoid accidental jumps
 const ALLOWED_TRANSITIONS = {
-  open: ["assigned", "closed"],                 // close if canceled/refunded before work
-  assigned: ["in_progress", "closed"],
-  in_progress: ["completed", "disputed", "closed"],
+  open: ["assigned", "active", "awaiting_documents", "reviewing", "in_progress", "cancelled", "closed"],
+  assigned: ["active", "awaiting_documents", "reviewing", "in_progress", "cancelled", "closed"],
+  active: ["awaiting_documents", "reviewing", "in_progress", "cancelled", "closed"],
+  awaiting_documents: ["reviewing", "in_progress", "completed", "cancelled", "closed"],
+  reviewing: ["in_progress", "completed", "cancelled", "closed"],
+  in_progress: ["completed", "disputed", "cancelled", "closed"],
   completed: ["disputed", "closed"],
-  disputed: ["resolved", "closed"],            // "resolved" is not a case status; we treat resolution as → closed
-  closed: [],                                   // terminal
+  disputed: ["closed"],
+  cancelled: [],
+  closed: [],
 };
 
 caseSchema.methods.canTransitionTo = function (nextStatus) {

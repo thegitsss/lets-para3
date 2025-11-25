@@ -4,11 +4,14 @@ const bcrypt = require("bcryptjs");
 
 const { Schema, Types } = mongoose;
 
+const uniqueStrings = (arr = []) =>
+  [...new Set((arr || []).map((s) => String(s || "").trim()).filter(Boolean))];
+
 /** ----------------------------------------
  * Enums
  * -----------------------------------------*/
 const ROLE_ENUM = ["attorney", "paralegal", "admin"];
-const STATUS_ENUM = ["pending", "approved", "rejected"];
+const STATUS_ENUM = ["pending", "approved", "denied", "rejected"];
 const KYC_STATUS = ["unverified", "pending_review", "verified", "rejected"];
 
 /** ----------------------------------------
@@ -17,7 +20,7 @@ const KYC_STATUS = ["unverified", "pending_review", "verified", "rejected"];
 const auditEntrySchema = new Schema(
   {
     adminId: { type: Types.ObjectId, ref: "User" },
-    action: { type: String, enum: ["approved", "rejected"], required: true },
+    action: { type: String, enum: ["approved", "denied", "rejected"], required: true },
     date: { type: Date, default: Date.now },
     note: { type: String, trim: true, maxlength: 10_000 },
   },
@@ -36,13 +39,39 @@ const notificationPrefsSchema = new Schema(
   { _id: false }
 );
 
+const writingSampleSchema = new Schema(
+  {
+    title: { type: String, trim: true, maxlength: 400 },
+    content: { type: String, trim: true, maxlength: 10_000 },
+  },
+  { _id: false }
+);
+
+const experienceEntrySchema = new Schema(
+  {
+    title: { type: String, trim: true, maxlength: 300 },
+    years: { type: String, trim: true, maxlength: 120 },
+    description: { type: String, trim: true, maxlength: 5_000 },
+  },
+  { _id: false }
+);
+
+const educationEntrySchema = new Schema(
+  {
+    degree: { type: String, trim: true, maxlength: 200 },
+    school: { type: String, trim: true, maxlength: 200 },
+  },
+  { _id: false }
+);
+
 /** ----------------------------------------
  * Main schema
  * -----------------------------------------*/
 const userSchema = new Schema(
   {
     // Core identity
-    name: { type: String, required: true, trim: true, maxlength: 300 },
+    firstName: { type: String, required: true, trim: true, maxlength: 150 },
+    lastName: { type: String, required: true, trim: true, maxlength: 150 },
     email: {
       type: String,
       required: true,
@@ -67,31 +96,42 @@ const userSchema = new Schema(
 
     // Optional profile
     bio: { type: String, default: "", trim: true, maxlength: 20_000 },
-    availability: { type: Boolean, default: true },
+    about: { type: String, default: "", trim: true, maxlength: 20_000 },
+    availability: { type: String, default: "Available Now", trim: true, maxlength: 200 },
     avatarURL: { type: String, default: "", trim: true },
     timezone: { type: String, default: "America/New_York", trim: true },
     location: { type: String, default: "", trim: true }, // City, State
+    practiceAreas: { type: [String], default: [], set: uniqueStrings },
 
     // Expertise (improves browse/search)
-    specialties: { type: [String], default: [], set: arr => [...new Set((arr || []).map(s => String(s).trim()).filter(Boolean))] },
-    jurisdictions: { type: [String], default: [], set: arr => [...new Set((arr || []).map(s => String(s).trim()).filter(Boolean))] },
-    skills: { type: [String], default: [], set: arr => [...new Set((arr || []).map(s => String(s).trim()).filter(Boolean))] },
+    specialties: { type: [String], default: [], set: uniqueStrings },
+    jurisdictions: { type: [String], default: [], set: uniqueStrings },
+    skills: { type: [String], default: [], set: uniqueStrings },
     yearsExperience: { type: Number, min: 0, max: 80, default: 0 },
-    languages: { type: [String], default: [], set: arr => [...new Set((arr || []).map(s => String(s).trim()).filter(Boolean))] },
+    languages: { type: [String], default: [], set: uniqueStrings },
+    writingSamples: { type: [writingSampleSchema], default: [] },
+    experience: { type: [experienceEntrySchema], default: [] },
+    education: { type: [educationEntrySchema], default: [] },
 
     // Security / housekeeping
     emailVerified: { type: Boolean, default: false },
     lastLoginAt: { type: Date },
     failedLogins: { type: Number, default: 0 },
     lockedUntil: { type: Date },
+    notificationsLastViewedAt: { type: Date, default: null },
 
     // KYC / payouts (non-sensitive markers; do NOT store secrets)
     kycStatus: { type: String, enum: KYC_STATUS, default: "unverified", index: true },
     stripeCustomerId: { type: String, default: null, index: true },
     stripeAccountId: { type: String, default: null, index: true }, // for Connect payouts
+    stripeOnboarded: { type: Boolean, default: false },
 
     // Notifications
     notifications: { type: notificationPrefsSchema, default: () => ({}) },
+    emailPref: {
+      marketing: { type: Boolean, default: true },
+      product: { type: Boolean, default: true },
+    },
 
     // Audit trail of admin actions
     audit: { type: [auditEntrySchema], default: [] },
@@ -124,7 +164,10 @@ userSchema.index({ role: 1, status: 1, createdAt: -1 });
 userSchema.index({ specialties: 1 });
 userSchema.index({ jurisdictions: 1 });
 userSchema.index({ skills: 1 });
-userSchema.index({ name: "text", bio: "text", specialties: "text", skills: "text", jurisdictions: "text" }, { name: "user_text_idx" });
+userSchema.index(
+  { firstName: "text", lastName: "text", bio: "text", specialties: "text", skills: "text", jurisdictions: "text" },
+  { name: "user_text_idx" }
+);
 
 /** ----------------------------------------
  * Virtuals
@@ -147,12 +190,17 @@ userSchema.virtual("isLocked").get(function () {
   return Boolean(this.lockedUntil && this.lockedUntil > new Date());
 });
 
+userSchema.virtual("name").get(function () {
+  return `${this.firstName || ""} ${this.lastName || ""}`.trim();
+});
+
 /** ----------------------------------------
  * Validation & Hooks
  * -----------------------------------------*/
 userSchema.pre("validate", function (next) {
   if (this.email) this.email = String(this.email).trim().toLowerCase();
-  if (this.name) this.name = String(this.name).trim();
+  if (this.firstName) this.firstName = String(this.firstName).trim();
+  if (this.lastName) this.lastName = String(this.lastName).trim();
   next();
 });
 

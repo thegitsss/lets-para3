@@ -110,7 +110,7 @@ nav a.active, nav a:hover {
   border-radius: 50%;
 }
 .user-profile span {
-  font-weight: 400;
+  font-weight: 200;
   font-size: 0.95rem;
 }
 
@@ -176,7 +176,7 @@ th {
 td a {
   color: var(--ink);
   text-decoration: none;
-  font-weight: 400;
+  font-weight: 200;
 }
 td a:hover {
   color: var(--accent);
@@ -508,7 +508,7 @@ td a:hover {
   border-bottom: 1px solid var(--line);
   font-size: 0.9rem;
 }
-.escrow-table th { color: var(--muted); font-weight: 400; }
+.escrow-table th { color: var(--muted); font-weight: 200; }
 .status {
   padding: 4px 8px;
   border-radius: 6px;

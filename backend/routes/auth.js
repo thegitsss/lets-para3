@@ -3,7 +3,6 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const axios = require("axios");
 const mongoose = require("mongoose");
 
 const User = require("../models/User");
@@ -19,11 +18,11 @@ const TWO_HOURS = "2h";
 const FIFTEEN_MIN = 15 * 60 * 1000;
 
 function signAccess(user) {
-  return jwt.sign(
-    { id: user._id.toString(), role: user.role, email: user.email },
-    process.env.JWT_SECRET,
-    { expiresIn: TWO_HOURS }
-  );
+  const payload = { id: user._id.toString(), role: user.role, email: user.email };
+  const opts = { expiresIn: TWO_HOURS };
+  if (process.env.JWT_ISSUER) opts.issuer = process.env.JWT_ISSUER;
+  if (process.env.JWT_AUDIENCE) opts.audience = process.env.JWT_AUDIENCE;
+  return jwt.sign(payload, process.env.JWT_SECRET, opts);
 }
 
 function signOneTime(payload, { minutes = 30, secretEnv = "JWT_SECRET" } = {}) {
@@ -35,40 +34,8 @@ function isEmail(v = "") {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).toLowerCase());
 }
 
-function needRecaptcha() {
-  // Skip only in local dev or if secret is not configured
-  return process.env.NODE_ENV !== "development" && !!process.env.RECAPTCHA_SECRET;
-}
-
-async function verifyRecaptcha(token) {
-  if (!needRecaptcha()) return true;
-  if (!token) return false;
-  const resp = await axios.post(
-    `https://www.google.com/recaptcha/api/siteverify?secret=${process.env.RECAPTCHA_SECRET}&response=${token}`
-  );
-  return !!resp.data?.success;
-}
-
 function isObjId(id) {
   return mongoose.isValidObjectId(id);
-}
-
-// naive in-memory limiter (per-process). Replace with Redis for multi-instance.
-const loginLimiter = new Map(); // key: email/ip, value: { count, until }
-function touchLimiter(key, max = 7, lockMinutes = 10) {
-  const now = Date.now();
-  const rec = loginLimiter.get(key) || { count: 0, until: 0 };
-  if (rec.until && now < rec.until) return { locked: true, until: rec.until };
-  rec.count += 1;
-  if (rec.count >= max) {
-    rec.count = 0;
-    rec.until = now + lockMinutes * 60 * 1000;
-  }
-  loginLimiter.set(key, rec);
-  return { locked: false, until: rec.until };
-}
-function clearLimiter(key) {
-  loginLimiter.delete(key);
 }
 
 // ----------------------------------------
@@ -79,19 +46,20 @@ router.post(
   "/register",
   asyncHandler(async (req, res) => {
     const {
-      name,
+      firstName,
+      lastName,
       email,
       password,
       role,
       barNumber,
       resumeURL,
       certificateURL,
-      recaptchaToken,
     } = req.body || {};
 
-    if (needRecaptcha()) {
-      const ok = await verifyRecaptcha(recaptchaToken);
-      if (!ok) return res.status(400).json({ msg: "reCAPTCHA validation failed" });
+    const safeFirst = String(firstName || "").trim();
+    const safeLast = String(lastName || "").trim();
+    if (!safeFirst || !safeLast) {
+      return res.status(400).json({ msg: "First and last name are required." });
     }
 
     const roleLc = String(role || "").toLowerCase();
@@ -110,7 +78,8 @@ router.post(
 
     // Let the model hash the password (pre-save hook)
     const user = new User({
-      name: String(name || "").trim(),
+      firstName: safeFirst,
+      lastName: safeLast,
       email: String(email || "").toLowerCase(),
       password: String(password),
       role: roleLc,
@@ -155,21 +124,7 @@ router.post(
 router.post(
   "/login",
   asyncHandler(async (req, res) => {
-    const { email, password, recaptchaToken } = req.body || {};
-
-    // per-email+IP limiter
-    const ipKey = `ip:${req.ip}`;
-    const emKey = `em:${String(email || "").toLowerCase()}`;
-    const lim1 = touchLimiter(ipKey);
-    const lim2 = touchLimiter(emKey);
-    if (lim1.locked || lim2.locked) {
-      return res.status(429).json({ msg: "Too many attempts. Try again later." });
-    }
-
-    if (needRecaptcha()) {
-      const ok = await verifyRecaptcha(recaptchaToken);
-      if (!ok) return res.status(400).json({ msg: "reCAPTCHA validation failed" });
-    }
+    const { email, password } = req.body || {};
 
     if (!isEmail(email) || !password) {
       return res.status(400).json({ msg: "Invalid credentials" });
@@ -182,40 +137,33 @@ router.post(
       return res.status(400).json({ msg: "Invalid credentials" });
     }
 
-    if (user.isLocked) {
-      return res.status(423).json({ msg: "Account locked. Try again later." });
-    }
-
-    if (user.status !== "approved") {
-      return res.status(403).json({ msg: "Account pending approval" });
+    const status = user.status || "pending";
+    if (status !== "approved") {
+      const msg =
+        status === "pending"
+          ? "Your application is still pending admin approval."
+          : "Your application was not approved. Please contact support if you have questions.";
+      return res.status(403).json({ msg });
     }
 
     const ok = await bcrypt.compare(String(password), user.password);
     if (!ok) {
-      // track failure & potential lockout using model helper
-      user.recordLoginFailure?.();
-      await user.save();
       await AuditLog.logFromReq(req, "auth.login.fail", { targetType: "user", targetId: user._id });
       return res.status(400).json({ msg: "Invalid credentials" });
     }
 
-    // success
-    user.recordLoginSuccess?.();
-    await user.save();
-
-    clearLimiter(ipKey);
-    clearLimiter(emKey);
-
     const token = signAccess(user);
     await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
 
-    res.json({
+    return res.json({
       token,
       user: {
+        _id: user._id,
         id: user._id,
-        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
-        name: user.name,
+        role: user.role,
         status: user.status,
       },
     });
@@ -242,7 +190,8 @@ router.get(
           id: u._id,
           role: u.role,
           email: u.email,
-          name: u.name,
+          firstName: u.firstName,
+          lastName: u.lastName,
           status: u.status,
         },
       });
@@ -266,11 +215,7 @@ router.post("/logout", (_req, res) => res.json({ ok: true }));
 router.post(
   "/resend-verification",
   asyncHandler(async (req, res) => {
-    const { email, recaptchaToken } = req.body || {};
-    if (needRecaptcha()) {
-      const ok = await verifyRecaptcha(recaptchaToken);
-      if (!ok) return res.status(400).json({ msg: "reCAPTCHA validation failed" });
-    }
+    const { email } = req.body || {};
     if (!isEmail(email)) return res.status(400).json({ msg: "Invalid email" });
 
     const user = await User.findOne({ email: String(email).toLowerCase() });
@@ -330,11 +275,7 @@ router.post(
 router.post(
   "/request-password-reset",
   asyncHandler(async (req, res) => {
-    const { email, recaptchaToken } = req.body || {};
-    if (needRecaptcha()) {
-      const ok = await verifyRecaptcha(recaptchaToken);
-      if (!ok) return res.status(400).json({ msg: "reCAPTCHA validation failed" });
-    }
+    const { email } = req.body || {};
     if (!isEmail(email)) return res.status(400).json({ msg: "Invalid email" });
 
     const user = await User.findOne({ email: String(email).toLowerCase() });

@@ -4,9 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Case Detail | Let’s-ParaConnect</title>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/styles/dashboard.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://js.stripe.com/v3/"></script>
+  <script src="assets/scripts/utils/session.js"></script>
 
   <style>
     :root {
@@ -82,6 +84,25 @@
     .btn.primary:hover { background: #a38e5f; }
     .btn.secondary { background: #fff; border: 1px solid var(--line); color: var(--ink); }
     .btn.secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .payment-panel {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1rem;
+      min-width: 260px;
+    }
+    #card-element {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+    }
+    #card-errors {
+      color: #b00020;
+      font-size: 0.85rem;
+      margin-top: 0.4rem;
+      min-height: 1.1rem;
+    }
 
     .case-overview {
       font-size: 0.95rem;
@@ -497,6 +518,16 @@
     }
     .party-card a {color:var(--accent);text-decoration:none;font-size:.85rem;}
     .party-card a:hover{text-decoration:underline;}
+    .party-card .card-actions{
+      display:flex;
+      gap:.5rem;
+      margin-top:.75rem;
+      flex-wrap:wrap;
+    }
+    .party-card .card-actions .btn{
+      flex:1 1 140px;
+      justify-content:center;
+    }
 
     .drop-zone {
       border:2px dashed var(--line);
@@ -600,11 +631,11 @@
       <a href="documents.html">Documents</a>
       <a href="review.html">Review</a>
       <a href="case-files.html">Case Files</a>
-      <a href="payments-escrow.html">Billing</a>
+      <a href="billing-attorney.html">Billing</a>
       <a href="tasks.html">Tasks</a>
       <a href="help.html">Help</a>
     </nav>
-    <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
+    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
   </aside>
 
   <main class="main">
@@ -641,6 +672,17 @@
             <p><strong>Phone:</strong> 323-595-6500<br>
                <strong>Email:</strong> eng+452676@fuery.com</p>
             <p><a href="#">Print Envelope</a> · <a href="#">Map</a></p>
+            <div class="card-actions">
+              <button
+                class="btn primary"
+                data-hire-button
+                data-paralegal-id="demo-paralegal-452676"
+                aria-label="Hire Drew Adams"
+              >
+                Hire
+              </button>
+              <button class="btn secondary">Message</button>
+            </div>
           </div>
 
           <div class="party-card">
@@ -663,6 +705,13 @@
     <div class="case-actions">
       <button class="btn secondary" id="saveBtn">Save</button>
       <button class="btn primary" onclick="window.location.href='create-case.html?ref=existing'">Add Additional Job</button>
+      <button class="btn primary hidden" id="fundEscrowBtn">Fund Escrow</button>
+      <div class="payment-panel hidden" id="escrowPayment">
+        <p style="margin-bottom:.6rem;font-weight:600;">Payment Method</p>
+        <div id="card-element"></div>
+        <div id="card-errors" role="alert"></div>
+      </div>
+      <button class="btn primary" id="releaseEscrowBtn">Mark Complete &amp; Release Funds</button>
       <button class="btn primary" onclick="openExportModal()">Complete Case</button>
     </div>
 
@@ -770,6 +819,7 @@
 
   <script src="assets/scripts/utils/toast.js"></script>
   <script>
+    const sessionInfo = window.checkSession();
     // Upload Document
     document.getElementById('fileInput').addEventListener('change', e => {
       const file = e.target.files[0];
@@ -845,8 +895,36 @@
     const CASE_ID = document.body.dataset.caseId || 'demo-case-0001';
     const toastHelper = window.toastUtils;
     const FALLBACK_TOAST_KEY = toastHelper?.STORAGE_KEY || 'lpDashboardToast';
+    const AUTH_TOKEN_STORAGE_KEY = 'lpc_token';
+    const USER_STORAGE_KEY = 'lpc_user';
+    const paymentPanel = document.getElementById('escrowPayment');
+    const cardElementHost = document.getElementById('card-element');
+    const cardErrorsEl = document.getElementById('card-errors');
+    let cachedCsrfToken = window.__CSRF__ || '';
+    let stripeClientPromise;
+    let stripeElementsInstance;
+    let cardElementInstance;
+    let caseDetails = null;
     let progressInterval;
     let exportTimeout;
+    const hireButtons = document.querySelectorAll('[data-hire-button]');
+    const fundEscrowBtn = document.getElementById('fundEscrowBtn');
+    const releaseEscrowBtn = document.getElementById('releaseEscrowBtn');
+
+    hireButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const paralegalId = btn.dataset.paralegalId || prompt('Enter the paralegal ID to hire:');
+        if (!paralegalId) {
+          alert('Paralegal reference is required.');
+          return;
+        }
+        const targetCase = btn.dataset.caseId || CASE_ID;
+        hireParalegal(targetCase, paralegalId, btn);
+      });
+    });
+    fundEscrowBtn?.addEventListener('click', () => startEscrow(CASE_ID, fundEscrowBtn));
+    releaseEscrowBtn?.addEventListener('click', () => releaseEscrow(CASE_ID, releaseEscrowBtn));
+    loadCaseDetails();
 
     function resetExportModalState() {
       clearInterval(progressInterval);
@@ -867,6 +945,303 @@
       downloadLink.removeAttribute('download');
       purgeBtn.classList.add('hidden');
     }
+
+    function readStoredToken() {
+      if (typeof window.getSessionToken === 'function') {
+        const token = window.getSessionToken();
+        return token || '';
+      }
+      try {
+        return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || '';
+      } catch {
+        return '';
+      }
+    }
+
+    function readStoredUser() {
+      if (typeof window.getStoredUser === 'function') {
+        return window.getStoredUser();
+      }
+      try {
+        const raw = localStorage.getItem(USER_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function readStoredRole() {
+      const user = readStoredUser();
+      return user?.role || '';
+    }
+
+    async function ensureCsrfToken() {
+      if (cachedCsrfToken) return cachedCsrfToken;
+      try {
+        const res = await fetch('/api/csrf', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          cachedCsrfToken = data?.csrfToken || '';
+          window.__CSRF__ = cachedCsrfToken;
+        }
+      } catch (err) {
+        console.warn('Unable to refresh CSRF token.', err);
+      }
+      return cachedCsrfToken;
+    }
+
+    async function loadCaseDetails() {
+      const headers = new Headers();
+      const token = readStoredToken();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      try {
+        const res = await fetch(`/api/cases/${encodeURIComponent(CASE_ID)}`, { headers, credentials: 'include' });
+        if (!res.ok) throw new Error('Unable to fetch case');
+        caseDetails = await res.json();
+      } catch (err) {
+        console.warn('Unable to load case details.', err);
+        caseDetails = null;
+      } finally {
+        updatePaymentVisibility();
+      }
+    }
+
+    function shouldShowPaymentForm() {
+      const role = readStoredRole().toLowerCase();
+      const hasParalegal = !!(caseDetails && caseDetails.paralegal);
+      const escrowFunded = !!(caseDetails && caseDetails.paymentReleased);
+      return role === 'attorney' && hasParalegal && !escrowFunded;
+    }
+
+    function updatePaymentVisibility() {
+      const show = shouldShowPaymentForm();
+      fundEscrowBtn?.classList.toggle('hidden', !show);
+      paymentPanel?.classList.toggle('hidden', !show);
+      if (show) {
+        ensureCardElement().catch((err) => console.warn('Unable to initialize payment field.', err));
+      }
+    }
+
+    async function ensureCardElement() {
+      if (!paymentPanel || !cardElementHost) return null;
+      if (cardElementInstance) return cardElementInstance;
+      const stripe = await getStripeClient();
+      if (!stripeElementsInstance) {
+        stripeElementsInstance = stripe.elements();
+      }
+      cardElementInstance = stripeElementsInstance.create('card', {
+        style: {
+          base: {
+            color: '#1a1a1a',
+            fontFamily: '"Sarabun", sans-serif',
+            fontSize: '16px',
+            '::placeholder': { color: '#9ba6b1' },
+          },
+          invalid: { color: '#b00020' },
+        },
+      });
+      cardElementInstance.mount(cardElementHost);
+      cardElementInstance.on('change', (event) => {
+        if (cardErrorsEl) cardErrorsEl.textContent = event.error ? event.error.message : '';
+      });
+      return cardElementInstance;
+    }
+
+    async function hireParalegal(caseId, paralegalId, button) {
+      if (!caseId || !paralegalId) {
+        alert('Missing case or paralegal identifier.');
+        return;
+      }
+
+      button?.setAttribute('disabled', 'disabled');
+      const headers = new Headers();
+      const token = readStoredToken();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      const csrfToken = await ensureCsrfToken();
+      if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
+
+      let response;
+      try {
+        response = await fetch(`/api/cases/${encodeURIComponent(caseId)}/hire/${encodeURIComponent(paralegalId)}`, {
+          method: 'POST',
+          headers,
+          credentials: 'include'
+        });
+      } catch (networkErr) {
+        console.error('Network error hiring paralegal:', networkErr);
+        button?.removeAttribute('disabled');
+        alert('Network error hiring paralegal.');
+        return;
+      }
+
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch {
+        payload = {};
+      }
+
+      if (!response.ok) {
+        button?.removeAttribute('disabled');
+        alert(payload?.error || payload?.msg || 'Unable to hire paralegal.');
+        return;
+      }
+
+      button?.removeAttribute('disabled');
+      if (caseStatus) {
+        caseStatus.textContent = 'IN PROGRESS';
+        caseStatus.style.background = 'rgba(31,122,74,.1)';
+        caseStatus.style.color = '#1f7a4a';
+      }
+      if (toastHelper?.stage) {
+        toastHelper.stage('Paralegal hired successfully.', 'success');
+      } else {
+        alert('Paralegal hired successfully.');
+      }
+
+      loadCaseDetails();
+      return payload;
+    }
+    window.hireParalegal = hireParalegal;
+
+    async function getStripeClient() {
+      if (stripeClientPromise) {
+        try {
+          return await stripeClientPromise;
+        } catch (err) {
+          stripeClientPromise = null;
+          throw err;
+        }
+      }
+      if (typeof Stripe === 'undefined') {
+        throw new Error('Stripe.js failed to load.');
+      }
+      stripeClientPromise = (async () => {
+        const res = await fetch('/api/payments/config', { credentials: 'include' });
+        const data = await res.json();
+        if (!data?.publishableKey) throw new Error('Stripe publishable key missing.');
+        return Stripe(data.publishableKey);
+      })();
+      return getStripeClient();
+    }
+
+    async function startEscrow(caseId, button) {
+      if (!caseId) {
+        alert('Missing case identifier.');
+        return;
+      }
+      if (!shouldShowPaymentForm()) {
+        alert('Escrow funding is currently unavailable.');
+        return;
+      }
+      try {
+        await ensureCardElement();
+      } catch (err) {
+        alert(err?.message || 'Unable to initialize payment form.');
+        return;
+      }
+      if (!cardElementInstance) {
+        alert('Payment form is not ready.');
+        return;
+      }
+      if (cardErrorsEl) cardErrorsEl.textContent = '';
+      button?.setAttribute('disabled', 'disabled');
+      const headers = new Headers({ 'Content-Type': 'application/json' });
+      const token = readStoredToken();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      const csrfToken = await ensureCsrfToken();
+      if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
+
+      let payload = {};
+      try {
+        const response = await fetch('/api/payments/start-escrow', {
+          method: 'POST',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify({ caseId })
+        });
+        payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.error || payload?.msg || 'Unable to start escrow.');
+        }
+      } catch (err) {
+        button?.removeAttribute('disabled');
+        alert(err.message || 'Unable to start escrow.');
+        return;
+      }
+
+      let stripeClient;
+      try {
+        stripeClient = await getStripeClient();
+      } catch (err) {
+        button?.removeAttribute('disabled');
+        alert(err.message || 'Unable to load payment form.');
+        return;
+      }
+
+      try {
+        const result = await stripeClient.confirmCardPayment(payload.clientSecret, {
+          payment_method: { card: cardElementInstance },
+        });
+        if (result.error) {
+          if (cardErrorsEl) cardErrorsEl.textContent = result.error.message || 'Payment failed.';
+          throw new Error(result.error.message || 'Payment failed.');
+        }
+        if (result.paymentIntent?.status === 'succeeded') {
+          toastHelper?.stage
+            ? toastHelper.stage('Escrow funded successfully.', 'success')
+            : alert('Escrow funded successfully.');
+          window.location.reload();
+          return;
+        }
+        throw new Error('Payment not completed.');
+      } catch (err) {
+        button?.removeAttribute('disabled');
+        if (!cardErrorsEl?.textContent) {
+          alert(err.message || 'Unable to confirm payment.');
+        }
+      }
+    }
+    window.startEscrow = startEscrow;
+
+    async function releaseEscrow(caseId, button) {
+      if (!caseId) {
+        alert('Missing case identifier.');
+        return;
+      }
+      button?.setAttribute('disabled', 'disabled');
+      const headers = new Headers({ 'Content-Type': 'application/json' });
+      const token = readStoredToken();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      const csrfToken = await ensureCsrfToken();
+      if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
+
+      let payload = {};
+      try {
+        const response = await fetch('/api/payments/release', {
+          method: 'POST',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify({ caseId })
+        });
+        payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.error || payload?.msg || 'Unable to release funds.');
+        }
+      } catch (err) {
+        button?.removeAttribute('disabled');
+        alert(err.message || 'Unable to release funds.');
+        return;
+      }
+
+      if (toastHelper?.stage) {
+        toastHelper.stage('Funds released successfully.', 'success');
+      } else {
+        alert('Funds released successfully.');
+      }
+      window.location.reload();
+    }
+    window.releaseEscrow = releaseEscrow;
 
     function openExportModal() {
       resetExportModalState();

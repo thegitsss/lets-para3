@@ -56,15 +56,25 @@ async function ensureEscrowIntent({
   currency = "usd",
   attorneyId,
   paralegalId,
+  caseName,
+  jobTitle,
+  paralegalName,
   existingIntentId, // optional: reuse if active
   idempotencyKey,   // optional: pass through for creation
 }) {
   const transfer_group = caseTransferGroup(caseId);
+  const cleanCaseName = caseName || `Case ${String(caseId)}`;
+  const cleanJobTitle = jobTitle || cleanCaseName;
+  const cleanParalegalName = paralegalName || "Unassigned Paralegal";
   const meta = {
     caseId: String(caseId),
+    caseName: cleanCaseName,
+    jobTitle: cleanJobTitle,
     attorneyId: attorneyId ? String(attorneyId) : "",
     paralegalId: paralegalId ? String(paralegalId) : "",
+    paralegalName: cleanParalegalName,
   };
+  const description = `Case: ${cleanCaseName} — Job: ${cleanJobTitle} — Paralegal: ${cleanParalegalName}`;
 
   if (existingIntentId) {
     const pi = await stripe.paymentIntents.retrieve(existingIntentId);
@@ -74,12 +84,13 @@ async function ensureEscrowIntent({
       const needsAmt = editable && pi.amount !== amount;
       const needsCurr = editable && (pi.currency || "").toLowerCase() !== String(currency).toLowerCase();
 
-      if (editable && (needsTG || needsAmt || needsCurr)) {
+      if (editable) {
         return stripe.paymentIntents.update(pi.id, {
           ...(needsTG ? { transfer_group } : {}),
           ...(needsAmt ? { amount } : {}),
           ...(needsCurr ? { currency } : {}),
           metadata: meta,
+          description,
         });
       }
       return pi;
@@ -94,6 +105,7 @@ async function ensureEscrowIntent({
       automatic_payment_methods: { enabled: true },
       transfer_group,
       metadata: meta,
+      description,
     },
     idempotencyKey ? { idempotencyKey } : undefined
   );

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Create Case | Let’s-ParaConnect</title>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
   <style>
     :root {
       --bg:#ffffff;
@@ -115,17 +115,16 @@
 
     /* Main */
     .main{flex:1;padding:40px;overflow-y:auto;}
-    .topbar{display:flex;justify-content:flex-end;align-items:center;margin-bottom:2rem;gap:1.5rem;}
-    .notification-icon svg{width:20px;height:20px;color:var(--ink);}
-    .notification-badge{
-      position:absolute;top:-6px;right:-6px;
-      background:red;color:white;border-radius:50%;
-      font-size:0.7rem;width:16px;height:16px;
-      display:flex;align-items:center;justify-content:center;font-weight:bold;
-    }
-    .user-profile{display:flex;align-items:center;gap:.75rem;cursor:pointer;}
-    .user-profile img{width:36px;height:36px;border-radius:50%;}
-    .user-profile span{font-weight:400;font-size:.95rem;}
+    .topbar{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:2rem;gap:1.5rem;position:relative;}
+    .notification-icon{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);display:flex;justify-content:center;align-items:center;background:#fff;cursor:pointer;position:relative;transition:border-color .2s ease, transform .2s ease;}
+    .notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
+    .notification-icon svg{width:22px;height:22px;color:var(--ink);}
+    .notification-badge{position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:999px;font-size:.75rem;padding:2px 6px;line-height:1;display:none;font-weight:600;}
+    .notification-badge.show{display:inline-flex;}
+    .user-profile{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(0,0,0,0.03);border:1px solid transparent;transition:border-color 0.2s ease;cursor:pointer;position:relative;}
+    .user-profile img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,0.08);object-fit:cover;}
+    .user-profile strong{display:block;font-weight:200;color:var(--ink);}
+    .user-profile span{font-size:0.85rem;color:var(--muted);}
 
     header h1{
       font-family:var(--font-serif);
@@ -314,30 +313,20 @@
       <a href="dashboard-attorney.html">Home</a>
       <a href="active-cases.html">Cases</a>
       <a href="create-case.html" class="active">Create Case</a>
-      <a href="#">Messages</a>
-      <a href="#">Documents</a>
-      <a href="#">Billing</a>
-      <a href="#">Tasks</a>
+      <a href="messages.html">Messages</a>
+      <a href="documents.html">Documents</a>
+      <a href="review.html">Review</a>
+      <a href="case-files.html">Case Files</a>
+      <a href="billing-attorney.html">Billing</a>
+      <a href="tasks.html">Tasks</a>
       <a href="help.html">Help</a>
     </nav>
-    <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
+    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
   </aside>
 
   <!-- Main -->
   <main class="main">
-    <div class="topbar">
-      <div class="notification-icon" style="position:relative;">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
-        <span class="notification-badge">2</span>
-      </div>
-      <div class="user-profile">
-        <img src="https://via.placeholder.com/36" alt="User avatar" />
-        <span>Samantha</span>
-      </div>
-    </div>
+    <div class="topbar" data-attorney-header></div>
 
     <header>
       <h1>Create a New Case</h1>
@@ -365,11 +354,6 @@
 
     <!-- Form -->
     <form>
-      <div class="field">
-        <label for="title">Case Title</label>
-        <input id="title" placeholder="e.g., Draft Motion for Summary Judgment" required />
-      </div>
-
       <div class="field">
         <label for="specialty">Field of Law</label>
         <select id="specialty">
@@ -514,11 +498,16 @@
       </div>
 
       <div class="actions">
-  <button type="button" class="btn secondary" onclick="window.location.href='dashboard-attorney.html'">Cancel</button>
-  <button type="button" class="btn primary" onclick="window.location.href='create-case-step2.html'">Next Step</button>
+  <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html">Cancel</button>
+  <button type="button" class="btn primary" data-nav="next" id="nextStepBtn" data-target="create-case-step2.html">Next Step</button>
 </div>
     </form>
   </main>
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script>window.__ATTORNEY_PAGE__ = "create-case";</script>
+  <script type="module" src="assets/scripts/attorney-tabs.js"></script>
+
   <script>
 document.querySelector('.btn.primary').addEventListener('click', () => {
   localStorage.setItem('caseTitle', document.getElementById('title').value);
@@ -544,8 +533,6 @@ compInput.addEventListener('input', () => {
   localStorage.setItem('caseCompAmount', compInput.value);
 });
 </script>
-<script>
-  loadUserHeaderInfo();
-</script>
+<script src="assets/scripts/create-case-nav.js"></script>
 </body>
 </html>

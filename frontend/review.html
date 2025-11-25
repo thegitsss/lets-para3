@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Review | Let’s-ParaConnect</title>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <script src="assets/scripts/utils/session.js"></script>
   <style>
     :root {
       --bg: #ffffff;
@@ -50,7 +51,7 @@
     nav a {
       text-decoration: none;
       color: var(--ink);
-      font-weight: 400;
+      font-weight: 200;
       font-size: 0.95rem;
       padding: 10px 14px;
       border-radius: var(--radius);
@@ -78,23 +79,38 @@
       margin-bottom: 2rem;
       gap: 1.5rem;
     }
-    .notification-icon svg { width: 20px; height: 20px; color: var(--ink); }
-    .notification-icon { position: relative; }
+    .notification-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #fff;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+    .notification-icon:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+    .notification-icon svg { width: 22px; height: 22px; color: var(--ink); }
     .notification-badge {
       position: absolute;
-      top: -6px;
-      right: -6px;
-      background: red;
-      color: white;
-      border-radius: 50%;
-      font-size: 0.7rem;
-      width: 16px;
-      height: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
+      top: -4px;
+      right: -4px;
+      background: #c0392b;
+      color: #fff;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      padding: 2px 6px;
+      line-height: 1;
+      display: none;
+      font-weight: 600;
     }
+    .notification-badge.show { display: inline-flex; }
     .user-profile {
       display: flex;
       align-items: center;
@@ -102,7 +118,7 @@
       cursor: pointer;
     }
     .user-profile img { width: 36px; height: 36px; border-radius: 50%; }
-    .user-profile span { font-weight: 400; font-size: 0.95rem; }
+    .user-profile span { font-weight: 200; font-size: 0.95rem; }
 
     header h1 {
       font-family: var(--font-serif);
@@ -172,6 +188,15 @@
       padding: 0.75rem;
       margin-top: 1rem;
     }
+    .modal-content textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.75rem;
+      margin-top: 1rem;
+      font-family: var(--font-sans);
+      resize: vertical;
+    }
 
     @media (max-width: 900px) {
       body { flex-direction: column; }
@@ -193,131 +218,50 @@
       <a href="documents.html">Documents</a>
       <a href="review.html" class="active">Review</a>
       <a href="case-files.html">Case Files</a>
-      <a href="payments-escrow.html">Billing</a>
+      <a href="billing-attorney.html">Billing</a>
       <a href="tasks.html">Tasks</a>
       <a href="help.html">Help</a>
     </nav>
-    <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
+    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
   </aside>
 
   <main class="main">
-    <div class="topbar">
-      <div class="notification-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
-        <span class="notification-badge">2</span>
-      </div>
-      <div class="user-profile">
-        <img src="https://via.placeholder.com/36" alt="User avatar" />
-        <span>Samantha</span>
-      </div>
-    </div>
+    <div class="topbar" data-attorney-header></div>
 
     <header>
       <h1>Review</h1>
       <p>Review all paralegal submissions by case. Approve, request revisions, or upload your own revised version. Approved files automatically move to Case Files → Approved Documents.</p>
     </header>
 
-    <div class="review-container">
-      <section class="case-review">
-        <h2 class="case-title">Motion for Summary Judgment</h2>
-
-        <div class="review-item">
-          <div class="review-info">
-            <h3>Draft_Motion.docx</h3>
-            <p>Submitted by J. Stone · Nov 10 2025 · Status: Pending Review</p>
-          </div>
-          <div class="review-actions">
-            <button class="btn secondary" onclick="viewDoc('Draft_Motion.docx')">View</button>
-            <button class="btn primary" onclick="approveDoc(this)">Approve</button>
-            <button class="btn secondary" onclick="requestRevisions(this)">Request Revisions</button>
-            <button class="btn secondary" onclick="openUploadModal(this)">Upload Revised Version</button>
-          </div>
-        </div>
-
-        <div class="review-item">
-          <div class="review-info">
-            <h3>Exhibit_List.pdf</h3>
-            <p>Submitted by J. Stone · Nov 9 2025 · Status: Approved</p>
-          </div>
-          <div class="review-actions">
-            <button class="btn secondary" onclick="viewDoc('Exhibit_List.pdf')">View</button>
-            <button class="btn secondary" onclick="downloadDoc('Exhibit_List.pdf')">Download</button>
-            <button class="btn secondary" onclick="printDoc('Exhibit_List.pdf')">Print</button>
-          </div>
-        </div>
-      </section>
-
-      <section class="case-review">
-        <h2 class="case-title">Anderson Merger Filing</h2>
-
-        <div class="review-item">
-          <div class="review-info">
-            <h3>Lease_Addendum.docx</h3>
-            <p>Submitted by A. Bennett · Nov 11 2025 · Status: Pending Review</p>
-          </div>
-          <div class="review-actions">
-            <button class="btn secondary" onclick="viewDoc('Lease_Addendum.docx')">View</button>
-            <button class="btn primary" onclick="approveDoc(this)">Approve</button>
-            <button class="btn secondary" onclick="requestRevisions(this)">Request Revisions</button>
-            <button class="btn secondary" onclick="openUploadModal(this)">Upload Revised Version</button>
-          </div>
-        </div>
-      </section>
+    <div class="review-container" id="reviewContainer">
+      <p style="color:var(--muted);font-size:0.95rem;">Loading submissions…</p>
     </div>
   </main>
 
-  <div id="uploadModal" class="modal hidden">
+  <div id="revisionModal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-content">
-      <h3>Upload Revised Version</h3>
-      <input type="file" id="revisedFile" accept=".doc,.docx,.pdf,.txt" />
+      <h3>Request Revisions</h3>
+      <textarea id="revisionNotes" placeholder="Summarize the requested revisions" rows="4"></textarea>
       <div style="margin-top:1rem; display:flex; justify-content:center; gap:0.75rem;">
-        <button class="btn secondary" onclick="closeUploadModal()">Cancel</button>
-        <button class="btn primary" onclick="submitRevised()">Upload</button>
+        <button class="btn secondary" type="button" data-close-revision>Cancel</button>
+        <button class="btn primary" type="button" data-submit-revision>Send Request</button>
       </div>
     </div>
   </div>
 
+  <div id="uploadModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <h3>Upload Revised Version</h3>
+      <input type="file" id="revisedFile" accept=".doc,.docx,.pdf,.txt,.png,.jpg,.jpeg" />
+      <div style="margin-top:1rem; display:flex; justify-content:center; gap:0.75rem;">
+        <button class="btn secondary" type="button" data-close-upload>Cancel</button>
+        <button class="btn primary" type="button" data-submit-upload>Upload</button>
+      </div>
+    </div>
+  </div>
   <script>
-  let selectedReviewItem = null;
-
-  function approveDoc(btn) {
-    const item = btn.closest('.review-item');
-    const info = item.querySelector('p');
-    info.textContent = info.textContent.replace('Pending Review', 'Approved');
-    item.querySelector('.review-actions').innerHTML = `
-      <button class="btn secondary" onclick="viewDoc()">View</button>
-      <button class="btn secondary" onclick="downloadDoc()">Download</button>
-      <button class="btn secondary" onclick="printDoc()">Print</button>`;
-    alert('Document approved and moved to Case Files → Approved Documents.');
-  }
-
-  function requestRevisions(btn) {
-    const item = btn.closest('.review-item');
-    const name = item.querySelector('h3').textContent;
-    alert('Revision requested for ' + name + '. The paralegal will be notified.');
-  }
-
-  function openUploadModal(btn) {
-    selectedReviewItem = btn.closest('.review-item');
-    document.getElementById('uploadModal').classList.remove('hidden');
-  }
-  function closeUploadModal() {
-    document.getElementById('uploadModal').classList.add('hidden');
-    selectedReviewItem = null;
-  }
-  function submitRevised() {
-    const file = document.getElementById('revisedFile').files[0];
-    if (!file) return alert('Please choose a file.');
-    const caseTitle = selectedReviewItem.closest('.case-review').querySelector('.case-title').textContent;
-    alert(`Revised version (${file.name}) uploaded for ${caseTitle}.`);
-    closeUploadModal();
-  }
-
-  function viewDoc(name){ alert('Opening document: ' + (name || 'selected file')); }
-  function downloadDoc(name){ alert('Downloading ' + (name || 'selected file')); }
-  function printDoc(name){ alert('Printing ' + (name || 'selected file')); }
+    window.__ATTORNEY_PAGE__ = "review";
   </script>
+  <script type="module" src="assets/scripts/attorney-tabs.js"></script>
 </body>
 </html>

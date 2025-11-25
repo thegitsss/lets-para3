@@ -1,51 +1,60 @@
 // frontend/assets/scripts/views/settings.js
 // Settings view aligned to Express/Mongo backend.
 
-export async function render(el) {
+import { secureJSON, secureFetch, logout, requireAuth } from "../auth.js";
+
+let stylesInjected = false;
+
+export async function loadSettingsView(root, { escapeHTML } = {}) {
+  requireAuth();
   ensureStylesOnce();
-
-  // Apply prefs ASAP to avoid FOUC
   applyStoredPrefs();
-
-  el.innerHTML = skeleton();
+  root.innerHTML = skeleton();
 
   try {
-    const me = await j("/api/users/me");
-    draw(el, me);
-    wire(el, me);
-    // Re-apply in case this is the first route paint
+    const me = await secureJSON("/api/users/me");
+    draw(root, me, escapeHTML || escapeHtml);
+    wire(root, me);
     applyStoredPrefs();
-  } catch (e) {
-    // If we were bounced due to auth, send to login
-    if (String(e.message || "").includes("401")) {
-      location.href = "login.html";
+  } catch (error) {
+    if (String(error?.message || "").includes("401")) {
+      window.location.href = "login.html";
       return;
     }
-    el.innerHTML = `
+    root.innerHTML = `
       <div class="section">
         <div class="section-title">Settings</div>
         <div class="err">Couldn’t load settings. Please refresh.</div>
-      </div>`;
+      </div>
+    `;
   }
 }
 
+export const render = loadSettingsView;
+export { loadSettingsView };
+
 /* ----------------------------- render ----------------------------- */
 
-function draw(root, me) {
-  const h = escapeHtml;
+function draw(root, me, escapeHTML) {
   const role = me.role || "attorney";
   const status = me.status || "pending";
+  const displayName = `${me.firstName || ""} ${me.lastName || ""}`.trim() || "—";
 
-const payouts = role === "paralegal" ? `
-  <div class="block">
-    <div class="block-title">Payouts</div>
-    <div class="row wrap" role="group" aria-label="Payout status">
-      <div>Stripe account: ${me.stripeAccountId ? `<span class="ok">Connected</span>` : `<span class="muted">Not connected</span>`}</div>
-      ${!me.stripeAccountId ? `<button class="btn" id="connectStripeBtn">Connect Stripe</button>` : ""}
+  const payouts =
+    role === "paralegal"
+      ? `
+    <div class="block">
+      <div class="block-title">Payouts</div>
+      <div class="row wrap" role="group" aria-label="Payout status">
+        <div id="stripeStatusRow" class="row" style="display:none; gap:12px; align-items:center; flex-wrap:wrap;">
+          <div>Stripe account: <span id="stripeStatusText" class="muted">Checking…</span></div>
+          <button class="btn" id="connectStripeBtn" type="button">Connect Stripe Account</button>
+        </div>
+      </div>
+      <div class="tiny muted" id="stripeStatusHint" style="margin-top:6px; display:none;">Auto-pay on completion requires Stripe Connect onboarding.</div>
     </div>
-    ${!me.stripeAccountId ? `<div class="tiny muted" style="margin-top:6px;">Auto-pay on completion requires Stripe Connect onboarding.</div>` : ""}
-  </div>
-` : "";
+  `
+      : "";
 
   root.innerHTML = `
     <div class="section">
@@ -54,20 +63,30 @@ const payouts = role === "paralegal" ? `
       <div class="grid two">
         <div class="block">
           <div class="block-title">Account</div>
-          <div class="kv"><span>Name</span><span>${h(me.name || "")}</span></div>
-          <div class="kv"><span>Email</span><span>${h(me.email || "")}</span></div>
-          <div class="kv"><span>Role</span><span style="text-transform:capitalize">${h(role)}</span></div>
-          <div class="kv"><span>Status</span><span class="${status === "approved" ? "ok" : "muted"}">${h(status)}</span></div>
-          ${role === "attorney" ? `<div class="kv"><span>Bar #</span><span>${h(me.barNumber || "—")}</span></div>` : ""}
-          ${role === "paralegal" ? `
+          <div class="kv"><span>Name</span><span>${escapeHTML(displayName)}</span></div>
+          <div class="kv"><span>Email</span><span>${escapeHTML(me.email || "")}</span></div>
+          <div class="kv"><span>Role</span><span style="text-transform:capitalize">${escapeHTML(role)}</span></div>
+          <div class="kv"><span>Status</span><span class="${
+            status === "approved" ? "ok" : "muted"
+          }">${escapeHTML(status)}</span></div>
+          ${
+            role === "attorney"
+              ? `<div class="kv"><span>Bar #</span><span>${escapeHTML(me.barNumber || "—")}</span></div>`
+              : ""
+          }
+          ${
+            role === "paralegal"
+              ? `
             <div class="kv"><span>Resume</span><span>${me.resumeURL ? "Uploaded" : "—"}</span></div>
-            <div class="kv"><span>Certificate</span><span>${me.certificateURL ? "Uploaded" : "—"}</span></div>` : ""}
+            <div class="kv"><span>Certificate</span><span>${me.certificateURL ? "Uploaded" : "—"}</span></div>`
+              : ""
+          }
         </div>
 
         <div class="block">
           <div class="block-title">Security</div>
           <div class="row wrap">
-            <button class="btn danger" id="signOutBtn" aria-label="Sign out">Sign out</button>
+            <button class="btn danger" id="logoutBtn" type="button" aria-label="Sign out">Sign out</button>
           </div>
           <div class="tiny muted" style="margin-top:6px;">Signs you out of this browser by clearing the secure session cookie.</div>
         </div>
@@ -107,110 +126,130 @@ const payouts = role === "paralegal" ? `
 /* ----------------------------- events ----------------------------- */
 
 function wire(root, me) {
-  // hydrate toggles from stored prefs
   const darkEl = root.querySelector("#prefDark");
   const compactEl = root.querySelector("#prefCompact");
   if (darkEl) darkEl.checked = getPref("dark") === true;
   if (compactEl) compactEl.checked = getPref("compact") === true;
 
-  root.querySelector("#signOutBtn")?.addEventListener("click", async () => {
+  darkEl?.addEventListener("change", (event) => {
+    setPref("dark", !!event.target.checked);
+    applyStoredPrefs();
+  });
+
+  compactEl?.addEventListener("change", (event) => {
+    setPref("compact", !!event.target.checked);
+    applyStoredPrefs();
+  });
+
+  root.querySelector("#logoutBtn")?.addEventListener("click", () => logout("login.html"));
+
+  if (me.role === "paralegal") {
+    initStripeConnect(root);
+  }
+}
+
+function initStripeConnect(root) {
+  const row = root.querySelector("#stripeStatusRow");
+  const statusText = root.querySelector("#stripeStatusText");
+  const hint = root.querySelector("#stripeStatusHint");
+  const button = root.querySelector("#connectStripeBtn");
+  if (!row || !statusText || !button) return;
+
+  const setState = ({ details_submitted, accountId }) => {
+    const connected = !!details_submitted;
+    statusText.textContent = connected ? "Connected" : "Not connected";
+    statusText.classList.toggle("ok", connected);
+    statusText.classList.toggle("muted", !connected);
+    button.textContent = connected ? "Update Stripe Details" : "Connect Stripe Account";
+    button.disabled = false;
+    if (hint) {
+      hint.style.display = "block";
+      hint.textContent = connected
+        ? "Stripe Connect onboarding complete."
+        : "Auto-pay on completion requires Stripe Connect onboarding.";
+    }
+    row.style.display = "flex";
+    button.dataset.accountId = accountId || "";
+  };
+
+  async function refreshStatus() {
     try {
-      const token = await getCSRF().catch(() => null);
-      const headers = token ? { "X-CSRF-Token": token } : {};
-      await j("/api/auth/logout", { method: "POST", headers });
-    } catch {
-      // ignore — we’ll still navigate away
+      const res = await secureFetch("/api/payments/connect/status");
+      if (!res.ok) throw new Error("Unable to fetch status");
+      const data = await res.json();
+      setState(data);
+    } catch (err) {
+      statusText.textContent = "Status unavailable";
+      statusText.classList.add("muted");
+      row.style.display = "flex";
     }
-    location.href = "login.html";
-  });
+  }
 
-  root.querySelector("#prefDark")?.addEventListener("change", (e) => {
-    const on = !!e.target.checked;
-    setPref("dark", on);
-    applyStoredPrefs();
-  });
-
-  root.querySelector("#prefCompact")?.addEventListener("change", (e) => {
-    const on = !!e.target.checked;
-    setPref("compact", on);
-    applyStoredPrefs();
-  });
-}
-// Connect Stripe (placeholder)
-root.querySelector("#connectStripeBtn")?.addEventListener("click", async (e) => {
-  const btn = e.currentTarget;
-  btn.disabled = true;
-  const old = btn.textContent;
-  btn.textContent = "Preparing…";
-  try {
-    const token = await getCSRF().catch(() => null);
-    const headers = token ? { "X-CSRF-Token": token } : {};
-    // Expecting { url: "https://connect.stripe.com/..." }
-    const res = await j("/api/payments/connect/onboard", { method: "POST", headers });
-    if (res?.url) {
-      window.open(res.url, "_blank", "noopener");
-    } else {
-      alert("Could not start Stripe onboarding.");
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    button.textContent = "Connecting…";
+    try {
+      const createRes = await secureFetch("/api/payments/connect/create-account", { method: "POST" });
+      if (!createRes.ok) throw new Error("Unable to prepare Stripe account");
+      const { accountId } = await createRes.json();
+      const linkRes = await secureFetch("/api/payments/connect/onboard-link", {
+        method: "POST",
+        body: { accountId },
+      });
+      if (!linkRes.ok) throw new Error("Unable to start onboarding");
+      const { url } = await linkRes.json();
+      if (!url) throw new Error("Invalid onboarding link");
+      window.location.href = url;
+    } catch (err) {
+      alert(err?.message || "Unable to start Stripe onboarding.");
+      button.disabled = false;
+      button.textContent = "Connect Stripe Account";
+      refreshStatus();
     }
-  } catch {
-    alert("Failed to start onboarding.");
-  } finally {
-    btn.textContent = old;
-    btn.disabled = false;
-  }
-});
+  });
 
-
-/* ----------------------------- data ------------------------------- */
-
-async function j(url, opts = {}) {
-  const o = { credentials: "include", headers: {}, ...opts };
-  if (o.body && typeof o.body === "object" && !(o.body instanceof FormData)) {
-    o.headers["Content-Type"] = "application/json";
-    o.body = JSON.stringify(o.body);
-  }
-  const r = await fetch(url, o);
-  if (!r.ok) throw new Error(`${r.status}`);
-  const ct = r.headers.get("content-type") || "";
-  return ct.includes("application/json") ? r.json() : r.text();
-}
-
-let _csrf;
-async function getCSRF() {
-  if (_csrf) return _csrf;
-  const r = await fetch("/api/csrf", { credentials: "include" });
-  const j = await r.json();
-  _csrf = j.csrfToken;
-  return _csrf;
+  refreshStatus();
 }
 
 /* ---------------------------- prefs (local) ---------------------------- */
 
 const PREF_KEY = "lp:prefs";
 function getAllPrefs() {
-  try { return JSON.parse(localStorage.getItem(PREF_KEY) || "{}"); } catch { return {}; }
+  try {
+    return JSON.parse(localStorage.getItem(PREF_KEY) || "{}");
+  } catch {
+    return {};
+  }
 }
-function setAllPrefs(p) { localStorage.setItem(PREF_KEY, JSON.stringify(p || {})); }
-function getPref(k) { return getAllPrefs()[k]; }
-function setPref(k, v) { const p = getAllPrefs(); p[k] = v; setAllPrefs(p); }
+function setAllPrefs(prefs) {
+  localStorage.setItem(PREF_KEY, JSON.stringify(prefs || {}));
+}
+function getPref(key) {
+  return getAllPrefs()[key];
+}
+function setPref(key, value) {
+  const prefs = getAllPrefs();
+  prefs[key] = value;
+  setAllPrefs(prefs);
+}
 
 function applyStoredPrefs() {
-  const p = getAllPrefs();
+  const prefs = getAllPrefs();
   const root = document.documentElement;
-  // dark mode
-  if (p.dark) root.classList.add("dark"); else root.classList.remove("dark");
-  // compact density
+  if (prefs.dark) root.classList.add("dark");
+  else root.classList.remove("dark");
   const app = document.getElementById("app") || document.body;
-  if (p.compact) app.classList.add("compact"); else app.classList.remove("compact");
+  if (prefs.compact) app.classList.add("compact");
+  else app.classList.remove("compact");
 }
 
 /* ----------------------------- UI utils ---------------------------- */
 
 function ensureStylesOnce() {
-  if (document.getElementById("settings-styles")) return;
-  const s = document.createElement("style");
-  s.id = "settings-styles";
-  s.textContent = `
+  if (stylesInjected) return;
+  const style = document.createElement("style");
+  style.id = "settings-styles";
+  style.textContent = `
   .grid.two{display:grid;gap:16px}
   @media(min-width:960px){.grid.two{grid-template-columns:1fr 1fr}}
   .block{border:1px solid #e5e7eb;border-radius:12px;background:#fff;padding:14px}
@@ -227,7 +266,6 @@ function ensureStylesOnce() {
   .err{color:#b91c1c}
   .tiny{font-size:.8rem}
 
-  /* prefs switches */
   .pref{display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px dashed #eef2f7}
   .pref:last-child{border-bottom:0}
   .pref-title{font-weight:600}
@@ -239,16 +277,15 @@ function ensureStylesOnce() {
   input:checked + .slider{background:#111827}
   input:checked + .slider:before{transform:translateX(20px)}
 
-  /* optional global hooks for prefs */
   :root.dark{color-scheme:dark}
   :root.dark body{background:#0b0d12;color:#e5e7eb}
-  body.compact .section, body.compact .block, body.compact .btn{padding-top:10px;padding-bottom:10px}
+  body.compact .section,body.compact .block,body.compact .btn{padding-top:10px;padding-bottom:10px}
 
-  /* tiny skeleton lines */
   .skeleton .line{height:14px;background:#f3f4f6;border-radius:6px;animation:sh 1.2s infinite}
   @keyframes sh{0%{opacity:.6}50%{opacity:1}100%{opacity:.6}}
   `;
-  document.head.appendChild(s);
+  document.head.appendChild(style);
+  stylesInjected = true;
 }
 
 function skeleton() {
@@ -262,6 +299,6 @@ function skeleton() {
   </div>`;
 }
 
-function escapeHtml(s) {
-  return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;" }[c] || c));
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[char] || char));
 }

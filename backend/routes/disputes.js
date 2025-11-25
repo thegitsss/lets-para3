@@ -2,7 +2,8 @@
 const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
-const { requireRole, requireCaseAccess } = require("../utils/authz");
+const { requireCaseAccess } = require("../utils/authz");
+const requireRole = require("../middleware/requireRole");
 const Case = require("../models/Case");
 const AuditLog = require("../models/AuditLog");
 
@@ -85,6 +86,53 @@ router.get(
 );
 
 /**
+ * GET /api/disputes/all
+ * Simple list of all disputes for the admin UI (no pagination/filtering).
+ */
+router.get(
+  "/all",
+  requireRole("admin"),
+  asyncHandler(async (_req, res) => {
+    const cases = await Case.find({ "disputes.0": { $exists: true } })
+      .select("title disputes status attorney paralegal")
+      .populate("disputes.raisedBy", "firstName lastName email role")
+      .lean();
+
+    const disputes = [];
+    for (const c of cases) {
+      for (const d of c.disputes || []) {
+        disputes.push({
+          id: d.disputeId || (d._id ? String(d._id) : undefined),
+          caseId: c._id,
+          caseTitle: c.title,
+          reason: d.message,
+          status: d.status,
+          createdAt: d.createdAt,
+          raisedBy: d.raisedBy
+            ? {
+                id: d.raisedBy._id ? String(d.raisedBy._id) : String(d.raisedBy),
+                name: `${d.raisedBy.firstName || ""} ${d.raisedBy.lastName || ""}`.trim() ||
+                  d.raisedBy.email ||
+                  "User",
+                role: d.raisedBy.role || null,
+                email: d.raisedBy.email || null,
+              }
+            : null,
+        });
+      }
+    }
+
+    disputes.sort((a, b) => {
+      const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return tb - ta;
+    });
+
+    res.json(disputes);
+  })
+);
+
+/**
  * GET /api/disputes/:caseId
  * List disputes for a single case (must have access to the case).
  */
@@ -96,7 +144,7 @@ router.get(
     if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid caseId" });
 
     const c = await Case.findById(caseId)
-      .populate("attorney paralegal", "name email role")
+      .populate("attorney paralegal", "firstName lastName email role")
       .lean();
     if (!c) return res.status(404).json({ error: "Case not found" });
 
@@ -252,6 +300,49 @@ router.patch(
       targetId: c._id,
       caseId: c._id,
       meta: { disputeId, status },
+    });
+
+    res.json({ ok: true });
+  })
+);
+
+/**
+ * POST /api/disputes/resolve/:disputeId
+ * Resolve a dispute by ID without needing the caseId (admin only).
+ */
+router.post(
+  "/resolve/:disputeId",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const { disputeId } = req.params;
+    if (!disputeId) return res.status(400).json({ error: "disputeId required" });
+
+    const match = [{ "disputes.disputeId": disputeId }];
+    if (isObjId(disputeId)) {
+      match.push({ "disputes._id": new mongoose.Types.ObjectId(disputeId) });
+    }
+
+    const c = await Case.findOne({ $or: match });
+    if (!c) return res.status(404).json({ error: "Dispute not found" });
+
+    const d = (c.disputes || []).find(
+      (x) => String(x.disputeId || x._id) === String(disputeId)
+    );
+    if (!d) return res.status(404).json({ error: "Dispute not found" });
+
+    d.status = "resolved";
+    if (typeof c.canTransitionTo === "function" && c.canTransitionTo("closed")) {
+      c.transitionTo("closed");
+    } else if (["completed", "disputed"].includes(c.status)) {
+      c.status = "closed";
+    }
+    await c.save();
+
+    await AuditLog.logFromReq(req, "dispute.status.update", {
+      targetType: "case",
+      targetId: c._id,
+      caseId: c._id,
+      meta: { disputeId: String(disputeId), status: "resolved" },
     });
 
     res.json({ ok: true });

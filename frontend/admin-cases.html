@@ -57,9 +57,15 @@
     .badge{ font-size:12px; padding:6px 8px; border:1px solid var(--line); border-radius:999px; color:var(--muted); background:color-mix(in srgb, var(--line) 30%, transparent); }
     .badge.status{ color:#fff; border-color:transparent; }
     .s-open{ background:linear-gradient(180deg, color-mix(in srgb, var(--info) 65%, black 10%), var(--info)); }
-    .s-in_review{ background:linear-gradient(180deg, color-mix(in srgb, var(--warn) 65%, black 10%), var(--warn)); }
-    .s-approved{ background:linear-gradient(180deg, color-mix(in srgb, var(--ok) 65%, black 10%), var(--ok)); }
-    .s-rejected, .s-closed{ background:linear-gradient(180deg, color-mix(in srgb, var(--bad) 65%, black 10%), var(--bad)); }
+    .s-assigned{ background:linear-gradient(180deg, color-mix(in srgb, var(--gold) 65%, black 10%), var(--gold)); }
+    .s-active{ background:linear-gradient(180deg, color-mix(in srgb, var(--ok) 70%, black 5%), var(--ok)); }
+    .s-awaiting_documents{ background:linear-gradient(180deg, color-mix(in srgb, var(--warn) 70%, black 5%), var(--warn)); }
+    .s-reviewing{ background:linear-gradient(180deg, color-mix(in srgb, var(--info) 55%, var(--gold)), var(--info)); }
+    .s-in_progress{ background:linear-gradient(180deg, color-mix(in srgb, var(--info) 80%, black 5%), var(--info)); }
+    .s-completed{ background:linear-gradient(180deg, color-mix(in srgb, var(--ok) 85%, black 5%), var(--ok)); }
+    .s-disputed{ background:linear-gradient(180deg, color-mix(in srgb, var(--bad) 70%, black 5%), var(--bad)); }
+    .s-cancelled{ background:linear-gradient(180deg, color-mix(in srgb, var(--muted) 70%, black 10%), var(--muted)); }
+    .s-closed{ background:linear-gradient(180deg, color-mix(in srgb, var(--muted) 65%, black 10%), var(--muted)); }
 
     .actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:2px; }
 
@@ -83,7 +89,7 @@
   <header role="banner" class="container">
     <nav aria-label="Primary">
       <a href="index.html">Home</a>
-      <a href="admin-dashboard.html">Admin</a>
+      <a href="index.html#admin-pending-users">Admin</a>
       <a href="admin-cases.html" class="active" aria-current="page">Cases</a>
       <a href="admin-disputes.html">Disputes</a>
       <a href="login.html">Login</a>
@@ -98,9 +104,14 @@
       <select id="statusF" aria-label="Filter by status">
         <option value="">All statuses</option>
         <option value="open">Open</option>
-        <option value="in_review">In Review</option>
-        <option value="approved">Approved</option>
-        <option value="rejected">Rejected</option>
+        <option value="assigned">Assigned</option>
+        <option value="active">Active</option>
+        <option value="awaiting_documents">Awaiting Documents</option>
+        <option value="reviewing">Reviewing</option>
+        <option value="in_progress">In Progress</option>
+        <option value="completed">Completed</option>
+        <option value="disputed">Disputed</option>
+        <option value="cancelled">Cancelled</option>
         <option value="closed">Closed</option>
       </select>
       <select id="sortF" aria-label="Sort cases">
@@ -156,10 +167,26 @@
     const setBusy = (on) => listEl?.setAttribute('aria-busy', on ? 'true' : 'false');
     const debounce = (fn, ms=250) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
     const clamp = (n,min,max)=>Math.max(min,Math.min(max,n));
-
-    const statusClass = (s) => ({
-      open:'s-open', in_review:'s-in_review', approved:'s-approved', rejected:'s-rejected', closed:'s-closed'
-    }[s] || 's-open');
+    const STATUS_ORDER = ["open","assigned","active","awaiting_documents","reviewing","in_progress","completed","disputed","cancelled","closed"];
+    const STATUS_LABELS = {
+      open: "Open",
+      assigned: "Assigned",
+      active: "Active",
+      awaiting_documents: "Awaiting Documents",
+      reviewing: "Reviewing",
+      in_progress: "In Progress",
+      completed: "Completed",
+      disputed: "Disputed",
+      cancelled: "Cancelled",
+      closed: "Closed",
+    };
+    const statusLabel = (s) => STATUS_LABELS[s] || (String(s || "").replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase()) || "Unknown");
+    const statusClass = (s = "") => (STATUS_ORDER.includes(s) ? `s-${s}` : "s-open");
+    const userLabel = (person, fallback = "Unassigned") => {
+      if (!person) return fallback;
+      const name = `${person.firstName || ""} ${person.lastName || ""}`.trim();
+      return name || person.email || fallback;
+    };
 
     // persist filters per admin
     const KEY = 'adminCasesFilters:v1';
@@ -177,7 +204,7 @@
     // --- auth gate: must be admin -----------------------------------
     async function ensureAdmin() {
       try {
-        const r = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' });
+        const r = await secureFetch(`${API_BASE}/auth/me`);
         if (!r.ok) throw new Error('not authed');
         const { user } = await r.json();
         if (!user || user.role !== 'admin') throw new Error('not admin');
@@ -196,7 +223,7 @@
         <div class="skeleton"></div>
         <div class="skeleton"></div>`;
       try {
-        const r = await fetch(`${API_BASE}/admin/cases`, { credentials: 'include' });
+        const r = await secureFetch(`${API_BASE}/admin/cases`);
         const data = r.ok ? await r.json() : {};
         allCases = Array.isArray(data?.cases) ? data.cases : [];
         render();
@@ -225,14 +252,17 @@
       return allCases.filter(c => {
         if (st && c.status !== st) return false;
         if (!term) return true;
+        const attorney = userLabel(c.attorney, "");
+        const paralegal = userLabel(c.paralegal, "");
         const hay = [
-          safe(c.title).toLowerCase(),
-          safe(c._id).toLowerCase(),
-          safe(by(c,'createdBy.email')).toLowerCase(),
-          safe(by(c,'createdBy.name')).toLowerCase(),
-          safe(by(c,'assignedTo.email')).toLowerCase(),
-          safe(by(c,'assignedTo.name')).toLowerCase(),
-        ].join(' ');
+          safe(c.title),
+          safe(c.practiceArea),
+          safe(c.details),
+          safe(c.status),
+          safe(c._id),
+          attorney,
+          paralegal,
+        ].join(" ").toLowerCase();
         return hay.includes(term);
       });
     }
@@ -248,12 +278,15 @@
       }
 
       listEl.innerHTML = items.map(c => {
-        const id = esc(c._id);
+        const id = esc(c._id || c.id);
         const title = esc(c.title || 'Untitled Case');
-        const createdBy = esc(by(c,'createdBy.name') || by(c,'createdBy.email') || 'Unknown');
-        const assigned = esc(by(c,'assignedTo.name') || by(c,'assignedTo.email') || 'Unassigned');
+        const attorney = esc(userLabel(c.attorney, 'Unknown'));
+        const paralegal = esc(userLabel(c.paralegal, 'Unassigned'));
         const createdAt = fmt(c.createdAt);
-        const status = esc(c.status || 'open');
+        const updatedAt = fmt(c.updatedAt);
+        const practice = c.practiceArea ? `<span class="badge">Practice: ${esc(c.practiceArea)}</span>` : '';
+        const preview = (c.details || '').trim();
+        const statusText = esc(statusLabel(c.status));
 
         return `
           <div class="card" data-id="${id}" tabindex="0" role="group" aria-label="Case ${id}">
@@ -261,17 +294,23 @@
               <div class="title">${title}</div>
               <div class="small">#${id}</div>
             </div>
+            ${preview ? `<p class="small" style="margin:4px 0 6px; color:var(--muted);">${esc(preview.slice(0, 220))}${preview.length > 220 ? "&hellip;" : ""}</p>` : ""}
             <div class="meta" aria-label="Case metadata">
-              <span class="badge">Created by: ${createdBy}</span>
-              <span class="badge">Assigned to: ${assigned}</span>
-              <span class="badge status ${statusClass(c.status)}">${status}</span>
+              <span class="badge">Attorney: ${attorney}</span>
+              <span class="badge">Paralegal: ${paralegal}</span>
+              ${practice}
+              <span class="badge status ${statusClass(c.status)}">${statusText}</span>
               ${createdAt ? `<span class="badge">Created: ${esc(createdAt)}</span>` : ''}
+              ${updatedAt ? `<span class="badge">Updated: ${esc(updatedAt)}</span>` : ''}
             </div>
             <div class="actions" role="group" aria-label="Actions for ${id}">
-              <button class="btn ok"  data-action="approved" title="Approve">Approve</button>
-              <button class="btn bad" data-action="rejected" title="Reject">Reject</button>
-              <button class="btn"     data-action="in_review" title="Mark In Review">Mark In Review</button>
-              <button class="btn"     data-action="closed" title="Close">Close</button>
+              <label class="small" style="display:flex;align-items:center;gap:6px;">
+                <span>Update status</span>
+                <select data-status-select>
+                  ${STATUS_ORDER.map(s => `<option value="${s}" ${s === c.status ? 'selected' : ''}>${statusLabel(s)}</option>`).join('')}
+                </select>
+              </label>
+              <button class="btn primary" data-action="set-status" title="Apply status">Save</button>
             </div>
           </div>
         `;
@@ -281,7 +320,7 @@
     async function updateCase(id, status) {
       try {
         await fetchCSRF();
-        const res = await secureFetch(`${API_BASE}/admin/cases/${encodeURIComponent(id)}`, {
+        const res = await secureFetch(`${API_BASE}/admin/cases/${encodeURIComponent(id)}/status`, {
           method: 'PATCH',
           body: { status }
         });
@@ -299,12 +338,14 @@
 
     // --- events ------------------------------------------------------
     document.addEventListener('click', (e) => {
-      const btn = e.target.closest('button[data-action]');
+      const btn = e.target.closest('button[data-action="set-status"]');
       if (!btn) return;
       const card = btn.closest('.card'); if (!card) return;
-      const id = card.dataset.id; const action = btn.dataset.action;
-      if (!id || !action) return;
-      updateCase(id, action);
+      const select = card.querySelector('[data-status-select]');
+      const id = card.dataset.id;
+      const next = select?.value;
+      if (!id || !next) return;
+      updateCase(id, next);
     });
 
     refreshBtn?.addEventListener('click', fetchCases);

@@ -1,77 +1,99 @@
-// frontend/assets/scripts/login.js
-import { j } from "./helpers.js";
+const API_BASE = "/api";
 
-const form = document.getElementById("loginForm");
-const email = document.getElementById("email");
-const password = document.getElementById("password");
-const msg = document.getElementById("msg");
-const bypass = document.getElementById("devBypass");
-const caps = document.getElementById("caps"); // optional span for caps warning
-
-function show(t) { if (msg) msg.textContent = t || ""; }
-
-window.togglePassword = function () {
-  const toggle = document.querySelector(".show-toggle");
-  if (!password || !toggle) return;
-  if (password.type === "password") { password.type = "text"; toggle.textContent = "Hide"; }
-  else { password.type = "password"; toggle.textContent = "Show"; }
+const clearLocalSession = () => {
+  if (window.clearStoredSession) window.clearStoredSession();
+  try {
+    localStorage.removeItem("lpc_user");
+  } catch {}
 };
 
-let submitting = false;
-
-if (password && caps) {
-  password.addEventListener("keyup", (e) => {
-    const on = e.getModifierState && e.getModifierState("CapsLock");
-    caps.style.visibility = on ? "visible" : "hidden";
-  });
+let skipInit = false;
+try {
+  const token = localStorage.getItem("lpc_token");
+  const rawUser = localStorage.getItem("lpc_user");
+  const parsedUser = rawUser ? JSON.parse(rawUser) : null;
+  const role = (parsedUser?.role || "").toLowerCase();
+  const status = (parsedUser?.status || "").toLowerCase();
+  if (token && role && status === "approved") {
+    if (window.redirectUserDashboard) {
+      window.redirectUserDashboard(role);
+    } else {
+      window.location.href =
+        role === "admin"
+          ? "admin-dashboard.html"
+          : role === "paralegal"
+          ? "dashboard-paralegal.html"
+          : "dashboard-attorney.html";
+    }
+    skipInit = true;
+  } else {
+    clearLocalSession();
+  }
+} catch {
+  clearLocalSession();
 }
 
-if (form) {
-  form.addEventListener("submit", async (e) => {
+const toastHelper = window.toastUtils;
+const stagedSignupToast = sessionStorage.getItem("signupToast");
+if (stagedSignupToast) {
+  sessionStorage.removeItem("signupToast");
+  if (toastHelper) {
+    toastHelper.show(stagedSignupToast, { targetId: "toastBanner", type: "info" });
+  } else {
+    alert(stagedSignupToast);
+  }
+}
+
+if (!skipInit) {
+  clearLocalSession();
+
+  document.getElementById("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (submitting) return;
-    show("");
 
-    const emailVal = (email?.value || "").trim().toLowerCase();
-    const passVal  = password?.value || "";
-    if (!emailVal || !passVal) { show("Email and password are required."); return; }
-
-    // Optional reCAPTCHA (backend skips in development)
-    let recaptchaToken = "";
-    if (window.grecaptcha && typeof grecaptcha.getResponse === "function") {
-      recaptchaToken = grecaptcha.getResponse();
-      if (!recaptchaToken) { show("Please verify you are not a robot."); return; }
-    }
-
-    // Disable while submitting
-    submitting = true;
-    const submitBtn = form.querySelector('button[type="submit"]');
-    submitBtn?.setAttribute("disabled", "true");
-    submitBtn?.classList.add("disabled");
-    show("Signing in…");
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value.trim();
 
     try {
-      await j("/api/auth/login", {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
-        body: { email: emailVal, password: passVal, recaptchaToken }
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
-      location.href = "index.html"; // cookie is set by the server
-    } catch (err) {
-      const text = err?.data?.msg || err?.data?.error || "Login failed. Check your email and password.";
-      show(text);
-      try { window.grecaptcha?.reset?.(); } catch {}
-    } finally {
-      submitting = false;
-      submitBtn?.removeAttribute("disabled");
-      submitBtn?.classList.remove("disabled");
-    }
-  });
-}
 
-// Dev bypass: app shell does its own session check
-if (bypass) {
-  bypass.addEventListener("click", (e) => {
-    e.preventDefault();
-    location.href = "index.html";
+      let data = {};
+      try {
+        data = await res.json();
+      } catch {}
+
+      if (!res.ok) {
+        clearLocalSession();
+        const msg = data?.msg || data?.message || "Login failed";
+        if (toastHelper) {
+          toastHelper.show(msg, { targetId: "toastBanner", type: "err" });
+        } else {
+          alert(msg);
+        }
+        return;
+      }
+
+      localStorage.setItem("lpc_token", data.token);
+      localStorage.setItem("lpc_user", JSON.stringify(data.user || {}));
+
+      if (data.user.role === "admin") {
+        window.location.href = "admin-dashboard.html";
+      } else if (data.user.role === "paralegal") {
+        window.location.href = "dashboard-paralegal.html";
+      } else {
+        window.location.href = "dashboard-attorney.html";
+      }
+    } catch (err) {
+      console.error(err);
+      clearLocalSession();
+      if (toastHelper) {
+        toastHelper.show("Network error during login", { targetId: "toastBanner", type: "err" });
+      } else {
+        alert("Network error during login");
+      }
+    }
   });
 }

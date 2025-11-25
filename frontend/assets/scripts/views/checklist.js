@@ -2,16 +2,9 @@
 // Case-aware checklist (deadlines, todos). Requires backend routes at /api/checklist.
 // Cookie-based auth + CSRF cookie flow.
 
-const API_BASE = "/api/checklist";
-let CSRF = null;
+import { j } from "../helpers.js";
 
-async function getCSRF() {
-  if (CSRF) return CSRF;
-  const r = await fetch("/api/csrf", { credentials: "include" });
-  const j = await r.json().catch(() => ({}));
-  CSRF = j.csrfToken;
-  return CSRF;
-}
+const API_BASE = "/api/checklist";
 
 function ensureStylesOnce() {
   if (document.getElementById("pc-checklist-styles")) return;
@@ -66,38 +59,24 @@ async function apiList(params = {}) {
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined && v !== "") url.searchParams.set(k, v);
   }
-  const r = await fetch(url, { credentials: "include", signal: inflight.signal });
-  if (!r.ok) throw new Error("Failed to load tasks");
-  return r.json(); // { items: [...] }
+  return j(url.toString(), { signal: inflight.signal });
 }
 async function apiCreate(body) {
-  const r = await fetch(API_BASE, {
+  return j(API_BASE, {
     method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json", "X-CSRF-Token": await getCSRF() },
-    body: JSON.stringify(body),
+    body,
   });
-  if (!r.ok) throw new Error("Create failed");
-  return r.json();
 }
 async function apiUpdate(id, body) {
-  const r = await fetch(`${API_BASE}/${encodeURIComponent(id)}`, {
+  return j(`${API_BASE}/${encodeURIComponent(id)}`, {
     method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json", "X-CSRF-Token": await getCSRF() },
-    body: JSON.stringify(body),
+    body,
   });
-  if (!r.ok) throw new Error("Update failed");
-  return r.json();
 }
 async function apiDelete(id) {
-  const r = await fetch(`${API_BASE}/${encodeURIComponent(id)}`, {
+  return j(`${API_BASE}/${encodeURIComponent(id)}`, {
     method: "DELETE",
-    credentials: "include",
-    headers: { "X-CSRF-Token": await getCSRF() },
   });
-  if (!r.ok) throw new Error("Delete failed");
-  return r.json();
 }
 
 export async function render(el) {

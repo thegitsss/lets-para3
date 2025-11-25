@@ -7,6 +7,105 @@
 
 export let CSRF_TOKEN = "";
 
+const TOKEN_KEY = "lpc_token";
+const USER_KEY = "lpc_user";
+let redirectingToLogin = false;
+
+function readStorage(key) {
+  try {
+    return localStorage.getItem(key) || "";
+  } catch {
+    return "";
+  }
+}
+
+function writeStorage(key, value) {
+  try {
+    if (!value) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    /* noop */
+  }
+}
+
+function redirectToLoginOnce() {
+  if (redirectingToLogin) return;
+  redirectingToLogin = true;
+  try {
+    if (typeof window !== "undefined") {
+      window.location.href = "login.html";
+    }
+  } catch {
+    /* noop */
+  }
+}
+
+function readStoredUser() {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function getStoredSession() {
+  const token = readStorage(TOKEN_KEY);
+  const user = readStoredUser();
+  return {
+    token,
+    user,
+    role: String(user?.role || ""),
+    status: String(user?.status || ""),
+  };
+}
+
+export function persistSession({ token, user } = {}) {
+  if (typeof token !== "undefined") writeStorage(TOKEN_KEY, token);
+  if (typeof user !== "undefined") {
+    try {
+      const payload = user ? JSON.stringify(user) : "";
+      writeStorage(USER_KEY, payload);
+    } catch {
+      writeStorage(USER_KEY, "");
+    }
+  }
+}
+
+export function clearSession() {
+  writeStorage(TOKEN_KEY, "");
+  writeStorage(USER_KEY, "");
+}
+
+export function requireAuth(expectedRole) {
+  const session = getStoredSession();
+  const token = session.token;
+  const role = String(session.role || "");
+  const status = String(session.status || "");
+  const normalizedRole = role.toLowerCase();
+  const expected = typeof expectedRole === "string" ? expectedRole.toLowerCase() : "";
+
+  if (!token || !role) {
+    clearSession();
+    redirectToLoginOnce();
+    throw new Error("Authentication required");
+  }
+
+  if (expected && normalizedRole !== expected) {
+    clearSession();
+    redirectToLoginOnce();
+    throw new Error("Forbidden");
+  }
+
+  if (status && status.toLowerCase() !== "approved") {
+    clearSession();
+    redirectToLoginOnce();
+    throw new Error("Not approved");
+  }
+
+  return session;
+}
+
 // Prefetch CSRF token (sets cookie via server; we store the token for headers)
 export async function fetchCSRF(force = false) {
   if (CSRF_TOKEN && !force) return CSRF_TOKEN;
@@ -25,15 +124,6 @@ export async function secureJSON(url, opts = {}) {
   const ct = res.headers.get("content-type") || "";
   return ct.includes("application/json") ? res.json() : res.text();
 }
-export async function secureJSON(url, opts = {}) {
-  const res = await secureFetch(url, opts);
-  if (res.status === 401 && !opts.noRedirect) {
-    try { location.href = "login.html"; } catch {}
-  }
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const ct = res.headers.get("content-type") || "";
-  return ct.includes("application/json") ? res.json() : res.text();
-}
 
 // Fetch wrapper that adds CSRF on mutating methods and handles JSON bodies safely.
 export async function secureFetch(url, opts = {}) {
@@ -41,6 +131,10 @@ export async function secureFetch(url, opts = {}) {
   const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
 
   const headers = new Headers(opts.headers || {});
+  const session = getStoredSession();
+  if (session.token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${session.token}`);
+  }
   let body = opts.body;
 
   if (isMutation) {
@@ -66,13 +160,13 @@ export async function secureFetch(url, opts = {}) {
     }
   }
 
-const res = await fetch(url, {
-  ...opts,
-  body,
-  headers,
-  credentials: "include",
-  signal: opts.signal, // pass-through
-});
+  const res = await fetch(url, {
+    ...opts,
+    body,
+    headers,
+    credentials: "include",
+    signal: opts.signal,
+  });
 
   // If CSRF expired and server returns 403, refresh once and retry
   if (res.status === 403 && isMutation) {
@@ -85,23 +179,16 @@ const res = await fetch(url, {
     }
   }
 
+  if ((res.status === 401 || res.status === 403) && !opts.noRedirect) {
+    clearSession();
+    redirectToLoginOnce();
+  }
+
   return res;
 }
 
 // Convenience helpers
 export function showMsg(el, txt) { if (el) el.textContent = txt; }
-
-// Dev-safe reCAPTCHA gate (returns true if grecaptcha isn’t present)
-export function isRecaptchaValid(_siteKey, msgEl) {
-  /* global grecaptcha */
-  if (typeof grecaptcha === "undefined") return true; // likely dev
-  const token = grecaptcha.getResponse();
-  if (!token) {
-    showMsg(msgEl, "Please verify you are not a robot.");
-    return false;
-  }
-  return true;
-}
 
 // Apply [data-visible="attorney"], [data-visible="paralegal"], [data-visible="admin"]
 export function applyRoleVisibility(role) {
@@ -112,6 +199,20 @@ export function applyRoleVisibility(role) {
       .map((s) => s.trim().toLowerCase());
     if (!needed.includes(want)) el.remove();
   });
+}
+
+export async function logout(redirect = "login.html") {
+  try {
+    await secureFetch("/api/auth/logout", { method: "POST" });
+  } catch {
+    /* ignore */
+  }
+  clearSession();
+  if (redirect) {
+    try {
+      window.location.href = redirect;
+    } catch {}
+  }
 }
 
 // Boot-time: add 'loaded' class, fetch CSRF, and toggle role-based UI (best-effort)
@@ -137,7 +238,7 @@ window.loadUserHeaderInfo = async function () {
     const avatarEl = document.querySelector(".user-profile img");
 
     if (cachedUser.name && nameEl) nameEl.textContent = cachedUser.name;
-    if (cachedUser.profileImage && avatarEl) avatarEl.src = cachedUser.profileImage;
+    if (cachedUser.avatarURL && avatarEl) avatarEl.src = cachedUser.avatarURL;
 
     // 2. Refresh with live data
     const res = await fetch("/api/users/me", { credentials: "include" });
@@ -145,17 +246,18 @@ window.loadUserHeaderInfo = async function () {
 
     const user = await res.json();
     if (!user || !user.name) return;
+    const avatar = user.avatarURL || user.profileImage || "";
 
     // 3. Update UI
     if (nameEl) nameEl.textContent = user.name;
-    if (avatarEl && user.profileImage) avatarEl.src = user.profileImage;
+    if (avatarEl && avatar) avatarEl.src = avatar;
 
     // 4. Cache for next load
     localStorage.setItem(
       "userInfo",
       JSON.stringify({
         name: user.name,
-        profileImage: user.profileImage || cachedUser.profileImage || ""
+        avatarURL: avatar || cachedUser.avatarURL || ""
       })
     );
   } catch (err) {

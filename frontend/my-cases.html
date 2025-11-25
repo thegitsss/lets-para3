@@ -8,6 +8,7 @@
   <!-- Global styles + CSRF/role helpers -->
   <link rel="stylesheet" href="assets/styles/styles.css" />
   <script type="module" src="assets/scripts/auth.js"></script>
+  <script src="assets/scripts/utils/session.js"></script>
 
   <style>
     :root{
@@ -60,9 +61,14 @@
 
     /* Status accents */
     .status-open{ background:#eef4ff; color:#264a9b; border-color:#cfe0ff; }
-    .status-in_review{ background:#fbf3e2; color:#6a4d12; border-color:#f1dfb9; }
-    .status-approved{ background:#eaf7ef; color:#0f6b3b; border-color:#c9e7d4; }
-    .status-rejected{ background:#fdeeee; color:#7a2f2f; border-color:#f6cdcd; }
+    .status-assigned{ background:#fdf6ec; color:#7a4d11; border-color:#f0d7b3; }
+    .status-active{ background:#eaf7ef; color:#0f6b3b; border-color:#c9e7d4; }
+    .status-awaiting_documents{ background:#fff8e1; color:#6a4d12; border-color:#f6e3b0; }
+    .status-reviewing{ background:#eef7ff; color:#255a92; border-color:#c9e4ff; }
+    .status-in_progress{ background:#e0f2ff; color:#0f5182; border-color:#b7e0ff; }
+    .status-completed{ background:#e2f7f0; color:#0b6d3c; border-color:#b9ead8; }
+    .status-disputed{ background:#fdeeee; color:#7a2f2f; border-color:#f6cdcd; }
+    .status-cancelled{ background:#f5f5f5; color:#414b56; border-color:#e1e5ec; }
     .status-closed{ background:#eef0f3; color:#45505e; border-color:#d8dfe7; }
 
     /* Skeletons */
@@ -84,13 +90,18 @@
 
   <main>
     <div class="toolbar" role="region" aria-label="Filters">
-      <input id="q" type="search" placeholder="Search title, type, creator…" aria-label="Search cases" />
+      <input id="q" type="search" placeholder="Search title, practice area, people…" aria-label="Search cases" />
       <select id="status" aria-label="Filter by status">
         <option value="">All statuses</option>
         <option value="open">Open</option>
-        <option value="in_review">In Review</option>
-        <option value="approved">Approved</option>
-        <option value="rejected">Rejected</option>
+        <option value="assigned">Assigned</option>
+        <option value="active">Active</option>
+        <option value="awaiting_documents">Awaiting Documents</option>
+        <option value="reviewing">Reviewing</option>
+        <option value="in_progress">In Progress</option>
+        <option value="completed">Completed</option>
+        <option value="disputed">Disputed</option>
+        <option value="cancelled">Cancelled</option>
         <option value="closed">Closed</option>
       </select>
       <select id="sort" aria-label="Sort cases">
@@ -110,7 +121,10 @@
     <p id="err" class="error" style="display:none">Couldn’t load your cases.</p>
   </main>
 
-  <script>
+  <script type="module">
+    import { secureFetch } from './assets/scripts/auth.js';
+
+    window.checkSession();
     const API_BASE = '/api';
 
     const grid = document.getElementById('grid');
@@ -124,21 +138,26 @@
 
     let all = [];
 
-    // Session check (cookie-based)
-    (async function ensureSession(){
-      try{
-        const r = await fetch('/api/users/me', { credentials:'include' });
-        if (!r.ok) throw new Error();
-      }catch{
-        location.href = 'login.html';
-      }
-    })();
-
     const safe = (v, f='') => (v ?? f);
-    const byPath = (obj, path, f='') => {
-      try { return path.split('.').reduce((o,k)=>o?.[k], obj) ?? f; } catch { return f; }
+    const STATUS_LABELS = {
+      open: "Open",
+      assigned: "Assigned",
+      active: "Active",
+      awaiting_documents: "Awaiting Documents",
+      reviewing: "Reviewing",
+      in_progress: "In Progress",
+      completed: "Completed",
+      disputed: "Disputed",
+      cancelled: "Cancelled",
+      closed: "Closed",
     };
-    const clsFor = (s) => `pill status-${String(s||'open').replace(/\s+/g,'_')}`;
+    const statusLabel = (s) => STATUS_LABELS[s] || (String(s || "").replace(/_/g, " ").replace(/\b\w/g, ch => ch.toUpperCase()) || "Unknown");
+    const statusClass = (s) => `pill status-${String(s || 'open').toLowerCase()}`;
+    const userLabel = (person, fallback = "Unknown") => {
+      if (!person) return fallback;
+      const name = `${person.firstName || ""} ${person.lastName || ""}`.trim();
+      return name || person.email || fallback;
+    };
 
     async function fetchCases(){
       errEl.style.display = 'none';
@@ -147,7 +166,7 @@
       countEl.textContent = '';
 
       try{
-        const r = await fetch(`${API_BASE}/cases/my`, { credentials:'include' });
+        const r = await secureFetch(`${API_BASE}/cases/my`, { headers: { Accept: 'application/json' } });
         const data = await r.json().catch(()=> ({}));
         if (!r.ok) throw new Error(data?.msg || 'Load failed');
 
@@ -169,13 +188,15 @@
         const okStatus = !st || c.status === st;
         if (!okStatus) return false;
         if (!term) return true;
+        const attorney = userLabel(c.attorney, '');
+        const paralegal = userLabel(c.paralegal, '');
         const hay = [
-          safe(c.title).toLowerCase(),
-          safe(c.type).toLowerCase(),
-          safe(c.party).toLowerCase(),
-          byPath(c, 'createdBy.email','').toLowerCase(),
-          byPath(c, 'createdBy.name','').toLowerCase()
-        ].join(' ');
+          safe(c.title),
+          safe(c.practiceArea),
+          safe(c.details),
+          attorney,
+          paralegal,
+        ].join(' ').toLowerCase();
         return hay.includes(term);
       });
 
@@ -196,20 +217,24 @@
 
       grid.innerHTML = list.map(c => {
         const created = c.createdAt ? new Date(c.createdAt).toLocaleString() : '';
-        const createdBy = byPath(c,'createdBy.name') || byPath(c,'createdBy.email') || 'Unknown';
-        const assigned = byPath(c,'assignedTo.name') || byPath(c,'assignedTo.email') || 'Unassigned';
-        const desc = c.description || c.details || '';
+        const updated = c.updatedAt ? new Date(c.updatedAt).toLocaleString() : '';
+        const attorney = userLabel(c.attorney, 'Unknown');
+        const paralegal = userLabel(c.paralegal, 'Unassigned');
+        const details = (c.details || '').trim();
+        const practice = c.practiceArea ? `<span class="pill">Practice: ${safe(c.practiceArea)}</span>` : '';
+        const statusText = statusLabel(c.status);
 
         return `
           <article class="card" data-id="${c._id || c.id}">
             <h3>${safe(c.title,'Untitled Case')}</h3>
-            <p style="margin:.25rem 0 .5rem; color:#4b5563;">${safe(desc,'')}</p>
+            ${details ? `<p style="margin:.25rem 0 .5rem; color:#4b5563;">${safe(details)}</p>` : ''}
             <div class="meta">
-              <span class="pill ${clsFor(c.status)}">${safe(c.status,'open')}</span>
-              ${c.type ? `<span class="pill">Type: ${c.type}</span>` : ''}
-              <span class="pill">Created by: ${createdBy}</span>
-              <span class="pill">Assigned: ${assigned}</span>
+              <span class="${statusClass(c.status)}">${statusText}</span>
+              ${practice}
+              <span class="pill">Attorney: ${attorney}</span>
+              <span class="pill">Paralegal: ${paralegal}</span>
               ${created ? `<span class="pill">Created: ${created}</span>` : ''}
+              ${updated ? `<span class="pill">Updated: ${updated}</span>` : ''}
             </div>
             <div class="actions">
               <button class="btn btn-primary" data-open="${c._id || c.id}">Open</button>
@@ -223,7 +248,7 @@
     // Navigation (persist for pages expecting localStorage; also pass ?id=)
     function openCase(id){
       localStorage.setItem('openCaseId', id);
-      location.href = `case-detail.html?id=${encodeURIComponent(id)}`;
+      location.href = `index.html#case-detail?id=${encodeURIComponent(id)}`;
     }
     function toMessages(id){
       localStorage.setItem('openCaseId', id);

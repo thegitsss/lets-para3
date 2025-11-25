@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="preload" as="image" href="hero-mountain.jpg" />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&display=swap" rel="stylesheet" />
   <link href="assets/styles/styles.css" rel="stylesheet" />
 
   <style>
@@ -230,8 +230,11 @@
         </div>
 
         <form id="signupForm" novalidate>
-          <label for="name">Full name</label>
-          <input id="name" type="text" autocomplete="name" required />
+          <label for="firstName">First name</label>
+          <input id="firstName" type="text" autocomplete="given-name" required />
+
+          <label for="lastName">Last name</label>
+          <input id="lastName" type="text" autocomplete="family-name" required />
 
           <label for="email">Email</label>
           <input id="email" type="email" autocomplete="email" required />
@@ -272,7 +275,8 @@
     const togglePw = document.getElementById('togglePw');
     const pw = document.getElementById('password');
     const emailEl = document.getElementById('email');
-    const nameEl = document.getElementById('name');
+    const firstNameEl = document.getElementById('firstName');
+    const lastNameEl = document.getElementById('lastName');
     emailEl.value = localStorage.getItem('lastEmail') || '';
 
     let role = 'attorney';
@@ -309,20 +313,21 @@
       msg.textContent = text || '';
     }
 
-    function validEmail(e) {
-      return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(e || '');
+    function isValidEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((email || '').trim());
     }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       say('');
 
-      const name = nameEl.value.trim();
+      const firstName = firstNameEl.value.trim();
+      const lastName = lastNameEl.value.trim();
       const email = emailEl.value.trim().toLowerCase();
       const password = pw.value;
 
-      if (!name || !email || !password) { say('Please fill all required fields.', 'err'); return; }
-      if (!validEmail(email)) { say('Enter a valid email address.', 'err'); return; }
+      if (!firstName || !lastName || !email || !password) { say('Please fill all required fields.', 'err'); return; }
+      if (!isValidEmail(email)) { say('Enter a valid email address.', 'err'); return; }
       if (password.length < 8) { say('Use 8+ characters with letters and numbers.', 'err'); return; }
 
       if (role === 'attorney') {
@@ -334,9 +339,9 @@
       submitBtn.textContent = 'Creating…';
 
       try {
-        const payload = { name, email, password, role };
+        const payload = { firstName, lastName, email, password, role };
         if (role === 'attorney') payload.barNumber = document.getElementById('bar').value.trim();
-        else payload.certification = (document.getElementById('cert')?.value || '').trim() || undefined;
+        else payload.certificateURL = (document.getElementById('cert')?.value || '').trim() || undefined;
 
         const headers = { 'Content-Type': 'application/json' };
         if (window.__CSRF__) headers['X-CSRF-Token'] = window.__CSRF__;
@@ -358,6 +363,7 @@
         }
 
         localStorage.setItem('lastEmail', email);
+        sessionStorage.setItem('signupToast', 'Your application has been submitted for approval.');
         say('Application submitted. Await approval.', 'ok');
         setTimeout(() => location.href = 'login.html', 1000);
       } catch (err) {

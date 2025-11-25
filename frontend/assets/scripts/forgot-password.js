@@ -16,7 +16,7 @@ if (form) {
     show("Sending reset link…");
 
     try {
-      await j("/api/auth/forgot-password", {
+      await j("/api/auth/request-password-reset", {
         method: "POST",
         body: { email: emailVal }
       });

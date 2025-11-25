@@ -4,9 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Browse Paralegals | Let’s ParaConnect</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;200&family=Sarabun:wght@200;300&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;200&family=Sarabun:wght@200&display=swap" rel="stylesheet" />
   <link href="assets/styles/styles.css" rel="stylesheet" />
   <script type="module" src="assets/scripts/auth.js"></script>
+  <script src="assets/scripts/utils/session.js"></script>
   <style>
     :root {
       --gold: #b4975a;
@@ -22,6 +23,8 @@
       background-color: var(--bg);
       color: var(--navy);
       font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.95rem;
     }
 
  /* -----------------------------------------
@@ -39,6 +42,7 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: relative;
 }
 
 .header-logo {
@@ -55,22 +59,157 @@ header {
   gap: 40px;
 }
 
-.header-inner nav a {
-  font-family: 'Sarabun', sans-serif;
-  font-weight: 200;
-  font-size: 16px;
-  color: var(--ink);
-  text-decoration: none;
-  transition: color 0.2s, border-bottom 0.2s;
+    .header-inner nav a {
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.95rem;
+      color: var(--ink);
+      text-decoration: none;
+      transition: color 0.2s, border-bottom 0.2s;
   padding-bottom: 2px;
   border-bottom: 1px solid transparent;
 }
 
-.header-inner nav a:hover,
-.header-inner nav a.active {
-  color: var(--gold);
-  border-bottom: 1px solid var(--gold);
-}
+    .header-inner nav a:hover,
+    .header-inner nav a.active {
+      color: var(--gold);
+      border-bottom: 1px solid var(--gold);
+    }
+
+    .page-intro {
+      width: 100%;
+      margin: 0;
+      padding: 32px 40px 0;
+    }
+
+    .unified-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 32px;
+      margin-bottom: 32px;
+      position: relative;
+    }
+
+    .unified-header .title-block {
+      max-width: 520px;
+    }
+
+    .unified-header .eyebrow {
+      letter-spacing: 3px;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .unified-header h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2.3rem;
+      margin-bottom: 8px;
+      font-weight: 200;
+    }
+
+    .unified-header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+    }
+
+    .notification-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #fff;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .notification-icon:hover {
+      border-color: var(--gold);
+      transform: translateY(-1px);
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: #c0392b;
+      color: #fff;
+      font-size: 0.65rem;
+      border-radius: 999px;
+      padding: 1px 4px;
+      line-height: 1;
+      display: none;
+    }
+
+    .notification-badge.show {
+      display: inline-flex;
+    }
+
+    .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.03);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: border-color 0.2s ease;
+    }
+
+    .user-chip:hover {
+      border-color: var(--gold);
+    }
+
+    .user-chip img {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .user-chip strong {
+      display: block;
+      font-weight: 200;
+      color: var(--ink);
+    }
+
+    .user-chip span {
+      display: block;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    .notification-panel {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 12px);
+      width: 280px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+      padding: 18px;
+      display: none;
+      z-index: 40;
+    }
+
+    .notification-panel.show {
+      display: block;
+    }
 
 
     .brand {
@@ -115,7 +254,7 @@ header {
 
     .filter-group label {
       display: block;
-      font-size: 0.8rem;
+      font-size: 0.95rem;
       color: var(--muted);
       margin-bottom: 4px;
     }
@@ -124,7 +263,7 @@ header {
     select, input[type="text"], #stateInput {
       width: 100%;
       padding: 6px 8px;
-      font-size: 0.78rem;
+      font-size: 0.95rem;
       color: var(--muted);
       border: 1px solid var(--line);
       border-radius: 0;
@@ -210,6 +349,20 @@ header {
       gap: 2rem;
     }
 
+    .results-status {
+      padding: 2rem;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .results-status.error {
+      color: #b4453c;
+      border-color: rgba(180, 69, 60, 0.4);
+    }
+
 
     .paralegal-card {
       display: flex;
@@ -271,7 +424,7 @@ header {
     .card-content p {
       font-size: 1.05rem;
       color: var(--muted);
-      font-weight: 300;
+      font-weight: 200;
       margin: 0.25rem 0;
     }
 
@@ -285,11 +438,11 @@ header {
 
 
     .card-meta span {
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       color: var(--muted);
       border: 1px solid var(--line);
       padding: 0.2rem 0.6rem;
-      font-weight: 400;
+      font-weight: 200;
       letter-spacing: 0.3px;
     }
 
@@ -306,7 +459,7 @@ header {
     .action-btn {
       padding: 0.45rem 1.4rem;
       font-size: 0.95rem;
-      font-weight: 300;
+      font-weight: 200;
       border: 1px solid var(--gold);
       background: transparent;
       color: var(--gold);
@@ -376,7 +529,7 @@ header {
 
     .inquire-modal p {
       margin: 0;
-      font-size: 0.92rem;
+      font-size: 0.95rem;
       color: var(--muted);
     }
 
@@ -390,6 +543,25 @@ header {
       padding-right: 0.2rem;
     }
 
+    .modal-note {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    .modal-note textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 0.6rem;
+      resize: vertical;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 0.95rem;
+      min-height: 70px;
+    }
+
 
     .job-option {
       display: flex;
@@ -399,7 +571,7 @@ header {
       padding: 0.45rem 0.6rem;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
       color: var(--navy);
     }
 
@@ -423,7 +595,7 @@ header {
       background: transparent;
       color: var(--navy);
       cursor: pointer;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
       font-family: 'Sarabun', sans-serif;
       transition: background 0.2s, color 0.2s;
     }
@@ -473,28 +645,54 @@ header {
     .pagination-controls {
       margin: 2rem 5vw 3rem;
       display: flex;
-      justify-content: flex-end;
+      justify-content: space-between;
       align-items: center;
-      gap: 0.5rem;
-      width: 160px;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .pagination-controls .page-nav {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .pagination-controls button {
+      border: 1px solid var(--line);
+      background: #fff;
+      padding: 0.35rem 0.9rem;
+      border-radius: 999px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .pagination-controls button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .pagination-controls button:not(:disabled):hover {
+      border-color: var(--gold);
+      color: var(--gold);
     }
 
 
     .pagination-controls label {
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       color: var(--muted);
     }
 
 
     .pagination-controls select {
       padding: 0.4rem 0.6rem;
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       width: 150px;
     }
 
     footer {
       text-align: center;
-      font-size: 0.8rem;
+      font-size: 0.95rem;
       color: var(--muted);
       margin-top: 4rem;
     }
@@ -581,22 +779,173 @@ footer {
   margin-top: auto; /* keeps footer anchored to the bottom */
 }
 
+.site-header {
+  display: none;
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 60;
+}
+
+.site-header .header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 18px 32px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 30px;
+}
+
+.site-header nav ul {
+  list-style: none;
+  display: flex;
+  gap: 20px;
+  padding: 0;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.site-header nav a {
+  color: var(--navy);
+  text-decoration: none;
+  font-weight: 200;
+}
+
+.site-header .brand {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.3rem;
+  text-decoration: none;
+  color: var(--navy);
+  justify-self: center;
+}
+
+.site-header .header-actions {
+  justify-self: end;
+  display: flex;
+  gap: 12px;
+}
+
+.site-header .pill {
+  border: 1px solid rgba(0,0,0,0.12);
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  background: transparent;
+  text-decoration: none;
+  color: var(--navy);
+}
+
+.public-view .site-header {
+  display: block;
+}
+
+.public-view .auth-header {
+  display: none;
+}
+
+.public-view .filter,
+.public-view .invite-btn,
+.public-view .profile-link,
+.public-view .modal-overlay,
+.public-view .pagination-controls button {
+  display: none !important;
+}
+.public-view .auth-header .header-inner nav,
+.public-view .auth-header .header-controls {
+  display: none !important;
+}
+
+.public-view .auth-header .header-inner {
+  justify-content: center;
+}
+
+.public-view .auth-header .header-logo {
+  margin: 0 auto;
+  font-size: 1.4rem;
+  font-weight: 300;
+}
+
+.public-view .page-intro {
+  padding-top: 40px;
+  text-align: center;
+}
+
+.public-view .filter,
+.public-view .invite-btn,
+.public-view .profile-link,
+.public-view .modal-overlay,
+.public-view .pagination-controls button {
+  display: none !important;
+}
+
 
   </style>
-<header>
+  <script>
+    const isLoggedIn = localStorage.getItem("lpc_name");
+    document.addEventListener("DOMContentLoaded", () => {
+      if (!isLoggedIn) document.body.classList.add("public-view");
+    });
+  </script>
+<header class="site-header">
   <div class="header-inner">
-    <a href="dashboard-attorney.html" class="header-logo">Let’s ParaConnect</a>
+    <nav aria-label="Primary">
+      <ul>
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#services">Services</a></li>
+        <li><a href="index.html#how">How It Works</a></li>
+      </ul>
+    </nav>
+    <a class="brand" href="index.html">Let’s-ParaConnect</a>
+    <div class="header-actions">
+      <a class="pill" href="login.html">Sign In</a>
+      <a class="pill" href="signup.html">Create Account</a>
+    </div>
+  </div>
+</header>
+<header class="auth-header">
+  <div class="header-inner">
+    <a href="index.html" class="header-logo">Let’s ParaConnect</a>
     <nav>
       <a href="my-cases.html">My Cases</a>
       <a href="browse-paralegals.html" class="active">Browse Paralegals</a>
       <a href="create-case.html">Post Job</a>
-      <a href="messages.html">Messages</a>
-      <a href="profile-attorney.html">My Profile</a>
-      <a href="#" id="logoutBtn">Log Out</a>
+      <a href="index.html#paralegal-messages">Messages</a>
     </nav>
+    <div class="header-controls">
+      <button class="notification-icon" id="notificationToggle" aria-label="View notifications">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 01-3.46 0" />
+        </svg>
+        <span class="notification-badge" id="notificationBadge">0</span>
+      </button>
+      <div class="user-chip" id="headerUser">
+        <img id="headerAvatar" alt="Attorney avatar" />
+        <div>
+          <strong id="headerName">Attorney</strong>
+          <span id="headerRole">Member</span>
+        </div>
+      </div>
+      <div class="notification-panel" id="notificationsPanel" role="region" aria-live="polite">
+        <h4>Notifications</h4>
+        <div id="notificationList">
+          <p class="notification-item">Loading…</p>
+        </div>
+      </div>
+    </div>
   </div>
 </header>
 
+  <div class="page-intro">
+    <section class="unified-header" aria-label="Attorney header">
+      <div class="title-block">
+        <p class="eyebrow">Browse Paralegals</p>
+        <p>Explore vetted talent available to collaborate on your next matter.</p>
+      </div>
+    </section>
+  </div>
   <main>
     <aside class="filter">
       <h2>Filter Paralegals</h2>
@@ -643,245 +992,8 @@ footer {
     </aside>
 
 
-    <section class="results" id="paralegalResults">
-      <div class="paralegal-card"
-        data-experience="5+ years"
-        data-specialty="Family Law"
-        data-state="California"
-        data-availability="Available Now">
-        <a href="profile-paralegal.html" class="profile-photo-link">
-          <img src="assets/images/paralegal.jpg" alt="Portrait of Ava Martinez" />
-        </a>
-        <div class="card-content">
-          <h3><a href="profile-paralegal.html" class="profile-name-link">Ava Martinez</a></h3>
-          <p>Family Law Specialist · Los Angeles, CA</p>
-          <p>Guides complex custody matters with bilingual filings and lightning-fast drafting help.</p>
-          <div class="card-meta">
-            <span>Experience: 5+ years</span>
-            <span>Specialty: Family Law</span>
-            <span>Availability: Available Now</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <button type="button" class="action-btn inquire-btn">Inquire</button>
-        </div>
-      </div>
-
-
-      <div class="paralegal-card"
-        data-experience="3+ years"
-        data-specialty="Litigation"
-        data-state="New York"
-        data-availability="Weekends">
-        <a href="profile-paralegal.html" class="profile-photo-link">
-          <img src="assets/images/paralegal.jpg" alt="Portrait of Liam O'Connor" />
-        </a>
-        <div class="card-content">
-          <h3><a href="profile-paralegal.html" class="profile-name-link">Liam O’Connor</a></h3>
-          <p>Litigation Support · New York, NY</p>
-          <p>Runs discovery timelines, trial binders, and depo prep for multi-party commercial disputes.</p>
-          <div class="card-meta">
-            <span>Experience: 3+ years</span>
-            <span>Specialty: Litigation</span>
-            <span>Availability: Weekends</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <button type="button" class="action-btn inquire-btn">Inquire</button>
-        </div>
-      </div>
-
-
-      <div class="paralegal-card"
-        data-experience="5+ years"
-        data-specialty="Business / Corporate Law"
-        data-state="Washington"
-        data-availability="Available Now">
-        <a href="profile-paralegal.html" class="profile-photo-link">
-          <img src="assets/images/paralegal.jpg" alt="Portrait of Naomi Chen" />
-        </a>
-        <div class="card-content">
-          <h3><a href="profile-paralegal.html" class="profile-name-link">Naomi Chen</a></h3>
-          <p>Corporate & Commercial · Seattle, WA</p>
-          <p>Drafts MSAs/SAAS agreements, tracks cap tables, and coordinates venture diligence rooms.</p>
-          <div class="card-meta">
-            <span>Experience: 5+ years</span>
-            <span>Specialty: Business / Corporate Law</span>
-            <span>Availability: Available Now</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <button type="button" class="action-btn inquire-btn">Inquire</button>
-        </div>
-      </div>
-
-
-      <div class="paralegal-card"
-        data-experience="5+ years"
-        data-specialty="Immigration Law"
-        data-state="Texas"
-        data-availability="Weekends">
-        <a href="profile-paralegal.html" class="profile-photo-link">
-          <img src="assets/images/paralegal.jpg" alt="Portrait of Javier Reyes" />
-        </a>
-        <div class="card-content">
-          <h3><a href="profile-paralegal.html" class="profile-name-link">Javier Reyes</a></h3>
-          <p>Immigration Paralegal · Austin, TX</p>
-          <p>Prepares PERM, TN, and family-based petitions with bilingual interviews and QC reviews.</p>
-          <div class="card-meta">
-            <span>Experience: 5+ years</span>
-            <span>Specialty: Immigration Law</span>
-            <span>Availability: Weekends</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <button type="button" class="action-btn inquire-btn">Inquire</button>
-        </div>
-      </div>
-
-
-      <div class="paralegal-card"
-        data-experience="1+ years"
-        data-specialty="Personal Injury"
-        data-state="Florida"
-        data-availability="Available Now">
-        <a href="profile-paralegal.html" class="profile-photo-link">
-          <img src="assets/images/paralegal.jpg" alt="Portrait of Emily Stone" />
-        </a>
-        <div class="card-content">
-          <h3><a href="profile-paralegal.html" class="profile-name-link">Emily Stone</a></h3>
-          <p>Personal Injury Support · Miami, FL</p>
-          <p>Tracks medical records, negotiates liens, and builds settlement statements for PI claims.</p>
-          <div class="card-meta">
-            <span>Experience: 1+ years</span>
-            <span>Specialty: Personal Injury</span>
-            <span>Availability: Available Now</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <button type="button" class="action-btn inquire-btn">Inquire</button>
-        </div>
-      </div>
-
-
-      <div class="paralegal-card"
-        data-experience="3+ years"
-        data-specialty="Intellectual Property"
-        data-state="Massachusetts"
-        data-availability="Available Now">
-        <a href="profile-paralegal.html" class="profile-photo-link">
-          <img src="assets/images/paralegal.jpg" alt="Portrait of Priya Desai" />
-        </a>
-        <div class="card-content">
-          <h3><a href="profile-paralegal.html" class="profile-name-link">Priya Desai</a></h3>
-          <p>IP & Trademark · Boston, MA</p>
-          <p>Files USPTO applications, responds to office actions, and manages international mark portfolios.</p>
-          <div class="card-meta">
-            <span>Experience: 3+ years</span>
-            <span>Specialty: Intellectual Property</span>
-            <span>Availability: Available Now</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <button type="button" class="action-btn inquire-btn">Inquire</button>
-        </div>
-      </div>
-
-
-      <div class="paralegal-card"
-        data-experience="5+ years"
-        data-specialty="Criminal Defense"
-        data-state="Georgia"
-        data-availability="Available Now">
-        <a href="profile-paralegal.html" class="profile-photo-link">
-          <img src="assets/images/paralegal.jpg" alt="Portrait of Marcus Reed" />
-        </a>
-        <div class="card-content">
-          <h3><a href="profile-paralegal.html" class="profile-name-link">Marcus Reed</a></h3>
-          <p>Criminal Defense · Atlanta, GA</p>
-          <p>Handles motions practice, witness logistics, and speedy arraignment filings across Fulton courts.</p>
-          <div class="card-meta">
-            <span>Experience: 5+ years</span>
-            <span>Specialty: Criminal Defense</span>
-            <span>Availability: Available Now</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <button type="button" class="action-btn inquire-btn">Inquire</button>
-        </div>
-      </div>
-
-
-      <div class="paralegal-card"
-        data-experience="3+ years"
-        data-specialty="Real Estate Law"
-        data-state="Colorado"
-        data-availability="Weekends">
-        <a href="profile-paralegal.html" class="profile-photo-link">
-          <img src="assets/images/paralegal.jpg" alt="Portrait of Sofia Alvarez" />
-        </a>
-        <div class="card-content">
-          <h3><a href="profile-paralegal.html" class="profile-name-link">Sofia Alvarez</a></h3>
-          <p>Real Estate Paralegal · Denver, CO</p>
-          <p>Prepares closing packets, coordinates title curatives, and supports commercial lease reviews.</p>
-          <div class="card-meta">
-            <span>Experience: 3+ years</span>
-            <span>Specialty: Real Estate Law</span>
-            <span>Availability: Weekends</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <button type="button" class="action-btn inquire-btn">Inquire</button>
-        </div>
-      </div>
-
-
-      <div class="paralegal-card"
-        data-experience="5+ years"
-        data-specialty="Employment / Labor Law"
-        data-state="Illinois"
-        data-availability="Available Now">
-        <a href="profile-paralegal.html" class="profile-photo-link">
-          <img src="assets/images/paralegal.jpg" alt="Portrait of Daniel Brooks" />
-        </a>
-        <div class="card-content">
-          <h3><a href="profile-paralegal.html" class="profile-name-link">Daniel Brooks</a></h3>
-          <p>Employment & Labor · Chicago, IL</p>
-          <p>Drafts EEOC responses, audits handbooks, and manages wage-and-hour class discovery.</p>
-          <div class="card-meta">
-            <span>Experience: 5+ years</span>
-            <span>Specialty: Employment / Labor Law</span>
-            <span>Availability: Available Now</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <button type="button" class="action-btn inquire-btn">Inquire</button>
-        </div>
-      </div>
-
-
-      <div class="paralegal-card"
-        data-experience="3+ years"
-        data-specialty="Technology Law"
-        data-state="Oregon"
-        data-availability="Available Now">
-        <a href="profile-paralegal.html" class="profile-photo-link">
-          <img src="assets/images/paralegal.jpg" alt="Portrait of Harper Nguyen" />
-        </a>
-        <div class="card-content">
-          <h3><a href="profile-paralegal.html" class="profile-name-link">Harper Nguyen</a></h3>
-          <p>Technology Transactions · Portland, OR</p>
-          <p>Builds DPAs, open-source reviews, and privacy compliance trackers for SaaS clients.</p>
-          <div class="card-meta">
-            <span>Experience: 3+ years</span>
-            <span>Specialty: Technology Law</span>
-            <span>Availability: Available Now</span>
-          </div>
-        </div>
-        <div class="card-actions">
-          <button type="button" class="action-btn inquire-btn">Inquire</button>
-        </div>
-      </div>
+        <section class="results" id="paralegalResults">
+      <div class="results-status" id="resultsStatus">Loading paralegals…</div>
     </section>
   </main>
 
@@ -891,6 +1003,10 @@ footer {
       <h3>Send Inquiry</h3>
       <p id="selectedParalegalText">Select a case to send this paralegal.</p>
       <div class="job-list" id="jobList"></div>
+      <label class="modal-note">
+        <span>Optional message</span>
+        <textarea id="inquireMessage" placeholder="Add context or next steps" rows="3"></textarea>
+      </label>
       <div class="modal-actions">
         <button type="button" id="cancelInquire">Cancel</button>
         <button type="button" class="confirm" id="confirmInquire">Send</button>
@@ -900,6 +1016,11 @@ footer {
 
 
   <div class="pagination-controls">
+    <div class="page-nav">
+      <button type="button" id="prevPage" class="invite-btn">Previous</button>
+      <span id="paginationLabel">Page 1</span>
+      <button type="button" id="nextPage" class="invite-btn">Next</button>
+    </div>
     <label for="resultsPerPage">Results per page:</label>
     <select id="resultsPerPage">
       <option value="15">15</option>
@@ -926,220 +1047,7 @@ footer {
   </div>
 </footer>
 
-  <script>
-    /* ---------- STATES ---------- */
-    const states = [
-      'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut',
-      'Delaware','Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa',
-      'Kansas','Kentucky','Louisiana','Maine','Maryland','Massachusetts','Michigan',
-      'Minnesota','Mississippi','Missouri','Montana','Nebraska','Nevada','New Hampshire',
-      'New Jersey','New Mexico','New York','North Carolina','North Dakota','Ohio','Oklahoma',
-      'Oregon','Pennsylvania','Rhode Island','South Carolina','South Dakota','Tennessee',
-      'Texas','Utah','Vermont','Virginia','Washington','West Virginia','Wisconsin','Wyoming'
-    ];
-
-
-    const inputState = document.getElementById('stateInput');
-    const listState = document.getElementById('stateList');
-
-
-    function renderStateList(filterText = '') {
-      const filtered = states.filter(s => s.toLowerCase().startsWith(filterText.toLowerCase()));
-      listState.innerHTML = filtered.map(s => `<li>${s}</li>`).join('');
-      listState.classList.toggle('show', filtered.length > 0);
-    }
-
-
-    inputState.addEventListener('input', () => renderStateList(inputState.value));
-    inputState.addEventListener('focus', () => renderStateList(inputState.value));
-    listState.addEventListener('click', e => {
-      if (e.target.tagName === 'LI') {
-        inputState.value = e.target.textContent;
-        listState.classList.remove('show');
-      }
-    });
-    document.addEventListener('click', e => {
-      if (!e.target.closest('.dropdown-wrapper')) listState.classList.remove('show');
-    });
-
-
-    /* ---------- SPECIALTIES ---------- */
-    const specialties = [
-      'Administrative Law','Admiralty / Maritime Law','Appellate Law','Banking & Finance Law',
-      'Bankruptcy Law','Business / Corporate Law','Civil Rights Law','Class Action Law',
-      'Commercial Law','Constitutional Law','Construction Law','Consumer Law','Contract Law',
-      'Criminal Defense','Education Law','Elder Law','Employment / Labor Law','Energy Law',
-      'Entertainment Law','Environmental Law','Family Law','Government Law','Health Law',
-      'Immigration Law','Insurance Law','Intellectual Property','International Law',
-      'Litigation','Medical Malpractice','Mergers & Acquisitions','Personal Injury',
-      'Privacy / Data Security','Product Liability','Real Estate Law','Securities Law',
-      'Social Security / Disability','Tax Law','Technology Law','Torts','Trusts & Estates',
-      'Workers’ Compensation'
-    ];
-
-
-    const specialtyInput = document.getElementById('specialtyInput');
-    const specialtyList = document.getElementById('specialtyList');
-    const selectedSpecialties = new Set();
-
-
-    function renderSpecialties() {
-      specialtyList.innerHTML = specialties
-        .map(s => `
-          <li>
-            <input type="checkbox" id="${s}" value="${s}" ${selectedSpecialties.has(s) ? 'checked' : ''}/>
-            <label for="${s}">${s}</label>
-          </li>`).join('');
-    }
-
-
-    function updateSpecialtyInput() {
-      specialtyInput.value = [...selectedSpecialties].join(', ');
-    }
-
-
-    specialtyInput.addEventListener('focus', () => {
-      renderSpecialties();
-      specialtyList.classList.add('show');
-    });
-
-
-    specialtyList.addEventListener('change', e => {
-      const value = e.target.value;
-      if (e.target.checked) selectedSpecialties.add(value);
-      else selectedSpecialties.delete(value);
-      updateSpecialtyInput();
-    });
-
-
-    document.addEventListener('click', e => {
-      if (!e.target.closest('.dropdown-wrapper')) specialtyList.classList.remove('show');
-    });
-    /* ---------- FILTER FUNCTIONALITY ---------- */
-const filters = {
-  experience: document.getElementById('experience'),
-  availability: document.getElementById('availability'),
-  state: document.getElementById('stateInput'),
-  specialties: selectedSpecialties // this Set already exists in your code
-};
-
-
-const cards = document.querySelectorAll('.paralegal-card');
-
-
-function applyFilters() {
-  const expVal = filters.experience.value.toLowerCase();
-  const availVal = filters.availability.value.toLowerCase();
-  const stateVal = filters.state.value.toLowerCase();
-  const specVals = [...filters.specialties].map(s => s.toLowerCase());
-
-
-  cards.forEach(card => {
-    const cardExp = (card.dataset.experience || '').toLowerCase();
-    const cardAvail = (card.dataset.availability || '').toLowerCase();
-    const cardState = (card.dataset.state || '').toLowerCase();
-    const cardSpec = (card.dataset.specialty || '').toLowerCase();
-
-
-    // match logic
-    const matchExp = !expVal || cardExp.includes(expVal);
-    const matchAvail = !availVal || cardAvail.includes(availVal);
-    const matchState = !stateVal || cardState.includes(stateVal);
-    const matchSpec =
-      specVals.length === 0 || specVals.some(s => cardSpec.includes(s));
-
-
-    if (matchExp && matchAvail && matchState && matchSpec) {
-      card.style.display = 'flex';
-    } else {
-      card.style.display = 'none';
-    }
-  });
-}
-filters.experience.addEventListener('change', applyFilters);
-filters.availability.addEventListener('change', applyFilters);
-filters.state.addEventListener('input', applyFilters);
-
-
-// For specialties — call whenever the Set updates:
-specialtyList.addEventListener('change', () => {
-  updateSpecialtyInput();
-  applyFilters();
-});
-
-
-  /* ---------- INQUIRE MODAL ---------- */
-  const openJobs = [
-    { id: 'case-001', title: 'Estate Litigation – Morgan vs. Cobalt' },
-    { id: 'case-002', title: 'Commercial Lease Review – Summit Holdings' },
-    { id: 'case-003', title: 'Immigration Petition – Reyes Consulting' },
-    { id: 'case-004', title: 'PI Settlement Prep – Cedar Medical' }
-  ];
-
-
-  const inquireModal = document.getElementById('inquireModal');
-  const jobListEl = document.getElementById('jobList');
-  const selectedParalegalText = document.getElementById('selectedParalegalText');
-  const cancelInquireBtn = document.getElementById('cancelInquire');
-  const confirmInquireBtn = document.getElementById('confirmInquire');
-  let activeParalegal = '';
-
-
-  function renderJobOptions() {
-    if (!openJobs.length) {
-      jobListEl.innerHTML = '<p>No open cases available.</p>';
-      return;
-    }
-    jobListEl.innerHTML = openJobs.map(job => `
-      <label class="job-option">
-        <input type="radio" name="jobOption" value="${job.id}">
-        <span>${job.title}</span>
-      </label>
-    `).join('');
-  }
-  renderJobOptions();
-
-
-  function openInquireModal(paralegalName) {
-    activeParalegal = paralegalName;
-    selectedParalegalText.textContent = `Select the open case for ${paralegalName}.`;
-    inquireModal.classList.add('show');
-  }
-
-
-  function closeInquireModal() {
-    inquireModal.classList.remove('show');
-    const checked = jobListEl.querySelector('input[name="jobOption"]:checked');
-    if (checked) checked.checked = false;
-    activeParalegal = '';
-  }
-
-
-  document.querySelectorAll('.inquire-btn').forEach(btn => {
-    btn.addEventListener('click', e => {
-      const card = e.target.closest('.paralegal-card');
-      const name = card.querySelector('h3').textContent.trim();
-      openInquireModal(name);
-    });
-  });
-
-
-  cancelInquireBtn.addEventListener('click', closeInquireModal);
-  inquireModal.addEventListener('click', e => {
-    if (e.target === inquireModal) closeInquireModal();
-  });
-
-
-  confirmInquireBtn.addEventListener('click', () => {
-    const selectedJob = jobListEl.querySelector('input[name="jobOption"]:checked');
-    if (!selectedJob) {
-      alert('Please select an open case to send.');
-      return;
-    }
-    const jobTitle = openJobs.find(job => job.id === selectedJob.value)?.title || 'Selected Case';
-    alert(`Inquiry sent for ${activeParalegal} to ${jobTitle}.`);
-    closeInquireModal();
-  });
-  </script>
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script type="module" src="assets/scripts/browse-paralegals.js"></script>
 </body>
 </html>

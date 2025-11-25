@@ -2,16 +2,40 @@
 const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
-const { requireRole } = require("../utils/authz");
+const requireRole = require("../middleware/requireRole");
 const User = require("../models/User");
 const Case = require("../models/Case");
 const AuditLog = require("../models/AuditLog"); // NOTE: file name fix
+const Payout = require("../models/Payout");
+const PlatformIncome = require("../models/PlatformIncome");
 const sendEmail = require("../utils/email");
+
+// -----------------------------------------
+// Optional CSRF (enable via ENABLE_CSRF=true)
+// -----------------------------------------
+const noop = (_req, _res, next) => next();
+let csrfProtection = noop;
+if (process.env.ENABLE_CSRF === "true") {
+  const csrf = require("csurf");
+  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
+}
+
+const APP_BASE_URL = (process.env.APP_BASE_URL || "").replace(/\/$/, "");
+const LOGIN_URL = APP_BASE_URL ? `${APP_BASE_URL}/login.html` : "https://www.lets-paraconnect.com/login.html";
+const APPROVAL_EMAIL_SUBJECT =
+  "Welcome to Let's ParaConnect. Your account has been approved. You may now log in and begin using your dashboard.";
+const DENIAL_EMAIL_SUBJECT =
+  "Your application to join Let's ParaConnect has been reviewed and was unfortunately not approved.";
 
 // -----------------------------------------
 // Helpers
 // -----------------------------------------
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+const formatFullName = (u = {}) => {
+  const joined = `${u.firstName || ""} ${u.lastName || ""}`.trim();
+  return joined || null;
+};
 
 function parsePagination(req, { maxLimit = 100, defaultLimit = 20 } = {}) {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -27,40 +51,200 @@ function isObjId(id) {
 function pickUserSafe(u) {
   // fields safe to return to admin tools
   const {
-    _id, name, email, role, status, bio, availability, emailVerified,
+    _id, firstName, lastName, email, role, status, bio, about, availability, emailVerified,
     lastLoginAt, lockedUntil, failedLogins, audit, createdAt, updatedAt,
     specialties, jurisdictions, skills, yearsExperience, languages,
     avatarURL, timezone, location, kycStatus, stripeCustomerId, stripeAccountId,
+    barNumber, resumeURL, certificateURL, practiceAreas, experience, education,
   } = u;
   return {
-    id: _id, name, email, role, status, bio, availability, emailVerified,
+    id: _id,
+    firstName,
+    lastName,
+    name: formatFullName(u),
+    email,
+    role,
+    status,
+    bio,
+    about,
+    availability,
+    emailVerified,
     lastLoginAt, lockedUntil, failedLogins, audit, createdAt, updatedAt,
     specialties, jurisdictions, skills, yearsExperience, languages,
     avatarURL, timezone, location, kycStatus, stripeCustomerId, stripeAccountId,
+    barNumber,
+    resumeURL,
+    certificateURL,
+    practiceAreas,
+    experience,
+    education,
   };
+}
+
+function normalizeUserStatus(value) {
+  const safe = String(value || "").trim().toLowerCase();
+  if (!safe) return null;
+  if (safe === "rejected") return "denied";
+  if (["pending", "approved", "denied"].includes(safe)) return safe;
+  return null;
+}
+
+function sanitizeNote(note) {
+  if (!note && note !== 0) return undefined;
+  const text = String(note).trim();
+  return text ? text.slice(0, 1000) : undefined;
+}
+
+async function dispatchDecisionEmail(user, status) {
+  if (!user?.email) return;
+  const friendlyName = formatFullName(user) || "there";
+  const loginLine = LOGIN_URL ? `<br/><br/>Log in here: <a href="${LOGIN_URL}">${LOGIN_URL}</a>` : "";
+  if (status === "approved") {
+    const html = `Hi ${friendlyName},<br/><br/>Welcome to Let's ParaConnect. Your account has been approved. You may now log in and begin using your dashboard.${loginLine}<br/><br/>We're excited to have you onboard.<br/>— Let's ParaConnect`;
+    await sendEmail(user.email, APPROVAL_EMAIL_SUBJECT, html);
+    return;
+  }
+  if (status === "denied") {
+    const html = `Hi ${friendlyName},<br/><br/>Your application to join Let's ParaConnect has been reviewed and was unfortunately not approved. Our team reviews every submission carefully, and you can reply to this email if you believe we missed important information.<br/><br/>Thank you for your interest in the community.<br/>— Let's ParaConnect`;
+    await sendEmail(user.email, DENIAL_EMAIL_SUBJECT, html);
+  }
+}
+
+async function sendDecisionEmailSafe(user, status) {
+  try {
+    await dispatchDecisionEmail(user, status);
+  } catch (err) {
+    console.warn(`[admin] Failed to send ${status} email to ${user?.email || "unknown"}`, err?.message || err);
+  }
+}
+
+async function applyUserDecision(req, user, status, note) {
+  const normalized = normalizeUserStatus(status);
+  if (!normalized || normalized === "pending") {
+    const error = new Error("Invalid status");
+    error.statusCode = 400;
+    throw error;
+  }
+  const cleanNote = sanitizeNote(note);
+  user.status = normalized;
+  if (!Array.isArray(user.audit)) user.audit = [];
+  user.audit.push({
+    adminId: req.user?.id || null,
+    action: normalized === "denied" ? "denied" : "approved",
+    note: cleanNote,
+  });
+  await user.save();
+
+  const auditEvent = normalized === "denied" ? "admin.user.denied" : "admin.user.approved";
+  try {
+    await AuditLog.logFromReq(req, auditEvent, {
+      targetType: "user",
+      targetId: user._id,
+      meta: { status: normalized, note: cleanNote },
+    });
+  } catch (err) {
+    console.warn("[admin] Failed to log audit event", err?.message || err);
+  }
+
+  await sendDecisionEmailSafe(user, normalized);
+  return user;
 }
 
 // All admin routes are protected & admin-only
 router.use(verifyToken, requireRole("admin"));
 
-/**
- * GET /api/admin/pending-users
- * Optional query: ?status=pending|approved|rejected&role=attorney|paralegal|admin&q=search&page=&limit=
- * Returns paginated users (password never selected).
- */
-router.get("/pending-users", asyncHandler(async (req, res) => {
+router.get("/metrics", asyncHandler(async (_req, res) => {
+  const ACTIVE_CASE_STATUSES = ["open", "assigned", "active", "awaiting_documents", "reviewing", "in_progress"];
+
+  const [roleAggregation, pendingApprovals, suspendedUsers, recentUsersRaw, monthlyRegistrationsRaw, caseAggregation, escrowAggregation, revenueAggregation] =
+    await Promise.all([
+      User.aggregate([{ $group: { _id: "$role", count: { $sum: 1 } } }]),
+      User.countDocuments({ status: "pending" }),
+      User.countDocuments({ status: { $in: ["denied", "rejected"] } }),
+      User.find()
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .select("firstName lastName email role status createdAt")
+        .lean(),
+      User.aggregate([
+        { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } },
+        { $sort: { "_id.year": 1, "_id.month": 1 } },
+      ]),
+      Case.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+      Case.aggregate([
+        { $match: { paymentReleased: { $ne: true } } },
+        { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+      ]),
+      PlatformIncome.aggregate([{ $group: { _id: null, total: { $sum: "$feeAmount" } } }]),
+    ]);
+
+  const roleMap = roleAggregation.reduce((acc, item) => {
+    acc[item._id] = item.count;
+    return acc;
+  }, {});
+
+  const totalUsers = Object.values(roleMap).reduce((sum, value) => sum + value, 0);
+
+  let activeCases = 0;
+  let completedCases = 0;
+  caseAggregation.forEach((item) => {
+    if (item._id === "completed") {
+      completedCases = item.count;
+    } else if (ACTIVE_CASE_STATUSES.includes(item._id)) {
+      activeCases += item.count;
+    }
+  });
+
+  const monthlyRegistrations = monthlyRegistrationsRaw.map((entry) => ({
+    month: `${entry._id.year}-${String(entry._id.month).padStart(2, "0")}`,
+    count: entry.count,
+  }));
+
+  const recentUsers = recentUsersRaw.map((user) => ({
+    id: user._id,
+    name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email || "User",
+    email: user.email || "",
+    role: user.role || "",
+    status: user.status || "",
+    createdAt: user.createdAt,
+  }));
+
+  const escrowHeld = escrowAggregation[0]?.total || 0;
+  const totalRevenue = revenueAggregation[0]?.total || 0;
+
+  res.json({
+    totals: {
+      totalUsers,
+      attorneys: roleMap.attorney || 0,
+      paralegals: roleMap.paralegal || 0,
+      pendingApprovals,
+      suspendedUsers,
+      escrowHeld,
+      activeCases,
+      completedCases,
+      totalRevenue,
+    },
+    monthlyRegistrations,
+    recentUsers,
+  });
+}));
+
+const listUsersHandler = asyncHandler(async (req, res) => {
   const { status = "pending", role, q } = req.query;
   const { skip, limit, page } = parsePagination(req, { defaultLimit: 25 });
 
   const filter = {};
-  if (["pending", "approved", "rejected"].includes(status)) filter.status = status;
+  const normalizedStatus = normalizeUserStatus(status);
+  if (normalizedStatus) filter.status = normalizedStatus;
   if (["attorney", "paralegal", "admin"].includes(role)) filter.role = role;
   if (q && q.trim()) {
+    const rx = new RegExp(q.trim(), "i");
     filter.$or = [
-      { name: new RegExp(q.trim(), "i") },
-      { email: new RegExp(q.trim(), "i") },
-      { specialties: new RegExp(q.trim(), "i") },
-      { jurisdictions: new RegExp(q.trim(), "i") },
+      { firstName: rx },
+      { lastName: rx },
+      { email: rx },
+      { specialties: rx },
+      { jurisdictions: rx },
     ];
   }
 
@@ -73,77 +257,67 @@ router.get("/pending-users", asyncHandler(async (req, res) => {
     page, limit, total, pages: Math.ceil(total / limit),
     users: items.map(pickUserSafe),
   });
-}));
+});
+
+/**
+ * GET /api/admin/pending-users
+ * GET /api/admin/users/pending
+ * Optional query: ?status=pending|approved|denied&role=attorney|paralegal|admin&q=search&page=&limit=
+ * Returns paginated users (password never selected).
+ */
+router.get("/pending-users", listUsersHandler);
+router.get("/users/pending", listUsersHandler);
 
 /**
  * PATCH /api/admin/user/:id
- * Body: { status: 'approved' | 'rejected', note? }
- * Approve or reject a user, email them, and audit.
+ * Body: { status: 'approved' | 'denied', note? }
+ * Approve or deny a user, email them, and audit.
  */
-router.patch("/user/:id", asyncHandler(async (req, res) => {
+router.patch("/user/:id", csrfProtection, asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status, note } = req.body || {};
   if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
-  if (!["approved", "rejected"].includes(status)) return res.status(400).json({ msg: "Invalid status" });
+  const normalized = normalizeUserStatus(status);
+  if (!normalized || normalized === "pending") return res.status(400).json({ msg: "Invalid status" });
 
   const user = await User.findById(id);
   if (!user) return res.status(404).json({ msg: "User not found" });
 
-  user.status = status;
-  user.audit.push({ adminId: req.user.id, action: status, note });
-  await user.save();
-
-  // Notify (best-effort)
-  try {
-    await sendEmail(
-      user.email,
-      `Your ParaConnect account has been ${status}`,
-      `Hello ${user.name || "there"}, your account has been ${status}. ${
-        status === "approved" ? "You can now log in." : "Contact support if needed."
-      }`
-    );
-  } catch (_) { /* ignore email errors */ }
-
-  await AuditLog.logFromReq(req, "admin.user.status.update", {
-    targetType: "user",
-    targetId: user._id,
-    meta: { status, note },
-  });
-
-  res.json({ ok: true, user: pickUserSafe(user.toObject()) });
+  const updated = await applyUserDecision(req, user, normalized, note);
+  res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
 }));
 
 /**
  * (Alias) POST /api/admin/approve-user/:id
  * Approve via friendlier endpoint.
  */
-router.post("/approve-user/:id", asyncHandler(async (req, res) => {
+router.post("/approve-user/:id", csrfProtection, asyncHandler(async (req, res) => {
   const { id } = req.params;
   if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
 
-  const user = await User.findByIdAndUpdate(
-    id,
-    { status: "approved", $push: { audit: { adminId: req.user.id, action: "approved" } } },
-    { new: true }
-  ).lean();
-
+  const user = await User.findById(id);
   if (!user) return res.status(404).json({ msg: "User not found" });
 
-  try {
-    await sendEmail(
-      user.email,
-      "Account approved",
-      `Hi ${user.name || ""}, your account has been approved. You can now sign in.`
-    );
-  } catch (_) {}
+  const updated = await applyUserDecision(req, user, "approved");
+  res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
+}));
 
-  await AuditLog.logFromReq(req, "admin.user.status.update", {
-    targetType: "user",
-    targetId: user._id,
-    meta: { status: "approved" },
-  });
+router.post("/users/:id/approve", csrfProtection, asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
+  const user = await User.findById(id);
+  if (!user) return res.status(404).json({ msg: "User not found" });
+  const updated = await applyUserDecision(req, user, "approved", req.body?.note);
+  res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
+}));
 
-  res.json({ ok: true, user: pickUserSafe(user) });
+router.post("/users/:id/deny", csrfProtection, asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
+  const user = await User.findById(id);
+  if (!user) return res.status(404).json({ msg: "User not found" });
+  const updated = await applyUserDecision(req, user, "denied", req.body?.note);
+  res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
 }));
 
 /**
@@ -165,7 +339,7 @@ router.get("/cases", asyncHandler(async (req, res) => {
     Case.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip).limit(limit)
-      .populate("attorney paralegal", "name email role status")
+      .populate("attorney paralegal", "firstName lastName email role status")
       .lean(),
     Case.countDocuments(filter),
   ]);
@@ -215,7 +389,7 @@ router.patch("/assign/:caseId", asyncHandler(async (req, res) => {
     meta: { paralegalId },
   });
 
-  const populated = await Case.findById(c._id).populate("attorney paralegal", "name email role status").lean();
+  const populated = await Case.findById(c._id).populate("attorney paralegal", "firstName lastName email role status").lean();
   res.json({ ok: true, msg: "Paralegal assigned", case: populated });
 }));
 
@@ -254,7 +428,9 @@ router.patch("/cases/:id/status", asyncHandler(async (req, res) => {
     meta: { status },
   });
 
-  const populated = await Case.findById(id).populate("attorney paralegal", "name email").lean();
+  const populated = await Case.findById(id)
+    .populate("attorney paralegal", "firstName lastName email role")
+    .lean();
   res.json({ ok: true, msg: "Case updated", case: populated });
 }));
 
@@ -273,6 +449,30 @@ router.get("/metrics", asyncHandler(async (_req, res) => {
   ]);
 
   res.json({ users, cases });
+}));
+
+router.get("/payouts", asyncHandler(async (_req, res) => {
+  const [items, summary] = await Promise.all([
+    Payout.find().sort({ createdAt: -1 }).limit(200).lean(),
+    Payout.aggregate([{ $group: { _id: null, total: { $sum: "$amountPaid" }, count: { $sum: 1 } } }]),
+  ]);
+  res.json({
+    totalAmount: summary[0]?.total || 0,
+    count: summary[0]?.count || 0,
+    items,
+  });
+}));
+
+router.get("/income", asyncHandler(async (_req, res) => {
+  const [items, summary] = await Promise.all([
+    PlatformIncome.find().sort({ createdAt: -1 }).limit(200).lean(),
+    PlatformIncome.aggregate([{ $group: { _id: null, total: { $sum: "$feeAmount" }, count: { $sum: 1 } } }]),
+  ]);
+  res.json({
+    totalAmount: summary[0]?.total || 0,
+    count: summary[0]?.count || 0,
+    items,
+  });
 }));
 
 // -----------------------------------------
