@@ -69,7 +69,6 @@ const paymentsRouter = require("./routes/payments");
 const paymentsWebhookHandler = require("./routes/paymentsWebhook");
 const usersRouter = require("./routes/users");
 const disputesRouter = require("./routes/disputes");
-const paymentsWebhookHandler = require("./routes/paymentsWebhook");
 const jobsRouter = require("./routes/jobs");
 const applicationsRouter = require("./routes/applications");
 const attorneyDashboardRouter = require("./routes/attorneyDashboard");
