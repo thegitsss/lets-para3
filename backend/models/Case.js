@@ -113,6 +113,15 @@ const caseSchema = new Schema(
     briefSummary: { type: String, trim: true, maxlength: 1000, default: "" },
     archived: { type: Boolean, default: false, index: true },
     downloadUrl: [{ type: String, trim: true }],
+    readOnly: { type: Boolean, default: false, index: true },
+    paralegalAccessRevokedAt: { type: Date, default: null },
+    archiveZipKey: { type: String, trim: true, default: "" },
+    archiveReadyAt: { type: Date, default: null },
+    archiveDownloadedAt: { type: Date, default: null },
+    purgeScheduledFor: { type: Date, default: null, index: true },
+    purgedAt: { type: Date, default: null },
+    paralegalNameSnapshot: { type: String, trim: true, default: "" },
+    attorneyNameSnapshot: { type: String, trim: true, default: "" },
 
     // Zoom / meeting info
     zoomLink: {

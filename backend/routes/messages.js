@@ -48,6 +48,10 @@ function buildUnreadClause(userObjectId) {
   };
 }
 
+function isCaseReadOnly(req) {
+  return !!(req.case?.readOnly && !req.acl?.isAdmin);
+}
+
 // All message routes require auth
 router.use(verifyToken);
 router.use(requireRole(["admin", "attorney", "paralegal"]));
@@ -198,6 +202,9 @@ router.post(
   requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    if (isCaseReadOnly(req)) {
+      return res.status(403).json({ error: "Case is read-only" });
+    }
     const { caseId } = req.params;
     if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid caseId" });
 
@@ -244,6 +251,9 @@ router.post(
   requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    if (isCaseReadOnly(req)) {
+      return res.status(403).json({ error: "Case is read-only" });
+    }
     const { fileKey, fileName, mimeType, fileSize } = req.body || {};
     if (!fileKey || !fileName) return res.status(400).json({ error: "fileKey and fileName required" });
 
@@ -282,6 +292,9 @@ router.post(
   requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    if (isCaseReadOnly(req)) {
+      return res.status(403).json({ error: "Case is read-only" });
+    }
     const { fileKey, fileName, mimeType, transcript = "" } = req.body || {};
     if (!fileKey) return res.status(400).json({ error: "fileKey required" });
     if (!mimeType || !String(mimeType).startsWith("audio/")) {
@@ -374,6 +387,9 @@ router.patch(
   requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    if (isCaseReadOnly(req)) {
+      return res.status(403).json({ error: "Case is read-only" });
+    }
     const { caseId, messageId } = req.params;
     if (!isObjId(messageId)) return res.status(400).json({ error: "Invalid messageId" });
 
@@ -424,6 +440,9 @@ router.post(
   requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    if (isCaseReadOnly(req)) {
+      return res.status(403).json({ error: "Case is read-only" });
+    }
     const { caseId, messageId } = req.params;
     const { emoji } = req.body || {};
     if (!isObjId(messageId)) return res.status(400).json({ error: "Invalid messageId" });
@@ -451,6 +470,9 @@ router.delete(
   requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    if (isCaseReadOnly(req)) {
+      return res.status(403).json({ error: "Case is read-only" });
+    }
     const { caseId, messageId } = req.params;
     const { emoji } = req.body || {};
     if (!isObjId(messageId)) return res.status(400).json({ error: "Invalid messageId" });
@@ -481,6 +503,9 @@ router.delete(
   requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    if (isCaseReadOnly(req)) {
+      return res.status(403).json({ error: "Case is read-only" });
+    }
     const { caseId, messageId } = req.params;
     if (!isObjId(messageId)) return res.status(400).json({ error: "Invalid messageId" });
 

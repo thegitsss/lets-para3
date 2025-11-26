@@ -77,6 +77,7 @@ const paralegalDashboardRouter = require("./routes/paralegalDashboard");
 const chatRouter = require("./routes/chat");
 const checklistRouter = require("./routes/checklist");
 const eventsRouter = require("./routes/events");
+const { startPurgeWorker } = require("./services/caseLifecycle");
 
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }), paymentsWebhookHandler);
 app.use(express.json({ limit: "1mb" }));
@@ -141,3 +142,5 @@ mongoose
 app.listen(PORT, () => {
   console.log(`🚀 Server is live at http://localhost:${PORT}`);
 });
+
+startPurgeWorker();

@@ -3,12 +3,37 @@
   const toastHelper = window.toastUtils;
   const toastTarget = "toastBanner";
   const MAX_FILE_BYTES = 5 * 1024 * 1024;
+  const FALLBACK_TEXT = "—";
 
   const els = {};
   let currentUser = null;
   let pendingAvatarURL = "";
   let uploadingAvatar = false;
   let notificationPanelOpen = false;
+
+  function sanitizeSingleLine(value, maxLength = 150) {
+    if (typeof value !== "string") return "";
+    return value
+      .replace(/<[^>]*>/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, maxLength);
+  }
+
+  function sanitizeMultiLine(value, maxLength = 4000) {
+    if (typeof value !== "string") return "";
+    return value
+      .replace(/<[^>]*>/g, "")
+      .replace(/\r\n/g, "\n")
+      .replace(/[^\S\n]+/g, " ")
+      .trim()
+      .slice(0, maxLength);
+  }
+
+  function displayValue(value, fallback = FALLBACK_TEXT) {
+    const str = typeof value === "string" ? value.trim() : "";
+    return str || fallback;
+  }
 
   document.addEventListener("DOMContentLoaded", () => {
     init();
@@ -113,17 +138,22 @@
         if (!els.profileSaveBtn) return;
         const payload = buildProfilePayload();
         setButtonBusy(els.profileSaveBtn, true, "Saving…");
+        let restoreButton = true;
         try {
           const updated = await patchMe(payload);
           currentUser = updated;
           pendingAvatarURL = "";
           hydrateProfileForm(updated);
           showToast("Profile updated.");
+          scheduleFormButtonReset(els.profileForm, els.profileSaveBtn);
+          restoreButton = false;
         } catch (err) {
           console.error(err);
           showToast(err.message || "Unable to save profile", "err");
         } finally {
-          setButtonBusy(els.profileSaveBtn, false);
+          if (restoreButton) {
+            setButtonBusy(els.profileSaveBtn, false);
+          }
         }
       });
   }
@@ -151,15 +181,20 @@
       }
 
       setButtonBusy(els.passwordSaveBtn, true, "Updating…");
+      let restoreButton = true;
       try {
         await requestPasswordChange(currentPassword, newPassword);
         els.passwordForm.reset();
         showToast("Password updated.");
+        scheduleFormButtonReset(els.passwordForm, els.passwordSaveBtn);
+        restoreButton = false;
       } catch (err) {
         console.error(err);
         showToast(err.message || "Unable to change password", "err");
       } finally {
-        setButtonBusy(els.passwordSaveBtn, false);
+        if (restoreButton) {
+          setButtonBusy(els.passwordSaveBtn, false);
+        }
       }
     });
   }
@@ -171,16 +206,21 @@
       if (!els.preferencesSaveBtn) return;
       const payload = buildPreferencesPayload();
       setButtonBusy(els.preferencesSaveBtn, true, "Saving…");
+      let restoreButton = true;
       try {
         const updated = await patchMe(payload);
         currentUser = updated;
         hydratePreferences(updated);
         showToast("Preferences saved.");
+        scheduleFormButtonReset(els.preferencesForm, els.preferencesSaveBtn);
+        restoreButton = false;
       } catch (err) {
         console.error(err);
         showToast(err.message || "Unable to save preferences", "err");
       } finally {
-        setButtonBusy(els.preferencesSaveBtn, false);
+        if (restoreButton) {
+          setButtonBusy(els.preferencesSaveBtn, false);
+        }
       }
     });
   }
@@ -199,16 +239,20 @@
     els.confirmDelete &&
       els.confirmDelete.addEventListener("click", async () => {
         setButtonBusy(els.confirmDelete, true, "Deleting…");
+        let restoreButton = true;
         try {
           await deleteAccount();
           showToast("Account deleted.");
           window.clearStoredSession && window.clearStoredSession();
           window.location.href = "login.html";
+          restoreButton = false;
         } catch (err) {
           console.error(err);
           showToast(err.message || "Unable to delete account", "err");
         } finally {
-          setButtonBusy(els.confirmDelete, false);
+          if (restoreButton) {
+            setButtonBusy(els.confirmDelete, false);
+          }
           toggleDeleteModal(false);
         }
       });
@@ -288,14 +332,14 @@
 
   function hydrateProfileForm(user) {
     if (!user) return;
-    setValue(els.firstName, user.firstName || "");
-    setValue(els.lastName, user.lastName || "");
-    setValue(els.email, user.email || "");
-    const phoneValue = user.phone || user.contactPhone || user.phoneNumber || "";
+    setValue(els.firstName, sanitizeSingleLine(user.firstName || ""));
+    setValue(els.lastName, sanitizeSingleLine(user.lastName || ""));
+    setValue(els.email, sanitizeSingleLine(user.email || ""));
+    const phoneValue = sanitizeSingleLine(user.phone || user.contactPhone || user.phoneNumber || "");
     setValue(els.phone, phoneValue);
-    const firmValue = user.lawFirm || user.firm || user.company || "";
+    const firmValue = sanitizeSingleLine(user.lawFirm || user.firm || user.company || "");
     setValue(els.lawFirm, firmValue);
-    setValue(els.bio, user.bio || "");
+    setValue(els.bio, sanitizeMultiLine(user.bio || "", 4000));
     setAvatarPreview(user.avatarURL);
     hydrateHeader(user);
   }
@@ -311,15 +355,16 @@
   }
 
   function hydrateHeader(user) {
-    const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Attorney";
-    const roleLabel = (user.role || "Attorney").replace(/\b\w/g, (c) => c.toUpperCase());
-    if (els.headerName) els.headerName.textContent = fullName;
+    const fullName = `${sanitizeSingleLine(user.firstName || "")} ${sanitizeSingleLine(user.lastName || "")}`.trim();
+    const safeName = displayValue(fullName || user.name || "");
+    const roleLabel = displayValue((user.role || "Attorney").replace(/\b\w/g, (c) => c.toUpperCase()));
+    if (els.headerName) els.headerName.textContent = safeName;
     if (els.headerRole) els.headerRole.textContent = roleLabel;
     const initials = getInitials(fullName);
     const avatarSource = user.avatarURL || buildInitialAvatar(initials);
     if (els.headerAvatar) {
       els.headerAvatar.src = avatarSource;
-      els.headerAvatar.alt = `${fullName} avatar`;
+      els.headerAvatar.alt = `${safeName} avatar`;
     }
   }
 
@@ -347,14 +392,17 @@
 
   function buildProfilePayload() {
     const payload = {};
-    payload.firstName = (els.firstName?.value || "").trim();
-    payload.lastName = (els.lastName?.value || "").trim();
-    payload.email = (els.email?.value || "").trim();
-    payload.phone = (els.phone?.value || "").trim();
-    payload.lawFirm = (els.lawFirm?.value || "").trim();
-    payload.bio = (els.bio?.value || "").trim();
+    payload.firstName = sanitizeSingleLine(els.firstName?.value || "", 80) || null;
+    payload.lastName = sanitizeSingleLine(els.lastName?.value || "", 80) || null;
+    payload.email = sanitizeSingleLine(els.email?.value || "", 120) || null;
+    payload.phone = sanitizeSingleLine(els.phone?.value || "", 40) || null;
+    payload.lawFirm = sanitizeSingleLine(els.lawFirm?.value || "", 120) || null;
+    payload.bio = sanitizeMultiLine(els.bio?.value || "", 4000) || null;
     const avatarURL = pendingAvatarURL || currentUser?.avatarURL || "";
     if (avatarURL) payload.avatarURL = avatarURL;
+    Object.keys(payload).forEach((key) => {
+      if (payload[key] === null) payload[key] = null;
+    });
     return payload;
   }
 
@@ -497,6 +545,15 @@
     }
   }
 
+  function scheduleFormButtonReset(form, button) {
+    if (!form || !button) return;
+    const handler = () => {
+      setButtonBusy(button, false);
+      form.removeEventListener("input", handler);
+    };
+    form.addEventListener("input", handler, { once: true });
+  }
+
   function updateNotificationBadge(count) {
     if (els.notificationBadge) {
       els.notificationBadge.textContent = count > 9 ? "9+" : String(count);
@@ -576,6 +633,13 @@
     const method = String(opts.method || "GET").toUpperCase();
     const headers = { ...(opts.headers || {}) };
     if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+      if (typeof window.refreshSession === "function") {
+        const session = await window.refreshSession("attorney");
+        if (!session) {
+          handleUnauthorized();
+          throw new Error("Session expired");
+        }
+      }
       const token = await ensureCsrfToken();
       if (token) headers["X-CSRF-Token"] = token;
     }

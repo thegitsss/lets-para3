@@ -81,6 +81,8 @@ if (!skipInit) {
 
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value.trim();
+    const originalLabel = loginButton?.textContent || "Log In";
+    let shouldRestoreButton = true;
 
     try {
       if (loginButton) {
@@ -115,6 +117,7 @@ if (!skipInit) {
         return;
       }
 
+      shouldRestoreButton = false;
       localStorage.setItem("lpc_user", JSON.stringify(data.user || {}));
 
       if (data.user.role === "admin") {
@@ -133,9 +136,9 @@ if (!skipInit) {
         alert("Network error during login");
       }
     } finally {
-      if (loginButton) {
+      if (shouldRestoreButton && loginButton) {
         loginButton.disabled = false;
-        loginButton.textContent = "Log In";
+        loginButton.textContent = originalLabel;
       }
     }
   });

@@ -285,6 +285,19 @@ export async function render(el) {
   toolbar.querySelector('[name="status"]').addEventListener("change", loadAndRender);
   toolbar.querySelector('[name="caseId"]').addEventListener("input", debounce(loadAndRender, 250));
 
+  const formSubmitBtn = formEl?.querySelector('button[type="submit"]');
+  const defaultSubmitText = formSubmitBtn?.textContent || "Add";
+
+  const scheduleFormReset = () => {
+    if (!formEl || !formSubmitBtn) return;
+    const handler = () => {
+      formSubmitBtn.disabled = false;
+      formSubmitBtn.textContent = defaultSubmitText;
+      formEl.removeEventListener("input", handler);
+    };
+    formEl.addEventListener("input", handler, { once: true });
+  };
+
   formEl.addEventListener("submit", async (e) => {
     e.preventDefault();
     const title = formEl.title.value.trim();
@@ -303,14 +316,26 @@ export async function render(el) {
     const temp = { id: tempId, title, due, caseId, notes, done: false, createdAt: new Date().toISOString() };
     draw([temp, ...Array.from(listEl.children).map(rowToTask)]);
 
+    let restoreButton = true;
+    if (formSubmitBtn) {
+      formSubmitBtn.disabled = true;
+      formSubmitBtn.textContent = "Saving…";
+    }
     try {
       await apiCreate({ title, due, caseId, notes });
       formEl.reset();
       await loadAndRender();
       toast("Task added");
+      scheduleFormReset();
+      restoreButton = false;
     } catch {
       toast("Failed to add task");
       await loadAndRender(); // rollback to server truth
+    } finally {
+      if (restoreButton && formSubmitBtn) {
+        formSubmitBtn.disabled = false;
+        formSubmitBtn.textContent = defaultSubmitText;
+      }
     }
   });
 

@@ -338,6 +338,8 @@
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((email || '').trim());
     }
 
+    const defaultSubmitText = submitBtn?.textContent || "Create Account";
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       say('');
@@ -356,8 +358,12 @@
         if (!bar) { say('State Bar Number is required for attorneys.', 'err'); return; }
       }
 
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Creating…';
+      const originalText = submitBtn?.textContent || defaultSubmitText;
+      let shouldRestoreButton = true;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Signing up…';
+      }
 
       try {
         const payload = { firstName, lastName, email, password, role };
@@ -387,13 +393,16 @@
         localStorage.setItem('lastEmail', email);
         sessionStorage.setItem('signupToast', 'Your application has been submitted for approval.');
         say('Application submitted. Await approval.', 'ok');
+        shouldRestoreButton = false;
         setTimeout(() => location.href = 'login.html', 1000);
       } catch (err) {
         console.error(err);
         say(err.message || 'Network error. Please try again.', 'err');
       } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Create Account';
+        if (shouldRestoreButton && submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
       }
     });
   </script>

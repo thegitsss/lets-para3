@@ -84,7 +84,7 @@ function requireCaseAccess(paramKey = "caseId", opts = {}) {
 
       // Build a minimal projection; add applicants only if needed
       // Always include attorney/paralegal to evaluate access quickly.
-      let select = "_id attorney paralegal";
+      let select = "_id attorney paralegal status readOnly paralegalAccessRevokedAt";
       if (checkApplicants) select += " applicants";
       if (project) {
         // Allow caller to ask for more fields (e.g., "status title")
@@ -108,6 +108,13 @@ function requireCaseAccess(paramKey = "caseId", opts = {}) {
       const isAdmin = req.user.role === "admin";
       const isAttorney = sameId(c.attorney, uid);
       const isParalegal = sameId(c.paralegal, uid);
+      const paralegalRevoked = isParalegal && !isAdmin && !!c.paralegalAccessRevokedAt;
+
+      if (paralegalRevoked) {
+        return res
+          .status(hideExistence ? 404 : 403)
+          .json({ error: hideExistence ? "Case not found" : "Access revoked" });
+      }
 
       let isApplicant = false;
       if (checkApplicants && Array.isArray(c.applicants) && req.user.role === "paralegal") {
@@ -137,7 +144,14 @@ function requireCaseAccess(paramKey = "caseId", opts = {}) {
       }
 
       // Attach convenience access flags for downstream handlers
-      req.acl = Object.assign({}, req.acl, { isAdmin, isAttorney, isParalegal, isApplicant });
+      req.acl = Object.assign({}, req.acl, {
+        isAdmin,
+        isAttorney,
+        isParalegal,
+        isApplicant,
+        caseReadOnly: !!c.readOnly,
+        caseStatus: c.status || null,
+      });
       req.case = c;
       return next();
     } catch (err) {

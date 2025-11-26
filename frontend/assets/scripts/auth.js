@@ -120,6 +120,14 @@ export async function secureFetch(url, opts = {}) {
   let body = opts.body;
 
   if (isMutation) {
+    if (typeof window !== "undefined" && typeof window.refreshSession === "function") {
+      const activeSession = await window.refreshSession();
+      if (!activeSession) {
+        clearSession();
+        redirectToLoginOnce();
+        throw new Error("Session expired");
+      }
+    }
     if (!CSRF_TOKEN) {
       try { await fetchCSRF(); } catch {}
     }

@@ -443,16 +443,14 @@ async function loadCompletedJobs(container) {
 function renderCompletedJobCard(job) {
   const summary = sanitize(job.briefSummary || job.title || "Completed case");
   const completedAt = job.completedAt ? new Date(job.completedAt).toLocaleDateString() : "Date unavailable";
-  const downloads = Array.isArray(job.downloadUrl) && job.downloadUrl.length
-    ? job.downloadUrl
-        .map((url) => `<a href="${sanitizeDownloadPath(url)}" target="_blank" rel="noopener">Download</a>`)
-        .join(" ")
-    : '<span class="muted">No files available</span>';
+  const archiveLink = job.id
+    ? `<a href="/api/cases/${encodeURIComponent(job.id)}/archive/download" target="_blank" rel="noopener">Download Archive</a>`
+    : '<span class="muted">Archive unavailable</span>';
   return `
     <div class="completed-job-card">
       <div class="info-line"><strong>${summary}</strong></div>
       <div class="info-line" style="color:var(--muted);">Completed ${completedAt}</div>
-      <div class="downloads">${downloads}</div>
+      <div class="downloads">${archiveLink}</div>
     </div>
   `;
 }
@@ -613,7 +611,12 @@ async function submitJobEdit(event) {
     totalAmount: dollarsToCents(form.budget.value),
     budget: dollarsToCents(form.budget.value),
   };
-  submitBtn.disabled = true;
+  const defaultText = submitBtn?.textContent || "Save";
+  let restoreButton = true;
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Posting…";
+  }
   try {
     const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, {
       method: "PATCH",
@@ -624,11 +627,16 @@ async function submitJobEdit(event) {
     notifyBilling("Job updated successfully.", "success");
     toggleModal(modal, false);
     await loadPostedJobs(true);
+    enableButtonOnFormInput(form, submitBtn, defaultText);
+    restoreButton = false;
   } catch (err) {
     console.error("Job update failed", err);
     notifyBilling("Unable to save those changes right now.", "error");
   } finally {
-    submitBtn.disabled = false;
+    if (restoreButton && submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = defaultText;
+    }
   }
 }
 
@@ -1568,7 +1576,12 @@ async function submitTaskCreate(event) {
     form.title.focus();
     return;
   }
-  submitBtn.disabled = true;
+  const defaultText = submitBtn?.textContent || "Create Task";
+  let restoreButton = true;
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Saving…";
+  }
   try {
     const payload = { title };
     if (notes) payload.notes = notes;
@@ -1585,12 +1598,27 @@ async function submitTaskCreate(event) {
     await loadTasks();
     renderTasks();
     notifyTasks("Task created.", "success");
+    enableButtonOnFormInput(form, submitBtn, defaultText);
+    restoreButton = false;
   } catch (err) {
     console.warn(err);
     notifyTasks(err.message || "Unable to create task.", "error");
   } finally {
-    submitBtn.disabled = false;
+    if (restoreButton && submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = defaultText;
+    }
   }
+}
+
+function enableButtonOnFormInput(form, button, defaultText) {
+  if (!form || !button) return;
+  const handler = () => {
+    button.disabled = false;
+    button.textContent = defaultText;
+    form.removeEventListener("input", handler);
+  };
+  form.addEventListener("input", handler, { once: true });
 }
 
 // -------------------------
@@ -1774,7 +1802,7 @@ function matchesCaseSearch(item, term) {
 }
 
 function renderCaseRow(item, filterKey = "active") {
-  const client = item.paralegal?.name || "Awaiting hire";
+  const client = item.paralegal?.name || item.paralegalNameSnapshot || "Awaiting hire";
   const practice = item.practiceArea || "General";
   const created = formatCaseDate(item.createdAt || item.updatedAt);
   const updated = formatCaseDate(item.updatedAt || item.completedAt || item.createdAt);
@@ -1966,6 +1994,8 @@ function notifyCases(message, type = "info") {
 // -------------------------
 // Messages Page
 // -------------------------
+let chatCountdownTimer = null;
+
 async function initMessagesPage() {
   const casesPane = document.querySelector("[data-message-cases]");
   if (!casesPane) return;
@@ -1985,11 +2015,11 @@ async function initMessagesPage() {
   });
 
   try {
-    await Promise.all([loadCasesWithFiles(), loadThreadSummary()]);
+    await Promise.all([loadCasesWithFiles(), loadArchivedCases(), loadThreadSummary()]);
   } catch (err) {
     console.warn("Unable to load conversations", err);
   }
-  state.messages.cases = state.cases.filter((c) => !c.archived);
+  state.messages.cases = [...state.cases, ...(state.casesArchived || [])];
   renderMessageCases();
 
   const firstCase = state.messages.cases[0];
@@ -2202,19 +2232,22 @@ function onMessageThreadClick(event) {
 
 function renderChatMessages() {
   const body = document.querySelector("[data-chat-body]");
-  const chatInput = document.querySelector("[data-chat-input]");
-  const sendBtn = document.querySelector("[data-chat-send]");
   const chatTitle = document.getElementById("chatTitle");
   if (!body) return;
   const caseId = state.messages.activeCaseId;
   if (!caseId) {
     body.innerHTML = `<p style="color:var(--muted);">Select a case to view messages.</p>`;
-    if (chatInput) chatInput.disabled = true;
-    if (sendBtn) sendBtn.disabled = true;
+    setComposerLock(true);
+    if (chatCountdownTimer) {
+      clearInterval(chatCountdownTimer);
+      chatCountdownTimer = null;
+    }
     chatTitle.textContent = "Chat";
     return;
   }
   const caseEntry = state.caseLookup.get(String(caseId));
+  const readOnly = !!caseEntry?.readOnly;
+  const purgeAt = caseEntry?.purgeScheduledFor ? new Date(caseEntry.purgeScheduledFor) : null;
   chatTitle.textContent = caseEntry?.title || "Chat";
   const messages = state.messages.messagesByCase.get(String(caseId)) || [];
   const filterId = state.messages.activeThreadId;
@@ -2240,8 +2273,59 @@ function renderChatMessages() {
       .join("");
     body.scrollTop = body.scrollHeight;
   }
-  if (chatInput) chatInput.disabled = false;
-  if (sendBtn) sendBtn.disabled = state.messages.sending;
+  if (readOnly) {
+    const countdownText = purgeAt ? formatAutoDelete(purgeAt) : "--:--";
+    body.innerHTML =
+      `<p style="color:var(--muted);font-size:.85rem;margin-bottom:.6rem;">Case archived. Auto-delete in <span data-chat-countdown>${countdownText}</span>.</p>` +
+      body.innerHTML;
+    const countdownNode = body.querySelector("[data-chat-countdown]");
+    if (countdownNode && purgeAt) startChatCountdown(countdownNode, purgeAt);
+  } else if (chatCountdownTimer) {
+    clearInterval(chatCountdownTimer);
+    chatCountdownTimer = null;
+  }
+  setComposerLock(readOnly);
+}
+
+function setComposerLock(readOnly) {
+  const chatInput = document.querySelector("[data-chat-input]");
+  const sendBtn = document.querySelector("[data-chat-send]");
+  if (chatInput) {
+    const disable = readOnly || !state.messages.activeCaseId;
+    chatInput.disabled = disable;
+    chatInput.placeholder = disable ? "Case archived. Messaging disabled." : "Type a message...";
+    if (disable) chatInput.value = "";
+  }
+  if (sendBtn) {
+    const disable = readOnly || state.messages.sending || !state.messages.activeCaseId;
+    sendBtn.disabled = disable;
+    sendBtn.textContent = readOnly ? "Locked" : "Send";
+  }
+}
+
+function startChatCountdown(node, targetDate) {
+  if (!node || !targetDate) return;
+  const update = () => {
+    const diff = targetDate.getTime() - Date.now();
+    if (diff <= 0) {
+      node.textContent = "00:00";
+      clearInterval(chatCountdownTimer);
+      chatCountdownTimer = null;
+      return;
+    }
+    node.textContent = formatAutoDelete(targetDate);
+  };
+  update();
+  clearInterval(chatCountdownTimer);
+  chatCountdownTimer = setInterval(update, 60 * 1000);
+}
+
+function formatAutoDelete(targetDate) {
+  const diff = Math.max(0, targetDate.getTime() - Date.now());
+  const totalMinutes = Math.floor(diff / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 async function sendCurrentMessage() {
@@ -2250,6 +2334,11 @@ async function sendCurrentMessage() {
   if (!chatInput) return;
   const value = chatInput.value.trim();
   if (!value || !state.messages.activeCaseId) return;
+  const caseEntry = state.caseLookup.get(String(state.messages.activeCaseId));
+  if (caseEntry?.readOnly) {
+    notifyMessages("This case is archived. Messaging is disabled.", "error");
+    return;
+  }
   const sendBtn = document.querySelector("[data-chat-send]");
   state.messages.sending = true;
   if (sendBtn) sendBtn.disabled = true;

@@ -25,6 +25,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  const submitBtn = form?.querySelector('button[type="submit"]');
+  const defaultText = submitBtn?.textContent || "Reset Password";
+
+  const scheduleReset = () => {
+    if (!form || !submitBtn) return;
+    const handler = () => {
+      submitBtn.disabled = false;
+      submitBtn.textContent = defaultText;
+      form.removeEventListener("input", handler);
+    };
+    form.addEventListener("input", handler, { once: true });
+  };
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -34,6 +47,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (newPassword !== confirmPassword) {
       message.textContent = "Passwords do not match.";
       return;
+    }
+
+    const buttonLabel = submitBtn?.textContent || defaultText;
+    let restoreButton = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Saving…";
     }
 
     try {
@@ -52,6 +72,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (res.ok) {
         message.textContent = "✅ Password reset successful! Redirecting...";
+        scheduleReset();
+        restoreButton = false;
         setTimeout(() => {
           window.location.href = "/frontend/login.html"; // or modal open
         }, 3000);
@@ -60,6 +82,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } catch (err) {
       message.textContent = "❌ Network error. Please try again.";
+    } finally {
+      if (restoreButton && submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = buttonLabel;
+      }
     }
   });
 });

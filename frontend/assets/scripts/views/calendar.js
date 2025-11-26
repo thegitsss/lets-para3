@@ -385,6 +385,19 @@ export async function render(el) {
   });
 
   // submit
+  const formSubmitBtn = formEl?.querySelector('button[type="submit"]');
+  const defaultSubmitText = formSubmitBtn?.textContent || "Add";
+
+  const scheduleFormReset = () => {
+    if (!formEl || !formSubmitBtn) return;
+    const handler = () => {
+      formSubmitBtn.disabled = false;
+      formSubmitBtn.textContent = defaultSubmitText;
+      formEl.removeEventListener("input", handler);
+    };
+    formEl.addEventListener("input", handler, { once: true });
+  };
+
   formEl.addEventListener("submit", async (e) => {
     e.preventDefault();
     const date = formEl.date.value;
@@ -419,17 +432,29 @@ export async function render(el) {
     (dayMap[k] ||= []).push({ id: tempId, ...payload });
     renderMonth();
 
+    let restoreButton = true;
+    if (formSubmitBtn) {
+      formSubmitBtn.disabled = true;
+      formSubmitBtn.textContent = "Saving…";
+    }
     try {
       await apiCreate(payload);
       toast("Event added");
       formEl.reset();
       await loadMonth();
       renderMonth();
+      scheduleFormReset();
+      restoreButton = false;
     } catch (err) {
       // rollback optimistic
       dayMap[k] = (dayMap[k] || []).filter((e) => e.id !== tempId);
       renderMonth();
       toast("Failed to add event");
+    } finally {
+      if (restoreButton && formSubmitBtn) {
+        formSubmitBtn.disabled = false;
+        formSubmitBtn.textContent = defaultSubmitText;
+      }
     }
   });
 

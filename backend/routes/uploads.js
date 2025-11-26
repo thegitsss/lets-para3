@@ -50,22 +50,12 @@ function safeSegment(s, { allowSlash = false } = {}) {
   return allowSlash ? cleaned.replace(/\/+/g, "/") : cleaned.replace(/\//g, "");
 }
 
-function buildUserPrefix(user) {
-  // e.g., uploads/attorney/64ef.../  (keep consistent for ownership checks)
-  return `uploads/${user.role}/${user.id}/`;
-}
-
 function buildCasePrefix(caseId) {
   return `cases/${caseId}/`;
 }
 
 function normalizeKeyPath(key) {
   return String(key || "").replace(/^\/+/, "");
-}
-
-function userOwnsKey(user, key) {
-  const prefix = buildUserPrefix(user);
-  return normalizeKeyPath(key).includes(prefix);
 }
 
 function extractCaseIdFromKey(key) {
@@ -86,7 +76,7 @@ async function ensureKeyAccess(req, key, explicitCaseId) {
     }
     return hasCaseAccess(req, caseId);
   }
-  return userOwnsKey(req.user, cleaned);
+  return false;
 }
 
 function sseParams() {
@@ -105,11 +95,18 @@ const ALLOWED = new Set([
   "application/pdf",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
   "image/png",
   "image/jpeg",
+  "image/gif",
 ]);
 const BLOCKED = [/html/i, /javascript/i, /zip/i, /x-msdownload/i, /octet-stream/i];
-const MAX_FILE_BYTES = 25 * 1024 * 1024;
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 // ----------------------------------------
 // All routes require auth
@@ -128,13 +125,11 @@ router.post(
   csrfProtection,
   async (req, res, next) => {
     try {
-      // If caseId present, run case access check; otherwise continue
       const { caseId } = req.body || {};
-      if (caseId && isObjId(caseId)) {
-        // delegate to middleware then resume handler
-        return requireCaseAccessInline(req, res, next, "caseId");
+      if (!caseId || !isObjId(caseId)) {
+        return res.status(400).json({ msg: "Valid caseId is required" });
       }
-      return next();
+      return requireCaseAccessInline(req, res, next, "caseId");
     } catch (e) {
       return next(e);
     }
@@ -144,6 +139,9 @@ router.post(
     try {
       const { contentType, ext, folder, caseId, checksumSha256, contentDisposition, size } = req.body || {};
       if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
+      if (!caseId || !isObjId(caseId)) {
+        return res.status(400).json({ msg: "caseId is required" });
+      }
 
       if (!contentType || typeof contentType !== "string") {
         return res.status(400).json({ msg: "contentType required" });
@@ -163,15 +161,12 @@ router.post(
         return res.status(400).json({ msg: "File exceeds maximum allowed size" });
       }
 
-      const safeFolder = safeSegment(folder || "uploads", { allowSlash: true }) || "uploads";
       const fileExt = safeSegment(ext || "bin");
       const filename = `${crypto.randomUUID()}.${fileExt}`;
+      const normalizedFolder = String(folder || "").toLowerCase();
+      const scope = normalizedFolder.includes("message") || normalizedFolder.includes("voice") ? "messages" : "documents";
 
-      // Key rules:
-      // - If caseId present (and access verified), put under cases/<caseId>/
-      // - Else put under user personal prefix uploads/<role>/<userId>/
-      const base = caseId && isObjId(caseId) ? buildCasePrefix(caseId) : buildUserPrefix(req.user);
-      const key = `${safeFolder}/${base}${filename}`.replace(/\/+/g, "/");
+      const key = `${buildCasePrefix(caseId)}${scope}/${filename}`.replace(/\/+/g, "/");
 
       // Additional server controls
       const putParams = {
@@ -191,7 +186,10 @@ router.post(
 
       // Optional content disposition (e.g., "attachment; filename=\"...\"")
       if (contentDisposition && typeof contentDisposition === "string") {
-        putParams.ContentDisposition = contentDisposition;
+        const sanitizedDisposition = contentDisposition.replace(/[\r\n]/g, " ").trim().slice(0, 200);
+        if (sanitizedDisposition) {
+          putParams.ContentDisposition = sanitizedDisposition;
+        }
       }
 
       const expiresIn = 60; // seconds

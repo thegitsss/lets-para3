@@ -12,10 +12,12 @@ let cardElementInstance = null;
 let cardErrorsNode = null;
 let cardHostNode = null;
 let paymentEnabled = false;
+let countdownTimer = null;
 
 export async function render(el, { escapeHTML, params: routeParams } = {}) {
   const session = requireAuth();
   ensureStyles();
+  const viewerRole = String(session?.role || session?.user?.role || "").toLowerCase();
   const h = escapeHTML || ((s) => String(s ?? ""));
   const params = getRouteParams(routeParams);
   const caseId = params.get("caseId");
@@ -31,6 +33,10 @@ export async function render(el, { escapeHTML, params: routeParams } = {}) {
     const data = await j(`/api/cases/${encodeURIComponent(caseId)}`);
     draw(el, data, h, caseId, session);
   } catch (err) {
+    if (viewerRole === "paralegal") {
+      window.location.href = "dashboard-paralegal.html";
+      return;
+    }
     el.innerHTML = `<section class="dash"><div class="error">${h(err?.message || "Unable to load case details.")}</div></section>`;
   }
 }
@@ -49,6 +55,8 @@ function draw(root, data, escapeHTML, caseId, session) {
   const isOwner = viewerRole === "attorney" && ownerId && viewerId && String(ownerId) === String(viewerId);
   const isAdmin = viewerRole === "admin";
   const paralegalOnCase = !!data?.paralegal;
+  const readOnly = !!data?.readOnly;
+  const purgeAt = data?.purgeScheduledFor ? new Date(data.purgeScheduledFor) : null;
   const alreadyApplied = applicants.some((applicant) => {
     const entry =
       applicant?.paralegalId?._id ||
@@ -57,8 +65,8 @@ function draw(root, data, escapeHTML, caseId, session) {
       applicant?.paralegal?.id;
     return entry && viewerId && String(entry) === String(viewerId);
   });
-  const showPayment = (isOwner || isAdmin) && paralegalOnCase && !data?.paymentReleased;
-  const canRelease = (isOwner || isAdmin) && paralegalOnCase && !data?.paymentReleased;
+  const showPayment = (isOwner || isAdmin) && paralegalOnCase && !data?.paymentReleased && !readOnly;
+  const showCompleteButton = (isOwner || isAdmin) && paralegalOnCase && !data?.paymentReleased && !readOnly;
   const canHire = isOwner || isAdmin;
   const canApply =
     viewerRole === "paralegal" &&
@@ -111,7 +119,7 @@ function draw(root, data, escapeHTML, caseId, session) {
   }
 
   const actionsSection =
-    showPayment || canRelease
+    showPayment || showCompleteButton
       ? `
       <div class="case-section">
         <div class="case-section-title">Actions</div>
@@ -126,13 +134,25 @@ function draw(root, data, escapeHTML, caseId, session) {
               : ""
           }
           ${
-            canRelease
-              ? `<button class="btn secondary" data-release-escrow>Mark Complete &amp; Release Funds</button>`
+            showCompleteButton
+              ? `<button class="btn secondary" data-complete-case>Mark Case Complete &amp; Archive</button>`
               : ""
           }
         </div>
       </div>`
       : "";
+
+  const archiveSection = readOnly
+    ? `
+      <div class="case-section notice" data-archive-status>
+        <div class="case-section-title">Archive</div>
+        <p class="notice">Case archived. Auto-delete in <span data-purge-countdown>${purgeAt ? formatCountdown(purgeAt) : "--:--"}</span>.</p>
+        <div class="case-actions">
+          <button class="btn" data-download-archive>Download Archive</button>
+        </div>
+      </div>
+    `
+    : "";
 
   root.innerHTML = `
     <section class="dash">
@@ -156,14 +176,22 @@ function draw(root, data, escapeHTML, caseId, session) {
 
       ${applicationSection}
       ${actionsSection}
+      ${archiveSection}
     </section>
   `;
 
   bindHireButtons(root, caseId);
   setupPaymentSection(root, caseId, showPayment);
   bindEscrowButton(root, caseId);
-  bindReleaseButton(root, caseId);
+  bindCompleteButton(root, caseId);
+  bindDownloadButton(root, caseId);
   bindApplicationForm(root, caseId);
+  if (readOnly && purgeAt) {
+    startCountdown(root.querySelector("[data-purge-countdown]"), purgeAt);
+  } else if (countdownTimer) {
+    clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
 }
 
 function ensureStyles() {
@@ -197,6 +225,10 @@ function ensureStyles() {
     .applicant-status{font-size:.85rem;color:#6b7280;text-transform:capitalize}
     .shimmer{background:linear-gradient(90deg,#f3f4f6 25%,#e5e7eb 37%,#f3f4f6 63%);background-size:400% 100%;animation:shimmer 1.4s ease infinite;border-radius:10px;height:18px}
     @keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+    .case-modal-overlay{position:fixed;inset:0;background:rgba(17,24,39,.45);display:flex;align-items:center;justify-content:center;z-index:999}
+    .case-modal{background:#fff;border-radius:16px;padding:24px;max-width:420px;box-shadow:0 20px 45px rgba(0,0,0,.22)}
+    .case-modal-title{font-weight:600;font-size:1.15rem;margin-bottom:8px}
+    .case-modal-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:16px}
   `;
   document.head.appendChild(style);
   stylesInjected = true;
@@ -274,10 +306,16 @@ function bindEscrowButton(root, caseId) {
   btn.addEventListener("click", () => startEscrow(caseId, btn));
 }
 
-function bindReleaseButton(root, caseId) {
-  const btn = root.querySelector("[data-release-escrow]");
+function bindCompleteButton(root, caseId) {
+  const btn = root.querySelector("[data-complete-case]");
   if (!btn) return;
-  btn.addEventListener("click", () => releaseEscrow(caseId, btn));
+  btn.addEventListener("click", () => showCompletionModal(caseId, btn));
+}
+
+function bindDownloadButton(root, caseId) {
+  const btn = root.querySelector("[data-download-archive]");
+  if (!btn) return;
+  btn.addEventListener("click", () => downloadArchive(caseId, btn));
 }
 
 function bindApplicationForm(root, caseId) {
@@ -286,12 +324,17 @@ function bindApplicationForm(root, caseId) {
   const textarea = form.querySelector("[data-apply-note]");
   const statusNode = form.querySelector("[data-apply-status]");
   const submitBtn = form.querySelector('button[type="submit"]');
+  const defaultText = submitBtn?.textContent || "Submit application";
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const note = textarea?.value.trim();
     if (statusNode) statusNode.textContent = "Submitting application…";
-    submitBtn.disabled = true;
+    let restoreButton = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Applying…";
+    }
     try {
       await j(`/api/cases/${encodeURIComponent(caseId)}/apply`, {
         method: "POST",
@@ -299,10 +342,15 @@ function bindApplicationForm(root, caseId) {
       });
       if (statusNode) statusNode.textContent = "Application submitted!";
       if (textarea) textarea.value = "";
+      restoreButton = false;
       setTimeout(() => window.location.reload(), 800);
     } catch (err) {
       if (statusNode) statusNode.textContent = err?.message || "Unable to apply right now.";
-      submitBtn.disabled = false;
+    } finally {
+      if (restoreButton && submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = defaultText;
+      }
     }
   });
 }
@@ -459,23 +507,89 @@ async function startEscrow(caseId, button) {
   }
 }
 
-async function releaseEscrow(caseId, button) {
+function showCompletionModal(caseId) {
+  const overlay = document.createElement("div");
+  overlay.className = "case-modal-overlay";
+  overlay.innerHTML = `
+    <div class="case-modal">
+      <div class="case-modal-title">Mark case complete?</div>
+      <p>Confirming will release the escrow payment, lock all uploads and messages, revoke paralegal access, generate a ZIP archive, and start a 24-hour purge timer.</p>
+      <div class="case-modal-actions">
+        <button class="btn" data-modal-cancel>Cancel</button>
+        <button class="btn primary" data-modal-confirm>Confirm</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) overlay.remove();
+  });
+  overlay.querySelector("[data-modal-cancel]")?.addEventListener("click", () => overlay.remove());
+  const confirmBtn = overlay.querySelector("[data-modal-confirm]");
+  confirmBtn?.addEventListener("click", async () => {
+    if (confirmBtn.disabled) return;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = "Working…";
+    try {
+      await completeCase(caseId);
+    } finally {
+      overlay.remove();
+    }
+  });
+}
+
+async function completeCase(caseId) {
   if (!caseId) {
     notify("Missing case identifier.", "error");
     return;
   }
-  button?.setAttribute("disabled", "disabled");
   try {
-    await j("/api/payments/release", {
+    const result = await j(`/api/cases/${encodeURIComponent(caseId)}/complete`, {
       method: "POST",
-      body: { caseId },
     });
-    notify("Funds released successfully.", "success");
-    window.location.reload();
+    notify("Case archived. Downloading…", "success");
+    if (result?.downloadPath) {
+      setTimeout(() => {
+        window.open(result.downloadPath, "_blank", "noopener");
+      }, 300);
+    }
+    setTimeout(() => window.location.reload(), 1200);
   } catch (err) {
-    button?.removeAttribute("disabled");
-    notify(err?.message || "Unable to release funds.", "error");
+    notify(err?.message || "Unable to complete this case.", "error");
   }
+}
+
+function downloadArchive(caseId, button) {
+  if (!caseId) return;
+  button?.setAttribute("disabled", "disabled");
+  const url = `/api/cases/${encodeURIComponent(caseId)}/archive/download`;
+  window.open(url, "_blank", "noopener");
+  setTimeout(() => button?.removeAttribute("disabled"), 1500);
+}
+
+function startCountdown(node, targetDate) {
+  if (!node || !targetDate) return;
+  const run = () => {
+    const diff = targetDate.getTime() - Date.now();
+    if (diff <= 0) {
+      node.textContent = "00:00";
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+      return;
+    }
+    node.textContent = formatCountdown(targetDate);
+  };
+  run();
+  clearInterval(countdownTimer);
+  countdownTimer = setInterval(run, 60 * 1000);
+}
+
+function formatCountdown(targetDate) {
+  const diff = Math.max(0, targetDate.getTime() - Date.now());
+  const totalMinutes = Math.floor(diff / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 function notify(message, type = "info") {

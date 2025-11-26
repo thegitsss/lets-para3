@@ -272,9 +272,38 @@ export async function render(el) {
     filtersEl.to.disabled = !custom;
   });
 
+  const filterSubmitBtn = filtersEl?.querySelector('button[type="submit"]');
+  const filterDefaultText = filterSubmitBtn?.textContent || "Apply";
+
+  const scheduleFilterReset = () => {
+    if (!filtersEl || !filterSubmitBtn) return;
+    const handler = () => {
+      filterSubmitBtn.disabled = false;
+      filterSubmitBtn.textContent = filterDefaultText;
+      filtersEl.removeEventListener("input", handler);
+      filtersEl.removeEventListener("change", handler);
+    };
+    filtersEl.addEventListener("input", handler, { once: true });
+    filtersEl.addEventListener("change", handler, { once: true });
+  };
+
   filtersEl.addEventListener("submit", async (e) => {
     e.preventDefault();
-    await loadAndRender();
+    let restoreButton = true;
+    if (filterSubmitBtn) {
+      filterSubmitBtn.disabled = true;
+      filterSubmitBtn.textContent = "Loading…";
+    }
+    try {
+      await loadAndRender();
+      scheduleFilterReset();
+      restoreButton = false;
+    } finally {
+      if (restoreButton && filterSubmitBtn) {
+        filterSubmitBtn.disabled = false;
+        filterSubmitBtn.textContent = filterDefaultText;
+      }
+    }
   });
 
   // exports
@@ -392,6 +421,9 @@ export async function render(el) {
   }
 
   // quick add
+  const addSubmitBtn = addEl.querySelector('button[type="submit"]');
+  const addDefaultText = addSubmitBtn?.textContent || "Add";
+
   addEl.addEventListener("submit", async (e) => {
     e.preventDefault();
     const title = addEl.title.value.trim();
@@ -413,17 +445,39 @@ export async function render(el) {
     items = items.concat([temp]).sort((a,b) => new Date(a.start) - new Date(b.start));
     renderList();
 
+    let restoreButton = true;
+    if (addSubmitBtn) {
+      addSubmitBtn.disabled = true;
+      addSubmitBtn.textContent = "Saving…";
+    }
     try {
       await apiCreate(payload);
       toast("Deadline added");
       addEl.reset();
       await loadAndRender();
+      scheduleAddButtonReset();
+      restoreButton = false;
     } catch {
       items = items.filter(x => x.id !== temp.id);
       renderList();
       toast("Failed to add");
+    } finally {
+      if (restoreButton && addSubmitBtn) {
+        addSubmitBtn.disabled = false;
+        addSubmitBtn.textContent = addDefaultText;
+      }
     }
   });
+
+  function scheduleAddButtonReset() {
+    if (!addEl || !addSubmitBtn) return;
+    const handler = () => {
+      addSubmitBtn.disabled = false;
+      addSubmitBtn.textContent = addDefaultText;
+      addEl.removeEventListener("input", handler);
+    };
+    addEl.addEventListener("input", handler, { once: true });
+  }
 
   // initial
   await loadAndRender();

@@ -90,6 +90,14 @@
     } catch (_) {}
   }
 
+  async function refreshSession(expectedRole) {
+    try {
+      return await checkSession(expectedRole);
+    } catch {
+      return null;
+    }
+  }
+
   fetchSession().catch(() => {});
 
   window.checkSession = checkSession;
@@ -98,4 +106,5 @@
   window.getSessionToken = () => "";
   window.getSessionData = getSessionData;
   window.getStoredUser = getCachedUser;
+  window.refreshSession = refreshSession;
 })();

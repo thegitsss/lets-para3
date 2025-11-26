@@ -1,14 +1,19 @@
 // backend/routes/cases.js
 const router = require("express").Router();
 const mongoose = require("mongoose");
-const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, GetObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const verifyToken = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
 const { requireCaseAccess } = require("../utils/authz");
 const Case = require("../models/Case");
+const Payout = require("../models/Payout");
+const PlatformIncome = require("../models/PlatformIncome");
+const sendEmail = require("../utils/email");
+const stripe = require("../utils/stripe");
 const { cleanText, cleanTitle, cleanMessage } = require("../utils/sanitize");
 const { logAction } = require("../utils/audit");
+const { generateArchiveZip } = require("../services/caseLifecycle");
 
 // ----------------------------------------
 // Optional CSRF (enable via ENABLE_CSRF=true)
@@ -71,6 +76,15 @@ if (!S3_BUCKET) {
 function cleanString(value, { len = 400 } = {}) {
   if (!value || typeof value !== "string") return "";
   return value.replace(/[\u0000-\u001F\u007F]/g, "").trim().slice(0, len);
+}
+
+function safeArchiveName(title) {
+  const cleaned = String(title || "")
+    .replace(/[\u0000-\u001F\u007F]/g, "")
+    .replace(/[^a-z0-9._-]+/gi, "-")
+    .replace(/-+/g, "-")
+    .trim();
+  return (cleaned || "case-archive").slice(0, 80);
 }
 
 const DOLLARS_RX = /[^0-9.\-]/g;
@@ -175,6 +189,13 @@ function caseSummary(doc, { includeFiles = false } = {}) {
     briefSummary: doc.briefSummary || "",
     archived: !!doc.archived,
     downloadUrl: Array.isArray(doc.downloadUrl) ? doc.downloadUrl : [],
+    readOnly: !!doc.readOnly,
+    paralegalAccessRevokedAt: doc.paralegalAccessRevokedAt || null,
+    archiveReadyAt: doc.archiveReadyAt || null,
+    archiveDownloadedAt: doc.archiveDownloadedAt || null,
+    purgeScheduledFor: doc.purgeScheduledFor || null,
+    purgedAt: doc.purgedAt || null,
+    paralegalNameSnapshot: doc.paralegalNameSnapshot || "",
     updatedAt: doc.updatedAt,
     createdAt: doc.createdAt,
   };
@@ -231,6 +252,107 @@ async function signDownload(key) {
   if (!S3_BUCKET) throw new Error("S3 bucket not configured");
   const command = new GetObjectCommand({ Bucket: S3_BUCKET, Key: key });
   return getSignedUrl(s3, command, { expiresIn: 60 });
+}
+
+async function ensureFundsReleased(req, caseDoc) {
+  if (caseDoc.paymentReleased) return null;
+  const paralegal = caseDoc.paralegal;
+  if (!paralegal || !paralegal.stripeAccountId) {
+    throw new Error("Paralegal cannot be paid until onboarding completes.");
+  }
+  if (!paralegal.stripeOnboarded) {
+    throw new Error("Paralegal must finish Stripe onboarding before payouts.");
+  }
+  if (!caseDoc.paymentIntentId) {
+    throw new Error("Case has no funded payment intent.");
+  }
+
+  const budgetCents = Number(caseDoc.totalAmount || 0);
+  if (!Number.isFinite(budgetCents) || budgetCents <= 0) {
+    throw new Error("Case total amount is invalid.");
+  }
+  const feeAmount = Math.max(0, Math.round(budgetCents * 0.15));
+  const payout = Math.max(0, budgetCents - feeAmount);
+  if (payout <= 0) {
+    throw new Error("Calculated payout must be positive.");
+  }
+
+  const transfer = await stripe.transfers.create({
+    amount: payout,
+    currency: caseDoc.currency || "usd",
+    destination: paralegal.stripeAccountId,
+    transfer_group: `case_${caseDoc._id}`,
+    metadata: {
+      caseId: String(caseDoc._id),
+      attorneyId: String(caseDoc.attorney?._id || caseDoc.attorneyId || ""),
+      paralegalId: String(paralegal._id || caseDoc.paralegalId || ""),
+      description: "Case completion payout",
+    },
+  });
+
+  const completedAt = new Date();
+  const paralegalName = `${paralegal.firstName || ""} ${paralegal.lastName || ""}`.trim() || "Paralegal";
+  caseDoc.paymentReleased = true;
+  caseDoc.payoutTransferId = transfer.id;
+  caseDoc.paidOutAt = completedAt;
+  caseDoc.completedAt = caseDoc.completedAt || completedAt;
+  caseDoc.briefSummary = `${caseDoc.title} – ${paralegalName} – completed ${completedAt.toISOString().split("T")[0]}`;
+
+  const attorneyObjectId = caseDoc.attorney?._id || caseDoc.attorneyId || caseDoc.attorney;
+  const paralegalObjectId = paralegal._id || caseDoc.paralegalId || caseDoc.paralegal;
+
+  await Promise.all([
+    Payout.create({
+      paralegalId: paralegalObjectId,
+      caseId: caseDoc._id,
+      amountPaid: payout,
+      transferId: transfer.id,
+    }),
+    PlatformIncome.create({
+      caseId: caseDoc._id,
+      attorneyId: attorneyObjectId,
+      paralegalId: paralegalObjectId,
+      feeAmount,
+    }),
+  ]);
+
+  try {
+    const completedDateStr = completedAt.toLocaleDateString("en-US");
+    const payoutDisplay = `$${(payout / 100).toFixed(2)}`;
+    const feeDisplay = `$${(feeAmount / 100).toFixed(2)}`;
+    const totalDisplay = `$${(budgetCents / 100).toFixed(2)}`;
+    if (caseDoc.attorney?.email) {
+      const attorneyName = `${caseDoc.attorney.firstName || ""} ${caseDoc.attorney.lastName || ""}`.trim() || "there";
+      await sendEmail(
+        caseDoc.attorney.email,
+        "Your case has been completed",
+        `<p>Hi ${attorneyName},</p>
+         <p>Your case "<strong>${caseDoc.title}</strong>" was completed on <strong>${completedDateStr}</strong>.</p>
+         <p>Deliverables will be available for the next 24 hours.</p>`
+      );
+    }
+    if (paralegal.email) {
+      const paraName = `${paralegal.firstName || ""} ${paralegal.lastName || ""}`.trim() || "there";
+      await sendEmail(
+        paralegal.email,
+        "Your payout is complete",
+        `<p>Hi ${paraName},</p>
+         <p>Your payout for "<strong>${caseDoc.title}</strong>" is complete.</p>
+         <p>Job amount: ${totalDisplay}<br/>Service fee (15%): ${feeDisplay}<br/>Final payout: <strong>${payoutDisplay}</strong></p>`
+      );
+    }
+  } catch (err) {
+    console.warn("[cases] payout email error", err?.message || err);
+  }
+
+  await logAction(req, "case.release", {
+    targetType: "case",
+    targetId: caseDoc._id,
+    caseId: caseDoc._id,
+    meta: { payout, feeAmount, transferId: transfer.id },
+  });
+
+  return { payout, transferId: transfer.id };
 }
 
 router.get("/open", verifyToken, requireRole(["paralegal"]), async (req, res) => {
@@ -922,6 +1044,97 @@ router.patch(
 );
 
 /**
+ * POST /api/cases/:caseId/complete
+ * Attorney-only. Releases funds, locks case, generates archive, and schedules purge.
+ */
+router.post(
+  "/:caseId/complete",
+  csrfProtection,
+  requireCaseAccess("caseId"),
+  asyncHandler(async (req, res) => {
+    if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
+      return res.status(403).json({ error: "Only the case attorney may close this case." });
+    }
+    const { caseId } = req.params;
+    const doc = await Case.findById(caseId)
+      .populate("paralegal", "firstName lastName email role stripeAccountId stripeOnboarded")
+      .populate("attorney", "firstName lastName email role");
+    if (!doc) return res.status(404).json({ error: "Case not found" });
+    if (!doc.paralegal) {
+      return res.status(400).json({ error: "Assign a paralegal before completing the case." });
+    }
+    if (doc.readOnly) {
+      if (!doc.archiveZipKey) {
+        try {
+          const regen = await generateArchiveZip(doc);
+          doc.archiveZipKey = regen.key;
+          doc.archiveReadyAt = regen.readyAt;
+          doc.archiveDownloadedAt = null;
+          await doc.save();
+        } catch (err) {
+          console.error("[cases] archive regenerate error", err);
+          return res.status(500).json({ error: "Unable to regenerate archive" });
+        }
+      }
+      return res.json({
+        ok: true,
+        downloadPath: `/api/cases/${encodeURIComponent(doc._id)}/archive/download`,
+        purgeScheduledFor: doc.purgeScheduledFor,
+        archiveReadyAt: doc.archiveReadyAt,
+        alreadyClosed: true,
+      });
+    }
+
+    try {
+      await ensureFundsReleased(req, doc);
+    } catch (err) {
+      return res.status(400).json({ error: err.message || "Unable to release funds." });
+    }
+
+    const now = new Date();
+    doc.status = "closed";
+    doc.archived = true;
+    doc.readOnly = true;
+    doc.paralegalAccessRevokedAt = doc.paralegalAccessRevokedAt || now;
+    doc.paralegalNameSnapshot =
+      doc.paralegalNameSnapshot ||
+      `${doc.paralegal?.firstName || ""} ${doc.paralegal?.lastName || ""}`.trim();
+    doc.attorneyNameSnapshot =
+      doc.attorneyNameSnapshot ||
+      `${doc.attorney?.firstName || ""} ${doc.attorney?.lastName || ""}`.trim();
+    doc.purgeScheduledFor = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    doc.archiveDownloadedAt = null;
+    doc.downloadUrl = [];
+    doc.applicants = [];
+
+    let archiveMeta;
+    try {
+      archiveMeta = await generateArchiveZip(doc);
+    } catch (err) {
+      console.error("[cases] archive error", err);
+      return res.status(500).json({ error: "Unable to generate archive" });
+    }
+    doc.archiveZipKey = archiveMeta.key;
+    doc.archiveReadyAt = archiveMeta.readyAt;
+    await doc.save();
+
+    await logAction(req, "case.complete.archive", {
+      targetType: "case",
+      targetId: doc._id,
+      caseId: doc._id,
+      meta: { purgeScheduledFor: doc.purgeScheduledFor },
+    });
+
+    res.json({
+      ok: true,
+      downloadPath: `/api/cases/${encodeURIComponent(doc._id)}/archive/download`,
+      purgeScheduledFor: doc.purgeScheduledFor,
+      archiveReadyAt: doc.archiveReadyAt,
+    });
+  })
+);
+
+/**
  * GET /api/cases/:caseId
  * Returns case details needed by the Documents view (includes files array).
  */
@@ -974,11 +1187,76 @@ router.get(
       briefSummary: doc.briefSummary || "",
       archived: !!doc.archived,
       downloadUrl: Array.isArray(doc.downloadUrl) ? doc.downloadUrl : [],
+      readOnly: !!doc.readOnly,
+      paralegalAccessRevokedAt: doc.paralegalAccessRevokedAt || null,
+      archiveReadyAt: doc.archiveReadyAt || null,
+      archiveDownloadedAt: doc.archiveDownloadedAt || null,
+      purgeScheduledFor: doc.purgeScheduledFor || null,
       attorney: doc.attorney || null,
       paralegal: doc.paralegal || null,
+      paralegalNameSnapshot: doc.paralegalNameSnapshot || "",
       files: Array.isArray(doc.files) ? doc.files.map(normalizeFile) : [],
       applicants,
     });
+  })
+);
+
+router.get(
+  "/:caseId/archive/download",
+  requireCaseAccess("caseId"),
+  asyncHandler(async (req, res) => {
+    if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
+      return res.status(403).json({ error: "Only the attorney can download the archive." });
+    }
+    const doc = await Case.findById(req.params.caseId).select("archiveZipKey title");
+    if (!doc) {
+      return res.status(404).json({ error: "Archive not available" });
+    }
+    if (!doc.archiveZipKey) {
+      try {
+        const regen = await generateArchiveZip(doc);
+        doc.archiveZipKey = regen.key;
+        doc.archiveReadyAt = regen.readyAt;
+        doc.archiveDownloadedAt = null;
+        await doc.save();
+      } catch (err) {
+        console.error("[cases] archive regenerate error", err);
+        return res.status(500).json({ error: "Archive not ready" });
+      }
+    }
+    if (!S3_BUCKET) {
+      return res.status(500).json({ error: "Storage misconfigured" });
+    }
+    const key = doc.archiveZipKey.replace(/^\/+/, "");
+    let stream;
+    try {
+      const cmd = new GetObjectCommand({ Bucket: S3_BUCKET, Key: key });
+      stream = await s3.send(cmd);
+    } catch (err) {
+      console.error("[cases] archive fetch error", err);
+      return res.status(404).json({ error: "Archive not found" });
+    }
+
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeArchiveName(doc.title)}.zip"`);
+
+    stream.Body.on("error", (err) => {
+      console.error("[cases] archive stream error", err);
+      res.destroy(err);
+    });
+
+    stream.Body.on("end", async () => {
+      try {
+        await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: key }));
+      } catch (err) {
+        console.warn("[cases] archive delete error", err?.message || err);
+      }
+      doc.archiveZipKey = "";
+      doc.archiveDownloadedAt = new Date();
+      await doc.save();
+    });
+
+    stream.Body.pipe(res);
   })
 );
 
