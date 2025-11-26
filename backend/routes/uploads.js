@@ -8,6 +8,7 @@ const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/clien
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const verifyToken = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
+const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const { requireCaseAccess, sameId } = require("../utils/authz");
 const Case = require("../models/Case");
 const CaseFile = require("../models/CaseFile");
