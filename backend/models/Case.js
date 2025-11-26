@@ -99,6 +99,8 @@ const caseSchema = new Schema(
     attorneyId: { type: Types.ObjectId, ref: "User", required: true, index: true }, // alias for compatibility
     paralegal: { type: Types.ObjectId, ref: "User", default: null, index: true }, // accepted paralegal
     paralegalId: { type: Types.ObjectId, ref: "User", default: null, index: true }, // alias for compatibility
+    pendingParalegalId: { type: Types.ObjectId, ref: "User", default: null, index: true },
+    pendingParalegalInvitedAt: { type: Date, default: null },
 
     // Core
     title: { type: String, required: true, trim: true, index: true, maxlength: 300 },
@@ -191,6 +193,7 @@ caseSchema.index({ attorney: 1, createdAt: -1 });
 caseSchema.index({ attorneyId: 1, createdAt: -1 });
 caseSchema.index({ paralegal: 1, createdAt: -1 });
 caseSchema.index({ paralegalId: 1, createdAt: -1 });
+caseSchema.index({ pendingParalegalId: 1, createdAt: -1 });
 caseSchema.index({ status: 1, createdAt: -1 });
 caseSchema.index({ "applicants.paralegalId": 1, createdAt: -1 }); // helpful when showing "my applications"
 

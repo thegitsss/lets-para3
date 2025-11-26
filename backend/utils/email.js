@@ -1,6 +1,8 @@
 // backend/utils/email.js
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
+const CONTACT_EMAIL = "admin@lets-paraconnect.com";
+const SIGNATURE = "Let’s-ParaConnect Verification Division";
 
 // ----------------------------------------
 // Transport setup
@@ -70,7 +72,7 @@ function wrapHtml(html) {
 
 function defaultFrom() {
   const name = process.env.SMTP_FROM_NAME || "ParaConnect";
-  const email = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "no-reply@example.com";
+  const email = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "admin@lets-paraconnect.com";
   return `"${name}" <${email}>`;
 }
 
@@ -162,3 +164,56 @@ module.exports = async function sendEmail(to, subject, html, opts = {}) {
 
 // (optional) export transporter for tests/health checks
 module.exports.transporter = transporter;
+
+function escapeHtmlLite(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildVerificationEmail(lastName, paragraphs = []) {
+  const safeName = escapeHtmlLite((lastName || "Applicant").trim() || "Applicant");
+  const parts = [
+    `<p>Dear Ms./Mr. ${safeName},</p>`,
+    ...paragraphs.map((text) => `<p>${escapeHtmlLite(text)}</p>`),
+    `<p>If you have any questions, contact us at <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>`,
+    `<p>${SIGNATURE}</p>`,
+  ];
+  return parts.join("");
+}
+
+function sendPendingReviewEmail(lastName) {
+  return buildVerificationEmail(lastName, [
+    "Thank you for submitting your application. Our verification team is currently reviewing your credentials for the Let’s-ParaConnect elite paralegal professional collective.",
+    "We will email you as soon as the review is complete.",
+  ]);
+}
+
+function sendAdditionalInfoEmail(lastName) {
+  return buildVerificationEmail(lastName, [
+    "Thank you for your continued interest in Let’s-ParaConnect.",
+    "We require additional documentation to complete your verification. Please reply to this email with the requested materials so we can finalize your review.",
+  ]);
+}
+
+function sendAcceptedEmail(lastName) {
+  return buildVerificationEmail(lastName, [
+    "Congratulations! Your application has been approved and you have been accepted into the Let’s-ParaConnect elite paralegal professional collective.",
+    "We will send onboarding instructions as we approach the official platform launch.",
+  ]);
+}
+
+function sendNotAcceptedEmail(lastName) {
+  return buildVerificationEmail(lastName, [
+    "Thank you for your interest in Let’s-ParaConnect. After reviewing your submission, we are unable to extend an invitation at this time.",
+    "You are welcome to reapply in the future if circumstances change.",
+  ]);
+}
+
+module.exports.sendPendingReviewEmail = sendPendingReviewEmail;
+module.exports.sendAdditionalInfoEmail = sendAdditionalInfoEmail;
+module.exports.sendAcceptedEmail = sendAcceptedEmail;
+module.exports.sendNotAcceptedEmail = sendNotAcceptedEmail;

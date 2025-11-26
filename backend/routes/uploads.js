@@ -3,11 +3,16 @@ const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
 const mongoose = require("mongoose");
+const multer = require("multer");
 const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const verifyToken = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
-const { requireCaseAccess } = require("../utils/authz");
+const { requireCaseAccess, sameId } = require("../utils/authz");
+const Case = require("../models/Case");
+const CaseFile = require("../models/CaseFile");
+const User = require("../models/User");
+const { logAction } = require("../utils/audit");
 
 // ----------------------------------------
 // Optional CSRF (enable via ENABLE_CSRF=true)
@@ -18,6 +23,8 @@ if (process.env.ENABLE_CSRF === "true") {
   const csrf = require("csurf");
   csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
 }
+
+const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // ----------------------------------------
 // S3 client
@@ -66,7 +73,8 @@ function extractCaseIdFromKey(key) {
 async function ensureKeyAccess(req, key, explicitCaseId) {
   if (!req.user) return false;
   const cleaned = normalizeKeyPath(key);
-  if (!cleaned) return false;
+  if (!cleaned || cleaned.includes("..")) return false;
+  if (!cleaned.startsWith("cases/")) return false;
   if (req.user.role === "admin") return true;
 
   const caseId = explicitCaseId || extractCaseIdFromKey(cleaned);
@@ -107,6 +115,12 @@ const ALLOWED = new Set([
 ]);
 const BLOCKED = [/html/i, /javascript/i, /zip/i, /x-msdownload/i, /octet-stream/i];
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
+const MAX_CASE_FILE_BYTES = 20 * 1024 * 1024;
+const MAX_CERT_FILE_BYTES = 10 * 1024 * 1024;
+const caseFileUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_CASE_FILE_BYTES },
+});
 
 // ----------------------------------------
 // All routes require auth
@@ -137,7 +151,7 @@ router.post(
   
   async (req, res) => {
     try {
-      const { contentType, ext, folder, caseId, checksumSha256, contentDisposition, size } = req.body || {};
+      const { contentType, ext, caseId, checksumSha256, contentDisposition, size } = req.body || {};
       if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
       if (!caseId || !isObjId(caseId)) {
         return res.status(400).json({ msg: "caseId is required" });
@@ -163,10 +177,7 @@ router.post(
 
       const fileExt = safeSegment(ext || "bin");
       const filename = `${crypto.randomUUID()}.${fileExt}`;
-      const normalizedFolder = String(folder || "").toLowerCase();
-      const scope = normalizedFolder.includes("message") || normalizedFolder.includes("voice") ? "messages" : "documents";
-
-      const key = `${buildCasePrefix(caseId)}${scope}/${filename}`.replace(/\/+/g, "/");
+      const key = `${buildCasePrefix(caseId)}documents/${filename}`.replace(/\/+/g, "/");
 
       // Additional server controls
       const putParams = {
@@ -250,6 +261,158 @@ router.get("/download", csrfProtection, async (req, res) => {
   }
 });
 
+function caseFileMiddleware(req, res, next) {
+  caseFileUpload.single("file")(req, res, (err) => {
+    if (err) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({ msg: "File exceeds maximum allowed size" });
+      }
+      return res.status(400).json({ msg: err?.message || "Upload failed" });
+    }
+    return next();
+  });
+}
+
+router.post(
+  "/paralegal-certificate",
+  requireRole(["paralegal"]),
+  csrfProtection,
+  caseFileMiddleware,
+  asyncHandler(async (req, res) => {
+    if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
+    if (!req.file) return res.status(400).json({ msg: "Certificate file is required" });
+    if (req.file.mimetype !== "application/pdf") {
+      return res.status(400).json({ msg: "Certificate must be a PDF" });
+    }
+    if (req.file.size > MAX_CERT_FILE_BYTES) {
+      return res.status(400).json({ msg: "Certificate exceeds maximum allowed size" });
+    }
+
+    const ownerId = String(req.user?.id || req.user?._id || "").trim();
+    if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
+
+    const key = `paralegal-certificates/${safeSegment(ownerId)}/certificate.pdf`;
+    const putParams = {
+      Bucket: BUCKET,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: "application/pdf",
+      ContentLength: req.file.size,
+      ACL: "private",
+      ...sseParams(),
+    };
+    await s3.send(new PutObjectCommand(putParams));
+
+    const user = await User.findById(ownerId);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+    user.certificateURL = key;
+    await user.save();
+
+    try {
+      await logAction(req, "paralegal.certificate.upload", { targetType: "user", targetId: user._id });
+    } catch (err) {
+      console.warn("[uploads] certificate upload audit failed", err?.message || err);
+    }
+
+    return res.json({ success: true, url: key });
+  })
+);
+
+router.post(
+  "/case/:caseId",
+  ensureCaseParticipant(),
+  csrfProtection,
+  caseFileMiddleware,
+  asyncHandler(async (req, res) => {
+    const { caseDoc } = await loadCaseForUser(req, req.params.caseId);
+    if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
+    if (!req.file) return res.status(400).json({ msg: "File is required" });
+    if (req.file.size > MAX_CASE_FILE_BYTES) {
+      return res.status(400).json({ msg: "File exceeds maximum allowed size" });
+    }
+
+    const originalName = req.file.originalname || `case-file-${Date.now()}`;
+    const safeName = safeSegment(originalName) || `case-file-${Date.now()}`;
+    const key = `${buildCasePrefix(caseDoc._id)}documents/${Date.now()}-${safeName}`.replace(/\/+/g, "/");
+    const putParams = {
+      Bucket: BUCKET,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype || "application/octet-stream",
+      ContentLength: req.file.size,
+      ACL: "private",
+      ...sseParams(),
+    };
+    await s3.send(new PutObjectCommand(putParams));
+    const entry = await CaseFile.create({
+      caseId: caseDoc._id,
+      userId: req.user.id,
+      originalName,
+      storageKey: key,
+      mimeType: req.file.mimetype || "",
+      size: req.file.size || 0,
+    });
+
+    try {
+      await logAction(req, "file_uploaded", {
+        targetType: "case",
+        targetId: caseDoc._id,
+        meta: { fileId: entry._id, filename: originalName },
+      });
+    } catch (err) {
+      console.warn("[uploads] file upload audit failed", err?.message || err);
+    }
+
+    res.status(201).json({ file: serializeCaseFile(entry) });
+  })
+);
+
+router.get(
+  "/case/:caseId",
+  ensureCaseParticipant(),
+  asyncHandler(async (req, res) => {
+    const { caseDoc } = await loadCaseForUser(req, req.params.caseId);
+    const files = await CaseFile.find({ caseId: caseDoc._id }).sort({ createdAt: -1 }).lean();
+    res.json({ files: files.map(serializeCaseFile) });
+  })
+);
+
+router.get(
+  "/case/:caseId/:fileId/download",
+  ensureCaseParticipant(),
+  asyncHandler(async (req, res) => {
+    const { caseDoc } = await loadCaseForUser(req, req.params.caseId);
+    if (!isObjId(req.params.fileId)) {
+      return res.status(400).json({ msg: "Invalid file id" });
+    }
+    const record = await CaseFile.findOne({ _id: req.params.fileId, caseId: caseDoc._id });
+    if (!record) {
+      return res.status(404).json({ msg: "File not found" });
+    }
+    if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
+    const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(record.storageKey) });
+    const data = await s3.send(getCmd);
+    const filename = record.originalName || `case-file-${record._id}`;
+    res.setHeader("Content-Type", record.mimeType || "application/octet-stream");
+    if (record.size) {
+      res.setHeader("Content-Length", String(record.size));
+    }
+    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
+    data.Body.on("error", (err) => {
+      console.error("[uploads] download stream error", err);
+      res.destroy(err);
+    });
+    data.Body.pipe(res);
+    data.Body.on("end", () => {
+      logAction(req, "file_downloaded", {
+        targetType: "case",
+        targetId: caseDoc._id,
+        meta: { fileId: record._id, filename },
+      }).catch(() => {});
+    });
+  })
+);
+
 // ----------------------------------------
 // Inline access helpers
 // ----------------------------------------
@@ -271,6 +434,43 @@ async function hasCaseAccess(req, caseId) {
 function requireCaseAccessInline(req, res, next, param) {
   const mw = requireCaseAccess(param);
   return mw(req, res, next);
+}
+
+async function loadCaseForUser(req, caseId) {
+  if (!isObjId(caseId)) {
+    const error = new Error("Invalid case id");
+    error.statusCode = 400;
+    throw error;
+  }
+  const doc = await Case.findById(caseId).select("_id attorney attorneyId paralegal paralegalId title");
+  if (!doc) {
+    const error = new Error("Case not found");
+    error.statusCode = 404;
+    throw error;
+  }
+  const userId = req.user?.id;
+  const isAdmin = req.user?.role === "admin";
+  const isAttorney = sameId(doc.attorney, userId) || sameId(doc.attorneyId, userId);
+  const isParalegal = sameId(doc.paralegal, userId) || sameId(doc.paralegalId, userId);
+  if (!isAdmin && !isAttorney && !isParalegal) {
+    const error = new Error("Forbidden");
+    error.statusCode = 403;
+    throw error;
+  }
+  return { caseDoc: doc, isAdmin, isAttorney, isParalegal };
+}
+
+function serializeCaseFile(doc) {
+  return {
+    id: String(doc._id),
+    caseId: String(doc.caseId),
+    userId: String(doc.userId),
+    originalName: doc.originalName,
+    storageKey: doc.storageKey,
+    mimeType: doc.mimeType || null,
+    size: doc.size || 0,
+    createdAt: doc.createdAt,
+  };
 }
 
 module.exports = router;

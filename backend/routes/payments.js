@@ -2,8 +2,8 @@
 const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
-const { requireCaseAccess } = require("../utils/authz");
 const requireRole = require("../middleware/requireRole");
+const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const stripe = require("../utils/stripe");
 const Case = require("../models/Case");
 const User = require("../models/User");
@@ -330,6 +330,7 @@ router.get('/connect', (_req, res) => {
 
 // All routes below require auth
 router.use(verifyToken);
+router.param("caseId", ensureCaseParticipant("caseId"));
 
 /**
  * POST /api/payments/portal
@@ -691,7 +692,6 @@ router.get(
 router.patch(
   "/:caseId/budget",
   requireRole("attorney", "admin"),
-  requireCaseAccess("caseId"),
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
     const { amountUsd, currency } = req.body || {};
@@ -732,7 +732,6 @@ router.patch(
 router.post(
   "/intent/:caseId",
   requireRole("attorney", "admin"),
-  requireCaseAccess("caseId"),
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
     const idem = req.headers["x-idempotency-key"];
@@ -823,7 +822,6 @@ router.post(
 router.post(
   "/release/:caseId",
   requireRole("attorney", "admin"),
-  requireCaseAccess("caseId"),
   asyncHandler(async (req, res) => {
     const c = await Case.findById(req.params.caseId);
     if (!c) return res.status(404).json({ error: "Case not found" });
@@ -873,7 +871,6 @@ router.post(
 router.post(
   "/payout/:caseId",
   requireRole("admin"),
-  requireCaseAccess("caseId"),
   asyncHandler(async (req, res) => {
     const c = await Case.findById(req.params.caseId).populate(
       "paralegal",
@@ -925,7 +922,6 @@ router.post(
 router.post(
   "/refund/:caseId",
   requireRole("admin"),
-  requireCaseAccess("caseId"),
   asyncHandler(async (req, res) => {
     const c = await Case.findById(req.params.caseId);
     if (!c) return res.status(404).json({ error: "Case not found" });

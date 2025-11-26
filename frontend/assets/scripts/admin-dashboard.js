@@ -1,6 +1,7 @@
 import { secureFetch } from "./auth.js";
 
 const METRICS_ENDPOINT = "/api/admin/metrics";
+const SUMMARY_ENDPOINT = "/api/admin/summary";
 const REFRESH_INTERVAL_MS = 60_000;
 
 const chartCache = {
@@ -10,6 +11,7 @@ const chartCache = {
 };
 
 let refreshTimer;
+let summaryTimer;
 
 function cacheCharts() {
   if (window.Chart?.getChart) {
@@ -34,16 +36,113 @@ async function loadMetrics() {
   }
 }
 
+async function loadSummary() {
+  try {
+    const res = await secureFetch(SUMMARY_ENDPOINT, {
+      headers: { Accept: "application/json" },
+      noRedirect: true,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const payload = await res.json();
+    renderSummary(payload);
+  } catch (err) {
+    console.warn("Unable to load admin summary", err);
+    renderSummary(null);
+  }
+}
+
+async function loadPendingParalegals() {
+  try {
+    const res = await secureFetch("/api/admin/pending-paralegals", {
+      headers: { Accept: "application/json" },
+      noRedirect: true,
+    });
+    const payload = await res.json().catch(() => ({}));
+    renderVerificationList(Array.isArray(payload?.items) ? payload.items : []);
+  } catch (err) {
+    console.warn("Unable to load pending paralegals", err);
+    renderVerificationList([]);
+  }
+}
+
+function renderSummary(data) {
+  const totals = {
+    totalUsers: Number(data?.totalUsers) || 0,
+    pendingUsers: Number(data?.pendingUsers) || 0,
+    activeCases: Number(data?.activeCases) || 0,
+    completedCases: Number(data?.completedCases) || 0,
+    escrowHold: Number(data?.totalEscrowHold) || 0,
+    escrowReleased: Number(data?.totalEscrowReleased) || 0,
+  };
+  const metricCards = document.querySelectorAll(".metrics .metric");
+  const cardDefinitions = [
+    { label: "Total Users", value: formatSummaryNumber(totals.totalUsers) },
+    { label: "Pending Approvals", value: formatSummaryNumber(totals.pendingUsers) },
+    { label: "Active Cases", value: formatSummaryNumber(totals.activeCases) },
+    { label: "Completed Cases", value: formatSummaryNumber(totals.completedCases) },
+  ];
+  cardDefinitions.forEach((def, index) => {
+    const card = metricCards[index];
+    if (!card) return;
+    const title = card.querySelector("h3");
+    const value = card.querySelector("p");
+    if (title) title.textContent = def.label;
+    if (value) value.textContent = def.value;
+  });
+  renderQuickStats(totals);
+}
+
+function renderQuickStats(totals) {
+  const quickStatNodes = document.querySelectorAll(".quick-stats div");
+  const configs = [
+    { label: "Total Users", value: formatSummaryNumber(totals.totalUsers) },
+    { label: "Pending Approvals", value: formatSummaryNumber(totals.pendingUsers) },
+    { label: "Active Cases", value: formatSummaryNumber(totals.activeCases) },
+    { label: "Completed Cases", value: formatSummaryNumber(totals.completedCases) },
+    { label: "Escrow In Progress", value: formatSummaryCurrency(totals.escrowHold) },
+    { label: "Escrow Released", value: formatSummaryCurrency(totals.escrowReleased) },
+  ];
+  configs.forEach((config, index) => {
+    const node = quickStatNodes[index];
+    if (!node) return;
+    let strong = node.querySelector("strong");
+    let span = node.querySelector("span");
+    if (!strong) {
+      strong = document.createElement("strong");
+      node.prepend(strong);
+    }
+    if (!span) {
+      span = document.createElement("span");
+      node.appendChild(span);
+    }
+    strong.textContent = config.value;
+    span.textContent = config.label;
+  });
+  for (let i = configs.length; i < quickStatNodes.length; i += 1) {
+    const node = quickStatNodes[i];
+    if (!node) continue;
+    const strong = node.querySelector("strong");
+    const span = node.querySelector("span");
+    if (strong) strong.textContent = "—";
+    if (span) span.textContent = "";
+  }
+}
+
+function formatSummaryNumber(value) {
+  return Number.isFinite(value) ? Number(value).toLocaleString() : "0";
+}
+
+function formatSummaryCurrency(cents) {
+  if (!Number.isFinite(cents)) return "$0";
+  const dollars = Number(cents) / 100;
+  return dollars.toLocaleString(undefined, { style: "currency", currency: "USD" });
+}
+
 function renderMetrics(data) {
   if (!chartCache.userLine && window.Chart?.getChart) {
     cacheCharts();
   }
   const totals = data?.totals || {};
-  setNumber("totalUsers", totals.totalUsers);
-  setCurrency("escrowTotal", totals.escrowHeld);
-  setNumber("activeCases", totals.activeCases);
-  setNumber("pendingUsers", totals.pendingApprovals);
-
   setNumber("metricAttorneys", totals.attorneys);
   setNumber("metricParalegals", totals.paralegals);
   setNumber("metricPending", totals.pendingApprovals);
@@ -151,15 +250,130 @@ function escapeHTML(value) {
   });
 }
 
+function escapeAttribute(value = "") {
+  return String(value || "").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+function renderVerificationList(items) {
+  const list = document.getElementById("paralegalVerificationList");
+  if (!list) return;
+  if (!items.length) {
+    list.innerHTML = "<p>No paralegals awaiting verification.</p>";
+    return;
+  }
+  const cards = items
+    .map((p) => {
+      const id = escapeAttribute(p._id || p.id || "");
+      const firstName = escapeHTML(p.firstName || "");
+      const lastName = escapeHTML(p.lastName || "");
+      const email = escapeHTML(p.email || "");
+      const years = Number.isFinite(Number(p.yearsExperience)) ? Number(p.yearsExperience) : null;
+      const yearsLabel = years === null ? "N/A" : `${years} year${years === 1 ? "" : "s"}`;
+      const linkedIn = p.linkedInURL
+        ? `<p><a href="${escapeAttribute(p.linkedInURL)}" target="_blank" rel="noopener">LinkedIn Profile</a></p>`
+        : "<p>LinkedIn profile not provided.</p>";
+      const certificateHref = p.certificateURL
+        ? `/api/uploads/view/${encodeURIComponent(p.certificateURL)}`
+        : "";
+      const certificate = certificateHref
+        ? `<p><a href="${escapeAttribute(certificateHref)}" target="_blank" rel="noopener">Certificate</a></p>`
+        : "<p>Certificate not uploaded.</p>";
+      const ref1 = `${escapeHTML(p.ref1Name || "N/A")} — ${escapeHTML(p.ref1Email || "N/A")}`;
+      const ref2 = `${escapeHTML(p.ref2Name || "N/A")} — ${escapeHTML(p.ref2Email || "N/A")}`;
+      return `
+        <div class="verify-card" data-id="${id}">
+          <strong>${lastName || "N/A"}, ${firstName || "N/A"}</strong>
+          <p>Email: ${email || "N/A"}</p>
+          <p>Years Experience: ${yearsLabel}</p>
+          ${linkedIn}
+          ${certificate}
+          <details>
+            <summary>References</summary>
+            <p>${ref1}</p>
+            <p>${ref2}</p>
+          </details>
+          <button class="approveParalegalBtn" data-id="${id}">Approve</button>
+          <button class="rejectParalegalBtn" data-id="${id}">Reject</button>
+        </div>
+      `;
+    })
+    .join("");
+  list.innerHTML = cards;
+}
+
 function startMetrics() {
   cacheCharts();
   loadMetrics();
+  loadPendingParalegals();
+  startSummary();
   if (refreshTimer) clearInterval(refreshTimer);
-  refreshTimer = setInterval(loadMetrics, REFRESH_INTERVAL_MS);
+  refreshTimer = setInterval(() => {
+    loadMetrics();
+    loadPendingParalegals();
+  }, REFRESH_INTERVAL_MS);
+}
+
+function startSummary() {
+  loadSummary();
+  if (summaryTimer) clearInterval(summaryTimer);
+  summaryTimer = setInterval(loadSummary, REFRESH_INTERVAL_MS);
+}
+
+async function bootAdminDashboard() {
+  const user = typeof window.requireRole === "function" ? await window.requireRole("admin") : null;
+  if (!user) return;
+  applyRoleVisibility(user);
+  await loadPendingParalegals();
+  startMetrics();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      loadSummary();
+    }
+  });
+}
+
+function applyRoleVisibility(user) {
+  const role = String(user?.role || "").toLowerCase();
+  if (role === "paralegal") {
+    document.querySelectorAll("[data-attorney-only]").forEach((el) => {
+      el.style.display = "none";
+    });
+  }
+  if (role === "attorney") {
+    document.querySelectorAll("[data-paralegal-only]").forEach((el) => {
+      el.style.display = "none";
+    });
+  }
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", startMetrics, { once: true });
+  document.addEventListener("DOMContentLoaded", bootAdminDashboard, { once: true });
 } else {
-  startMetrics();
+  bootAdminDashboard();
 }
+
+document.addEventListener("click", async (evt) => {
+  const approveBtn = evt.target.closest(".approveParalegalBtn");
+  const rejectBtn = evt.target.closest(".rejectParalegalBtn");
+  if (approveBtn) {
+    const id = approveBtn.dataset.id;
+    if (!id) return;
+    try {
+      await secureFetch(`/api/admin/approve/${encodeURIComponent(id)}`, { method: "POST" });
+      await loadPendingParalegals();
+    } catch (err) {
+      console.error("Failed to approve paralegal", err);
+    }
+    return;
+  }
+  if (rejectBtn) {
+    const id = rejectBtn.dataset.id;
+    if (!id) return;
+    try {
+      await secureFetch(`/api/admin/reject/${encodeURIComponent(id)}`, { method: "POST" });
+      await loadPendingParalegals();
+    } catch (err) {
+      console.error("Failed to reject paralegal", err);
+    }
+  }
+});

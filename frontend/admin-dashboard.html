@@ -265,6 +265,7 @@ th{color:var(--muted);font-weight:200;}
 </head>
 
 <body>
+<div id="protectedContent" style="visibility:hidden">
 <aside class="sidebar">
   <div class="logo">Admin Panel</div>
   <nav>
@@ -463,6 +464,11 @@ th{color:var(--muted);font-weight:200;}
         </table>
       </div>
     </div>
+  </section>
+
+  <section id="paralegalVerification" class="section">
+    <h2>Paralegal Verification</h2>
+    <div id="paralegalVerificationList"><p>Loading…</p></div>
   </section>
 
   <!-- ESCROW -->
@@ -799,7 +805,6 @@ nav a.active {background:rgba(255,255,255,0.25);}
 
 <script src="assets/scripts/utils/toast.js"></script>
 <script>
-const adminSession = window.checkSession('admin');
 const navLinks=document.querySelectorAll("nav a");
 const sections=document.querySelectorAll(".section");
 const logoutButton=document.getElementById("sidebarLogoutBtn");
@@ -1546,5 +1551,6 @@ denyBtn?.addEventListener('click', () => submitDecision('deny'));
 loadPendingUsers();
 </script>
 <script type="module" src="assets/scripts/admin-dashboard.js"></script>
+</div>
 </body>
 </html>

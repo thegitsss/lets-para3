@@ -506,11 +506,12 @@
   </style>
 </head>
 <body>
+<div id="protectedContent" style="visibility:hidden">
   <div class="page-shell">
     <header class="profile-hero">
       <div class="hero-copy">
         <p class="eyebrow">Paralegal profile</p>
-        <h1>Meet the talent powering your matters</h1>
+        <h1>Meet the paralegal professional powering your matters</h1>
         <p>Review credentials, availability, and a complete work history before you collaborate.</p>
       </div>
     </header>
@@ -530,7 +531,7 @@
           <span id="joinedMeta" class="skeleton-block" style="height:16px;width:70%"></span>
         </div>
         <div class="cta-group">
-          <button type="button" class="cta-primary hidden" id="inviteBtn">Invite to Case</button>
+          <button type="button" class="cta-primary hidden" id="inviteToCaseBtn">Invite to Case</button>
           <button type="button" class="cta-secondary hidden" id="messageBtn">Message</button>
           <button type="button" class="cta-ghost hidden" id="editProfileBtn">Edit Profile</button>
         </div>
@@ -587,23 +588,56 @@
         <h2>Fun Facts &amp; Extras</h2>
         <p id="funFactsCopy"></p>
       </article>
+
+      <article class="info-card section-block" id="attorneyInsightsCard" data-attorney-only>
+        <h2>Professional Credentials</h2>
+        <div class="list-stack" id="attorneyHighlights"></div>
+      </article>
+
+      <article class="info-card section-block" id="profileFormSection">
+        <form id="paralegalProfileForm">
+          <label>LinkedIn Profile
+            <input type="url" id="linkedInURL" placeholder="https://linkedin.com/in/...">
+          </label>
+
+          <label>Years of Experience
+            <input type="number" id="yearsExperience" min="0">
+          </label>
+
+          <label>Reference #1 Name
+            <input type="text" id="ref1Name">
+          </label>
+
+          <label>Reference #1 Email
+            <input type="email" id="ref1Email">
+          </label>
+
+          <label>Reference #2 Name
+            <input type="text" id="ref2Name">
+          </label>
+
+          <label>Reference #2 Email
+            <input type="email" id="ref2Email">
+          </label>
+
+          <label>Paralegal Certificate (PDF)
+            <input type="file" id="certificateUpload" accept="application/pdf">
+          </label>
+        </form>
+      </article>
     </div>
   </div>
 
   <div class="modal-overlay" id="inviteModal" role="dialog" aria-modal="true">
     <div class="invite-modal">
       <h3>Invite to Case</h3>
-      <p id="inviteSubtitle">Choose a live matter to connect with this paralegal.</p>
-      <div class="job-options" id="jobOptions">
-        <p class="muted">Loading your open cases…</p>
-      </div>
       <label>
-        <span style="display:block;font-size:0.9rem;color:var(--muted);margin-bottom:6px;">Optional message</span>
-        <textarea id="inviteMessage" placeholder="Add context for this collaboration."></textarea>
+        <span style="display:block;font-size:0.9rem;color:var(--muted);margin-bottom:6px;">Select a case</span>
+        <select id="inviteCaseSelect"></select>
       </label>
       <div class="modal-actions">
-        <button type="button" id="cancelInvite">Cancel</button>
-        <button type="button" class="confirm" id="confirmInvite" disabled>Send Invite</button>
+        <button type="button" id="sendInviteBtn" disabled>Send Invite</button>
+        <button type="button" id="closeInviteBtn">Cancel</button>
       </div>
     </div>
   </div>
@@ -611,5 +645,6 @@
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
   <script src="assets/scripts/utils/toast.js"></script>
   <script type="module" src="assets/scripts/profile-paralegal.js"></script>
+</div>
 </body>
 </html>

@@ -2,8 +2,8 @@
 const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
-const { requireCaseAccess } = require("../utils/authz");
 const requireRole = require("../middleware/requireRole");
+const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const Case = require("../models/Case");
 const AuditLog = require("../models/AuditLog");
 
@@ -24,6 +24,7 @@ function parsePagination(req, { maxLimit = 100, defaultLimit = 25 } = {}) {
 // All dispute routes require auth
 // ----------------------------------------
 router.use(verifyToken);
+router.param("caseId", ensureCaseParticipant("caseId"));
 
 /**
  * GET /api/disputes/admin
@@ -138,7 +139,6 @@ router.get(
  */
 router.get(
   "/:caseId",
-  requireCaseAccess("caseId"),
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
     if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid caseId" });
@@ -167,7 +167,6 @@ router.get(
  */
 router.post(
   "/:caseId",
-  requireCaseAccess("caseId"),
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
     const { message } = req.body || {};
@@ -221,7 +220,6 @@ router.post(
  */
 router.post(
   "/:caseId/:disputeId/comment",
-  requireCaseAccess("caseId"),
   asyncHandler(async (req, res) => {
     const { caseId, disputeId } = req.params;
     const { text } = req.body || {};
@@ -266,7 +264,6 @@ router.post(
 router.patch(
   "/:caseId/:disputeId",
   requireRole("admin"),
-  requireCaseAccess("caseId"),
   asyncHandler(async (req, res) => {
     const { caseId, disputeId } = req.params;
     const { status } = req.body || {};

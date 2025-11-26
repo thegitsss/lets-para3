@@ -4,8 +4,8 @@ const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
 const Event = require("../models/Event");
-const Case = require("../models/Case");
 const { logAction } = require("../utils/audit");
+const { assertCaseParticipant } = require("../middleware/ensureCaseParticipant");
 
 // ----------------------------------------
 // Optional CSRF (enable via ENABLE_CSRF=true)
@@ -34,13 +34,16 @@ function clampDate(s, fallbackMs) {
   return s ? new Date(s) : new Date(Date.now() + fallbackMs);
 }
 
-async function ensureCaseAccess(caseId, user) {
+async function ensureEventCaseAccess(req, res, caseId) {
   if (!caseId) return true;
-  if (!isObjId(caseId)) return false;
-  const c = await Case.findById(caseId).select("attorney paralegal");
-  if (!c) return false;
-  if (user.role === "admin") return true;
-  return String(c.attorney) === String(user.id) || String(c.paralegal || "") === String(user.id);
+  try {
+    await assertCaseParticipant(req, caseId);
+    return true;
+  } catch (err) {
+    const status = err.statusCode || err.status || 500;
+    res.status(status).json({ error: err.message || "Access denied" });
+    return false;
+  }
 }
 
 // ----------------------------------------
@@ -73,7 +76,11 @@ router.get(
     };
 
     if (type) filter.type = type;
-    if (caseId && isObjId(caseId)) filter.caseId = caseId;
+    if (caseId) {
+      const ok = await ensureEventCaseAccess(req, res, caseId);
+      if (!ok) return;
+      filter.caseId = caseId;
+    }
     if (q && q.trim()) {
       const rx = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
       filter.$or = [{ title: rx }, { where: rx }, { notes: rx }];
@@ -123,8 +130,9 @@ router.post(
 
     if (!title || !start) return res.status(400).json({ error: "title and start required" });
 
-    if (caseId && !(await ensureCaseAccess(caseId, req.user))) {
-      return res.status(403).json({ error: "Not authorized to link this case" });
+    if (caseId) {
+      const ok = await ensureEventCaseAccess(req, res, caseId);
+      if (!ok) return;
     }
 
     const ev = await Event.create({
@@ -203,11 +211,11 @@ router.patch(
     if (typeof color === "string") assign("color", color);
 
     if (caseId !== undefined) {
-      if (caseId === null || caseId === "") ev.caseId = null;
-      else {
-        if (!(await ensureCaseAccess(caseId, req.user))) {
-          return res.status(403).json({ error: "Not authorized to link this case" });
-        }
+      if (caseId === null || caseId === "") {
+        ev.caseId = null;
+      } else {
+        const ok = await ensureEventCaseAccess(req, res, caseId);
+        if (!ok) return;
         ev.caseId = caseId;
       }
     }

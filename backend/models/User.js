@@ -119,6 +119,11 @@ const userSchema = new Schema(
     failedLogins: { type: Number, default: 0 },
     lockedUntil: { type: Date },
     notificationsLastViewedAt: { type: Date, default: null },
+    messageLastViewedAt: {
+      type: Map,
+      of: Date,
+      default: () => ({}),
+    },
 
     // KYC / payouts (non-sensitive markers; do NOT store secrets)
     kycStatus: { type: String, enum: KYC_STATUS, default: "unverified", index: true },
@@ -139,6 +144,11 @@ const userSchema = new Schema(
     // Soft-delete
     deleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
+    linkedInURL: { type: String, default: null },
+    ref1Name: { type: String, default: null },
+    ref1Email: { type: String, default: null },
+    ref2Name: { type: String, default: null },
+    ref2Email: { type: String, default: null },
   },
   {
     timestamps: true,

@@ -347,6 +347,7 @@
   </style>
 </head>
 <body>
+<div id="protectedContent" style="visibility:hidden">
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
     <nav>
@@ -429,6 +430,20 @@
       <button data-action="upload">Upload document</button>
     </section>
 
+    <section>
+      <div class="section-title">Case Invitations</div>
+      <div class="case-list" id="inviteList">
+        <div class="case-card empty-state">
+          <div class="case-header">
+            <div>
+              <h2>No pending invitations</h2>
+              <div class="case-subinfo">New case invites will appear here.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="case-list" id="assignmentList">
       <div class="case-card empty-state">
         <div class="case-header">
@@ -438,6 +453,11 @@
           </div>
         </div>
       </div>
+    </section>
+
+    <section id="assignedCases">
+      <h2>Assigned Cases</h2>
+      <div id="assignedCasesList"></div>
     </section>
   </main>
   <template id="assignmentCardTemplate">
@@ -461,8 +481,6 @@
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
   <script src="assets/scripts/utils/toast.js"></script>
   <script type="module" src="assets/scripts/paralegal-dashboard.js"></script>
-  <script>
-    window.checkSession('paralegal');
-  </script>
+</div>
 </body>
 </html>

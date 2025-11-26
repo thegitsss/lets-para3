@@ -81,6 +81,7 @@
   </style>
 </head>
 <body>
+<div id="protectedContent" style="visibility:hidden">
   <header>
     <div class="title">My Cases</div>
     <nav>
@@ -124,7 +125,11 @@
   <script type="module">
     import { secureFetch } from './assets/scripts/auth.js';
 
-    window.checkSession();
+    const currentUser = typeof window.requireRole === 'function' ? await window.requireRole() : null;
+    if (!currentUser) {
+      // Guard will redirect unauthorized visitors.
+    } else {
+      applyRoleVisibility(currentUser);
     const API_BASE = '/api';
 
     const grid = document.getElementById('grid');
@@ -272,9 +277,25 @@
 
     // Initial load
     fetchCases();
+    }
+
+    function applyRoleVisibility(user) {
+      const role = String(user?.role || '').toLowerCase();
+      if (role === 'paralegal') {
+        document.querySelectorAll('[data-attorney-only]').forEach((el) => {
+          el.style.display = 'none';
+        });
+      }
+      if (role === 'attorney') {
+        document.querySelectorAll('[data-paralegal-only]').forEach((el) => {
+          el.style.display = 'none';
+        });
+      }
+    }
   </script>
   <script>
   loadUserHeaderInfo();
 </script>
+</div>
 </body>
 </html>

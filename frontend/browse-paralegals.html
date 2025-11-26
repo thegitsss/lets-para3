@@ -837,57 +837,11 @@ footer {
   color: var(--navy);
 }
 
-.public-view .site-header {
-  display: block;
-}
-
-.public-view .auth-header {
-  display: none;
-}
-
-.public-view .filter,
-.public-view .invite-btn,
-.public-view .profile-link,
-.public-view .modal-overlay,
-.public-view .pagination-controls button {
-  display: none !important;
-}
-.public-view .auth-header .header-inner nav,
-.public-view .auth-header .header-controls {
-  display: none !important;
-}
-
-.public-view .auth-header .header-inner {
-  justify-content: center;
-}
-
-.public-view .auth-header .header-logo {
-  margin: 0 auto;
-  font-size: 1.4rem;
-  font-weight: 300;
-}
-
-.public-view .page-intro {
-  padding-top: 40px;
-  text-align: center;
-}
-
-.public-view .filter,
-.public-view .invite-btn,
-.public-view .profile-link,
-.public-view .modal-overlay,
-.public-view .pagination-controls button {
-  display: none !important;
-}
-
-
   </style>
-  <script>
-    const isLoggedIn = localStorage.getItem("lpc_name");
-    document.addEventListener("DOMContentLoaded", () => {
-      if (!isLoggedIn) document.body.classList.add("public-view");
-    });
-  </script>
+</head>
+<body>
+<div id="protectedContent" style="visibility:hidden">
+<div id="mainHeader">
 <header class="site-header">
   <div class="header-inner">
     <nav aria-label="Primary">
@@ -899,12 +853,12 @@ footer {
     </nav>
     <a class="brand" href="index.html">Let’s-ParaConnect</a>
     <div class="header-actions">
-      <a class="pill" href="login.html">Sign In</a>
-      <a class="pill" href="signup.html">Create Account</a>
+      <a class="pill" href="login.html" data-public-only>Sign In</a>
+      <a class="pill" href="signup.html" data-public-only>Create Account</a>
     </div>
   </div>
 </header>
-<header class="auth-header">
+<header class="auth-header" data-authed-only>
   <div class="header-inner">
     <a href="index.html" class="header-logo">Let’s ParaConnect</a>
     <nav>
@@ -937,12 +891,13 @@ footer {
     </div>
   </div>
 </header>
+</div>
 
   <div class="page-intro">
     <section class="unified-header" aria-label="Attorney header">
       <div class="title-block">
         <p class="eyebrow">Browse Paralegals</p>
-        <p>Explore vetted talent available to collaborate on your next matter.</p>
+        <p>Explore our elite paralegal professional collective, ready to collaborate on your next matter.</p>
       </div>
     </section>
   </div>
@@ -994,6 +949,8 @@ footer {
 
         <section class="results" id="paralegalResults">
       <div class="results-status" id="resultsStatus">Loading paralegals…</div>
+      <div id="paralegalGrid"></div>
+      <div id="paralegalPagination"></div>
     </section>
   </main>
 
@@ -1048,6 +1005,7 @@ footer {
 </footer>
 
   <script src="assets/scripts/utils/toast.js"></script>
-  <script type="module" src="assets/scripts/browse-paralegals.js"></script>
+  <script type="module" src="assets/scripts/views/browse-paralegals.js"></script>
+</div>
 </body>
 </html>

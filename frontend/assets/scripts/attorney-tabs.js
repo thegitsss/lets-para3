@@ -7,6 +7,7 @@ const STATUS_LABELS = {
   approved: "Approved",
   attorney_revision: "Attorney Revisions",
 };
+const CASE_FILE_MAX_BYTES = 20 * 1024 * 1024;
 
 const state = {
   user: null,
@@ -50,23 +51,54 @@ const state = {
     sort: "date",
     replaceTarget: null,
   },
+  caseFiles: {
+    selectedCaseId: null,
+    files: [],
+    loading: false,
+    error: "",
+  },
+  simpleMessages: {
+    cases: [],
+    unread: new Map(),
+    activeCaseId: null,
+    messagesByCase: new Map(),
+    lastIds: new Map(),
+    pollTimer: null,
+  },
 };
 
 let openCaseMenu = null;
 let chatMenuWrapper = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-  bootstrap();
+  void bootAttorneyExperience();
 });
 
-async function bootstrap() {
-  try {
-    if (typeof window.checkSession === "function") {
-      await window.checkSession("attorney");
-    }
-  } catch {
-    return;
+async function bootAttorneyExperience() {
+  const user = typeof window.requireRole === "function" ? await window.requireRole("attorney") : null;
+  if (!user) return;
+  applyRoleVisibility(user);
+  if (!state.user) {
+    state.user = user;
   }
+  bootstrap();
+}
+
+function applyRoleVisibility(user) {
+  const role = String(user?.role || "").toLowerCase();
+  if (role === "paralegal") {
+    document.querySelectorAll("[data-attorney-only]").forEach((el) => {
+      el.style.display = "none";
+    });
+  }
+  if (role === "attorney") {
+    document.querySelectorAll("[data-paralegal-only]").forEach((el) => {
+      el.style.display = "none";
+    });
+  }
+}
+
+async function bootstrap() {
 
   ensureHeaderStyles();
   await initHeader();
@@ -266,7 +298,8 @@ async function loadNotifications() {
     if (!res.ok) throw new Error("Failed notifications");
     const payload = await res.json();
     state.notifications = Array.isArray(payload.items) ? payload.items : [];
-    updateNotificationUI(payload.unread || 0);
+    const unread = state.notifications.filter((item) => item && item.read === false).length;
+    updateNotificationUI(unread);
   } catch (err) {
     console.warn("Notifications unavailable", err);
     updateNotificationUI(0, "No notifications available.");
@@ -309,13 +342,27 @@ function updateNotificationUI(unread = 0, fallbackText) {
   });
 }
 
-async function markNotificationsRead() {
-  if (!state.notifications.length) return;
+async function markNotificationsRead(options = {}) {
+  const payload = {};
+  if (options.caseId) payload.caseId = options.caseId;
+  if (options.type) payload.type = options.type;
   try {
-    await secureFetch("/api/users/me/notifications/read", { method: "POST" });
-    const badge = document.getElementById("notificationBadge");
-    if (badge) badge.classList.remove("show");
-  } catch {}
+    await secureFetch("/api/users/me/notifications/read", { method: "POST", body: payload });
+    const targetCase = options.caseId ? String(options.caseId) : null;
+    const targetType = options.type ? String(options.type) : null;
+    if (state.notifications.length) {
+      state.notifications = state.notifications.map((item) => {
+        if (!item) return item;
+        if (targetCase && String(item.caseId || "") !== targetCase) return item;
+        if (targetType && String(item.type || "") !== targetType) return item;
+        return { ...item, read: true };
+      });
+    }
+    const unread = state.notifications.filter((item) => item && item.read === false).length;
+    updateNotificationUI(unread);
+  } catch (err) {
+    console.warn("Notifications mark read failed", err);
+  }
 }
 
 function formatRelativeTime(value) {
@@ -1340,9 +1387,227 @@ async function submitRevisionUpload() {
 // -------------------------
 // Case Files Page
 // -------------------------
+function getCaseFileQueryId() {
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    return params.get("caseId");
+  } catch {
+    return null;
+  }
+}
+
+function getAvailableCaseOptions() {
+  return [...state.cases, ...state.casesArchived];
+}
+
+function setupCaseFilesUploadUI() {
+  const cases = getAvailableCaseOptions();
+  if (!state.caseFiles.selectedCaseId) {
+    const queryId = getCaseFileQueryId();
+    if (queryId && cases.some((item) => String(item.id) === String(queryId))) {
+      state.caseFiles.selectedCaseId = queryId;
+    } else if (cases.length) {
+      state.caseFiles.selectedCaseId = String(cases[0].id);
+    } else {
+      state.caseFiles.selectedCaseId = null;
+    }
+  }
+
+  const host = document.querySelector(".main") || document.body;
+  if (!host) return;
+
+  let uploadWrapper = document.getElementById("caseFilesUploadWrapper");
+  if (!uploadWrapper) {
+    uploadWrapper = document.createElement("div");
+    uploadWrapper.id = "caseFilesUploadWrapper";
+    uploadWrapper.innerHTML = `
+      <div>
+        <select id="caseFileCaseSelect"></select>
+        <input type="file" id="caseFileInput" />
+        <button type="button" class="btn primary" id="caseFileUploadBtn">Upload</button>
+      </div>
+    `;
+    const filtersBlock = document.querySelector(".filters");
+    host.insertBefore(uploadWrapper, filtersBlock || host.firstChild);
+  }
+
+  let listHost = document.getElementById("caseFilesList");
+  if (!listHost) {
+    listHost = document.createElement("div");
+    listHost.id = "caseFilesList";
+    const container = document.getElementById("caseFilesContainer");
+    host.insertBefore(listHost, container || null);
+  }
+
+  const caseSelect = document.getElementById("caseFileCaseSelect");
+  if (caseSelect) {
+    caseSelect.innerHTML = "";
+    if (!cases.length) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "No cases available";
+      caseSelect.appendChild(option);
+      caseSelect.disabled = true;
+      state.caseFiles.selectedCaseId = null;
+    } else {
+      cases.forEach((caseItem) => {
+        const option = document.createElement("option");
+        option.value = String(caseItem.id);
+        option.textContent = caseItem.title || "Untitled Case";
+        caseSelect.appendChild(option);
+      });
+      caseSelect.disabled = false;
+      if (state.caseFiles.selectedCaseId) {
+        caseSelect.value = String(state.caseFiles.selectedCaseId);
+      }
+    }
+    if (!caseSelect.dataset.bound) {
+      caseSelect.dataset.bound = "true";
+      caseSelect.addEventListener("change", () => {
+        state.caseFiles.selectedCaseId = caseSelect.value || null;
+        refreshCaseFilesList();
+      });
+    }
+  }
+
+  const uploadBtn = document.getElementById("caseFileUploadBtn");
+  if (uploadBtn && !uploadBtn.dataset.bound) {
+    uploadBtn.dataset.bound = "true";
+    uploadBtn.addEventListener("click", handleCaseFileUpload);
+  }
+}
+
+async function refreshCaseFilesList() {
+  const caseId = state.caseFiles.selectedCaseId;
+  if (!caseId) {
+    state.caseFiles.files = [];
+    state.caseFiles.loading = false;
+    state.caseFiles.error = "";
+    renderModernCaseFilesList();
+    return;
+  }
+  state.caseFiles.loading = true;
+  state.caseFiles.error = "";
+  renderModernCaseFilesList();
+  try {
+    const res = await secureFetch(`/api/uploads/case/${encodeURIComponent(caseId)}`, {
+      headers: { Accept: "application/json" },
+      noRedirect: true,
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload?.msg || payload?.error || "Unable to load files.");
+    }
+    state.caseFiles.files = Array.isArray(payload.files) ? payload.files : [];
+  } catch (err) {
+    state.caseFiles.files = [];
+    state.caseFiles.error = err?.message || "Unable to load files.";
+  } finally {
+    state.caseFiles.loading = false;
+    renderModernCaseFilesList();
+  }
+}
+
+function renderModernCaseFilesList() {
+  const listHost = document.getElementById("caseFilesList");
+  if (!listHost) return;
+  const caseId = state.caseFiles.selectedCaseId;
+  if (!caseId) {
+    listHost.innerHTML = `<p style="color:var(--muted);font-size:.95rem;">Select a case to view its files.</p>`;
+    return;
+  }
+  if (state.caseFiles.loading) {
+    listHost.innerHTML = `<p style="color:var(--muted);font-size:.95rem;">Loading files…</p>`;
+    return;
+  }
+  if (state.caseFiles.error) {
+    listHost.innerHTML = `<p style="color:#b91c1c;font-size:.95rem;">${sanitize(state.caseFiles.error)}</p>`;
+    return;
+  }
+  if (!state.caseFiles.files.length) {
+    listHost.innerHTML = `<p style="color:var(--muted);font-size:.95rem;">No files uploaded yet.</p>`;
+    return;
+  }
+  listHost.innerHTML = state.caseFiles.files
+    .map((file) => {
+      const safeName = sanitize(file.originalName || "Document");
+      const uploadedAt = file.createdAt ? new Date(file.createdAt).toLocaleString() : "Unknown date";
+      const sizeText = formatBytes(file.size);
+      return `
+        <div class="case-file-row">
+          <div>
+            <div class="file-name">${safeName}</div>
+            <div class="file-meta">${sanitize(uploadedAt)}${sizeText ? ` · ${sanitize(sizeText)}` : ""}</div>
+          </div>
+          <a class="btn secondary" href="/api/uploads/case/${encodeURIComponent(caseId)}/${encodeURIComponent(file.id)}/download">Download</a>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+async function handleCaseFileUpload() {
+  const caseId = state.caseFiles.selectedCaseId;
+  if (!caseId) {
+    notifyCases("Select a case before uploading.", "error");
+    return;
+  }
+  const input = document.getElementById("caseFileInput");
+  const btn = document.getElementById("caseFileUploadBtn");
+  if (!input || !input.files || !input.files.length) {
+    notifyCases("Choose a file to upload.", "error");
+    return;
+  }
+  const file = input.files[0];
+  if (!file || file.size <= 0) {
+    notifyCases("Selected file is empty.", "error");
+    return;
+  }
+  if (file.size > CASE_FILE_MAX_BYTES) {
+    notifyCases("Files must be 20MB or less.", "error");
+    return;
+  }
+  btn.disabled = true;
+  const originalText = btn.textContent || "Upload";
+  btn.textContent = "Uploading…";
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await secureFetch(`/api/uploads/case/${encodeURIComponent(caseId)}`, {
+      method: "POST",
+      body: form,
+      noRedirect: true,
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload?.msg || payload?.error || "Upload failed.");
+    }
+    input.value = "";
+    notifyCases("File uploaded.", "info");
+    await refreshCaseFilesList();
+  } catch (err) {
+    console.error(err);
+    notifyCases(err?.message || "Unable to upload file.", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+}
+
+function formatBytes(bytes) {
+  const value = Number(bytes);
+  if (!Number.isFinite(value) || value <= 0) return "";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  if (value < 1024 * 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
 async function initCaseFilesPage() {
   await loadCasesWithFiles();
   await loadArchivedCases();
+  setupCaseFilesUploadUI();
+  await refreshCaseFilesList();
   const filters = document.querySelectorAll(".filters button");
   filters.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1802,7 +2067,15 @@ function matchesCaseSearch(item, term) {
 }
 
 function renderCaseRow(item, filterKey = "active") {
-  const client = item.paralegal?.name || item.paralegalNameSnapshot || "Awaiting hire";
+  let client = item.paralegal?.name || item.paralegalNameSnapshot || "Awaiting hire";
+  if (!item.paralegal && item.pendingParalegal) {
+    const pendingName =
+      item.pendingParalegal.name ||
+      [item.pendingParalegal.firstName, item.pendingParalegal.lastName].filter(Boolean).join(" ").trim();
+    client = `${pendingName || "Invitation"} (Invitation Sent)`;
+  } else if (!item.paralegal && item.pendingParalegalId) {
+    client = "Invitation Sent";
+  }
   const practice = item.practiceArea || "General";
   const created = formatCaseDate(item.createdAt || item.updatedAt);
   const updated = formatCaseDate(item.updatedAt || item.completedAt || item.createdAt);
@@ -2001,6 +2274,7 @@ async function initMessagesPage() {
   if (!casesPane) return;
 
   setupChatMenu();
+  markNotificationsRead({ type: "message" });
   casesPane.addEventListener("click", onMessageCaseClick);
   document.querySelector("[data-message-threads]")?.addEventListener("click", onMessageThreadClick);
 
@@ -2028,6 +2302,12 @@ async function initMessagesPage() {
   } else {
     renderMessageThreads(null);
     renderChatMessages();
+  }
+
+  try {
+    await setupCaseScopedMessagingUI();
+  } catch (err) {
+    console.warn("Case-scoped messaging unavailable", err);
   }
 }
 
@@ -2093,6 +2373,8 @@ async function selectMessageCase(caseId) {
     await ensureCaseMessages(caseId);
     renderMessageThreads(caseId);
     renderChatMessages();
+    await markNotificationsRead({ caseId: String(caseId) });
+    await loadNotifications();
   } catch (err) {
     console.warn(err);
     notifyMessages(err.message || "Unable to load messages for that case.", "error");
@@ -2300,6 +2582,278 @@ function setComposerLock(readOnly) {
     const disable = readOnly || state.messages.sending || !state.messages.activeCaseId;
     sendBtn.disabled = disable;
     sendBtn.textContent = readOnly ? "Locked" : "Send";
+  }
+}
+
+async function setupCaseScopedMessagingUI() {
+  injectCaseScopedMessagingUI();
+  updateSimpleMessageCases();
+  await loadMessageSummaryCounts();
+  populateCaseSelectOptions();
+  const initialCaseId =
+    state.simpleMessages.activeCaseId ||
+    (state.simpleMessages.cases[0] ? String(state.simpleMessages.cases[0].id) : null);
+  if (initialCaseId) {
+    await loadSimpleMessageThread(initialCaseId, { replace: true });
+  } else {
+    renderSimpleMessageThread(null, [], "Select a case to view messages.");
+  }
+}
+
+function injectCaseScopedMessagingUI() {
+  if (document.getElementById("msgInterface")) return;
+  const host = document.querySelector(".main");
+  if (!host) return;
+  const wrapper = document.createElement("section");
+  wrapper.id = "msgInterface";
+  wrapper.innerHTML = `
+    <div>
+      <select id="msgCaseSelect"></select>
+    </div>
+    <div id="msgThread"></div>
+    <form id="msgForm">
+      <textarea id="msgInput" rows="3" placeholder="Type a case message..."></textarea>
+      <button type="submit" id="msgSend">Send</button>
+    </form>
+  `;
+  host.appendChild(wrapper);
+  const select = wrapper.querySelector("#msgCaseSelect");
+  const form = wrapper.querySelector("#msgForm");
+  select?.addEventListener("change", (event) => {
+    loadSimpleMessageThread(event.target.value, { replace: true });
+  });
+  form?.addEventListener("submit", handleSimpleMessageSend);
+}
+
+function updateSimpleMessageCases() {
+  state.simpleMessages.cases = (state.messages.cases || []).map((caseItem) => ({
+    id: String(caseItem.id),
+    title: caseItem.title || "Untitled Case",
+  }));
+}
+
+async function loadMessageSummaryCounts() {
+  try {
+    const res = await secureFetch("/api/messages/summary", {
+      headers: { Accept: "application/json" },
+      noRedirect: true,
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (res.ok && Array.isArray(payload.items)) {
+      state.simpleMessages.unread = new Map(
+        payload.items.map((entry) => [String(entry.caseId), Number(entry.unread) || 0])
+      );
+    } else {
+      state.simpleMessages.unread = new Map();
+    }
+  } catch {
+    state.simpleMessages.unread = new Map();
+  }
+}
+
+function populateCaseSelectOptions() {
+  const select = document.getElementById("msgCaseSelect");
+  if (!select) return;
+  select.innerHTML = "";
+  const cases = state.simpleMessages.cases;
+  if (!cases.length) {
+    select.disabled = true;
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No cases available";
+    select.appendChild(option);
+    return;
+  }
+  select.disabled = false;
+  cases.forEach((caseItem) => {
+    const option = document.createElement("option");
+    const unread = state.simpleMessages.unread.get(String(caseItem.id)) || 0;
+    option.value = String(caseItem.id);
+    option.textContent =
+      unread > 0 ? `${caseItem.title || "Case"} (${unread})` : caseItem.title || "Case";
+    select.appendChild(option);
+  });
+  const active =
+    state.simpleMessages.activeCaseId &&
+    cases.some((entry) => String(entry.id) === String(state.simpleMessages.activeCaseId))
+      ? String(state.simpleMessages.activeCaseId)
+      : String(cases[0].id);
+  state.simpleMessages.activeCaseId = active;
+  select.value = active;
+}
+
+async function loadSimpleMessageThread(caseId, { replace = true } = {}) {
+  if (!caseId) {
+    state.simpleMessages.activeCaseId = null;
+    renderSimpleMessageThread(null, [], "Select a case to view messages.");
+    stopSimpleMessagePolling();
+    return;
+  }
+  state.simpleMessages.activeCaseId = String(caseId);
+  const select = document.getElementById("msgCaseSelect");
+  if (select && select.value !== String(caseId)) {
+    select.value = String(caseId);
+  }
+  const result = await fetchSimpleMessages(caseId, { replace });
+  renderSimpleMessageThread(caseId, result.messages, result.error);
+  state.simpleMessages.unread.set(String(caseId), 0);
+  populateCaseSelectOptions();
+  startSimpleMessagePolling();
+}
+
+async function fetchSimpleMessages(caseId, { replace = true } = {}) {
+  const existing = state.simpleMessages.messagesByCase.get(caseId) || [];
+  try {
+    const res = await secureFetch(`/api/messages/${encodeURIComponent(caseId)}`, {
+      headers: { Accept: "application/json" },
+      noRedirect: true,
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload?.error || (res.status === 403 ? "Access denied." : "Unable to load messages."));
+    }
+    const incoming = Array.isArray(payload.messages)
+      ? payload.messages.map((msg) => ({
+          id: msg._id || msg.id || `${Date.now()}-${Math.random()}`,
+          text: msg.text || msg.content || "",
+          createdAt: msg.createdAt || msg.updatedAt || new Date().toISOString(),
+          isMine:
+            state.user && msg.senderId
+              ? String(msg.senderId._id || msg.senderId || "") === String(state.user.id)
+              : false,
+        }))
+      : [];
+    const merged = mergeSimpleMessages(caseId, incoming, replace);
+    return { messages: merged, error: null };
+  } catch (err) {
+    return { messages: existing, error: err?.message || "Unable to load messages." };
+  }
+}
+
+function mergeSimpleMessages(caseId, incoming, replace) {
+  const current = replace ? [] : state.simpleMessages.messagesByCase.get(caseId) || [];
+  const known = new Set(current.map((msg) => msg.id));
+  let changed = false;
+  incoming.forEach((msg) => {
+    if (!known.has(msg.id)) {
+      current.push(msg);
+      known.add(msg.id);
+      changed = true;
+    }
+  });
+  if (changed || replace) {
+    current.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  }
+  state.simpleMessages.messagesByCase.set(caseId, current);
+  state.simpleMessages.lastIds.set(caseId, current.length ? current[current.length - 1].id : null);
+  return current;
+}
+
+function renderSimpleMessageThread(caseId, messages = [], error) {
+  const thread = document.getElementById("msgThread");
+  if (!thread) return;
+  if (!caseId) {
+    thread.innerHTML = `<p style="color:var(--muted);font-size:.9rem;">Select a case to view messages.</p>`;
+    return;
+  }
+  if (error) {
+    thread.innerHTML = `<p style="color:#b91c1c;font-size:.9rem;">${sanitize(error)}</p>`;
+    return;
+  }
+  if (!messages.length) {
+    thread.innerHTML = `<p style="color:var(--muted);font-size:.9rem;">No messages yet.</p>`;
+    return;
+  }
+  thread.innerHTML = messages
+    .map(
+      (msg) => `
+        <div class="msg-row${msg.isMine ? " mine" : ""}">
+          <div class="msg-text">${sanitize(msg.text || "")}</div>
+          <div class="msg-time">${sanitize(formatMessageTimestamp(msg.createdAt))}</div>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function formatMessageTimestamp(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString();
+}
+
+async function handleSimpleMessageSend(event) {
+  event.preventDefault();
+  const caseId = state.simpleMessages.activeCaseId;
+  if (!caseId) {
+    notifyMessages("Select a case before sending.", "error");
+    return;
+  }
+  const input = document.getElementById("msgInput");
+  const btn = document.getElementById("msgSend");
+  const text = (input?.value || "").trim();
+  if (!text) {
+    notifyMessages("Enter a message before sending.", "error");
+    return;
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.dataset.originalText = btn.textContent || "Send";
+    btn.textContent = "Sending…";
+  }
+  try {
+    const res = await secureFetch(`/api/messages/${encodeURIComponent(caseId)}`, {
+      method: "POST",
+      body: { text },
+      headers: { Accept: "application/json" },
+      noRedirect: true,
+    });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      throw new Error(payload?.error || "Unable to send message.");
+    }
+    if (input) input.value = "";
+    const result = await fetchSimpleMessages(caseId, { replace: true });
+    renderSimpleMessageThread(caseId, result.messages, result.error);
+    startSimpleMessagePolling();
+  } catch (err) {
+    notifyMessages(err?.message || "Unable to send message.", "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = btn.dataset.originalText || "Send";
+    }
+  }
+}
+
+function startSimpleMessagePolling() {
+  if (state.simpleMessages.pollTimer) {
+    clearInterval(state.simpleMessages.pollTimer);
+  }
+  if (!state.simpleMessages.activeCaseId) return;
+  state.simpleMessages.pollTimer = setInterval(pollSimpleMessages, 10_000);
+}
+
+function stopSimpleMessagePolling() {
+  if (state.simpleMessages.pollTimer) {
+    clearInterval(state.simpleMessages.pollTimer);
+    state.simpleMessages.pollTimer = null;
+  }
+}
+
+async function pollSimpleMessages() {
+  const caseId = state.simpleMessages.activeCaseId;
+  if (!caseId) return;
+  const previousLast = state.simpleMessages.lastIds.get(caseId);
+  const result = await fetchSimpleMessages(caseId, { replace: false });
+  const currentLast = state.simpleMessages.lastIds.get(caseId);
+  if (result.error) {
+    renderSimpleMessageThread(caseId, result.messages, result.error);
+    return;
+  }
+  if (currentLast && currentLast !== previousLast) {
+    renderSimpleMessageThread(caseId, result.messages);
   }
 }
 

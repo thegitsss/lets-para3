@@ -7,7 +7,7 @@ const User = require("../models/User");
 
 const raw = process.env.MONGO_URI || "";
 const MONGO = /<cluster>/.test(raw) || !raw ? "mongodb://127.0.0.1:27017/lets-para" : raw;
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "admin@letsparaconnect.com").toLowerCase();
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "admin@lets-paraconnect.com").toLowerCase();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin123!";
 
 async function seedAdmin() {

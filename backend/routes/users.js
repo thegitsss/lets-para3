@@ -7,6 +7,7 @@ const requireRole = require("../middleware/requireRole");
 const User = require("../models/User");
 const Case = require("../models/Case");
 const Task = require("../models/Task");
+const Notification = require("../models/Notification");
 const { maskProfanity } = require("../utils/badWords");
 const { logAction } = require("../utils/audit");
 
@@ -98,8 +99,34 @@ const parseParalegalFilters = (query = {}) => {
   return { filter, sortOpt, page: p, limit: l };
 };
 
+const SAFE_PUBLIC_SELECT = "_id firstName lastName avatarURL location specialties yearsExperience linkedInURL certificateURL education";
+const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email`;
+
+function serializePublicUser(user, { includeEmail = false } = {}) {
+  if (!user) return null;
+  const src = user.toObject ? user.toObject() : user;
+  const payload = {
+    _id: String(src._id),
+    firstName: src.firstName || "",
+    lastName: src.lastName || "",
+    avatarURL: src.avatarURL || "",
+    state: src.state || src.location || "",
+    specialties: Array.isArray(src.specialties) ? src.specialties : [],
+    yearsExperience:
+      typeof src.yearsExperience === "number" ? src.yearsExperience : 0,
+    linkedInURL: src.linkedInURL || "",
+    certificateURL: src.certificateURL || "",
+    education: Array.isArray(src.education) ? src.education : [],
+  };
+  if (includeEmail) {
+    payload.email = src.email || "";
+  }
+  return payload;
+}
+
 async function buildNotifications(userDoc) {
   const ownerId = userDoc._id || userDoc.id;
+  const lastSeen = userDoc.notificationsLastViewedAt || null;
   const taskFilter = { owner: ownerId, deleted: { $ne: true } };
   const caseFilter = {};
   if (String(userDoc.role).toLowerCase() === "attorney") {
@@ -108,7 +135,8 @@ async function buildNotifications(userDoc) {
     caseFilter.paralegal = ownerId;
   }
 
-  const [tasks, cases] = await Promise.all([
+  const [stored, tasks, cases] = await Promise.all([
+    Notification.find({ userId: ownerId }).sort({ createdAt: -1 }).limit(12).lean(),
     Task.find(taskFilter)
       .sort({ updatedAt: -1 })
       .limit(8)
@@ -119,6 +147,21 @@ async function buildNotifications(userDoc) {
   ]);
 
   const items = [];
+  stored.forEach((n) => {
+    const createdAt = n.createdAt || n.updatedAt || new Date();
+    items.push({
+      id: `notif-${n._id}`,
+      type: n.type || "system",
+      title: n.title || "Notification",
+      body: n.body || "",
+      createdAt,
+      caseId: n.caseId ? String(n.caseId) : null,
+      messageId: n.messageId ? String(n.messageId) : null,
+      read: !!n.read,
+      meta: n.meta || null,
+    });
+  });
+
   tasks.forEach((t) => {
     const createdAt = t.updatedAt || t.createdAt || new Date();
     const dueLabel = t.due ? new Date(t.due).toLocaleDateString() : null;
@@ -136,6 +179,7 @@ async function buildNotifications(userDoc) {
       createdAt,
       caseId: t.caseId ? String(t.caseId) : null,
       done: t.done,
+      read: lastSeen ? !(createdAt > lastSeen) : false,
     };
     items.push(entry);
   });
@@ -149,10 +193,11 @@ async function buildNotifications(userDoc) {
       body: c.status ? `Status updated to ${c.status.replace(/_/g, " ")}` : "Case timeline updated.",
       createdAt,
       caseId: String(c._id),
+      read: lastSeen ? !(createdAt > lastSeen) : false,
     });
   });
 
-  return items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 10);
+  return items.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 15);
 }
 
 // all routes require auth
@@ -201,9 +246,9 @@ router.get(
 router.get(
   "/me",
   asyncHandler(async (req, res) => {
-    const me = await User.findById(req.user.id);
+    const me = await User.findById(req.user.id).select(SAFE_SELF_SELECT).lean();
     if (!me) return res.status(404).json({ error: "Not found" });
-    res.json(me.toJSON());
+    return res.json(serializePublicUser(me, { includeEmail: true }));
   })
 );
 
@@ -214,12 +259,8 @@ router.get(
     if (!me) return res.status(404).json({ error: "Not found" });
     const items = await buildNotifications(me);
     const lastSeen = me.notificationsLastViewedAt || null;
-    const unread = items.filter((item) => {
-      if (!lastSeen) return true;
-      const createdAt = new Date(item.createdAt);
-      return createdAt > lastSeen;
-    }).length;
-    res.json({ items, unread, lastSeen });
+    const unread = items.filter((item) => item.read === false).length;
+    return res.json({ items, unread, lastSeen });
   })
 );
 
@@ -227,11 +268,20 @@ router.post(
   "/me/notifications/read",
   csrfProtection,
   asyncHandler(async (req, res) => {
+    const { caseId, type } = req.body || {};
     const me = await User.findById(req.user.id).select("notificationsLastViewedAt");
     if (!me) return res.status(404).json({ error: "Not found" });
+    const filter = { userId: me._id, read: false };
+    if (caseId && mongoose.isValidObjectId(caseId)) {
+      filter.caseId = new mongoose.Types.ObjectId(caseId);
+    }
+    if (type && typeof type === "string") {
+      filter.type = type;
+    }
+    await Notification.updateMany(filter, { $set: { read: true } });
     me.notificationsLastViewedAt = new Date();
     await me.save();
-    res.json({ ok: true, seenAt: me.notificationsLastViewedAt });
+    return res.json({ ok: true, seenAt: me.notificationsLastViewedAt });
   })
 );
 
@@ -283,7 +333,7 @@ router.patch(
       await logAction(req, "user.me.update", { targetType: "user", targetId: me._id });
     } catch {}
 
-    res.json(me.toJSON());
+    return res.json(serializePublicUser(me, { includeEmail: true }));
   })
 );
 
@@ -313,7 +363,7 @@ router.post(
         meta: { availability: me.availability },
       });
     } catch {}
-    res.json(me.toJSON());
+    return res.json(serializePublicUser(me, { includeEmail: true }));
   })
 );
 
@@ -337,7 +387,7 @@ router.post(
     try {
       await logAction(req, "user.me.emailPref", { targetType: "user", targetId: me._id, meta: updates });
     } catch {}
-    res.json(me.toJSON());
+    return res.json(serializePublicUser(me, { includeEmail: true }));
   })
 );
 
@@ -351,18 +401,14 @@ router.get(
   asyncHandler(async (req, res) => {
     const { filter, sortOpt, page: p, limit: l } = parseParalegalFilters(req.query);
 
-    const [items, total] = await Promise.all([
-      User.find(filter)
-        .sort(sortOpt)
-        .skip((p - 1) * l)
-        .limit(l)
-        .select(
-          "firstName lastName email about bio resumeURL certificateURL availability role status createdAt practiceAreas skills yearsExperience location"
-        ),
+    const [docs, total] = await Promise.all([
+      User.find(filter).sort(sortOpt).skip((p - 1) * l).limit(l).select(SAFE_PUBLIC_SELECT).lean(),
       User.countDocuments(filter),
     ]);
 
-    res.json({ items, page: p, limit: l, total, pages: Math.ceil(total / l), hasMore: p * l < total });
+    const items = docs.map((doc) => serializePublicUser(doc));
+
+    return res.json({ items, page: p, limit: l, total, pages: Math.ceil(total / l), hasMore: p * l < total });
   })
 );
 
@@ -376,9 +422,7 @@ router.get(
     const { userId } = req.params;
     if (!isObjId(userId)) return res.status(400).json({ error: "Invalid userId" });
 
-    const u = await User.findById(userId).select(
-      "firstName lastName email bio about resumeURL certificateURL availability role status createdAt barNumber practiceAreas skills yearsExperience location writingSamples experience education"
-    );
+    const u = await User.findById(userId).select(SAFE_PUBLIC_SELECT).lean();
     if (!u) return res.status(404).json({ error: "User not found" });
     if (u.role !== "paralegal" || u.status !== "approved") {
       return res.status(403).json({ error: "Profile not available" });
@@ -388,25 +432,25 @@ router.get(
       await logAction(req, "user.profile.view", { targetType: "user", targetId: u._id });
     } catch {}
 
-    res.json(u);
+    return res.json(serializePublicUser(u));
   })
 );
 
 // ----------------------------------------
 // Paralegal Directory Routes (/api/paralegals)
 // ----------------------------------------
-const PARALEGAL_SELECT =
-  "firstName lastName email role status about bio availability practiceAreas skills yearsExperience location writingSamples experience education resumeURL certificateURL avatarURL";
+const PARALEGAL_SELECT = `${SAFE_PUBLIC_SELECT} role status email`;
 
 paralegalRouter.get(
   "/",
   asyncHandler(async (req, res) => {
     const { filter, sortOpt, page, limit } = parseParalegalFilters(req.query);
-    const [items, total] = await Promise.all([
+    const [docs, total] = await Promise.all([
       User.find(filter).sort(sortOpt).skip((page - 1) * limit).limit(limit).select(PARALEGAL_SELECT).lean(),
       User.countDocuments(filter),
     ]);
-    res.json({
+    const items = docs.map((doc) => serializePublicUser(doc));
+    return res.json({
       items,
       page,
       limit,
@@ -428,10 +472,11 @@ paralegalRouter.get(
     if (profile.role !== "paralegal" && String(profile._id) !== String(req.user.id) && req.user.role !== "admin") {
       return res.status(404).json({ error: "Paralegal not found" });
     }
+    const isOwner = String(profile._id) === String(req.user.id);
     if (
       profile.role === "paralegal" &&
       profile.status !== "approved" &&
-      String(profile._id) !== String(req.user.id) &&
+      !isOwner &&
       req.user.role !== "admin"
     ) {
       return res.status(403).json({ error: "Profile not available" });
@@ -441,7 +486,7 @@ paralegalRouter.get(
       await logAction(req, "paralegal.profile.view", { targetType: "user", targetId: profile._id });
     } catch {}
 
-    res.json(profile.toJSON());
+    return res.json(serializePublicUser(profile, { includeEmail: isOwner }));
   })
 );
 
@@ -491,7 +536,7 @@ paralegalRouter.post(
       await logAction(req, "paralegal.profile.update", { targetType: "user", targetId: paralegal._id });
     } catch {}
 
-    res.json(paralegal.toJSON());
+    return res.json(serializePublicUser(paralegal, { includeEmail: isSelf }));
   })
 );
 

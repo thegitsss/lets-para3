@@ -553,7 +553,7 @@
 </head>
 <body id="top">
   <!-- Header -->
-  <header class="site-header">
+  <header class="site-header" id="mainHeader">
     <div class="header-inner">
       <nav aria-label="Primary">
         <ul>
@@ -567,9 +567,9 @@
         Let’s-ParaConnect
       </a>
       <div class="header-actions">
-        <a class="pill" href="login.html" id="authAction">Sign In</a>
-        <a class="pill" href="signup.html" id="signupAction">Sign Up</a>
-        <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
+        <a class="pill" href="login.html" id="authAction" data-public-only>Sign In</a>
+        <a class="pill" href="signup.html" id="signupAction" data-public-only>Sign Up</a>
+        <button type="button" class="pill" id="logoutAction" style="display:none;" data-authed-only>Log Out</button>
       </div>
     </div>
   </header>
@@ -721,7 +721,7 @@
     </div>
     <div class="caption">
       <div class="kicker">On-demand paralegal support to</div>
-      <h1 class="headline">Discover the Talent</h1>
+      <h1 class="headline">Discover the elite paralegal professional collective</h1>
       <a class="cta" href="browse-paralegals.html" target="_blank" rel="noopener">Explore the Marketplace
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M5 12h14M13 5l7 7-7 7"/>
@@ -753,7 +753,7 @@
   <section class="section about wrap who-we-are" id="about" style="text-align: center; background-color: #ffffff;">
     <h2 class="who-title" style="color: #1a2230; font-family: 'Cormorant Garamond', sans-serif; font-weight: 200;">Who We Are</h2>
     <p class="who-text" style="color: #333333; font-family: 'Sarabun', sans-serif; font-weight: 200; max-width: 600px; margin: 0 auto 1.5rem;">
-      Let’s-ParaConnect is a modern legal-tech marketplace that brings attorneys and vetted freelance paralegals together for flexible, project-based support.
+      Let’s-ParaConnect is a modern legal-tech marketplace that brings attorneys and vetted members of our elite paralegal professional collective together for flexible, project-based support.
       We’re focused on making collaboration efficient, intuitive, and effortless from start to finish.
     </p>
   </section>
@@ -779,8 +779,8 @@
         <div class="pad">
           <span class="card-icon" aria-hidden="true">*</span>
           <h3>Paralegals Apply</h3>
-          <p>Vetted freelance paralegals submit proposals. You pick the best fit.</p>
-          <a class="read" href="#">Browse Talent →</a>
+          <p>Members of the elite paralegal professional collective submit proposals. You pick the best fit.</p>
+          <a class="read" href="#">Browse the elite paralegal professional collective →</a>
         </div>
       </div>
       <div class="card">

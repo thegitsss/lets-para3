@@ -6,9 +6,12 @@ const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const verifyToken = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
 const { requireCaseAccess } = require("../utils/authz");
+const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const Case = require("../models/Case");
+const User = require("../models/User");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
+const Notification = require("../models/Notification");
 const sendEmail = require("../utils/email");
 const stripe = require("../utils/stripe");
 const { cleanText, cleanTitle, cleanMessage } = require("../utils/sanitize");
@@ -163,8 +166,14 @@ function summarizeUser(person) {
   };
 }
 
+function formatPersonName(person) {
+  if (!person || typeof person !== "object") return "";
+  return `${person.firstName || ""} ${person.lastName || ""}`.trim();
+}
+
 function caseSummary(doc, { includeFiles = false } = {}) {
   const paralegal = summarizeUser(doc.paralegal || doc.paralegalId);
+  const pendingParalegal = summarizeUser(doc.pendingParalegal || doc.pendingParalegalId);
   const attorney = summarizeUser(doc.attorney || doc.attorneyId);
   const summary = {
     _id: doc._id,
@@ -184,6 +193,10 @@ function caseSummary(doc, { includeFiles = false } = {}) {
     jobId: doc.jobId || null,
     attorney,
     paralegal,
+    pendingParalegal,
+    pendingParalegalId:
+      pendingParalegal?.id || (doc.pendingParalegalId ? String(doc.pendingParalegalId) : null),
+    pendingParalegalInvitedAt: doc.pendingParalegalInvitedAt || null,
     hiredAt: doc.hiredAt || null,
     completedAt: doc.completedAt || null,
     briefSummary: doc.briefSummary || "",
@@ -225,6 +238,26 @@ function normalizeFile(file) {
     approvedAt: file.approvedAt || null,
     replacedAt: file.replacedAt || null,
   };
+}
+
+async function createCaseNotification({ userId, caseDoc, title, body, type = "case-event", meta = {} }) {
+  if (!userId) return;
+  try {
+    await Notification.create({
+      userId,
+      caseId: caseDoc?._id || null,
+      title,
+      body,
+      type,
+      meta: {
+        ...(meta || {}),
+        caseId: caseDoc?._id || null,
+      },
+      read: false,
+    });
+  } catch (err) {
+    console.warn("[cases] notification create failed", err);
+  }
 }
 
 function findFile(doc, fileId) {
@@ -372,6 +405,7 @@ router.get("/open", verifyToken, requireRole(["paralegal"]), async (req, res) =>
 // ----------------------------------------
 router.use(verifyToken);
 router.use(requireRole(["admin", "attorney", "paralegal"]));
+router.use("/:caseId", ensureCaseParticipant());
 
 /**
  * POST /api/cases
@@ -528,7 +562,7 @@ router.get(
       .sort({ updatedAt: -1 })
       .limit(limit)
       .select(
-        "title details practiceArea status deadline zoomLink paymentReleased escrowIntentId applicants files jobId createdAt updatedAt attorney attorneyId paralegal paralegalId hiredAt completedAt briefSummary archived downloadUrl"
+        "title details practiceArea status deadline zoomLink paymentReleased escrowIntentId applicants files jobId createdAt updatedAt attorney attorneyId paralegal paralegalId pendingParalegalId pendingParalegalInvitedAt hiredAt completedAt briefSummary archived downloadUrl"
       )
       .populate("paralegalId", "firstName lastName email role avatarURL")
       .populate("attorneyId", "firstName lastName email role avatarURL")
@@ -537,6 +571,86 @@ router.get(
       .lean();
 
     res.json(docs.map((doc) => caseSummary(doc, { includeFiles })));
+  })
+);
+
+router.get(
+  "/my-active",
+  requireRole(["attorney"]),
+  asyncHandler(async (req, res) => {
+    const limit = clamp(parseInt(req.query.limit, 10) || 50, 1, 200);
+    const filter = {
+      attorney: req.user.id,
+      archived: { $ne: true },
+      status: { $nin: ["completed", "closed", "cancelled"] },
+    };
+    const docs = await Case.find(filter)
+      .sort({ updatedAt: -1 })
+      .limit(limit)
+      .select(
+        "title practiceArea status deadline zoomLink paymentReleased escrowIntentId jobId createdAt updatedAt attorney attorneyId paralegal paralegalId pendingParalegalId pendingParalegalInvitedAt"
+      )
+      .populate("attorney", "firstName lastName email role avatarURL")
+      .populate("attorneyId", "firstName lastName email role avatarURL")
+      .populate("paralegal", "firstName lastName email role avatarURL")
+      .populate("paralegalId", "firstName lastName email role avatarURL")
+      .populate("pendingParalegalId", "firstName lastName email role avatarURL")
+      .lean();
+
+    res.json({ items: docs.map((doc) => caseSummary(doc)) });
+  })
+);
+
+router.get(
+  "/invited-to",
+  requireRole(["paralegal"]),
+  asyncHandler(async (req, res) => {
+    const limit = clamp(parseInt(req.query.limit, 10) || 50, 1, 200);
+    const docs = await Case.find({
+      pendingParalegalId: req.user.id,
+      archived: { $ne: true },
+    })
+      .sort({ updatedAt: -1 })
+      .limit(limit)
+      .select(
+        "title practiceArea status deadline zoomLink paymentReleased escrowIntentId jobId createdAt updatedAt attorney attorneyId pendingParalegalId pendingParalegalInvitedAt"
+      )
+      .populate("attorney", "firstName lastName email role avatarURL")
+      .populate("attorneyId", "firstName lastName email role avatarURL")
+      .populate("pendingParalegalId", "firstName lastName email role avatarURL")
+      .lean();
+
+    res.json({ items: docs.map((doc) => caseSummary(doc)) });
+  })
+);
+
+router.get(
+  "/my-assigned",
+  requireRole(["paralegal"]),
+  asyncHandler(async (req, res) => {
+    const limit = clamp(parseInt(req.query.limit, 10) || 100, 1, 500);
+    const docs = await Case.find({
+      paralegal: req.user.id,
+    })
+      .sort({ updatedAt: -1 })
+      .limit(limit)
+      .select("title caseNumber status createdAt updatedAt attorney attorneyId")
+      .populate("attorney", "firstName lastName")
+      .populate("attorneyId", "firstName lastName")
+      .lean();
+
+    const items = docs.map((doc) => ({
+      _id: doc._id,
+      title: doc.title,
+      caseNumber: doc.caseNumber || null,
+      attorneyName:
+        formatPersonName(doc.attorney || doc.attorneyId) ||
+        (doc.attorneyNameSnapshot || ""),
+      status: doc.status,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+    }));
+    res.json({ items });
   })
 );
 
@@ -951,6 +1065,175 @@ router.post(
   })
 );
 
+router.post(
+  "/:caseId/invite",
+  csrfProtection,
+  requireCaseAccess("caseId"),
+  asyncHandler(async (req, res) => {
+    if (req.user.role !== "attorney" || !req.acl?.isAttorney) {
+      return res.status(403).json({ error: "Only the case attorney can invite paralegals." });
+    }
+    const { paralegalId } = req.body || {};
+    if (!isObjId(paralegalId)) {
+      return res.status(400).json({ error: "A valid paralegalId is required." });
+    }
+    const invitee = await User.findById(paralegalId).select("firstName lastName role status");
+    if (!invitee || invitee.role !== "paralegal" || invitee.status !== "approved") {
+      return res.status(400).json({ error: "Select an approved paralegal to invite." });
+    }
+
+    const caseDoc = await Case.findById(req.params.caseId)
+      .populate("attorney", "firstName lastName email role")
+      .populate("attorneyId", "firstName lastName email role")
+      .populate("paralegal", "firstName lastName email role");
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+
+    const ownerId = String(caseDoc.attorneyId || caseDoc.attorney?._id || "");
+    if (!ownerId || ownerId !== String(req.user.id)) {
+      return res.status(403).json({ error: "You are not the attorney for this case." });
+    }
+    if (caseDoc.paralegal) {
+      return res.status(400).json({ error: "A paralegal has already been assigned to this case." });
+    }
+    if (caseDoc.archived) {
+      return res.status(400).json({ error: "This case is archived." });
+    }
+
+    caseDoc.pendingParalegalId = invitee._id;
+    caseDoc.pendingParalegalInvitedAt = new Date();
+    await caseDoc.save();
+
+    try {
+      await logAction(req, "paralegal_invited", {
+        targetType: "case",
+        targetId: caseDoc._id,
+        caseId: caseDoc._id,
+        meta: { paralegalId: invitee._id },
+      });
+    } catch {}
+
+    const attorneyName = formatPersonName(caseDoc.attorney || caseDoc.attorneyId) || "An attorney";
+    const caseTitle = caseDoc.title || "a case";
+    await createCaseNotification({
+      userId: invitee._id,
+      caseDoc,
+      title: "New Case Invitation",
+      body: `Attorney ${attorneyName} has invited you to ${caseTitle}.`,
+      type: "case-invite",
+    });
+
+    res.json({ success: true });
+  })
+);
+
+router.post(
+  "/:caseId/invite/accept",
+  csrfProtection,
+  requireRole(["paralegal"]),
+  asyncHandler(async (req, res) => {
+    const { caseId } = req.params;
+    if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid case id" });
+    const caseDoc = await Case.findById(caseId)
+      .populate("attorney", "firstName lastName email role")
+      .populate("attorneyId", "firstName lastName email role")
+      .populate("pendingParalegalId", "firstName lastName email role");
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+    if (!caseDoc.pendingParalegalId || String(caseDoc.pendingParalegalId) !== String(req.user.id)) {
+      return res.status(403).json({ error: "You do not have an invitation for this case." });
+    }
+    if (caseDoc.paralegal && String(caseDoc.paralegal) !== String(req.user.id)) {
+      return res.status(400).json({ error: "This case is already assigned to another paralegal." });
+    }
+
+    const paralegal = await User.findById(req.user.id).select("firstName lastName");
+    caseDoc.paralegal = req.user.id;
+    caseDoc.paralegalId = req.user.id;
+    caseDoc.pendingParalegalId = null;
+    caseDoc.pendingParalegalInvitedAt = null;
+    caseDoc.hiredAt = new Date();
+    caseDoc.paralegalNameSnapshot = formatPersonName(paralegal);
+    if (typeof caseDoc.canTransitionTo === "function" && caseDoc.canTransitionTo("in_progress")) {
+      caseDoc.transitionTo("in_progress");
+    } else if (!["in_progress", "active"].includes(caseDoc.status)) {
+      caseDoc.status = "in_progress";
+    }
+    if (Array.isArray(caseDoc.applicants) && caseDoc.applicants.length) {
+      caseDoc.applicants.forEach((app) => {
+        if (String(app.paralegalId) === String(req.user.id)) {
+          app.status = "accepted";
+        }
+      });
+    }
+
+    await caseDoc.save();
+
+    try {
+      await logAction(req, "paralegal_assigned", {
+        targetType: "case",
+        targetId: caseDoc._id,
+        caseId: caseDoc._id,
+      });
+    } catch {}
+
+    const attorneyId = caseDoc.attorney?._id || caseDoc.attorneyId || null;
+    if (attorneyId) {
+      await createCaseNotification({
+        userId: attorneyId,
+        caseDoc,
+        title: "Invitation Accepted",
+        body: `Paralegal ${formatPersonName(paralegal)} accepted your invitation to ${caseDoc.title || "a case"}.`,
+        type: "case-invite-response",
+      });
+    }
+
+    res.json({ success: true });
+  })
+);
+
+router.post(
+  "/:caseId/invite/decline",
+  csrfProtection,
+  requireRole(["paralegal"]),
+  asyncHandler(async (req, res) => {
+    const { caseId } = req.params;
+    if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid case id" });
+    const caseDoc = await Case.findById(caseId)
+      .populate("attorney", "firstName lastName email role")
+      .populate("attorneyId", "firstName lastName email role")
+      .populate("pendingParalegalId", "firstName lastName email role");
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+    if (!caseDoc.pendingParalegalId || String(caseDoc.pendingParalegalId) !== String(req.user.id)) {
+      return res.status(403).json({ error: "You do not have an invitation for this case." });
+    }
+
+    const paralegal = await User.findById(req.user.id).select("firstName lastName");
+    caseDoc.pendingParalegalId = null;
+    caseDoc.pendingParalegalInvitedAt = null;
+    await caseDoc.save();
+
+    try {
+      await logAction(req, "paralegal_declined", {
+        targetType: "case",
+        targetId: caseDoc._id,
+        caseId: caseDoc._id,
+      });
+    } catch {}
+
+    const attorneyId = caseDoc.attorney?._id || caseDoc.attorneyId || null;
+    if (attorneyId) {
+      await createCaseNotification({
+        userId: attorneyId,
+        caseDoc,
+        title: "Invitation Declined",
+        body: `Paralegal ${formatPersonName(paralegal)} declined your invitation to ${caseDoc.title || "a case"}.`,
+        type: "case-invite-response",
+      });
+    }
+
+    res.json({ success: true });
+  })
+);
+
 /**
  * POST /api/cases/:caseId/hire/:paralegalId
  * Assigns a paralegal to an existing case (attorney-only).
@@ -983,6 +1266,8 @@ router.post(
 
     selectedCase.paralegal = paralegalId;
     selectedCase.paralegalId = paralegalId;
+    selectedCase.pendingParalegalId = null;
+    selectedCase.pendingParalegalInvitedAt = null;
     selectedCase.hiredAt = new Date();
     if (typeof selectedCase.canTransitionTo === "function" && selectedCase.canTransitionTo("in_progress")) {
       selectedCase.transitionTo("in_progress");

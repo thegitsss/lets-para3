@@ -3,10 +3,13 @@ const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
+const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const { requireCaseAccess } = require("../utils/authz");
 const Message = require("../models/Message");
 const Case = require("../models/Case");
+const User = require("../models/User");
 const AuditLog = require("../models/AuditLog"); // match filename
+const Notification = require("../models/Notification");
 const { containsProfanity, maskProfanity } = require("../utils/badWords");
 
 // ----------------------------------------
@@ -37,6 +40,60 @@ function buildCaseAccessFilter(user) {
   if (!user) return {};
   if (user.role === "admin") return {};
   return { $or: [{ attorney: user.id }, { paralegal: user.id }] };
+}
+
+function toObjectId(value) {
+  if (!value) return null;
+  if (value instanceof mongoose.Types.ObjectId) return value;
+  if (typeof value === "string" && mongoose.isValidObjectId(value)) {
+    return new mongoose.Types.ObjectId(value);
+  }
+  if (typeof value === "object" && value._id) {
+    return value._id instanceof mongoose.Types.ObjectId ? value._id : new mongoose.Types.ObjectId(value._id);
+  }
+  return null;
+}
+
+function buildShortPreview(text = "", maxLen = 50) {
+  const source = (text || "").replace(/\s+/g, " ").trim();
+  if (!source) return "New message";
+  if (source.length <= maxLen) return source;
+  return `${source.slice(0, maxLen - 1).trim()}…`;
+}
+
+async function createMessageNotification({ caseDoc, senderDoc, message, previewText }) {
+  if (!caseDoc || !senderDoc) return;
+  const role = String(senderDoc.role || "").toLowerCase();
+  let recipientId = null;
+  if (role === "attorney") {
+    recipientId = toObjectId(caseDoc.paralegal) || toObjectId(caseDoc.paralegalId);
+  } else if (role === "paralegal") {
+    recipientId = toObjectId(caseDoc.attorney) || toObjectId(caseDoc.attorneyId);
+  } else {
+    return;
+  }
+  if (!recipientId) return;
+  const senderId = toObjectId(senderDoc._id || senderDoc.id);
+  if (senderId && String(recipientId) === String(senderId)) return;
+
+  const title = `New message on case: ${caseDoc.title || "Case"}`;
+  const senderName = `${senderDoc.firstName || ""} ${senderDoc.lastName || ""}`.trim() || "New message";
+  const body = `${senderName}: ${buildShortPreview(previewText)}`;
+
+  const doc = {
+    userId: recipientId,
+    caseId: toObjectId(caseDoc._id),
+    messageId: message?._id ? new mongoose.Types.ObjectId(message._id) : null,
+    title,
+    body,
+    type: "message",
+    meta: {
+      caseId: caseDoc._id ? new mongoose.Types.ObjectId(caseDoc._id) : null,
+      messageId: message?._id ? new mongoose.Types.ObjectId(message._id) : null,
+    },
+    read: false,
+  };
+  await Notification.create(doc);
 }
 
 function buildUnreadClause(userObjectId) {
@@ -74,6 +131,34 @@ router.get(
     ]);
     const totalUnread = aggregateResult[0]?.count || 0;
     res.json({ count: totalUnread });
+  })
+);
+
+router.get(
+  "/summary",
+  asyncHandler(async (req, res) => {
+    const filter = buildCaseAccessFilter(req.user);
+    const caseDocs = await Case.find(filter).select("_id title").lean();
+    if (!caseDocs.length) {
+      return res.json({ items: [] });
+    }
+    const userDoc = await User.findById(req.user.id).select("messageLastViewedAt");
+    const lastMap = userDoc?.messageLastViewedAt || new Map();
+    const items = [];
+    for (const doc of caseDocs) {
+      const key = String(doc._id);
+      const lastViewed =
+        typeof lastMap.get === "function" ? lastMap.get(key) : lastMap?.[key];
+      const query = { caseId: doc._id, deleted: { $ne: true } };
+      if (lastViewed) query.createdAt = { $gt: new Date(lastViewed) };
+      const unread = await Message.countDocuments(query);
+      items.push({
+        caseId: key,
+        title: doc.title || "Case",
+        unread,
+      });
+    }
+    res.json({ items });
   })
 );
 
@@ -149,6 +234,9 @@ router.get(
   })
 );
 
+// Case-scoped routes (require participant access)
+router.use("/:caseId", ensureCaseParticipant());
+
 /**
  * GET /api/messages/:caseId?before=&after=&limit=&threadRoot=
  * List messages for a case you can access.
@@ -159,37 +247,23 @@ router.get(
  */
 router.get(
   "/:caseId",
-  requireCaseAccess("caseId"),
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
-    if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid caseId" });
+    const items = await Message.find({ caseId, deleted: { $ne: true } })
+      .sort({ createdAt: 1 })
+      .populate("senderId", "firstName lastName email role")
+      .lean();
 
-    const before = req.query.before ? new Date(req.query.before) : null;
-    const after = req.query.after ? new Date(req.query.after) : null;
-    let limit = Number(req.query.limit) || 50;
-    limit = Math.max(1, Math.min(100, limit));
-    const caseObjectId = new mongoose.Types.ObjectId(caseId);
-
-    const q = { caseId: caseObjectId, deleted: { $ne: true } };
-    if (req.query.threadRoot && isObjId(req.query.threadRoot)) {
-      q.$or = [
-        { _id: new mongoose.Types.ObjectId(req.query.threadRoot) },
-        { threadRoot: new mongoose.Types.ObjectId(req.query.threadRoot) },
-      ];
+    const viewer = await User.findById(req.user.id).select("messageLastViewedAt");
+    if (viewer) {
+      if (!viewer.messageLastViewedAt || typeof viewer.messageLastViewedAt.set !== "function") {
+        viewer.messageLastViewedAt = new Map();
+      }
+      viewer.messageLastViewedAt.set(String(caseId), new Date());
+      await viewer.save();
     }
 
-    if (after) q.createdAt = { ...(q.createdAt || {}), $gt: after };
-    if (before) q.createdAt = { ...(q.createdAt || {}), $lte: before };
-    if (!after && !before) q.createdAt = { $lte: new Date() };
-
-    const items = await Message.find(q)
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .populate("senderId", "firstName lastName email role")
-      .populate("replyTo")
-      .populate("threadRoot")
-      .lean();
-    res.json({ messages: items.reverse() });
+    return res.json({ messages: items });
   })
 );
 
@@ -199,45 +273,47 @@ router.get(
  */
 router.post(
   "/:caseId",
-  requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
-    if (isCaseReadOnly(req)) {
+    const { caseId } = req.params;
+    const caseDoc = req.case;
+    if (caseDoc?.readOnly && !req.acl?.isAdmin) {
       return res.status(403).json({ error: "Case is read-only" });
     }
-    const { caseId } = req.params;
-    if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid caseId" });
 
-    const type = String(req.body.type || "text").toLowerCase();
-    if (type !== "text") return res.status(400).json({ error: "Only text supported here" });
+    const text = sanitizeText(req.body?.text);
+    if (!text) return res.status(400).json({ error: "text required" });
 
-    const content = sanitizeText(req.body.content);
-    if (!content) return res.status(400).json({ error: "content required" });
+    const senderDocPromise = User.findById(req.user.id).select("firstName lastName role").lean();
 
-    const payload = {
+    const msg = await Message.create({
       caseId,
       senderId: req.user.id,
       senderRole: req.user.role,
       type: "text",
-      text: content,
-      content,
-    };
-
-    // threading
-    if (req.body.replyTo && isObjId(req.body.replyTo)) payload.replyTo = req.body.replyTo;
-    if (req.body.threadRoot && isObjId(req.body.threadRoot)) payload.threadRoot = req.body.threadRoot;
-    else if (payload.replyTo) payload.threadRoot = payload.replyTo;
-
-    const msg = await Message.create(payload);
-
-    await AuditLog.logFromReq(req, "message.create", {
-      targetType: "message",
-      targetId: msg._id,
-      caseId,
-      meta: { type: "text" },
+      text,
+      content: text,
     });
 
-    res.status(201).json({ message: msg });
+    await AuditLog.logFromReq(req, "message_sent", {
+      targetType: "case",
+      targetId: caseId,
+      meta: { messageId: msg._id },
+    });
+
+    try {
+      const senderDoc = await senderDocPromise;
+      await createMessageNotification({
+        caseDoc,
+        senderDoc,
+        message: msg,
+        previewText: text,
+      });
+    } catch (err) {
+      console.warn("[messages] notification creation failed", err);
+    }
+
+    return res.status(201).json({ message: msg });
   })
 );
 

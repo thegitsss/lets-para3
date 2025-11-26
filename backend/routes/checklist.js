@@ -5,6 +5,7 @@ const verifyToken = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
 const Task = require("../models/Task");
 const { logAction } = require("../utils/audit");
+const { assertCaseParticipant } = require("../middleware/ensureCaseParticipant");
 
 // ----------------------------------------
 // Optional CSRF (enable by setting ENABLE_CSRF=true and configuring cookie parser)
@@ -31,6 +32,18 @@ function parsePagination(req, { maxLimit = 100, defaultLimit = 25 } = {}) {
 
 function escapeRegex(s = "") {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function ensureTaskCaseAccess(req, res, caseId) {
+  if (!caseId) return true;
+  try {
+    await assertCaseParticipant(req, caseId);
+    return true;
+  } catch (err) {
+    const status = err.statusCode || err.status || 500;
+    res.status(status).json({ error: err.message || "Access denied" });
+    return false;
+  }
 }
 
 // ----------------------------------------
@@ -78,7 +91,11 @@ router.get(
       filter.$or = [{ title: rx }, { notes: rx }, { labels: rx }];
     }
 
-    if (caseId && isObjId(caseId)) filter.caseId = caseId;
+    if (caseId) {
+      const ok = await ensureTaskCaseAccess(req, res, caseId);
+      if (!ok) return;
+      filter.caseId = caseId;
+    }
 
     if (assignee) {
       if (assignee === "me") filter.$or = [...(filter.$or || []), { assignee: owner }, { owner }];
@@ -127,6 +144,10 @@ router.post(
   asyncHandler(async (req, res) => {
     const { title, notes, due, caseId, assignee, priority, labels, checklist, pinned } = req.body || {};
     if (!title || !String(title).trim()) return res.status(400).json({ error: "title required" });
+    if (caseId) {
+      const ok = await ensureTaskCaseAccess(req, res, caseId);
+      if (!ok) return;
+    }
 
     const doc = {
       title: String(title).slice(0, 200).trim(),
@@ -160,6 +181,10 @@ router.patch(
 
     const t = await Task.findOne({ _id: id, owner: req.user.id });
     if (!t) return res.status(404).json({ error: "Not found" });
+    if (t.caseId) {
+      const ok = await ensureTaskCaseAccess(req, res, String(t.caseId));
+      if (!ok) return;
+    }
 
     const { title, notes, due, done, assignee, priority, labels, pinned, deleted } = req.body || {};
 
@@ -204,18 +229,22 @@ router.delete(
     const hard = req.query.hard === "1";
     if (!isObjId(id)) return res.status(400).json({ error: "Invalid id" });
 
+    const existing = await Task.findOne({ _id: id, owner: req.user.id });
+    if (!existing) return res.status(404).json({ error: "Not found" });
+    if (existing.caseId) {
+      const ok = await ensureTaskCaseAccess(req, res, String(existing.caseId));
+      if (!ok) return;
+    }
+
     if (hard) {
-      const t = await Task.findOneAndDelete({ _id: id, owner: req.user.id });
-      if (!t) return res.status(404).json({ error: "Not found" });
-      await logAction(req, "task.delete.hard", { targetType: "task", targetId: t._id });
+      await Task.deleteOne({ _id: existing._id });
+      await logAction(req, "task.delete.hard", { targetType: "task", targetId: existing._id });
     } else {
-      const t = await Task.findOne({ _id: id, owner: req.user.id });
-      if (!t) return res.status(404).json({ error: "Not found" });
-      t.deleted = true;
-      t.deletedAt = new Date();
-      t.deletedBy = req.user.id;
-      await t.save();
-      await logAction(req, "task.delete.soft", { targetType: "task", targetId: t._id });
+      existing.deleted = true;
+      existing.deletedAt = new Date();
+      existing.deletedBy = req.user.id;
+      await existing.save();
+      await logAction(req, "task.delete.soft", { targetType: "task", targetId: existing._id });
     }
 
     res.json({ ok: true });

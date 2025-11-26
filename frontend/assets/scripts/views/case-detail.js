@@ -3,6 +3,17 @@
 
 import { j } from "../helpers.js";
 import { requireAuth } from "../auth.js";
+import { render as renderChecklist } from "./checklist.js";
+
+function normalizeSessionPayload(raw) {
+  if (!raw) return null;
+  if (raw.user) return raw;
+  return {
+    user: raw,
+    role: raw.role,
+    status: raw.status,
+  };
+}
 
 let stylesInjected = false;
 let stripeClientPromise = null;
@@ -15,8 +26,21 @@ let paymentEnabled = false;
 let countdownTimer = null;
 
 export async function render(el, { escapeHTML, params: routeParams } = {}) {
-  const session = requireAuth();
   ensureStyles();
+  let session = null;
+  try {
+    if (typeof window.requireRole === "function") {
+      session = normalizeSessionPayload(await window.requireRole());
+    } else if (typeof window.checkSession === "function") {
+      session = normalizeSessionPayload(await window.checkSession());
+    } else {
+      session = normalizeSessionPayload(requireAuth());
+    }
+  } catch {
+    return;
+  }
+  if (!session) return;
+
   const viewerRole = String(session?.role || session?.user?.role || "").toLowerCase();
   const h = escapeHTML || ((s) => String(s ?? ""));
   const params = getRouteParams(routeParams);
@@ -33,8 +57,8 @@ export async function render(el, { escapeHTML, params: routeParams } = {}) {
     const data = await j(`/api/cases/${encodeURIComponent(caseId)}`);
     draw(el, data, h, caseId, session);
   } catch (err) {
-    if (viewerRole === "paralegal") {
-      window.location.href = "dashboard-paralegal.html";
+    if (err?.status === 403) {
+      el.innerHTML = `<section class="dash"><div class="error">You don’t have access to this case.</div></section>`;
       return;
     }
     el.innerHTML = `<section class="dash"><div class="error">${h(err?.message || "Unable to load case details.")}</div></section>`;
@@ -177,6 +201,7 @@ function draw(root, data, escapeHTML, caseId, session) {
       ${applicationSection}
       ${actionsSection}
       ${archiveSection}
+      <div id="caseChecklist"></div>
     </section>
   `;
 
@@ -186,6 +211,16 @@ function draw(root, data, escapeHTML, caseId, session) {
   bindCompleteButton(root, caseId);
   bindDownloadButton(root, caseId);
   bindApplicationForm(root, caseId);
+  const checklistHost = root.querySelector("#caseChecklist");
+  if (checklistHost) {
+    renderChecklist(checklistHost, { caseId: data?._id || caseId }).catch((err) => {
+      console.warn("Checklist failed to render", err);
+      checklistHost.innerHTML = `<div class="empty">Checklist unavailable.</div>`;
+    });
+  }
+  if (viewerRole === "paralegal") {
+    hideAttorneyOnlyControls(root);
+  }
   if (readOnly && purgeAt) {
     startCountdown(root.querySelector("[data-purge-countdown]"), purgeAt);
   } else if (countdownTimer) {
@@ -535,6 +570,22 @@ function showCompletionModal(caseId) {
     } finally {
       overlay.remove();
     }
+  });
+}
+
+function hideAttorneyOnlyControls(root) {
+  const selectors = [
+    "[data-hire-paralegal]",
+    "[data-start-escrow]",
+    "[data-payment-panel]",
+    "[data-complete-case]",
+    "[data-invite-paralegal]",
+    "[data-budget-edit]",
+  ];
+  selectors.forEach((selector) => {
+    root.querySelectorAll(selector).forEach((node) => {
+      node.style.display = "none";
+    });
   });
 }
 
