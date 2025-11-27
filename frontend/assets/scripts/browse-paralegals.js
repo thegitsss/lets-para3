@@ -278,7 +278,7 @@ function buildParalegalCard(paralegal) {
   const availability = paralegal.availability || "Availability on request";
   const specialties = (paralegal.practiceAreas || []).slice(0, 2);
   const experience = formatExperience(paralegal.yearsExperience);
-  const avatar = paralegal.avatarURL || buildInitialAvatar(getInitials(name));
+  const avatar = paralegal.profileImage || paralegal.avatarURL || buildInitialAvatar(getInitials(name));
 
   const card = document.createElement("article");
   card.className = "paralegal-card";

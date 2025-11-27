@@ -277,7 +277,7 @@ async function loadUser() {
     const user = await res.json();
     state.user = user;
     const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.name || "Attorney";
-    const avatar = user.avatarURL || user.profileImage || "https://via.placeholder.com/36";
+    const avatar = user.profileImage || user.avatarURL || "https://via.placeholder.com/36";
     const roleLabel = (user.role || "Attorney").replace(/\b\w/g, (c) => c.toUpperCase());
     const nameEl = document.getElementById("headerName");
     const avatarEl = document.getElementById("headerAvatar");

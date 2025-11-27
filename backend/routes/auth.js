@@ -77,6 +77,7 @@ router.post(
       certificateURL,
       recaptchaToken,
       termsAccepted,
+      phoneNumber,
     } = req.body || {};
 
     const captchaOk = await verifyRecaptcha(recaptchaToken, "signup");
@@ -120,6 +121,7 @@ router.post(
       resumeURL: roleLc === "paralegal" ? String(resumeURL || "") : "",
       certificateURL: roleLc === "paralegal" ? String(certificateURL || "") : "",
       termsAccepted: true,
+      phoneNumber: phoneNumber ? String(phoneNumber).trim() || null : null,
     });
 
     await user.save();

@@ -65,7 +65,7 @@
     els.profileForm = document.getElementById("profileForm");
     els.passwordForm = document.getElementById("passwordForm");
     els.preferencesForm = document.getElementById("preferencesForm");
-    els.avatarInput = document.getElementById("avatarInput");
+    els.profilePhotoInput = document.getElementById("profilePhoto");
     els.triggerAvatarUpload = document.getElementById("triggerAvatarUpload");
     els.avatarFrame = document.getElementById("avatarFrame");
     els.avatarPreview = document.getElementById("avatarPreview");
@@ -82,10 +82,12 @@
     els.lawFirm = document.getElementById("lawFirm");
     els.bio = document.getElementById("bio");
 
-    els.prefEmail = document.getElementById("prefEmail");
-    els.prefCase = document.getElementById("prefCaseUpdates");
-    els.prefMessages = document.getElementById("prefMessages");
-    els.prefTasks = document.getElementById("prefTasks");
+    els.prefInAppMessages = document.getElementById("prefInAppMessages");
+    els.prefInAppCase = document.getElementById("prefInAppCase");
+    els.prefEmailMessages = document.getElementById("prefEmailMessages");
+    els.prefEmailCase = document.getElementById("prefEmailCase");
+    els.prefSMSMessages = document.getElementById("prefSMSMessages");
+    els.prefSMSCase = document.getElementById("prefSMSCase");
 
     els.deleteBtn = document.getElementById("deleteAccountBtn");
     els.deleteModal = document.getElementById("deleteModal");
@@ -121,9 +123,9 @@
   }
 
   function bindProfileForm() {
-    if (els.triggerAvatarUpload && els.avatarInput) {
-      els.triggerAvatarUpload.addEventListener("click", () => els.avatarInput.click());
-      els.avatarInput.addEventListener("change", (event) => {
+    if (els.triggerAvatarUpload && els.profilePhotoInput) {
+      els.triggerAvatarUpload.addEventListener("click", () => els.profilePhotoInput.click());
+      els.profilePhotoInput.addEventListener("change", (event) => {
         const file = event.target.files && event.target.files[0];
         if (file) {
           handleAvatarUpload(file);
@@ -208,9 +210,9 @@
       setButtonBusy(els.preferencesSaveBtn, true, "Saving…");
       let restoreButton = true;
       try {
-        const updated = await patchMe(payload);
-        currentUser = updated;
-        hydratePreferences(updated);
+        const updated = await patchNotificationPrefs(payload);
+        currentUser.notificationPrefs = updated.notificationPrefs || payload;
+        hydratePreferences(currentUser);
         showToast("Preferences saved.");
         scheduleFormButtonReset(els.preferencesForm, els.preferencesSaveBtn);
         restoreButton = false;
@@ -340,18 +342,19 @@
     const firmValue = sanitizeSingleLine(user.lawFirm || user.firm || user.company || "");
     setValue(els.lawFirm, firmValue);
     setValue(els.bio, sanitizeMultiLine(user.bio || "", 4000));
-    setAvatarPreview(user.avatarURL);
+    setAvatarPreview(user.profileImage || user.avatarURL);
     hydrateHeader(user);
   }
 
   function hydratePreferences(user) {
     if (!user) return;
-    const notifications = user.notifications || {};
-    const emailPref = user.emailPref || {};
-    if (els.prefEmail) els.prefEmail.checked = emailPref.product !== false;
-    if (els.prefCase) els.prefCase.checked = notifications.caseUpdates !== false;
-    if (els.prefMessages) els.prefMessages.checked = notifications.messages !== false;
-    if (els.prefTasks) els.prefTasks.checked = notifications.system !== false;
+    const prefs = user.notificationPrefs || {};
+    if (els.prefInAppMessages) els.prefInAppMessages.checked = prefs.inAppMessages !== false;
+    if (els.prefInAppCase) els.prefInAppCase.checked = prefs.inAppCase !== false;
+    if (els.prefEmailMessages) els.prefEmailMessages.checked = prefs.emailMessages !== false;
+    if (els.prefEmailCase) els.prefEmailCase.checked = prefs.emailCase !== false;
+    if (els.prefSMSMessages) els.prefSMSMessages.checked = !!prefs.smsMessages;
+    if (els.prefSMSCase) els.prefSMSCase.checked = !!prefs.smsCase;
   }
 
   function hydrateHeader(user) {
@@ -361,7 +364,7 @@
     if (els.headerName) els.headerName.textContent = safeName;
     if (els.headerRole) els.headerRole.textContent = roleLabel;
     const initials = getInitials(fullName);
-    const avatarSource = user.avatarURL || buildInitialAvatar(initials);
+    const avatarSource = user.profileImage || user.avatarURL || buildInitialAvatar(initials);
     if (els.headerAvatar) {
       els.headerAvatar.src = avatarSource;
       els.headerAvatar.alt = `${safeName} avatar`;
@@ -398,8 +401,11 @@
     payload.phone = sanitizeSingleLine(els.phone?.value || "", 40) || null;
     payload.lawFirm = sanitizeSingleLine(els.lawFirm?.value || "", 120) || null;
     payload.bio = sanitizeMultiLine(els.bio?.value || "", 4000) || null;
-    const avatarURL = pendingAvatarURL || currentUser?.avatarURL || "";
-    if (avatarURL) payload.avatarURL = avatarURL;
+    const avatarURL = pendingAvatarURL || currentUser?.profileImage || currentUser?.avatarURL || "";
+    if (avatarURL) {
+      payload.avatarURL = avatarURL;
+      payload.profileImage = avatarURL;
+    }
     Object.keys(payload).forEach((key) => {
       if (payload[key] === null) payload[key] = null;
     });
@@ -407,15 +413,14 @@
   }
 
   function buildPreferencesPayload() {
-    const payload = { notifications: {}, emailPref: {} };
-    if (els.prefEmail) {
-      payload.emailPref.product = !!els.prefEmail.checked;
-      payload.emailPref.marketing = !!els.prefEmail.checked;
-    }
-    if (els.prefCase) payload.notifications.caseUpdates = !!els.prefCase.checked;
-    if (els.prefMessages) payload.notifications.messages = !!els.prefMessages.checked;
-    if (els.prefTasks) payload.notifications.system = !!els.prefTasks.checked;
-    return payload;
+    return {
+      inAppMessages: !!els.prefInAppMessages?.checked,
+      inAppCase: !!els.prefInAppCase?.checked,
+      emailMessages: !!els.prefEmailMessages?.checked,
+      emailCase: !!els.prefEmailCase?.checked,
+      smsMessages: !!els.prefSMSMessages?.checked,
+      smsCase: !!els.prefSMSCase?.checked,
+    };
   }
 
   async function patchMe(body) {
@@ -487,7 +492,7 @@
     try {
       const formData = new FormData();
       formData.append("file", file, file.name);
-      const res = await authorizedFetch("/uploads/profile", {
+      const res = await authorizedFetch("/uploads/profile-photo", {
         method: "POST",
         body: formData,
       });
@@ -496,21 +501,30 @@
         const message = data?.error || data?.msg || "Upload failed";
         throw new Error(message);
       }
-      const url = data?.url || data?.secureUrl || data?.avatarURL || data?.location;
+      const url = data?.url || data?.secureUrl || data?.profileImage || data?.avatarURL || data?.location;
       if (!url) {
         throw new Error("Upload did not return a file URL");
       }
       pendingAvatarURL = url;
+      currentUser.profileImage = url;
+      currentUser.avatarURL = url;
       setAvatarPreview(url, initials);
-      setUploadStatus("Photo uploaded. Click Save to apply.", "success");
+      if (els.headerAvatar) {
+        els.headerAvatar.src = url;
+      }
+      setUploadStatus("Photo uploaded.", "success");
       showToast("Photo uploaded.");
     } catch (err) {
       console.error(err);
       setUploadStatus(err.message || "Upload failed", "error");
       showToast(err.message || "Unable to upload photo", "err");
       const fallbackInitials = getInitials(`${currentUser?.firstName || ""} ${currentUser?.lastName || ""}`);
-      if (currentUser?.avatarURL) {
-        setAvatarPreview(currentUser.avatarURL, fallbackInitials);
+      if (currentUser?.profileImage || currentUser?.avatarURL) {
+        const existing = currentUser.profileImage || currentUser.avatarURL;
+        setAvatarPreview(existing, fallbackInitials);
+        if (els.headerAvatar && existing) {
+          els.headerAvatar.src = existing;
+        }
       } else {
         setAvatarPreview(null, fallbackInitials);
       }
@@ -659,3 +673,16 @@
   }
 
 })();
+  async function patchNotificationPrefs(body) {
+    const res = await authorizedFetch("/users/me/notification-prefs", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const message = data?.error || data?.msg || "Unable to update notification preferences";
+      throw new Error(message);
+    }
+    return data;
+  }

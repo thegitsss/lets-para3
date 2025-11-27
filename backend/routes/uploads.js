@@ -118,6 +118,8 @@ const BLOCKED = [/html/i, /javascript/i, /zip/i, /x-msdownload/i, /octet-stream/
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_CASE_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_CERT_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_PROFILE_PHOTO_BYTES = 5 * 1024 * 1024;
 const caseFileUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_CASE_FILE_BYTES },
@@ -313,6 +315,97 @@ router.post(
       await logAction(req, "paralegal.certificate.upload", { targetType: "user", targetId: user._id });
     } catch (err) {
       console.warn("[uploads] certificate upload audit failed", err?.message || err);
+    }
+
+    return res.json({ success: true, url: key });
+  })
+);
+
+router.post(
+  "/paralegal-resume",
+  requireRole(["paralegal"]),
+  csrfProtection,
+  caseFileMiddleware,
+  asyncHandler(async (req, res) => {
+    if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
+    if (!req.file) return res.status(400).json({ msg: "Résumé file is required" });
+    if (req.file.mimetype !== "application/pdf") {
+      return res.status(400).json({ msg: "Résumé must be a PDF" });
+    }
+    if (req.file.size > MAX_RESUME_FILE_BYTES) {
+      return res.status(400).json({ msg: "Résumé exceeds maximum allowed size" });
+    }
+
+    const ownerId = String(req.user?.id || req.user?._id || "").trim();
+    if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
+
+    const key = `paralegal-resumes/${safeSegment(ownerId)}/resume.pdf`;
+    const putParams = {
+      Bucket: BUCKET,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: "application/pdf",
+      ContentLength: req.file.size,
+      ACL: "private",
+      ...sseParams(),
+    };
+    await s3.send(new PutObjectCommand(putParams));
+
+    const user = await User.findById(ownerId);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+    user.resumeURL = key;
+    await user.save();
+
+    try {
+      await logAction(req, "paralegal.resume.upload", { targetType: "user", targetId: user._id });
+    } catch (err) {
+      console.warn("[uploads] resume upload audit failed", err?.message || err);
+    }
+
+    return res.json({ success: true, url: key });
+  })
+);
+
+router.post(
+  "/profile-photo",
+  requireRole(["paralegal", "attorney"]),
+  csrfProtection,
+  caseFileMiddleware,
+  asyncHandler(async (req, res) => {
+    if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
+    if (!req.file) return res.status(400).json({ msg: "Profile photo is required" });
+    if (!/image\/(png|jpe?g)/i.test(req.file.mimetype || "")) {
+      return res.status(400).json({ msg: "Only JPEG or PNG images are allowed" });
+    }
+    if (req.file.size > MAX_PROFILE_PHOTO_BYTES) {
+      return res.status(400).json({ msg: "Profile photo exceeds maximum allowed size" });
+    }
+
+    const ownerId = String(req.user?.id || req.user?._id || "").trim();
+    if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
+
+    const key = `profile-photos/${safeSegment(ownerId)}/profile.jpg`;
+    const putParams = {
+      Bucket: BUCKET,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype || "image/jpeg",
+      ContentLength: req.file.size,
+      ACL: "private",
+      ...sseParams(),
+    };
+    await s3.send(new PutObjectCommand(putParams));
+
+    const user = await User.findById(ownerId);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+    user.profileImage = key;
+    user.avatarURL = key;
+    await user.save();
+
+    try {
+      await logAction(req, "user.profile_photo.upload", { targetType: "user", targetId: user._id });
+    } catch (err) {
+      console.warn("[uploads] profile photo upload audit failed", err?.message || err);
     }
 
     return res.json({ success: true, url: key });

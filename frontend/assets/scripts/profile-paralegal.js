@@ -44,6 +44,8 @@ const elements = {
   ref2NameInput: document.getElementById("ref2Name"),
   ref2EmailInput: document.getElementById("ref2Email"),
   certificateUploadInput: document.getElementById("certificateUpload"),
+  resumeUploadInput: document.getElementById("resumeUpload"),
+  profilePhotoInput: document.getElementById("profilePhoto"),
   profileSaveBtn: document.getElementById("saveProfileBtn"),
 };
 
@@ -159,6 +161,8 @@ function bindProfileForm() {
   if (!elements.profileForm) return;
   elements.profileForm.addEventListener("submit", handleProfileFormSubmit);
   elements.certificateUploadInput?.addEventListener("change", handleCertificateUpload);
+  elements.resumeUploadInput?.addEventListener("change", handleResumeUpload);
+  elements.profilePhotoInput?.addEventListener("change", handleProfilePhotoChange);
   updateProfileFormVisibility();
 }
 
@@ -277,11 +281,107 @@ async function uploadCertificate(file) {
       const snapshot = state.profile || { id: state.paralegalId };
       state.profile = { ...snapshot, certificateURL: url };
       renderMetadata(state.profile);
+      renderAttorneyHighlights(state.profile);
     }
     showToast("Certificate uploaded.", "success");
   } catch (err) {
     console.error(err);
     showToast(err.message || "Certificate upload failed.", "error");
+  }
+}
+
+function handleResumeUpload(event) {
+  const file = event.target?.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  if (!canEditProfile()) {
+    showToast("Only the profile owner can upload documents.", "error");
+    return;
+  }
+  if (file.type !== "application/pdf") {
+    showToast("Please upload a PDF résumé.", "error");
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    showToast("Résumé must be 10 MB or smaller.", "error");
+    return;
+  }
+  uploadResume(file);
+}
+
+async function uploadResume(file) {
+  if (!file) return;
+  const formData = new FormData();
+  formData.append("file", file, file.name || "resume.pdf");
+  try {
+    const res = await secureFetch("/api/uploads/paralegal-resume", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error || "Unable to upload résumé");
+    }
+    const url = data?.url || data?.resumeURL || data?.location || data?.fileURL || null;
+    if (url) {
+      const snapshot = state.profile || { id: state.paralegalId };
+      state.profile = { ...snapshot, resumeURL: url };
+      renderMetadata(state.profile);
+      renderAttorneyHighlights(state.profile);
+    }
+    showToast("Résumé uploaded.", "success");
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || "Résumé upload failed.", "error");
+  }
+}
+
+function handleProfilePhotoChange(event) {
+  const file = event.target?.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  if (!canEditProfile()) {
+    showToast("Only the profile owner can upload photos.", "error");
+    return;
+  }
+  if (!/image\/(png|jpe?g)/i.test(file.type || "")) {
+    showToast("Upload a JPEG or PNG profile photo.", "error");
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    showToast("Profile photo must be 5 MB or smaller.", "error");
+    return;
+  }
+  uploadProfilePhoto(file);
+}
+
+async function uploadProfilePhoto(file) {
+  if (!file) return;
+  const formData = new FormData();
+  formData.append("file", file, file.name || "profile.jpg");
+  try {
+    const res = await secureFetch("/api/uploads/profile-photo", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error || "Unable to upload profile photo");
+    }
+    const url = data?.url || data?.profileImage || data?.location || null;
+    if (url) {
+      const snapshot = state.profile || { id: state.paralegalId };
+      state.profile = { ...snapshot, profileImage: url };
+      if (state.viewerRole === "paralegal" && state.viewerId === state.paralegalId) {
+        state.viewer = { ...(state.viewer || {}), profileImage: url };
+        hydrateHeader();
+      }
+      renderProfile(state.profile);
+    }
+    showToast("Profile photo updated.", "success");
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || "Unable to upload profile photo.", "error");
   }
 }
 
@@ -302,6 +402,8 @@ function updateProfileFormVisibility() {
     elements.ref2NameInput,
     elements.ref2EmailInput,
     elements.certificateUploadInput,
+    elements.resumeUploadInput,
+    elements.profilePhotoInput,
   ].filter(Boolean);
   inputs.forEach((input) => {
     input.disabled = !canEdit;
@@ -314,7 +416,7 @@ function hydrateHeader() {
   if (!state.viewer) return;
   if (elements.chipName) elements.chipName.textContent = formatName(state.viewer);
   if (elements.chipRole) elements.chipRole.textContent = prettyRole(state.viewer.role);
-  const avatarSrc = state.viewer.avatarURL || state.viewer.profileImage || buildInitialAvatar(getInitials(formatName(state.viewer)));
+  const avatarSrc = state.viewer.profileImage || state.viewer.avatarURL || buildInitialAvatar(getInitials(formatName(state.viewer)));
   if (elements.chipAvatar && avatarSrc) {
     elements.chipAvatar.src = avatarSrc;
     elements.chipAvatar.alt = `${formatName(state.viewer)} avatar`;
@@ -385,7 +487,7 @@ function renderProfile(profile) {
   const summary = profile.bio || profile.about || "This professional hasn’t added a summary yet.";
   setFieldText(elements.bioCopy, summary);
 
-  renderAvatar(fullName, profile.avatarURL);
+  renderAvatar(fullName, profile.profileImage || profile.avatarURL);
   renderStatus(profile);
   renderMetadata(profile);
   renderPills(elements.skillsList, profile.skills, "This paralegal hasn’t shared skills yet.");
@@ -607,6 +709,20 @@ function renderAttorneyHighlights(profile) {
     entries.push({
       title: "Certificate",
       content: `<a href="${certUrl}" target="_blank" rel="noopener">View credential</a>`,
+    });
+  }
+  if (profile.resumeURL) {
+    const resumeHref = escapeAttribute(profile.resumeURL);
+    entries.push({
+      title: "Résumé",
+      content: `<a href="${resumeHref}" target="_blank" rel="noopener">View Résumé</a>`,
+    });
+  }
+  if (profile.resumeURL) {
+    const resumeUrl = escapeAttribute(profile.resumeURL);
+    entries.push({
+      title: "Résumé",
+      content: `<a href="${resumeUrl}" target="_blank" rel="noopener">View Résumé</a>`,
     });
   }
 

@@ -302,7 +302,7 @@ async function loadViewerProfile() {
     const safeName = sanitizeMessageInput(`${me.firstName || ""} ${me.lastName || ""}`) || "Paralegal";
     const safeState = sanitizeMessageInput(me.state || me.location || me.region || "");
     const safeBio = sanitizeMessageInput(me.bio || "");
-    const avatar = me.avatarURL || buildInitialsAvatar(safeName);
+    const avatar = me.profileImage || me.avatarURL || buildInitialsAvatar(safeName);
     viewerProfile = { name: safeName, state: safeState, bio: safeBio, avatar };
     applyViewerProfile(viewerProfile);
     return viewerProfile;

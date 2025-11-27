@@ -10,6 +10,7 @@ const Case = require("../models/Case");
 const User = require("../models/User");
 const AuditLog = require("../models/AuditLog"); // match filename
 const Notification = require("../models/Notification");
+const sendEmail = require("../utils/email");
 const { containsProfanity, maskProfanity } = require("../utils/badWords");
 
 // ----------------------------------------
@@ -80,20 +81,37 @@ async function createMessageNotification({ caseDoc, senderDoc, message, previewT
   const senderName = `${senderDoc.firstName || ""} ${senderDoc.lastName || ""}`.trim() || "New message";
   const body = `${senderName}: ${buildShortPreview(previewText)}`;
 
-  const doc = {
-    userId: recipientId,
-    caseId: toObjectId(caseDoc._id),
+  const recipient = await User.findById(recipientId).select("notificationPrefs email phoneNumber");
+  if (!recipient) return;
+  const prefs = recipient.notificationPrefs || {};
+  const meta = {
+    caseId: caseDoc._id ? new mongoose.Types.ObjectId(caseDoc._id) : null,
     messageId: message?._id ? new mongoose.Types.ObjectId(message._id) : null,
-    title,
-    body,
-    type: "message",
-    meta: {
-      caseId: caseDoc._id ? new mongoose.Types.ObjectId(caseDoc._id) : null,
-      messageId: message?._id ? new mongoose.Types.ObjectId(message._id) : null,
-    },
-    read: false,
   };
-  await Notification.create(doc);
+  if (prefs.inAppMessages !== false) {
+    await Notification.create({
+      userId: recipientId,
+      caseId: toObjectId(caseDoc._id),
+      messageId: meta.messageId,
+      title,
+      body,
+      type: "message",
+      meta,
+      read: false,
+    });
+  }
+  if (prefs.emailMessages !== false && recipient.email) {
+    if (typeof sendEmail.sendNotificationEmail === "function") {
+      sendEmail
+        .sendNotificationEmail(recipient.email, title, `${body}<br/><br/>Sign in to reply.`)
+        .catch((err) => console.warn("[messages] notification email failed", err?.message || err));
+    } else {
+      sendEmail(recipient.email, title, body).catch((err) => console.warn("[messages] email failed", err?.message || err));
+    }
+  }
+  if (prefs.smsMessages && recipient.phoneNumber && typeof sendEmail.sendNotificationSMS === "function") {
+    sendEmail.sendNotificationSMS(recipient.phoneNumber, `${title}: ${buildShortPreview(previewText)}`);
+  }
 }
 
 function buildUnreadClause(userObjectId) {

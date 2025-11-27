@@ -248,6 +248,9 @@
           <label for="email">Email</label>
           <input id="email" type="email" autocomplete="email" required />
 
+          <label for="phoneNumber">Phone (optional)</label>
+          <input id="phoneNumber" type="tel" autocomplete="tel" placeholder="Phone (optional)" />
+
           <label for="password">Password</label>
           <div class="pw-wrap">
             <input id="password" type="password" autocomplete="new-password" placeholder="8+ characters" required />
@@ -318,6 +321,7 @@
     const firstNameEl = document.getElementById('firstName');
     const lastNameEl = document.getElementById('lastName');
     const termsCheckbox = document.getElementById('termsAccept');
+    const phoneEl = document.getElementById('phoneNumber');
     emailEl.value = localStorage.getItem('lastEmail') || '';
 
     let role = 'attorney';
@@ -368,6 +372,7 @@
       const lastName = lastNameEl.value.trim();
       const email = emailEl.value.trim().toLowerCase();
       const password = pw.value;
+      const phoneNumber = (phoneEl?.value || '').trim();
 
       const termsAccepted = termsCheckbox?.checked;
       if (!termsAccepted) {
@@ -395,6 +400,7 @@
         const payload = { firstName, lastName, email, password, role };
         if (role === 'attorney') payload.barNumber = document.getElementById('bar').value.trim();
         else payload.certificateURL = (document.getElementById('cert')?.value || '').trim() || undefined;
+        if (phoneNumber) payload.phoneNumber = phoneNumber;
         payload.recaptchaToken = await getRecaptchaToken('signup');
         payload.termsAccepted = true;
 

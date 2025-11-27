@@ -110,7 +110,7 @@ function renderGrid(items = []) {
     const avatar = document.createElement("img");
     avatar.className = "pl-avatar";
     avatar.alt = `${formatName(paralegal)} avatar`;
-    avatar.src = paralegal.avatarURL || paralegal.profileImage || PLACEHOLDER_AVATAR;
+    avatar.src = paralegal.profileImage || paralegal.avatarURL || PLACEHOLDER_AVATAR;
 
     const name = document.createElement("div");
     name.className = "pl-name";

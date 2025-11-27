@@ -217,3 +217,38 @@ module.exports.sendPendingReviewEmail = sendPendingReviewEmail;
 module.exports.sendAdditionalInfoEmail = sendAdditionalInfoEmail;
 module.exports.sendAcceptedEmail = sendAcceptedEmail;
 module.exports.sendNotAcceptedEmail = sendNotAcceptedEmail;
+
+async function sendVerificationEmail(user, code) {
+  if (!user?.email) return;
+  const safeCode = code || Math.random().toString(36).slice(2, 8).toUpperCase();
+  const body = `Hi ${user.firstName || user.email},<br/><br/>Your Let’s-ParaConnect verification code is <strong>${safeCode}</strong>.<br/><br/>Enter this code in the app to confirm your email.`;
+  try {
+    await module.exports(user.email, "Verify your email", body);
+  } catch (err) {
+    console.warn("[email] verification email placeholder failed", err?.message || err);
+  }
+}
+
+async function sendVerificationSMS(phone, code) {
+  console.log(`[sms] Placeholder verification SMS to ${phone || "unknown"}: ${code || "000000"}`);
+}
+
+module.exports.sendVerificationEmail = sendVerificationEmail;
+module.exports.sendVerificationSMS = sendVerificationSMS;
+
+async function sendNotificationEmail(to, subject, body) {
+  if (!to) return;
+  try {
+    await module.exports(to, subject || "Let’s-ParaConnect notification", body || "You have a new notification.");
+  } catch (err) {
+    console.warn("[email] notification email failed", err?.message || err);
+  }
+}
+
+function sendNotificationSMS(phone, message) {
+  if (!phone) return;
+  console.log(`[sms] Notification to ${phone}: ${message || "You have a new notification."}`);
+}
+
+module.exports.sendNotificationEmail = sendNotificationEmail;
+module.exports.sendNotificationSMS = sendNotificationSMS;

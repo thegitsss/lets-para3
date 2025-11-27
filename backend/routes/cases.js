@@ -242,19 +242,36 @@ function normalizeFile(file) {
 
 async function createCaseNotification({ userId, caseDoc, title, body, type = "case-event", meta = {} }) {
   if (!userId) return;
+  const recipient = await User.findById(userId).select("notificationPrefs email phoneNumber");
+  if (!recipient) return;
+  const prefs = recipient.notificationPrefs || {};
   try {
-    await Notification.create({
-      userId,
-      caseId: caseDoc?._id || null,
-      title,
-      body,
-      type,
-      meta: {
-        ...(meta || {}),
+    if (prefs.inAppCase !== false) {
+      await Notification.create({
+        userId,
         caseId: caseDoc?._id || null,
-      },
-      read: false,
-    });
+        title,
+        body,
+        type,
+        meta: {
+          ...(meta || {}),
+          caseId: caseDoc?._id || null,
+        },
+        read: false,
+      });
+    }
+    if (prefs.emailCase !== false && recipient.email) {
+      const subject = title || "Case update";
+      const emailBody = `${body || "You have a new case update."}<br/><br/>Sign in to view details.`;
+      if (typeof sendEmail.sendNotificationEmail === "function") {
+        await sendEmail.sendNotificationEmail(recipient.email, subject, emailBody);
+      } else {
+        await sendEmail(recipient.email, subject, body || emailBody);
+      }
+    }
+    if (prefs.smsCase && recipient.phoneNumber && typeof sendEmail.sendNotificationSMS === "function") {
+      sendEmail.sendNotificationSMS(recipient.phoneNumber, body || title || "Case update");
+    }
   } catch (err) {
     console.warn("[cases] notification create failed", err);
   }

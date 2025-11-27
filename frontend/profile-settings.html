@@ -683,7 +683,9 @@
             <p class="hint" id="uploadStatus" aria-live="polite"></p>
           </div>
         </div>
-        <input type="file" id="avatarInput" accept="image/png,image/jpeg" hidden />
+        <label>Profile Photo
+          <input type="file" id="profilePhoto" accept="image/png, image/jpeg" hidden />
+        </label>
         <div class="grid">
           <label for="firstName">
             First name
@@ -744,46 +746,30 @@
       <h2>Preferences</h2>
       <p>Decide when LPC should reach out.</p>
       <form id="preferencesForm">
-        <div class="toggle-row">
-          <div>
-            <h3>Email notifications</h3>
-            <p>General updates for your matters and account.</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="prefEmail" />
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="toggle-row">
-          <div>
-            <h3>Case update alerts</h3>
-            <p>Be notified when a paralegal moves a case forward.</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="prefCaseUpdates" />
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="toggle-row">
-          <div>
-            <h3>Message notifications</h3>
-            <p>Know when a paralegal drops you a new message.</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="prefMessages" />
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="toggle-row">
-          <div>
-            <h3>Task reminders</h3>
-            <p>Stay on track with subtle nudges for open tasks.</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="prefTasks" />
-            <span class="slider"></span>
-          </label>
-        </div>
+        <label>
+          <input type="checkbox" id="prefInAppMessages" />
+          In-app: Messages
+        </label>
+        <label>
+          <input type="checkbox" id="prefInAppCase" />
+          In-app: Case Updates
+        </label>
+        <label>
+          <input type="checkbox" id="prefEmailMessages" />
+          Email: Messages
+        </label>
+        <label>
+          <input type="checkbox" id="prefEmailCase" />
+          Email: Case Updates
+        </label>
+        <label>
+          <input type="checkbox" id="prefSMSMessages" />
+          SMS: Messages
+        </label>
+        <label>
+          <input type="checkbox" id="prefSMSCase" />
+          SMS: Case Updates
+        </label>
         <div class="btn-row">
           <button class="btn btn-primary" type="submit" id="preferencesSaveBtn">Save preferences</button>
         </div>

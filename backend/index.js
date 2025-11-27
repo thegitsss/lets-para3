@@ -76,6 +76,7 @@ const paralegalDashboardRouter = require("./routes/paralegalDashboard");
 const chatRouter = require("./routes/chat");
 const checklistRouter = require("./routes/checklist");
 const eventsRouter = require("./routes/events");
+const verificationRouter = require("./routes/verification");
 const { startPurgeWorker } = require("./services/caseLifecycle");
 
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }), paymentsWebhookHandler);
@@ -95,6 +96,7 @@ app.use("/api/attorney/dashboard", attorneyDashboardRouter);
 app.use("/api/paralegal/dashboard", paralegalDashboardRouter);
 app.use("/api/chat", chatRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/verify", verificationRouter);
 if (usersRouter?.paralegalRouter) {
   app.use("/api/paralegals", usersRouter.paralegalRouter);
 }
@@ -130,13 +132,25 @@ app.use((err, _req, res, _next) => {
 });
 
 // 8) MongoDB Connection & Server start
-const raw = process.env.MONGO_URI || "";
-const MONGO = /<cluster>/.test(raw) || !raw ? "mongodb://127.0.0.1:27017/lets-para" : raw;
+function connectWithRetry() {
+  const uri = process.env.MONGO_URI;
+  if (!uri) {
+    console.error("❌ MONGO_URI is not set. Cannot connect to MongoDB.");
+    return;
+  }
+  mongoose
+    .connect(uri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    })
+    .then(() => console.log("✅ Connected to MongoDB Atlas"))
+    .catch((err) => {
+      console.error("❌ MongoDB Error:", err);
+      setTimeout(connectWithRetry, 5000);
+    });
+}
 
-mongoose
-  .connect(MONGO)
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.error("❌ MongoDB error:", err));
+connectWithRetry();
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is live at http://localhost:${PORT}`);

@@ -228,7 +228,8 @@ window.loadUserHeaderInfo = async function () {
     const avatarEl = document.querySelector(".user-profile img");
 
     if (cachedUser.name && nameEl) nameEl.textContent = cachedUser.name;
-    if (cachedUser.avatarURL && avatarEl) avatarEl.src = cachedUser.avatarURL;
+    const cachedAvatar = cachedUser.profileImage || cachedUser.avatarURL;
+    if (cachedAvatar && avatarEl) avatarEl.src = cachedAvatar;
 
     // 2. Refresh with live data
     const res = await fetch("/api/users/me", { credentials: "include" });
@@ -236,7 +237,7 @@ window.loadUserHeaderInfo = async function () {
 
     const user = await res.json();
     if (!user || !user.name) return;
-    const avatar = user.avatarURL || user.profileImage || "";
+    const avatar = user.profileImage || user.avatarURL || "";
 
     // 3. Update UI
     if (nameEl) nameEl.textContent = user.name;
@@ -247,6 +248,7 @@ window.loadUserHeaderInfo = async function () {
       "userInfo",
       JSON.stringify({
         name: user.name,
+        profileImage: avatar || cachedUser.profileImage || cachedUser.avatarURL || "",
         avatarURL: avatar || cachedUser.avatarURL || ""
       })
     );

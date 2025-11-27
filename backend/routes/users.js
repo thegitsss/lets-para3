@@ -99,7 +99,7 @@ const parseParalegalFilters = (query = {}) => {
   return { filter, sortOpt, page: p, limit: l };
 };
 
-const SAFE_PUBLIC_SELECT = "_id firstName lastName avatarURL location specialties yearsExperience linkedInURL certificateURL education";
+const SAFE_PUBLIC_SELECT = "_id firstName lastName avatarURL profileImage location specialties yearsExperience linkedInURL certificateURL education resumeURL notificationPrefs";
 const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email`;
 
 function serializePublicUser(user, { includeEmail = false } = {}) {
@@ -110,13 +110,16 @@ function serializePublicUser(user, { includeEmail = false } = {}) {
     firstName: src.firstName || "",
     lastName: src.lastName || "",
     avatarURL: src.avatarURL || "",
+    profileImage: src.profileImage || "",
     state: src.state || src.location || "",
     specialties: Array.isArray(src.specialties) ? src.specialties : [],
     yearsExperience:
       typeof src.yearsExperience === "number" ? src.yearsExperience : 0,
     linkedInURL: src.linkedInURL || "",
     certificateURL: src.certificateURL || "",
+    resumeURL: src.resumeURL || "",
     education: Array.isArray(src.education) ? src.education : [],
+    notificationPrefs: src.notificationPrefs || null,
   };
   if (includeEmail) {
     payload.email = src.email || "";
@@ -303,6 +306,7 @@ router.patch(
       certificateURL,
       barNumber,
       avatarURL,
+      profileImage,
       timezone,
     } = req.body || {};
 
@@ -315,6 +319,9 @@ router.patch(
 
     if (typeof avatarURL === "string" && isURL(avatarURL)) {
       me.avatarURL = avatarURL;
+    }
+    if (typeof profileImage === "string" && profileImage.trim()) {
+      me.profileImage = profileImage.trim();
     }
     if (typeof timezone === "string" && timezone.length <= 64) {
       me.timezone = timezone;
@@ -334,6 +341,30 @@ router.patch(
     } catch {}
 
     return res.json(serializePublicUser(me, { includeEmail: true }));
+  })
+);
+
+router.patch(
+  "/me/notification-prefs",
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const me = await User.findById(req.user.id);
+    if (!me) return res.status(404).json({ error: "Not found" });
+    const current = me.notificationPrefs
+      ? typeof me.notificationPrefs.toObject === "function"
+        ? me.notificationPrefs.toObject()
+        : { ...me.notificationPrefs }
+      : {};
+    const updates = req.body || {};
+    const allowed = ["inAppMessages", "inAppCase", "emailMessages", "emailCase", "smsMessages", "smsCase"];
+    allowed.forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(updates, key)) {
+        current[key] = !!updates[key];
+      }
+    });
+    me.notificationPrefs = current;
+    await me.save();
+    return res.json({ notificationPrefs: me.notificationPrefs });
   })
 );
 

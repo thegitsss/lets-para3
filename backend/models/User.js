@@ -39,6 +39,18 @@ const notificationPrefsSchema = new Schema(
   { _id: false }
 );
 
+const notificationSettingsSchema = new Schema(
+  {
+    inAppMessages: { type: Boolean, default: true },
+    inAppCase: { type: Boolean, default: true },
+    emailMessages: { type: Boolean, default: true },
+    emailCase: { type: Boolean, default: true },
+    smsMessages: { type: Boolean, default: false },
+    smsCase: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
 const writingSampleSchema = new Schema(
   {
     title: { type: String, trim: true, maxlength: 400 },
@@ -82,13 +94,16 @@ const userSchema = new Schema(
       maxlength: 320,
     },
     password: { type: String, required: true, select: false }, // never returned by default
+    emailVerified: { type: Boolean, default: false },
+    phoneNumber: { type: String, default: null },
+    phoneVerified: { type: Boolean, default: false },
 
     // Role
     role: { type: String, enum: ROLE_ENUM, required: true, index: true },
 
     // Role-specific profile fields
     barNumber: { type: String, default: "", trim: true },         // attorneys
-    resumeURL: { type: String, default: "", trim: true },         // paralegals
+    resumeURL: { type: String, default: null },
     certificateURL: { type: String, default: "", trim: true },    // paralegals
 
     // Status
@@ -99,6 +114,7 @@ const userSchema = new Schema(
     about: { type: String, default: "", trim: true, maxlength: 20_000 },
     availability: { type: String, default: "Available Now", trim: true, maxlength: 200 },
     avatarURL: { type: String, default: "", trim: true },
+    profileImage: { type: String, default: null },
     timezone: { type: String, default: "America/New_York", trim: true },
     location: { type: String, default: "", trim: true }, // City, State
     practiceAreas: { type: [String], default: [], set: uniqueStrings },
@@ -114,7 +130,6 @@ const userSchema = new Schema(
     education: { type: [educationEntrySchema], default: [] },
 
     // Security / housekeeping
-    emailVerified: { type: Boolean, default: false },
     termsAccepted: { type: Boolean, default: false },
     lastLoginAt: { type: Date },
     failedLogins: { type: Number, default: 0 },
@@ -134,6 +149,7 @@ const userSchema = new Schema(
 
     // Notifications
     notifications: { type: notificationPrefsSchema, default: () => ({}) },
+    notificationPrefs: { type: notificationSettingsSchema, default: () => ({}) },
     emailPref: {
       marketing: { type: Boolean, default: true },
       product: { type: Boolean, default: true },
