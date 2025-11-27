@@ -65,6 +65,10 @@ async function loadPendingParalegals() {
   }
 }
 
+async function loadUsers() {
+  await Promise.allSettled([loadPendingParalegals(), loadMetrics()]);
+}
+
 function renderSummary(data) {
   const totals = {
     totalUsers: Number(data?.totalUsers) || 0,
@@ -294,6 +298,10 @@ function renderVerificationList(items) {
           </details>
           <button class="approveParalegalBtn" data-id="${id}">Approve</button>
           <button class="rejectParalegalBtn" data-id="${id}">Reject</button>
+          <div class="user-card-actions">
+            <button class="disableUserBtn" data-id="${id}">Disable</button>
+            <button class="enableUserBtn" data-id="${id}">Enable</button>
+          </div>
         </div>
       `;
     })
@@ -353,6 +361,32 @@ if (document.readyState === "loading") {
 }
 
 document.addEventListener("click", async (evt) => {
+  const disableBtn = evt.target.closest(".disableUserBtn");
+  if (disableBtn) {
+    const id = disableBtn.dataset.id;
+    if (!id) return;
+    try {
+      await secureFetch(`/api/admin/disable/${encodeURIComponent(id)}`, { method: "POST" });
+      await loadUsers();
+    } catch (err) {
+      console.error("Failed to disable user", err);
+    }
+    return;
+  }
+
+  const enableBtn = evt.target.closest(".enableUserBtn");
+  if (enableBtn) {
+    const id = enableBtn.dataset.id;
+    if (!id) return;
+    try {
+      await secureFetch(`/api/admin/enable/${encodeURIComponent(id)}`, { method: "POST" });
+      await loadUsers();
+    } catch (err) {
+      console.error("Failed to enable user", err);
+    }
+    return;
+  }
+
   const approveBtn = evt.target.closest(".approveParalegalBtn");
   const rejectBtn = evt.target.closest(".rejectParalegalBtn");
   if (approveBtn) {

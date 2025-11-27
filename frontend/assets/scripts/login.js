@@ -60,6 +60,16 @@ if (stagedSignupToast) {
   }
 }
 
+const disabledMsg = sessionStorage.getItem("disabledAccountMsg");
+if (disabledMsg) {
+  sessionStorage.removeItem("disabledAccountMsg");
+  if (toastHelper) {
+    toastHelper.show(disabledMsg, { targetId: "toastBanner", type: "err" });
+  } else {
+    alert(disabledMsg);
+  }
+}
+
 async function fetchCsrfToken() {
   try {
     const res = await fetch(`${API_BASE}/csrf`, { credentials: "include" });

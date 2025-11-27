@@ -134,6 +134,7 @@ const userSchema = new Schema(
     lastLoginAt: { type: Date },
     failedLogins: { type: Number, default: 0 },
     lockedUntil: { type: Date },
+    disabled: { type: Boolean, default: false },
     notificationsLastViewedAt: { type: Date, default: null },
     messageLastViewedAt: {
       type: Map,

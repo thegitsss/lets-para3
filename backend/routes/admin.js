@@ -9,6 +9,7 @@ const AuditLog = require("../models/AuditLog"); // NOTE: file name fix
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
 const sendEmail = require("../utils/email");
+const { sendWelcomePacket } = sendEmail;
 
 // -----------------------------------------
 // Optional CSRF (enable via ENABLE_CSRF=true)
@@ -58,6 +59,7 @@ function pickUserSafe(u) {
     specialties, jurisdictions, skills, yearsExperience, languages,
     avatarURL, timezone, location, kycStatus, stripeCustomerId, stripeAccountId,
     barNumber, resumeURL, certificateURL, practiceAreas, experience, education,
+    disabled,
   } = u;
   return {
     id: _id,
@@ -80,6 +82,7 @@ function pickUserSafe(u) {
     practiceAreas,
     experience,
     education,
+    disabled,
   };
 }
 
@@ -271,6 +274,7 @@ router.post(
       user.verified = true;
     }
     await user.save();
+    await sendWelcomePacket(user);
     const html = buildVerificationAcceptanceBody(user);
     if (user.email) {
       try {
@@ -302,6 +306,32 @@ router.post(
       }
     }
     res.json({ ok: true });
+  })
+);
+
+router.post(
+  "/disable/:id",
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    user.disabled = true;
+    await user.save();
+    res.json({ ok: true, disabled: true });
+  })
+);
+
+router.post(
+  "/enable/:id",
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    user.disabled = false;
+    await user.save();
+    res.json({ ok: true, disabled: false });
   })
 );
 

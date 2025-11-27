@@ -213,10 +213,34 @@ function sendNotAcceptedEmail(lastName) {
   ]);
 }
 
+async function sendWelcomePacket(user) {
+  const lastName = user.lastName || "";
+  const email = user.email;
+
+  const subject = "Welcome to Let’s-ParaConnect — Acceptance Packet";
+  const body = `
+  Dear Ms./Mr. ${lastName},
+
+  Congratulations — your application has been meticulously reviewed and approved.
+  We would like to welcome you to Let’s-ParaConnect as one of our vetted,
+  elite paralegals.
+
+  Your acceptance signifies trust in your professionalism, verified credentials,
+  and commitment to excellence. Your profile will appear to attorneys upon launch.
+
+  Respectfully,
+  Let’s-ParaConnect Verification Division
+  `;
+
+  if (!email) return;
+  return module.exports(email, subject, body);
+}
+
 module.exports.sendPendingReviewEmail = sendPendingReviewEmail;
 module.exports.sendAdditionalInfoEmail = sendAdditionalInfoEmail;
 module.exports.sendAcceptedEmail = sendAcceptedEmail;
 module.exports.sendNotAcceptedEmail = sendNotAcceptedEmail;
+module.exports.sendWelcomePacket = sendWelcomePacket;
 
 async function sendVerificationEmail(user, code) {
   if (!user?.email) return;

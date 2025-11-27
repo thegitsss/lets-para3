@@ -18,6 +18,7 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
 
 const TWO_HOURS = "2h";
 const FIFTEEN_MIN = 15 * 60 * 1000;
+const DISABLED_ACCOUNT_MSG = "This account has been disabled.";
 
 function signAccess(user) {
   const payload = { id: user._id.toString(), role: user.role, email: user.email };
@@ -177,6 +178,10 @@ router.post(
       return res.status(400).json({ msg: "Invalid credentials" });
     }
 
+    if (user.disabled) {
+      return res.status(403).json({ error: DISABLED_ACCOUNT_MSG, msg: DISABLED_ACCOUNT_MSG });
+    }
+
     const status = user.status || "pending";
     if (status !== "approved") {
       const msg =
@@ -212,6 +217,7 @@ router.post(
         email: user.email,
         role: user.role,
         status: user.status,
+        disabled: Boolean(user.disabled),
       },
     });
   })
@@ -232,6 +238,9 @@ router.get(
       // freshen user info (role/status might have changed)
       const u = await User.findById(payload.id).lean();
       if (!u) return res.json({ user: null });
+      if (u.disabled) {
+        return res.status(403).json({ error: DISABLED_ACCOUNT_MSG });
+      }
       res.json({
         user: {
           id: u._id,
@@ -240,6 +249,7 @@ router.get(
           firstName: u.firstName,
           lastName: u.lastName,
           status: u.status,
+          disabled: Boolean(u.disabled),
         },
       });
     } catch {

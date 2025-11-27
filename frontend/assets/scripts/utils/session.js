@@ -1,4 +1,6 @@
 (function () {
+  const DISABLED_ERROR = "This account has been disabled.";
+  const DISABLED_MSG_KEY = "disabledAccountMsg";
   let hasRedirected = false;
   let nukedOnRedirect = false;
   let cachedUser = null;
@@ -12,18 +14,33 @@
     } catch (_) {}
   }
 
+  function rememberDisabled(message) {
+    try {
+      sessionStorage.setItem(DISABLED_MSG_KEY, message || DISABLED_ERROR);
+    } catch (_) {}
+  }
+
+  function handleDisabledAccount(message) {
+    rememberDisabled(message);
+    invalidateAndRedirect();
+  }
+
   async function fetchSession(force = false) {
     if (force) sessionPromise = null;
     if (!sessionPromise) {
       sessionPromise = fetch("/api/auth/me", { credentials: "include" })
         .then(async (res) => {
+          const payload = await res.json().catch(() => ({}));
           if (!res.ok) {
+            const message = payload?.error || payload?.msg;
+            if (message === DISABLED_ERROR) {
+              handleDisabledAccount(message);
+              return null;
+            }
             if (res.status === 401) return null;
-            const payload = await res.json().catch(() => ({}));
             return payload?.user || null;
           }
-          const data = await res.json().catch(() => ({}));
-          return data?.user || null;
+          return payload?.user || null;
         })
         .catch(() => null)
         .then((user) => {
@@ -72,6 +89,10 @@
     if (!user) {
       if (redirectOnFail) invalidateAndRedirect();
       throw new Error("Authentication required");
+    }
+    if (user?.disabled) {
+      if (redirectOnFail) handleDisabledAccount(DISABLED_ERROR);
+      throw new Error(DISABLED_ERROR);
     }
     if (expectedRole && normalizedRole !== String(expectedRole).toLowerCase()) {
       if (redirectOnFail) invalidateAndRedirect();
