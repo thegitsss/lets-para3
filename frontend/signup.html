@@ -256,6 +256,20 @@
 
           <div id="roleFieldWrap"></div>
 
+          <label class="terms-label">
+            <input type="checkbox" id="termsAccept" required>
+            I have read and agree to the
+            <a href="terms.html" target="_blank">Terms of Use</a> and
+            <a href="privacy.html" target="_blank">Privacy Policy</a>.
+          </label>
+
+          <label class="terms-label">
+            <input type="checkbox" id="termsAccept" required>
+            I have read and agree to the
+            <a href="terms.html" target="_blank">Terms of Use</a> and
+            <a href="privacy.html" target="_blank">Privacy Policy</a>.
+          </label>
+
           <button id="submitBtn" class="btn" type="submit">Create Account</button>
           <div id="msg" class="msg" role="status" aria-live="polite"></div>
 
@@ -303,6 +317,7 @@
     const emailEl = document.getElementById('email');
     const firstNameEl = document.getElementById('firstName');
     const lastNameEl = document.getElementById('lastName');
+    const termsCheckbox = document.getElementById('termsAccept');
     emailEl.value = localStorage.getItem('lastEmail') || '';
 
     let role = 'attorney';
@@ -354,6 +369,12 @@
       const email = emailEl.value.trim().toLowerCase();
       const password = pw.value;
 
+      const termsAccepted = termsCheckbox?.checked;
+      if (!termsAccepted) {
+        alert('You must agree to the Terms of Use and Privacy Policy before creating an account.');
+        return;
+      }
+
       if (!firstName || !lastName || !email || !password) { say('Please fill all required fields.', 'err'); return; }
       if (!isValidEmail(email)) { say('Enter a valid email address.', 'err'); return; }
       if (password.length < 8) { say('Use 8+ characters with letters and numbers.', 'err'); return; }
@@ -375,6 +396,7 @@
         if (role === 'attorney') payload.barNumber = document.getElementById('bar').value.trim();
         else payload.certificateURL = (document.getElementById('cert')?.value || '').trim() || undefined;
         payload.recaptchaToken = await getRecaptchaToken('signup');
+        payload.termsAccepted = true;
 
         const headers = { 'Content-Type': 'application/json' };
         if (window.__CSRF__) headers['X-CSRF-Token'] = window.__CSRF__;

@@ -76,6 +76,7 @@ router.post(
       resumeURL,
       certificateURL,
       recaptchaToken,
+      termsAccepted,
     } = req.body || {};
 
     const captchaOk = await verifyRecaptcha(recaptchaToken, "signup");
@@ -87,6 +88,10 @@ router.post(
     const safeLast = String(lastName || "").trim();
     if (!safeFirst || !safeLast) {
       return res.status(400).json({ msg: "First and last name are required." });
+    }
+
+    if (!termsAccepted) {
+      return res.status(400).json({ msg: "Terms of Use must be accepted." });
     }
 
     const roleLc = String(role || "").toLowerCase();
@@ -114,6 +119,7 @@ router.post(
       barNumber: roleLc === "attorney" ? String(barNumber || "") : "",
       resumeURL: roleLc === "paralegal" ? String(resumeURL || "") : "",
       certificateURL: roleLc === "paralegal" ? String(certificateURL || "") : "",
+      termsAccepted: true,
     });
 
     await user.save();

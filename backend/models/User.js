@@ -115,6 +115,7 @@ const userSchema = new Schema(
 
     // Security / housekeeping
     emailVerified: { type: Boolean, default: false },
+    termsAccepted: { type: Boolean, default: false },
     lastLoginAt: { type: Date },
     failedLogins: { type: Number, default: 0 },
     lockedUntil: { type: Date },
