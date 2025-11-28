@@ -23,6 +23,7 @@ const specialties = [
 ];
 
 const selectedSpecialties = new Set();
+const isPublicView = !localStorage.getItem("lpc_name");
 
 const elements = {
   results: document.getElementById("paralegalResults"),
@@ -33,7 +34,6 @@ const elements = {
   stateList: document.getElementById("stateList"),
   specialtyInput: document.getElementById("specialtyInput"),
   specialtyList: document.getElementById("specialtyList"),
-  perPage: document.getElementById("resultsPerPage"),
   prevPage: document.getElementById("prevPage"),
   nextPage: document.getElementById("nextPage"),
   paginationLabel: document.getElementById("paginationLabel"),
@@ -47,7 +47,7 @@ const elements = {
 
 const state = {
   page: 1,
-  limit: parseInt(elements.perPage?.value || "15", 10),
+  limit: 15,
   total: 0,
   pages: 1,
   filters: {
@@ -107,12 +107,6 @@ function bindFilterEvents() {
   elements.stateInput?.addEventListener("blur", () => {
     state.filters.location = (elements.stateInput.value || "").trim();
     resetPageAndFetch();
-  });
-
-  elements.perPage?.addEventListener("change", () => {
-    state.limit = parseInt(elements.perPage.value, 10) || 15;
-    state.page = 1;
-    loadParalegals();
   });
 
   elements.prevPage?.addEventListener("click", () => {
@@ -278,7 +272,7 @@ function buildParalegalCard(paralegal) {
   const availability = paralegal.availability || "Availability on request";
   const specialties = (paralegal.practiceAreas || []).slice(0, 2);
   const experience = formatExperience(paralegal.yearsExperience);
-  const avatar = paralegal.profileImage || paralegal.avatarURL || buildInitialAvatar(getInitials(name));
+  const avatar = paralegal.avatarURL || buildInitialAvatar(getInitials(name));
 
   const card = document.createElement("article");
   card.className = "paralegal-card";

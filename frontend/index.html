@@ -447,7 +447,7 @@
   top: 50%;
   left: 50%;
   transform: translateZ(0);
-  z-index: 20;
+  z-index: 2000;
   font-family: 'Cormorant Garamond', serif;
   font-size: clamp(2rem, 6vw, 4rem);
   font-weight: 300;
@@ -468,7 +468,7 @@
 }
 .hero-content .btn {
   position: relative;
-  z-index: 25;
+  z-index: 250;
   box-shadow:
     0 12px 30px rgba(0, 0, 0, 0.25),
     0 4px 10px rgba(0, 0, 0, 0.15);
@@ -642,7 +642,7 @@
   text-align: center;
   background-color: #ffffff;
   position: relative;
-  z-index: 5;
+  z-index: 500;
   padding: 4rem 0;
   margin: 0;
 }
@@ -706,7 +706,7 @@
     <div class="caption">
       <div class="kicker">Scale your practice with</div>
       <h1 class="headline">Vetted Paralegal Professionals</h1>
-      <a class="cta" href="#services">Explore the collective
+      <a class="cta" href="browse-paralegals.html">Explore the collective
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M5 12h14M13 5l7 7-7 7"/>
         </svg>
@@ -1206,7 +1206,7 @@ updateHeaderAppearance();
 /* === Foreground Content === */
 .how-it-works-bg {
   position: relative;
-  z-index: 3;
+  z-index: 1000;
   text-align: center;
   padding: 3.5rem 0 9rem;
   color: #1a2230;
@@ -1234,7 +1234,7 @@ updateHeaderAppearance();
   grid-template-columns: 1fr;
   gap: 60px;
   max-width: 700px;
-  margin: 0 auto;
+  margin: 180px auto 0;
   padding: 40px 0 0;
 }
 
@@ -1252,6 +1252,8 @@ updateHeaderAppearance();
   height: 340px;
   display: flex;
   text-align: left;
+  position: relative;
+  z-index: 1000;
 }
 
 .how-it-works-bg .card .pad {
