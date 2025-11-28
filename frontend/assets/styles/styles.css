@@ -60,6 +60,23 @@ header {
   font-size: 12px;
 }
 
+.header-actions .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid rgba(26, 34, 48, 0.2);
+  border-radius: 999px;
+  font-size: 12px;
+  font-family: 'Sarabun', sans-serif;
+  font-weight: 200;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #1a2230;
+  text-decoration: none;
+  background: transparent;
+}
+
 .header-actions .login-btn.primary {
   background: #1a2230;
   color: #fff;
