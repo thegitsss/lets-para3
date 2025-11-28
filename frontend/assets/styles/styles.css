@@ -210,6 +210,23 @@ html {
   scroll-behavior: smooth;
 }
 
+/* GPU Layer Promotion for Smooth Scrolling */
+.hero-section,
+.hero-slide,
+.section,
+.hiw-card,
+.fade-in,
+.fade-element,
+.w-slider,
+.w-slide,
+.parallax-layer,
+.observed-element,
+.animated-block {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
 body {
   scroll-behavior: smooth;
   overscroll-behavior-y: contain;
