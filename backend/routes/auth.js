@@ -44,19 +44,32 @@ function isObjId(id) {
 async function verifyRecaptcha(token, expectedAction) {
   const secret = process.env.RECAPTCHA_SECRET || "";
   if (!secret) return true;
-  if (!token) return false;
+  const enforceRecaptcha = String(process.env.RECAPTCHA_ENFORCED || "false").toLowerCase() === "true";
+  if (!token) {
+    console.warn("[recaptcha] missing token");
+    return !enforceRecaptcha;
+  }
   try {
     const params = new URLSearchParams();
     params.append("secret", secret);
     params.append("response", token);
     const { data } = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);
-    if (!data?.success) return false;
-    if (expectedAction && data.action && data.action !== expectedAction) return false;
-    if (typeof data.score === "number" && data.score < 0.3) return false;
+    if (!data?.success) {
+      console.warn("[recaptcha] verification failed", data?.["error-codes"]);
+      return !enforceRecaptcha;
+    }
+    if (expectedAction && data.action && data.action !== expectedAction) {
+      console.warn("[recaptcha] action mismatch", data.action, "expected", expectedAction);
+      return !enforceRecaptcha;
+    }
+    if (typeof data.score === "number" && data.score < 0.3) {
+      console.warn("[recaptcha] low score", data.score);
+      return !enforceRecaptcha;
+    }
     return true;
   } catch (err) {
     console.error("[recaptcha] verify error", err?.message || err);
-    return false;
+    return !enforceRecaptcha;
   }
 }
 

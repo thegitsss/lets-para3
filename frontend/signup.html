@@ -220,11 +220,28 @@
     @media (max-width: 768px) {
       .overlay {
         flex-direction: column;
+        padding-top: 60px;
       }
 
       .left-panel {
         width: 100%;
-        padding: 40px;
+        padding: 24px;
+        min-height: auto;
+      }
+
+      .form-container {
+        max-width: 100%;
+      }
+
+      .brand {
+        position: static;
+        margin-bottom: 16px;
+        text-align: center;
+        display: inline-block;
+      }
+
+      h1 {
+        text-align: center;
       }
     }
   </style>
@@ -232,7 +249,7 @@
   <script type="module" src="assets/scripts/auth.js"></script>
 </head>
 
-<body>
+<body class="signup-page">
   <div class="overlay">
     <div class="left-panel">
       <div class="form-container fade-in">
