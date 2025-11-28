@@ -99,8 +99,7 @@ const parseParalegalFilters = (query = {}) => {
   return { filter, sortOpt, page: p, limit: l };
 };
 
-const SAFE_PUBLIC_SELECT =
-  "_id firstName lastName avatarURL profileImage location specialties yearsExperience linkedInURL certificateURL education resumeURL notificationPrefs bio awards highlightedSkills";
+const SAFE_PUBLIC_SELECT = "_id firstName lastName avatarURL profileImage location specialties yearsExperience linkedInURL certificateURL education resumeURL notificationPrefs";
 const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email`;
 
 function serializePublicUser(user, { includeEmail = false } = {}) {
@@ -120,9 +119,6 @@ function serializePublicUser(user, { includeEmail = false } = {}) {
     certificateURL: src.certificateURL || "",
     resumeURL: src.resumeURL || "",
     education: Array.isArray(src.education) ? src.education : [],
-    bio: src.bio || "",
-    awards: Array.isArray(src.awards) ? src.awards : [],
-    highlightedSkills: Array.isArray(src.highlightedSkills) ? src.highlightedSkills : [],
     notificationPrefs: src.notificationPrefs || null,
   };
   if (includeEmail) {
@@ -543,7 +539,6 @@ paralegalRouter.post(
 
     const body = req.body || {};
     if (typeof body.about === "string") paralegal.about = normStr(maskProfanity(body.about), { len: 4000 });
-    if (typeof body.bio === "string") paralegal.bio = normStr(maskProfanity(body.bio), { len: 4000 });
     if (typeof body.location === "string") paralegal.location = normStr(body.location, { len: 400 });
     const availabilityStr = normalizeAvailability(body.availability);
     if (availabilityStr) paralegal.availability = availabilityStr;
@@ -553,8 +548,6 @@ paralegalRouter.post(
     }
     if (body.practiceAreas !== undefined) paralegal.practiceAreas = cleanList(body.practiceAreas);
     if (body.skills !== undefined) paralegal.skills = cleanList(body.skills);
-    if (body.highlightedSkills !== undefined) paralegal.highlightedSkills = cleanList(body.highlightedSkills);
-    if (body.awards !== undefined) paralegal.awards = cleanList(body.awards);
     paralegal.experience = cleanCollection(body.experience, [
       ["title", 300],
       ["years", 120],
@@ -563,9 +556,6 @@ paralegalRouter.post(
     paralegal.education = cleanCollection(body.education, [
       ["degree", 200],
       ["school", 200],
-      ["institution", 200],
-      ["year", 50],
-      ["certification", 400],
     ]);
     paralegal.writingSamples = cleanCollection(body.writingSamples, [
       ["title", 400],

@@ -72,9 +72,6 @@ const educationEntrySchema = new Schema(
   {
     degree: { type: String, trim: true, maxlength: 200 },
     school: { type: String, trim: true, maxlength: 200 },
-    institution: { type: String, trim: true, maxlength: 200 },
-    year: { type: String, trim: true, maxlength: 12 },
-    certification: { type: String, trim: true, maxlength: 200 },
   },
   { _id: false }
 );
@@ -131,8 +128,6 @@ const userSchema = new Schema(
     writingSamples: { type: [writingSampleSchema], default: [] },
     experience: { type: [experienceEntrySchema], default: [] },
     education: { type: [educationEntrySchema], default: [] },
-    awards: { type: [String], default: [], set: uniqueStrings },
-    highlightedSkills: { type: [String], default: [], set: uniqueStrings },
 
     // Security / housekeeping
     termsAccepted: { type: Boolean, default: false },

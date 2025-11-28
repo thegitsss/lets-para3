@@ -547,8 +547,8 @@
 
     <div class="detail-grid profile-grid">
       <article class="info-card section-block" id="skillsCard">
-        <h2>Highlighted Skills</h2>
-        <div class="pill-group" id="profileSkillsList">
+        <h2>Skills &amp; Specialties</h2>
+        <div class="pill-group" id="skillsList">
           <div class="pill skeleton-block" style="width:120px;height:28px;"></div>
           <div class="pill skeleton-block" style="width:140px;height:28px;"></div>
           <div class="pill skeleton-block" style="width:100px;height:28px;"></div>
@@ -576,24 +576,12 @@
 
       <article class="info-card section-block" id="educationCard">
         <h2>Education</h2>
-        <div class="list-stack" id="profileEducationList">
+        <div class="list-stack" id="educationList">
           <article>
             <h3 class="skeleton-block" style="height:20px;width:60%"></h3>
             <span class="skeleton-block" style="height:16px;width:50%;margin-top:8px;"></span>
           </article>
         </div>
-      </article>
-
-      <article class="info-card section-block" id="awardsCard">
-        <h2>Awards &amp; Honors</h2>
-        <div class="list-stack" id="awardsDisplayList">
-          <p class="muted">No awards listed yet.</p>
-        </div>
-      </article>
-
-      <article class="info-card section-block" id="documentsCard">
-        <h2>Professional Résumé</h2>
-        <p id="resumeLink">Résumé not uploaded.</p>
       </article>
 
       <article class="info-card section-block hidden" id="funFactsCard">
@@ -608,10 +596,6 @@
 
       <article class="info-card section-block" id="profileFormSection">
         <form id="paralegalProfileForm">
-          <label>Professional Bio
-            <textarea id="bio" placeholder="Tell attorneys about yourself..."></textarea>
-          </label>
-
           <label>LinkedIn Profile
             <input type="url" id="linkedInURL" placeholder="https://linkedin.com/in/...">
           </label>
@@ -619,24 +603,6 @@
           <label>Years of Experience
             <input type="number" id="yearsExperience" min="0">
           </label>
-
-          <div id="educationSection">
-            <h3>Education</h3>
-            <button type="button" id="addEducationEntry">Add Education</button>
-            <div id="educationList"></div>
-          </div>
-
-          <div id="awardsSection">
-            <h3>Awards</h3>
-            <button type="button" id="addAward">Add Award</button>
-            <div id="awardsList"></div>
-          </div>
-
-          <div id="skillsSection">
-            <h3>Highlighted Skills (Top 3–5)</h3>
-            <button type="button" id="addSkill">Add Skill</button>
-            <div id="skillsList"></div>
-          </div>
 
           <label>Reference #1 Name
             <input type="text" id="ref1Name">

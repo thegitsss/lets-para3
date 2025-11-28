@@ -18,18 +18,18 @@ const defaultParalegalData = {
     excerpt: 'Can you update the discovery log?',
   },
   deadlines: [
-    { title: 'Jones Inc. collaboration', detail: 'Upload exhibit review', due: 'Nov 25' },
+    { title: 'Jones LLC collaboration', detail: 'Upload exhibit review', due: 'Nov 25' },
     { title: 'Anderson merger support', detail: 'Draft summary', due: 'Nov 28' },
   ],
   notifications: [
     { title: 'New Assignment', body: 'Johnson & Co. invited you to collaborate.' },
-    { title: 'Payment', body: '$820 released for “Samantha vs. Jones Inc.”.' },
+    { title: 'Payment', body: '$820 released for “Samantha vs. Jones LLC”.' },
     { title: 'Reminder', body: 'Submit summary for the Anderson filing.' },
   ],
   recentActivity: 'Discovery Responses · Draft revisions uploaded yesterday.',
   assignments: [
     {
-      title: 'Samantha vs. Jones Inc.',
+      title: 'Samantha vs. Jones LLC',
       attorney: 'Samantha Sider',
       due: 'Nov 30',
       status: 'Active',
@@ -65,7 +65,6 @@ const selectors = {
   assignmentList: document.getElementById('assignmentList'),
   inviteList: document.getElementById('inviteList'),
   assignedCasesList: document.getElementById('assignedCasesList'),
-  applicationsList: document.getElementById('applicationsList'),
   recentActivity: document.getElementById('recentActivity'),
   assignmentTemplate: document.getElementById('assignmentCardTemplate'),
   toastBanner: document.getElementById('toastBanner'),
@@ -360,55 +359,6 @@ function renderAssignedCasesError(message = 'Unable to load assigned cases.') {
   list.innerHTML = `<p>${message}</p>`;
 }
 
-async function loadApplications() {
-  const container = selectors.applicationsList;
-  if (!container) return;
-  try {
-    const res = await secureFetch("/api/applications/my", {
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) throw new Error("Unable to load applications");
-    const data = await res.json().catch(() => []);
-    const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
-    renderApplications(items);
-  } catch (error) {
-    renderApplications([], error.message || "Unable to load applications.");
-  }
-}
-
-function renderApplications(applications = [], errorMessage) {
-  const container = selectors.applicationsList;
-  if (!container) return;
-  if (errorMessage) {
-    container.innerHTML = `<p>${errorMessage}</p>`;
-    return;
-  }
-  if (!applications.length) {
-    container.innerHTML = "<p>No applications submitted yet.</p>";
-    return;
-  }
-  container.innerHTML = applications
-    .map((app) => {
-      const caseTitle =
-        app.caseId?.title ||
-        app.jobId?.title ||
-        "Case Application";
-      const submittedDate = app.createdAt ? new Date(app.createdAt).toLocaleDateString() : "—";
-      const status = (app.status || "submitted").replace(/_/g, " ");
-      return `
-        <div class="case-card">
-          <div class="case-header">
-            <div>
-              <h2>${caseTitle}</h2>
-              <div class="case-subinfo">Submitted ${submittedDate}</div>
-            </div>
-            <div class="case-status">${status}</div>
-          </div>
-        </div>`;
-    })
-    .join("");
-}
-
 function handleCaseAction(action, title) {
   const toastHelper = window.toastUtils;
   const message = `${action} for “${title}” is coming soon.`;
@@ -476,7 +426,6 @@ async function initDashboard() {
   renderAssignments(data.assignments);
   renderInvites(invites);
   await loadAssignedCases();
-  await loadApplications();
 }
 
 document.addEventListener('DOMContentLoaded', () => {

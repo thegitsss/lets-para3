@@ -123,37 +123,6 @@
       margin-bottom: 0.75rem;
     }
 
-    .file-upload-section {
-      margin: 2rem 0;
-      padding: 1.5rem;
-      border: 1px dashed var(--line);
-      border-radius: var(--radius);
-      background: #fff;
-    }
-    .file-upload-section h3 {
-      font-family: var(--font-serif);
-      font-weight: 500;
-      font-size: 1.2rem;
-      margin-bottom: 1rem;
-    }
-    .file-upload-section input[type="file"] {
-      margin-bottom: 1rem;
-    }
-    .file-upload-section .upload-btn {
-      border: none;
-      border-radius: 6px;
-      padding: 8px 18px;
-      background: var(--accent);
-      color: #fff;
-      font-family: var(--font-sans);
-      font-size: 0.9rem;
-      cursor: pointer;
-      transition: background 0.2s ease;
-    }
-    .file-upload-section .upload-btn:hover {
-      background: #a38e5f;
-    }
-
     /* Uploaded Documents */
     .doc-list {
       display: flex;
@@ -667,7 +636,7 @@
       <a href="tasks.html">Tasks</a>
       <a href="help.html">Help</a>
     </nav>
-    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect Inc. 2025</a></div>
+    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
   </aside>
 
   <main class="main">
@@ -750,16 +719,6 @@
     <div class="case-overview">
       <p>This case involves reviewing discovery responses and drafting a Motion for Summary Judgment for Smith & Co. The paralegal assists in organizing discovery, citing prior rulings, and preparing exhibit indexes.</p>
       <p><strong>Deadline:</strong> November 30, 2025 · <strong>Assigned Paralegal:</strong> J. Stone</p>
-      <div id="paralegalApplicationPanel" class="hidden" data-paralegal-only>
-        <button class="btn primary" id="applyToCaseBtn">Apply to This Job</button>
-        <textarea id="coverLetter" placeholder="Optional cover letter" rows="4" style="width:100%;margin-top:.5rem;"></textarea>
-      </div>
-    </div>
-
-    <div class="file-upload-section">
-      <h3>Upload Files</h3>
-      <input type="file" id="fileUploadInput" multiple />
-      <button class="upload-btn" type="button">Upload</button>
     </div>
 
     <section class="case-section">
@@ -946,9 +905,6 @@
     const paymentPanel = document.getElementById('escrowPayment');
     const cardElementHost = document.getElementById('card-element');
     const cardErrorsEl = document.getElementById('card-errors');
-    const applyPanel = document.getElementById('paralegalApplicationPanel');
-    const applyButton = document.getElementById('applyToCaseBtn');
-    const coverLetterInput = document.getElementById('coverLetter');
     let cachedCsrfToken = window.__CSRF__ || '';
     let stripeClientPromise;
     let stripeElementsInstance;
@@ -973,7 +929,6 @@
     });
     fundEscrowBtn?.addEventListener('click', () => startEscrow(CASE_ID, fundEscrowBtn));
     releaseEscrowBtn?.addEventListener('click', () => releaseEscrow(CASE_ID, releaseEscrowBtn));
-    applyButton?.addEventListener('click', submitCaseApplication);
     loadCaseDetails();
 
     function resetExportModalState() {
@@ -1053,7 +1008,6 @@
         caseDetails = null;
       } finally {
         updatePaymentVisibility();
-        updateParalegalApplicationPanel();
       }
     }
 
@@ -1071,81 +1025,6 @@
       if (show) {
         ensureCardElement().catch((err) => console.warn('Unable to initialize payment field.', err));
       }
-    }
-
-    function hasAppliedAlready() {
-      if (!caseDetails || !Array.isArray(caseDetails.applicants)) return false;
-      const userId = currentUser?._id || currentUser?.id || '';
-      if (!userId) return false;
-      return caseDetails.applicants.some((entry) => {
-        const target =
-          entry?.paralegalId?._id ||
-          entry?.paralegalId ||
-          entry?.paralegal?._id ||
-          entry?.paralegal?.id;
-        return target && String(target) === String(userId);
-      });
-    }
-
-    async function submitCaseApplication() {
-      if (!caseDetails) {
-        alert('Case details are still loading. Please try again.');
-        return;
-      }
-      if (!applyButton) return;
-      applyButton.disabled = true;
-      const headers = new Headers({ 'Content-Type': 'application/json' });
-      const token = readStoredToken();
-      if (token) headers.set('Authorization', `Bearer ${token}`);
-      const csrfToken = await ensureCsrfToken();
-      if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
-      const coverLetter = coverLetterInput?.value?.trim() || '';
-      let response;
-      try {
-        response = await fetch(`/api/applications/${encodeURIComponent(CASE_ID)}`, {
-          method: 'POST',
-          headers,
-          credentials: 'include',
-          body: JSON.stringify({ coverLetter })
-        });
-      } catch (err) {
-        console.warn('Failed to submit application.', err);
-        alert('Unable to submit application. Please try again.');
-        applyButton.disabled = false;
-        return;
-      }
-
-      let payload = {};
-      try {
-        payload = await response.json();
-      } catch {
-        payload = {};
-      }
-
-      if (!response.ok) {
-        alert(payload?.error || payload?.msg || 'Unable to submit application.');
-        applyButton.disabled = false;
-        return;
-      }
-
-      alert('Application submitted!');
-      if (coverLetterInput) coverLetterInput.value = '';
-      await loadCaseDetails();
-    }
-
-    function updateParalegalApplicationPanel() {
-      if (!applyPanel) return;
-      const role = String(currentUser?.role || '').toLowerCase();
-      if (role !== 'paralegal') {
-        applyPanel.classList.add('hidden');
-        return;
-      }
-      const isOpen = caseDetails && String(caseDetails.status || '').toLowerCase() === 'open';
-      const hasParalegal = !!(caseDetails && caseDetails.paralegal);
-      const applied = hasAppliedAlready();
-      const show = Boolean(caseDetails && isOpen && !hasParalegal && !applied);
-      applyPanel.classList.toggle('hidden', !show);
-      if (applyButton) applyButton.disabled = !show;
     }
 
     async function ensureCardElement() {

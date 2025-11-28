@@ -137,7 +137,7 @@ router.post(
       await sendEmail(
         user.email,
         "Registration received",
-        `Thanks for registering with Let’s-ParaConnect. An admin will review your account shortly.${
+        `Thanks for registering with Let's ParaConnect. An admin will review your account shortly.${
           process.env.APP_BASE_URL ? `\n\nYou can verify your email here (optional): ${verifyUrl}` : ""
         }`
       );

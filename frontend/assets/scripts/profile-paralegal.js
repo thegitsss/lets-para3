@@ -16,12 +16,10 @@ const elements = {
   nameField: document.getElementById("profileName"),
   roleLine: document.getElementById("roleLine"),
   bioCopy: document.getElementById("bioCopy"),
-  skillsDisplayList: document.getElementById("profileSkillsList"),
+  skillsList: document.getElementById("skillsList"),
   practiceList: document.getElementById("practiceList"),
   experienceList: document.getElementById("experienceList"),
-  educationDisplayList: document.getElementById("profileEducationList"),
-  awardsDisplayList: document.getElementById("awardsDisplayList"),
-  resumeLink: document.getElementById("resumeLink"),
+  educationList: document.getElementById("educationList"),
   funFactsCard: document.getElementById("funFactsCard"),
   funFactsCopy: document.getElementById("funFactsCopy"),
   attorneyCard: document.getElementById("attorneyInsightsCard"),
@@ -39,7 +37,6 @@ const elements = {
   chipRole: document.getElementById("chipRole"),
   profileFormSection: document.getElementById("profileFormSection"),
   profileForm: document.getElementById("paralegalProfileForm"),
-  bioInput: document.getElementById("bio"),
   linkedInInput: document.getElementById("linkedInURL"),
   yearsExperienceInput: document.getElementById("yearsExperience"),
   ref1NameInput: document.getElementById("ref1Name"),
@@ -50,12 +47,6 @@ const elements = {
   resumeUploadInput: document.getElementById("resumeUpload"),
   profilePhotoInput: document.getElementById("profilePhoto"),
   profileSaveBtn: document.getElementById("saveProfileBtn"),
-  educationFormList: document.getElementById("educationList"),
-  addEducationEntryBtn: document.getElementById("addEducationEntry"),
-  awardsList: document.getElementById("awardsList"),
-  addAwardBtn: document.getElementById("addAward"),
-  skillsFormList: document.getElementById("skillsList"),
-  addSkillBtn: document.getElementById("addSkill"),
 };
 
 const state = {
@@ -172,47 +163,6 @@ function bindProfileForm() {
   elements.certificateUploadInput?.addEventListener("change", handleCertificateUpload);
   elements.resumeUploadInput?.addEventListener("change", handleResumeUpload);
   elements.profilePhotoInput?.addEventListener("change", handleProfilePhotoChange);
-  populateEducationForm([]);
-  populateAwardsForm([]);
-  populateHighlightedSkillsForm([]);
-  elements.addEducationEntryBtn?.addEventListener("click", (event) => {
-    event.preventDefault();
-    const entries = readEducationFormEntries();
-    entries.push({});
-    populateEducationForm(entries);
-  });
-  elements.educationFormList?.addEventListener("click", (event) => {
-    if (event.target?.dataset?.removeEducation) {
-      event.preventDefault();
-      const row = event.target.closest("[data-education-entry]");
-      row?.remove();
-      populateEducationForm(readEducationFormEntries());
-    }
-  });
-  elements.addAwardBtn?.addEventListener("click", (event) => {
-    event.preventDefault();
-    appendSimpleInputRow("award");
-  });
-  elements.awardsList?.addEventListener("click", (event) => {
-    if (event.target?.dataset?.removeAward) {
-      event.preventDefault();
-      const row = event.target.closest("[data-award-row]");
-      row?.remove();
-      populateAwardsForm(readSimpleInputList("award"));
-    }
-  });
-  elements.addSkillBtn?.addEventListener("click", (event) => {
-    event.preventDefault();
-    appendSimpleInputRow("skill");
-  });
-  elements.skillsFormList?.addEventListener("click", (event) => {
-    if (event.target?.dataset?.removeSkill) {
-      event.preventDefault();
-      const row = event.target.closest("[data-skill-row]");
-      row?.remove();
-      populateHighlightedSkillsForm(readSimpleInputList("skill"));
-    }
-  });
   updateProfileFormVisibility();
 }
 
@@ -266,16 +216,12 @@ async function saveProfileDetails(payload) {
 
 function buildProfileUpdatePayload() {
   return {
-    bio: sanitizeLongText(elements.bioInput?.value),
     linkedInURL: sanitizeUrl(elements.linkedInInput?.value),
     yearsExperience: sanitizeYears(elements.yearsExperienceInput?.value),
     ref1Name: sanitizeText(elements.ref1NameInput?.value),
     ref1Email: sanitizeText(elements.ref1EmailInput?.value),
     ref2Name: sanitizeText(elements.ref2NameInput?.value),
     ref2Email: sanitizeText(elements.ref2EmailInput?.value),
-    education: readEducationFormEntries(),
-    awards: readSimpleInputList("award"),
-    highlightedSkills: readSimpleInputList("skill"),
   };
 }
 
@@ -296,119 +242,6 @@ function sanitizeYears(value) {
   const num = parseInt(value, 10);
   if (!Number.isFinite(num)) return null;
   return Math.max(0, Math.min(80, num));
-}
-
-function sanitizeLongText(value) {
-  if (typeof value !== "string") return "";
-  const trimmed = value.trim();
-  return trimmed;
-}
-
-function populateEducationForm(entries) {
-  if (!elements.educationFormList) return;
-  const list = Array.isArray(entries) && entries.length ? entries : [{}];
-  elements.educationFormList.innerHTML = "";
-  list.forEach((entry) => {
-    elements.educationFormList.appendChild(buildEducationFormRow(entry));
-  });
-}
-
-function buildEducationFormRow(entry = {}) {
-  const row = document.createElement("div");
-  row.dataset.educationEntry = "true";
-  const fields = [
-    { key: "degree", label: "Degree or Program" },
-    { key: "institution", label: "Institution" },
-    { key: "year", label: "Year" },
-    { key: "certification", label: "Certification" },
-  ];
-  fields.forEach(({ key, label }) => {
-    const input = document.createElement("input");
-    input.type = "text";
-    input.placeholder = label;
-    input.value = entry[key] || (key === "institution" ? entry.school : "") || "";
-    input.setAttribute(`data-education-${key}`, "true");
-    row.appendChild(input);
-  });
-  const removeBtn = document.createElement("button");
-  removeBtn.type = "button";
-  removeBtn.textContent = "Remove";
-  removeBtn.dataset.removeEducation = "true";
-  row.appendChild(removeBtn);
-  return row;
-}
-
-function readEducationFormEntries() {
-  if (!elements.educationFormList) return [];
-  const rows = elements.educationFormList.querySelectorAll("[data-education-entry]");
-  const entries = [];
-  rows.forEach((row) => {
-    const entry = {
-      degree: sanitizeText(row.querySelector("[data-education-degree]")?.value),
-      institution: sanitizeText(row.querySelector("[data-education-institution]")?.value),
-      year: sanitizeText(row.querySelector("[data-education-year]")?.value),
-      certification: sanitizeText(row.querySelector("[data-education-certification]")?.value),
-    };
-    const hasData = entry.degree || entry.institution || entry.year || entry.certification;
-    if (hasData) {
-      if (entry.institution && !entry.school) entry.school = entry.institution;
-      entries.push(entry);
-    }
-  });
-  return entries;
-}
-
-function populateAwardsForm(values) {
-  renderSimpleInputList("award", values);
-}
-
-function populateHighlightedSkillsForm(values) {
-  renderSimpleInputList("skill", values);
-}
-
-function appendSimpleInputRow(type) {
-  const existing = readSimpleInputList(type);
-  existing.push("");
-  renderSimpleInputList(type, existing);
-}
-
-function renderSimpleInputList(type, values) {
-  const container = type === "award" ? elements.awardsList : elements.skillsFormList;
-  if (!container) return;
-  const list = Array.isArray(values) && values.length ? values : [""];
-  const placeholders = {
-    award: "Award or recognition",
-    skill: "Highlighted skill",
-  };
-  container.innerHTML = "";
-  list.forEach((value) => {
-    const row = document.createElement("div");
-    row.dataset[`${type}Row`] = "true";
-    const input = document.createElement("input");
-    input.type = "text";
-    input.placeholder = placeholders[type] || "Entry";
-    input.value = value || "";
-    input.setAttribute(`data-${type}-input`, "true");
-    row.appendChild(input);
-    const removeBtn = document.createElement("button");
-    removeBtn.type = "button";
-    removeBtn.textContent = "Remove";
-    removeBtn.setAttribute(`data-remove-${type}`, "true");
-    row.appendChild(removeBtn);
-    container.appendChild(row);
-  });
-}
-
-function readSimpleInputList(type) {
-  const container = type === "award" ? elements.awardsList : elements.skillsFormList;
-  if (!container) return [];
-  const inputs = container.querySelectorAll(`[data-${type}-input]`);
-  const values = [];
-  inputs.forEach((input) => {
-    const value = sanitizeText(input.value);
-    if (value) values.push(value);
-  });
-  return values;
 }
 
 function handleCertificateUpload(event) {
@@ -657,29 +490,22 @@ function renderProfile(profile) {
   renderAvatar(fullName, profile.profileImage || profile.avatarURL);
   renderStatus(profile);
   renderMetadata(profile);
-  const highlighted = Array.isArray(profile.highlightedSkills) && profile.highlightedSkills.length ? profile.highlightedSkills : profile.skills;
-  renderPills(elements.skillsDisplayList, highlighted, "This paralegal hasn’t shared skills yet.");
+  renderPills(elements.skillsList, profile.skills, "This paralegal hasn’t shared skills yet.");
   renderPills(elements.practiceList, profile.practiceAreas, "No practice areas listed yet.");
   renderExperience(profile.experience);
   renderEducation(profile.education);
-  renderAwards(profile.awards);
-  renderResumeLink(profile.resumeURL);
   renderFunFacts(profile.about, profile.writingSamples);
   renderAttorneyHighlights(profile);
 }
 
 function populateProfileForm(profile) {
   if (!elements.profileForm || !profile) return;
-  setInputValue(elements.bioInput, profile.bio || "");
   setInputValue(elements.linkedInInput, profile.linkedInURL);
   setInputValue(elements.yearsExperienceInput, profile.yearsExperience ?? "");
   setInputValue(elements.ref1NameInput, profile.ref1Name);
   setInputValue(elements.ref1EmailInput, profile.ref1Email);
   setInputValue(elements.ref2NameInput, profile.ref2Name);
   setInputValue(elements.ref2EmailInput, profile.ref2Email);
-  populateEducationForm(profile.education);
-  populateAwardsForm(profile.awards);
-  populateHighlightedSkillsForm(profile.highlightedSkills);
 }
 
 function setInputValue(input, value) {
@@ -814,67 +640,26 @@ function renderExperience(entries) {
 }
 
 function renderEducation(entries) {
-  const container = elements.educationDisplayList;
-  if (!container) return;
-  container.innerHTML = "";
-  const list = Array.isArray(entries)
-    ? entries.filter((item) => item && (item.degree || item.school || item.institution || item.certification))
-    : [];
+  if (!elements.educationList) return;
+  elements.educationList.innerHTML = "";
+  const list = Array.isArray(entries) ? entries.filter((item) => item && (item.degree || item.school)) : [];
   if (!list.length) {
-    container.innerHTML = `<p class="muted">Education history coming soon.</p>`;
+    elements.educationList.innerHTML = `<p class="muted">Education history coming soon.</p>`;
     return;
   }
   list.forEach((item) => {
     const block = document.createElement("article");
-    const heading = document.createElement("h3");
-    heading.textContent = item.degree || item.certification || "Education";
-    block.appendChild(heading);
+    const degree = document.createElement("h3");
+    degree.textContent = item.degree || "Degree";
+    block.appendChild(degree);
 
-    const details = [];
-    if (item.institution || item.school) details.push(item.institution || item.school);
-    if (item.year) details.push(item.year);
-    if (details.length) {
-      const meta = document.createElement("span");
-      meta.textContent = details.join(" • ");
-      block.appendChild(meta);
+    if (item.school) {
+      const school = document.createElement("span");
+      school.textContent = item.school;
+      block.appendChild(school);
     }
-
-    if (item.certification && item.degree) {
-      const cert = document.createElement("p");
-      cert.textContent = item.certification;
-      block.appendChild(cert);
-    }
-    container.appendChild(block);
+    elements.educationList.appendChild(block);
   });
-}
-
-function renderAwards(values) {
-  const container = elements.awardsDisplayList;
-  if (!container) return;
-  container.innerHTML = "";
-  const list = Array.isArray(values) ? values.filter((item) => typeof item === "string" && item.trim()) : [];
-  if (!list.length) {
-    container.innerHTML = `<p class="muted">No awards listed yet.</p>`;
-    return;
-  }
-  const ul = document.createElement("ul");
-  list.slice(0, 20).forEach((award) => {
-    const li = document.createElement("li");
-    li.textContent = award;
-    ul.appendChild(li);
-  });
-  container.appendChild(ul);
-}
-
-function renderResumeLink(url) {
-  const target = elements.resumeLink;
-  if (!target) return;
-  if (url) {
-    const safe = escapeAttribute(url);
-    target.innerHTML = `<a href="${safe}" target="_blank" rel="noopener">View Résumé</a>`;
-  } else {
-    target.textContent = "Résumé not uploaded.";
-  }
 }
 
 function renderFunFacts(about, writingSamples = []) {

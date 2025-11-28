@@ -27,7 +27,6 @@
       padding: 0;
       height: 100%;
       width: 100%;
-      overflow-x: hidden;
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
       background: url('hero-mountain.jpg') no-repeat center center fixed;
@@ -58,11 +57,6 @@
     .form-container {
       max-width: 360px;
       width: 100%;
-    }
-
-    .signup-container {
-      max-width: 420px;
-      margin: 0 auto;
     }
 
     .brand {
@@ -98,14 +92,6 @@
       margin-bottom: 4px;
       display: block;
       color: var(--navy);
-    }
-
-    input:not([type="checkbox"]):not([type="radio"]),
-    select,
-    textarea {
-      width: 100%;
-      max-width: 100%;
-      box-sizing: border-box;
     }
 
     input[type="text"],
@@ -230,13 +216,6 @@
         padding: 40px;
       }
     }
-
-    @media (max-width: 480px) {
-      .signup-container {
-        width: 90%;
-        padding: 0 12px;
-      }
-    }
   </style>
 
   <script type="module" src="assets/scripts/auth.js"></script>
@@ -245,7 +224,7 @@
 <body>
   <div class="overlay">
     <div class="left-panel">
-      <div class="form-container signup-container fade-in">
+      <div class="form-container fade-in">
         <p class="prelaunch-note">
           Let’s-ParaConnect is in pre-launch. We are currently reviewing applicants
           for acceptance into our elite paralegal professional collective. Approved
@@ -279,6 +258,13 @@
           </div>
 
           <div id="roleFieldWrap"></div>
+
+          <label class="terms-label">
+            <input type="checkbox" id="termsAccept" required>
+            I have read and agree to the
+            <a href="terms.html" target="_blank">Terms of Use</a> and
+            <a href="privacy.html" target="_blank">Privacy Policy</a>.
+          </label>
 
           <label class="terms-label">
             <input type="checkbox" id="termsAccept" required>
@@ -454,5 +440,4 @@
     });
   </script>
 </body>
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </html>

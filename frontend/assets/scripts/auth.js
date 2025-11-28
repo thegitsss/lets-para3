@@ -9,20 +9,6 @@ export let CSRF_TOKEN = "";
 
 const USER_KEY = "lpc_user";
 let redirectingToLogin = false;
-function toggleHeaderAuthState(isLoggedIn) {
-  const authed = Boolean(isLoggedIn);
-  document.querySelectorAll("[data-public-only]").forEach((el) => {
-    if (!el) return;
-    el.style.display = authed ? "none" : "";
-  });
-  document.querySelectorAll("[data-authed-only]").forEach((el) => {
-    if (!el) return;
-    el.style.display = authed ? "" : "none";
-  });
-}
-if (typeof window !== "undefined") {
-  window.updateHeaderBasedOnAuth = toggleHeaderAuthState;
-}
 
 function redirectToLoginOnce() {
   if (redirectingToLogin) return;
@@ -222,14 +208,12 @@ export async function logout(redirect = "login.html") {
 // Boot-time: add 'loaded' class, fetch CSRF, and toggle role-based UI (best-effort)
 window.addEventListener("DOMContentLoaded", async () => {
   document.body.classList.add("loaded");
-  toggleHeaderAuthState(false);
 
   try { await fetchCSRF(); } catch {}
 
   try {
     const r = await fetch("/api/users/me", { credentials: "include" });
     const me = r.ok ? await r.json() : null;
-     toggleHeaderAuthState(Boolean(me && (me.id || me._id || me.role)));
     if (me?.role) applyRoleVisibility(me.role);
   } catch {
     // non-fatal for public/unauthenticated pages

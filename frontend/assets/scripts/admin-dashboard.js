@@ -284,33 +284,6 @@ function renderVerificationList(items) {
         : "<p>Certificate not uploaded.</p>";
       const ref1 = `${escapeHTML(p.ref1Name || "N/A")} — ${escapeHTML(p.ref1Email || "N/A")}`;
       const ref2 = `${escapeHTML(p.ref2Name || "N/A")} — ${escapeHTML(p.ref2Email || "N/A")}`;
-      const bio = escapeHTML(p.bio || "No bio provided yet.");
-      const educationItems = Array.isArray(p.education)
-        ? p.education.filter((entry) => entry && (entry.degree || entry.institution || entry.certification || entry.year))
-        : [];
-      const educationMarkup = educationItems.length
-        ? `<ul>${educationItems
-            .map((entry) => {
-              const parts = [
-                entry.degree ? escapeHTML(entry.degree) : "",
-                entry.institution ? escapeHTML(entry.institution) : "",
-                entry.year ? escapeHTML(entry.year) : "",
-                entry.certification ? escapeHTML(entry.certification) : "",
-              ]
-                .filter(Boolean)
-                .join(" • ");
-              return `<li>${parts || "Education detail"}</li>`;
-            })
-            .join("")}</ul>`
-        : "<p>No education listed.</p>";
-      const awardsList = Array.isArray(p.awards) ? p.awards.filter(Boolean) : [];
-      const awardsMarkup = awardsList.length
-        ? `<ul>${awardsList.map((award) => `<li>${escapeHTML(award)}</li>`).join("")}</ul>`
-        : "<p>No awards listed.</p>";
-      const skillsList = Array.isArray(p.highlightedSkills) ? p.highlightedSkills.filter(Boolean) : [];
-      const skillsMarkup = skillsList.length
-        ? `<p>${skillsList.map((skill) => `<span>${escapeHTML(skill)}</span>`).join(", ")}</p>`
-        : "<p>No highlighted skills provided.</p>";
       return `
         <div class="verify-card" data-id="${id}">
           <strong>${lastName || "N/A"}, ${firstName || "N/A"}</strong>
@@ -318,22 +291,6 @@ function renderVerificationList(items) {
           <p>Years Experience: ${yearsLabel}</p>
           ${linkedIn}
           ${certificate}
-          <div>
-            <strong>Bio</strong>
-            <p>${bio}</p>
-          </div>
-          <div>
-            <strong>Education</strong>
-            ${educationMarkup}
-          </div>
-          <div>
-            <strong>Awards</strong>
-            ${awardsMarkup}
-          </div>
-          <div>
-            <strong>Highlighted Skills</strong>
-            ${skillsMarkup}
-          </div>
           <details>
             <summary>References</summary>
             <p>${ref1}</p>

@@ -1,22 +1,27 @@
-// backend/models/Application.js
 const mongoose = require("mongoose");
 
-const ApplicationSchema = new mongoose.Schema(
-  {
-    caseId: { type: mongoose.Schema.Types.ObjectId, ref: "Case", index: true, default: null },
-    jobId: { type: mongoose.Schema.Types.ObjectId, ref: "Job", index: true, default: null },
-    paralegalId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    coverLetter: { type: String, default: "", trim: true },
-    status: {
-      type: String,
-      enum: ["submitted", "reviewed", "rejected", "accepted"],
-      default: "submitted",
-      index: true,
-    },
+const ApplicationSchema = new mongoose.Schema({
+  jobId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Job",
+    required: true,
   },
-  {
-    timestamps: { createdAt: true, updatedAt: false },
-  }
-);
+
+  paralegalId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+
+  coverLetter: { type: String, required: true },
+
+  status: {
+    type: String,
+    enum: ["submitted", "viewed", "shortlisted", "accepted", "rejected"],
+    default: "submitted",
+  },
+
+  createdAt: { type: Date, default: Date.now },
+});
 
 module.exports = mongoose.model("Application", ApplicationSchema);
