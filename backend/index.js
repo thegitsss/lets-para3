@@ -139,10 +139,7 @@ function connectWithRetry() {
     return;
   }
   mongoose
-    .connect(uri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    })
+    .connect(uri)
     .then(() => console.log("✅ Connected to MongoDB Atlas"))
     .catch((err) => {
       console.error("❌ MongoDB Error:", err);
