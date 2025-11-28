@@ -5,6 +5,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Let’s-ParaConnect</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&display=swap" rel="stylesheet">
   <style>
@@ -755,9 +762,9 @@
     </div>
   </section>
 
-  <section class="section about wrap who-we-are" id="about" style="text-align: center; background-color: #ffffff;">
-    <h2 class="who-title" style="color: #1a2230; font-family: 'Cormorant Garamond', sans-serif; font-weight: 200;">Who We Are</h2>
-    <p class="who-text" style="color: #333333; font-family: 'Sarabun', sans-serif; font-weight: 200; max-width: 600px; margin: 0 auto 1.5rem;">
+  <section id="who-we-are" class="who-wrapper">
+    <h2 class="who-title">Who We Are</h2>
+    <p class="who-text">
       Let’s-ParaConnect is a modern legal-tech marketplace that brings attorneys and vetted freelance paralegals together for flexible, project-based support.
       We’re focused on making collaboration efficient, intuitive, and effortless from start to finish.
     </p>
@@ -775,25 +782,96 @@
       <div class="card">
         <div class="pad">
           <span class="card-icon" aria-hidden="true">*</span>
-          <h3>Post a Job</h3>
-          <p>Attorneys quickly post what they need: timelines, type of law, and case details.</p>
-          <a class="read" href="#">Learn More →</a>
+          <div class="hiw-card">
+            <div class="hiw-default">
+              <h3>Post a Job</h3>
+              <p>Attorneys post what they need in minutes: timelines, type of law, and case details.</p>
+              <a href="#" class="hiw-toggle" data-target="post-job">Learn More →</a>
+            </div>
+            <div class="hiw-expanded" data-section="post-job">
+              <h3>How Posting Works</h3>
+              <p>Create a clear outline of the work you need completed — such as drafting, research, document preparation, or case support.<br>
+              Set your timeline and budget, attach any relevant materials, and publish the job.<br>
+              Your posting goes directly to vetted paralegals who match your practice area.</p>
+              <a href="#" class="hiw-toggle-back">← Learn Less</a>
+            </div>
+          </div>
         </div>
       </div>
       <div class="card">
         <div class="pad">
           <span class="card-icon" aria-hidden="true">*</span>
-          <h3>Paralegals Apply</h3>
-          <p>Vetted freelance paralegals submit proposals. You pick the best fit.</p>
-          <a class="read" href="#">Browse Talent →</a>
+          <div class="hiw-card">
+            <div class="hiw-default">
+              <h3>Paralegals Apply</h3>
+              <p>Qualified paralegals review your posting and apply if they have the experience and availability you need.</p>
+              <a href="#" class="hiw-toggle" data-target="paralegals-apply">Learn More →</a>
+            </div>
+            <div class="hiw-expanded" data-section="paralegals-apply">
+              <h3>How Applications Work</h3>
+              <p>Only paralegals who meet your listed criteria can apply.<br>
+              You’ll see each applicant’s background, skillset, and relevant experience.<br>
+              Select the paralegal that best fits the needs of your case — no back-and-forth emails or delays.</p>
+              <a href="#" class="hiw-toggle-back">← Learn Less</a>
+            </div>
+          </div>
         </div>
       </div>
       <div class="card">
         <div class="pad">
           <span class="card-icon" aria-hidden="true">*</span>
-          <h3>Work Begins</h3>
-          <p>Funds are held in escrow. Once the job is marked complete, payment is released.</p>
-          <a class="read" href="#">Escrow Details →</a>
+          <div class="hiw-card">
+            <div class="hiw-default">
+              <h3>Work Begins</h3>
+              <p>Once you choose a paralegal, work starts immediately. All communication stays within your LPC dashboard.</p>
+              <a href="#" class="hiw-toggle" data-target="work-begins">Learn More →</a>
+            </div>
+            <div class="hiw-expanded" data-section="work-begins">
+              <h3>How Workflows Operate</h3>
+              <p>After selecting a paralegal, both parties communicate directly through your secure LPC dashboard.<br>
+              Files, instructions, and updates stay in one place.<br>
+              You maintain full visibility on progress without disrupting your existing workflow.</p>
+              <a href="#" class="hiw-toggle-back">← Learn Less</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="pad">
+          <span class="card-icon" aria-hidden="true">*</span>
+          <div class="hiw-card">
+            <div class="hiw-default">
+              <h3>Secure Escrow</h3>
+              <p>Funds are held safely until work is approved.</p>
+              <a href="#" class="hiw-toggle" data-target="secure-escrow">Learn More →</a>
+            </div>
+            <div class="hiw-expanded" data-section="secure-escrow">
+              <h3>How Escrow Protects You</h3>
+              <p>When the job begins, your payment goes into a secure Stripe escrow — not to the paralegal.<br>
+              You review the completed work, request revisions if needed, and release payment only when you are satisfied.<br>
+              This ensures fairness, transparency, and accountability for every assignment.</p>
+              <a href="#" class="hiw-toggle-back">← Learn Less</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="pad">
+          <span class="card-icon" aria-hidden="true">*</span>
+          <div class="hiw-card">
+            <div class="hiw-default">
+              <h3>Finalize &amp; Close</h3>
+              <p>Review the work, release payment, and close the job.</p>
+              <a href="#" class="hiw-toggle" data-target="finalize-close">Learn More →</a>
+            </div>
+            <div class="hiw-expanded" data-section="finalize-close">
+              <h3>How Closing Works</h3>
+              <p>Once you approve the final deliverable, payment is released from escrow.<br>
+              You’ll receive a full record of the assignment in your dashboard, including dates, files, and payment confirmation.<br>
+              This creates a clear, organized archive for your practice.</p>
+              <a href="#" class="hiw-toggle-back">← Learn Less</a>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -806,7 +884,7 @@
   <p style="color: #333333; font-family: 'Sarabun', sans-serif; font-weight: 200; max-width: 600px; margin: 0 auto 1.5rem;">
     Whether you're an attorney seeking reliable help, or a paralegal looking for your next great opportunity, Let's ParaConnect is where your journey begins.
   </p>
-<a class="cta" href="contact.html" style="
+<a class="cta" href="signup.html" style="
   margin-top: 1rem;
   border: 1.5px solid #1a2230;
   color: #1a2230;
@@ -817,7 +895,7 @@
   display: inline-block;
   text-decoration: none;
   transition: all 0.3s ease;
-">Contact Us</a>
+">Sign Up</a>
 </section>
 
 <footer class="footer">
@@ -1134,10 +1212,10 @@ updateHeaderAppearance();
 .how-it-works-bg .cards {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 32px;
+  gap: 60px;
   max-width: 700px;
   margin: 0 auto;
-  padding: 0;
+  padding: 40px 0 0;
 }
 
 .how-it-works-bg .card {
@@ -1145,19 +1223,22 @@ updateHeaderAppearance();
   border-radius: 0;
   border: 1px solid rgba(10,15,20,0.06);
   box-shadow: 0 16px 60px rgba(10,15,20,0.12);
-  padding: 2.5rem 2rem;
+  padding: 1.4rem 1.5rem;
   transform: translateY(0);
   opacity: 1;
   will-change: transform, opacity;
   transition: transform 0.6s ease-out, opacity 0.6s ease-out;
   width: 100%;
+  height: 340px;
+  display: flex;
   text-align: left;
 }
 
 .how-it-works-bg .card .pad {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
+  height: 100%;
 }
 
 .how-it-works-bg .card-icon {
@@ -1191,50 +1272,84 @@ updateHeaderAppearance();
   margin-top: auto;
 }
 
+.hiw-default,
+.hiw-expanded {
+  transition: opacity 0.6s ease-in-out, visibility 0.6s ease-in-out;
+  will-change: opacity;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.hiw-expanded {
+  display: none;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.hiw-expanded.show {
+  display: flex;
+  opacity: 1;
+  visibility: visible;
+}
+
+.hiw-default.fade-out {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.hiw-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  position: relative;
+}
+
+.hiw-card a {
+  margin-top: auto;
+}
+
 @media (min-width: 960px) {
   .how-it-works-bg .cards {
     grid-template-columns: repeat(2, minmax(300px, 360px));
-    gap: 80px 120px;
+    gap: 140px 220px;
     max-width: 960px;
     padding: 0 1.5rem;
   }
 
   .how-it-works-bg .card {
     margin: 0;
-    padding: 3rem 2.5rem;
+    padding: 1.75rem 1.5rem;
+    height: 360px;
     box-shadow: 0 24px 80px rgba(10,15,20,0.12);
   }
 
-  .how-it-works-bg .card:nth-child(1) {
-    grid-column: 1;
-    grid-row: 1;
+  .how-it-works-bg .card:nth-child(odd) {
     align-self: flex-start;
+    transform: translateY(-80px);
   }
 
-  .how-it-works-bg .card:nth-child(2) {
-    grid-column: 2;
-    grid-row: 2;
-    align-self: center;
-    margin-top: -60px;
-  }
-
-  .how-it-works-bg .card:nth-child(3) {
-    grid-column: 1;
-    grid-row: 3;
+  .how-it-works-bg .card:nth-child(even) {
+    margin-top: 220px;
     align-self: flex-end;
-    margin-top: -40px;
-    z-index: 8;
+    transform: translateY(80px);
   }
 }
 
 @media (max-width: 600px) {
   .how-it-works-bg .cards {
     max-width: 92vw;
+    gap: 50px;
   }
 
   .how-it-works-bg .card {
-    padding: 2rem 1.5rem;
+    padding: 1.5rem 1.35rem;
     margin: 0 auto;
+    height: 340px;
   }
 }
 .floating-panel {
@@ -1353,18 +1468,82 @@ updateHeaderAppearance();
 </script>
 
 <script>
-  window.addEventListener('scroll', () => {
+  (function () {
     const section = document.getElementById('how');
+    if (!section) return;
     const bg = section.querySelector('.parallax-bg');
-    const scrollY = window.scrollY;
-    const offsetTop = section.offsetTop;
-    const height = section.offsetHeight;
+    if (!bg) return;
 
-    if (scrollY + window.innerHeight > offsetTop && scrollY < offsetTop + height) {
-      const progress = (scrollY - offsetTop) / height;
-      const yPos = progress * 400 - 100;  // adjust “50” for more/less effect
-      bg.style.transform = `translateY(${yPos}px)`;
-    }
+    let ticking = false;
+
+    const updateParallax = () => {
+      ticking = false;
+      const scrollY = window.scrollY;
+      const offsetTop = section.offsetTop;
+      const height = section.offsetHeight;
+
+      if (scrollY + window.innerHeight > offsetTop && scrollY < offsetTop + height) {
+        const progress = (scrollY - offsetTop) / height;
+        const yPos = progress * 400 - 100;
+        bg.style.transform = `translateY(${yPos}px)`;
+      }
+    };
+
+    const onScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(updateParallax);
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', onScroll);
+    updateParallax();
+  })();
+</script>
+
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const toggles = document.querySelectorAll(".hiw-toggle");
+    const backs = document.querySelectorAll(".hiw-toggle-back");
+
+    toggles.forEach(t => {
+      t.addEventListener("click", e => {
+        e.preventDefault();
+
+        const section = t.dataset.target;
+        const card = t.closest(".hiw-card");
+        const defaultBox = card.querySelector(".hiw-default");
+        const expandedBox = card.querySelector(`.hiw-expanded[data-section="${section}"]`);
+
+        defaultBox.classList.add("fade-out");
+
+        setTimeout(() => {
+          defaultBox.style.display = "none";
+          expandedBox.style.display = "block";
+
+          requestAnimationFrame(() => expandedBox.classList.add("show"));
+        }, 600);
+      });
+    });
+
+    backs.forEach(b => {
+      b.addEventListener("click", e => {
+        e.preventDefault();
+
+        const card = b.closest(".hiw-card");
+        const defaultBox = card.querySelector(".hiw-default");
+        const expandedBox = card.querySelector(".hiw-expanded");
+
+        expandedBox.classList.remove("show");
+
+        setTimeout(() => {
+          expandedBox.style.display = "none";
+          defaultBox.style.display = "block";
+
+          requestAnimationFrame(() => defaultBox.classList.remove("fade-out"));
+        }, 600);
+      });
+    });
   });
 </script>
 

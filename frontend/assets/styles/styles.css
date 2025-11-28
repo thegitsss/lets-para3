@@ -265,19 +265,48 @@ html.lenis {
 }
 
 /* Home: Who We Are section */
-#about.section {
-  min-height: 420px;
-  padding: 80px 0;
+.who-wrapper {
+  width: 100%;
+  max-width: 100%;
+  padding: 80px 40px;
+  position: relative;
+  z-index: 1000;
+  background: #ffffff;
+  text-align: center;
   display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
   gap: 1.5rem;
 }
 
-@media (max-width: 768px) {
-  #about.section {
-    min-height: 360px;
-    padding: 60px 0;
+.who-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 300;
+  color: #1a2230;
+  margin: 0;
+}
+
+.who-text {
+  width: 100%;
+  max-width: 100%;
+  margin: 20px auto 0 auto;
+  line-height: 1.6;
+  font-size: 1rem;
+  color: #303030;
+  text-align: center;
+  font-family: 'Sarabun', sans-serif;
+  font-weight: 200;
+}
+
+@media (max-width: 600px) {
+  .who-wrapper {
+    padding: 60px 20px;
+  }
+
+  .who-text {
+    font-size: 0.95rem;
   }
 }
 
