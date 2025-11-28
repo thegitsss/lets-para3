@@ -24,6 +24,8 @@ let cardErrorsNode = null;
 let cardHostNode = null;
 let paymentEnabled = false;
 let countdownTimer = null;
+let lastEscapeFn = (value) => String(value ?? "");
+let lastSessionPayload = null;
 
 export async function render(el, { escapeHTML, params: routeParams } = {}) {
   ensureStyles();
@@ -40,9 +42,11 @@ export async function render(el, { escapeHTML, params: routeParams } = {}) {
     return;
   }
   if (!session) return;
+  lastSessionPayload = session;
 
   const viewerRole = String(session?.role || session?.user?.role || "").toLowerCase();
   const h = escapeHTML || ((s) => String(s ?? ""));
+  lastEscapeFn = h;
   const params = getRouteParams(routeParams);
   const caseId = params.get("caseId");
 
@@ -66,6 +70,11 @@ export async function render(el, { escapeHTML, params: routeParams } = {}) {
 }
 
 function draw(root, data, escapeHTML, caseId, session) {
+  const safeEscape = typeof escapeHTML === "function" ? escapeHTML : lastEscapeFn;
+  lastEscapeFn = safeEscape;
+  if (session) {
+    lastSessionPayload = session;
+  }
   const practiceArea = data?.practiceArea || "General matter";
   const title = data?.title || "Case";
   const statusRaw = String(data?.status || "open");
@@ -101,7 +110,7 @@ function draw(root, data, escapeHTML, caseId, session) {
 
   const applicantsMarkup =
     applicants.length
-      ? `<ul class="applicant-list">${applicants.map((app) => renderApplicant(app, escapeHTML, { canHire })).join("")}</ul>`
+      ? `<ul class="applicant-list">${applicants.map((app) => renderApplicant(app, safeEscape, { canHire })).join("")}</ul>`
       : `<div class="empty">No applicants yet.</div>`;
 
   let applicationSection = "";
@@ -135,7 +144,7 @@ function draw(root, data, escapeHTML, caseId, session) {
         applicationSection = `
           <div class="case-section">
             <div class="case-section-title">Apply to this case</div>
-            <p class="notice">${escapeHTML(note)}</p>
+            <p class="notice">${safeEscape(note)}</p>
           </div>
         `;
       }
@@ -180,22 +189,26 @@ function draw(root, data, escapeHTML, caseId, session) {
 
   root.innerHTML = `
     <section class="dash">
-      <div class="section-title">${escapeHTML(title)}</div>
-      <div class="case-meta">Practice area: ${escapeHTML(practiceArea)}</div>
-      <div class="case-status-pill">${escapeHTML(status)}</div>
+      <div class="section-title">${safeEscape(title)}</div>
+      <div class="case-meta">Practice area: ${safeEscape(practiceArea)}</div>
+      <div class="case-status-pill">${safeEscape(status)}</div>
 
       <div class="case-section">
         <div class="case-section-title">Zoom link</div>
         ${
           zoomLink
-            ? `<a class="btn primary" href="${escapeHTML(zoomLink)}" target="_blank" rel="noopener">Join meeting</a>`
+            ? `<a class="btn primary" href="${safeEscape(zoomLink)}" target="_blank" rel="noopener">Join meeting</a>`
             : `<div class="empty">No meeting link has been provided yet.</div>`
         }
       </div>
 
       <div class="case-section">
         <div class="case-section-title">Applicants</div>
-        ${applicantsMarkup}
+        ${
+          isOwner || isAdmin
+            ? `<div id="applicantsList" data-applicants-list></div>`
+            : applicantsMarkup
+        }
       </div>
 
       ${applicationSection}
@@ -220,6 +233,8 @@ function draw(root, data, escapeHTML, caseId, session) {
   }
   if (viewerRole === "paralegal") {
     hideAttorneyOnlyControls(root);
+  } else if ((isOwner || isAdmin) && root.querySelector("[data-applicants-list]")) {
+    renderApplicantPanel(root.querySelector("[data-applicants-list]"), caseId);
   }
   if (readOnly && purgeAt) {
     startCountdown(root.querySelector("[data-purge-countdown]"), purgeAt);
@@ -254,10 +269,15 @@ function ensureStyles() {
     .empty{color:#6b7280;font-size:.95rem}
     .error{padding:16px;border:1px solid #fecaca;background:#fef2f2;border-radius:12px;color:#b91c1c}
     .applicant-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
-    .applicant-card{display:flex;align-items:center;justify-content:space-between;border:1px solid #e5e7eb;padding:12px 16px;border-radius:12px}
+    .applicant-card{border:1px solid #e5e7eb;padding:16px;border-radius:12px;background:#fff;display:grid;gap:8px}
     .applicant-card-main{display:flex;flex-direction:column;gap:4px}
     .applicant-name{font-weight:600;font-size:1rem}
     .applicant-status{font-size:.85rem;color:#6b7280;text-transform:capitalize}
+    .applicant-detail{font-size:.9rem;color:#4b5563;margin:2px 0}
+    .applicant-skills{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+    .applicant-skills span{padding:4px 10px;border-radius:999px;background:#eef2ff;color:#312e81;font-size:.8rem}
+    .applicant-cover{border:1px solid #e5e7eb;border-radius:12px;padding:10px;font-size:.9rem;background:#f9fafb;color:#374151}
+    .applicant-actions{display:flex;gap:10px;flex-wrap:wrap}
     .shimmer{background:linear-gradient(90deg,#f3f4f6 25%,#e5e7eb 37%,#f3f4f6 63%);background-size:400% 100%;animation:shimmer 1.4s ease infinite;border-radius:10px;height:18px}
     @keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
     .case-modal-overlay{position:fixed;inset:0;background:rgba(17,24,39,.45);display:flex;align-items:center;justify-content:center;z-index:999}
@@ -320,6 +340,107 @@ function renderApplicant(applicant, escapeHTML, { canHire } = {}) {
       }
     </li>
   `;
+}
+
+async function renderApplicantPanel(container, caseId) {
+  if (!container) return;
+  container.innerHTML = "<p>Loading applicants…</p>";
+  const safeEscape = lastEscapeFn || escapeHTMLString;
+  try {
+    const res = await j(`/api/applications/case/${encodeURIComponent(caseId)}`);
+    const items = Array.isArray(res) ? res : Array.isArray(res?.items) ? res.items : [];
+    if (!items.length) {
+      container.innerHTML = "<p>No applications submitted yet.</p>";
+      return;
+    }
+    container.innerHTML = items.map((item) => renderApplicantCard(item, safeEscape)).join("");
+    container.querySelectorAll("[data-app-action]").forEach((btn) => {
+      btn.addEventListener("click", () => handleApplicationAction(btn.dataset.appAction, btn.dataset.appId, caseId, btn));
+    });
+  } catch (err) {
+    container.innerHTML = `<p class="error">${safeEscape(err?.message || "Unable to load applications.")}</p>`;
+  }
+}
+
+function renderApplicantCard(application, escapeHTML) {
+  const paralegal = application?.paralegalId || {};
+  const name = paralegal.name || [paralegal.firstName, paralegal.lastName].filter(Boolean).join(" ").trim() || "Paralegal";
+  const linkedIn = paralegal.linkedInURL || application?.linkedInURL;
+  const resume = paralegal.resumeURL || application?.resumeURL;
+  const skills = paralegal.highlightedSkills || application?.highlightedSkills || [];
+  const coverLetter = application?.coverLetter || "";
+  const submitted = application?.createdAt ? new Date(application.createdAt).toLocaleString() : "";
+  const status = (application?.status || "submitted").replace(/_/g, " ");
+
+  const skillTags = Array.isArray(skills) && skills.length
+    ? `<div class="applicant-skills">${skills.map((skill) => `<span>${escapeHTML(String(skill))}</span>`).join("")}</div>`
+    : "";
+
+  return `
+    <div class="applicant-card" data-app-id="${escapeHTML(application?._id || application?.id || "")}">
+      <div class="applicant-card-main">
+        <div class="applicant-name">${escapeHTML(name)}</div>
+        <div class="applicant-status">Status: ${escapeHTML(status)}${submitted ? ` • Submitted ${escapeHTML(submitted)}` : ""}</div>
+        ${linkedIn ? `<div class="applicant-detail">LinkedIn: <a href="${escapeAttribute(linkedIn)}" target="_blank" rel="noopener">Profile</a></div>` : ""}
+        ${resume ? `<div class="applicant-detail">Résumé: <a href="${escapeAttribute(resume)}" target="_blank" rel="noopener">View Résumé</a></div>` : ""}
+        ${skillTags}
+      </div>
+      ${
+        coverLetter
+          ? `<div class="applicant-cover">
+              <strong>Cover Letter:</strong>
+              <p>${escapeHTML(coverLetter)}</p>
+            </div>`
+          : ""
+      }
+      <div class="applicant-actions">
+        <button class="btn primary" data-app-action="accept" data-app-id="${escapeHTML(application?._id || application?.id || "")}">Accept</button>
+        <button class="btn" data-app-action="reject" data-app-id="${escapeHTML(application?._id || application?.id || "")}">Reject</button>
+      </div>
+    </div>
+  `;
+}
+
+async function handleApplicationAction(action, applicationId, caseId, button) {
+  if (!applicationId || !action) return;
+  const originalLabel = button?.textContent || "";
+  const toastHelper = window.toastUtils;
+  if (button) {
+    button.disabled = true;
+    button.textContent = action === "accept" ? "Accepting…" : "Rejecting…";
+  }
+  try {
+    const res = await j(`/api/applications/${encodeURIComponent(applicationId)}/${action}`, {
+      method: "POST",
+    });
+    if (!res?.ok && res !== true) {
+      throw new Error(res?.error || "Unable to update application.");
+    }
+    toastHelper?.show?.(`Application ${action}ed.`, { type: "success" });
+    await renderApplicantPanel(document.querySelector("[data-applicants-list]"), caseId);
+    await refreshCaseDetails(caseId);
+  } catch (err) {
+    console.warn(err);
+    toastHelper?.show?.(err?.message || "Unable to update application.", { type: "error" });
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
+  }
+}
+
+async function refreshCaseDetails(caseId) {
+  try {
+    const el = document.querySelector(".dash");
+    if (!el) return;
+    const data = await j(`/api/cases/${encodeURIComponent(caseId)}`);
+    const safeEscape = lastEscapeFn || ((value) => String(value ?? ""));
+    const sessionPayload = lastSessionPayload || { user: {} };
+    draw(el.parentElement || document.body, data, safeEscape, caseId, sessionPayload);
+  } catch (err) {
+    console.warn("Failed to refresh case detail", err);
+  }
 }
 
 function bindHireButtons(root, caseId) {
@@ -649,4 +770,42 @@ function notify(message, type = "info") {
   } else {
     alert(message);
   }
+}
+
+function escapeHTMLString(value) {
+  const str = String(value ?? "");
+  return str.replace(/[&<>"]/g, (char) => {
+    switch (char) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return char;
+    }
+  });
+}
+
+function escapeAttribute(value) {
+  const str = String(value ?? "");
+  return str.replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "'":
+        return "&#39;";
+      default:
+        return char;
+    }
+  });
 }

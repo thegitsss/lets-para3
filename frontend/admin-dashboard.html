@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Admin Dashboard | Let's-ParaConnect</title>
+<title>Admin Dashboard | Let’s-ParaConnect</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="assets/scripts/utils/session.js"></script>
@@ -282,7 +282,7 @@ th{color:var(--muted);font-weight:200;}
   </nav>
   <button type="button" class="sidebar-link" id="sidebarLogoutBtn">Log Out</button>
   <div id="weatherSidebar">Loading weather…</div>
-  <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
+  <div class="sidebar-footer">© Let’s-ParaConnect Inc. 2025</div>
 </aside>
 
 <main class="main">
@@ -1061,7 +1061,7 @@ function downloadCSV(){
   const url=URL.createObjectURL(blob);
   const a=document.createElement("a");
   a.href=url;
-  a.download="LetsParaConnect_RevenueLedger.csv";
+  a.download="Lets-ParaConnect_RevenueLedger.csv";
   a.click();
   URL.revokeObjectURL(url);
 }

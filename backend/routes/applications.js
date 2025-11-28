@@ -3,6 +3,8 @@ const mongoose = require("mongoose");
 const router = express.Router();
 const Application = require("../models/Application");
 const Job = require("../models/Job");
+const Case = require("../models/Case");
+const Notification = require("../models/Notification");
 const auth = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
 
@@ -64,7 +66,9 @@ async function createApplicationForJob(jobId, user, coverLetter) {
 router.get("/my", auth, requireRole(["paralegal"]), async (req, res) => {
   try {
     const apps = await Application.find({ paralegalId: req.user._id })
-      .populate("jobId");
+      .sort({ createdAt: -1 })
+      .populate("caseId", "title status attorney attorneyId")
+      .populate("jobId", "title status attorneyId");
 
     res.json(apps);
   } catch (err) {
@@ -89,6 +93,150 @@ router.get("/for-job/:jobId", auth, requireRole(["admin", "attorney"]), async (r
     );
 
     res.json(apps);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/case/:caseId", auth, requireRole(["attorney"]), async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    if (!mongoose.isValidObjectId(caseId)) {
+      return res.status(400).json({ error: "Invalid case id" });
+    }
+    const caseDoc = await Case.findById(caseId).select("attorney attorneyId");
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+    const ownsCase =
+      (caseDoc.attorney && String(caseDoc.attorney) === String(req.user._id)) ||
+      (caseDoc.attorneyId && String(caseDoc.attorneyId) === String(req.user._id));
+    if (!ownsCase) return res.status(403).json({ error: "Unauthorized" });
+
+    const apps = await Application.find({ caseId })
+      .sort({ createdAt: -1 })
+      .populate("paralegalId", "firstName lastName email role");
+    res.json(apps);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/:caseId", auth, requireRole(["paralegal"]), async (req, res) => {
+  try {
+    const { caseId } = req.params;
+    if (!mongoose.isValidObjectId(caseId)) {
+      return res.status(400).json({ error: "Invalid case id" });
+    }
+    const caseDoc = await Case.findById(caseId).select("status attorney attorneyId");
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+    if (caseDoc.status !== "open") {
+      return res.status(400).json({ error: "Applications are closed for this case" });
+    }
+    const activeExisting = await Application.findOne({
+      caseId,
+      paralegalId: req.user._id,
+      status: { $in: ["submitted", "reviewed", "accepted"] },
+    });
+    if (activeExisting) {
+      return res.status(400).json({ error: "You already have an application for this case." });
+    }
+    const coverLetter = sanitizeMessage(req.body?.coverLetter || "", { min: 20, max: 2000 });
+    if (!coverLetter || coverLetter.length < 20) {
+      return res.status(400).json({ error: "Cover letter must be at least 20 characters." });
+    }
+    const application = await Application.create({
+      caseId,
+      paralegalId: req.user._id,
+      coverLetter,
+      status: "submitted",
+      createdAt: new Date(),
+    });
+    const ownerId = caseDoc.attorneyId || caseDoc.attorney;
+    if (ownerId) {
+      try {
+        await Notification.create({
+          userId: ownerId,
+          caseId,
+          title: "New Application",
+          body: "A paralegal applied to your case.",
+          type: "application",
+        });
+      } catch (notifyErr) {
+        console.warn("[applications] notify attorney failed", notifyErr?.message || notifyErr);
+      }
+    }
+    res.status(201).json(application);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/:id/accept", auth, requireRole(["attorney"]), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Invalid application id" });
+    const application = await Application.findById(id);
+    if (!application || !application.caseId) return res.status(404).json({ error: "Application not found" });
+    const caseDoc = await Case.findById(application.caseId).select("attorney attorneyId status paralegal paralegalId");
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+    const ownsCase =
+      (caseDoc.attorney && String(caseDoc.attorney) === String(req.user._id)) ||
+      (caseDoc.attorneyId && String(caseDoc.attorneyId) === String(req.user._id));
+    if (!ownsCase) return res.status(403).json({ error: "Unauthorized" });
+
+    application.status = "accepted";
+    await application.save();
+
+    caseDoc.paralegal = application.paralegalId;
+    caseDoc.paralegalId = application.paralegalId;
+    caseDoc.status = "in_progress";
+    caseDoc.hiredAt = new Date();
+    await caseDoc.save();
+    try {
+      await Notification.create({
+        userId: application.paralegalId,
+        caseId: application.caseId,
+        title: "Application Accepted",
+        body: "You have been selected for a case.",
+        type: "application",
+      });
+    } catch (notifyErr) {
+      console.warn("[applications] notify paralegal acceptance failed", notifyErr?.message || notifyErr);
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post("/:id/reject", auth, requireRole(["attorney"]), async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Invalid application id" });
+    const application = await Application.findById(id);
+    if (!application || !application.caseId) return res.status(404).json({ error: "Application not found" });
+    const caseDoc = await Case.findById(application.caseId).select("attorney attorneyId");
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+    const ownsCase =
+      (caseDoc.attorney && String(caseDoc.attorney) === String(req.user._id)) ||
+      (caseDoc.attorneyId && String(caseDoc.attorneyId) === String(req.user._id));
+    if (!ownsCase) return res.status(403).json({ error: "Unauthorized" });
+
+    application.status = "rejected";
+    await application.save();
+    try {
+      await Notification.create({
+        userId: application.paralegalId,
+        caseId: application.caseId,
+        title: "Application Rejected",
+        body: "Your application was not selected.",
+        type: "application",
+      });
+    } catch (notifyErr) {
+      console.warn("[applications] notify paralegal rejection failed", notifyErr?.message || notifyErr);
+    }
+
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

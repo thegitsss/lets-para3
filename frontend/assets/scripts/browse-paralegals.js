@@ -1,6 +1,6 @@
-import { requireAuth, secureFetch, logout } from "./auth.js";
+import { secureFetch, logout } from "./auth.js";
 
-const isPublicView = !localStorage.getItem("lpc_name");
+let isPublicView = true;
 
 const states = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","Florida","Georgia",
@@ -69,18 +69,18 @@ async function init() {
     event.preventDefault();
     logout("login.html");
   });
+  const loggedIn = await checkIfLoggedIn();
+  isPublicView = !loggedIn;
 
   if (isPublicView) {
     document.body.classList.add("public-view");
+    window.updateHeaderBasedOnAuth?.(false);
     renderPublicSample();
     return;
   }
 
-  try {
-    requireAuth("attorney");
-  } catch {
-    return;
-  }
+  window.updateHeaderBasedOnAuth?.(true);
+  document.body.classList.remove("public-view");
 
   initStateDropdown();
   initSpecialtyDropdown();
@@ -269,6 +269,18 @@ function renderParalegals(items) {
     fragment.appendChild(buildParalegalCard(item));
   });
   elements.results.appendChild(fragment);
+}
+
+async function checkIfLoggedIn() {
+  if (typeof window.refreshSession !== "function") return false;
+  try {
+    const session = await window.refreshSession(undefined);
+    if (!session) return false;
+    const user = session.user || session;
+    return Boolean(user);
+  } catch {
+    return false;
+  }
 }
 
 function buildParalegalCard(paralegal) {

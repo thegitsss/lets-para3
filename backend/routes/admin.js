@@ -24,9 +24,9 @@ if (process.env.ENABLE_CSRF === "true") {
 const APP_BASE_URL = (process.env.APP_BASE_URL || "").replace(/\/$/, "");
 const LOGIN_URL = APP_BASE_URL ? `${APP_BASE_URL}/login.html` : "https://www.lets-paraconnect.com/login.html";
 const APPROVAL_EMAIL_SUBJECT =
-  "Welcome to Let's ParaConnect. Your account has been approved. You may now log in and begin using your dashboard.";
+  "Welcome to Let’s-ParaConnect. Your account has been approved. You may now log in and begin using your dashboard.";
 const DENIAL_EMAIL_SUBJECT =
-  "Your application to join Let's ParaConnect has been reviewed and was unfortunately not approved.";
+  "Your application to join Let’s-ParaConnect has been reviewed and was unfortunately not approved.";
 const VERIFICATION_ACCEPT_SUBJECT = "Let’s-ParaConnect Verification Approval";
 const VERIFICATION_REJECT_SUBJECT = "Let’s-ParaConnect Verification Update";
 
@@ -121,12 +121,12 @@ async function dispatchDecisionEmail(user, status) {
   const friendlyName = formatFullName(user) || "there";
   const loginLine = LOGIN_URL ? `<br/><br/>Log in here: <a href="${LOGIN_URL}">${LOGIN_URL}</a>` : "";
   if (status === "approved") {
-    const html = `Hi ${friendlyName},<br/><br/>Welcome to Let's ParaConnect. Your account has been approved. You may now log in and begin using your dashboard.${loginLine}<br/><br/>We're excited to have you onboard.<br/>— Let's ParaConnect`;
+    const html = `Hi ${friendlyName},<br/><br/>Welcome to Let’s-ParaConnect. Your account has been approved. You may now log in and begin using your dashboard.${loginLine}<br/><br/>We're excited to have you onboard.<br/>— Let’s-ParaConnect`;
     await sendEmail(user.email, APPROVAL_EMAIL_SUBJECT, html);
     return;
   }
   if (status === "denied") {
-    const html = `Hi ${friendlyName},<br/><br/>Your application to join Let's ParaConnect has been reviewed and was unfortunately not approved. Our team reviews every submission carefully, and you can reply to this email if you believe we missed important information.<br/><br/>Thank you for your interest in the community.<br/>— Let's ParaConnect`;
+    const html = `Hi ${friendlyName},<br/><br/>Your application to join Let’s-ParaConnect has been reviewed and was unfortunately not approved. Our team reviews every submission carefully, and you can reply to this email if you believe we missed important information.<br/><br/>Thank you for your interest in the community.<br/>— Let’s-ParaConnect`;
     await sendEmail(user.email, DENIAL_EMAIL_SUBJECT, html);
   }
 }
@@ -254,7 +254,9 @@ router.get(
   "/pending-paralegals",
   asyncHandler(async (_req, res) => {
     const pending = await User.find({ role: "paralegal", status: "pending" })
-      .select("firstName lastName email linkedInURL certificateURL yearsExperience ref1Name ref1Email ref2Name ref2Email createdAt")
+      .select(
+        "firstName lastName email linkedInURL certificateURL yearsExperience ref1Name ref1Email ref2Name ref2Email createdAt bio education awards highlightedSkills resumeURL"
+      )
       .sort({ createdAt: 1 })
       .lean();
     res.json({ items: pending });
