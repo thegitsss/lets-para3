@@ -1,15 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-  <link rel="manifest" href="/site.webmanifest">
-  <link rel="shortcut icon" href="/favicon.ico">
-  <meta name="theme-color" content="#0B2A4A">
   <link href="assets/styles/styles.css" rel="stylesheet" />  
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -429,55 +420,6 @@
   }
 }
 
-/* Mobile and very narrow screens: hide nav + sign-in, keep only brand */
-.header-actions {
-  opacity: 1 !important;
-  visibility: visible !important;
-  pointer-events: auto !important;
-  position: relative !important;
-
-  .site-header .pill {
-    display: inline-flex !important;
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    background: var(--gold);
-    color: white;
-    padding: 8px 14px;
-    border-radius: 999px;
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-weight: 300;
-    z-index: 1000;
-    border: none;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.15);
-    text-decoration: none;
-  }
-
-  .site-header .pill:hover {
-    background: #a6894d;
-  }
-
-    .site-header .header-actions {
-    display: block !important;
-    opacity: 1 !important;
-    pointer-events: all !important;
-    transform: none !important;
-    position: relative !important;
-    visibility: visible !important;
-  }
-
-  /* center the brand */
-  .brand {
-    position: relative;
-    left: auto;
-    transform: none;
-    margin: 0 auto;
-    text-align: center;
-  }
-}
-
 /* === Responsive Header Behavior (Apple-style smooth collapse) === */
 
 /* Default (desktop) */
@@ -558,15 +500,64 @@
     opacity: 1;
   }
 }
+
+@media (max-width: 600px) {
+  body {
+    padding-top: 76px;
+  }
+
+  .site-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom: 1px solid rgba(10, 15, 20, 0.08);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  }
+
+  .header-inner {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .site-header nav {
+    display: none;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    position: static !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  .header-actions .pill {
+    position: static !important;
+    background: transparent;
+    color: #1a2230;
+    border: 1px solid rgba(26, 34, 48, 0.2);
+    box-shadow: none;
+  }
+
+  .slider {
+    margin-top: 0;
+  }
+}
   </style>
 </head>
-<body id="top">
+<body>
   <!-- Header -->
-  <header class="site-header" id="mainHeader">
+  <header class="site-header">
     <div class="header-inner">
       <nav aria-label="Primary">
         <ul>
-          <li><a href="#top">Home</a></li>
           <li><a href="#about">About</a></li>
           <li><a href="#services">Services</a></li>
           <li><a href="#how">How It Works</a></li>
@@ -576,9 +567,8 @@
         Let’s-ParaConnect
       </a>
       <div class="header-actions">
-        <a class="pill" href="login.html" id="authAction" data-public-only>Sign In</a>
-        <a class="pill" href="signup.html" id="signupAction" data-public-only>Sign Up</a>
-        <button type="button" class="pill" id="logoutAction" style="display:none;" data-authed-only>Log Out</button>
+        <a class="pill" href="login.html" id="authAction">Sign In</a>
+        <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
       </div>
     </div>
   </header>
@@ -665,11 +655,8 @@
   text-align: center;
   background-color: #ffffff;
   position: relative;
-  z-index: 1000;
-  margin-top: 120px;
-  padding: 300px 20px;
-  width: 100%;
-  max-width: none;
+  z-index: 5;
+  margin-top: 12
 }
 
     .who-title {
@@ -729,9 +716,9 @@
       <img src="./hero-mountain.jpg" alt="Snow-capped mountain peak" />
     </div>
     <div class="caption">
-      <div class="kicker">Scale your practice with</div>
-      <h1 class="headline">On-Demand Expertise</h1>
-      <a class="cta" href="browse-paralegals.html" target="_blank" rel="noopener">Explore the Collective
+      <div class="kicker">On-demand paralegal support to</div>
+      <h1 class="headline">Discover the Talent</h1>
+      <a class="cta" href="#services">Explore the Marketplace
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M5 12h14M13 5l7 7-7 7"/>
         </svg>
@@ -744,8 +731,8 @@
           <img src="./hero-city.jpg" alt="City skyline at dusk with river and bridges" />
         </div>
         <div class="caption">
-          <div class="kicker">On-demand paralegal support to</div>
-          <h1 class="headline">Scale your practice</h1>
+          <div class="kicker">Scale your practice with</div>
+          <h1 class="headline">Elite vetted paralegal professionals</h1>
           <a class="cta" href="#how">How It Works
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
           </a>
@@ -759,10 +746,10 @@
     </div>
   </section>
 
-  <section class="section about wrap who-we-are" id="about" style="text-align: left; background-color: #ffffff;">
-    <h2 class="who-title" style="color: #1a2230; font-family: 'Cormorant Garamond', sans-serif; font-weight: 200; text-align: center;">Who We Are</h2>
-    <p class="who-text" style="color: #333333; font-family: 'Sarabun', sans-serif; font-weight: 200; margin: 0 auto 1.5rem;">
-      Let’s-ParaConnect is a modern legal-tech marketplace that brings attorneys and vetted members of our elite paralegal professional collective together for flexible, project-based support.
+  <section class="section about wrap who-we-are" id="about" style="text-align: center; background-color: #ffffff;">
+    <h2 class="who-title" style="color: #1a2230; font-family: 'Cormorant Garamond', sans-serif; font-weight: 200;">Who We Are</h2>
+    <p class="who-text" style="color: #333333; font-family: 'Sarabun', sans-serif; font-weight: 200; max-width: 600px; margin: 0 auto 1.5rem;">
+      Let’s-ParaConnect is a modern legal-tech marketplace that brings attorneys and vetted freelance paralegals together for flexible, project-based support.
       We’re focused on making collaboration efficient, intuitive, and effortless from start to finish.
     </p>
   </section>
@@ -788,8 +775,8 @@
         <div class="pad">
           <span class="card-icon" aria-hidden="true">*</span>
           <h3>Paralegals Apply</h3>
-          <p>Members of the elite paralegal professional collective submit proposals. You pick the best fit.</p>
-          <a class="read" href="#">Browse the elite paralegal professional collective →</a>
+          <p>Vetted freelance paralegals submit proposals. You pick the best fit.</p>
+          <a class="read" href="#">Browse Talent →</a>
         </div>
       </div>
       <div class="card">
@@ -1393,7 +1380,6 @@ updateHeaderAppearance();
     function updateAuthLink() {
       const link = document.getElementById("authAction");
       const logoutBtn = document.getElementById("logoutAction");
-      const signupLink = document.getElementById("signupAction");
       if (!link) return;
       const token = readStoredToken();
       const user = readStoredUser();
@@ -1404,16 +1390,11 @@ updateHeaderAppearance();
         link.href = dashboard;
         link.setAttribute("data-authenticated", "true");
         if (logoutBtn) logoutBtn.style.display = "inline-flex";
-        if (signupLink) signupLink.style.display = "none";
       } else {
         link.textContent = "Sign In";
         link.href = "login.html";
         link.removeAttribute("data-authenticated");
         if (logoutBtn) logoutBtn.style.display = "none";
-        if (signupLink) {
-          signupLink.style.display = "inline-flex";
-          signupLink.href = "signup.html";
-        }
       }
     }
 
