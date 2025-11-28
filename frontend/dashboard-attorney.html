@@ -1,15 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-  <link rel="manifest" href="/site.webmanifest">
-  <link rel="shortcut icon" href="/favicon.ico">
-  <meta name="theme-color" content="#0B2A4A">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Let’s-ParaConnect | Attorney Dashboard</title>
@@ -99,46 +90,43 @@
     }
 
     .notification-icon {
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
-      border: 1px solid var(--line);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #fff;
-      cursor: pointer;
       position: relative;
-      transition: border-color 0.2s ease, transform 0.2s ease;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      transition: background 0.2s ease;
     }
+
 
     .notification-icon:hover {
-      border-color: var(--accent);
-      transform: translateY(-1px);
+      background: rgba(0,0,0,0.05);
     }
 
+
     .notification-icon svg {
-      width: 22px;
-      height: 22px;
+      width: 20px;
+      height: 20px;
       color: var(--ink);
     }
 
     .notification-badge {
       position: absolute;
-      top: -4px;
-      right: -4px;
-      background: #c0392b;
-      color: #fff;
-      font-size: 0.75rem;
-      border-radius: 999px;
-      padding: 2px 6px;
-      line-height: 1;
-      display: none;
-      font-weight: 600;
-    }
-
-    .notification-badge.show {
-      display: inline-flex;
+      top: -6px;
+      right: -6px;
+      background: red;
+      color: white;
+      border-radius: 50%;
+      font-size: 0.7rem;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
     }
 
     .user-profile {
@@ -388,7 +376,6 @@
   </style>
 </head>
 <body>
-<div id="protectedContent" style="visibility:hidden">
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
     <nav>
@@ -411,7 +398,7 @@
 
     <header>
       <h1>Welcome back, <span id="user-name-heading">Samantha</span></h1>
-      <p id="activeCasesHeading">Checking your active cases…</p>
+      <p>You have 2 active cases</p>
     </header>
 
     <section class="summary">
@@ -481,6 +468,5 @@
   window.__ATTORNEY_PAGE__ = "overview";
 </script>
 <script type="module" src="assets/scripts/attorney-tabs.js"></script>
-</div>
 </body>
 </html>
