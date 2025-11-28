@@ -511,7 +511,8 @@
     top: 0;
     left: 0;
     width: 100%;
-    justify-content: space-between;
+    justify-content: center;
+    gap: 0;
     padding: 12px 16px;
     background: rgba(255, 255, 255, 0.95);
     border-bottom: 1px solid rgba(10, 15, 20, 0.08);
@@ -520,10 +521,17 @@
 
   .header-inner {
     width: 100%;
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    gap: 8px;
+  }
+
+  .brand {
+    position: relative;
+    left: auto;
+    transform: none;
+    justify-self: start;
   }
 
   .site-header nav {
@@ -532,6 +540,7 @@
 
   .header-actions {
     display: flex;
+    justify-content: flex-end;
     gap: 8px;
     position: static !important;
     opacity: 1 !important;
@@ -732,7 +741,7 @@
         </div>
         <div class="caption">
           <div class="kicker">Scale your practice with</div>
-          <h1 class="headline">Elite vetted paralegal professionals</h1>
+          <h1 class="headline">Elite Vetted Paralegals</h1>
           <a class="cta" href="#how">How It Works
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
           </a>
