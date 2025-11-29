@@ -166,6 +166,7 @@
       width: 100vw;
       backdrop-filter: blur(8px);
       background-color: rgba(0, 0, 0, 0.45);
+      padding-top: 0;
     }
 
     /* left panel — narrower, stronger opacity */
@@ -339,6 +340,12 @@
 
       h1 {
         text-align: center;
+      }
+    }
+
+    @media (min-width: 769px) {
+      .overlay {
+        padding-top: 80px;
       }
     }
 
