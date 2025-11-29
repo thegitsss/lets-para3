@@ -11,6 +11,19 @@ const User = require("../models/User");
 const AuditLog = require("../models/AuditLog"); // audit trail hooks
 const sendEmail = require("../utils/email");
 
+const IS_PROD = process.env.PROD === "true";
+const COOKIE_BASE_OPTIONS = {
+  httpOnly: true,
+  secure: true,
+  sameSite: "none",
+  path: "/",
+  ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
+};
+const AUTH_COOKIE_OPTIONS = {
+  ...COOKIE_BASE_OPTIONS,
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
+
 // ----------------------------------------
 // Helpers
 // ----------------------------------------
@@ -174,11 +187,13 @@ router.post(
   "/login",
   asyncHandler(async (req, res) => {
     const { email, password } = req.body || {};
-    const IS_PROD = process.env.PROD === "true";
     const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY || process.env.RECAPTCHA_SECRET || "";
 
     if (IS_PROD && recaptchaSecret) {
-      const recaptchaToken = req.body?.recaptcha || req.body?.recaptchaToken;
+      let recaptchaToken = req.body?.recaptcha;
+      if (!recaptchaToken && req.body?.recaptchaToken) {
+        recaptchaToken = req.body.recaptchaToken;
+      }
       if (!recaptchaToken) {
         return res.status(400).json({ error: "Recaptcha verification failed" });
       }
@@ -229,13 +244,7 @@ router.post(
     }
 
     const token = signAccess(user);
-    res.cookie("access", token, {
-      httpOnly: true,
-      secure: IS_PROD,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie("token", token, AUTH_COOKIE_OPTIONS);
     await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
 
     return res.json({
@@ -294,12 +303,12 @@ router.get(
 // POST /api/auth/logout
 // ----------------------------------------
 router.post("/logout", (_req, res) => {
-  res.cookie("access", "", {
+  res.clearCookie("token", {
     httpOnly: true,
-    secure: PROD,
-    sameSite: "lax",
+    secure: true,
+    sameSite: "none",
     path: "/",
-    maxAge: 0,
+    ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
   });
   res.json({ success: true });
 });
