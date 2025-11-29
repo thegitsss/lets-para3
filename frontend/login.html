@@ -285,7 +285,7 @@ button[type="submit"]:hover {
           <label for="password">Enter your password</label>
           <div class="pw-wrap">
             <input id="password" name="password" type="password" placeholder="••••••••" required />
-            <button type="button" class="show-toggle" onclick="togglePassword()">Show</button>
+            <button type="button" class="show-toggle" aria-pressed="false">Show</button>
           </div>
 
           <button type="submit" class="login-btn">Log In</button>
@@ -311,13 +311,18 @@ button[type="submit"]:hover {
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
 
   <script>
-    function togglePassword() {
+    document.addEventListener('DOMContentLoaded', () => {
       const input = document.getElementById('password');
       const toggle = document.querySelector('.show-toggle');
-      const isHidden = input.type === 'password';
-      input.type = isHidden ? 'text' : 'password';
-      toggle.textContent = isHidden ? 'Hide' : 'Show';
-    }
+      if (!input || !toggle) return;
+      toggle.addEventListener('click', (event) => {
+        event.preventDefault();
+        const isHidden = input.type === 'password';
+        input.type = isHidden ? 'text' : 'password';
+        toggle.textContent = isHidden ? 'Hide' : 'Show';
+        toggle.setAttribute('aria-pressed', String(isHidden));
+      });
+    });
   </script>
 
   <script src="assets/scripts/utils/toast.js"></script>
