@@ -173,11 +173,29 @@ router.post(
 router.post(
   "/login",
   asyncHandler(async (req, res) => {
-    const { email, password, recaptchaToken } = req.body || {};
+    const { email, password } = req.body || {};
+    const IS_PROD = process.env.PROD === "true";
+    const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY || process.env.RECAPTCHA_SECRET || "";
 
-    const captchaOk = await verifyRecaptcha(recaptchaToken, "login");
-    if (!captchaOk) {
-      return res.status(400).json({ msg: "reCAPTCHA failed. Please try again." });
+    if (IS_PROD && recaptchaSecret) {
+      const recaptchaToken = req.body?.recaptcha || req.body?.recaptchaToken;
+      if (!recaptchaToken) {
+        return res.status(400).json({ error: "Recaptcha verification failed" });
+      }
+
+      try {
+        const params = new URLSearchParams();
+        params.append("secret", recaptchaSecret);
+        params.append("response", recaptchaToken);
+        const verifyRes = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);
+        const verifyData = verifyRes?.data;
+        if (!verifyData?.success) {
+          return res.status(400).json({ error: "Recaptcha verification failed" });
+        }
+      } catch (err) {
+        console.error("[recaptcha]", err?.message || err);
+        return res.status(400).json({ error: "Recaptcha verification failed" });
+      }
     }
 
     if (!isEmail(email) || !password) {
@@ -213,7 +231,7 @@ router.post(
     const token = signAccess(user);
     res.cookie("access", token, {
       httpOnly: true,
-      secure: PROD,
+      secure: IS_PROD,
       sameSite: "lax",
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
