@@ -418,6 +418,10 @@
 
 /* Tablet and smaller: gradually space things tighter */
 @media (max-width: 800px) {
+  .mobile-only {
+    display: inline-flex;
+  }
+
   .site-header {
     justify-content: center;
   }
@@ -757,6 +761,9 @@
   <div class="how-it-works-bg">
     <h2>How It Works</h2>
     <p>Let’s ParaConnect is designed to be intuitive, fair, and efficient — for both attorneys and paralegals.</p>
+    <a class="cta mobile-only" href="paralegal-faq.html" style="display:inline-flex;align-items:center;gap:6px;margin:0 auto 1.5rem;">Paralegal FAQ
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    </a>
 
     <div class="cards">
       <div class="card">
