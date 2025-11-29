@@ -510,7 +510,7 @@
 
 @media (max-width: 600px) {
   body {
-    padding-top: 76px;
+    padding-top: 0;
   }
 
   .site-header {
@@ -529,16 +529,16 @@
   .header-inner {
     width: 100%;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
+    justify-content: space-between;
+    gap: 12px;
   }
 
   .brand {
     position: static;
     transform: none;
-    margin: 4px 0 0;
+    margin: 0;
   }
 
   .site-header nav {
@@ -547,12 +547,12 @@
 
   .header-actions {
     display: flex;
-    justify-content: center;
+    justify-content: flex-end;
     gap: 8px;
     position: static !important;
     opacity: 1 !important;
     visibility: visible !important;
-    width: 100%;
+    width: auto;
   }
 
   .header-actions .pill {
@@ -561,6 +561,12 @@
     color: #1a2230;
     border: 1px solid rgba(26, 34, 48, 0.2);
     box-shadow: none;
+  }
+
+  .site-header.over-image .brand,
+  .site-header.over-image .header-actions .pill {
+    color: #1a2230;
+    border-color: rgba(26, 34, 48, 0.2);
   }
 
   .slider {
@@ -575,8 +581,7 @@
     <div class="header-inner">
       <nav aria-label="Primary">
         <ul>
-          <li><a href="#about">About</a></li>
-          <li><a href="#services">Services</a></li>
+          <li><a href="#who-we-are">About</a></li>
           <li><a href="#how">How It Works</a></li>
         </ul>
       </nav>
@@ -762,7 +767,7 @@
               <p>Attorneys post what they need in minutes: timelines, type of law, and case details.</p>
               <a href="#" class="hiw-toggle" data-target="post-job">Learn More →</a>
             </div>
-            <div class="hiw-expanded" data-section="post-job">
+            <div class="hiw-expanded scrollable" data-section="post-job">
               <h3>How Posting Works</h3>
               <p>Create a clear outline of the work you need completed — such as drafting, research, document preparation, or case support.<br>
               Set your timeline and budget, attach any relevant materials, and publish the job.<br>
@@ -781,7 +786,7 @@
               <p>Qualified paralegals review your posting and apply if they have the experience and availability you need.</p>
               <a href="#" class="hiw-toggle" data-target="paralegals-apply">Learn More →</a>
             </div>
-            <div class="hiw-expanded" data-section="paralegals-apply">
+            <div class="hiw-expanded scrollable" data-section="paralegals-apply">
               <h3>How Applications Work</h3>
               <p>Only paralegals who meet your listed criteria can apply.<br>
               You’ll see each applicant’s background, skillset, and relevant experience.<br>
@@ -800,7 +805,7 @@
               <p>Once you choose a paralegal, work starts immediately. All communication stays within your LPC dashboard.</p>
               <a href="#" class="hiw-toggle" data-target="work-begins">Learn More →</a>
             </div>
-            <div class="hiw-expanded" data-section="work-begins">
+            <div class="hiw-expanded scrollable" data-section="work-begins">
               <h3>How Workflows Operate</h3>
               <p>After selecting a paralegal, both parties communicate directly through your secure LPC dashboard.<br>
               Files, instructions, and updates stay in one place.<br>
@@ -819,7 +824,7 @@
               <p>Funds are held safely until work is approved.</p>
               <a href="#" class="hiw-toggle" data-target="secure-escrow">Learn More →</a>
             </div>
-            <div class="hiw-expanded" data-section="secure-escrow">
+            <div class="hiw-expanded scrollable" data-section="secure-escrow">
               <h3>How Escrow Protects You</h3>
               <p>When the job begins, your payment goes into a secure Stripe escrow — not to the paralegal.<br>
               You review the completed work, request revisions if needed, and release payment only when you are satisfied.<br>
@@ -838,7 +843,7 @@
               <p>Review the work, release payment, and close the job.</p>
               <a href="#" class="hiw-toggle" data-target="finalize-close">Learn More →</a>
             </div>
-            <div class="hiw-expanded" data-section="finalize-close">
+            <div class="hiw-expanded scrollable" data-section="finalize-close">
               <h3>How Closing Works</h3>
               <p>Once you approve the final deliverable, payment is released from escrow.<br>
               You’ll receive a full record of the assignment in your dashboard, including dates, files, and payment confirmation.<br>
@@ -1311,6 +1316,25 @@ updateHeaderAppearance();
   display: none;
   opacity: 0;
   visibility: hidden;
+}
+
+.hiw-expanded.scrollable {
+  overflow-y: scroll;
+  scrollbar-width: thin;
+  scrollbar-color: #ccc transparent;
+}
+
+.hiw-expanded.scrollable::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hiw-expanded.scrollable::-webkit-scrollbar-thumb {
+  background-color: #ccc;
+  border-radius: 999px;
+}
+
+.hiw-expanded.scrollable::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .hiw-expanded.show {
