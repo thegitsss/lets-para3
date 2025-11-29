@@ -271,7 +271,11 @@ router.get(
   "/me",
   asyncHandler(async (req, res) => {
     const hdr = req.headers.authorization || "";
-    const token = hdr.startsWith("Bearer ") ? hdr.slice(7) : "";
+    const bearer = hdr.startsWith("Bearer ") ? hdr.slice(7) : "";
+    const cookieToken =
+      req.cookies?.token ||
+      req.cookies?.[process.env.JWT_COOKIE_NAME || "access"];
+    const token = cookieToken || bearer;
     if (!token) return res.json({ user: null });
     try {
       const payload = jwt.verify(token, process.env.JWT_SECRET);
