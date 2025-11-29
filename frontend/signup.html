@@ -65,6 +65,8 @@
       display: flex;
       justify-content: center;
       align-items: center;
+      position: relative;
+      z-index: 1000;
     }
 
     .form-container {
@@ -72,7 +74,7 @@
       width: 100%;
     }
 
-    .brand {
+    .brand-fixed {
       position: absolute;
       top: 24px;
       left: 32px;
@@ -82,6 +84,8 @@
       color: var(--navy);
       text-decoration: none;
       letter-spacing: 0.03em;
+      z-index: 20;
+      display: inline-block;
     }
 
     h1, h2 {
@@ -213,6 +217,33 @@
       line-height: 1.5;
     }
 
+    .name-row {
+      display: flex;
+      gap: 16px;
+    }
+
+    .name-row .field-col {
+      flex: 1;
+    }
+
+    .file-input {
+      width: 100%;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 0.6rem;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 0.9rem;
+      background-color: rgba(255,255,255,0.9);
+      margin-bottom: 12px;
+    }
+
+    .file-hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: -8px;
+      margin-bottom: 16px;
+    }
+
     @media (max-width: 768px) {
       .overlay {
         flex-direction: column;
@@ -222,21 +253,48 @@
         width: 100%;
         padding: 40px 24px;
       }
+
+      .name-row {
+      flex-direction: column;
+    }
+  }
+
+    /* Style ONLY the file input button */
+    input[type="file"] {
+      font-size: 0;
+    }
+
+    input[type="file"]::file-selector-button {
+      font-size: 14px;
+      font-weight: 400;
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      background: white;
+      color: #333;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    input[type="file"]::file-selector-button:hover {
+      background: #f5f5f5;
+      border-color: #ccc;
+    }
+
+    input[type="file"]::file-selector-button:focus {
+      outline: none;
+      border-color: #999;
     }
   </style>
-</style>
 
   <script type="module" src="assets/scripts/auth.js"></script>
 </head>
 
 <body class="signup-page">
+  <a href="index.html" class="brand-fixed">Let<span class="gold">’</span>s-ParaConnect</a>
   <div class="overlay">
     <div class="left-panel">
       <div class="form-container fade-in">
-        <h1>
-          <a href="index.html" class="brand">Let’s ParaConnect</a>
-        </h1>
-        <h2>Create your account</h2>
         <p class="prelaunch-note">
           Let’s-ParaConnect is in pre-launch. We are currently acceptinng and reviewing applicants
           for Paralegals who wish to be part of our Founding Paralegal Collective. 
@@ -249,28 +307,29 @@
         </div>
 
         <form id="signupForm" novalidate>
-          <label for="firstName">First name</label>
-          <input id="firstName" type="text" autocomplete="given-name" required />
-
-          <label for="lastName">Last name</label>
-          <input id="lastName" type="text" autocomplete="family-name" required />
-
-          <label for="email">Email</label>
-          <input id="email" type="email" autocomplete="email" required />
-
-          <label for="password">Password</label>
-          <div class="pw-wrap">
-            <input id="password" type="password" autocomplete="new-password" placeholder="8+ characters" required />
-            <button id="togglePw" class="pw-toggle" aria-controls="password">Show</button>
+          <div class="name-row">
+            <div class="field-col">
+              <input id="firstName" type="text" autocomplete="given-name" placeholder="First name" required />
+            </div>
+            <div class="field-col">
+              <input id="lastName" type="text" autocomplete="family-name" placeholder="Last name" required />
+            </div>
           </div>
 
+          <input id="email" type="email" autocomplete="email" placeholder="Email" required />
+
+          <div class="pw-wrap">
+            <input id="password" type="password" autocomplete="new-password" placeholder="Password" required />
+            <button id="togglePw" class="pw-toggle" aria-controls="password">Show</button>
+          </div>
           <div id="roleFieldWrap"></div>
 
-          <label class="terms-label">
-            <input type="checkbox" id="termsAccept" required>
-            I have read and agree to the
-            <a href="terms.html" target="_blank">Terms of Use</a> and
-            <a href="privacy.html" target="_blank">Privacy Policy</a>.
+          <label class="terms-label" style="margin-top:16px;display:flex;align-items:flex-start;gap:8px;font-size:0.9rem;font-weight:200;color:var(--muted);">
+            <input type="checkbox" id="termsAccept" required style="margin-top:4px;">
+            <span>I have read and agree to the
+              <a href="terms.html" target="_blank" style="color:var(--gold);text-decoration:none;">Terms of Use</a> and
+              <a href="privacy.html" target="_blank" style="color:var(--gold);text-decoration:none;">Privacy Policy</a>.
+            </span>
           </label>
 
           <button id="submitBtn" class="btn" type="submit">Create Account</button>
@@ -278,7 +337,6 @@
 
           <div class="extra-links">
             <p>Already have an account? <a href="login.html">Log in</a></p>
-            <p style="margin-top:8px">By continuing you agree to our <a href="terms.html" target="_blank">Terms</a> and <a href="privacy.html" target="_blank">Privacy Policy</a>.</p>
           </div>
         </form>
       </div>
@@ -334,12 +392,10 @@
         b.setAttribute('aria-selected', on ? 'true' : 'false');
       });
       roleFieldWrap.innerHTML = r === 'attorney'
-        ? `<label for="bar">State Bar Number</label>
-           <input id="bar" type="text" autocomplete="off" required />
-           <div class="hint">We verify bar numbers during review.</div>`
-        : `<label for="cert">Certification / License (optional)</label>
-           <input id="cert" type="text" autocomplete="off" />
-           <div class="hint">Add NALA CP, state license #, etc. You can update later.</div>`;
+        ? `<input id="bar" type="text" autocomplete="off" placeholder="State Bar Number" required />`
+        : `<input id="cert" type="text" autocomplete="off" placeholder="Certification / License (optional)" />
+           <input id="resumeUpload" type="file" accept=".pdf,.doc,.docx" class="file-input" aria-label="Resume" required />
+           <div class="file-hint">Resume</div>`;
     }
     setRole(role);
 
@@ -387,6 +443,9 @@
       if (role === 'attorney') {
         const bar = (document.getElementById('bar')?.value || '').trim();
         if (!bar) { say('State Bar Number is required for attorneys.', 'err'); return; }
+      } else {
+        const resumeInput = document.getElementById('resumeUpload');
+        if (!resumeInput || !resumeInput.files?.length) { say('Please upload your resume.', 'err'); return; }
       }
 
       const originalText = submitBtn?.textContent || defaultSubmitText;
@@ -398,8 +457,13 @@
 
       try {
         const payload = { firstName, lastName, email, password, role };
-        if (role === 'attorney') payload.barNumber = document.getElementById('bar').value.trim();
-        else payload.certificateURL = (document.getElementById('cert')?.value || '').trim() || undefined;
+        if (role === 'attorney') {
+          payload.barNumber = document.getElementById('bar').value.trim();
+        } else {
+          const resumeFile = document.getElementById('resumeUpload')?.files?.[0];
+          payload.resumeURL = resumeFile ? resumeFile.name : "";
+          payload.certificateURL = (document.getElementById('cert')?.value || '').trim() || undefined;
+        }
         if (phoneNumber) payload.phoneNumber = phoneNumber;
         payload.recaptchaToken = await getRecaptchaToken('signup');
         payload.termsAccepted = true;
