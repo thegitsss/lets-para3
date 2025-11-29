@@ -767,7 +767,7 @@
               <p>Attorneys post what they need in minutes: timelines, type of law, and case details.</p>
               <a href="#" class="hiw-toggle" data-target="post-job">Learn More →</a>
             </div>
-            <div class="hiw-expanded scrollable" data-section="post-job">
+            <div class="hiw-expanded card-scroll-area" data-section="post-job">
               <h3>How Posting Works</h3>
               <p>Create a clear outline of the work you need completed — such as drafting, research, document preparation, or case support.<br>
               Set your timeline and budget, attach any relevant materials, and publish the job.<br>
@@ -786,7 +786,7 @@
               <p>Qualified paralegals review your posting and apply if they have the experience and availability you need.</p>
               <a href="#" class="hiw-toggle" data-target="paralegals-apply">Learn More →</a>
             </div>
-            <div class="hiw-expanded scrollable" data-section="paralegals-apply">
+            <div class="hiw-expanded card-scroll-area" data-section="paralegals-apply">
               <h3>How Applications Work</h3>
               <p>Only paralegals who meet your listed criteria can apply.<br>
               You’ll see each applicant’s background, skillset, and relevant experience.<br>
@@ -805,7 +805,7 @@
               <p>Once you choose a paralegal, work starts immediately. All communication stays within your LPC dashboard.</p>
               <a href="#" class="hiw-toggle" data-target="work-begins">Learn More →</a>
             </div>
-            <div class="hiw-expanded scrollable" data-section="work-begins">
+            <div class="hiw-expanded card-scroll-area" data-section="work-begins">
               <h3>How Workflows Operate</h3>
               <p>After selecting a paralegal, both parties communicate directly through your secure LPC dashboard.<br>
               Files, instructions, and updates stay in one place.<br>
@@ -824,7 +824,7 @@
               <p>Funds are held safely until work is approved.</p>
               <a href="#" class="hiw-toggle" data-target="secure-escrow">Learn More →</a>
             </div>
-            <div class="hiw-expanded scrollable" data-section="secure-escrow">
+            <div class="hiw-expanded card-scroll-area" data-section="secure-escrow">
               <h3>How Escrow Protects You</h3>
               <p>When the job begins, your payment goes into a secure Stripe escrow — not to the paralegal.<br>
               You review the completed work, request revisions if needed, and release payment only when you are satisfied.<br>
@@ -843,7 +843,7 @@
               <p>Review the work, release payment, and close the job.</p>
               <a href="#" class="hiw-toggle" data-target="finalize-close">Learn More →</a>
             </div>
-            <div class="hiw-expanded scrollable" data-section="finalize-close">
+            <div class="hiw-expanded card-scroll-area" data-section="finalize-close">
               <h3>How Closing Works</h3>
               <p>Once you approve the final deliverable, payment is released from escrow.<br>
               You’ll receive a full record of the assignment in your dashboard, including dates, files, and payment confirmation.<br>
@@ -1318,25 +1318,6 @@ updateHeaderAppearance();
   visibility: hidden;
 }
 
-.hiw-expanded.scrollable {
-  overflow-y: scroll;
-  scrollbar-width: thin;
-  scrollbar-color: #ccc transparent;
-}
-
-.hiw-expanded.scrollable::-webkit-scrollbar {
-  width: 6px;
-}
-
-.hiw-expanded.scrollable::-webkit-scrollbar-thumb {
-  background-color: #ccc;
-  border-radius: 999px;
-}
-
-.hiw-expanded.scrollable::-webkit-scrollbar-track {
-  background: transparent;
-}
-
 .hiw-expanded.show {
   display: flex;
   opacity: 1;
@@ -1398,6 +1379,27 @@ updateHeaderAppearance();
     padding: 1.5rem 1.35rem;
     margin: 0 auto;
     height: 340px;
+  }
+}
+
+@media (max-width: 768px) {
+  .card-scroll-area {
+    overflow-y: scroll !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin !important;
+    scrollbar-color: #d1d1d1 transparent !important;
+  }
+
+  .card-scroll-area::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .card-scroll-area::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+  }
+
+  .card-scroll-area::-webkit-scrollbar-track {
+    background: transparent;
   }
 }
 .floating-panel {
