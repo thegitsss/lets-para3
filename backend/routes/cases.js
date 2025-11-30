@@ -816,6 +816,23 @@ router.get(
 );
 
 router.get(
+  "/open",
+  requireRole(["paralegal"]),
+  asyncHandler(async (req, res) => {
+    const docs = await Case.find({
+      status: "open",
+      pendingParalegalId: null,
+      paralegalId: null,
+      archived: { $ne: true },
+    })
+      .sort({ createdAt: -1 })
+      .select("title description _id attorneyId");
+
+    res.json({ items: docs });
+  })
+);
+
+router.get(
   "/my-assigned",
   requireRole(["paralegal"]),
   asyncHandler(async (req, res) => {

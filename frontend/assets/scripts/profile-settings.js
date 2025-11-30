@@ -1,688 +1,413 @@
-(() => {
-  const API_BASE = "/api";
-  const toastHelper = window.toastUtils;
-  const toastTarget = "toastBanner";
-  const MAX_FILE_BYTES = 5 * 1024 * 1024;
-  const FALLBACK_TEXT = "—";
+import { secureFetch, logout } from "./auth.js";
 
-  const els = {};
-  let currentUser = null;
-  let pendingAvatarURL = "";
-  let uploadingAvatar = false;
-  let notificationPanelOpen = false;
+document.addEventListener("DOMContentLoaded", async () => {
+  await window.checkSession("paralegal");
+  await loadSettings();
+  console.log("Settings page loaded");
+});
 
-  function sanitizeSingleLine(value, maxLength = 150) {
-    if (typeof value !== "string") return "";
-    return value
-      .replace(/<[^>]*>/g, "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, maxLength);
+let settingsState = {
+  profileImageFile: null,
+  profileImage: "",
+  resumeFile: null,
+  bio: "",
+  education: [],
+  awards: [],
+  highlightedSkills: [],
+  linkedInURL: "",
+  notificationPrefs: {}
+};
+
+function renderFallback(sectionId, title) {
+  const section = document.getElementById(sectionId);
+  if (section) section.innerHTML = `<h3>${title}</h3><p>Unable to load.</p>`;
+}
+
+function syncCluster(user = {}) {
+  const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.name || "Paralegal";
+  const roleLabel = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "Paralegal";
+  const avatar = user.profileImage || user.avatarURL || settingsState.profileImage || "https://via.placeholder.com/64x64.png?text=PL";
+  const avatarEl = document.getElementById("clusterAvatar");
+  if (avatarEl) avatarEl.src = avatar;
+  document.querySelectorAll(".nav-profile-photo").forEach((el) => {
+    el.src = avatar;
+  });
+  const nameEl = document.getElementById("clusterName");
+  if (nameEl) nameEl.textContent = fullName;
+  const roleEl = document.getElementById("clusterRole");
+  if (roleEl) roleEl.textContent = roleLabel;
+  window.hydrateParalegalCluster?.(user);
+}
+
+async function loadSettings() {
+  let user = {};
+  try {
+    const res = await secureFetch("/api/users/me");
+    user = await res.json();
+  } catch (err) {
+    renderFallback("settingsProfilePhoto", "Profile Photo");
+    renderFallback("settingsResume", "Résumé");
+    renderFallback("settingsBio", "Bio");
+    renderFallback("settingsEducation", "Education");
+    renderFallback("settingsAwards", "Awards");
+    renderFallback("settingsSkills", "Skills");
+    renderFallback("settingsLinkedIn", "LinkedIn");
+    renderFallback("settingsNotifications", "Notifications");
+    return;
   }
 
-  function sanitizeMultiLine(value, maxLength = 4000) {
-    if (typeof value !== "string") return "";
-    return value
-      .replace(/<[^>]*>/g, "")
-      .replace(/\r\n/g, "\n")
-      .replace(/[^\S\n]+/g, " ")
-      .trim()
-      .slice(0, maxLength);
+  // Store existing data
+  settingsState.bio = user.bio || "";
+  settingsState.education = user.education || [];
+  settingsState.awards = user.awards || [];
+  settingsState.highlightedSkills = user.highlightedSkills || [];
+  settingsState.linkedInURL = user.linkedInURL || "";
+  settingsState.notificationPrefs = user.notificationPrefs || {};
+  settingsState.profileImage = user.profileImage || user.avatarURL || "";
+
+  // Build UI
+  try { await loadProfilePhoto(user); } catch { renderFallback("settingsProfilePhoto", "Profile Photo"); }
+  try { await loadResume(user); } catch { renderFallback("settingsResume", "Résumé"); }
+  try { await loadBio(user); } catch { renderFallback("settingsBio", "Bio"); }
+  try { await loadEducation(user); } catch { renderFallback("settingsEducation", "Education"); }
+  try { await loadAwards(user); } catch { renderFallback("settingsAwards", "Awards"); }
+  try { await loadSkills(user); } catch { renderFallback("settingsSkills", "Skills"); }
+  try { await loadLinkedIn(user); } catch { renderFallback("settingsLinkedIn", "LinkedIn"); }
+  try { await loadNotifications(user); } catch { renderFallback("settingsNotifications", "Notifications"); }
+  syncCluster(user);
+
+  const saveBtn = document.getElementById("saveSettingsBtn");
+  if (saveBtn && !saveBtn.dataset.boundSave) {
+    saveBtn.dataset.boundSave = "true";
+    saveBtn.addEventListener("click", saveSettings);
+  }
+}
+
+
+// ================= PROFILE PHOTO =================
+
+function loadProfilePhoto(user) {
+  const section = document.getElementById("settingsProfilePhoto");
+  if (!section) return;
+  const current = user.profileImage || settingsState.profileImage || "https://via.placeholder.com/120x120.png?text=PL";
+  section.innerHTML = `
+    <h3>Profile Photo</h3>
+    <div class="photo-box" style="display:flex;flex-direction:column;gap:1rem;">
+      <div id="profile-photo-preview" class="preview-square"></div>
+      <input id="profile-photo-input" type="file" accept="image/*" hidden>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button id="upload-profile-photo-btn" class="upload-btn" style="padding:8px 14px;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:white;">
+          Upload
+        </button>
+        <button id="save-profile-photo-btn" class="primary-btn" style="display:none;">Save Profile Photo</button>
+      </div>
+    </div>
+  `;
+  const preview = document.getElementById("profile-photo-preview");
+  if (preview) {
+    preview.innerHTML = `<img src="${current}" alt="Profile photo" style="width:100%;height:100%;object-fit:cover;">`;
+  }
+  const navPhotos = document.querySelectorAll(".nav-profile-photo");
+  navPhotos.forEach((img) => {
+    img.src = current;
+  });
+  const uploadBtn = document.getElementById("upload-profile-photo-btn");
+  const inputEl = document.getElementById("profile-photo-input");
+  if (uploadBtn && inputEl) {
+    uploadBtn.addEventListener("click", () => inputEl.click());
+  }
+}
+
+
+// ================= RESUME =================
+
+function loadResume(user) {
+  const section = document.getElementById("settingsResume");
+  if (!section) return;
+  section.innerHTML = `
+    <h3>Résumé</h3>
+    ${user.resumeURL ? `<a href="${user.resumeURL}" target="_blank">View current résumé</a><br>` : ""}
+    <input type="file" id="newResume" accept="application/pdf">
+  `;
+  const resumeInput = document.getElementById("newResume");
+  if (resumeInput) {
+    resumeInput.addEventListener("change", (evt) => {
+      settingsState.resumeFile = evt.target.files[0];
+    });
+  }
+}
+
+
+// ================= BIO =================
+
+function loadBio(user) {
+  const section = document.getElementById("settingsBio");
+  if (!section) return;
+  section.innerHTML = `
+    <h3>Bio</h3>
+    <textarea id="bioInput" style="width:100%;">${user.bio || ""}</textarea>
+  `;
+  const bioInput = document.getElementById("bioInput");
+  if (bioInput) {
+    bioInput.addEventListener("input", (evt) => {
+      settingsState.bio = evt.target.value;
+    });
+  }
+}
+
+
+// ================= EDUCATION =================
+
+function loadEducation(user) {
+  const section = document.getElementById("settingsEducation");
+  if (!section) return;
+  const items = user.education || [];
+
+  section.innerHTML = `
+    <h3>Education</h3>
+    <div id="eduList"></div>
+    <button id="addEduBtn">Add Education Entry</button>
+  `;
+
+  const list = document.getElementById("eduList");
+  if (!list) return;
+
+  function renderEdu() {
+    list.innerHTML = "";
+    settingsState.education.forEach((ed, idx) => {
+      list.innerHTML += `
+        <div class="edu-entry">
+          <input placeholder="Degree" value="${ed.degree || ""}" data-idx="${idx}" data-field="degree">
+          <input placeholder="Institution" value="${ed.institution || ""}" data-idx="${idx}" data-field="institution">
+          <input placeholder="Year" value="${ed.year || ""}" data-idx="${idx}" data-field="year">
+          <input placeholder="Certification" value="${ed.certification || ""}" data-idx="${idx}" data-field="certification">
+        </div>
+      `;
+    });
+
+    list.querySelectorAll("input").forEach(input => {
+      input.addEventListener("input", (evt) => {
+        const idx = evt.target.dataset.idx;
+        const field = evt.target.dataset.field;
+        settingsState.education[idx][field] = evt.target.value;
+      });
+    });
   }
 
-  function displayValue(value, fallback = FALLBACK_TEXT) {
-    const str = typeof value === "string" ? value.trim() : "";
-    return str || fallback;
+  settingsState.education = items;
+  renderEdu();
+
+  const addBtn = document.getElementById("addEduBtn");
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      settingsState.education.push({ degree:"", institution:"", year:"", certification:"" });
+      renderEdu();
+    });
+  }
+}
+
+
+// ================= AWARDS =================
+
+function loadAwards(user) {
+  const section = document.getElementById("settingsAwards");
+  if (!section) return;
+  const items = user.awards || [];
+
+  section.innerHTML = `
+    <h3>Awards</h3>
+    <div id="awardList"></div>
+    <button id="addAwardBtn">Add Award</button>
+  `;
+
+  const list = document.getElementById("awardList");
+  if (!list) return;
+
+  function renderAwards() {
+    list.innerHTML = "";
+    settingsState.awards.forEach((a, idx) => {
+      list.innerHTML += `
+        <div class="award-entry">
+          <input placeholder="Award title" value="${a}" data-idx="${idx}">
+        </div>
+      `;
+    });
+
+    list.querySelectorAll("input").forEach(input => {
+      input.addEventListener("input", (evt) => {
+        const idx = evt.target.dataset.idx;
+        settingsState.awards[idx] = evt.target.value;
+      });
+    });
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    init();
+  settingsState.awards = items;
+  renderAwards();
+
+  const addBtn = document.getElementById("addAwardBtn");
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      settingsState.awards.push("");
+      renderAwards();
+    });
+  }
+}
+
+
+// ================= SKILLS =================
+
+function loadSkills(user) {
+  const section = document.getElementById("settingsSkills");
+  if (!section) return;
+  const items = user.highlightedSkills || [];
+
+  section.innerHTML = `
+    <h3>Highlighted Skills (Top 3–5)</h3>
+    <div id="skillsList"></div>
+    <button id="addSkillBtn">Add Skill</button>
+  `;
+
+  const list = document.getElementById("skillsList");
+  if (!list) return;
+
+  function renderSkills() {
+    list.innerHTML = "";
+    settingsState.highlightedSkills.forEach((s, idx) => {
+      list.innerHTML += `
+        <div class="skill-entry">
+          <input placeholder="Skill" value="${s}" data-idx="${idx}">
+        </div>
+      `;
+    });
+
+    list.querySelectorAll("input").forEach(input => {
+      input.addEventListener("input", (evt) => {
+        const idx = evt.target.dataset.idx;
+        settingsState.highlightedSkills[idx] = evt.target.value;
+      });
+    });
+  }
+
+  settingsState.highlightedSkills = items;
+  renderSkills();
+
+  const addBtn = document.getElementById("addSkillBtn");
+  if (addBtn) {
+    addBtn.addEventListener("click", () => {
+      if (settingsState.highlightedSkills.length < 5) {
+        settingsState.highlightedSkills.push("");
+        renderSkills();
+      }
+    });
+  }
+}
+
+
+// ================= LINKEDIN =================
+
+function loadLinkedIn(user) {
+  const section = document.getElementById("settingsLinkedIn");
+  if (!section) return;
+  section.innerHTML = `
+    <h3>LinkedIn Profile</h3>
+    <input id="linkedInURLInput" type="url" style="width:100%;" value="${user.linkedInURL || ""}">
+  `;
+  const linkedInInput = document.getElementById("linkedInURLInput");
+  if (linkedInInput) {
+    linkedInInput.addEventListener("input", (evt) => {
+      settingsState.linkedInURL = evt.target.value;
+    });
+  }
+}
+
+
+// ================= NOTIFICATION PREFS =================
+
+function loadNotifications(user) {
+  const prefs = user.notificationPrefs || {};
+
+  const section = document.getElementById("settingsNotifications");
+  if (!section) return;
+  section.innerHTML = `
+    <h3>Notification Preferences</h3>
+    <label><input type="checkbox" id="prefInAppMessages"> In-app: Messages</label><br>
+    <label><input type="checkbox" id="prefInAppCase"> In-app: Case Updates</label><br>
+    <label><input type="checkbox" id="prefEmailMessages"> Email: Messages</label><br>
+    <label><input type="checkbox" id="prefEmailCase"> Email: Case Updates</label><br>
+  `;
+
+  const inAppMsg = document.getElementById("prefInAppMessages");
+  const inAppCase = document.getElementById("prefInAppCase");
+  const emailMsg = document.getElementById("prefEmailMessages");
+  const emailCase = document.getElementById("prefEmailCase");
+
+  if (inAppMsg) {
+    inAppMsg.checked = !!prefs.inAppMessages;
+    inAppMsg.addEventListener("change", (e) => { prefs.inAppMessages = e.target.checked; });
+  }
+  if (inAppCase) {
+    inAppCase.checked = !!prefs.inAppCase;
+    inAppCase.addEventListener("change", (e) => { prefs.inAppCase = e.target.checked; });
+  }
+  if (emailMsg) {
+    emailMsg.checked = !!prefs.emailMessages;
+    emailMsg.addEventListener("change", (e) => { prefs.emailMessages = e.target.checked; });
+  }
+  if (emailCase) {
+    emailCase.checked = !!prefs.emailCase;
+    emailCase.addEventListener("change", (e) => { prefs.emailCase = e.target.checked; });
+  }
+
+  settingsState.notificationPrefs = prefs;
+}
+
+
+// ================= SAVE SETTINGS =================
+
+async function saveSettings() {
+  let uploadedAvatarUrl = null;
+  // Upload profile photo
+  if (settingsState.profileImageFile) {
+    const fd = new FormData();
+    fd.append("file", settingsState.profileImageFile);
+    try {
+      const res = await secureFetch("/api/uploads/profile-photo", { method: "POST", body: fd });
+      const payload = await res.json().catch(() => ({}));
+      uploadedAvatarUrl = payload.url || payload.location || null;
+      if (uploadedAvatarUrl) {
+        settingsState.profileImage = uploadedAvatarUrl;
+      }
+    } catch {}
+  }
+
+  // Upload resume
+  if (settingsState.resumeFile) {
+    const fd = new FormData();
+    fd.append("file", settingsState.resumeFile);
+    await secureFetch("/api/uploads/paralegal-resume", { method: "POST", body: fd });
+  }
+
+  // Save all profile fields
+  await secureFetch("/api/users/me", {
+    method: "PATCH",
+    body: {
+      bio: settingsState.bio,
+      education: settingsState.education,
+      awards: settingsState.awards,
+      highlightedSkills: settingsState.highlightedSkills,
+      linkedInURL: settingsState.linkedInURL,
+      notificationPrefs: settingsState.notificationPrefs,
+      profileImage: uploadedAvatarUrl || settingsState.profileImage || undefined
+    }
   });
 
-  async function init() {
-    try {
-      if (window.checkSession) {
-        await window.checkSession("attorney");
-      }
-    } catch (err) {
-      console.warn("[settings] session invalid", err);
-      return;
-    }
+  try {
+    const refreshed = await secureFetch("/api/users/me");
+    const user = await refreshed.json();
+    if (uploadedAvatarUrl) user.profileImage = uploadedAvatarUrl;
+    if (!user.profileImage && settingsState.profileImage) user.profileImage = settingsState.profileImage;
+    syncCluster(user);
+  } catch {}
 
-    cacheElements();
-    bindNavigation();
-    bindProfileForm();
-    bindPasswordForm();
-    bindPreferencesForm();
-    bindDangerZone();
-    bindNotifications();
-
-    loadUser();
-    loadNotifications();
-  }
-
-  function cacheElements() {
-    els.profileForm = document.getElementById("profileForm");
-    els.passwordForm = document.getElementById("passwordForm");
-    els.preferencesForm = document.getElementById("preferencesForm");
-    els.profilePhotoInput = document.getElementById("profilePhoto");
-    els.triggerAvatarUpload = document.getElementById("triggerAvatarUpload");
-    els.avatarFrame = document.getElementById("avatarFrame");
-    els.avatarPreview = document.getElementById("avatarPreview");
-    els.avatarInitials = document.getElementById("avatarInitials");
-    els.uploadStatus = document.getElementById("uploadStatus");
-    els.profileSaveBtn = document.getElementById("profileSaveBtn");
-    els.passwordSaveBtn = document.getElementById("passwordSaveBtn");
-    els.preferencesSaveBtn = document.getElementById("preferencesSaveBtn");
-
-    els.firstName = document.getElementById("firstName");
-    els.lastName = document.getElementById("lastName");
-    els.email = document.getElementById("email");
-    els.phone = document.getElementById("phone");
-    els.lawFirm = document.getElementById("lawFirm");
-    els.bio = document.getElementById("bio");
-
-    els.prefInAppMessages = document.getElementById("prefInAppMessages");
-    els.prefInAppCase = document.getElementById("prefInAppCase");
-    els.prefEmailMessages = document.getElementById("prefEmailMessages");
-    els.prefEmailCase = document.getElementById("prefEmailCase");
-    els.prefSMSMessages = document.getElementById("prefSMSMessages");
-    els.prefSMSCase = document.getElementById("prefSMSCase");
-
-    els.deleteBtn = document.getElementById("deleteAccountBtn");
-    els.deleteModal = document.getElementById("deleteModal");
-    els.cancelDelete = document.getElementById("cancelDeleteBtn");
-    els.confirmDelete = document.getElementById("confirmDeleteBtn");
-
-    els.notificationToggle = document.getElementById("notificationToggle");
-    els.notificationPanel = document.getElementById("notificationsPanel");
-    els.notificationBadge = document.getElementById("notificationBadge");
-    els.notificationList = document.getElementById("notificationList");
-
-    els.headerAvatar = document.getElementById("headerAvatar");
-    els.headerName = document.getElementById("headerName");
-    els.headerRole = document.getElementById("headerRole");
-  }
-
-  function bindNavigation() {
-    const navButtons = Array.from(document.querySelectorAll(".settings-nav button"));
-    const panels = Array.from(document.querySelectorAll(".settings-panel"));
-    if (!navButtons.length || !panels.length) return;
-
-    navButtons.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const targetId = btn.dataset.target;
-        if (!targetId) return;
-        navButtons.forEach((node) => node.classList.remove("active"));
-        btn.classList.add("active");
-        panels.forEach((panel) => {
-          panel.classList.toggle("active", panel.id === targetId);
-        });
-      });
-    });
-  }
-
-  function bindProfileForm() {
-    if (els.triggerAvatarUpload && els.profilePhotoInput) {
-      els.triggerAvatarUpload.addEventListener("click", () => els.profilePhotoInput.click());
-      els.profilePhotoInput.addEventListener("change", (event) => {
-        const file = event.target.files && event.target.files[0];
-        if (file) {
-          handleAvatarUpload(file);
-        }
-        event.target.value = "";
-      });
-    }
-
-    els.profileForm &&
-      els.profileForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        if (!els.profileSaveBtn) return;
-        const payload = buildProfilePayload();
-        setButtonBusy(els.profileSaveBtn, true, "Saving…");
-        let restoreButton = true;
-        try {
-          const updated = await patchMe(payload);
-          currentUser = updated;
-          pendingAvatarURL = "";
-          hydrateProfileForm(updated);
-          showToast("Profile updated.");
-          scheduleFormButtonReset(els.profileForm, els.profileSaveBtn);
-          restoreButton = false;
-        } catch (err) {
-          console.error(err);
-          showToast(err.message || "Unable to save profile", "err");
-        } finally {
-          if (restoreButton) {
-            setButtonBusy(els.profileSaveBtn, false);
-          }
-        }
-      });
-  }
-
-  function bindPasswordForm() {
-    if (!els.passwordForm) return;
-    els.passwordForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      if (!els.passwordSaveBtn) return;
-      const currentPassword = (document.getElementById("currentPassword")?.value || "").trim();
-      const newPassword = (document.getElementById("newPassword")?.value || "").trim();
-      const confirmPassword = (document.getElementById("confirmPassword")?.value || "").trim();
-
-      if (!currentPassword || !newPassword) {
-        showToast("Enter your current and new password.", "err");
-        return;
-      }
-      if (newPassword.length < 8) {
-        showToast("New password must be at least 8 characters.", "err");
-        return;
-      }
-      if (newPassword !== confirmPassword) {
-        showToast("Passwords do not match.", "err");
-        return;
-      }
-
-      setButtonBusy(els.passwordSaveBtn, true, "Updating…");
-      let restoreButton = true;
-      try {
-        await requestPasswordChange(currentPassword, newPassword);
-        els.passwordForm.reset();
-        showToast("Password updated.");
-        scheduleFormButtonReset(els.passwordForm, els.passwordSaveBtn);
-        restoreButton = false;
-      } catch (err) {
-        console.error(err);
-        showToast(err.message || "Unable to change password", "err");
-      } finally {
-        if (restoreButton) {
-          setButtonBusy(els.passwordSaveBtn, false);
-        }
-      }
-    });
-  }
-
-  function bindPreferencesForm() {
-    if (!els.preferencesForm) return;
-    els.preferencesForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      if (!els.preferencesSaveBtn) return;
-      const payload = buildPreferencesPayload();
-      setButtonBusy(els.preferencesSaveBtn, true, "Saving…");
-      let restoreButton = true;
-      try {
-        const updated = await patchNotificationPrefs(payload);
-        currentUser.notificationPrefs = updated.notificationPrefs || payload;
-        hydratePreferences(currentUser);
-        showToast("Preferences saved.");
-        scheduleFormButtonReset(els.preferencesForm, els.preferencesSaveBtn);
-        restoreButton = false;
-      } catch (err) {
-        console.error(err);
-        showToast(err.message || "Unable to save preferences", "err");
-      } finally {
-        if (restoreButton) {
-          setButtonBusy(els.preferencesSaveBtn, false);
-        }
-      }
-    });
-  }
-
-  function bindDangerZone() {
-    if (els.deleteBtn) {
-      els.deleteBtn.addEventListener("click", () => toggleDeleteModal(true));
-    }
-    els.cancelDelete && els.cancelDelete.addEventListener("click", () => toggleDeleteModal(false));
-    els.deleteModal &&
-      els.deleteModal.addEventListener("click", (event) => {
-        if (event.target === els.deleteModal) {
-          toggleDeleteModal(false);
-        }
-      });
-    els.confirmDelete &&
-      els.confirmDelete.addEventListener("click", async () => {
-        setButtonBusy(els.confirmDelete, true, "Deleting…");
-        let restoreButton = true;
-        try {
-          await deleteAccount();
-          showToast("Account deleted.");
-          window.clearStoredSession && window.clearStoredSession();
-          window.location.href = "login.html";
-          restoreButton = false;
-        } catch (err) {
-          console.error(err);
-          showToast(err.message || "Unable to delete account", "err");
-        } finally {
-          if (restoreButton) {
-            setButtonBusy(els.confirmDelete, false);
-          }
-          toggleDeleteModal(false);
-        }
-      });
-  }
-
-  function bindNotifications() {
-    if (els.notificationToggle) {
-      els.notificationToggle.addEventListener("click", () => toggleNotifications());
-    }
-    document.addEventListener("click", (event) => {
-      if (!notificationPanelOpen) return;
-      const clickInsidePanel = els.notificationPanel?.contains(event.target);
-      const clickOnToggle = els.notificationToggle?.contains(event.target);
-      if (!clickInsidePanel && !clickOnToggle) {
-        toggleNotifications(false);
-      }
-    });
-  }
-
-  function toggleNotifications(forceState) {
-    const newState = typeof forceState === "boolean" ? forceState : !notificationPanelOpen;
-    notificationPanelOpen = newState;
-    if (els.notificationPanel) {
-      els.notificationPanel.classList.toggle("show", notificationPanelOpen);
-    }
-  }
-
-  async function loadUser() {
-    try {
-      const res = await authorizedFetch("/users/me");
-      const data = await res.json();
-      currentUser = data;
-      pendingAvatarURL = "";
-      hydrateProfileForm(data);
-      hydratePreferences(data);
-    } catch (err) {
-      console.error(err);
-      showToast(err.message || "Unable to load profile", "err");
-    }
-  }
-
-  async function loadNotifications() {
-    try {
-      const res = await authorizedFetch("/users/me/notifications");
-      const payload = await res.json();
-      renderNotifications(payload?.items || []);
-      updateNotificationBadge(payload?.unread || 0);
-    } catch (err) {
-      console.warn("[settings] notifications unavailable", err);
-      updateNotificationBadge(0);
-    }
-  }
-
-  function renderNotifications(items) {
-    if (!els.notificationList) return;
-    if (!items.length) {
-      els.notificationList.innerHTML = `<p class="notification-item">You're all caught up.</p>`;
-      return;
-    }
-    els.notificationList.innerHTML = "";
-    items.forEach((item) => {
-      const entry = document.createElement("p");
-      entry.className = "notification-item";
-      const title = document.createElement("strong");
-      title.textContent = `${item.title || "Notification"}: `;
-      entry.appendChild(title);
-      entry.appendChild(document.createTextNode(item.body || ""));
-      const meta = document.createElement("span");
-      meta.style.display = "block";
-      meta.style.fontSize = "0.82rem";
-      meta.style.color = "var(--muted)";
-      meta.textContent = formatRelative(item.createdAt);
-      entry.appendChild(meta);
-      els.notificationList.appendChild(entry);
-    });
-  }
-
-  function hydrateProfileForm(user) {
-    if (!user) return;
-    setValue(els.firstName, sanitizeSingleLine(user.firstName || ""));
-    setValue(els.lastName, sanitizeSingleLine(user.lastName || ""));
-    setValue(els.email, sanitizeSingleLine(user.email || ""));
-    const phoneValue = sanitizeSingleLine(user.phone || user.contactPhone || user.phoneNumber || "");
-    setValue(els.phone, phoneValue);
-    const firmValue = sanitizeSingleLine(user.lawFirm || user.firm || user.company || "");
-    setValue(els.lawFirm, firmValue);
-    setValue(els.bio, sanitizeMultiLine(user.bio || "", 4000));
-    setAvatarPreview(user.profileImage || user.avatarURL);
-    hydrateHeader(user);
-  }
-
-  function hydratePreferences(user) {
-    if (!user) return;
-    const prefs = user.notificationPrefs || {};
-    if (els.prefInAppMessages) els.prefInAppMessages.checked = prefs.inAppMessages !== false;
-    if (els.prefInAppCase) els.prefInAppCase.checked = prefs.inAppCase !== false;
-    if (els.prefEmailMessages) els.prefEmailMessages.checked = prefs.emailMessages !== false;
-    if (els.prefEmailCase) els.prefEmailCase.checked = prefs.emailCase !== false;
-    if (els.prefSMSMessages) els.prefSMSMessages.checked = !!prefs.smsMessages;
-    if (els.prefSMSCase) els.prefSMSCase.checked = !!prefs.smsCase;
-  }
-
-  function hydrateHeader(user) {
-    const fullName = `${sanitizeSingleLine(user.firstName || "")} ${sanitizeSingleLine(user.lastName || "")}`.trim();
-    const safeName = displayValue(fullName || user.name || "");
-    const roleLabel = displayValue((user.role || "Attorney").replace(/\b\w/g, (c) => c.toUpperCase()));
-    if (els.headerName) els.headerName.textContent = safeName;
-    if (els.headerRole) els.headerRole.textContent = roleLabel;
-    const initials = getInitials(fullName);
-    const avatarSource = user.profileImage || user.avatarURL || buildInitialAvatar(initials);
-    if (els.headerAvatar) {
-      els.headerAvatar.src = avatarSource;
-      els.headerAvatar.alt = `${safeName} avatar`;
-    }
-  }
-
-  function setAvatarPreview(url, initials) {
-    if (!els.avatarFrame) return;
-    if (url) {
-      els.avatarFrame.classList.add("has-photo");
-      if (els.avatarPreview) {
-        els.avatarPreview.src = url;
-        els.avatarPreview.alt = "Profile photo";
-      }
-      if (els.avatarInitials) {
-        els.avatarInitials.textContent = "";
-      }
-    } else {
-      els.avatarFrame.classList.remove("has-photo");
-      if (els.avatarPreview) {
-        els.avatarPreview.removeAttribute("src");
-      }
-      if (els.avatarInitials) {
-        els.avatarInitials.textContent = initials || getInitials();
-      }
-    }
-  }
-
-  function buildProfilePayload() {
-    const payload = {};
-    payload.firstName = sanitizeSingleLine(els.firstName?.value || "", 80) || null;
-    payload.lastName = sanitizeSingleLine(els.lastName?.value || "", 80) || null;
-    payload.email = sanitizeSingleLine(els.email?.value || "", 120) || null;
-    payload.phone = sanitizeSingleLine(els.phone?.value || "", 40) || null;
-    payload.lawFirm = sanitizeSingleLine(els.lawFirm?.value || "", 120) || null;
-    payload.bio = sanitizeMultiLine(els.bio?.value || "", 4000) || null;
-    const avatarURL = pendingAvatarURL || currentUser?.profileImage || currentUser?.avatarURL || "";
-    if (avatarURL) {
-      payload.avatarURL = avatarURL;
-      payload.profileImage = avatarURL;
-    }
-    Object.keys(payload).forEach((key) => {
-      if (payload[key] === null) payload[key] = null;
-    });
-    return payload;
-  }
-
-  function buildPreferencesPayload() {
-    return {
-      inAppMessages: !!els.prefInAppMessages?.checked,
-      inAppCase: !!els.prefInAppCase?.checked,
-      emailMessages: !!els.prefEmailMessages?.checked,
-      emailCase: !!els.prefEmailCase?.checked,
-      smsMessages: !!els.prefSMSMessages?.checked,
-      smsCase: !!els.prefSMSCase?.checked,
-    };
-  }
-
-  async function patchMe(body) {
-    const res = await authorizedFetch("/users/me", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const message = data?.error || data?.msg || "Unable to update profile";
-      throw new Error(message);
-    }
-    return data;
-  }
-
-  async function requestPasswordChange(currentPassword, newPassword) {
-    const res = await authorizedFetch("/users/me/password", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ currentPassword, newPassword }),
-    });
-    let data = null;
-    try {
-      data = await res.json();
-    } catch (_) {
-      data = null;
-    }
-    if (!res.ok) {
-      const message = data?.error || data?.msg || "Unable to update password";
-      throw new Error(message);
-    }
-    return data;
-  }
-
-  async function deleteAccount() {
-    const res = await authorizedFetch("/users/me", { method: "DELETE" });
-    let data = null;
-    try {
-      data = await res.json();
-    } catch (_) {
-      data = null;
-    }
-    if (!res.ok) {
-      const message = data?.error || data?.msg || "Unable to delete account";
-      throw new Error(message);
-    }
-    return data;
-  }
-
-  async function handleAvatarUpload(file) {
-    if (uploadingAvatar) return;
-    if (!file) return;
-    if (!/image\/(png|jpe?g)/i.test(file.type)) {
-      showToast("Only JPEG or PNG files are allowed.", "err");
-      return;
-    }
-    if (file.size > MAX_FILE_BYTES) {
-      showToast("Photo must be under 5 MB.", "err");
-      return;
-    }
-
-    uploadingAvatar = true;
-    setUploadStatus("Uploading…");
-    const tempUrl = URL.createObjectURL(file);
-    const initials = getInitials(`${currentUser?.firstName || ""} ${currentUser?.lastName || ""}`);
-    setAvatarPreview(tempUrl, initials);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file, file.name);
-      const res = await authorizedFetch("/uploads/profile-photo", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const message = data?.error || data?.msg || "Upload failed";
-        throw new Error(message);
-      }
-      const url = data?.url || data?.secureUrl || data?.profileImage || data?.avatarURL || data?.location;
-      if (!url) {
-        throw new Error("Upload did not return a file URL");
-      }
-      pendingAvatarURL = url;
-      currentUser.profileImage = url;
-      currentUser.avatarURL = url;
-      setAvatarPreview(url, initials);
-      if (els.headerAvatar) {
-        els.headerAvatar.src = url;
-      }
-      setUploadStatus("Photo uploaded.", "success");
-      showToast("Photo uploaded.");
-    } catch (err) {
-      console.error(err);
-      setUploadStatus(err.message || "Upload failed", "error");
-      showToast(err.message || "Unable to upload photo", "err");
-      const fallbackInitials = getInitials(`${currentUser?.firstName || ""} ${currentUser?.lastName || ""}`);
-      if (currentUser?.profileImage || currentUser?.avatarURL) {
-        const existing = currentUser.profileImage || currentUser.avatarURL;
-        setAvatarPreview(existing, fallbackInitials);
-        if (els.headerAvatar && existing) {
-          els.headerAvatar.src = existing;
-        }
-      } else {
-        setAvatarPreview(null, fallbackInitials);
-      }
-    } finally {
-      uploadingAvatar = false;
-      URL.revokeObjectURL(tempUrl);
-    }
-  }
-
-  function setUploadStatus(message, type) {
-    if (!els.uploadStatus) return;
-    els.uploadStatus.textContent = message || "";
-    els.uploadStatus.style.color =
-      type === "error" ? "#c0392b" : type === "success" ? "#1d976c" : "var(--muted)";
-  }
-
-  function toggleDeleteModal(show) {
-    if (!els.deleteModal) return;
-    els.deleteModal.classList.toggle("show", !!show);
-  }
-
-  function setButtonBusy(button, busy, busyLabel) {
-    if (!button) return;
-    if (!button.dataset.defaultText) {
-      button.dataset.defaultText = button.textContent || "";
-    }
-    button.disabled = busy;
-    if (busy && busyLabel) {
-      button.textContent = busyLabel;
-    } else {
-      button.textContent = button.dataset.defaultText;
-    }
-  }
-
-  function scheduleFormButtonReset(form, button) {
-    if (!form || !button) return;
-    const handler = () => {
-      setButtonBusy(button, false);
-      form.removeEventListener("input", handler);
-    };
-    form.addEventListener("input", handler, { once: true });
-  }
-
-  function updateNotificationBadge(count) {
-    if (els.notificationBadge) {
-      els.notificationBadge.textContent = count > 9 ? "9+" : String(count);
-      els.notificationBadge.classList.toggle("show", count > 0);
-    }
-  }
-
-  function formatRelative(value) {
-    if (!value) return "Just now";
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return "Just now";
-    const diffMs = Date.now() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return "Moments ago";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  }
-
-  function getInitials(name = "") {
-    const parts = name
-      .replace(/\s+/g, " ")
-      .trim()
-      .split(" ")
-      .filter(Boolean);
-    if (!parts.length && currentUser) {
-      parts.push(currentUser.firstName || "", currentUser.lastName || "");
-    }
-    const initials = parts
-      .slice(0, 2)
-      .map((p) => p.charAt(0).toUpperCase())
-      .join("");
-    return initials || "A";
-  }
-
-  function buildInitialAvatar(initials) {
-    const text = (initials || "A").slice(0, 2).toUpperCase();
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><circle cx='40' cy='40' r='36' fill='#d4c6a4' stroke='#ffffff' stroke-width='4'/><text x='50%' y='55%' text-anchor='middle' font-family='Sarabun, Arial' font-size='28' fill='#1a1a1a' font-weight='600'>${text}</text></svg>`;
-    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-  }
-
-  function showToast(message, type = "ok") {
-    if (!message) return;
-    if (toastHelper?.show) {
-      toastHelper.show(message, { targetId: toastTarget, type });
-    } else {
-      alert(message);
-    }
-  }
-
-  function setValue(el, value) {
-    if (!el) return;
-    el.value = value;
-  }
-
-  let csrfToken = "";
-
-  async function ensureCsrfToken(force = false) {
-    if (force) csrfToken = "";
-    if (csrfToken) return csrfToken;
-    try {
-      const res = await fetch("/api/csrf", { credentials: "include" });
-      if (!res.ok) return "";
-      const data = await res.json().catch(() => ({}));
-      csrfToken = data?.csrfToken || "";
-      return csrfToken;
-    } catch {
-      return "";
-    }
-  }
-
-  async function authorizedFetch(path, options = {}) {
-    const opts = { ...options };
-    const method = String(opts.method || "GET").toUpperCase();
-    const headers = { ...(opts.headers || {}) };
-    if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
-      if (typeof window.refreshSession === "function") {
-        const session = await window.refreshSession("attorney");
-        if (!session) {
-          handleUnauthorized();
-          throw new Error("Session expired");
-        }
-      }
-      const token = await ensureCsrfToken();
-      if (token) headers["X-CSRF-Token"] = token;
-    }
-    opts.headers = headers;
-    opts.credentials = "include";
-    const res = await fetch(`${API_BASE}${path}`, opts);
-    if (res.status === 401) {
-      handleUnauthorized();
-      throw new Error("Unauthorized");
-    }
-    return res;
-  }
-
-  function handleUnauthorized() {
-    window.clearStoredSession && window.clearStoredSession();
-    window.location.href = "login.html";
-  }
-
-})();
-  async function patchNotificationPrefs(body) {
-    const res = await authorizedFetch("/users/me/notification-prefs", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const message = data?.error || data?.msg || "Unable to update notification preferences";
-      throw new Error(message);
-    }
-    return data;
-  }
+  alert("Settings saved successfully.");
+}

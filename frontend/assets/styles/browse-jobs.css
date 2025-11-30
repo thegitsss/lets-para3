@@ -106,6 +106,7 @@ header {
   line-height: 1;
   display: none;
 }
+.notification-badge.show{display:inline-flex; align-items:center; justify-content:center;}
 
 .user-chip {
   display: flex;

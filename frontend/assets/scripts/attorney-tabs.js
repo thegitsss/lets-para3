@@ -1,4 +1,4 @@
-import { secureFetch, logout } from "./auth.js";
+import { secureFetch, logout, loadUserHeaderInfo } from "./auth.js";
 
 const PAGE_ID = window.__ATTORNEY_PAGE__ || "overview";
 const MESSAGE_JUMP_KEY = "lpc_message_jump";
@@ -77,6 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
 async function bootAttorneyExperience() {
   const user = typeof window.requireRole === "function" ? await window.requireRole("attorney") : null;
   if (!user) return;
+  await loadUserHeaderInfo();
   applyRoleVisibility(user);
   if (!state.user) {
     state.user = user;

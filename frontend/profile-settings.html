@@ -1,812 +1,176 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <meta name="theme-color" content="#0B2A4A">
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Attorney Account Settings | Let’s-ParaConnect</title>
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
-  <link rel="manifest" href="site.webmanifest" />
-  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
-
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
-  <script src="assets/scripts/utils/session.js"></script>
-  <style>
-    :root {
-      --bg: #ffffff;
-      --sidebar-bg: #f5f5f5e6;
-      --accent: #b6a47a;
-      --accent-dark: #9c8a63;
-      --ink: #1a1a1a;
-      --muted: #6b6b6b;
-      --line: rgba(0, 0, 0, 0.08);
-      --panel: #fcfcfc;
-      --danger: #c0392b;
-      --danger-dark: #962d22;
-      --radius: 14px;
-      --font-serif: 'Cormorant Garamond', serif;
-      --font-sans: 'Sarabun', sans-serif;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      font-family: var(--font-sans);
-      font-weight: 200;
-      background: var(--bg);
-      color: var(--ink);
-      min-height: 100vh;
-      display: flex;
-    }
-
-    .sidebar {
-      width: 240px;
-      background: var(--sidebar-bg);
-      border-right: 1px solid var(--line);
-      padding: 32px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
-      position: sticky;
-      top: 0;
-      height: 100vh;
-      font-family: var(--font-sans);
-      font-weight: 200;
-    }
-
-    .logo {
-      font-family: var(--font-serif);
-      font-size: 1.5rem;
-      text-align: center;
-      font-weight: 300;
-      letter-spacing: 0.5px;
-    }
-
-    .settings-nav {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .settings-nav button {
-      border: none;
-      background: transparent;
-      padding: 12px 16px;
-      border-radius: var(--radius);
-      text-align: left;
-      font-size: 0.95rem;
-      color: var(--ink);
-      transition: background 0.2s ease, color 0.2s ease;
-      cursor: pointer;
-      font-family: inherit;
-      font-weight: inherit;
-    }
-
-    .settings-nav button.active,
-    .settings-nav button:hover {
-      background: rgba(0, 0, 0, 0.05);
-      color: var(--ink);
-    }
-
-    .content {
-      flex: 1;
-      padding: 40px 48px;
-      overflow-y: auto;
-    }
-
-    .unified-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 32px;
-      position: relative;
-    }
-
-    .unified-header .title-block {
-      max-width: 520px;
-    }
-
-    .unified-header .eyebrow {
-      letter-spacing: 3px;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 8px;
-    }
-
-    .unified-header h1 {
-      font-family: var(--font-serif);
-      font-size: 2.4rem;
-      margin-bottom: 8px;
-      font-weight: 600;
-    }
-
-    .unified-header p {
-      color: var(--muted);
-      font-size: 0.95rem;
-    }
-
-    .header-controls {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-
-    .notification-icon {
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
-      border: 1px solid var(--line);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #fff;
-      cursor: pointer;
-      position: relative;
-      transition: border-color 0.2s ease, transform 0.2s ease;
-    }
-
-    .notification-icon:hover {
-      border-color: var(--accent);
-      transform: translateY(-1px);
-    }
-
-    .notification-icon svg {
-      width: 22px;
-      height: 22px;
-      color: var(--ink);
-    }
-
-    .notification-badge {
-      position: absolute;
-      top: -4px;
-      right: -4px;
-      background: var(--danger);
-      color: #fff;
-      font-size: 0.75rem;
-      border-radius: 999px;
-      padding: 2px 6px;
-      line-height: 1;
-      display: none;
-    }
-
-    .notification-badge.show {
-      display: inline-flex;
-    }
-
-    .user-chip {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: rgba(0, 0, 0, 0.03);
-      border: 1px solid transparent;
-      transition: border-color 0.2s ease;
-    }
-
-    .user-chip img {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      border: 2px solid #fff;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-      object-fit: cover;
-    }
-
-    .user-chip strong {
-      display: block;
-      font-weight: 200;
-    }
-
-    .user-chip span {
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-
-    .notification-panel {
-      position: absolute;
-      top: 60px;
-      right: 0;
-      width: 280px;
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-      padding: 16px;
-      display: none;
-      flex-direction: column;
-      gap: 0.75rem;
-      z-index: 20;
-    }
-
-    .notification-panel.show {
-      display: flex;
-    }
-
-    .notification-panel h4 {
-      margin: 0;
-      font-family: var(--font-serif);
-      font-size: 1.1rem;
-      font-weight: 600;
-    }
-
-    .notification-panel p {
-      margin: 0;
-      font-size: 0.9rem;
-      color: var(--muted);
-    }
-
-    .notification-item {
-      padding: 0.5rem 0;
-      border-bottom: 1px solid var(--line);
-      font-size: 0.9rem;
-      line-height: 1.4;
-      color: var(--ink);
-    }
-
-    .notification-item:last-child {
-      border-bottom: none;
-    }
-
-    .settings-panel {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 20px;
-      padding: 28px;
-      margin-bottom: 28px;
-      display: none;
-      animation: fadeIn 0.25s ease forwards;
-    }
-
-    .settings-panel.active {
-      display: block;
-    }
-
-    .settings-panel h2 {
-      font-family: var(--font-serif);
-      font-size: 1.6rem;
-      margin-bottom: 6px;
-      font-weight: 600;
-    }
-
-    .settings-panel p {
-      color: var(--muted);
-      margin-bottom: 24px;
-    }
-
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .photo-row {
-      display: flex;
-      gap: 18px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .avatar-frame {
-      width: 108px;
-      height: 108px;
-      border-radius: 24px;
-      background: linear-gradient(135deg, rgba(182, 164, 122, 0.25), rgba(0, 0, 0, 0.05));
-      border: 1px dashed var(--accent);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      overflow: hidden;
-      font-size: 1.6rem;
-      color: var(--accent);
-      text-transform: uppercase;
-    }
-
-    .avatar-frame.has-photo {
-      border-style: solid;
-      border-color: transparent;
-    }
-
-    .avatar-frame img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: none;
-    }
-
-    .avatar-frame.has-photo img {
-      display: block;
-    }
-
-    .avatar-frame span {
-      position: absolute;
-    }
-
-    .avatar-actions button {
-      border: none;
-      background: var(--accent);
-      color: #fff;
-      padding: 10px 16px;
-      border-radius: 999px;
-      cursor: pointer;
-      font-weight: 200;
-      transition: background 0.2s ease, transform 0.2s ease;
-    }
-
-    .avatar-actions button:hover {
-      background: var(--accent-dark);
-      transform: translateY(-1px);
-    }
-
-    label {
-      font-size: 0.9rem;
-      font-weight: 200;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    input[type="text"],
-    input[type="email"],
-    input[type="tel"],
-    input[type="password"],
-    textarea {
-      border-radius: 12px;
-      border: 1px solid var(--line);
-      padding: 12px 14px;
-      font-size: 0.95rem;
-      background: #fff;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    input:focus,
-    textarea:focus {
-      border-color: var(--accent);
-      outline: none;
-      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.2);
-    }
-
-    textarea {
-      min-height: 120px;
-      resize: vertical;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
-    }
-
-    .btn-row {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      border-radius: 999px;
-      padding: 12px 22px;
-      font-weight: 200;
-      cursor: pointer;
-      transition: transform 0.2s ease, background 0.2s ease;
-      border: none;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .btn:disabled {
-      cursor: not-allowed;
-      opacity: 0.65;
-      transform: none;
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: #fff;
-    }
-
-    .btn-primary:hover:not(:disabled) {
-      background: var(--accent-dark);
-      transform: translateY(-1px);
-    }
-
-    .btn-outline {
-      border: 1px solid var(--line);
-      background: transparent;
-      color: var(--ink);
-      font-weight: 200;
-    }
-
-    .btn-light {
-      font-weight: 200;
-    }
-
-    .toggle-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 18px 0;
-      border-bottom: 1px solid var(--line);
-      gap: 12px;
-    }
-
-    .toggle-row:last-child {
-      border-bottom: none;
-    }
-
-    .toggle-row h3 {
-      margin: 0;
-      font-size: 1rem;
-    }
-
-    .toggle-row p {
-      margin: 4px 0 0;
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 54px;
-      height: 30px;
-    }
-
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0, 0, 0, 0.12);
-      transition: 0.2s;
-      border-radius: 999px;
-    }
-
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 22px;
-      width: 22px;
-      left: 4px;
-      top: 4px;
-      background-color: #fff;
-      transition: 0.2s;
-      border-radius: 50%;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    }
-
-    .switch input:checked + .slider {
-      background-color: var(--accent);
-    }
-
-    .switch input:checked + .slider:before {
-      transform: translateX(24px);
-    }
-
-    .danger-panel {
-      border: 1px solid rgba(192, 57, 43, 0.4);
-      background: rgba(192, 57, 43, 0.05);
-    }
-
-    .danger-panel p {
-      color: var(--muted);
-    }
-
-    .danger-btn {
-      background: var(--danger);
-      color: #fff;
-    }
-
-    .danger-btn:hover:not(:disabled) {
-      background: var(--danger-dark);
-    }
-
-    .toast {
-      position: fixed;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%) translateY(20px);
-      background: var(--ink);
-      color: #fff;
-      padding: 12px 24px;
-      border-radius: 999px;
-      opacity: 0;
-      transition: opacity 0.2s ease, transform 0.2s ease;
-      pointer-events: none;
-      z-index: 40;
-    }
-
-    .toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-
-    .toast[data-toast-type="ok"] {
-      background: #1d976c;
-    }
-
-    .toast[data-toast-type="err"] {
-      background: var(--danger);
-    }
-
-    .modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.45);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s ease;
-      z-index: 50;
-    }
-
-    .modal.show {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .modal-card {
-      background: #fff;
-      border-radius: 20px;
-      padding: 32px;
-      max-width: 420px;
-      width: 92%;
-      text-align: center;
-      border: 1px solid var(--line);
-    }
-
-    .modal-card h3 {
-      font-size: 1.4rem;
-      margin-bottom: 12px;
-    }
-
-    .modal-card p {
-      margin-bottom: 24px;
-      color: var(--muted);
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(6px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    @media (max-width: 960px) {
-      body {
-        flex-direction: column;
-      }
-      .sidebar {
-        position: relative;
-        width: 100%;
-        height: auto;
-        border-right: none;
-        border-bottom: 1px solid var(--line);
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 12px;
-      }
-      .settings-nav {
-        flex-direction: row;
-        flex-wrap: wrap;
-        flex: 1;
-      }
-      .settings-nav button {
-        flex: 1 1 120px;
-        text-align: center;
-      }
-      .content {
-        padding: 28px 20px 60px;
-      }
-      .unified-header {
-        flex-direction: column;
-        gap: 20px;
-      }
-      .notifications-panel {
-        right: 12px;
-      }
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Paralegal Settings | Let's-ParaConnect</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css"/>
+<script src="assets/scripts/utils/session.js"></script>
+<script type="module" src="assets/scripts/auth.js"></script>
+<style>
+:root{
+  --accent:#d19c3a;
+  --accent-2:#2f8c7a;
+  --bg:#ffffff;
+  --panel:#ffffff;
+  --line:rgba(12,18,37,.08);
+  --muted:#5c6475;
+  --ink:#0b1225;
+  --font-serif:'Cormorant Garamond',serif;
+  --font-sans:'Sarabun',sans-serif;
+  --shadow:0 18px 55px rgba(12,18,37,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--font-sans);
+  font-weight:200;
+  color:var(--ink);
+  background:var(--bg);
+  display:flex;
+  min-height:100vh;
+  overflow:hidden;
+}
+/* Sidebar */
+.sidebar{
+  width:260px;
+  background:url('hero-mountain.jpg') center/cover no-repeat fixed;
+  color:#fff;
+  display:flex;
+  flex-direction:column;
+  font-weight:200;
+  padding:24px 20px;
+  border-right:1px solid var(--line);
+  position:relative;
+}
+.sidebar::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,0.45);}
+.logo,nav,.sidebar-footer{position:relative;z-index:2;}
+.logo{font-family:var(--font-serif);font-size:1.7rem;font-weight:300;text-align:center;margin-bottom:36px;}
+nav{display:flex;flex-direction:column;gap:14px;}
+nav a{text-decoration:none;color:#fff;font-weight:200;font-size:.95rem;padding:10px 14px;border-radius:8px;transition:background .3s;}
+nav a.active,nav a:hover{background:rgba(255,255,255,0.15);}
+.sidebar-link{display:block;width:100%;border:none;background:none;color:#fff;font-size:.95rem;font-family:var(--font-sans);font-weight:200;text-align:left;padding:10px 14px;border-radius:8px;cursor:pointer;position:relative;z-index:2;}
+.sidebar-link:hover,.sidebar-link:focus{background:rgba(255,255,255,0.15);outline:none;}
+.sidebar-footer{margin-top:auto;font-size:.7rem;color:#e8e8e8;text-align:center;position:relative;}
+#weatherSidebar{position:absolute;bottom:48px;left:0;width:100%;text-align:center;color:#fff;font-size:1rem;font-family:var(--font-serif);z-index:2;}
+/* Main */
+.main{flex:1;padding:40px;overflow-y:auto;}
+header h1{font-family:var(--font-serif);font-weight:300;font-size:2.3rem;margin-bottom:.25rem;}
+header p{color:var(--muted);font-size:.95rem;margin-bottom:2rem;}
+.page-header{display:flex;justify-content:space-between;align-items:center;gap:16px;}
+.header-cluster{display:flex;align-items:center;gap:14px;position:relative;}
+.notification-icon{position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:#fff;transition:border-color .2s ease,transform .2s ease;}
+.notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);} 
+.notification-icon svg{width:20px;height:20px;color:var(--ink);} 
+.notification-badge{position:absolute;top:-6px;right:-6px;background:#e63946;color:#fff;border-radius:50%;font-size:.7rem;width:18px;height:18px;display:none;align-items:center;justify-content:center;font-weight:700;} 
+.notification-badge.show{display:flex;} 
+.user-profile{display:flex;align-items:center;gap:.6rem;padding:6px 10px;border:1px solid var(--line);border-radius:12px;background:#fff;} 
+.user-profile img{width:42px;height:42px;border-radius:50%;object-fit:cover;box-shadow:0 6px 16px rgba(0,0,0,0.08);} 
+.user-profile strong{display:block;font-weight:500;} 
+.user-profile span{display:block;font-size:.85rem;color:var(--muted);font-weight:200;} 
+.notification-panel{position:absolute;right:0;top:calc(100% + 10px);width:280px;padding:14px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,0.1);display:none;z-index:50;} 
+.notification-panel.show{display:block;} 
+.notification-panel.hidden{display:none;} 
+.notification-panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:.92rem;} 
+.notification-panel-header button{border:none;background:none;color:var(--accent);cursor:pointer;font-size:.85rem;} 
+[data-notification-list]{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;} 
+[data-notification-list] li{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fcfcfc;} 
+[data-notification-list] li strong{display:block;font-weight:500;margin-bottom:4px;} 
+[data-notification-list] li span{display:block;font-size:.8rem;color:var(--muted);} 
+[data-notification-empty]{font-size:.85rem;color:var(--muted);} 
+.section {display:none;opacity:0;transition:opacity .4s ease;} 
+.section.visible {display:block;opacity:1;} 
+nav a.active {background:rgba(255,255,255,0.25);} 
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.5rem;margin-bottom:1.5rem;} 
+.lpc-card{border:1px solid var(--line);border-radius:10px;padding:1.5rem;background:#fff;box-shadow:var(--shadow);} 
+.lpc-card h3{font-family:var(--font-serif);font-weight:500;margin-bottom:.75rem;} 
+.lpc-card h4{margin-top:1rem;margin-bottom:.5rem;font-family:var(--font-serif);font-weight:500;} 
+.lpc-card ul{padding-left:1.1rem;line-height:1.5;} 
+.lpc-card img.profile-img{width:120px;height:120px;border-radius:12px;object-fit:cover;display:block;margin:0 auto 1rem;box-shadow:0 10px 30px rgba(0,0,0,0.08);} 
+.primary-btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 18px;font-size:1rem;cursor:pointer;box-shadow:0 8px 20px rgba(0,0,0,0.08);} 
+.primary-btn:hover{background:#a38e5f;} 
+input[type="file"]{display:block;margin-top:.4rem;font-family:var(--font-sans);font-weight:200;font-size:.85rem;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:#fff;}
+input[type="file"]::file-selector-button{background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:4px 8px;margin-right:6px;cursor:pointer;font-family:var(--font-sans);font-weight:200;font-size:.85rem;}
+input[type="file"]::file-selector-button:hover{border-color:var(--accent);color:var(--accent);}
+.preview-square {
+    width: 300px;
+    height: 300px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+}
+</style>
 </head>
 <body>
-  <aside class="sidebar">
-    <div class="logo">Let’s-ParaConnect</div>
-    <nav class="settings-nav" aria-label="Settings navigation">
-      <button class="active" data-target="profileSection">Profile</button>
-      <button data-target="securitySection">Security</button>
-      <button data-target="preferencesSection">Preferences</button>
-      <button data-target="dangerSection">Delete Account</button>
-    </nav>
-    <a class="btn btn-outline btn-light" href="dashboard-attorney.html" style="margin-top:auto;">Return to Dashboard</a>
-  </aside>
-
-  <main class="content">
-    <section class="unified-header" aria-label="Attorney header">
-      <div class="title-block">
-        <p class="eyebrow">Account</p>
-        <h1>Account Settings</h1>
-        <p>Keep your LPC profile accurate, stay secure, and control how we notify you.</p>
-      </div>
-      <div class="header-controls">
-        <button class="notification-icon" id="notificationToggle" aria-label="View notifications">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 01-3.46 0" />
-          </svg>
-          <span class="notification-badge" id="notificationBadge">0</span>
-        </button>
-        <div class="user-chip" id="headerUser">
-          <img id="headerAvatar" alt="Attorney avatar" />
-          <div>
-            <strong id="headerName">Attorney</strong>
-            <span id="headerRole">Member</span>
-          </div>
+<aside class="sidebar">
+  <div class="logo">Paralegal Panel</div>
+  <nav>
+    <a href="dashboard-paralegal.html">Home</a>
+    <a href="#paraApplications">Applications</a>
+    <a href="#paraAssignedCases">Assigned Cases</a>
+    <a href="profile-settings.html" class="active">Settings</a>
+  </nav>
+  <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
+  <div id="weatherSidebar">Stay current</div>
+  <div class="sidebar-footer">© Let's-ParaConnect 2025</div>
+</aside>
+<main class="main">
+  <header class="page-header">
+    <div>
+      <h1>Profile Settings</h1>
+      <p>Manage your profile, résumé, skills, and notifications.</p>
+    </div>
+    <div class="header-cluster" data-paralegal-cluster data-notification-center>
+      <button class="notification-icon" aria-label="View notifications" data-notification-toggle>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 01-3.46 0" />
+        </svg>
+        <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
+      </button>
+      <div id="profileHeaderBlock" class="user-profile">
+        <img id="clusterAvatar" class="globalProfileImage nav-profile-photo profile-img-small" src="https://via.placeholder.com/64x64.png?text=PL" alt="Paralegal avatar">
+        <div>
+          <span id="clusterName" class="globalProfileName">Paralegal</span><br>
+          <span id="clusterRole" class="globalProfileRole">Logged in</span>
         </div>
       </div>
-      <div class="notification-panel" id="notificationsPanel" role="region" aria-live="polite">
-        <h4>Notifications</h4>
-        <div id="notificationList">
-          <p class="notification-item">Loading…</p>
+      <div class="notification-panel" data-notification-panel>
+        <div class="notification-panel-header">
+          <h4 style="margin:0;font-size:0.95rem;">Notifications</h4>
+          <button type="button" data-notification-mark>Mark all read</button>
         </div>
-      </div>
-    </section>
-
-    <section class="settings-panel active" id="profileSection">
-      <h2>Profile</h2>
-      <p>Update your public-facing information and bio.</p>
-      <form id="profileForm">
-        <div class="photo-row">
-          <div class="avatar-frame" id="avatarFrame">
-            <img id="avatarPreview" alt="Profile preview" />
-            <span id="avatarInitials">A</span>
-          </div>
-          <div class="avatar-actions">
-            <button type="button" id="triggerAvatarUpload">Upload photo</button>
-            <p class="hint" id="uploadHint">JPEG or PNG up to 5 MB.</p>
-            <p class="hint" id="uploadStatus" aria-live="polite"></p>
-          </div>
-        </div>
-        <label>Profile Photo
-          <input type="file" id="profilePhoto" accept="image/png, image/jpeg" hidden />
-        </label>
-        <div class="grid">
-          <label for="firstName">
-            First name
-            <input type="text" id="firstName" name="firstName" autocomplete="given-name" required />
-          </label>
-          <label for="lastName">
-            Last name
-            <input type="text" id="lastName" name="lastName" autocomplete="family-name" required />
-          </label>
-          <label for="email">
-            Email
-            <input type="email" id="email" name="email" autocomplete="email" required />
-          </label>
-          <label for="phone">
-            Phone
-            <input type="tel" id="phone" name="phone" autocomplete="tel" />
-          </label>
-          <label for="lawFirm">
-            Law firm (optional)
-            <input type="text" id="lawFirm" name="lawFirm" autocomplete="organization" />
-          </label>
-        </div>
-        <label for="bio">
-          Bio (optional)
-          <textarea id="bio" name="bio"></textarea>
-        </label>
-        <div class="btn-row">
-          <button class="btn btn-primary" type="submit" id="profileSaveBtn">Save changes</button>
-        </div>
-      </form>
-    </section>
-
-    <section class="settings-panel" id="securitySection">
-      <h2>Security</h2>
-      <p>Require a strong password to keep client work protected.</p>
-      <form id="passwordForm">
-        <label for="currentPassword">
-          Current password
-          <input type="password" id="currentPassword" name="currentPassword" autocomplete="current-password" required />
-        </label>
-        <div class="grid">
-          <label for="newPassword">
-            New password
-            <input type="password" id="newPassword" name="newPassword" autocomplete="new-password" required />
-          </label>
-          <label for="confirmPassword">
-            Confirm new password
-            <input type="password" id="confirmPassword" name="confirmPassword" autocomplete="new-password" required />
-          </label>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-primary" type="submit" id="passwordSaveBtn">Change password</button>
-        </div>
-      </form>
-    </section>
-
-    <section class="settings-panel" id="preferencesSection">
-      <h2>Preferences</h2>
-      <p>Decide when LPC should reach out.</p>
-      <form id="preferencesForm">
-        <label>
-          <input type="checkbox" id="prefInAppMessages" />
-          In-app: Messages
-        </label>
-        <label>
-          <input type="checkbox" id="prefInAppCase" />
-          In-app: Case Updates
-        </label>
-        <label>
-          <input type="checkbox" id="prefEmailMessages" />
-          Email: Messages
-        </label>
-        <label>
-          <input type="checkbox" id="prefEmailCase" />
-          Email: Case Updates
-        </label>
-        <label>
-          <input type="checkbox" id="prefSMSMessages" />
-          SMS: Messages
-        </label>
-        <label>
-          <input type="checkbox" id="prefSMSCase" />
-          SMS: Case Updates
-        </label>
-        <div class="btn-row">
-          <button class="btn btn-primary" type="submit" id="preferencesSaveBtn">Save preferences</button>
-        </div>
-      </form>
-    </section>
-
-    <section class="settings-panel danger-panel" id="dangerSection">
-      <h2>Delete Account</h2>
-      <p>Once you delete this account, there is no going back.</p>
-      <button class="btn danger-btn" id="deleteAccountBtn" type="button">Delete account</button>
-    </section>
-  </main>
-
-  <div id="toastBanner" class="toast" role="status" aria-live="assertive"></div>
-
-  <div class="modal" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
-    <div class="modal-card">
-      <h3 id="deleteModalTitle">Delete account?</h3>
-      <p>Are you sure? This action cannot be undone.</p>
-      <div class="btn-row" style="justify-content:center;">
-        <button class="btn btn-outline" type="button" id="cancelDeleteBtn">Cancel</button>
-        <button class="btn danger-btn" type="button" id="confirmDeleteBtn">Delete account</button>
+        <ul data-notification-list></ul>
+        <p class="notification-item" data-notification-empty>Loading…</p>
       </div>
     </div>
-  </div>
+  </header>
 
-  <script src="assets/scripts/utils/toast.js"></script>
-  <script src="assets/scripts/profile-settings.js"></script>
+  <div class="card-grid">
+    <section id="settingsProfilePhoto" class="lpc-card"></section>
+    <section id="settingsResume" class="lpc-card"></section>
+    <section id="settingsBio" class="lpc-card"></section>
+    <section id="settingsEducation" class="lpc-card"></section>
+    <section id="settingsAwards" class="lpc-card"></section>
+    <section id="settingsSkills" class="lpc-card"></section>
+    <section id="settingsLinkedIn" class="lpc-card"></section>
+    <section id="settingsNotifications" class="lpc-card"></section>
+    <div style="grid-column: 1 / -1;">
+      <button id="saveSettingsBtn" class="primary-btn">Save Changes</button>
+    </div>
+  </div>
+</main>
+
+<div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+<script src="assets/scripts/utils/toast.js"></script>
+<script type="module" src="assets/scripts/utils/notifications.js"></script>
+<script src="assets/scripts/paralegal-cluster.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+<script type="module">
+  import { loadUserHeaderInfo } from "./assets/scripts/auth.js";
+  loadUserHeaderInfo();
+</script>
+<script src="assets/scripts/profile.js"></script>
 </body>
 </html>

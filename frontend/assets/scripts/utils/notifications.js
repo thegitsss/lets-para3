@@ -3,9 +3,11 @@ import { secureFetch, getStoredSession } from "../auth.js";
 
 const centers = [];
 let dismissBound = false;
+let initBound = false;
 
-document.addEventListener("DOMContentLoaded", () => {
+export function scanNotificationCenters() {
   document.querySelectorAll("[data-notification-center]").forEach((root) => {
+    if (root.dataset.boundNotificationCenter === "true") return;
     const center = createCenter(root);
     if (center) {
       centers.push(center);
@@ -13,7 +15,30 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   bindGlobalDismiss();
-});
+}
+
+export function initNotificationCenters() {
+  if (initBound) return;
+  initBound = true;
+  document.addEventListener("DOMContentLoaded", scanNotificationCenters);
+}
+
+// Auto-init on import
+initNotificationCenters();
+// Expose for late-mounted clusters (e.g., injected shells)
+if (typeof window !== "undefined") {
+  window.initNotificationCenters = scanNotificationCenters;
+  window.scanNotificationCenters = scanNotificationCenters;
+  window.refreshNotificationCenters = refreshNotificationCenters;
+}
+
+function refreshNotificationCenters() {
+  centers.forEach((center) => {
+    if (center.loading) return;
+    center.loaded = false;
+    fetchNotifications(center);
+  });
+}
 
 function createCenter(root) {
   const toggle = root.querySelector("[data-notification-toggle]");
@@ -37,14 +62,17 @@ function createCenter(root) {
     loaded: false,
   };
 
-  toggle.addEventListener("click", () => togglePanel(state));
-  toggle.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      togglePanel(state);
-    }
-  });
-  markBtn?.addEventListener("click", () => markNotificationsRead(state));
+  if (!root.dataset.boundNotificationCenter) {
+    root.dataset.boundNotificationCenter = "true";
+    toggle.addEventListener("click", () => togglePanel(state));
+    toggle.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        togglePanel(state);
+      }
+    });
+    markBtn?.addEventListener("click", () => markNotificationsRead(state));
+  }
   return state;
 }
 
@@ -73,6 +101,7 @@ async function fetchNotifications(center) {
   const session = getStoredSession();
   if (!session?.token) {
     renderEmpty(center, "Sign in to view notifications.");
+    center.loaded = true;
     return;
   }
   center.loading = true;
@@ -132,7 +161,8 @@ function renderEmpty(center, text) {
 
 function updateBadge(center, count) {
   if (!center.badge) return;
-  center.badge.textContent = count > 9 ? "9+" : String(count || 0);
+  const value = count > 9 ? "9+" : String(count || 0);
+  center.badge.textContent = value;
   center.badge.classList.toggle("show", count > 0);
 }
 

@@ -1,131 +1,104 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <meta name="theme-color" content="#0B2A4A">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Browse Jobs – Let's ParaConnect</title>
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
-  <link rel="manifest" href="site.webmanifest" />
-  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
-
-
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;500&family=Sarabun:wght@200;400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/styles/styles.css" />
-  <link rel="stylesheet" href="assets/styles/browse-jobs.css" />
+  <title>Browse Jobs | Let's-ParaConnect</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <script src="assets/scripts/utils/session.js"></script>
+  <script type="module" src="assets/scripts/auth.js"></script>
+  <style>
+    :root{
+      --accent:#d19c3a;
+      --bg:#ffffff;
+      --panel:#ffffff;
+      --line:rgba(12,18,37,0.08);
+      --muted:#5c6475;
+      --ink:#0b1225;
+      --font-serif:'Cormorant Garamond',serif;
+      --font-sans:'Sarabun',sans-serif;
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:var(--font-sans);font-weight:200;background:var(--bg);color:var(--ink);min-height:100vh;}
+    header{display:flex;justify-content:space-between;align-items:center;padding:20px 28px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:10;}
+    .logo{font-family:var(--font-serif);font-size:1.6rem;font-weight:300;letter-spacing:0.5px;}
+    nav{display:flex;gap:14px;align-items:center;}
+    nav a{text-decoration:none;color:var(--ink);font-weight:200;padding:8px 12px;border-radius:10px;transition:background .2s ease;}
+    nav a:hover,nav a.active{background:rgba(0,0,0,0.05);}
+    .header-cluster{display:flex;align-items:center;gap:12px;position:relative;}
+    .notification-icon{position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:#fff;transition:border-color .2s ease,transform .2s ease;}
+    .notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
+    .notification-icon svg{width:20px;height:20px;color:var(--ink);}
+    .notification-badge{position:absolute;top:-6px;right:-6px;background:#e63946;color:#fff;border-radius:50%;font-size:.7rem;width:18px;height:18px;display:none;align-items:center;justify-content:center;font-weight:700;}
+    .notification-badge.show{display:flex;}
+    .user-profile{display:flex;align-items:center;gap:.6rem;padding:6px 10px;border:1px solid var(--line);border-radius:12px;background:#fff;}
+    .user-profile img{width:42px;height:42px;border-radius:50%;object-fit:cover;box-shadow:0 6px 16px rgba(0,0,0,0.08);}
+    .user-profile strong{display:block;font-weight:500;}
+    .user-profile span{display:block;font-size:.85rem;color:var(--muted);font-weight:200;}
+    .notification-panel{position:absolute;right:0;top:calc(100% + 10px);width:280px;padding:14px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,0.1);display:none;z-index:50;}
+    .notification-panel.show{display:block;}
+    .notification-panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:.92rem;}
+    .notification-panel-header button{border:none;background:none;color:var(--accent);cursor:pointer;font-size:.85rem;}
+    [data-notification-list]{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;}
+    [data-notification-list] li{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fcfcfc;}
+    [data-notification-list] li strong{display:block;font-weight:500;margin-bottom:4px;}
+    [data-notification-list] li span{display:block;font-size:.8rem;color:var(--muted);}
+    [data-notification-empty]{font-size:.85rem;color:var(--muted);}    
+    main{max-width:1100px;margin:32px auto;padding:0 24px 64px;}
+    .lpc-card{border:1px solid var(--line);border-radius:12px;padding:18px;background:#fff;box-shadow:0 14px 40px rgba(0,0,0,0.08);}
+    .lpc-card h3{font-family:var(--font-serif);font-weight:500;margin-bottom:12px;}
+    .job-card{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;background:#fcfcfc;}
+    .job-card button{margin-top:8px;border:none;background:var(--accent);color:#fff;padding:8px 12px;border-radius:8px;cursor:pointer;}
+    .job-card button:hover{background:#a38e5f;}
+    footer{border-top:1px solid var(--line);padding:16px 24px;text-align:center;color:var(--muted);font-size:.9rem;}
+  </style>
 </head>
-
 <body>
   <header>
-    <div class="header-inner">
-      <a href="dashboard-paralegal.html" class="header-logo">Let’s ParaConnect</a>
-      <nav>
-        <a href="dashboard-paralegal.html">Dashboard</a>
-        <a href="browse-jobs.html" class="active">Browse Jobs</a>
-        <a href="my-cases.html">My Cases</a>
-        <a href="messages.html">Messages</a>
-      </nav>
-      <div class="header-controls" data-notification-center>
-        <button class="notification-icon" aria-label="View notifications" data-notification-toggle type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 01-3.46 0" />
-          </svg>
-          <span class="notification-badge" data-notification-badge>0</span>
-        </button>
-        <div class="user-chip" id="headerUser">
-          <img id="headerAvatar" src="https://via.placeholder.com/48x48.png?text=AP" alt="Paralegal avatar" />
-          <div>
-            <strong id="headerName">Alex Parker</strong>
-            <span id="headerRole">Approved Paralegal</span>
-          </div>
+    <div class="logo">Paralegal Panel</div>
+    <nav>
+      <a href="dashboard-paralegal.html">Dashboard</a>
+      <a href="browse-jobs.html" class="active">Browse Jobs</a>
+    </nav>
+    <div class="header-cluster" data-notification-center>
+      <button class="notification-icon" aria-label="View notifications" data-notification-toggle>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 01-3.46 0" />
+        </svg>
+        <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
+      </button>
+      <div class="user-profile">
+        <img id="clusterAvatar" class="nav-profile-photo" src="https://via.placeholder.com/64x64.png?text=PL" alt="Paralegal avatar">
+        <div>
+          <strong id="clusterName">Paralegal</strong>
+          <span id="clusterRole">Logged in</span>
         </div>
-        <div class="notification-panel" data-notification-panel role="region" aria-live="polite">
-          <div class="notification-panel-header">
-            <h4>Notifications</h4>
-            <button type="button" data-notification-mark>Mark as read</button>
-          </div>
-          <ul data-notification-list></ul>
-          <p class="notification-item" data-notification-empty>Loading…</p>
+      </div>
+      <div class="notification-panel" data-notification-panel>
+        <div class="notification-panel-header">
+          <h4 style="margin:0;font-size:0.95rem;">Notifications</h4>
+          <button type="button" data-notification-mark>Mark all read</button>
         </div>
+        <ul data-notification-list></ul>
+        <p class="notification-item" data-notification-empty>Loading…</p>
       </div>
     </div>
   </header>
 
-  <main class="page-content">
-    <div class="page-wrapper">
-      <section class="jobs-hero">
-        <div class="hero-text">
-          <p class="eyebrow">Opportunities</p>
-          <h1>Browse Available Jobs</h1>
-          <p>Curated opportunities for the elite paralegal professional collective from solo and boutique law firms who need trusted support.</p>
-        </div>
-        <div class="filter-container">
-          <button id="filterToggle" class="filter-button">Filter ▾</button>
-
-          <div id="filterMenu" class="filter-menu">
-            <div class="filter-header">Filter by:</div>
-
-            <label class="filter-label">Area of Law</label>
-            <select id="filterPracticeArea" class="filter-select"></select>
-
-            <label class="filter-label">State</label>
-            <select id="filterState" class="filter-select"></select>
-            <div class="filter-note">
-              If your preferred state does not appear here, it means there are no open jobs in that location.
-            </div>
-
-            <label class="filter-label">Minimum Pay (USD)</label>
-            <input type="range" id="filterMinPay" min="0" max="1000" value="0" class="filter-slider" />
-            <div class="slider-value" id="minPayValue">$0</div>
-
-            <label class="filter-label">Minimum Experience (Years)</label>
-            <input type="range" id="filterMinExp" min="0" max="20" value="0" class="filter-slider" />
-            <div class="slider-value" id="minExpValue">0 years</div>
-
-            <label class="filter-label">Sort by</label>
-            <select id="sortBy" class="filter-select">
-              <option value="">Default</option>
-              <option value="newest">Posted: Newest → Oldest</option>
-              <option value="oldest">Posted: Oldest → Newest</option>
-              <option value="payHigh">Pay: High → Low</option>
-              <option value="payLow">Pay: Low → High</option>
-            </select>
-
-            <button id="applyFilters" class="apply-button">Apply</button>
-            <button id="clearFilters" class="clear-button">Clear All</button>
-          </div>
-        </div>
-      </section>
-    </div>
-
-    <section class="jobs-grid" id="jobs-grid"></section>
-
-    <div class="pagination" id="pagination"></div>
+  <main>
+    <section id="jobList" class="lpc-card">
+      <h3>Available Jobs</h3>
+    </section>
   </main>
 
-  <footer class="footer">
-    <div class="footer-inner">
-      <p>© 2025 Let’s-ParaConnect. All rights reserved.</p>
-      <nav>
-        <a href="privacy.html">Privacy Policy</a>
-        <span>|</span>
-        <a href="terms.html">Terms</a>
-        <span>|</span>
-        <a href="contact.html">Contact</a>
-        <span>|</span>
-        <a href="accessibility.html">Accessibility</a>
-      </nav>
-      <div class="region">United States</div>
-    </div>
+  <footer>
+    © 2025 Let's-ParaConnect. All rights reserved.
   </footer>
 
+  <script src="assets/scripts/utils/toast.js"></script>
   <script type="module" src="assets/scripts/utils/notifications.js"></script>
-  <script src="assets/scripts/views/browse-jobs.js"></script>
+  <script src="assets/scripts/paralegal-cluster.js"></script>
+  <script type="module" src="assets/scripts/browse-jobs.js"></script>
 </body>
 </html>

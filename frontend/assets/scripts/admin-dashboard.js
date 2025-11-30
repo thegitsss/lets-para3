@@ -1,6 +1,6 @@
-import { secureFetch } from "./auth.js";
+import { secureFetch, loadUserHeaderInfo } from "./auth.js";
 
-const REFRESH_INTERVAL_MS = 60_000;
+const REFRESH_INTERVAL_MS = 30_000;
 
 const chartCache = {
   userLine: null,
@@ -454,12 +454,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   const user = await bootAdminDashboard();
   if (!user) return;
 
+  await loadUserHeaderInfo();
+
   const data = await loadAnalytics();
   if (!data) return;
 
   applyAnalyticsPayload(data);
+  const refreshLoop = async () => {
+    if (document.hidden) return;
+    await Promise.allSettled([hydrateAnalytics(), loadPendingParalegals()]);
+  };
   if (analyticsTimer) clearInterval(analyticsTimer);
-  analyticsTimer = setInterval(hydrateAnalytics, REFRESH_INTERVAL_MS);
+  analyticsTimer = setInterval(refreshLoop, REFRESH_INTERVAL_MS);
 });
 
 document.addEventListener("click", async (evt) => {

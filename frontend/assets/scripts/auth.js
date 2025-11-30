@@ -252,39 +252,25 @@ window.addEventListener("DOMContentLoaded", async () => {
   wireLogoutButton();
 });
 // === Auto-inject logged-in user's name + avatar globally ===
-window.loadUserHeaderInfo = async function () {
+export async function loadUserHeaderInfo() {
   try {
-    // 1. Show cached info instantly
-    const cachedUser = JSON.parse(localStorage.getItem("userInfo") || "{}");
-    const nameEl = document.getElementById("user-name");
-    const avatarEl = document.querySelector(".user-profile img");
-
-    if (cachedUser.name && nameEl) nameEl.textContent = cachedUser.name;
-    const cachedAvatar = cachedUser.profileImage || cachedUser.avatarURL;
-    if (cachedAvatar && avatarEl) avatarEl.src = cachedAvatar;
-
-    // 2. Refresh with live data
-    const res = await fetch("/api/users/me", { credentials: "include" });
+    const res = await secureFetch("/api/users/me", { method: "GET" });
     if (!res.ok) return;
-
     const user = await res.json();
-    if (!user || !user.name) return;
-    const avatar = user.profileImage || user.avatarURL || "";
 
-    // 3. Update UI
-    if (nameEl) nameEl.textContent = user.name;
-    if (avatarEl && avatar) avatarEl.src = avatar;
+    document.querySelectorAll(".globalProfileImage").forEach((img) => {
+      img.src = user.profileImage || "default.jpg";
+    });
 
-    // 4. Cache for next load
-    localStorage.setItem(
-      "userInfo",
-      JSON.stringify({
-        name: user.name,
-        profileImage: avatar || cachedUser.profileImage || cachedUser.avatarURL || "",
-        avatarURL: avatar || cachedUser.avatarURL || ""
-      })
-    );
+    document.querySelectorAll(".globalProfileName").forEach((name) => {
+      name.textContent = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+    });
+
+    document.querySelectorAll(".globalProfileRole").forEach((role) => {
+      role.textContent = user.role === "paralegal" ? "Paralegal" : "Attorney";
+    });
   } catch (err) {
     console.warn("Could not load user header info:", err);
   }
-};
+}
+window.loadUserHeaderInfo = loadUserHeaderInfo;

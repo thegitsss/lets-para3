@@ -58,6 +58,9 @@
   function clearStoredSession() {
     cachedUser = null;
     sessionPromise = null;
+    try {
+      localStorage.removeItem("lpc_user");
+    } catch (_) {}
   }
 
   function invalidateAndRedirect() {

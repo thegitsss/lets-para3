@@ -663,6 +663,49 @@ router.patch(
   })
 );
 
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
+
+const r2 = new S3Client({
+  region: "auto",
+  endpoint: process.env.R2_ENDPOINT,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  },
+});
+
+router.post("/profile-photo", verifyToken, async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image) return res.status(400).json({ success: false, message: "No image provided" });
+
+    // Convert Base64 → Buffer
+    const base64Data = image.split("base64,")[1]; // SAFE
+    const buffer = Buffer.from(base64Data, "base64");
+
+    const key = `profile_${req.user.id}_${Date.now()}.jpg`;
+
+    await r2.send(new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      ContentType: "image/jpeg",
+    }));
+
+    const url = `${process.env.R2_ENDPOINT}/${process.env.R2_BUCKET_NAME}/${key}`;
+
+    // Update user record
+    const user = await User.findById(req.user.id);
+    user.profileImage = url;
+    await user.save();
+
+    res.json({ success: true, url });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
+  }
+});
+
 // ----------------------------------------
 // Route-level error fallback
 // ----------------------------------------

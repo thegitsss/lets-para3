@@ -2,7 +2,6 @@
   const STORAGE_KEY = "lpDashboardToast";
   let hideTimer;
   const STATUS_MESSAGES = {
-    400: "Please complete all required fields.",
     401: "Your session expired. Please sign in again.",
     403: "You don’t have permission to perform this action.",
     404: "Item not found.",
