@@ -222,7 +222,7 @@ router.post(
 );
 
 // Temporary stub for legacy attachment probes
-router.post("/attach", csrfProtection, (_req, res) => {
+router.post("/attach", (_req, res) => {
   res.json({ ok: true });
 });
 
@@ -283,7 +283,6 @@ function caseFileMiddleware(req, res, next) {
 router.post(
   "/paralegal-certificate",
   requireRole(["paralegal"]),
-  csrfProtection,
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
@@ -328,7 +327,6 @@ router.post(
 router.post(
   "/paralegal-resume",
   requireRole(["paralegal"]),
-  csrfProtection,
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
@@ -418,7 +416,6 @@ router.post(
 router.post(
   "/case/:caseId",
   ensureCaseParticipant(),
-  csrfProtection,
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
     const { caseDoc } = await loadCaseForUser(req, req.params.caseId);
