@@ -89,33 +89,57 @@ async function loadSettings() {
 function loadProfilePhoto(user) {
   const section = document.getElementById("settingsProfilePhoto");
   if (!section) return;
-  const current = user.profileImage || settingsState.profileImage || "https://via.placeholder.com/120x120.png?text=PL";
   section.innerHTML = `
     <h3>Profile Photo</h3>
-    <div class="photo-box" style="display:flex;flex-direction:column;gap:1rem;">
-      <div id="profile-photo-preview" class="preview-square"></div>
-      <input id="profile-photo-input" type="file" accept="image/*" hidden>
-      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-        <button id="upload-profile-photo-btn" class="upload-btn" style="padding:8px 14px;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:white;">
-          Upload
-        </button>
-        <button id="save-profile-photo-btn" class="primary-btn" style="display:none;">Save Profile Photo</button>
-      </div>
-    </div>
+    <img id="profilePreview" src="${user.profileImage || "default.jpg"}" class="profile-img" style="object-fit:cover;"/>
+    <br><br>
+
+    <input id="profileInput" type="file" accept="image/png, image/jpeg">
+    <br><br>
+    <button id="uploadProfileBtn" class="primary-btn">Upload Photo</button>
   `;
-  const preview = document.getElementById("profile-photo-preview");
-  if (preview) {
-    preview.innerHTML = `<img src="${current}" alt="Profile photo" style="width:100%;height:100%;object-fit:cover;">`;
-  }
-  const navPhotos = document.querySelectorAll(".nav-profile-photo");
-  navPhotos.forEach((img) => {
-    img.src = current;
+
+  document.getElementById("profileInput").addEventListener("change", (evt) => {
+    const file = evt.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      document.getElementById("profilePreview").src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+
+    settingsState.profileImageFile = file;
   });
-  const uploadBtn = document.getElementById("upload-profile-photo-btn");
-  const inputEl = document.getElementById("profile-photo-input");
-  if (uploadBtn && inputEl) {
-    uploadBtn.addEventListener("click", () => inputEl.click());
-  }
+
+  document.getElementById("uploadProfileBtn").addEventListener("click", async () => {
+    if (!settingsState.profileImageFile) {
+      alert("Please choose a photo first.");
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append("file", settingsState.profileImageFile);
+
+    const res = await secureFetch("/api/uploads/profile-photo", {
+      method: "POST",
+      body: fd
+    });
+
+    if (!res.ok) {
+      alert("Upload failed.");
+      return;
+    }
+
+    alert("Photo uploaded!");
+
+    const refreshed = await secureFetch("/api/users/me");
+    const updatedUser = await refreshed.json();
+
+    document.querySelectorAll(".globalProfileImage").forEach(img => {
+      img.src = updatedUser.profileImage;
+    });
+  });
 }
 
 
@@ -126,15 +150,34 @@ function loadResume(user) {
   if (!section) return;
   section.innerHTML = `
     <h3>Résumé</h3>
-    ${user.resumeURL ? `<a href="${user.resumeURL}" target="_blank">View current résumé</a><br>` : ""}
-    <input type="file" id="newResume" accept="application/pdf">
+    ${user.resumeURL ? `<a href="${user.resumeURL}" target="_blank">View current résumé</a><br><br>` : ""}
+    <input id="resumeInput" type="file" accept="application/pdf">
+    <br><br>
+    <button id="uploadResumeBtn" class="primary-btn">Upload Résumé</button>
   `;
-  const resumeInput = document.getElementById("newResume");
-  if (resumeInput) {
-    resumeInput.addEventListener("change", (evt) => {
-      settingsState.resumeFile = evt.target.files[0];
+
+  document.getElementById("uploadResumeBtn").addEventListener("click", async () => {
+    const file = document.getElementById("resumeInput").files[0];
+    if (!file) {
+      alert("Please choose a PDF résumé first.");
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append("file", file);
+
+    const res = await secureFetch("/api/uploads/paralegal-resume", {
+      method: "POST",
+      body: fd
     });
-  }
+
+    if (!res.ok) {
+      alert("Resume upload failed.");
+      return;
+    }
+
+    alert("Résumé uploaded!");
+  });
 }
 
 
@@ -365,49 +408,24 @@ function loadNotifications(user) {
 // ================= SAVE SETTINGS =================
 
 async function saveSettings() {
-  let uploadedAvatarUrl = null;
-  // Upload profile photo
-  if (settingsState.profileImageFile) {
-    const fd = new FormData();
-    fd.append("file", settingsState.profileImageFile);
-    try {
-      const res = await secureFetch("/api/uploads/profile-photo", { method: "POST", body: fd });
-      const payload = await res.json().catch(() => ({}));
-      uploadedAvatarUrl = payload.url || payload.location || null;
-      if (uploadedAvatarUrl) {
-        settingsState.profileImage = uploadedAvatarUrl;
-      }
-    } catch {}
-  }
+  const body = {
+    bio: settingsState.bio,
+    education: settingsState.education,
+    awards: settingsState.awards,
+    highlightedSkills: settingsState.highlightedSkills,
+    linkedInURL: settingsState.linkedInURL,
+    notificationPrefs: settingsState.notificationPrefs
+  };
 
-  // Upload resume
-  if (settingsState.resumeFile) {
-    const fd = new FormData();
-    fd.append("file", settingsState.resumeFile);
-    await secureFetch("/api/uploads/paralegal-resume", { method: "POST", body: fd });
-  }
-
-  // Save all profile fields
-  await secureFetch("/api/users/me", {
+  const res = await secureFetch("/api/users/me", {
     method: "PATCH",
-    body: {
-      bio: settingsState.bio,
-      education: settingsState.education,
-      awards: settingsState.awards,
-      highlightedSkills: settingsState.highlightedSkills,
-      linkedInURL: settingsState.linkedInURL,
-      notificationPrefs: settingsState.notificationPrefs,
-      profileImage: uploadedAvatarUrl || settingsState.profileImage || undefined
-    }
+    body
   });
 
-  try {
-    const refreshed = await secureFetch("/api/users/me");
-    const user = await refreshed.json();
-    if (uploadedAvatarUrl) user.profileImage = uploadedAvatarUrl;
-    if (!user.profileImage && settingsState.profileImage) user.profileImage = settingsState.profileImage;
-    syncCluster(user);
-  } catch {}
+  if (!res.ok) {
+    alert("Could not save changes.");
+    return;
+  }
 
-  alert("Settings saved successfully.");
+  alert("Settings saved!");
 }

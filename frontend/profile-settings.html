@@ -147,17 +147,19 @@ input[type="file"]::file-selector-button:hover{border-color:var(--accent);color:
     </div>
   </header>
 
-  <div class="card-grid">
-    <section id="settingsProfilePhoto" class="lpc-card"></section>
-    <section id="settingsResume" class="lpc-card"></section>
-    <section id="settingsBio" class="lpc-card"></section>
-    <section id="settingsEducation" class="lpc-card"></section>
-    <section id="settingsAwards" class="lpc-card"></section>
-    <section id="settingsSkills" class="lpc-card"></section>
-    <section id="settingsLinkedIn" class="lpc-card"></section>
-    <section id="settingsNotifications" class="lpc-card"></section>
-    <div style="grid-column: 1 / -1;">
-      <button id="saveSettingsBtn" class="primary-btn">Save Changes</button>
+  <div id="settingsScrollWrapper" style="overflow-y:auto; max-height:calc(100vh - 120px); padding-right:20px;">
+    <div class="card-grid">
+      <section id="settingsProfilePhoto" class="lpc-card"></section>
+      <section id="settingsResume" class="lpc-card"></section>
+      <section id="settingsBio" class="lpc-card"></section>
+      <section id="settingsEducation" class="lpc-card"></section>
+      <section id="settingsAwards" class="lpc-card"></section>
+      <section id="settingsSkills" class="lpc-card"></section>
+      <section id="settingsLinkedIn" class="lpc-card"></section>
+      <section id="settingsNotifications" class="lpc-card"></section>
+      <div style="grid-column: 1 / -1;">
+        <button id="saveSettingsBtn" class="primary-btn">Save Changes</button>
+      </div>
     </div>
   </div>
 </main>

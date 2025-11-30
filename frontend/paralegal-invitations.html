@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Paralegal Dashboard | Let's-ParaConnect</title>
+<title>Paralegal Invitations | Let's-ParaConnect</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
 <script src="assets/scripts/utils/session.js"></script>
 <script type="module" src="assets/scripts/auth.js"></script>
@@ -344,7 +344,7 @@ th{color:var(--muted);font-weight:200;}
   right:24px;
   bottom:24px;
   background:#fff;
-  color:var(--ink);
+  color:#ink;
   padding:12px 18px;
   border-radius:999px;
   border:1px solid var(--line);
@@ -392,11 +392,11 @@ nav a.active {background:rgba(255,255,255,0.25);}
 <aside class="sidebar">
   <div class="logo">Paralegal Panel</div>
   <nav>
-    <a href="dashboard-paralegal.html" class="sideNavItem active" data-target="paraProfileCard">Home</a>
-    <a href="paralegal-invitations.html">Invitations</a>
-    <a href="paralegal-applications.html">Applications</a>
-    <a href="paralegal-assigned.html">Assigned Cases</a>
-    <a href="profile-settings.html">Settings</a>
+    <a href="dashboard-paralegal.html" class="sideNavItem" data-target="paraProfileCard">Overview</a>
+    <a href="#invitationList" class="sideNavItem active" data-target="invitationList">Invitations</a>
+    <a href="dashboard-paralegal.html#paraApplications" class="sideNavItem" data-target="paraApplications">Applications</a>
+    <a href="dashboard-paralegal.html#paraAssignedCases" class="sideNavItem" data-target="paraAssignedCases">Assigned Cases</a>
+    <a href="profile-settings.html" class="sideNavItem" data-target="settingsPage">Settings</a>
   </nav>
   <button type="button" class="sidebar-link sideNavItem" data-target="logout" id="logoutBtn">Log Out</button>
   <div id="weatherSidebar">Stay current</div>
@@ -407,7 +407,7 @@ nav a.active {background:rgba(255,255,255,0.25);}
   <header class="page-header">
     <div>
       <h1>Welcome, Paralegal</h1>
-      <p>Review your profile overview.</p>
+      <p>Review invitations and respond quickly.</p>
     </div>
     <div class="header-cluster" data-paralegal-cluster data-notification-center>
       <button class="notification-icon" aria-label="View notifications" data-notification-toggle>
@@ -435,9 +435,8 @@ nav a.active {background:rgba(255,255,255,0.25);}
     </div>
   </header>
 
-  <div class="card-grid">
-    <section id="paraProfileCard" class="lpc-card"></section>
-  </div>
+  <h2 style="font-family:var(--font-serif);font-weight:500;margin-bottom:1rem;">Invitations</h2>
+  <section id="invitationList" class="lpc-card"></section>
 </main>
 
 <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
@@ -445,7 +444,7 @@ nav a.active {background:rgba(255,255,255,0.25);}
 <script src="assets/scripts/utils/toast.js"></script>
 <script type="module" src="assets/scripts/utils/notifications.js"></script>
 <script src="assets/scripts/paralegal-cluster.js"></script>
-<script type="module" src="assets/scripts/paralegal-dashboard.js"></script>
+<script type="module" src="assets/scripts/paralegal-invitations.js"></script>
 <script type="module">
   import { loadUserHeaderInfo } from "./assets/scripts/auth.js";
   loadUserHeaderInfo();
