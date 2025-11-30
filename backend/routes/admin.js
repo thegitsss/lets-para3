@@ -422,6 +422,8 @@ router.get(
       registrationsAgg,
       escrowHeldAgg,
       escrowReleasedAgg,
+      escrowHeldByMonthAgg,
+      escrowReleasedByMonthAgg,
       grossVolumeAgg,
       monthlyGrossAgg,
       platformFeeAgg,
@@ -454,6 +456,26 @@ router.get(
       Case.aggregate([
         { $match: { paymentReleased: true } },
         { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+      ]),
+      Case.aggregate([
+        { $match: { createdAt: { $gte: startWindow }, totalAmount: { $gt: 0 }, paymentReleased: { $ne: true } } },
+        {
+          $group: {
+            _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+            total: { $sum: "$totalAmount" },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1 } },
+      ]),
+      Payout.aggregate([
+        { $match: { createdAt: { $gte: startWindow } } },
+        {
+          $group: {
+            _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+            total: { $sum: "$amountPaid" },
+          },
+        },
+        { $sort: { "_id.year": 1, "_id.month": 1 } },
       ]),
       Case.aggregate([{ $group: { _id: null, total: { $sum: "$totalAmount" }, count: { $sum: 1 } } }]),
       Case.aggregate([
@@ -536,6 +558,33 @@ router.get(
       pendingApprovals,
       suspendedUsers,
       registrationsByMonth,
+    };
+
+    const heldByMonth = escrowHeldByMonthAgg.map((entry) => ({
+      month: formatMonthFromGroup(entry),
+      total: entry.total || 0,
+    }));
+    const releasedByMonth = escrowReleasedByMonthAgg.map((entry) => ({
+      month: formatMonthFromGroup(entry),
+      total: entry.total || 0,
+    }));
+    const heldMap = heldByMonth.reduce((acc, entry) => {
+      if (entry.month) acc[entry.month] = entry.total;
+      return acc;
+    }, {});
+    const releasedMap = releasedByMonth.reduce((acc, entry) => {
+      if (entry.month) acc[entry.month] = entry.total;
+      return acc;
+    }, {});
+    const escrowTrendMonths = Array.from(
+      new Set([...heldByMonth.map((e) => e.month), ...releasedByMonth.map((e) => e.month)]).values()
+    )
+      .filter(Boolean)
+      .sort();
+    const escrowTrends = {
+      months: escrowTrendMonths,
+      held: escrowTrendMonths.map((m) => heldMap[m] || 0),
+      released: escrowTrendMonths.map((m) => releasedMap[m] || 0),
     };
 
     let activeCases = 0;
@@ -688,6 +737,7 @@ router.get(
       upcomingPayouts,
       ledger,
       recentUsers,
+      escrowTrends,
     });
   })
 );

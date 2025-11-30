@@ -8,6 +8,7 @@ const chartCache = {
   escrow: null,
   revenue: null,
   expense: null,
+  escrowReport: null,
 };
 
 let analyticsTimer;
@@ -37,6 +38,7 @@ function cacheCharts() {
   chartCache.escrow = Chart.getChart("escrowChart") || chartCache.escrow;
   chartCache.revenue = Chart.getChart("revMainChart") || chartCache.revenue;
   chartCache.expense = Chart.getChart("revExpenseChart") || chartCache.expense;
+  chartCache.escrowReport = Chart.getChart("escrowReportChart") || chartCache.escrowReport;
 }
 
 function updateText(selector, value) {
@@ -267,6 +269,47 @@ function populateEscrowChart(data) {
   }
 }
 
+function populateEscrowReportChart(data) {
+  cacheCharts();
+  const chart = chartCache.escrowReport;
+  if (!chart) return;
+  const trends = data?.escrowTrends || {};
+  const months = Array.isArray(trends.months) ? trends.months : [];
+  const labels = months.map((m) => formatMonthLabel(m));
+  const held = (Array.isArray(trends.held) ? trends.held : []).map((v) =>
+    Math.round((Number(v) || 0) / 100)
+  );
+  const released = (Array.isArray(trends.released) ? trends.released : []).map((v) =>
+    Math.round((Number(v) || 0) / 100)
+  );
+
+  if (!chart.data.datasets[0]) {
+    chart.data.datasets[0] = {
+      label: "Held",
+      data: [],
+      borderColor: "#b6a47a",
+      backgroundColor: "rgba(182,164,122,0.15)",
+      tension: 0.4,
+      fill: true,
+    };
+  }
+  if (!chart.data.datasets[1]) {
+    chart.data.datasets[1] = {
+      label: "Released",
+      data: [],
+      borderColor: "#1f78d1",
+      backgroundColor: "rgba(31,120,209,0.15)",
+      tension: 0.4,
+      fill: true,
+    };
+  }
+
+  chart.data.labels = labels;
+  chart.data.datasets[0].data = months.map((_, idx) => held[idx] || 0);
+  chart.data.datasets[1].data = months.map((_, idx) => released[idx] || 0);
+  chart.update("none");
+}
+
 function populateNewUsers(data) {
   const list = document.getElementById("newUsersList");
   if (!list) return;
@@ -289,6 +332,7 @@ function applyAnalyticsPayload(data) {
   populateMetrics(data);
   populateCharts(data);
   populateExpenseChart(data);
+  populateEscrowReportChart(data);
   populateLedger(data);
   populateTaxSummary(data);
   populatePayoutSchedule(data);
