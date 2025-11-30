@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Case – Review & Post | Let’s-ParaConnect</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+  <script src="assets/scripts/utils/session.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:#ffffff; --sidebar-bg:#f5f5f5e6; --accent:#b6a47a; --ink:#1a1a1a;
+      --muted:#8a8a8a; --line:rgba(0,0,0,0.08); --panel:#fcfcfc; --radius:14px;
+      --font-serif:'Cormorant Garamond',serif; --font-sans:'Sarabun',sans-serif;
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Sarabun',sans-serif;background:var(--bg);color:var(--ink);display:flex;height:100vh;overflow:hidden;font-weight:200;}
+
+    /* Sidebar */
+    .sidebar{width:240px;background:var(--sidebar-bg);display:flex;flex-direction:column;border-right:1px solid var(--line);padding:24px 16px;}
+    .logo{font-family:var(--font-serif);font-size:1.6rem;font-weight:300;text-align:center;margin-bottom:36px;}
+    nav{display:flex;flex-direction:column;gap:14px;}
+    nav a{text-decoration:none;color:var(--ink);font-size:0.95rem;padding:10px 14px;border-radius:var(--radius);transition:background .3s;}
+    nav a.active,nav a:hover{background:rgba(0,0,0,0.04);}
+    .sidebar-footer{margin-top:auto;font-size:0.7rem;color:var(--muted);text-align:center;}
+
+    /* Main Layout */
+    .main{flex:1;padding:40px;overflow-y:auto;}
+    .topbar{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:2rem;gap:1.5rem;position:relative;}
+    .notification-icon{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);display:flex;justify-content:center;align-items:center;background:#fff;cursor:pointer;position:relative;transition:border-color .2s ease, transform .2s ease;}
+    .notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
+    .notification-icon svg{width:22px;height:22px;color:var(--ink);}
+    .notification-badge{position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:999px;font-size:.75rem;padding:2px 6px;line-height:1;display:none;font-weight:600;}
+    .notification-badge.show{display:inline-flex;}
+    .user-profile{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(0,0,0,0.03);border:1px solid transparent;transition:border-color 0.2s ease;cursor:pointer;position:relative;}
+    .user-profile img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,0.08);object-fit:cover;}
+    .user-profile strong{display:block;font-weight:200;color:var(--ink);}
+    .user-profile span{font-size:0.85rem;color:var(--muted);}
+
+
+    /* Steps */
+    .steps{display:flex;justify-content:space-between;align-items:center;max-width:700px;margin:0 auto 2.5rem;position:relative;}
+    .step{text-align:center;flex:1;position:relative;}
+    .circle{width:28px;height:28px;border-radius:50%;border:2px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:0.8rem;}
+    .active .circle{background:var(--accent);border-color:var(--accent);color:#fff;}
+    .step span{font-size:0.85rem;color:var(--muted);}
+    .steps::before{content:"";position:absolute;top:14px;left:0;right:0;height:2px;background:var(--line);z-index:0;}
+
+    header h1{font-family:var(--font-serif);font-weight:300;font-size:2rem;margin-bottom:1rem;}
+    header p{color:var(--muted);margin-bottom:2rem;}
+
+    /* Summary */
+    .summary{max-width:900px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:2rem;box-shadow:0 2px 6px rgba(0,0,0,0.03);}
+    .summary h2{font-family:'Sarabun',sans-serif;font-weight:300;font-size:1.5rem;margin-bottom:1rem;}
+    .summary p{margin:0.25rem 0;color:var(--ink);}
+    .summary small{color:var(--muted);}
+    .requirements, .questions{margin-top:1rem;}
+    .requirements li, .questions li{margin:0.25rem 0;color:#4a4a4a;}
+    .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:2rem;}
+    .btn{border:none;border-radius:6px;padding:0.6rem 1.1rem;font-size:0.9rem;cursor:pointer;transition:all .2s;}
+    .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
+    .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
+    .btn.primary{background:var(--accent);color:#fff;}
+    .btn.primary:hover{background:#a0854d;}
+
+    /* Modal Preview */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:50;}
+    .modal.active{display:flex;}
+    .modal-content{background:#fff;width:min(700px,90vw);border-radius:var(--radius);padding:2rem;box-shadow:0 16px 44px rgba(0,0,0,.25);}
+    .modal-content h3{font-family:var(--font-serif);font-weight:300;font-size:1.5rem;margin-bottom:1rem;}
+    .modal-content p{margin:0.5rem 0;color:var(--ink);}
+    .close-btn{background:#fff;border:1px solid var(--line);padding:6px 14px;border-radius:6px;cursor:pointer;margin-top:1rem;}
+    .close-btn:hover{border-color:var(--accent);color:var(--accent);}
+    .body-text {
+  margin: 0.5rem 0 1.5rem;
+}
+    /* Toast */
+    .toast{position:fixed;bottom:-120px;left:50%;transform:translateX(-50%);background:rgba(182,164,122,0.95);color:#fff;padding:1rem 1.5rem;border-radius:10px;font-size:0.9rem;display:flex;align-items:center;gap:1rem;box-shadow:0 4px 10px rgba(0,0,0,0.1);transition:all .4s ease;z-index:99;}
+    .toast.show{bottom:40px;}
+    .toast.error{background:#c0392b;}
+    .toast a{color:#fff;text-decoration:underline;margin-left:10px;}
+    .toast a:hover{opacity:0.85;}
+
+    /* Modal Preview Refined */
+.modal-content {
+  background: #fff;
+  width: min(700px, 90vw);
+  border-radius: 18px;
+  padding: 2.5rem 2.75rem;
+  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e9e6df;
+  font-family: 'Sarabun', sans-serif;
+  color: var(--ink);
+  line-height: 1.6;
+}
+
+.modal-content h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 300;
+  font-size: 1.9rem;
+  color: #1a1a1a;
+  margin-bottom: 2rem;
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+
+.modal-content hr {
+  border: none;
+  border-top: 1px solid #e0ded8;
+  margin: 1.5rem 0;
+}
+
+.modal-content p {
+  margin: 0.35rem 0;
+  color: #2a2a2a;
+  font-size: 0.95rem;
+    line-height: 1.4;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.modal-content strong {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 400;
+  font-size: 1rem;
+  color: #111;
+  min-width: 130px; /* aligns the labels neatly in a vertical column */
+  display: inline-block;
+}
+
+.modal-content h4 {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 400;
+  font-size: 1rem;
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
+  color: #1a1a1a;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.modal-content ul {
+  padding-left: 1.2rem;
+  margin: 0.3rem 0 0.75rem;
+}
+
+.modal-content li {
+  font-family: 'Sarabun', sans-serif;  
+  font-weight: 300;
+  margin-bottom: 0.4rem;
+  color: #333;
+  font-size: 0.95rem;
+}
+.modal-subinfo {
+  text-align: center;
+  color: #8a8a8a;
+  font-size: 0.9rem;
+  font-weight: 300;
+  margin-top: -0.5rem;
+  margin-bottom: 1rem;
+}
+
+.close-btn {
+  display: block;
+  margin: 2rem auto 0 auto;  
+  background: #faf9f6;
+  border: 1px solid #d8d3c9;
+  padding: 0.55rem 1.2rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: #333;
+  transition: all 0.2s ease;
+  font-family: 'Cormorant Garamond', serif;
+}
+
+.close-btn:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+/* Force Cormorant for the two section headers in the review card */
+#reviewSummary .requirements > h3,
+#reviewSummary .questions > h3,
+.summary .requirements > h3,
+.summary .questions > h3 {
+  font-family: 'Cormorant Garamond', serif !important;
+  font-weight: 500;
+  font-size: 1.7rem;
+  letter-spacing: 0.2px;
+  margin: 1rem 0 0.5rem;
+}
+/* Title header in review summary */
+#reviewSummary h2 {
+  font-family: 'Cormorant Garamond', serif !important;
+  font-weight: 500;
+  font-size: 1.8rem;
+  text-align: center;
+  letter-spacing: 0.3px;
+  color: #1a1a1a;
+  margin-bottom: 0.75rem;
+}
+/* Smaller, lighter bullets inside review summary lists */
+#reviewSummary ul {
+  list-style-type: disc;
+  list-style-position: inside;
+}
+
+#reviewSummary li::marker {
+  font-size: 0.45em;  /* make bullet small */
+  color: #8a8a8a;     /* match muted divider tone */
+  vertical-align: middle;
+}
+.user-profile img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(0,0,0,0.05);
+}
+/* ========== Align and refine summary key/value pairs ========== */
+#reviewSummary p {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  line-height: 1.1;
+  margin: 0.25rem 0;
+  color: #2c2c2c;
+  font-family: 'Sarabun', sans-serif;
+  font-size: 0.96rem;
+}
+
+#reviewSummary p strong {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 400;
+  font-size: 1.3rem;
+  color: #111;
+  min-width: 140px;  /* keeps columns aligned */
+  display: inline-block;
+}
+
+/* ensure consistency in modal preview too */
+.modal-content p strong {
+  font-family: 'Cormorant Garamond', serif !important;
+  font-weight: 400;
+  font-size: 1.3rem;
+  color: #111;
+  min-width: 140px;
+  display: inline-block;
+}
+.modal-content p {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: 'Sarabun', sans-serif;
+  color: #2c2c2c;
+  margin: 0.25rem 0;
+}
+.steps a {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.steps a:hover .circle {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.steps a:hover span {
+  color: var(--accent);
+}
+
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="logo">Dashboard</div>
+    <nav>
+      <a href="dashboard-attorney.html">Home</a>
+      <a href="active-cases.html">Cases</a>
+      <a href="create-case.html" class="active">Create Case</a>
+      <a href="messages.html">Messages</a>
+      <a href="documents.html">Documents</a>
+      <a href="review.html">Review</a>
+      <a href="case-files.html">Case Files</a>
+      <a href="billing-attorney.html">Billing</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="help.html">Help</a>
+    </nav>
+    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar" data-attorney-header></div>
+
+    <header>
+      <h1>Review & Post Your Case</h1>
+      <p>Step 5: Confirm details before posting your case publicly.</p>
+    </header>
+
+    <div class="steps">
+  <a href="create-case.html" class="step">
+    <div class="circle">1</div><span>Case details</span>
+  </a>
+  <a href="create-case-step2.html" class="step">
+    <div class="circle">2</div><span>Description</span>
+  </a>
+  <a href="create-case-step3.html" class="step">
+    <div class="circle">3</div><span>Requirements</span>
+  </a>
+  <a href="create-case-step4.html" class="step">
+    <div class="circle">4</div><span>Questions</span>
+  </a>
+  <a href="create-case-step5.html" class="step active">
+    <div class="circle">5</div><span>Review & Post</span>
+  </a>
+</div>
+    <section class="summary" id="reviewSummary"></section>
+
+    <div class="actions">
+      <button class="btn secondary" data-nav="back" data-target="create-case-step4.html">Back</button>
+      <button class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html">Save & Exit</button>
+      <button class="btn secondary" id="previewBtn">Preview Listing</button>
+      <button class="btn primary" id="postBtn">Post Case</button>
+    </div>
+  </main>
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script>window.__ATTORNEY_PAGE__ = "create-case";</script>
+  <script type="module" src="assets/scripts/attorney-tabs.js"></script>
+
+
+  <!-- Preview Modal -->
+  <div class="modal" id="previewModal">
+    <div class="modal-content">
+      <h3 id="prevTitle"></h3>
+      <p><strong>Field of Law:</strong> <span id="prevField"></span></p>
+      <p><strong>Location:</strong> <span id="prevState"></span></p>
+      <p><strong>Engagement:</strong> <span id="prevEmployment"></span></p>
+      <p><strong>Compensation:</strong> <span id="prevComp"></span></p>
+      <p><strong>Experience:</strong> <span id="prevExperience"></span></p>
+      <hr style="margin:1rem 0;">
+      <p id="prevDescription"></p>
+      <h4 style="margin-top:1.5rem;">Requirements</h4>
+      <ul id="prevReqs"></ul>
+      <h4 style="margin-top:1rem;">Questions</h4>
+      <ul id="prevQs"></ul>
+      <button class="close-btn" id="closePreview">Close Preview</button>
+    </div>
+  </div>
+  <div class="body-text">
+  <p id="prevDescription"></p>
+</div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast">
+    ✅ Your case has been successfully posted.
+    <a href="active-cases.html">View Posted Case</a>
+  </div>
+  <script type="module">
+  import { secureFetch } from './assets/scripts/auth.js';
+
+  // === Display cached info instantly ===
+  const cachedUser = JSON.parse(localStorage.getItem('userInfo') || '{}');
+  const nameEl = document.getElementById('user-name');
+  const avatarEl = document.querySelector('.user-profile img');
+
+  if (cachedUser.name && nameEl) nameEl.textContent = cachedUser.name;
+  if (cachedUser.avatarURL && avatarEl) avatarEl.src = cachedUser.avatarURL;
+
+  // === Refresh user info from API ===
+  secureFetch('/api/users/me')
+    .then(res => res.json())
+    .then(user => {
+      if (!user || !user.name) return;
+
+      // Update UI
+      if (nameEl) nameEl.textContent = user.name;
+      if (avatarEl && user.avatarURL) avatarEl.src = user.avatarURL;
+
+      // Cache for next load
+      localStorage.setItem('userInfo', JSON.stringify({
+        name: user.name,
+        avatarURL: user.avatarURL
+      }));
+    })
+    .catch(() => console.warn('User not logged in or fetch failed.'));
+</script>
+  <script>
+    try {
+      window.checkSession?.("attorney");
+    } catch (err) {
+      console.warn("Attorney session required", err);
+    }
+
+    // Pull from localStorage
+    const compAmountRaw = localStorage.getItem('caseCompAmount') || '';
+    const compType = localStorage.getItem('caseCompType') || '';
+    const data = {
+      title: localStorage.getItem('caseTitle') || '',
+      field: localStorage.getItem('caseSpecialty') || '',
+      state: localStorage.getItem('caseState') || '',
+      employment: localStorage.getItem('caseEmployment') || '',
+      compAmount: compAmountRaw,
+      compType,
+      comp: compAmountRaw ? `$${compAmountRaw} (${compType || 'Fixed'})` : '—',
+      experience: localStorage.getItem('caseExperience') || '',
+      description: localStorage.getItem('caseDescription') || '',
+      requirements: JSON.parse(localStorage.getItem('caseRequirements') || '[]'),
+      questions: JSON.parse(localStorage.getItem('caseQuestions') || '[]')
+    };
+
+    // Populate summary
+    const review = document.getElementById('reviewSummary');
+    review.innerHTML = `
+      <h2>${data.title || '(Untitled Case)'}</h2>
+      <p><small>${data.field} • ${data.state}</small></p>
+      <p><strong>Engagement:</strong> ${data.employment}</p>
+      <p><strong>Compensation:</strong> ${data.comp}</p>
+      <p><strong>Experience:</strong> ${data.experience}</p>
+      <hr style="margin:1rem 0;">
+      <p>${data.description}</p>
+      <div class="requirements"><h3>Requirements</h3><ul>${data.requirements.map(r=>`<li>${r}</li>`).join('')}</ul></div>
+      <div class="questions"><h3>Custom Questions</h3><ul>${data.questions.map(q=>`<li>${q}</li>`).join('')}</ul></div>
+    `;
+
+// === Modal logic (updated) ===
+const modal = document.getElementById('previewModal');
+const body = document.body;
+
+document.getElementById('previewBtn').addEventListener('click', () => {
+  // populate preview
+  document.getElementById('prevTitle').textContent = data.title;
+  document.getElementById('prevField').textContent = data.field;
+  document.getElementById('prevState').textContent = data.state;
+  document.getElementById('prevEmployment').textContent = data.employment;
+  document.getElementById('prevComp').textContent = data.comp;
+  document.getElementById('prevExperience').textContent = data.experience;
+  document.getElementById('prevDescription').textContent = data.description;
+  document.getElementById('prevReqs').innerHTML = data.requirements.map(r => `<li>${r}</li>`).join('');
+  document.getElementById('prevQs').innerHTML = data.questions.map(q => `<li>${q}</li>`).join('');
+  
+  modal.classList.add('active');
+  body.classList.add('modal-open');
+});
+
+// close when clicking close button
+document.getElementById('closePreview').addEventListener('click', () => {
+  modal.classList.remove('active');
+  body.classList.remove('modal-open');
+});
+
+// close when clicking outside modal content
+modal.addEventListener('click', e => {
+  if (e.target === modal) {
+    modal.classList.remove('active');
+    body.classList.remove('modal-open');
+  }
+});
+
+// Close button
+const closeBtn = document.getElementById('closePreview');
+closeBtn.addEventListener('click', () => modal.classList.remove('active'));
+
+const toast = document.getElementById('toast');
+const postBtn = document.getElementById('postBtn');
+let csrfToken = "";
+
+async function fetchCsrfToken() {
+  try {
+    const res = await fetch('/api/csrf', { credentials: 'include' });
+    const json = await res.json().catch(() => ({}));
+    csrfToken = json?.csrfToken || "";
+  } catch (err) {
+    console.error('Unable to fetch CSRF token', err);
+  }
+  return csrfToken;
+}
+
+async function submitCase(payload) {
+  const token = (window.getSessionToken && window.getSessionToken()) || "";
+  if (!token) {
+    window.checkSession?.("attorney");
+    throw new Error("Please log in again before posting.");
+  }
+  if (!csrfToken) await fetchCsrfToken();
+  const res = await fetch("/api/cases", {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      "X-CSRF-Token": csrfToken || "",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || data?.msg || "Unable to post this case right now.");
+  }
+  return data;
+}
+
+function buildPayload() {
+  const description = data.description || "Additional details will be provided once the case is accepted.";
+  return {
+    title: data.title,
+    practiceArea: data.field,
+    state: data.state,
+    employmentType: data.employment,
+    compensationAmount: data.compAmount,
+    compensationType: data.compType,
+    experience: data.experience,
+    details: description,
+    requirements: data.requirements,
+    questions: data.questions,
+  };
+}
+
+function clearDraft() {
+  [
+    "caseTitle",
+    "caseSpecialty",
+    "caseState",
+    "caseEmployment",
+    "caseComp",
+    "caseCompAmount",
+    "caseCompType",
+    "caseExperience",
+    "caseDescription",
+    "caseRequirements",
+    "caseQuestions",
+  ].forEach((key) => localStorage.removeItem(key));
+}
+
+function showToast(message, href, isError = false) {
+  if (!toast) return;
+  const linkHtml = href ? ` <a href="${href}">View Case</a>` : "";
+  toast.innerHTML = `${isError ? "⚠️" : "✅"} ${message}${linkHtml}`;
+  toast.classList.toggle("error", isError);
+  toast.classList.add("show");
+  setTimeout(() => toast.classList.remove("show"), 5000);
+}
+
+postBtn?.addEventListener("click", async () => {
+  if (!postBtn) return;
+  if (!data.title || !data.title.trim() || !data.description || !data.description.trim()) {
+    showToast("Add a case title and description before posting.", null, true);
+    return;
+  }
+  postBtn.disabled = true;
+  try {
+    const payload = buildPayload();
+    const created = await submitCase(payload);
+    localStorage.setItem("lastPostedTitle", data.title);
+    clearDraft();
+    const caseId = created?.id || created?._id;
+    const viewHref = caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "active-cases.html";
+    showToast("Your case has been successfully posted.", viewHref, false);
+    setTimeout(() => {
+      window.location.href = viewHref;
+    }, 1600);
+  } catch (err) {
+    console.error(err);
+    showToast(err?.message || "Unable to post this case right now.", null, true);
+    postBtn.disabled = false;
+  }
+});
+  </script>
+  <script src="assets/scripts/create-case-nav.js"></script>
+</body>
+</html>

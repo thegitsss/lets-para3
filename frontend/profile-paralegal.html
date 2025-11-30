@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paralegal Profile | Let’s-ParaConnect</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <script src="assets/scripts/utils/session.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --panel: #fcfcfc;
+      --line: rgba(0, 0, 0, 0.08);
+      --ink: #1a1a1a;
+      --muted: #6b6b6b;
+      --accent: #b6a47a;
+      --accent-dark: #9c8a63;
+      --success: #00a86b;
+      --radius: 18px;
+      --font-serif: 'Cormorant Garamond', serif;
+      --font-sans: 'Sarabun', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      font-weight: 200;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      line-height: 1.7;
+      letter-spacing: 0.25px;
+    }
+
+    .page-shell {
+      max-width: 1350px;
+      margin: 0 auto;
+      padding: 48px 48px 120px;
+    }
+
+    header.profile-hero {
+      margin-bottom: 48px;
+    }
+
+    .profile-hero .hero-copy {
+      max-width: 520px;
+    }
+
+    .profile-hero .eyebrow {
+      letter-spacing: 3px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .profile-hero h1 {
+      font-family: var(--font-serif);
+      font-size: 2.8rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    .profile-hero p {
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.65;
+      margin-bottom: 8px;
+    }
+
+    .notification-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .notification-icon:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .notification-icon svg {
+      width: 22px;
+      height: 22px;
+      color: var(--ink);
+    }
+
+    .profile-overview-card {
+      display: grid;
+      grid-template-columns: minmax(260px, 300px) minmax(360px, 1fr);
+      column-gap: 100px;
+      row-gap: 48px;
+      align-items: flex-start;
+      margin-bottom: 64px;
+    }
+
+    .overview-left {
+      width: 100%;
+    }
+
+    .profile-card {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    .overview-right {
+      flex: 1 1 320px;
+      min-width: 280px;
+    }
+
+    .info-card {
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
+      margin-top: 64px;
+    }
+
+    .avatar-shell {
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      overflow: hidden;
+      margin: 0 auto 24px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .avatar-shell img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+      border-radius: 50%;
+    }
+
+    .avatar-fallback {
+      font-size: 2.4rem;
+      font-weight: 600;
+      color: #1f1f1f;
+      letter-spacing: 1px;
+    }
+
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 0;
+      font-size: 0.88rem;
+      color: var(--success);
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .profile-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .profile-meta span {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .profile-meta svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .cta-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .cta-group button {
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      font-family: inherit;
+      font-size: 1rem;
+      cursor: pointer;
+      background: transparent;
+      color: var(--ink);
+      letter-spacing: 0.03em;
+      text-align: left;
+      transition: color 0.2s ease;
+    }
+
+    .cta-group button:hover {
+      text-decoration: underline;
+    }
+
+    .cta-group button:disabled {
+      opacity: 0.4;
+      cursor: default;
+      text-decoration: none;
+    }
+
+    .info-card h2 {
+      font-family: var(--font-serif);
+      font-size: 1.8rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      margin-top: 48px;
+      letter-spacing: 0.6px;
+    }
+
+    .info-card p {
+      font-size: 1rem;
+      color: var(--ink);
+    }
+
+    .info-card p,
+    .profile-hero p {
+      line-height: 1.7;
+      margin-bottom: 8px;
+    }
+
+    .pill-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .pill {
+      padding: 0.2rem 0;
+      border-radius: 0;
+      border: none;
+      background: transparent;
+      font-size: 0.95rem;
+      letter-spacing: 0.02em;
+    }
+
+    .list-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .list-stack article {
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .list-stack article:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .list-stack h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .list-stack span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .list-stack p {
+      margin-top: 6px;
+      color: var(--ink);
+      line-height: 1.5;
+    }
+
+    .skeleton-block {
+      position: relative;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    .skeleton-block::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0));
+      animation: shimmer 1.4s infinite;
+    }
+
+    @keyframes shimmer {
+      100% {
+        transform: translateX(100%);
+      }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      column-gap: 100px;
+      row-gap: 64px;
+    }
+
+    .profile-grid {
+      column-gap: 120px;
+      row-gap: 80px;
+    }
+
+    .info-card.primary-card h2 {
+      font-size: 2.6rem;
+      margin-bottom: 12px;
+    }
+
+    .info-card.primary-card p {
+      font-size: 1.05rem;
+    }
+
+    #profileName {
+      margin-bottom: 20px;
+      letter-spacing: 0.5px;
+      font-size: 2.8rem;
+    }
+
+    #roleLine {
+      margin-bottom: 20px;
+      letter-spacing: 0.3px;
+    }
+
+    #bioCopy {
+      margin-top: 20px;
+      line-height: 1.75;
+      letter-spacing: 0.2px;
+    }
+
+    #funFactsCopy ul {
+      padding-left: 18px;
+      line-height: 1.7;
+    }
+
+    .section-block {
+      margin-top: 64px;
+      padding-top: 64px;
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .section-block:first-of-type {
+      border-top: none;
+      padding-top: 0;
+    }
+
+    .profile-section,
+    .info-card,
+    section > article {
+      margin-bottom: 64px;
+    }
+
+    .error-card {
+      padding: 1.25rem;
+      border-radius: var(--radius);
+      border: 1px solid rgba(192, 57, 43, 0.2);
+      background: rgba(192, 57, 43, 0.05);
+      color: #962d22;
+      margin-bottom: 20px;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 24px;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .invite-modal {
+      width: min(520px, 100%);
+      background: #fff;
+      border-radius: 20px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      box-shadow: 0 40px 80px rgba(0, 0, 0, 0.18);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .invite-modal h3 {
+      font-size: 1.4rem;
+      font-weight: 600;
+    }
+
+    .job-options {
+      max-height: 240px;
+      overflow-y: auto;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .job-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.95rem;
+    }
+
+    textarea#inviteMessage {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      min-height: 80px;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .modal-actions button {
+      border-radius: 999px;
+      padding: 0.6rem 1.2rem;
+      border: 1px solid var(--line);
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .modal-actions .confirm {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 30px;
+      transform: translate(-50%, 20px);
+      background: rgba(17, 17, 17, 0.9);
+      color: #fff;
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 200;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    @media (max-width: 960px) {
+      .profile-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .profile-card {
+        position: static;
+      }
+
+      .avatar-shell {
+        width: 160px;
+        height: 160px;
+      }
+    }
+  </style>
+</head>
+<body>
+<div id="protectedContent" style="visibility:hidden">
+  <div class="page-shell">
+    <header class="profile-hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Paralegal profile</p>
+        <h1>Meet the paralegal professional powering your matters</h1>
+        <p>Review credentials, availability, and a complete work history before you collaborate.</p>
+      </div>
+    </header>
+
+    <div id="profileError" class="error-card hidden"></div>
+
+    <section class="profile-overview-card">
+      <div class="overview-left profile-card">
+        <div class="avatar-shell skeleton-block" data-avatar-wrapper>
+          <img data-profile-avatar alt="Paralegal portrait" />
+          <div class="avatar-fallback" data-avatar-fallback>LP</div>
+        </div>
+        <div class="status-chip" id="statusChip">Checking availability…</div>
+        <div class="profile-meta">
+          <span id="locationMeta" class="skeleton-block" style="height:16px;width:80%"></span>
+          <span id="credentialMeta" class="skeleton-block" style="height:16px;width:65%"></span>
+          <span id="joinedMeta" class="skeleton-block" style="height:16px;width:70%"></span>
+        </div>
+        <div class="cta-group">
+          <button type="button" class="cta-primary hidden" id="inviteToCaseBtn">Invite to Case</button>
+          <button type="button" class="cta-secondary hidden" id="messageBtn">Message</button>
+          <button type="button" class="cta-ghost hidden" id="editProfileBtn">Edit Profile</button>
+        </div>
+      </div>
+      <div class="overview-right">
+        <article class="info-card primary-card">
+          <h2 id="profileName" class="skeleton-block" style="height:28px;width:60%"></h2>
+          <p id="roleLine" class="skeleton-block" style="height:18px;width:40%;margin-bottom:16px;"></p>
+          <p id="bioCopy" class="skeleton-block" style="height:80px;"></p>
+        </article>
+      </div>
+    </section>
+
+    <div class="detail-grid profile-grid">
+      <article class="info-card section-block" id="skillsCard">
+        <h2>Skills &amp; Specialties</h2>
+        <div class="pill-group" id="skillsList">
+          <div class="pill skeleton-block" style="width:120px;height:28px;"></div>
+          <div class="pill skeleton-block" style="width:140px;height:28px;"></div>
+          <div class="pill skeleton-block" style="width:100px;height:28px;"></div>
+        </div>
+      </article>
+
+      <article class="info-card section-block" id="practiceCard">
+        <h2>Practice Areas</h2>
+        <div class="pill-group" id="practiceList">
+          <div class="pill skeleton-block" style="width:110px;height:28px;"></div>
+          <div class="pill skeleton-block" style="width:150px;height:28px;"></div>
+        </div>
+      </article>
+
+      <article class="info-card section-block" id="experienceCard">
+        <h2>Experience &amp; Background</h2>
+        <div class="list-stack" id="experienceList">
+          <article>
+            <h3 class="skeleton-block" style="height:20px;width:70%"></h3>
+            <span class="skeleton-block" style="height:16px;width:40%;margin-top:8px;"></span>
+            <p class="skeleton-block" style="height:60px;margin-top:8px;"></p>
+          </article>
+        </div>
+      </article>
+
+      <article class="info-card section-block" id="educationCard">
+        <h2>Education</h2>
+        <div class="list-stack" id="educationList">
+          <article>
+            <h3 class="skeleton-block" style="height:20px;width:60%"></h3>
+            <span class="skeleton-block" style="height:16px;width:50%;margin-top:8px;"></span>
+          </article>
+        </div>
+      </article>
+
+      <article class="info-card section-block hidden" id="funFactsCard">
+        <h2>Fun Facts &amp; Extras</h2>
+        <p id="funFactsCopy"></p>
+      </article>
+
+      <article class="info-card section-block" id="attorneyInsightsCard" data-attorney-only>
+        <h2>Professional Credentials</h2>
+        <div class="list-stack" id="attorneyHighlights"></div>
+      </article>
+
+      <article class="info-card section-block" id="profileFormSection">
+        <form id="paralegalProfileForm">
+          <label>LinkedIn Profile
+            <input type="url" id="linkedInURL" placeholder="https://linkedin.com/in/...">
+          </label>
+
+          <label>Years of Experience
+            <input type="number" id="yearsExperience" min="0">
+          </label>
+
+          <label>Reference #1 Name
+            <input type="text" id="ref1Name">
+          </label>
+
+          <label>Reference #1 Email
+            <input type="email" id="ref1Email">
+          </label>
+
+          <label>Reference #2 Name
+            <input type="text" id="ref2Name">
+          </label>
+
+          <label>Reference #2 Email
+            <input type="email" id="ref2Email">
+          </label>
+
+          <label>Paralegal Certificate (PDF)
+            <input type="file" id="certificateUpload" accept="application/pdf">
+          </label>
+
+          <label>Upload Résumé (PDF)
+            <input type="file" id="resumeUpload" accept="application/pdf">
+          </label>
+
+          <label>Profile Photo
+            <input type="file" id="profilePhoto" accept="image/png, image/jpeg">
+          </label>
+        </form>
+      </article>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="inviteModal" role="dialog" aria-modal="true">
+    <div class="invite-modal">
+      <h3>Invite to Case</h3>
+      <label>
+        <span style="display:block;font-size:0.9rem;color:var(--muted);margin-bottom:6px;">Select a case</span>
+        <select id="inviteCaseSelect"></select>
+      </label>
+      <div class="modal-actions">
+        <button type="button" id="sendInviteBtn" disabled>Send Invite</button>
+        <button type="button" id="closeInviteBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script type="module" src="assets/scripts/profile-paralegal.js"></script>
+</div>
+</body>
+</html>

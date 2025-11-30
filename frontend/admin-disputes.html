@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+  <style>body{opacity:1!important;visibility:visible!important}</style>
+  <meta charset="UTF-8" />
+  <title>Admin • Disputes</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link rel="stylesheet" href="assets/styles/styles.css">
+  <link rel="stylesheet" href="assets/styles/admin.css">
+  <script type="module" src="assets/scripts/auth.js"></script>
+
+  <style>
+    :root{ --ink:#1a2230; --muted:#5c6b7a; --line:#e8edf3; --card:#fff; --bg:#faf7f3; --accent:#b4975a; --ok:#2e7d32; --bad:#b00020; --warn:#b26a00; }
+    @media (prefers-color-scheme: dark){ :root{ --bg:#0f141b; --card:#121a23; --ink:#e8edf3; --muted:#8ea0b5; --line:#203040; } }
+
+    body{ margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial,sans-serif; }
+
+    header[role="banner"]{ padding:12px 18px; border-bottom:1px solid var(--line); position:sticky; top:0; z-index:20; background:color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter:saturate(120%) blur(6px); }
+    header nav a{ color:var(--muted); text-decoration:none; margin-right:14px; padding:6px 10px; border-radius:10px; }
+    header nav a.active{ color:var(--ink); background:color-mix(in srgb, var(--line) 55%, transparent); }
+
+    main{ max-width:1100px; margin:0 auto; padding:18px; }
+    h1{ margin:18px 0; font-weight:600; }
+
+    .toolbar{ display:grid; grid-template-columns: 1fr auto auto auto; gap:10px; align-items:center; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow: 0 1px 0 rgba(0,0,0,.03); position:sticky; top:64px; z-index:10; }
+    .toolbar input[type="search"], .toolbar select{ appearance:none; font:inherit; color:var(--ink); background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; outline:none; transition:border-color .15s ease, box-shadow .15s ease; }
+    .toolbar input[type="search"]:focus, .toolbar select:focus{ border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent); }
+    .toolbar .group{ display:flex; gap:8px; justify-content:flex-end; align-items:center; }
+    .switch{ display:inline-flex; gap:8px; align-items:center; color:var(--muted); }
+
+    .btn{ border:1px solid var(--line); background:var(--card); color:var(--ink); padding:9px 12px; border-radius:10px; cursor:pointer; transition:transform .08s ease, background .18s ease, border-color .18s ease; }
+    .btn:hover{ background:color-mix(in srgb, var(--line) 40%, transparent); }
+    .btn:active{ transform:translateY(1px); }
+    .btn.primary{ background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 14%, var(--card)), var(--card)); border-color:color-mix(in srgb, var(--accent) 55%, var(--line)); }
+    .btn.ok{ border-color:color-mix(in srgb, var(--ok) 55%, var(--line)); }
+    .btn.bad{ border-color:color-mix(in srgb, var(--bad) 55%, var(--line)); }
+
+    .list{ display:grid; grid-template-columns: repeat(auto-fill,minmax(360px,1fr)); gap:14px; margin-top:14px; }
+    .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:10px; box-shadow:0 1px 1px rgba(0,0,0,.03); }
+    .title{ font-weight:600; letter-spacing:.2px; }
+    .meta{ display:flex; flex-wrap:wrap; gap:8px; }
+    .badge{ font-size:12px; padding:6px 8px; border:1px solid var(--line); border-radius:999px; color:var(--muted); background:color-mix(in srgb, var(--line) 30%, transparent); }
+    .message{ white-space:pre-wrap; line-height:1.45; border:1px dashed var(--line); border-radius:10px; padding:8px; background:color-mix(in srgb, var(--line) 20%, transparent); }
+    .actions{ display:flex; flex-wrap:wrap; gap:8px; }
+
+    .skeleton{ height:136px; border-radius:14px; background:linear-gradient(90deg, rgba(0,0,0,.05), rgba(0,0,0,.08), rgba(0,0,0,.05)); background-size:200% 100%; animation: shimmer 1.1s ease-in-out infinite; border:1px solid var(--line); }
+    @keyframes shimmer{ from{ background-position:200% 0 } to{ background-position:-200% 0 } }
+    @media (prefers-reduced-motion: reduce){ .skeleton{ animation:none } .btn,.card{ transition:none } }
+
+    #count{ margin:10px 2px; color:var(--muted); }
+    .small{ color:var(--muted); font-size:.9rem; }
+
+    .toast{ position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(20px); background:#111827; color:#fff; padding:10px 14px; border-radius:12px; opacity:0; pointer-events:none; transition:opacity .2s ease, transform .2s ease; }
+    .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+    .toast.err{ background:var(--bad); }
+  </style>
+</head>
+<body>
+  <header role="banner">
+    <nav aria-label="Primary">
+      <a href="index.html">Home</a>
+      <a href="index.html#admin-pending-users">Admin</a>
+      <a href="admin-cases.html">Cases</a>
+      <a href="admin-disputes.html" class="active" aria-current="page">Disputes</a>
+      <a href="login.html">Login</a>
+    </nav>
+  </header>
+
+  <main role="main">
+    <h1>Disputes</h1>
+
+    <div class="toolbar" role="region" aria-label="Filters">
+      <input id="q" type="search" placeholder="Search case title, message, or email…" aria-label="Search disputes" />
+      <select id="statusF" aria-label="Status filter">
+        <option value="open">Open</option>
+        <option value="resolved">Resolved</option>
+        <option value="rejected">Rejected</option>
+      </select>
+      <select id="sortF" aria-label="Sort">
+        <option value="-createdAt">Newest first</option>
+        <option value="createdAt">Oldest first</option>
+        <option value="caseId.title">Case title (A–Z)</option>
+      </select>
+      <div class="group">
+        <label class="switch" for="autoRefresh" title="Refresh every 30s">
+          <input type="checkbox" id="autoRefresh" /> Auto-refresh
+        </label>
+        <button id="refresh" class="btn primary" type="button">Refresh</button>
+      </div>
+    </div>
+
+    <div id="count" class="small" aria-live="polite"></div>
+
+    <div id="disputeList" class="list" aria-live="polite" aria-busy="true">
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite">Saved</div>
+
+    <script type="module">
+    import { secureFetch, fetchCSRF } from './assets/scripts/auth.js';
+
+    const API_BASE = '/api';
+    const listEl = document.getElementById('disputeList');
+    const countEl = document.getElementById('count');
+    const toastEl = document.getElementById('toast');
+
+    const esc = (value) => String(value ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] || c));
+    const fmt = (val) => (val ? new Date(val).toLocaleString() : '');
+
+    const toast = (message, type = 'ok') => {
+      toastEl.textContent = message;
+      toastEl.className = 'toast show ' + (type === 'err' ? 'err' : 'ok');
+      setTimeout(() => toastEl.classList.remove('show'), 1800);
+    };
+
+    function renderDisputeCard(item) {
+      const filedByName = item?.raisedBy?.name || item?.raisedBy?.email || 'Unknown user';
+      const filedByRole = (item?.raisedBy?.role || 'user').replace(/_/g, ' ');
+      const statusText = (item?.status || 'open').replace(/_/g, ' ');
+      return `
+        <div class="card" data-id="${esc(item.id || '')}">
+          <div class="title">${esc(item.caseTitle || 'Case')}</div>
+          <div class="meta">
+            <span class="badge">Filed by: ${esc(filedByName)} (${esc(filedByRole)})</span>
+            ${item.createdAt ? `<span class="badge">${esc(fmt(item.createdAt))}</span>` : ''}
+            <span class="badge">Status: ${esc(statusText)}</span>
+          </div>
+          <div class="message">${esc(item.reason || '')}</div>
+          <div class="actions">
+            ${statusText.toLowerCase() !== 'resolved'
+              ? `<button class="btn ok" data-resolve-id="${esc(item.id || '')}">Resolve Dispute</button>`
+              : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadDisputes() {
+      if (!listEl) return;
+      listEl.setAttribute('aria-busy', 'true');
+      listEl.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
+      try {
+        await fetchCSRF();
+        const response = await secureFetch(`${API_BASE}/disputes/all`);
+        const disputes = response.ok ? await response.json() : [];
+        if (!Array.isArray(disputes) || disputes.length === 0) {
+          countEl.textContent = 'No disputes to review.';
+          listEl.innerHTML = '<div class="small">No disputes found.</div>';
+          return;
+        }
+        countEl.textContent = `${disputes.length} disputes`;
+        listEl.innerHTML = disputes.map(renderDisputeCard).join('');
+      } catch (err) {
+        countEl.textContent = '';
+        listEl.innerHTML = `<div class="small">${esc(err?.message || 'Unable to load disputes.')}</div>`;
+      } finally {
+        listEl.setAttribute('aria-busy', 'false');
+      }
+    }
+
+    async function resolveDispute(disputeId, button) {
+      if (!disputeId) return;
+      button?.setAttribute('disabled', 'disabled');
+      try {
+        await fetchCSRF();
+        const response = await secureFetch(`${API_BASE}/disputes/resolve/${encodeURIComponent(disputeId)}`, { method: 'POST' });
+        if (!response.ok) throw new Error('Unable to resolve dispute');
+        toast('Dispute resolved');
+        await loadDisputes();
+      } catch (err) {
+        toast(err?.message || 'Unable to resolve dispute', 'err');
+        button?.removeAttribute('disabled');
+      }
+    }
+
+    listEl?.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-resolve-id]');
+      if (!button) return;
+      resolveDispute(button.dataset.resolveId, button);
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.classList.add('loaded');
+      loadDisputes();
+    });
+  </script>
+</body>
+</html>

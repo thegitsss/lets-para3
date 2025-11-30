@@ -1,0 +1,49 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "ParaConnect backend (Express + Mongo + Stripe)",
+  "main": "index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18.17 <23"
+  },
+  "scripts": {
+    "start": "NODE_ENV=production node index.js",
+    "dev": "nodemon index.js",
+    "dev:debug": "nodemon --inspect=0.0.0.0:9229 index.js",
+    "seed:admin": "node scripts/seedAdmin.js",
+    "health": "node -e \"console.log('ok')\"",
+    "postinstall": "npm prune --production=false || true"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.645.0",
+    "@aws-sdk/lib-storage": "^3.940.0",
+    "@aws-sdk/s3-request-presigner": "^3.645.0",
+    "archiver": "^7.0.1",
+    "axios": "^1.7.7",
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.7.5",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "csurf": "^1.11.0",
+    "dotenv": "^16.4.5",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.6.0",
+    "morgan": "^1.10.0",
+    "multer": "^2.0.2",
+    "nodemailer": "^6.9.15",
+    "stripe": "^18.4.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  },
+  "overrides": {
+    "follow-redirects": "^1.15.6"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

@@ -1,0 +1,529 @@
+const jobsGrid = document.getElementById("jobs-grid");
+const pagination = document.getElementById("pagination");
+
+let allJobs = [];
+let filteredJobs = [];
+const APPLY_MAX_CHARS = 2000;
+const APPLIED_STORAGE_KEY = "lpc_applied_jobs";
+const appliedJobs = new Set(loadAppliedJobs());
+let applyModal = null;
+let applyTextarea = null;
+let applyStatus = null;
+let applySubmitBtn = null;
+let applyTitle = null;
+let applyCounter = null;
+let currentApplyJob = null;
+let csrfToken = "";
+const toast = window.toastUtils;
+
+// Elements
+const filterToggle = document.getElementById("filterToggle");
+const filterMenu = document.getElementById("filterMenu");
+
+const practiceAreaSelect = document.getElementById("filterPracticeArea");
+const stateSelect = document.getElementById("filterState");
+const sortSelect = document.getElementById("sortBy");
+
+const minPaySlider = document.getElementById("filterMinPay");
+const minPayValue = document.getElementById("minPayValue");
+
+const minExpSlider = document.getElementById("filterMinExp");
+const minExpValue = document.getElementById("minExpValue");
+
+const applyFiltersBtn = document.getElementById("applyFilters");
+const clearFiltersBtn = document.getElementById("clearFilters");
+
+let sessionReady = false;
+async function ensureSession() {
+  if (sessionReady) return true;
+  try {
+    if (typeof window.checkSession === "function") {
+      await window.checkSession("paralegal");
+    }
+    sessionReady = true;
+    return true;
+  } catch (err) {
+    console.warn("Paralegal session required", err);
+    return false;
+  }
+}
+
+// Toggle filter menu
+if (filterToggle && filterMenu) {
+  filterToggle.addEventListener("click", () => {
+    filterMenu.classList.toggle("active");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!filterMenu.contains(e.target) && !filterToggle.contains(e.target)) {
+      filterMenu.classList.remove("active");
+    }
+  });
+}
+
+// Dynamic filter population
+function populateFilters() {
+  if (!practiceAreaSelect || !stateSelect || !minPaySlider || !minExpSlider) return;
+
+  // Practice areas
+  const areas = [...new Set(allJobs.map((j) => j.practiceArea).filter(Boolean))];
+  practiceAreaSelect.innerHTML =
+    `<option value="">Any</option>` + areas.map((a) => `<option value="${a}">${a}</option>`).join("");
+
+  // States
+  const states = [...new Set(allJobs.map((j) => getJobState(j)).filter(Boolean))];
+  stateSelect.innerHTML =
+    `<option value="">Any</option>` + states.map((s) => `<option value="${s}">${s}</option>`).join("");
+
+  // Pay slider
+  const payValues = allJobs.map((job) => getJobPayUSD(job)).filter((value) => Number.isFinite(value));
+  const maxPay = payValues.length ? Math.max(...payValues) : 0;
+  minPaySlider.max = Math.max(1000, Math.ceil(maxPay));
+  minPaySlider.value = 0;
+  minPayValue.textContent = "$0";
+
+  // Experience slider
+  const expValues = allJobs.map((job) => getJobExperience(job)).filter((value) => Number.isFinite(value));
+  const maxExp = expValues.length ? Math.max(...expValues) : 0;
+  minExpSlider.max = Math.max(20, Math.ceil(maxExp));
+  minExpSlider.value = 0;
+  minExpValue.textContent = "0 years";
+}
+
+// Slider displays
+minPaySlider?.addEventListener("input", () => {
+  minPayValue.textContent = `$${Number(minPaySlider.value).toLocaleString()}`;
+});
+
+minExpSlider?.addEventListener("input", () => {
+  minExpValue.textContent = `${minExpSlider.value} years`;
+});
+
+// Apply filters
+function applyFilters() {
+  const area = practiceAreaSelect?.value || "";
+  const state = stateSelect?.value || "";
+  const minPay = Number(minPaySlider?.value || 0);
+  const maxExp = Number(minExpSlider?.value || 0);
+
+  filteredJobs = allJobs.filter((job) => {
+    const payUSD = getJobPayUSD(job);
+    const exp = getJobExperience(job);
+    const jobState = getJobState(job);
+
+    if (area && job.practiceArea !== area) return false;
+    if (state && jobState !== state) return false;
+    if (payUSD < minPay) return false;
+    if (exp > maxExp) return false;
+
+    return true;
+  });
+
+  applySort();
+  renderJobs();
+  filterMenu?.classList.remove("active");
+}
+
+applyFiltersBtn?.addEventListener("click", applyFilters);
+
+// Clear filters
+function clearFilters() {
+  if (practiceAreaSelect) practiceAreaSelect.value = "";
+  if (stateSelect) stateSelect.value = "";
+  if (minPaySlider) minPaySlider.value = 0;
+  if (minExpSlider) minExpSlider.value = 0;
+  if (minPayValue) minPayValue.textContent = "$0";
+  if (minExpValue) minExpValue.textContent = "0 years";
+  if (sortSelect) sortSelect.value = "";
+
+  filteredJobs = [...allJobs];
+  applySort();
+  renderJobs();
+  filterMenu?.classList.remove("active");
+}
+
+clearFiltersBtn?.addEventListener("click", clearFilters);
+
+// Helpers
+function getJobPayUSD(job) {
+  if (!job) return 0;
+  if (typeof job.totalAmount === "number") return Math.max(0, job.totalAmount / 100);
+  if (typeof job.payAmount === "number") return Math.max(0, job.payAmount);
+  return 0;
+}
+
+function getJobExperience(job) {
+  return Number(job?.minimumExperienceRequired ?? job?.minExperience ?? 0) || 0;
+}
+
+function getJobState(job) {
+  return (
+    job?.state ||
+    job?.locationState ||
+    job?.location?.state ||
+    job?.jurisdiction ||
+    job?.region ||
+    ""
+  );
+}
+
+function formatPay(value) {
+  const rounded = Math.round((value + Number.EPSILON) * 100) / 100;
+  return rounded.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function applySort() {
+  if (!sortSelect || !sortSelect.value) return;
+  const mode = sortSelect.value;
+  switch (mode) {
+    case "newest":
+      filteredJobs.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      break;
+    case "oldest":
+      filteredJobs.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+      break;
+    case "payHigh":
+      filteredJobs.sort((a, b) => getJobPayUSD(b) - getJobPayUSD(a));
+      break;
+    case "payLow":
+      filteredJobs.sort((a, b) => getJobPayUSD(a) - getJobPayUSD(b));
+      break;
+    default:
+      break;
+  }
+}
+
+// Render jobs
+function renderJobs() {
+  if (!jobsGrid) return;
+  jobsGrid.innerHTML = "";
+
+  if (!filteredJobs.length) {
+    const empty = document.createElement("p");
+    empty.className = "area";
+    empty.style.textAlign = "center";
+    empty.textContent = "No jobs match your filters yet. Try adjusting filters or check back soon.";
+    jobsGrid.appendChild(empty);
+    if (pagination) pagination.textContent = "";
+    return;
+  }
+
+  filteredJobs.forEach((job, idx) => {
+    const card = document.createElement("div");
+    card.classList.add("job-card");
+
+    const payUSD = getJobPayUSD(job);
+    const jobState = getJobState(job);
+    const title = escapeHtml(job.title || "Untitled Matter");
+    const practice = escapeHtml(job.practiceArea || "General Practice");
+    const when = job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Recently posted";
+    const jobId = String(job.id || job._id || "");
+
+    card.innerHTML = `
+      <h3>${title}</h3>
+      <div class="area">${practice}</div>
+      <div class="meta">
+        <span>${escapeHtml(jobState || "—")}</span>
+        <span>$${formatPay(payUSD)}</span>
+        <span>${escapeHtml(when)}</span>
+      </div>
+    `;
+
+    const actions = document.createElement("div");
+    actions.className = "job-actions";
+
+    const detailBtn = document.createElement("button");
+    detailBtn.type = "button";
+    detailBtn.className = "clear-button";
+    detailBtn.textContent = "View Details";
+    detailBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (jobId) window.location.href = `case-detail.html?caseId=${encodeURIComponent(jobId)}`;
+    });
+    actions.appendChild(detailBtn);
+
+    const applyBtn = document.createElement("button");
+    applyBtn.type = "button";
+    applyBtn.className = "apply-button";
+    applyBtn.dataset.jobId = jobId;
+    if (appliedJobs.has(jobId)) {
+      applyBtn.disabled = true;
+      applyBtn.textContent = "Application sent";
+    } else {
+      applyBtn.textContent = "Apply";
+      applyBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        openApplyModal(job);
+      });
+    }
+    actions.appendChild(applyBtn);
+
+    card.appendChild(actions);
+
+    card.addEventListener("click", () => {
+      if (jobId) window.location.href = `case-detail.html?caseId=${encodeURIComponent(jobId)}`;
+    });
+
+    jobsGrid.appendChild(card);
+
+    requestAnimationFrame(() => {
+      setTimeout(() => card.classList.add("visible"), idx * 40);
+    });
+  });
+
+  if (pagination) pagination.textContent = "";
+}
+
+// Fetch jobs
+async function fetchJobs() {
+  if (!sessionReady) return;
+  try {
+    const res = await fetch("/api/cases/open", {
+      headers: { Accept: "application/json" },
+      credentials: "include",
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const data = await res.json();
+    allJobs = Array.isArray(data) ? data : [];
+    filteredJobs = [...allJobs];
+
+    populateFilters();
+    applySort();
+    renderJobs();
+  } catch (err) {
+    console.error("Failed to load jobs", err);
+    allJobs = [];
+    filteredJobs = [];
+    renderJobs();
+    if (jobsGrid) {
+      const error = document.createElement("p");
+      error.className = "area";
+      error.style.textAlign = "center";
+      error.textContent = "Unable to load open cases right now. Please refresh.";
+      jobsGrid.appendChild(error);
+    }
+  }
+}
+
+ensureSession().then((ready) => {
+  if (ready) fetchJobs();
+});
+
+sortSelect?.addEventListener("change", () => {
+  applySort();
+  renderJobs();
+});
+
+function openApplyModal(job) {
+  if (!job) return;
+  ensureApplyModal();
+  currentApplyJob = job;
+  const jobId = String(job.id || job._id || "");
+  if (!jobId) return;
+  applyModal.dataset.jobId = jobId;
+  applyTitle.textContent = `Apply to ${escapeHtml(job.title || "this job")}`;
+  applyTextarea.value = "";
+  applyStatus.textContent = "";
+  applyCounter.textContent = `0 / ${APPLY_MAX_CHARS}`;
+  applySubmitBtn.disabled = false;
+  applySubmitBtn.textContent = "Submit application";
+  applyModal.classList.add("show");
+  applyTextarea.focus();
+}
+
+function closeApplyModal() {
+  if (applyModal) {
+    applyModal.classList.remove("show");
+  }
+  currentApplyJob = null;
+}
+
+function ensureApplyModal() {
+  if (applyModal) return;
+  injectApplyStyles();
+  applyModal = document.createElement("div");
+  applyModal.className = "job-apply-overlay";
+  applyModal.innerHTML = `
+    <div class="job-apply-dialog" role="dialog" aria-modal="true">
+      <header>
+        <h3 data-apply-title>Apply to this job</h3>
+        <button type="button" class="close-btn" aria-label="Close apply form">&times;</button>
+      </header>
+      <p class="muted">Share why you are a great fit (max ${APPLY_MAX_CHARS} characters).</p>
+      <textarea rows="6" data-apply-text></textarea>
+      <div class="apply-meta">
+        <span data-apply-counter>0 / ${APPLY_MAX_CHARS}</span>
+        <span data-apply-status></span>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="clear-button" data-apply-cancel>Cancel</button>
+        <button type="button" class="apply-button" data-apply-submit>Submit application</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(applyModal);
+  applyTextarea = applyModal.querySelector("[data-apply-text]");
+  applyStatus = applyModal.querySelector("[data-apply-status]");
+  applySubmitBtn = applyModal.querySelector("[data-apply-submit]");
+  applyTitle = applyModal.querySelector("[data-apply-title]");
+  applyCounter = applyModal.querySelector("[data-apply-counter]");
+  applyModal.querySelector(".close-btn")?.addEventListener("click", closeApplyModal);
+  applyModal.querySelector("[data-apply-cancel]")?.addEventListener("click", closeApplyModal);
+  applyTextarea?.addEventListener("input", updateApplyCounter);
+  applySubmitBtn?.addEventListener("click", submitApplication);
+  applyModal.addEventListener("click", (event) => {
+    if (event.target === applyModal) closeApplyModal();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && applyModal?.classList.contains("show")) {
+      closeApplyModal();
+    }
+  });
+}
+
+function updateApplyCounter() {
+  if (!applyTextarea || !applyCounter) return;
+  const length = applyTextarea.value.length;
+  applyCounter.textContent = `${Math.min(length, APPLY_MAX_CHARS)} / ${APPLY_MAX_CHARS}`;
+  if (length > APPLY_MAX_CHARS) {
+    applyCounter.classList.add("error");
+  } else {
+    applyCounter.classList.remove("error");
+  }
+}
+
+async function submitApplication() {
+  if (!currentApplyJob || !applyTextarea || !applyStatus || !applySubmitBtn) return;
+  const jobId = String(currentApplyJob.id || currentApplyJob._id || "");
+  const note = applyTextarea.value.trim();
+  if (!note) {
+    applyStatus.textContent = "Add a short cover letter before submitting.";
+    return;
+  }
+  if (note.length > APPLY_MAX_CHARS) {
+    applyStatus.textContent = `Messages must be under ${APPLY_MAX_CHARS} characters.`;
+    return;
+  }
+
+  applySubmitBtn.disabled = true;
+  applySubmitBtn.textContent = "Applying…";
+  applyStatus.textContent = "Submitting application…";
+
+  try {
+    const active = await ensureSession();
+    if (!active) throw new Error("Session expired. Refresh and try again.");
+    const csrf = await ensureCsrfToken();
+    const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/apply`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+      },
+      body: JSON.stringify({ coverLetter: note }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error || "Unable to submit application.");
+    }
+    applyStatus.textContent = "Application submitted!";
+    markJobAsApplied(jobId);
+    showToast("Application submitted successfully.", "ok");
+    setTimeout(() => {
+      closeApplyModal();
+      fetchJobs();
+    }, 800);
+  } catch (error) {
+    console.error(error);
+    applyStatus.textContent = error.message || "Unable to submit application.";
+    applySubmitBtn.disabled = false;
+    applySubmitBtn.textContent = "Submit application";
+  }
+}
+
+function markJobAsApplied(jobId) {
+  appliedJobs.add(jobId);
+  persistAppliedJobs();
+  const selector = `[data-job-id="${escapeAttr(jobId)}"]`;
+  document.querySelectorAll(selector).forEach((btn) => {
+    btn.disabled = true;
+    btn.textContent = "Application sent";
+  });
+}
+
+function loadAppliedJobs() {
+  try {
+    const raw = sessionStorage.getItem(APPLIED_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function persistAppliedJobs() {
+  try {
+    sessionStorage.setItem(APPLIED_STORAGE_KEY, JSON.stringify([...appliedJobs]));
+  } catch {
+    /* ignore */
+  }
+}
+
+async function ensureCsrfToken() {
+  if (csrfToken) return csrfToken;
+  try {
+    const res = await fetch("/api/csrf", { credentials: "include" });
+    if (!res.ok) return "";
+    const data = await res.json().catch(() => ({}));
+    csrfToken = data?.csrfToken || "";
+  } catch {
+    csrfToken = "";
+  }
+  return csrfToken;
+}
+
+function injectApplyStyles() {
+  if (document.getElementById("job-apply-styles")) return;
+  const style = document.createElement("style");
+  style.id = "job-apply-styles";
+  style.textContent = `
+    .job-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .job-apply-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s ease}
+    .job-apply-overlay.show{opacity:1;pointer-events:auto}
+    .job-apply-dialog{background:#fff;border-radius:18px;padding:20px;max-width:480px;width:92%;box-shadow:0 30px 60px rgba(0,0,0,.15);display:grid;gap:12px}
+    .job-apply-dialog header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .job-apply-dialog .close-btn{border:none;background:none;font-size:1.5rem;line-height:1;cursor:pointer}
+    .job-apply-dialog textarea{width:100%;border:1px solid #d1d5db;border-radius:12px;padding:10px;font:inherit;resize:vertical;min-height:120px}
+    .job-apply-dialog .apply-meta{display:flex;align-items:center;justify-content:space-between;font-size:.85rem;color:#6b7280}
+    .job-apply-dialog .apply-meta .error{color:#b91c1c}
+    .job-apply-dialog .modal-actions{display:flex;justify-content:flex-end;gap:10px}
+    .job-apply-dialog .muted{color:#6b7280;font-size:.9rem;margin:0}
+  `;
+  document.head.appendChild(style);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function showToast(message, type = "info") {
+  if (toast?.show) {
+    toast.show(message, { targetId: "toastBanner", type });
+  } else {
+    alert(message);
+  }
+}
+
+function escapeAttr(value) {
+  if (window.CSS && typeof window.CSS.escape === "function") {
+    return window.CSS.escape(value);
+  }
+  return String(value || "").replace(/"/g, '\\"');
+}

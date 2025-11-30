@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Let’s-ParaConnect | Paralegal Dashboard</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+<script src="assets/scripts/utils/session.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --sidebar-bg: #f5f5f5e6;
+      --accent: #b6a47a;
+      --ink: #1a1a1a;
+      --muted: #8a8a8a;
+      --line: rgba(0, 0, 0, 0.08);
+      --panel: #fcfcfc;
+      --radius: 14px;
+      --font-serif: 'Cormorant Garamond', serif;
+      --font-sans: 'Sarabun', sans-serif;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      font-weight: 200;
+      background: var(--bg);
+      color: var(--ink);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 240px;
+      background: var(--sidebar-bg);
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+      padding: 24px 16px;
+    }
+
+    .logo {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+      margin-bottom: 36px;
+      text-align: center;
+    }
+
+    nav {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    nav a {
+      text-decoration: none;
+      color: var(--ink);
+      font-weight: 200;
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      transition: background 0.3s ease;
+    }
+
+    nav a.active,
+    nav a:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .main {
+      flex: 1;
+      padding: 40px;
+      overflow-y: auto;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 2rem;
+      gap: 1.5rem;
+    }
+
+    .notification-icon {
+      position: relative;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      transition: background 0.2s ease;
+    }
+
+    .notification-icon:hover {
+      background: rgba(0,0,0,0.05);
+    }
+
+    .notification-icon svg {
+      width: 20px;
+      height: 20px;
+      color: var(--ink);
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: red;
+      color: white;
+      border-radius: 50%;
+      font-size: 0.7rem;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .user-profile img {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+    }
+
+    .user-profile span {
+      font-weight: 200;
+      font-size: 0.95rem;
+    }
+
+    header h1 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 2.2rem;
+      margin-bottom: 0.25rem;
+    }
+
+    header p {
+      font-weight: 200;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+
+    .summary {
+      display: flex;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .info-box {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      font-size: 0.95rem;
+      flex: 1;
+      font-weight: 200;
+    }
+
+    .message-box {
+      cursor:pointer;
+      transition:background .25s ease, transform .15s ease;
+    }
+
+    .message-box:hover {
+      background:rgba(182,164,122,0.08);
+      border-color:var(--accent);
+      transform:scale(1.02);
+    }
+
+    .section-title {
+      font-family: var(--font-serif);
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+
+    .info-line {
+      font-size: 0.95rem;
+      margin-bottom: 0.25rem;
+      font-weight: 200;
+    }
+
+    .side-by-side-panels {
+      display: flex;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .side-by-side-panels > section {
+      flex: 1;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 1.25rem;
+      font-weight: 200;
+    }
+
+    .quick-actions {
+      margin-bottom: 2rem;
+    }
+
+    .quick-actions button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-family: var(--font-sans);
+      font-weight: 200;
+      cursor: pointer;
+      margin-right: 0.5rem;
+    }
+
+    .case-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .case-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      background: var(--panel);
+    }
+
+    .case-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .case-header h2 {
+      font-family: var(--font-serif);
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .case-subinfo {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-top: 0.25rem;
+    }
+
+    .case-content {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+      display: none;
+      font-size: 0.95rem;
+    }
+
+    .open .case-content {
+      display: block;
+    }
+
+    .case-actions {
+      margin-top: 1rem;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 30px;
+      transform: translate(-50%, 20px);
+      background: rgba(17, 17, 17, 0.92);
+      color: #fff;
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 3000;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    .notification-panel {
+      position: absolute;
+      top: 40px;
+      right: 0;
+      width: 280px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 15px 35px rgba(15, 23, 42, 0.18);
+      padding: 1rem;
+      display: none;
+      flex-direction: column;
+      gap: 0.75rem;
+      z-index: 100;
+    }
+
+    .notification-panel.show {
+      display: flex;
+    }
+
+    .notification-panel h4 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .notification-panel p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .notification-item {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 0.9rem;
+      line-height: 1.4;
+      color: var(--ink);
+    }
+
+    .notification-item:last-child {
+      border-bottom: none;
+    }
+
+  </style>
+</head>
+<body>
+<div id="protectedContent" style="visibility:hidden">
+  <aside class="sidebar">
+    <div class="logo">Dashboard</div>
+    <nav>
+      <a href="index.html#paralegal-dashboard" class="active">Home</a>
+      <a href="my-cases.html">My Assignments</a>
+      <a href="index.html#paralegal-messages">Messages</a>
+      <a href="documents.html">Documents</a>
+      <a href="review.html">Reviews</a>
+      <a href="case-files.html">Case Files</a>
+      <a href="payments-escrow.html">Billing</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="help.html">Help</a>
+    </nav>
+      <div style="margin-top: auto; font-size: 0.7rem; color: var(--muted); text-align: center;">
+    <a href="index.html" style="color:inherit;text-decoration:none;">© Let’s‑ParaConnect 2025</a>
+  </div>
+</aside>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="notification-icon" id="notificationBell">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+        <span class="notification-badge" data-field="notificationCount">0</span>
+        <div class="notification-panel" id="notificationPanel">
+          <h4>Notifications</h4>
+          <div id="notificationList">
+            <div class="notification-item" data-empty-notification>You're all caught up.</div>
+          </div>
+          <h4>Recent Activity</h4>
+          <p id="recentActivity">No updates yet.</p>
+        </div>
+      </div>
+      <div class="user-profile">
+        <img src="https://via.placeholder.com/36" alt="User avatar" id="user-avatar" />
+        <span id="user-name" data-field="name">Taylor</span>
+      </div>
+    </div>
+
+    <header>
+      <h1>Welcome back, <span id="user-name-heading" data-field="name">Taylor</span></h1>
+      <p><span data-field="welcomeSubheading">You have 0 active assignments</span></p>
+    </header>
+
+    <section class="summary">
+      <div class="info-box"><span data-field="activeCases">0</span> active cases</div>
+      <div class="info-box message-box" id="messageBox">
+        <span id="messageCount" data-field="unreadMessages">0</span> message<span id="plural">s waiting</span>
+      </div>
+      <div class="info-box">Next deadline: <span data-field="nextDeadline">--</span></div>
+      <div class="info-box">$<span data-field="monthEarnings">0</span> earned this month</div>
+    </section>
+
+    <section class="deadlines">
+      <div class="section-title">Upcoming Deadlines</div>
+      <div id="deadlineList">
+        <div class="info-line" data-deadline-empty>No assigned deadlines.</div>
+      </div>
+    </section>
+
+    <div class="side-by-side-panels">
+      <section>
+        <div class="section-title">Latest Messages</div>
+        <div class="info-line" id="latestMessage">
+          <strong data-field="latestMessageName">—</strong>: <span data-field="latestMessageExcerpt">No new messages.</span> <a href="index.html#paralegal-messages">Open</a>
+        </div>
+      </section>
+      <section>
+        <div class="section-title">Payouts</div>
+        <div class="info-line">&bull; $<span data-field="payout30Days">0</span> paid out in the last 30 days</div>
+        <div class="info-line">&bull; Next release scheduled: <span data-field="nextPayout">—</span></div>
+      </section>
+    </div>
+
+    <section class="quick-actions">
+      <div class="section-title">Quick Actions</div>
+      <button data-action="browse">Browse new postings</button>
+      <button data-action="availability">Update availability</button>
+      <button data-action="upload">Upload document</button>
+    </section>
+
+    <section>
+      <div class="section-title">Case Invitations</div>
+      <div class="case-list" id="inviteList">
+        <div class="case-card empty-state">
+          <div class="case-header">
+            <div>
+              <h2>No pending invitations</h2>
+              <div class="case-subinfo">New case invites will appear here.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="case-list" id="assignmentList">
+      <div class="case-card empty-state">
+        <div class="case-header">
+          <div>
+            <h2>No active assignments</h2>
+            <div class="case-subinfo">New invitations will appear here.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="assignedCases">
+      <h2>Assigned Cases</h2>
+      <div id="assignedCasesList"></div>
+    </section>
+  </main>
+  <template id="assignmentCardTemplate">
+    <div class="case-card">
+      <div class="case-header">
+        <div>
+          <h2 data-field="assignmentTitle">Case name</h2>
+          <div class="case-subinfo" data-field="assignmentMeta"></div>
+        </div>
+        <div>▾</div>
+      </div>
+      <div class="case-content">
+        <p data-field="assignmentSummary"></p>
+        <div class="case-actions">
+          <button data-action="primary">Open Workspace</button>
+          <button data-action="secondary">Message Attorney</button>
+        </div>
+      </div>
+    </div>
+  </template>
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script type="module" src="assets/scripts/paralegal-dashboard.js"></script>
+</div>
+</body>
+</html>

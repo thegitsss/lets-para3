@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Let’s-ParaConnect | Stripe Billing & Payments</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <script src="assets/scripts/utils/session.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --sidebar-bg: #f5f5f5e6;
+      --accent: #b6a47a;
+      --ink: #1a1a1a;
+      --muted: #8a8a8a;
+      --line: rgba(0, 0, 0, 0.08);
+      --panel: #fcfcfc;
+      --radius: 14px;
+      --font-serif: 'Cormorant Garamond', serif;
+      --font-sans: 'Sarabun', sans-serif;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      font-weight: 200;
+      background: var(--bg);
+      color: var(--ink);
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 240px;
+      background: var(--sidebar-bg);
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+      padding: 24px 16px;
+    }
+
+    .logo {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+      margin-bottom: 36px;
+      text-align: center;
+    }
+
+    nav {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    nav a {
+      text-decoration: none;
+      color: var(--ink);
+      font-weight: 200;
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      transition: background 0.3s ease;
+    }
+
+    nav a.active,
+    nav a:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .main {
+      flex: 1;
+      padding: 40px;
+      overflow-y: auto;
+      background: var(--bg);
+    }
+
+    .topbar {
+      margin-bottom: 2rem;
+    }
+
+    .page-header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 2rem;
+    }
+
+    .page-header h1 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 2.3rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .page-header p {
+      color: var(--muted);
+      max-width: 540px;
+      font-size: 0.95rem;
+    }
+
+    .page-header .actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .primary-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 0.75rem 1.5rem;
+      background: var(--ink);
+      color: #fff;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .primary-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .primary-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .panel-header h2 {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+
+    .panel-header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .history-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .history-primary {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .history-primary .case-name {
+      font-family: var(--font-serif);
+      font-size: 1.45rem;
+      font-weight: 600;
+    }
+
+    .history-primary .job-title {
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .history-primary .paralegal-name {
+      font-size: 0.95rem;
+      color: var(--ink);
+    }
+
+    .history-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+
+    .meta-item span {
+      display: block;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      margin-bottom: 0.3rem;
+    }
+
+    .meta-item strong {
+      font-size: 1.2rem;
+      font-weight: 500;
+    }
+
+    .history-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .history-actions .link-button {
+      text-decoration: none;
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .history-actions button {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.45rem 1.25rem;
+      background: transparent;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .history-actions button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.09);
+    }
+
+    .history-empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 2rem 1rem;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+
+    .history-empty.error {
+      color: #c0392b;
+      border-color: rgba(192, 57, 43, 0.4);
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 30px;
+      transform: translate(-50%, 20px);
+      background: rgba(17, 17, 17, 0.92);
+      color: #fff;
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 3000;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    @media (max-width: 960px) {
+      body {
+        flex-direction: column;
+      }
+      .sidebar {
+        width: 100%;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+      }
+      nav {
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .main {
+        padding: 24px;
+      }
+      .history-meta {
+        gap: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="logo">Dashboard</div>
+    <nav>
+      <a href="dashboard-attorney.html">Home</a>
+      <a href="active-cases.html">Cases</a>
+      <a href="messages.html">Messages</a>
+      <a href="documents.html">Documents</a>
+      <a href="review.html">Review</a>
+      <a href="case-files.html">Case Files</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="billing-attorney.html" class="active">Completed Assignments</a>
+      <a href="help.html">Help</a>
+    </nav>
+    <div style="margin-top: auto; font-size: 0.7rem; color: var(--muted); text-align: center;">
+      © Let’s‑ParaConnect 2025
+    </div>
+  </aside>
+  <main class="main">
+    <div class="topbar" data-attorney-header></div>
+    <header class="page-header">
+      <div>
+        <h1>Billing &amp; Payments</h1>
+        <p>Manage invoices, receipts, and escrow releases without leaving your dashboard.</p>
+      </div>
+      <div class="actions">
+        <button type="button" class="primary-btn" id="openPortalBtn">Open Stripe Billing Portal</button>
+      </div>
+    </header>
+
+    <section class="panel" aria-labelledby="history-heading">
+      <div class="panel-header">
+        <div>
+          <h2 id="history-heading">Completed Assignments</h2>
+          <p>Receipts for every completed job. Click any record to jump back into its case file.</p>
+        </div>
+      </div>
+      <div id="historyList" class="history-list">
+        <div class="history-empty">Loading payment history…</div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script>
+    window.__ATTORNEY_PAGE__ = "billing";
+  </script>
+  <script type="module" src="assets/scripts/attorney-tabs.js"></script>
+  <script type="module">
+    import { requireAuth, secureFetch } from "./assets/scripts/auth.js";
+
+    const historyList = document.getElementById("historyList");
+    const portalBtn = document.getElementById("openPortalBtn");
+    const currencyFormatter = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" });
+
+    init();
+
+    async function init() {
+      try {
+        requireAuth("attorney");
+      } catch (err) {
+        console.warn("Auth required", err);
+        return;
+      }
+      bindEvents();
+      await loadHistory();
+    }
+
+    function bindEvents() {
+      portalBtn?.addEventListener("click", openBillingPortal);
+      historyList?.addEventListener("click", (event) => {
+        const btn = event.target.closest("[data-case-id]");
+        if (!btn) return;
+        const caseId = btn.getAttribute("data-case-id");
+        if (!caseId) return;
+        window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
+      });
+    }
+
+    async function loadHistory() {
+      if (!historyList) return;
+      historyList.innerHTML = `<div class="history-empty">Loading payment history…</div>`;
+      try {
+        const res = await secureFetch("/api/payments/history", { headers: { Accept: "application/json" } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const payload = await res.json().catch(() => ({}));
+        const items = Array.isArray(payload?.items)
+          ? payload.items
+          : Array.isArray(payload?.history)
+          ? payload.history
+          : Array.isArray(payload)
+          ? payload
+          : [];
+        if (!items.length) {
+          historyList.innerHTML = `<div class="history-empty">No completed payments yet.</div>`;
+          return;
+        }
+        historyList.innerHTML = items.map(renderHistoryCard).join("");
+      } catch (err) {
+        console.warn("Unable to load payment history", err);
+        historyList.innerHTML = `<div class="history-empty error">Unable to load payment history right now.</div>`;
+      }
+    }
+
+    async function openBillingPortal() {
+      if (!portalBtn) return;
+      const originalText = portalBtn.textContent;
+      portalBtn.disabled = true;
+      portalBtn.textContent = "Opening…";
+      try {
+        const res = await secureFetch("/api/payments/portal", { method: "POST" });
+        let data = {};
+        try {
+          data = await res.json();
+        } catch (_) {
+          data = {};
+        }
+        if (!res.ok || !data?.url) {
+          throw new Error(data?.error || "Unable to open the Stripe portal right now.");
+        }
+        window.location.href = data.url;
+      } catch (err) {
+        console.error("Billing portal error", err);
+        showToast(err.message || "Unable to open the Stripe portal.", "error");
+        portalBtn.disabled = false;
+        portalBtn.textContent = originalText;
+      }
+    }
+
+    function renderHistoryCard(entry = {}) {
+      const caseName = escapeHtml(entry.caseName || entry.caseTitle || entry.title || "Case");
+      const jobTitle = escapeHtml(entry.jobTitle || caseName);
+      const paralegal = escapeHtml(entry.paralegalName || "Assigned Paralegal");
+      const amount = formatCurrency(entry.jobAmount ?? entry.amount ?? entry.totalAmount);
+      const datePaid = formatDate(entry.releaseDate || entry.paidOutAt || entry.completedAt);
+      const receipt = sanitizeUrl(entry.stripeReceiptUrl || entry.receiptUrl || entry.receipt);
+      const receiptLink = receipt
+        ? `<a class="link-button" href="${receipt}" target="_blank" rel="noopener">View Stripe Receipt</a>`
+        : '<span class="muted">Receipt unavailable</span>';
+      const caseId = String(entry.caseId || entry.id || "");
+      return `
+        <article class="history-card">
+          <div class="history-primary">
+            <div class="case-name">${caseName}</div>
+            <div class="job-title">${jobTitle}</div>
+            <div class="paralegal-name">Paralegal: ${paralegal}</div>
+          </div>
+          <div class="history-meta">
+            <div class="meta-item">
+              <span>Amount</span>
+              <strong>${amount}</strong>
+            </div>
+            <div class="meta-item">
+              <span>Date Paid</span>
+              <strong>${datePaid}</strong>
+            </div>
+          </div>
+          <div class="history-actions">
+            ${receiptLink}
+            <button type="button" data-case-id="${caseId}">View Case</button>
+          </div>
+        </article>
+      `;
+    }
+
+    function formatCurrency(value) {
+      const cents = normalizeToCents(value);
+      return currencyFormatter.format(cents / 100);
+    }
+
+    function normalizeToCents(value) {
+      if (typeof value === "number" && Number.isFinite(value)) {
+        return Math.round(value);
+      }
+      if (typeof value === "string") {
+        const cleaned = value.replace(/[^0-9.-]/g, "");
+        if (!cleaned) return 0;
+        const parsed = Number(cleaned);
+        if (Number.isNaN(parsed)) return 0;
+        return cleaned.includes(".") ? Math.round(parsed * 100) : Math.round(parsed);
+      }
+      return 0;
+    }
+
+    function formatDate(raw) {
+      if (!raw) return "—";
+      const date = new Date(raw);
+      if (Number.isNaN(date.getTime())) return "—";
+      return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    }
+
+    function sanitizeUrl(url = "") {
+      if (!url) return "";
+      const trimmed = String(url).trim();
+      if (/^(https?:\/\/|\/)/i.test(trimmed)) {
+        return trimmed.replace(/"/g, "%22");
+      }
+      return "";
+    }
+
+    function escapeHtml(value = "") {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function showToast(message, type = "info") {
+      const helper = window.toastUtils;
+      if (helper?.show) {
+        helper.show(message, { targetId: "toastBanner", type });
+      }
+    }
+  </script>
+</body>
+</html>

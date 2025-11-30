@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Browse Jobs – Let's ParaConnect</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;500&family=Sarabun:wght@200;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles/styles.css" />
+  <link rel="stylesheet" href="assets/styles/browse-jobs.css" />
+</head>
+
+<body>
+  <header>
+    <div class="header-inner">
+      <a href="dashboard-paralegal.html" class="header-logo">Let’s ParaConnect</a>
+      <nav>
+        <a href="dashboard-paralegal.html">Dashboard</a>
+        <a href="browse-jobs.html" class="active">Browse Jobs</a>
+        <a href="my-cases.html">My Cases</a>
+        <a href="messages.html">Messages</a>
+      </nav>
+      <div class="header-controls" data-notification-center>
+        <button class="notification-icon" aria-label="View notifications" data-notification-toggle type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 01-3.46 0" />
+          </svg>
+          <span class="notification-badge" data-notification-badge>0</span>
+        </button>
+        <div class="user-chip" id="headerUser">
+          <img id="headerAvatar" src="https://via.placeholder.com/48x48.png?text=AP" alt="Paralegal avatar" />
+          <div>
+            <strong id="headerName">Alex Parker</strong>
+            <span id="headerRole">Approved Paralegal</span>
+          </div>
+        </div>
+        <div class="notification-panel" data-notification-panel role="region" aria-live="polite">
+          <div class="notification-panel-header">
+            <h4>Notifications</h4>
+            <button type="button" data-notification-mark>Mark as read</button>
+          </div>
+          <ul data-notification-list></ul>
+          <p class="notification-item" data-notification-empty>Loading…</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-content">
+    <div class="page-wrapper">
+      <section class="jobs-hero">
+        <div class="hero-text">
+          <p class="eyebrow">Opportunities</p>
+          <h1>Browse Available Jobs</h1>
+          <p>Curated opportunities for the elite paralegal professional collective from solo and boutique law firms who need trusted support.</p>
+        </div>
+        <div class="filter-container">
+          <button id="filterToggle" class="filter-button">Filter ▾</button>
+
+          <div id="filterMenu" class="filter-menu">
+            <div class="filter-header">Filter by:</div>
+
+            <label class="filter-label">Area of Law</label>
+            <select id="filterPracticeArea" class="filter-select"></select>
+
+            <label class="filter-label">State</label>
+            <select id="filterState" class="filter-select"></select>
+            <div class="filter-note">
+              If your preferred state does not appear here, it means there are no open jobs in that location.
+            </div>
+
+            <label class="filter-label">Minimum Pay (USD)</label>
+            <input type="range" id="filterMinPay" min="0" max="1000" value="0" class="filter-slider" />
+            <div class="slider-value" id="minPayValue">$0</div>
+
+            <label class="filter-label">Minimum Experience (Years)</label>
+            <input type="range" id="filterMinExp" min="0" max="20" value="0" class="filter-slider" />
+            <div class="slider-value" id="minExpValue">0 years</div>
+
+            <label class="filter-label">Sort by</label>
+            <select id="sortBy" class="filter-select">
+              <option value="">Default</option>
+              <option value="newest">Posted: Newest → Oldest</option>
+              <option value="oldest">Posted: Oldest → Newest</option>
+              <option value="payHigh">Pay: High → Low</option>
+              <option value="payLow">Pay: Low → High</option>
+            </select>
+
+            <button id="applyFilters" class="apply-button">Apply</button>
+            <button id="clearFilters" class="clear-button">Clear All</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="jobs-grid" id="jobs-grid"></section>
+
+    <div class="pagination" id="pagination"></div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <p>© 2025 Let’s-ParaConnect. All rights reserved.</p>
+      <nav>
+        <a href="privacy.html">Privacy Policy</a>
+        <span>|</span>
+        <a href="terms.html">Terms</a>
+        <span>|</span>
+        <a href="contact.html">Contact</a>
+        <span>|</span>
+        <a href="accessibility.html">Accessibility</a>
+      </nav>
+      <div class="region">United States</div>
+    </div>
+  </footer>
+
+  <script type="module" src="assets/scripts/utils/notifications.js"></script>
+  <script src="assets/scripts/views/browse-jobs.js"></script>
+</body>
+</html>

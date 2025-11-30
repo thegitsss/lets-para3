@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+  <link rel="preload" as="image" href="hero-mountain.jpg">
+<link href="assets/styles/styles.css" rel="stylesheet" />
+<script src="assets/scripts/utils/session.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login | Let’s ParaConnect</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&display=swap" rel="stylesheet">
+  <script>
+    window.RECAPTCHA_SITE_KEY = "6Lfmq1orAAAAAEfFBDqDFpXtHMGld5aesRFjvIEM";
+  </script>
+  <script src="https://www.google.com/recaptcha/api.js?render=6Lfmq1orAAAAAEfFBDqDFpXtHMGld5aesRFjvIEM" defer></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #ffffff;
+      background-image: url('hero-mountain.jpg');
+      background-size: cover;
+      background-position: center center;
+      background-repeat: no-repeat;
+      background-attachment: scroll;
+    }
+
+    :root {
+      --gold: #b4975a;
+      --navy: #27394d;
+      --line: #e8edf3;
+      --muted: #64748b;
+      --cream: #f5f2ed;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      background: url('./hero-mountain.jpg') no-repeat center center fixed;
+      background-size: cover;
+    }
+
+    .overlay {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      backdrop-filter: blur(5px);
+      background-color: rgba(0, 0, 0, 0.2); /* subtle dim layer over the mountain */
+    }
+
+    .left-panel {
+      width: 50%;
+      background-color: rgba(255, 255, 255, 0.95);
+      padding: 60px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .form-container {
+      max-width: 420px;
+      width: 100%;
+    }
+
+    .brand {
+  position: absolute;
+  top: 24px;
+  left: 32px;
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.25rem;
+  font-weight: 300;
+  color: var(--navy);
+  text-decoration: none;
+  letter-spacing: 0.03em;
+}
+
+h1 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.8rem;
+  font-weight: 300;
+  color: var(--navy);
+  margin-bottom: 24px;
+}
+
+h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.8rem;
+  font-weight: 300;
+  color: var(--navy);
+  margin-bottom: 24px;
+}
+
+    label {
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.95rem;
+      margin-bottom:4px;
+      display: block;
+      color: var(--navy);
+    }
+
+    input {
+      width: 100%;
+      padding: 0.75rem 0.9rem;
+      font-size: 1rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-family: inherit;
+    }
+
+    input:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(180, 151, 90, 0.15);
+      outline: none;
+    }
+
+    .pw-wrap {
+      position: relative;
+    }
+
+    .show-toggle {
+      position: absolute;
+      right: 12px;
+      top: 33%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: 0;
+      font: inherit;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    button[type="submit"] {
+      all: unset;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.9rem;
+      letter-spacing: 0.12em;
+      text-transform: none;
+      color: #1a2230;
+      background-color: transparent;
+      padding: 0.75rem 1rem;
+      width: 100%; /* 🔥 full width */
+      border:0.02px solid transparent;
+      transition: background-color 0.4s ease, transform 0.3s ease, border-color 0.3s ease;
+      text-align: center;
+      box-sizing: border-box;
+  }
+
+button[type="submit"]:hover {
+  background-color: #ffffff;
+  color: #1a2230;
+  border-color: #1a2230;
+  box-shadow: none;
+  transform: scale(1.01);
+}
+
+    
+    .extra-links {
+      text-align: center;
+      margin-top: 14px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .extra-links a {
+      color: var(--gold);
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    .extra-links a:hover {
+      text-decoration: underline;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 30px;
+      transform: translate(-50%, 20px);
+      background: rgba(17,17,17,0.92);
+      color: #fff;
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 3000;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    @media (max-width: 768px) {
+      .overlay {
+        flex-direction: column;
+      }
+
+      .left-panel {
+        width: 100%;
+        padding: 40px;
+      }
+    }
+    .back-link {
+  margin-top: 24px;
+  text-align: center;
+}
+
+.back-link a {
+  color: var(--muted);
+  font-size: 14px;
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.back-link a:hover {
+  color: var(--ink);
+}
+.login-actions {
+  margin-top: 2.5rem; /* pushes everything downward */
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.forgot {
+  color: #b4975a;
+  font-weight: 200;
+}
+
+    .previewing {
+      color: #6b7280; /* muted tone */
+      font-weight: 200;
+    }
+
+    .cancel-login {
+  display: inline-block;
+  margin-top: 1.5rem;
+      color: #475569;
+      text-decoration: none;
+      font-weight: 300;
+      font-size: 0.95rem;
+    }
+
+  </style>
+</head>
+
+<body>
+  <div class="overlay">
+    <!-- LEFT PANEL -->
+    <div class="left-panel">
+      <div class="form-container">
+<h1>
+  <a href="index.html" class="brand">Let’s ParaConnect</a>
+</h1>
+<h2>Login to Let’s ParaConnect</h2>
+
+        <form id="loginForm">
+          <label for="email">Enter e-mail</label>
+          <input id="email" name="email" type="email" placeholder="you@example.com" required />
+
+          <label for="password">Enter your password</label>
+          <div class="pw-wrap">
+            <input id="password" name="password" type="password" placeholder="••••••••" required />
+            <button type="button" class="show-toggle" aria-pressed="false">Show</button>
+          </div>
+
+          <button type="submit" class="login-btn">Log In</button>
+
+<div class="login-actions">
+  <p>
+    <a href="forgot-password.html" class="forgot">Forgotten password?</a>
+  </p>
+<a href="index.html" class="cancel-login">← Cancel Log In</a>
+</div>
+
+          <div class="extra-links">
+            Don't have an account? <a href="signup.html">Sign up</a>
+          </div>
+
+        </form>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: implicitly handled by mountain background -->
+  </div>
+
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const input = document.getElementById('password');
+      const toggle = document.querySelector('.show-toggle');
+      if (!input || !toggle) return;
+      toggle.addEventListener('click', (event) => {
+        event.preventDefault();
+        const isHidden = input.type === 'password';
+        input.type = isHidden ? 'text' : 'password';
+        toggle.textContent = isHidden ? 'Hide' : 'Show';
+        toggle.setAttribute('aria-pressed', String(isHidden));
+      });
+    });
+  </script>
+
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script type="module" src="assets/scripts/login.js"></script>
+</body>
+</html>

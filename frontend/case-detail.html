@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Case Detail | Let’s-ParaConnect</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles/dashboard.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://js.stripe.com/v3/"></script>
+  <script src="assets/scripts/utils/session.js"></script>
+
+  <style>
+    :root {
+      --accent: #b6a47a;
+      --line: rgba(0,0,0,0.08);
+      --muted: #8a8a8a;
+      --ink: #1a1a1a;
+      --panel: #fcfcfc;
+      --font-serif: 'Cormorant Garamond', serif;
+      --font-sans: 'Sarabun', sans-serif;
+      --radius: 12px;
+    }
+
+    /* Case Layout */
+    .back-arrow {
+      font-family: var(--font-serif);
+      font-size: 1rem;
+      color: var(--accent);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 1rem;
+    }
+    .back-arrow:hover { opacity: 0.8; }
+
+    .case-header h1 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 2rem;
+      margin-bottom: 0.25rem;
+    }
+    .case-header small {
+      display: block;
+      color: var(--muted);
+      font-weight: 300;
+      font-size: 0.95rem;
+    }
+    .case-status {
+      background: rgba(31,122,74,.1);
+      color: #1f7a4a;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      margin-top: 6px;
+      display: inline-block;
+    }
+
+    .case-actions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 10px;
+      margin: 1rem 0 2rem;
+    }
+    .btn {
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      gap: 0.35rem;
+    }
+    .btn.primary { background: var(--accent); color: #fff; }
+    .btn.primary:hover { background: #a38e5f; }
+    .btn.secondary { background: #fff; border: 1px solid var(--line); color: var(--ink); }
+    .btn.secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .payment-panel {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 1rem;
+      min-width: 260px;
+    }
+    #card-element {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+    }
+    #card-errors {
+      color: #b00020;
+      font-size: 0.85rem;
+      margin-top: 0.4rem;
+      min-height: 1.1rem;
+    }
+
+    .case-overview {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      color: var(--ink);
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 1.2rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .case-section {
+      margin-bottom: 2rem;
+    }
+    .case-section h2 {
+      font-family: var(--font-serif);
+      font-weight: 500;
+      font-size: 1.4rem;
+      margin-bottom: 0.75rem;
+    }
+
+    /* Uploaded Documents */
+    .doc-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .doc-item {
+      background: #f9f9f9;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      color: var(--ink);
+      transition: all 0.2s ease;
+    }
+    .doc-item:hover { border-color: var(--accent); }
+
+    .upload-form {
+      margin-top: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+    .upload-form label {
+      background: var(--accent);
+      color: #fff;
+      border-radius: 6px;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .upload-form input[type=file] { display: none; }
+
+    /* Deadlines */
+    .deadlines ul { list-style: none; padding: 0; }
+    .deadlines li { font-size: 0.95rem; margin-bottom: 0.4rem; }
+
+    /* Video Meeting */
+    .meeting-dropdown { position: relative; display: inline-block; }
+    .meeting-dropdown button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .meeting-options {
+      display: none;
+      position: absolute;
+      top: 38px;
+      left: 0;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      min-width: 160px;
+      z-index: 10;
+    }
+    .meeting-options a {
+      display: block;
+      padding: 8px 12px;
+      text-decoration: none;
+      color: var(--ink);
+      font-size: 0.9rem;
+    }
+    .meeting-options a:hover { background: #f7f7f7; color: var(--accent); }
+    .meeting-dropdown.active .meeting-options { display: block; }
+
+    /* Notes */
+    #caseNotes {
+      width: 100%;
+      height: 140px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      background: var(--panel);
+      resize: vertical;
+    }
+
+    /* Review Work */
+    .review-list { list-style: none; padding: 0; margin: 0; }
+    .review-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 0.8rem;
+      background: #fafafa;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Chat */
+    .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .column-stack { display:flex; flex-direction:column; gap:1rem; }
+    .chat-box {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 1rem;
+      height: 260px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+    .chat-msg {
+      padding: 0.6rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      max-width: 80%;
+    }
+    .chat-msg.you { align-self: flex-end; background: var(--accent); color: #fff; }
+    .chat-msg.them { align-self: flex-start; background: #f4f4f4; color: var(--ink); }
+
+    .chat-input { display: flex; margin-top: 0.75rem; gap: 0.5rem; }
+    .chat-input input {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+
+    /* === Refined Review & Messaging Section === */
+    .review-container {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 2rem;
+      margin-top: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      font-family: var(--font-sans);
+    }
+    .review-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .review-header h2 {
+      font-family: var(--font-serif);
+    }
+    .review-body {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 2rem;
+    }
+    .review-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+    .review-item {
+      background: #f8f8f8;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      font-family: var(--font-sans);
+    }
+    .notes-section h3,
+    .upload-box h3,
+    .video-box h3 {
+      font-family: var(--font-serif);
+      margin-bottom: 0.5rem;
+    }
+    .notes-section textarea {
+      width: 100%;
+      height: 120px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 0.8rem;
+      resize: none;
+      background: #fff;
+      margin-bottom: 0.5rem;
+      font-family: var(--font-sans);
+    }
+    .upload-video {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .upload-box,
+    .video-box {
+      flex: 1;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      background: #fff;
+      min-width: 240px;
+    }
+    .dropzone {
+      border: 2px dashed var(--accent);
+      border-radius: var(--radius);
+      padding: 2rem;
+      text-align: center;
+      font-size: 0.9rem;
+      background: #fff;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: var(--font-sans);
+    }
+    .dropzone:hover {
+      background: #fdfbf6;
+      border-color: #a58c5c;
+    }
+    .video-box .btn {
+      margin-top: 1rem;
+    }
+    .review-right {
+      display: flex;
+      flex-direction: column;
+    }
+    .review-right h3 {
+      font-family: var(--font-serif);
+      margin-bottom: 0.5rem;
+    }
+    .review-right .chat-window {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 1rem;
+      height: 320px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      font-family: var(--font-sans);
+    }
+    .review-right .chat-msg {
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      max-width: 80%;
+      font-family: var(--font-sans);
+    }
+    .review-right .chat-msg.you {
+      align-self: flex-end;
+      background: var(--accent);
+      color: #fff;
+    }
+    .review-right .chat-msg.them {
+      align-self: flex-start;
+      background: #f4f4f4;
+    }
+    .review-right .chat-input {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    .review-right .chat-input input {
+      flex: 1;
+      padding: 0.75rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      font-size: 0.9rem;
+      font-family: var(--font-sans);
+    }
+
+    /* Modal */
+    .hidden { display: none; }
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+    }
+    .modal-content {
+      background: #fff;
+      padding: 2rem;
+      border-radius: 12px;
+      text-align: center;
+      width: min(480px, 95%);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+      font-family: var(--font-sans);
+    }
+    .modal-content h2 {
+      font-family: var(--font-serif);
+      font-weight: 500;
+      margin-bottom: 0.75rem;
+    }
+    .modal-content p {
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 0.95rem;
+    }
+    .export-progress {
+      background: rgba(182,164,122,0.06);
+      border-radius: 10px;
+      padding: 1rem;
+      margin-top: 1rem;
+    }
+    .modal-actions {
+      margin-top: 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: center;
+    }
+    .modal-actions .btn {
+      flex: 1 1 135px;
+      min-width: 135px;
+      max-width: 190px;
+      padding: 0.5rem 0.85rem;
+      height: 42px;
+      white-space: nowrap;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 6px;
+      background: #eee;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 0.75rem;
+    }
+    .bar {
+      height: 6px;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.4s ease;
+    }
+    .btn.danger {
+      background: #d9534f;
+      color: #fff;
+      border: none;
+    }
+    .btn.danger:hover {
+      background: #c9302c;
+    }
+
+    .case-tabs {
+      display:flex;
+      gap:.5rem;
+      border-bottom:1px solid var(--line);
+      margin:2rem 0 1rem;
+    }
+    .case-tabs .tab {
+      background:#fff;
+      border:1px solid var(--line);
+      border-bottom:none;
+      border-radius:8px 8px 0 0;
+      padding:.6rem 1.2rem;
+      font-family:var(--font-sans);
+      font-size:.9rem;
+      cursor:pointer;
+      transition:background .2s ease;
+    }
+    .case-tabs .tab.active {
+      background:var(--accent);
+      color:#fff;
+      border-color:var(--accent);
+    }
+    .tab-panels {
+      border:1px solid var(--line);
+      border-radius:0 0 8px 8px;
+      background:var(--panel);
+      padding:1.5rem;
+    }
+    .tab-panel {display:none;}
+    .tab-panel.visible {display:block;animation:fadeIn .25s ease;}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:translateY(0);}}
+
+    .details-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+      gap:1.5rem;
+    }
+    .party-card {
+      border:1px solid var(--line);
+      border-radius:8px;
+      background:#fff;
+      padding:1rem 1.2rem;
+      line-height:1.5;
+    }
+    .party-card h4 {
+      font-family:var(--font-serif);
+      font-weight:500;
+      margin-bottom:.5rem;
+    }
+    .party-card a {color:var(--accent);text-decoration:none;font-size:.85rem;}
+    .party-card a:hover{text-decoration:underline;}
+    .party-card .card-actions{
+      display:flex;
+      gap:.5rem;
+      margin-top:.75rem;
+      flex-wrap:wrap;
+    }
+    .party-card .card-actions .btn{
+      flex:1 1 140px;
+      justify-content:center;
+    }
+
+    .drop-zone {
+      border:2px dashed var(--line);
+      border-radius:10px;
+      background:#fff;
+      padding:2rem;
+      text-align:center;
+      cursor:pointer;
+      transition:all .25s ease;
+      color:var(--muted);
+      font-size:.95rem;
+      position:relative;
+    }
+    .drop-zone:hover { border-color:var(--accent); background:#faf9f5; }
+    .drop-zone-icon {
+      font-size:3rem;
+      color:var(--accent);
+      margin-bottom:.5rem;
+    }
+    .drop-zone input[type=file] {
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      opacity:0;
+      cursor:pointer;
+    }
+    .uploaded-list {
+      list-style:none;
+      margin-top:1rem;
+      padding:0;
+    }
+    .uploaded-list li {
+      background:#f9f9f9;
+      border:1px solid var(--line);
+      border-radius:6px;
+      padding:.6rem .8rem;
+      margin-bottom:.4rem;
+      font-size:.9rem;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      transition:background .2s ease;
+    }
+    .uploaded-list li:hover { background:#fffbe9; border-color:var(--accent); }
+
+    .progress-fill {
+      background:var(--accent);
+      height:100%;
+      width:0;
+      transition:width .3s ease;
+    }
+
+    .upload-zone-section {
+      margin-bottom:0.5rem;
+      flex:1;
+    }
+    .video-meeting-card { flex:1; }
+    .upload-zone-body {
+      display:flex;
+      gap:1rem;
+      align-items:flex-start;
+    }
+    .upload-zone-body .drop-zone {
+      width:220px;
+      padding:1rem;
+      position:relative;
+      flex-shrink:0;
+    }
+    .upload-video-wrap {
+      display:flex;
+      gap:1rem;
+      align-items:flex-start;
+      flex-wrap:wrap;
+    }
+    .upload-zone-body .drop-zone-icon {
+      font-size:2rem;
+    }
+    .upload-zone-body .uploaded-list {
+      margin:0;
+      flex:1;
+    }
+    @media (max-width:640px) {
+      .upload-zone-body {
+        flex-direction:column;
+      }
+      .upload-zone-body .drop-zone {
+        width:100%;
+      }
+    }
+  </style>
+</head>
+
+<body data-case-id="case-motion-summary-judgment">
+<div id="protectedContent" style="visibility:hidden">
+  <aside class="sidebar">
+    <div class="logo">Dashboard</div>
+    <nav>
+      <a href="dashboard-attorney.html">Home</a>
+      <a href="active-cases.html" class="active">Cases</a>
+      <a href="messages.html">Messages</a>
+      <a href="documents.html">Documents</a>
+      <a href="review.html">Review</a>
+      <a href="case-files.html">Case Files</a>
+      <a href="billing-attorney.html">Billing</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="help.html">Help</a>
+    </nav>
+    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
+  </aside>
+
+  <main class="main">
+    <a href="active-cases.html" class="back-arrow">← Back to Cases</a>
+
+    <div class="case-header">
+      <h1>Motion for Summary Judgment</h1>
+      <small>Client: Smith & Co. · Field: Litigation</small>
+      <span class="case-status">OPEN</span>
+    </div>
+
+    <!-- === Case Tabs (Activity | Details | Parties | Injuries) === -->
+    <div class="case-tabs">
+      <button class="tab active" data-tab="agenda">Case Agenda</button>
+      <button class="tab" data-tab="details">Details</button>
+      <button class="tab" data-tab="parties">Parties</button>
+    </div>
+
+    <div class="tab-panels">
+      <!-- Case Agenda -->
+      <div id="tab-agenda" class="tab-panel visible">
+        <div class="agenda-panel">
+          <h3>Case Agenda <span class="subtext">Events & Tasks</span></h3>
+          <p class="muted">No items found.</p>
+        </div>
+      </div>
+
+      <!-- Case Details -->
+      <div id="tab-details" class="tab-panel">
+        <div class="details-grid">
+          <div class="party-card">
+            <h4>Drew Adams – Applicant</h4>
+            <p><strong>Address:</strong> 13200 Roxbury Rd, Oakland CA 94612 (Alameda County)</p>
+            <p><strong>Phone:</strong> 323-595-6500<br>
+               <strong>Email:</strong> eng+452676@fuery.com</p>
+            <p><a href="#">Print Envelope</a> · <a href="#">Map</a></p>
+            <div class="card-actions">
+              <button
+                class="btn primary"
+                data-hire-button
+                data-paralegal-id="demo-paralegal-452676"
+                aria-label="Hire Drew Adams"
+              >
+                Hire
+              </button>
+              <button class="btn secondary">Message</button>
+            </div>
+          </div>
+
+          <div class="party-card">
+            <h4>Gilmore Banks – Employer</h4>
+            <p><strong>Address:</strong> 1300 Fair Fax Ave, San Francisco CA 94104 (San Francisco County)</p>
+            <p><strong>Phone:</strong> 323-555-5687<br>
+               <strong>Email:</strong> eng+452682@fuery.com</p>
+            <p><a href="#">Print Envelope</a> · <a href="#">Map</a></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Parties -->
+      <div id="tab-parties" class="tab-panel">
+        <p>List all involved parties with roles, contact info, and communication logs here.</p>
+      </div>
+
+    </div>
+
+    <div class="case-actions">
+      <button class="btn secondary" id="saveBtn">Save</button>
+      <button class="btn primary" onclick="window.location.href='create-case.html?ref=existing'">Add Additional Job</button>
+      <button class="btn primary hidden" id="fundEscrowBtn">Fund Escrow</button>
+      <div class="payment-panel hidden" id="escrowPayment">
+        <p style="margin-bottom:.6rem;font-weight:600;">Payment Method</p>
+        <div id="card-element"></div>
+        <div id="card-errors" role="alert"></div>
+      </div>
+      <button class="btn primary" id="releaseEscrowBtn">Mark Complete &amp; Release Funds</button>
+      <button class="btn primary" onclick="openExportModal()">Complete Case</button>
+    </div>
+
+    <div class="case-overview">
+      <p>This case involves reviewing discovery responses and drafting a Motion for Summary Judgment for Smith & Co. The paralegal assists in organizing discovery, citing prior rulings, and preparing exhibit indexes.</p>
+      <p><strong>Deadline:</strong> November 30, 2025 · <strong>Assigned Paralegal:</strong> J. Stone</p>
+    </div>
+
+    <section class="case-section">
+      <h2>Uploaded Documents</h2>
+      <ul class="doc-list" id="docList">
+        <li class="doc-item">Exhibit_A.pdf</li>
+        <li class="doc-item">Deposition_Summary.docx</li>
+        <li class="doc-item">Draft_Motion.docx</li>
+      </ul>
+      <form class="upload-form" id="uploadForm">
+        <label for="fileInput">Upload Document</label>
+        <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt" required />
+      </form>
+    </section>
+
+    <section class="case-section deadlines">
+      <h2>Deadlines</h2>
+      <ul>
+        <li><strong>Initial Motion Due:</strong> Nov 10, 2025</li>
+        <li><strong>Client Review:</strong> Nov 15, 2025</li>
+        <li><strong>Filing Deadline:</strong> Nov 20, 2025</li>
+      </ul>
+    </section>
+
+    <!-- === REFINED REVIEW & MESSAGING SECTION === -->
+    <section class="review-container">
+      <div class="review-header">
+        <h2>Review Submitted Work</h2>
+        <button class="btn primary">Review & Approve</button>
+      </div>
+
+      <div class="review-body">
+        <div class="review-left">
+          <div class="review-item">
+            <p><strong>Revised Motion Draft</strong> – Uploaded Nov 5, 2025</p>
+          </div>
+
+          <div class="notes-section">
+            <h3>Notes</h3>
+            <textarea placeholder="Add internal notes..."></textarea>
+            <button class="btn secondary">Save Notes</button>
+          </div>
+
+          <div class="upload-video">
+            <div class="upload-box">
+              <h3>Upload to Case</h3>
+              <div class="dropzone">
+                <span>📂 Drag & Drop or click to upload</span>
+              </div>
+            </div>
+            <div class="video-box">
+              <h3>Video Meeting</h3>
+              <button class="btn primary dropdown">Start Meeting ▾</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="review-right">
+          <h3>Messages</h3>
+          <div class="chat-window">
+            <div class="chat-msg them">J. Stone: Uploaded revised exhibit set for your review.</div>
+            <div class="chat-msg you">Samantha: Reviewing now, should have comments shortly.</div>
+            <div class="chat-msg them">J. Stone: Perfect, thank you!</div>
+          </div>
+          <div class="chat-input">
+            <input type="text" placeholder="Type a message..." />
+            <button class="btn primary">Send</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="exportPurgeModal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Export &amp; Purge Case?</h2>
+      <p>
+        Once you confirm, a secure ZIP file containing all related data will be generated.
+        You’ll be able to download it immediately. This case data will be permanently deleted from our servers.
+      </p>
+
+      <div class="export-progress hidden" id="exportProgress">
+        <p>Preparing archive…</p>
+        <div class="progress-bar"><div class="bar" id="progressBar"></div></div>
+      </div>
+
+      <div class="modal-actions">
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-bottom:1rem;">
+          <button class="btn secondary" onclick="closeExportModal()">Cancel</button>
+          <a id="downloadLink" class="btn secondary hidden" download>Download Archive</a>
+        </div>
+        <button class="btn primary" id="exportBtn" onclick="startExport()">Generate ZIP</button>
+        <div style="text-align:right;">
+          <button class="btn danger hidden" id="purgeBtn" onclick="purgeCase()">Delete Case</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script type="module">
+    const currentUser = typeof window.requireRole === "function" ? await window.requireRole() : null;
+    if (!currentUser) {
+      // Guard will redirect unauthorized visitors.
+    } else {
+      applyRoleVisibility(currentUser);
+    // Upload Document
+    document.getElementById('fileInput').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file) {
+        const li = document.createElement('li');
+        li.className = 'doc-item';
+        li.textContent = file.name;
+        document.getElementById('docList').appendChild(li);
+        alert('File uploaded successfully.');
+      }
+    });
+
+    const chatWindow = document.querySelector('.review-right .chat-window');
+    const chatInputField = document.querySelector('.review-right .chat-input input');
+    const chatSendBtn = document.querySelector('.review-right .chat-input .btn.primary');
+
+    chatSendBtn?.addEventListener('click', () => {
+      const msg = chatInputField?.value.trim();
+      if (!msg) return;
+      const div = document.createElement('div');
+      div.className = 'chat-msg you';
+      div.textContent = 'You: ' + msg;
+      chatWindow?.appendChild(div);
+      chatInputField.value = '';
+      if (chatWindow) chatWindow.scrollTop = chatWindow.scrollHeight;
+    });
+
+    const reviewApproveBtn = document.querySelector('.review-header .btn.primary');
+    reviewApproveBtn?.addEventListener('click', () => alert('Work approved and archived.'));
+
+    const notesTextarea = document.querySelector('.notes-section textarea');
+    const notesSaveBtn = document.querySelector('.notes-section .btn.secondary');
+    notesSaveBtn?.addEventListener('click', () => {
+      const content = notesTextarea?.value.trim();
+      if (!content) {
+        alert('Please add notes before saving.');
+        return;
+      }
+      localStorage.setItem('caseNotes', content);
+      alert('Notes saved.');
+    });
+
+    const dropzoneEl = document.querySelector('.upload-box .dropzone');
+    dropzoneEl?.addEventListener('click', () => alert('Upload feature coming soon (cloud storage integration pending).'));
+
+    const meetingBtn = document.querySelector('.video-box .btn.dropdown');
+    meetingBtn?.addEventListener('click', () => {
+      const platform = prompt('Enter preferred meeting platform (Zoom / Teams / Meet):', 'Zoom');
+      if (!platform) return;
+      const urls = {
+        zoom: 'https://zoom.us',
+        teams: 'https://teams.microsoft.com',
+        meet: 'https://meet.google.com'
+      };
+      const url = urls[platform.toLowerCase()];
+      if (url) {
+        window.open(url, '_blank');
+      } else {
+        alert('Unsupported platform.');
+      }
+    });
+
+    // Export & Purge Modal Controls
+    const exportModal = document.getElementById('exportPurgeModal');
+    const exportBtn = document.getElementById('exportBtn');
+    const exportProgress = document.getElementById('exportProgress');
+    const progressBar = document.getElementById('progressBar');
+    const downloadLink = document.getElementById('downloadLink');
+    const purgeBtn = document.getElementById('purgeBtn');
+    const exportStatusText = exportProgress.querySelector('p');
+    const caseStatus = document.querySelector('.case-status');
+    const caseMain = document.querySelector('.main');
+    const CASE_ID = document.body.dataset.caseId || 'demo-case-0001';
+    const toastHelper = window.toastUtils;
+    const FALLBACK_TOAST_KEY = toastHelper?.STORAGE_KEY || 'lpDashboardToast';
+    const AUTH_TOKEN_STORAGE_KEY = 'lpc_token';
+    const USER_STORAGE_KEY = 'lpc_user';
+    const paymentPanel = document.getElementById('escrowPayment');
+    const cardElementHost = document.getElementById('card-element');
+    const cardErrorsEl = document.getElementById('card-errors');
+    let cachedCsrfToken = window.__CSRF__ || '';
+    let stripeClientPromise;
+    let stripeElementsInstance;
+    let cardElementInstance;
+    let caseDetails = null;
+    let progressInterval;
+    let exportTimeout;
+    const hireButtons = document.querySelectorAll('[data-hire-button]');
+    const fundEscrowBtn = document.getElementById('fundEscrowBtn');
+    const releaseEscrowBtn = document.getElementById('releaseEscrowBtn');
+
+    hireButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const paralegalId = btn.dataset.paralegalId || prompt('Enter the paralegal ID to hire:');
+        if (!paralegalId) {
+          alert('Paralegal reference is required.');
+          return;
+        }
+        const targetCase = btn.dataset.caseId || CASE_ID;
+        hireParalegal(targetCase, paralegalId, btn);
+      });
+    });
+    fundEscrowBtn?.addEventListener('click', () => startEscrow(CASE_ID, fundEscrowBtn));
+    releaseEscrowBtn?.addEventListener('click', () => releaseEscrow(CASE_ID, releaseEscrowBtn));
+    loadCaseDetails();
+
+    function resetExportModalState() {
+      clearInterval(progressInterval);
+      clearTimeout(exportTimeout);
+      progressInterval = null;
+      exportTimeout = null;
+      exportBtn.disabled = false;
+      exportBtn.style.display = '';
+      exportProgress.classList.add('hidden');
+      exportStatusText.textContent = 'Preparing archive…';
+      progressBar.style.width = '0%';
+      if (downloadLink.dataset.blobUrl) {
+        URL.revokeObjectURL(downloadLink.dataset.blobUrl);
+        delete downloadLink.dataset.blobUrl;
+      }
+      downloadLink.classList.add('hidden');
+      downloadLink.removeAttribute('href');
+      downloadLink.removeAttribute('download');
+      purgeBtn.classList.add('hidden');
+    }
+
+    function readStoredToken() {
+      if (typeof window.getSessionToken === 'function') {
+        const token = window.getSessionToken();
+        return token || '';
+      }
+      try {
+        return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || '';
+      } catch {
+        return '';
+      }
+    }
+
+    function readStoredUser() {
+      if (typeof window.getStoredUser === 'function') {
+        return window.getStoredUser();
+      }
+      try {
+        const raw = localStorage.getItem(USER_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    }
+
+    function readStoredRole() {
+      const user = readStoredUser();
+      return user?.role || '';
+    }
+
+    async function ensureCsrfToken() {
+      if (cachedCsrfToken) return cachedCsrfToken;
+      try {
+        const res = await fetch('/api/csrf', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          cachedCsrfToken = data?.csrfToken || '';
+          window.__CSRF__ = cachedCsrfToken;
+        }
+      } catch (err) {
+        console.warn('Unable to refresh CSRF token.', err);
+      }
+      return cachedCsrfToken;
+    }
+
+    async function loadCaseDetails() {
+      const headers = new Headers();
+      const token = readStoredToken();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      try {
+        const res = await fetch(`/api/cases/${encodeURIComponent(CASE_ID)}`, { headers, credentials: 'include' });
+        if (!res.ok) throw new Error('Unable to fetch case');
+        caseDetails = await res.json();
+      } catch (err) {
+        console.warn('Unable to load case details.', err);
+        caseDetails = null;
+      } finally {
+        updatePaymentVisibility();
+      }
+    }
+
+    function shouldShowPaymentForm() {
+      const role = readStoredRole().toLowerCase();
+      const hasParalegal = !!(caseDetails && caseDetails.paralegal);
+      const escrowFunded = !!(caseDetails && caseDetails.paymentReleased);
+      return role === 'attorney' && hasParalegal && !escrowFunded;
+    }
+
+    function updatePaymentVisibility() {
+      const show = shouldShowPaymentForm();
+      fundEscrowBtn?.classList.toggle('hidden', !show);
+      paymentPanel?.classList.toggle('hidden', !show);
+      if (show) {
+        ensureCardElement().catch((err) => console.warn('Unable to initialize payment field.', err));
+      }
+    }
+
+    async function ensureCardElement() {
+      if (!paymentPanel || !cardElementHost) return null;
+      if (cardElementInstance) return cardElementInstance;
+      const stripe = await getStripeClient();
+      if (!stripeElementsInstance) {
+        stripeElementsInstance = stripe.elements();
+      }
+      cardElementInstance = stripeElementsInstance.create('card', {
+        style: {
+          base: {
+            color: '#1a1a1a',
+            fontFamily: '"Sarabun", sans-serif',
+            fontSize: '16px',
+            '::placeholder': { color: '#9ba6b1' },
+          },
+          invalid: { color: '#b00020' },
+        },
+      });
+      cardElementInstance.mount(cardElementHost);
+      cardElementInstance.on('change', (event) => {
+        if (cardErrorsEl) cardErrorsEl.textContent = event.error ? event.error.message : '';
+      });
+      return cardElementInstance;
+    }
+
+    async function hireParalegal(caseId, paralegalId, button) {
+      if (!caseId || !paralegalId) {
+        alert('Missing case or paralegal identifier.');
+        return;
+      }
+
+      button?.setAttribute('disabled', 'disabled');
+      const headers = new Headers();
+      const token = readStoredToken();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      const csrfToken = await ensureCsrfToken();
+      if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
+
+      let response;
+      try {
+        response = await fetch(`/api/cases/${encodeURIComponent(caseId)}/hire/${encodeURIComponent(paralegalId)}`, {
+          method: 'POST',
+          headers,
+          credentials: 'include'
+        });
+      } catch (networkErr) {
+        console.error('Network error hiring paralegal:', networkErr);
+        button?.removeAttribute('disabled');
+        alert('Network error hiring paralegal.');
+        return;
+      }
+
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch {
+        payload = {};
+      }
+
+      if (!response.ok) {
+        button?.removeAttribute('disabled');
+        alert(payload?.error || payload?.msg || 'Unable to hire paralegal.');
+        return;
+      }
+
+      button?.removeAttribute('disabled');
+      if (caseStatus) {
+        caseStatus.textContent = 'IN PROGRESS';
+        caseStatus.style.background = 'rgba(31,122,74,.1)';
+        caseStatus.style.color = '#1f7a4a';
+      }
+      if (toastHelper?.stage) {
+        toastHelper.stage('Paralegal hired successfully.', 'success');
+      } else {
+        alert('Paralegal hired successfully.');
+      }
+
+      loadCaseDetails();
+      return payload;
+    }
+    window.hireParalegal = hireParalegal;
+
+    async function getStripeClient() {
+      if (stripeClientPromise) {
+        try {
+          return await stripeClientPromise;
+        } catch (err) {
+          stripeClientPromise = null;
+          throw err;
+        }
+      }
+      if (typeof Stripe === 'undefined') {
+        throw new Error('Stripe.js failed to load.');
+      }
+      stripeClientPromise = (async () => {
+        const res = await fetch('/api/payments/config', { credentials: 'include' });
+        const data = await res.json();
+        if (!data?.publishableKey) throw new Error('Stripe publishable key missing.');
+        return Stripe(data.publishableKey);
+      })();
+      return getStripeClient();
+    }
+
+    async function startEscrow(caseId, button) {
+      if (!caseId) {
+        alert('Missing case identifier.');
+        return;
+      }
+      if (!shouldShowPaymentForm()) {
+        alert('Escrow funding is currently unavailable.');
+        return;
+      }
+      try {
+        await ensureCardElement();
+      } catch (err) {
+        alert(err?.message || 'Unable to initialize payment form.');
+        return;
+      }
+      if (!cardElementInstance) {
+        alert('Payment form is not ready.');
+        return;
+      }
+      if (cardErrorsEl) cardErrorsEl.textContent = '';
+      button?.setAttribute('disabled', 'disabled');
+      const headers = new Headers({ 'Content-Type': 'application/json' });
+      const token = readStoredToken();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      const csrfToken = await ensureCsrfToken();
+      if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
+
+      let payload = {};
+      try {
+        const response = await fetch('/api/payments/start-escrow', {
+          method: 'POST',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify({ caseId })
+        });
+        payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.error || payload?.msg || 'Unable to start escrow.');
+        }
+      } catch (err) {
+        button?.removeAttribute('disabled');
+        alert(err.message || 'Unable to start escrow.');
+        return;
+      }
+
+      let stripeClient;
+      try {
+        stripeClient = await getStripeClient();
+      } catch (err) {
+        button?.removeAttribute('disabled');
+        alert(err.message || 'Unable to load payment form.');
+        return;
+      }
+
+      try {
+        const result = await stripeClient.confirmCardPayment(payload.clientSecret, {
+          payment_method: { card: cardElementInstance },
+        });
+        if (result.error) {
+          if (cardErrorsEl) cardErrorsEl.textContent = result.error.message || 'Payment failed.';
+          throw new Error(result.error.message || 'Payment failed.');
+        }
+        if (result.paymentIntent?.status === 'succeeded') {
+          toastHelper?.stage
+            ? toastHelper.stage('Escrow funded successfully.', 'success')
+            : alert('Escrow funded successfully.');
+          window.location.reload();
+          return;
+        }
+        throw new Error('Payment not completed.');
+      } catch (err) {
+        button?.removeAttribute('disabled');
+        if (!cardErrorsEl?.textContent) {
+          alert(err.message || 'Unable to confirm payment.');
+        }
+      }
+    }
+    window.startEscrow = startEscrow;
+
+    async function releaseEscrow(caseId, button) {
+      if (!caseId) {
+        alert('Missing case identifier.');
+        return;
+      }
+      button?.setAttribute('disabled', 'disabled');
+      const headers = new Headers({ 'Content-Type': 'application/json' });
+      const token = readStoredToken();
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      const csrfToken = await ensureCsrfToken();
+      if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
+
+      let payload = {};
+      try {
+        const response = await fetch('/api/payments/release', {
+          method: 'POST',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify({ caseId })
+        });
+        payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload?.error || payload?.msg || 'Unable to release funds.');
+        }
+      } catch (err) {
+        button?.removeAttribute('disabled');
+        alert(err.message || 'Unable to release funds.');
+        return;
+      }
+
+      if (toastHelper?.stage) {
+        toastHelper.stage('Funds released successfully.', 'success');
+      } else {
+        alert('Funds released successfully.');
+      }
+      window.location.reload();
+    }
+    window.releaseEscrow = releaseEscrow;
+
+    function openExportModal() {
+      resetExportModalState();
+      exportModal.classList.remove('hidden');
+      exportModal.style.display = 'flex';
+    }
+
+    function closeExportModal() {
+      exportModal.style.display = 'none';
+      exportModal.classList.add('hidden');
+      resetExportModalState();
+    }
+
+    function markCasePendingPurge() {
+      if (!caseStatus) return;
+      caseStatus.textContent = 'Pending Purge (30 days)';
+      caseStatus.style.background = 'rgba(182,164,122,0.15)';
+      caseStatus.style.color = '#7a6637';
+    }
+
+    function removeCaseFromUI() {
+      if (!caseMain) return;
+      caseMain.innerHTML = `
+        <section class="case-section">
+          <h2>Case removed</h2>
+          <p>This case has been purged from the workspace. Redirecting to dashboard…</p>
+        </section>
+      `;
+    }
+
+    async function startExport() {
+      if (exportBtn.disabled) return;
+      markCasePendingPurge();
+      exportBtn.disabled = true;
+      exportProgress.classList.remove('hidden');
+      exportStatusText.textContent = 'Preparing archive…';
+
+      let width = 0;
+      progressInterval = setInterval(() => {
+        width = Math.min(width + 15, 100);
+        progressBar.style.width = width + '%';
+      }, 200);
+
+      const zip = new JSZip();
+      zip.file('Case_Summary.txt', `Case ID: ${CASE_ID}\nStatus: Completed\nExported: ${new Date().toLocaleString()}`);
+      zip.file('Job_Posting.txt', 'Sample job posting details for this case.');
+      zip.file('Messages.txt', 'Chat logs with paralegals and internal notes.');
+
+      try {
+        const files = await fetch('/assets/docs/sample.pdf');
+        if (files.ok) {
+          const blob = await files.blob();
+          zip.file('Documents/sample.pdf', blob);
+        }
+      } catch (err) {
+        console.warn('No sample document available for export bundle.', err);
+      }
+
+      exportTimeout = setTimeout(async () => {
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+        exportStatusText.textContent = 'Archive ready for download.';
+
+        const content = await zip.generateAsync({ type: 'blob' });
+        if (downloadLink.dataset.blobUrl) {
+          URL.revokeObjectURL(downloadLink.dataset.blobUrl);
+        }
+        const url = URL.createObjectURL(content);
+        downloadLink.href = url;
+        downloadLink.dataset.blobUrl = url;
+        downloadLink.download = `Case_Archive_${new Date().toISOString().split('T')[0]}.zip`;
+
+        downloadLink.classList.remove('hidden');
+        purgeBtn.classList.remove('hidden');
+        exportBtn.style.display = 'none';
+      }, 2200);
+    }
+
+    function purgeCase() {
+      if (confirm('Are you sure you want to permanently delete this case? This cannot be undone.')) {
+        localStorage.removeItem('currentCase');
+        removeCaseFromUI();
+        alert('Case successfully purged and removed from records.');
+        closeExportModal();
+        if (toastHelper?.stage) {
+          toastHelper.stage('Case removed successfully.', 'success');
+        } else {
+          sessionStorage.setItem(FALLBACK_TOAST_KEY, JSON.stringify({ message: 'Case removed successfully.', type: 'success' }));
+        }
+        window.location.href = 'dashboard-attorney.html';
+      }
+    }
+
+    // --- Case Tabs toggle ---
+    const tabs = document.querySelectorAll('.case-tabs .tab');
+    const panels = document.querySelectorAll('.tab-panel');
+    tabs.forEach(tab=>{
+      tab.addEventListener('click',()=>{
+        tabs.forEach(t=>t.classList.remove('active'));
+        tab.classList.add('active');
+        panels.forEach(p=>p.classList.remove('visible'));
+        document.getElementById(`tab-${tab.dataset.tab}`).classList.add('visible');
+      });
+    });
+
+    // Save Button
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      alert('All progress saved successfully.');
+    });
+    }
+
+    function applyRoleVisibility(user) {
+      const role = String(user?.role || '').toLowerCase();
+      if (role === 'paralegal') {
+        document.querySelectorAll('[data-attorney-only]').forEach((el) => {
+          el.style.display = 'none';
+        });
+      }
+      if (role === 'attorney') {
+        document.querySelectorAll('[data-paralegal-only]').forEach((el) => {
+          el.style.display = 'none';
+        });
+      }
+    }
+  </script>
+</div>
+</div>
+</body>
+</html>

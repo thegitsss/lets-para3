@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Case | Let’s-ParaConnect</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:#ffffff;
+      --sidebar-bg:#f5f5f5e6;
+      --accent:#b6a47a;
+      --ink:#1a1a1a;
+      --muted:#8a8a8a;
+      --line:rgba(0,0,0,0.08);
+      --panel:#fcfcfc;
+      --radius:14px;
+      --font-serif:'Cormorant Garamond',serif;
+      --font-sans:'Sarabun',sans-serif;
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{
+      font-family:'Sarabun',serif;
+      background:var(--bg);
+      color:var(--ink);
+      display:flex;
+      height:100vh;
+      overflow:hidden;
+      font-weight:200;
+    }
+
+    /* Sidebar */
+    .sidebar{
+      width:240px;
+      background:var(--sidebar-bg);
+      display:flex;
+      flex-direction:column;
+      border-right:1px solid var(--line);
+      padding:24px 16px;
+    }
+    .logo{
+      font-family:var(--font-serif);
+      font-size:1.6rem;
+      font-weight:300;
+      text-align:center;
+      margin-bottom:36px;
+    }
+    nav{display:flex;flex-direction:column;gap:14px;}
+    nav a{
+      text-decoration:none;
+      color:var(--ink);
+      font-size:0.95rem;
+      padding:10px 14px;
+      border-radius:var(--radius);
+      transition:background .3s;
+    }
+    nav a.active,nav a:hover{background:rgba(0,0,0,0.04);}
+    .sidebar-footer{
+      margin-top:auto;
+      font-size:0.7rem;
+      color:var(--muted);
+      text-align:center;
+    }
+    /* uniform style for step bubbles across all create-case pages */
+.steps {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 700px;
+  margin: 0 auto 2.5rem;
+  position: relative;
+}
+
+.steps::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--line);
+}
+
+.step {
+  text-align: center;
+  flex: 1;
+  position: relative;
+}
+
+.circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 8px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  transition: all 0.3s ease;
+}
+
+.step.active .circle {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.step span {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+    /* Main */
+    .main{flex:1;padding:40px;overflow-y:auto;}
+    .topbar{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:2rem;gap:1.5rem;position:relative;}
+    .notification-icon{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);display:flex;justify-content:center;align-items:center;background:#fff;cursor:pointer;position:relative;transition:border-color .2s ease, transform .2s ease;}
+    .notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
+    .notification-icon svg{width:22px;height:22px;color:var(--ink);}
+    .notification-badge{position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:999px;font-size:.75rem;padding:2px 6px;line-height:1;display:none;font-weight:600;}
+    .notification-badge.show{display:inline-flex;}
+    .user-profile{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(0,0,0,0.03);border:1px solid transparent;transition:border-color 0.2s ease;cursor:pointer;position:relative;}
+    .user-profile img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,0.08);object-fit:cover;}
+    .user-profile strong{display:block;font-weight:200;color:var(--ink);}
+    .user-profile span{font-size:0.85rem;color:var(--muted);}
+
+    header h1{
+      font-family:var(--font-serif);
+      font-weight:300;
+      font-size:2rem;
+      margin-bottom:1rem;
+    }
+    header p{font-weight:200;color:var(--muted);margin-bottom:2rem;}
+
+    /* Wizard steps */
+    .steps{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      max-width:700px;
+      margin:0 auto 2.5rem;
+      position:relative;
+    }
+    .step{
+      text-align:center;
+      flex:1;
+      position:relative;
+    }
+    .step:not(:first-child)::before{
+      content:"";
+      position:absolute;
+      top:14px;
+      left:0;
+      width:100%;
+      height:2px;
+      background:var(--line);
+      z-index:0;
+    }
+    .circle{
+      position:relative;
+      z-index:1;
+      width:28px;
+      height:28px;
+      border-radius:50%;
+      background:#fff;
+      border:2px solid var(--line);
+      margin:0 auto 8px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:0.8rem;
+    }
+    .active .circle{
+      background:var(--accent);
+      border-color:var(--accent);
+      color:#fff;
+    }
+    .step span{font-size:0.85rem;color:var(--muted);}
+
+    /* Form */
+    form{
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:2rem;
+      max-width:800px;
+      margin:0 auto;
+      box-shadow:0 2px 6px rgba(0,0,0,0.03);
+    }
+    .field{margin-bottom:1.25rem;}
+    .field label{
+      display:block;
+      margin-bottom:6px;
+      font-size:0.9rem;
+      color:var(--ink);
+    }
+    input,select,textarea{
+      width:100%;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      border-radius:6px;
+      font-family:inherit;
+      font-size:0.9rem;
+      transition:border-color .2s,box-shadow .2s;
+    }
+    input:focus,select:focus,textarea:focus{
+      border-color:var(--accent);
+      box-shadow:0 0 0 3px rgba(182,164,122,0.15);
+      outline:none;
+    }
+
+    .actions{
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+      margin-top:1.5rem;
+    }
+    .btn{
+      border:none;
+      border-radius:6px;
+      padding:0.6rem 1.1rem;
+      font-size:0.9rem;
+      cursor:pointer;
+      transition:all .2s;
+    }
+    .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
+    .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
+    .btn.primary{background:var(--accent);color:#fff;}
+    .btn.primary:hover{background:#a0854d;}
+    .comp-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.dollar-sign {
+  position: absolute;
+  left: 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+#comp {
+  padding-left: 24px;
+  width: 120px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem 0.5rem 1.4rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+#comp:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(182,164,122,0.15);
+  outline: none;
+}
+
+.comp-type {
+  display: flex;
+  gap: 6px;
+}
+
+.type-btn {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.type-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.type-btn:hover:not(.active) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.steps a {
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.steps a:hover .circle {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.steps a:hover span {
+  color: var(--accent);
+}
+
+  </style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">Dashboard</div>
+    <nav>
+      <a href="dashboard-attorney.html">Home</a>
+      <a href="active-cases.html">Cases</a>
+      <a href="create-case.html" class="active">Create Case</a>
+      <a href="messages.html">Messages</a>
+      <a href="documents.html">Documents</a>
+      <a href="review.html">Review</a>
+      <a href="case-files.html">Case Files</a>
+      <a href="billing-attorney.html">Billing</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="help.html">Help</a>
+    </nav>
+    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar" data-attorney-header></div>
+
+    <header>
+      <h1>Create a New Case</h1>
+      <p>Provide details to post your case and invite paralegals to apply.</p>
+    </header>
+
+    <!-- Step Progress -->
+    <div class="steps">
+  <a href="create-case.html" class="step active">
+    <div class="circle">1</div><span>Case details</span>
+  </a>
+  <a href="create-case-step2.html" class="step">
+    <div class="circle">2</div><span>Description</span>
+  </a>
+  <a href="create-case-step3.html" class="step">
+    <div class="circle">3</div><span>Requirements</span>
+  </a>
+  <a href="create-case-step4.html" class="step">
+    <div class="circle">4</div><span>Questions</span>
+  </a>
+  <a href="create-case-step5.html" class="step">
+    <div class="circle">5</div><span>Review & Post</span>
+  </a>
+</div>
+
+    <!-- Form -->
+    <form>
+      <div class="field">
+        <label for="specialty">Field of Law</label>
+        <select id="specialty">
+              <option value="">Select…</option>
+    <option>Administrative Law</option>
+    <option>Admiralty & Maritime Law</option>
+    <option>Antitrust Law</option>
+    <option>Appellate Law</option>
+    <option>Banking Law</option>
+    <option>Bankruptcy Law</option>
+    <option>Business / Corporate Law</option>
+    <option>Civil Rights Law</option>
+    <option>Class Action Law</option>
+    <option>Commercial Law</option>
+    <option>Communications Law</option>
+    <option>Construction Law</option>
+    <option>Consumer Protection Law</option>
+    <option>Contract Law</option>
+    <option>Criminal Defense Law</option>
+    <option>Education Law</option>
+    <option>Elder Law</option>
+    <option>Election Law</option>
+    <option>Employment & Labor Law</option>
+    <option>Energy Law</option>
+    <option>Entertainment Law</option>
+    <option>Environmental Law</option>
+    <option>Estate Planning & Probate</option>
+    <option>Family Law</option>
+    <option>Franchise Law</option>
+    <option>Government Contracts Law</option>
+    <option>Health Care Law</option>
+    <option>Immigration Law</option>
+    <option>Insurance Law</option>
+    <option>Intellectual Property (IP) Law</option>
+    <option>International Law</option>
+    <option>Land Use & Zoning Law</option>
+    <option>Litigation</option>
+    <option>Media Law</option>
+    <option>Medical Malpractice</option>
+    <option>Military Law</option>
+    <option>Municipal Law</option>
+    <option>Personal Injury Law</option>
+    <option>Product Liability Law</option>
+    <option>Real Estate Law</option>
+    <option>Securities Law</option>
+    <option>Social Security / Disability Law</option>
+    <option>Sports Law</option>
+    <option>Tax Law</option>
+    <option>Technology Law</option>
+    <option>Telecommunications Law</option>
+    <option>Torts</option>
+    <option>Transportation Law</option>
+    <option>Trusts & Estates</option>
+    <option>White Collar Crime</option>
+    <option>Workers’ Compensation</option>
+  </select>
+</div>
+
+      <div class="field">
+  <label for="state">Location (State)</label>
+  <select id="state">
+    <option value="">Select…</option>
+    <option>Alabama</option>
+    <option>Alaska</option>
+    <option>Arizona</option>
+    <option>Arkansas</option>
+    <option>California</option>
+    <option>Colorado</option>
+    <option>Connecticut</option>
+    <option>Delaware</option>
+    <option>District of Columbia</option>
+    <option>Florida</option>
+    <option>Georgia</option>
+    <option>Hawaii</option>
+    <option>Idaho</option>
+    <option>Illinois</option>
+    <option>Indiana</option>
+    <option>Iowa</option>
+    <option>Kansas</option>
+    <option>Kentucky</option>
+    <option>Louisiana</option>
+    <option>Maine</option>
+    <option>Maryland</option>
+    <option>Massachusetts</option>
+    <option>Michigan</option>
+    <option>Minnesota</option>
+    <option>Mississippi</option>
+    <option>Missouri</option>
+    <option>Montana</option>
+    <option>Nebraska</option>
+    <option>Nevada</option>
+    <option>New Hampshire</option>
+    <option>New Jersey</option>
+    <option>New Mexico</option>
+    <option>New York</option>
+    <option>North Carolina</option>
+    <option>North Dakota</option>
+    <option>Ohio</option>
+    <option>Oklahoma</option>
+    <option>Oregon</option>
+    <option>Pennsylvania</option>
+    <option>Rhode Island</option>
+    <option>South Carolina</option>
+    <option>South Dakota</option>
+    <option>Tennessee</option>
+    <option>Texas</option>
+    <option>Utah</option>
+    <option>Vermont</option>
+    <option>Virginia</option>
+    <option>Washington</option>
+    <option>West Virginia</option>
+    <option>Wisconsin</option>
+    <option>Wyoming</option>
+  </select>
+</div>
+
+      <div class="field">
+        <label for="employment">Engagement Type</label>
+        <select id="employment">
+          <option value="">Select…</option>
+          <option>One-time Project</option>
+          <option>Ongoing Support</option>
+          <option>Temporary Contract</option>
+        </select>
+      </div>
+
+      <div class="field">
+  <label for="comp">Compensation</label>
+  <div class="comp-wrapper">
+    <span class="dollar-sign">$</span>
+    <input id="comp" type="number" min="0" placeholder="Amount" />
+    <div class="comp-type">
+      <button type="button" class="type-btn active" data-type="hourly">Hourly</button>
+      <button type="button" class="type-btn" data-type="flat">Flat Fee</button>
+    </div>
+  </div>
+</div>
+
+      <div class="field">
+        <label for="experience">Preferred Experience (Optional)</label>
+        <input id="experience" placeholder="e.g., 3+ years litigation experience" />
+      </div>
+
+      <div class="actions">
+  <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html">Cancel</button>
+  <button type="button" class="btn primary" data-nav="next" id="nextStepBtn" data-target="create-case-step2.html">Next Step</button>
+</div>
+    </form>
+  </main>
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script>window.__ATTORNEY_PAGE__ = "create-case";</script>
+  <script type="module" src="assets/scripts/attorney-tabs.js"></script>
+
+  <script>
+document.querySelector('.btn.primary').addEventListener('click', () => {
+  localStorage.setItem('caseTitle', document.getElementById('title').value);
+  localStorage.setItem('caseSpecialty', document.getElementById('specialty').value);
+  localStorage.setItem('caseState', document.getElementById('state').value);
+  localStorage.setItem('caseEmployment', document.getElementById('employment').value);
+  localStorage.setItem('caseComp', document.getElementById('comp').value);
+  localStorage.setItem('caseExperience', document.getElementById('experience').value);
+});
+</script>
+<script>
+const compBtns = document.querySelectorAll('.type-btn');
+compBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    compBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    localStorage.setItem('caseCompType', btn.dataset.type);
+  });
+});
+
+const compInput = document.getElementById('comp');
+compInput.addEventListener('input', () => {
+  localStorage.setItem('caseCompAmount', compInput.value);
+});
+</script>
+<script src="assets/scripts/create-case-nav.js"></script>
+</body>
+</html>

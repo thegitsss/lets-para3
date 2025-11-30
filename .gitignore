@@ -1,0 +1,90 @@
+# --- ENVIRONMENT VARIABLES ---
+.env
+.env.local
+.env.development
+.env.production
+*.env
+.env.*
+backend/.env
+backend/.env.*
+
+# --- NODE ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- LOGS ---
+logs/
+*.log
+*.log.*
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# --- BUILD / RUNTIME OUTPUT ---
+dist/
+build/
+.cache/
+.next/
+.vercel/
+out/
+
+# --- FRONTEND STATIC EXPORTS ---
+frontend/assets/scripts/*.map
+frontend/assets/styles/*.map
+frontend/node_modules/
+
+# --- RENDER / DEPLOYMENT ---
+render.yaml
+
+# --- MONGO / DATABASE ---
+dump/
+data/db/
+*.bson
+*.lock
+
+# --- WEBPACK / BUNDLERS ---
+.bundle/
+.parcel-cache/
+webpack-stats.json
+
+# --- UPLOADS ---
+uploads/
+public/uploads/
+tmp/
+
+# --- SYSTEM FILES ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# --- BACKEND GENERATED FILES ---
+coverage/
+lib/
+backend/node_modules/
+
+# --- SSL / KEYS ---
+*.pem
+*.crt
+*.key
+certs/
+
+uploads/
+public/uploads/
+tmp/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+dist/
+build/
+.cache/
+*.log
+logs/
+uploads/
+public/uploads/
+tmp/

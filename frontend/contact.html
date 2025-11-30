@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+<link href="assets/styles/styles.css" rel="stylesheet" />
+<link href="assets/styles/hero-pages.css" rel="stylesheet" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Contact Us • Let’s‑ParaConnect</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,500&family=Sarabun:wght@200&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1a2230;
+      --line: #e8edf3;
+      --gold: #b4975a;
+      --bg: #ffffff;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 300;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    main {
+      max-width: 880px;
+      margin: 80px auto;
+      padding: 0 24px;
+      flex: 1;
+    }
+
+    h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 36px;
+      letter-spacing: 1.2px;
+      margin-bottom: 12px;
+    }
+
+    p.muted {
+      font-size: 16px;
+      color: #5c6b7a;
+      margin-bottom: 40px;
+    }
+
+    form {
+      display: grid;
+      gap: 24px;
+    }
+
+    .field-group {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .field {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 240px;
+    }
+
+    label {
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    footer {
+      border-top: none !important;
+      margin-top: 0;
+    }
+
+    input, select, textarea {
+      font-family: 'Sarabun', sans-serif;
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid var(--line);
+      background: white;
+      color: var(--ink);
+      outline: none;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 120px;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .btn {
+      font-family: 'Sarabun', sans-serif;
+      font-size: 14px;
+      font-weight: 300;
+      padding: 10px 24px;
+      border: 1px solid var(--ink);
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+    }
+
+    .btn.primary {
+      background: var(--ink);
+      color: white;
+    }
+    @media (max-width: 768px) {
+
+      .actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+    <!-- Header -->
+<header>
+  <div class="header-inner">
+    <nav class="nav-left" aria-label="Primary">
+      <a href="index.html#who-we-are">About</a>
+      <a href="index.html#how">How It Works</a>
+      <a href="paralegal-faq.html">Paralegal FAQ</a>
+    </nav>
+
+    <a href="index.html" class="header-logo">
+      Let<span class="gold">’</span>s-ParaConnect
+    </a>
+
+    <div class="header-actions">
+      <a class="pill" href="login.html" id="authAction">Sign In</a>
+      <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
+    </div>
+    </div>
+  </header>
+
+  <div class="hero-banner" role="presentation" aria-hidden="true"></div>
+
+  <main aria-labelledby="contact-title" id="main">
+    <h1 id="contact-title">Contact Us</h1>
+    <p class="muted">Questions, partnerships, or support—send us a note and we’ll get back to you shortly.</p>
+
+    <form id="contactForm" novalidate>
+      <div class="field-group">
+        <div class="field">
+          <label for="name">Full name</label>
+          <input type="text" id="name" name="name" required />
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required />
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field">
+          <label for="role">I am a(n)</label>
+          <select id="role" name="role">
+            <option value="">— Select —</option>
+            <option value="attorney">Attorney</option>
+            <option value="paralegal">Paralegal</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="subject">Subject</label>
+          <input type="text" id="subject" name="subject" required />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="message">Message</label>
+        <textarea id="message" name="message" required></textarea>
+      </div>
+
+      <div class="actions">
+        <button type="reset" class="btn">Clear Form</button>
+        <button type="submit" class="btn primary">Submit Message</button>
+      </div>
+    </form>
+  </main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <p>© 2025 Let’s-ParaConnect. All rights reserved.</p>
+    <nav>
+      <a href="privacy.html">Privacy Policy</a>
+      <span>|</span>
+      <a href="terms.html">Terms</a>
+      <span>|</span>
+      <a href="contact.html">Contact</a>
+      <span>|</span>
+      <a href="accessibility.html">Accessibility</a>
+    </nav>
+    <div class="region">United States</div>
+  </div>
+</footer>
+<script type="module" src="assets/scripts/hero-parallax.js"></script>
+</body>
+</html>

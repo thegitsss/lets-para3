@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Let’s-ParaConnect | Attorney Dashboard</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+<script src="assets/scripts/utils/session.js"></script>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --sidebar-bg: #f5f5f5e6;
+      --accent: #b6a47a;
+      --ink: #1a1a1a;
+      --muted: #8a8a8a;
+      --line: rgba(0, 0, 0, 0.08);
+      --panel: #fcfcfc;
+      --radius: 14px;
+      --font-serif: 'Cormorant Garamond', serif;
+      --font-sans: 'Sarabun', sans-serif;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      font-weight: 200;
+      background: var(--bg);
+      color: var(--ink);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 240px;
+      background: var(--sidebar-bg);
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+      padding: 24px 16px;
+    }
+
+    .logo {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+      margin-bottom: 36px;
+      text-align: center;
+    }
+
+    nav {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    nav a {
+      text-decoration: none;
+      color: var(--ink);
+      font-weight: 200;
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      transition: background 0.3s ease;
+    }
+
+    nav a.active,
+    nav a:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .main {
+      flex: 1;
+      padding: 40px;
+      overflow-y: auto;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 2rem;
+      gap: 1.5rem;
+    }
+
+    .notification-icon {
+      position: relative;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      transition: background 0.2s ease;
+    }
+
+
+    .notification-icon:hover {
+      background: rgba(0,0,0,0.05);
+    }
+
+
+    .notification-icon svg {
+      width: 20px;
+      height: 20px;
+      color: var(--ink);
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: red;
+      color: white;
+      border-radius: 50%;
+      font-size: 0.7rem;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .user-profile img {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+    }
+
+    .user-profile span {
+      font-weight: 200;
+      font-size: 0.95rem;
+    }
+
+    header h1 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 2.2rem;
+      margin-bottom: 0.25rem;
+    }
+
+    header p {
+      font-weight: 200;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+
+    .summary {
+      display: flex;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .info-box {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      font-size: 0.95rem;
+      flex: 1;
+    }
+    .message-box {
+      cursor:pointer;
+      transition:background .25s ease, transform .15s ease;
+    }
+    .message-box:hover {
+      background:rgba(182,164,122,0.08);
+      border-color:var(--accent);
+      transform:scale(1.02);
+    }
+
+    .section-title {
+      font-family: var(--font-serif);
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    .completed-section {
+      margin-top: 2.5rem;
+    }
+    .completed-jobs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .completed-job-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      background: var(--panel);
+    }
+    .completed-job-card .downloads {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .completed-job-card .downloads a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .completed-job-card .downloads a:hover {
+      text-decoration: underline;
+    }
+
+    .info-line {
+      font-size: 0.95rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .side-by-side-panels {
+      display: flex;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .side-by-side-panels > section {
+      flex: 1;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 1.25rem;
+    }
+
+    .quick-actions {
+      margin-bottom: 2rem;
+    }
+
+    .quick-actions button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-family: var(--font-sans);
+      font-weight: 200;
+      cursor: pointer;
+      margin-right: 0.5rem;
+    }
+
+    .case-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .case-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      background: var(--panel);
+    }
+
+    .case-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .case-header h2 {
+      font-family: var(--font-serif);
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .case-subinfo {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-top: 0.25rem;
+    }
+
+    .case-content {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+      display: none;
+      font-size: 0.95rem;
+    }
+
+    .open .case-content {
+      display: block;
+    }
+
+    .case-actions {
+      margin-top: 1rem;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 30px;
+      transform: translate(-50%, 20px);
+      background: rgba(17, 17, 17, 0.92);
+      color: #fff;
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 3000;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+
+    .notification-panel {
+      position: absolute;
+      top: 40px;
+      right: 0;
+      width: 280px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 15px 35px rgba(15, 23, 42, 0.18);
+      padding: 1rem;
+      display: none;
+      flex-direction: column;
+      gap: 0.75rem;
+      z-index: 100;
+    }
+
+
+    .notification-panel.show {
+      display: flex;
+    }
+
+
+    .notification-panel h4 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+
+    .notification-panel p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+
+    .notification-item {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 0.9rem;
+      line-height: 1.4;
+      color: var(--ink);
+    }
+
+
+    .notification-item:last-child {
+      border-bottom: none;
+    }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="logo">Dashboard</div>
+    <nav>
+      <a href="dashboard-attorney.html" class="active">Home</a>
+      <a href="active-cases.html">Cases</a>
+      <a href="messages.html">Messages</a>
+      <a href="documents.html">Documents</a>
+      <a href="review.html">Review</a>
+      <a href="case-files.html">Case Files</a>
+      <a href="payments-escrow.html">Billing</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="help.html">Help</a>
+    </nav>
+    <div style="margin-top: auto; font-size: 0.7rem; color: var(--muted); text-align: center;">
+      © Let’s‑ParaConnect 2025
+    </div>
+  </aside>
+  <main class="main">
+    <div class="topbar" data-attorney-header></div>
+
+    <header>
+      <h1>Welcome back, <span id="user-name-heading">Samantha</span></h1>
+      <p>You have 2 active cases</p>
+    </header>
+
+    <section class="summary">
+      <div class="info-box" data-metric="activeCases">Loading active cases…</div>
+      <div class="info-box message-box" id="messageBox">
+        <div>
+          <span id="messageCount">0</span> message<span id="plural">s waiting</span>
+        </div>
+        <div id="messageSnippet" style="margin-top:.3rem;color:var(--muted);font-size:.85rem;">Fetching latest updates…</div>
+      </div>
+      <div class="info-box" data-metric="overdueTasks">Checking outstanding tasks…</div>
+      <div class="info-box" data-metric="escrowTotal">$0 held in escrow</div>
+    </section>
+
+    <section class="deadlines">
+      <div class="section-title">Upcoming Deadlines</div>
+      <div id="deadlineList">
+        <div class="info-line" style="color:var(--muted);">Loading deadlines…</div>
+      </div>
+    </section>
+
+    <div class="side-by-side-panels">
+      <section id="latestMessagePreview">
+        <div class="section-title">Unread Messages</div>
+        <div class="info-line">
+          <strong id="messagePreviewSender">Loading…</strong>
+          <span id="messagePreviewText"></span>
+          <a id="messagePreviewLink" href="messages.html">View</a>
+        </div>
+      </section>
+      <section>
+        <div class="section-title">Escrow Status</div>
+        <div id="escrowDetails">
+          <div class="info-line">&bull; Calculating escrow totals…</div>
+        </div>
+      </section>
+    </div>
+
+    <section class="quick-actions">
+      <div class="section-title">Quick Actions</div>
+      <button type="button" data-quick-link="create-case">Create New Request</button>
+      <button type="button" data-quick-link="browse-paralegals">Browse Paralegals</button>
+      <button type="button" data-quick-link="upload-doc">Upload Document</button>
+    </section>
+
+    <section class="case-list" id="caseCards">
+      <div class="case-card">
+        <div class="case-header">
+          <div>
+            <h2>Loading recent cases…</h2>
+            <div class="case-subinfo">Please hold while we fetch your assignments.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="completed-section">
+      <h2 class="section-title">Completed Jobs</h2>
+      <div id="completedJobsList" class="completed-jobs-list">
+        <p class="info-line" style="color:var(--muted);">Loading completed jobs…</p>
+      </div>
+    </section>
+  </main>
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script src="assets/scripts/utils/toast.js"></script>
+<script>
+  window.__ATTORNEY_PAGE__ = "overview";
+</script>
+<script type="module" src="assets/scripts/attorney-tabs.js"></script>
+</body>
+</html>

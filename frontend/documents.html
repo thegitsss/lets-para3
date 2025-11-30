@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Documents | Let’s-ParaConnect</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <script src="assets/scripts/utils/session.js"></script>
+  <style>
+    :root {
+      --bg:#ffffff;
+      --sidebar-bg:#f5f5f5e6;
+      --panel:#fcfcfc;
+      --accent:#b6a47a;
+      --ink:#1a1a1a;
+      --muted:#888;
+      --line:rgba(0,0,0,0.08);
+      --radius:14px;
+      --font-serif:'Cormorant Garamond',serif;
+      --font-sans:'Sarabun',sans-serif;
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{display:flex;font-family:var(--font-sans);color:var(--ink);background:var(--bg);min-height:100vh;}
+
+    .sidebar{width:240px;background:var(--sidebar-bg);display:flex;flex-direction:column;border-right:1px solid var(--line);padding:24px 16px;}
+    .logo{font-family:var(--font-serif);font-size:1.6rem;font-weight:300;letter-spacing:.5px;margin-bottom:36px;text-align:center;}
+    nav{display:flex;flex-direction:column;gap:14px;}
+    nav a{text-decoration:none;color:var(--ink);font-weight:200;font-size:.95rem;padding:10px 14px;border-radius:var(--radius);transition:background .3s ease;}
+    nav a:hover,nav a.active{background:rgba(0,0,0,0.04);}
+    .sidebar-footer{margin-top:auto;font-size:.7rem;color:var(--muted);text-align:center;}
+
+    .main{flex:1;padding:40px;overflow-y:auto;}
+
+    .notification-icon{
+      width:46px;
+      height:46px;
+      border-radius:50%;
+      border:1px solid var(--line);
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      background:#fff;
+      cursor:pointer;
+      position:relative;
+      transition:border-color .2s ease, transform .2s ease;
+    }
+    .notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
+    .notification-icon svg{width:22px;height:22px;color:var(--ink);}
+    .notification-badge{
+      position:absolute;
+      top:-4px;
+      right:-4px;
+      background:#c0392b;
+      color:#fff;
+      border-radius:999px;
+      font-size:.75rem;
+      padding:2px 6px;
+      line-height:1;
+      display:none;
+      font-weight:600;
+    }
+    .notification-badge.show{display:inline-flex;}
+
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;}
+    header h1{font-family:var(--font-serif);font-weight:300;font-size:2rem;}
+    .toolbar{display:flex;gap:1rem;align-items:center;flex-wrap:wrap;}
+    .btn{border:none;border-radius:8px;background:var(--accent);color:#fff;padding:.5rem 1rem;font-size:.9rem;cursor:pointer;transition:background .3s ease;font-family:var(--font-sans);}
+    .btn.secondary{background:#fff;color:var(--ink);border:1px solid var(--line);}
+    .btn:hover{background:#a08954;color:#fff;}
+    .btn.secondary:hover{background:rgba(0,0,0,0.03);}
+    select,input[type=file]{border:1px solid var(--line);border-radius:8px;padding:.4rem .7rem;font-family:var(--font-sans);font-size:.9rem;}
+
+    .tabs{display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;}
+    .tab{padding:.6rem 1.2rem;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;transition:all .3s ease;font-weight:200;}
+    .tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+    .layout{display:grid;grid-template-columns:300px 1fr;gap:2rem;}
+    .left-panel{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:1rem;height:calc(100vh - 240px);overflow-y:auto;}
+    .right-panel{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:1.5rem;min-height:500px;overflow-y:auto;}
+
+    .group-header{font-family:var(--font-serif);font-weight:500;margin-top:1rem;margin-bottom:.5rem;font-size:1.1rem;display:flex;justify-content:space-between;align-items:center;}
+    .template-item{padding:.6rem .8rem;border-radius:8px;cursor:pointer;transition:background .2s ease;display:flex;justify-content:space-between;gap:.5rem;align-items:center;}
+    .template-item span{display:block;font-size:.8rem;color:var(--muted);}
+    .template-item:hover,.template-item.active{background:rgba(182,164,122,0.15);}
+
+    .preview-card{border:1px solid var(--line);border-radius:8px;background:#fff;padding:1.5rem;margin-bottom:1rem;}
+    .preview-card h2{font-family:var(--font-serif);font-weight:500;margin-bottom:.25rem;}
+    .preview-meta{font-size:.85rem;color:var(--muted);margin-bottom:.5rem;display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;}
+    .preview-meta a{color:var(--accent);text-decoration:none;font-weight:500;}
+    .doc-preview{border:1px solid var(--line);border-radius:8px;height:220px;display:flex;align-items:center;justify-content:center;color:var(--muted);margin-bottom:1rem;text-align:center;padding:1rem;font-size:.9rem;}
+    .placeholder-table{width:100%;border-collapse:collapse;margin-top:1rem;font-size:.9rem;}
+    .placeholder-table th,.placeholder-table td{padding:.4rem .6rem;border-bottom:1px solid var(--line);text-align:left;}
+    .placeholder-table th{color:var(--muted);font-weight:200;}
+
+    .archive-panel{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:1.5rem;}
+    .archive-panel h2{font-family:var(--font-serif);font-weight:500;margin-bottom:.5rem;}
+    .archive-list{list-style:none;padding:0;margin:0;}
+    .archive-list li{border:1px solid var(--line);border-radius:8px;padding:.8rem 1rem;margin-bottom:.6rem;background:#fff;display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap;}
+    .archive-empty{color:var(--muted);font-style:italic;}
+
+    .hidden{display:none;}
+  </style>
+</head>
+<body>
+
+  <aside class="sidebar">
+    <div class="logo">Dashboard</div>
+    <nav>
+      <a href="dashboard-attorney.html">Home</a>
+      <a href="active-cases.html">Cases</a>
+      <a href="messages.html">Messages</a>
+      <a href="documents.html" class="active">Documents</a>
+      <a href="review.html">Review</a>
+      <a href="case-files.html">Case Files</a>
+      <a href="billing-attorney.html">Billing</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="help.html">Help</a>
+    </nav>
+    <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar" data-attorney-header></div>
+    <header>
+      <h1>Documents</h1>
+      <div class="toolbar">
+        <select id="sortSelect" data-doc-sort>
+          <option value="date">Sort by Date</option>
+          <option value="case">Sort by Case</option>
+          <option value="alpha">Sort A to Z</option>
+        </select>
+        <input type="file" id="fileUpload" data-doc-upload-input multiple />
+        <button class="btn" type="button" data-doc-upload>Upload</button>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <div class="tab active" data-doc-tab="templates">Templates</div>
+      <div class="tab" data-doc-tab="fields">Fields</div>
+      <div class="tab" data-doc-tab="forms">Forms</div>
+      <div class="tab" data-doc-tab="archive">Archived</div>
+    </div>
+
+    <div class="layout" id="standardContent">
+      <div class="left-panel" data-doc-list>
+        <button class="btn" type="button" style="width:100%;margin-bottom:.75rem;" data-doc-new>+ Upload Document</button>
+        <button class="btn secondary" type="button" style="width:100%;margin-bottom:1rem;" data-doc-refresh>Refresh</button>
+        <div data-doc-groups>
+          <p style="color:var(--muted);font-size:.9rem;">Loading documents…</p>
+        </div>
+      </div>
+
+      <div class="right-panel">
+        <div class="preview-card" id="previewCard">
+          <h2 id="templateTitle">Select a document</h2>
+          <div class="preview-meta" data-doc-meta>
+            <span>Choose a file from the list to view details.</span>
+          </div>
+          <div class="doc-preview" data-doc-preview>
+            No document selected. Use the left panel to pick one.
+          </div>
+          <table class="placeholder-table">
+            <thead><tr><th>Property</th><th>Value</th></tr></thead>
+            <tbody id="placeholderBody">
+              <tr><td>Status</td><td>—</td></tr>
+              <tr><td>Version</td><td>—</td></tr>
+              <tr><td>Uploaded</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="archiveContent" class="archive-panel hidden">
+      <h2>Archived Files</h2>
+      <p class="archive-empty hidden" id="archiveEmpty">No archived files yet.</p>
+      <ul class="archive-list" id="archiveList"></ul>
+    </div>
+  </main>
+
+  <input type="file" data-doc-replace-input class="hidden" />
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script>
+    window.__ATTORNEY_PAGE__ = "documents";
+  </script>
+  <script type="module" src="assets/scripts/attorney-tabs.js"></script>
+</body>
+</html>

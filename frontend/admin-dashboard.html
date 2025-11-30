@@ -1,0 +1,1784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin Dashboard | Let's-ParaConnect</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="assets/scripts/utils/session.js"></script>
+<script type="module" src="assets/scripts/auth.js"></script>
+<style>
+:root{
+  --accent:#b6a47a;
+  --bg:#fff;
+  --line:rgba(0,0,0,.08);
+  --muted:#8a8a8a;
+  --ink:#1a1a1a;
+  --font-serif:'Cormorant Garamond',serif;
+  --font-sans:'Sarabun',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--font-sans);
+  font-weight:200;
+  color:var(--ink);
+  background:var(--bg);
+  display:flex;
+  height:100vh;
+  overflow:hidden;
+}
+
+/* Sidebar */
+.sidebar{
+  width:260px;
+  background:url('hero-mountain.jpg') center/cover no-repeat;
+  color:#fff;
+  display:flex;
+  flex-direction:column;
+  padding:24px 20px;
+  border-right:1px solid var(--line);
+  position:relative;
+}
+.sidebar::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,0.45);
+}
+.logo,nav,.sidebar-footer{position:relative;z-index:2;}
+.logo{
+  font-family:var(--font-serif);
+  font-size:1.7rem;
+  font-weight:300;
+  text-align:center;
+  margin-bottom:36px;
+}
+nav{display:flex;flex-direction:column;gap:14px;}
+nav a{
+  text-decoration:none;
+  color:#fff;
+  font-size:.95rem;
+  padding:10px 14px;
+  border-radius:8px;
+  transition:background .3s;
+}
+nav a.active,nav a:hover{background:rgba(255,255,255,0.15);}
+.sidebar-link{
+  display:block;
+  width:100%;
+  border:none;
+  background:none;
+  color:#fff;
+  font-size:.95rem;
+  font-family:var(--font-sans);
+  font-weight:200;
+  text-align:left;
+  padding:10px 14px;
+  border-radius:8px;
+  cursor:pointer;
+}
+.sidebar-link:hover,.sidebar-link:focus{background:rgba(255,255,255,0.15);outline:none;}
+.sidebar-footer{
+  margin-top:auto;
+  font-size:.7rem;
+  color:#e8e8e8;
+  text-align:center;
+  position:relative;
+}
+
+/* Weather widget footer */
+#weatherSidebar{
+  position:absolute;
+  bottom:48px;
+  left:0;
+  width:100%;
+  text-align:center;
+  color:#fff;
+  font-size:1rem;
+  font-family:var(--font-serif);
+  z-index:2;
+}
+
+/* Main */
+.main{
+  flex:1;
+  padding:40px;
+  overflow-y:auto;
+}
+header h1{
+  font-family:var(--font-serif);
+  font-weight:300;
+  font-size:2.3rem;
+  margin-bottom:.25rem;
+}
+header p{color:var(--muted);font-size:.95rem;margin-bottom:2rem;}
+
+/* Metrics */
+.metrics{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:1rem;
+  margin-bottom:2rem;
+}
+.metric{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:1rem;
+  text-align:center;
+  background:#fff;
+}
+.metric.pink{background:#ffe4eb;} .metric.pink p{color:#e45a84;}
+.metric.blue{background:#e2f3ff;} .metric.blue p{color:#4a90e2;}
+.metric.purple{background:#f1e8ff;} .metric.purple p{color:#9b59b6;}
+.metric.teal{background:#e2fff7;} .metric.teal p{color:#16a085;}
+.metric.violet{background:linear-gradient(135deg,#7e49ff,#b47cff);color:#fff;}
+.metric.violet p{color:#fff;}
+.dashboard-grid{display:grid;grid-template-columns:2fr 1fr;gap:2rem;align-items:start;}
+.chart-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.5rem;}
+.chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;}
+.stats-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;}
+.lower-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.5rem;margin-top:2rem;}
+.panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.5rem;}
+.panel.new-users .search{width:100%;padding:.5rem .75rem;margin-bottom:1rem;border:1px solid var(--line);border-radius:6px;}
+.user-list{list-style:none;padding:0;margin:0;} .user-list li{display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--line);}
+.circle-progress{width:120px;height:120px;border-radius:50%;border:6px solid var(--accent);display:flex;align-items:center;justify-content:center;margin:1rem auto;font-weight:600;}
+.sales-box{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;text-align:center;margin-top:1rem;}
+.sales-box div strong{display:block;font-size:1.3rem;color:var(--accent);}
+.sales-box div span{font-size:.85rem;color:var(--muted);}
+.grid-two {display:grid;grid-template-columns:2fr 1fr;gap:1.5rem;margin-bottom:2rem;}
+.escrow-summary {display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1.5rem;}
+.card {background:#fff;border:1px solid var(--line);border-radius:10px;padding:1rem;text-align:center;}
+.card.highlight {background:#1abc9c;color:#fff;}
+.card.highlight h3,.card.highlight p{color:#fff;}
+.quick-stats {display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1rem;text-align:center;margin-bottom:2rem;}
+.quick-stats div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:.8rem;}
+.quick-stats strong{display:block;color:var(--accent);font-size:1.2rem;}
+.panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;}
+.view-all{font-size:.9rem;color:var(--accent);text-decoration:none;}
+.tickets{width:100%;border-collapse:collapse;}
+.tickets th,.tickets td{padding:.75rem;border-bottom:1px solid var(--line);}
+.tickets th{color:var(--muted);text-align:left;}
+.status.open{background:#e2fff7;color:#16a085;padding:4px 8px;border-radius:6px;font-size:.8rem;}
+.details-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:1000;}
+.details-content{background:#fff;border-radius:12px;max-width:800px;width:90%;padding:2rem;max-height:90vh;overflow-y:auto;position:relative;}
+.details-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;}
+.details-table{width:100%;border-collapse:collapse;margin-top:1rem;}
+.details-table td{padding:.6rem .4rem;border-bottom:1px solid var(--line);}
+.highlight-text{background:#e6fff6;color:#16a085;padding:3px 8px;border-radius:4px;}
+.hidden{display:none;}
+.posts-table{width:100%;border-collapse:collapse;}
+.posts-table th,.posts-table td{padding:.75rem;border-bottom:1px solid var(--line);text-align:left;}
+.status.pending{background:#fff4e5;color:#e67e22;padding:4px 8px;border-radius:6px;font-size:.8rem;}
+.status.approved{background:#e2fff7;color:#16a085;padding:4px 8px;border-radius:6px;font-size:.8rem;}
+.flagged-list{list-style:none;padding:0;margin:0;}
+.flagged-list li{padding:.6rem .4rem;border-bottom:1px solid var(--line);font-size:.95rem;}
+.flagged-list li:last-child{border-bottom:none;}
+#section-user-management,
+#section-user-management *{
+  font-family:var(--font-sans);
+  font-weight:200;
+}
+#section-user-management h1,
+#section-user-management h2,
+#section-user-management h3{
+  font-family:var(--font-serif);
+  font-weight:300;
+}
+.quality-bar{height:10px;background:#e8e8e8;border-radius:6px;overflow:hidden;}
+.quality-fill{height:10px;background:var(--accent);border-radius:6px 0 0 6px;}
+.btn.danger{background:#ffebeb;color:#c0392b;border:1px solid #f8d7da;}
+.btn.danger:hover{background:#c0392b;color:#fff;}
+.input-field{width:100%;padding:.6rem .8rem;margin-bottom:1rem;border:1px solid var(--line);border-radius:6px;font-family:var(--font-sans);}
+.search{width:260px;padding:.5rem .75rem;border:1px solid var(--line);border-radius:6px;}
+.grid-four{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1.5rem;}
+.ledger-table{width:100%;border-collapse:collapse;}
+.ledger-table th,.ledger-table td{padding:.75rem;border-bottom:1px solid var(--line);text-align:left;}
+.tax-summary,.payout-schedule{list-style:none;padding:0;margin:0;}
+.tax-summary li,.payout-schedule li{padding:.4rem 0;border-bottom:1px solid var(--line);font-size:.95rem;}
+.tax-summary strong{color:var(--ink);}
+.payout-schedule li:last-child,.tax-summary li:last-child{border-bottom:none;}
+.metric h3{font-family:var(--font-serif);font-weight:400;font-size:1.1rem;margin-bottom:.25rem;}
+.metric p{font-size:1.6rem;color:var(--accent);font-weight:200;}
+
+/* Panels */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:1.5rem;margin-bottom:2rem;}
+.panel{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:1.25rem 1.5rem;
+  background:#fff;
+  transition:all .25s ease;
+}
+.panel:hover{border-color:var(--accent);}
+.panel h2{
+  font-family:var(--font-serif);
+  font-weight:500;
+  font-size:1.3rem;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  cursor:pointer;
+}
+.panel h2 span{font-size:1.2rem;color:var(--muted);}
+.panel-content{margin-top:1rem;display:block;transition:max-height .4s ease;}
+.panel.collapsed .panel-content{display:none;}
+table{width:100%;border-collapse:collapse;font-size:.9rem;}
+th,td{text-align:left;padding:10px 6px;border-bottom:1px solid var(--line);}
+th{color:var(--muted);font-weight:200;}
+.btn{border:none;border-radius:6px;padding:6px 12px;font-size:.9rem;cursor:pointer;transition:all .2s ease;}
+.btn.primary{background:var(--accent);color:#fff;}
+.btn.primary:hover{background:#a38e5f;}
+.btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
+.btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
+.weather{display:flex;align-items:center;justify-content:space-between;}
+.weather h3{font-family:var(--font-serif);font-weight:400;}
+.toast{
+  position:fixed;
+  right:24px;
+  bottom:24px;
+  background:#111827;
+  color:#fff;
+  padding:12px 18px;
+  border-radius:999px;
+  opacity:0;
+  transform:translateY(20px);
+  transition:opacity .2s ease,transform .2s ease;
+  z-index:2000;
+  font-size:.95rem;
+}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast[data-toast-type="ok"]{background:#1abc9c;}
+.toast[data-toast-type="err"]{background:#c0392b;}
+.pending-controls{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem;align-items:flex-start;}
+.pending-controls .search{flex:1;min-width:220px;}
+.pending-controls select{padding:.55rem .8rem;border:1px solid var(--line);border-radius:6px;background:#fff;font-family:var(--font-sans);font-size:.95rem;}
+.pending-count{color:var(--muted);font-size:.9rem;}
+.pending-empty{padding:1rem;text-align:center;color:var(--muted);}
+.pending-users-table td.actions{width:140px;}
+.pending-users-table td.actions .btn{width:100%;}
+.pending-modal-actions{display:flex;justify-content:flex-end;gap:.75rem;margin-top:1.5rem;}
+#pendingUserModal .details-content{max-width:900px;}
+#pendingUserModal .details-table td:first-child{width:200px;font-weight:600;}
+#pendingUserModal .details-table td:last-child{white-space:pre-line;}
+</style>
+</head>
+
+<body>
+<aside class="sidebar">
+  <div class="logo">Admin Panel</div>
+  <nav>
+    <a href="#" class="active" data-section="overview">Overview</a>
+    <a href="#" data-section="user-management">User Management</a>
+    <a href="#" data-section="escrow">Escrow</a>
+    <a href="#" data-section="revenue">Revenue</a>
+    <a href="#" data-section="posts">Posts</a>
+    <a href="#" data-section="activity-logs">Activity Logs</a>
+    <a href="#" data-section="settings">Settings</a>
+  </nav>
+  <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
+  <div id="weatherSidebar">Loading weather…</div>
+  <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
+</aside>
+
+<main class="main">
+
+  <!-- OVERVIEW (default visible) -->
+  <section id="section-overview" class="section visible">
+    <header>
+      <h1>Welcome, Admin</h1>
+    </header>
+
+    <div class="metrics">
+      <div class="metric"><h3>Total Users</h3><p id="totalUsers">0</p></div>
+      <div class="metric"><h3>Funds in Escrow</h3><p id="escrowTotal">$0</p></div>
+      <div class="metric"><h3>Active Cases</h3><p id="activeCases">0</p></div>
+      <div class="metric"><h3>Pending Approvals</h3><p id="pendingUsers">0</p></div>
+    </div>
+
+    <div class="grid-four" style="margin-bottom:1.5rem;">
+      <div class="card" id="payoutCard">
+        <h3>Payouts</h3>
+        <p style="font-size:1.6rem;font-weight:600;color:var(--accent);" id="payoutTotal">$0</p>
+        <p class="small" id="payoutCount">0 payouts recorded</p>
+      </div>
+      <div class="card" id="incomeCard">
+        <h3>Platform Income</h3>
+        <p style="font-size:1.6rem;font-weight:600;color:var(--accent);" id="incomeTotal">$0</p>
+        <p class="small" id="incomeCount">0 income records</p>
+      </div>
+    </div>
+
+    <div class="grid">
+
+      <!-- Escrow -->
+      <div class="panel" id="escrowPanel">
+        <h2 onclick="togglePanel('escrowPanel')">Escrow Overview <span>▾</span></h2>
+        <div class="panel-content">
+          <canvas id="escrowChart" height="150"></canvas>
+          <table>
+            <thead><tr><th>Case</th><th>Attorney</th><th>Paralegal</th><th>Held</th><th>Status</th></tr></thead>
+            <tbody id="escrowBody">
+              <tr><td colspan="5" style="text-align:center;color:var(--muted)">No escrow data yet</td></tr>
+            </tbody>
+          </table>
+          <button class="btn secondary" onclick="pauseReportActivity(0)">Pause & Report Activity</button>
+        </div>
+      </div>
+
+      <!-- New Users -->
+      <div class="panel" id="userPanel">
+        <h2 onclick="togglePanel('userPanel')">New Users Analytics <span>▾</span></h2>
+        <div class="panel-content">
+          <canvas id="userChart" height="150"></canvas>
+          <button class="btn primary" onclick="alert('Opening Review Queue…')">Review New Users</button>
+        </div>
+      </div>
+
+      <!-- Revenue -->
+      <div class="panel" id="revenuePanel">
+        <h2 onclick="togglePanel('revenuePanel')">Revenue Reports <span>▾</span></h2>
+        <div class="panel-content"><canvas id="revChart" height="150"></canvas></div>
+      </div>
+
+      <!-- Recent Posts -->
+      <div class="panel" id="postsPanel">
+        <h2 onclick="togglePanel('postsPanel')">Recent Job Posts <span>▾</span></h2>
+        <div class="panel-content">
+          <table>
+            <thead><tr><th>Title</th><th>Posted By</th><th>Date</th></tr></thead>
+            <tbody id="postsBody">
+              <tr><td colspan="3" style="text-align:center;color:var(--muted)">No posts available</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Audit Logs -->
+      <div class="panel" id="logsPanel">
+        <h2 onclick="togglePanel('logsPanel')">Admin Activity / Audit Logs <span>▾</span></h2>
+        <div class="panel-content">
+          <ul id="logsList" style="list-style:none;padding:0;margin:0;">
+            <li style="color:var(--muted)">No activity yet</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- USER MANAGEMENT -->
+  <section id="section-user-management" class="section">
+    <header>
+      <div class="header-top">
+        <h1>User Management</h1>
+        <div class="date-picker">
+          <span>August 1 – August 31, 2025</span>
+          <i class="calendar-icon">📅</i>
+        </div>
+      </div>
+      <p>Analyze user registrations, activity, and sales performance over time.</p>
+    </header>
+
+    <!-- Chart + Cards -->
+    <div class="dashboard-grid">
+      <div class="chart-card">
+        <div class="chart-header">
+          <h2>Registration Trends</h2>
+          <select id="userMgmtView">
+            <option>Show By Month</option>
+            <option>Show By Week</option>
+          </select>
+        </div>
+        <canvas id="userMgmtComboChart" height="200"></canvas>
+      </div>
+
+      <div class="stats-cards">
+        <div class="metric pink"><h3>Attorneys</h3><p id="metricAttorneys">0</p></div>
+        <div class="metric blue"><h3>Paralegals</h3><p id="metricParalegals">0</p></div>
+        <div class="metric purple"><h3>Pending Approvals</h3><p id="metricPending">0</p></div>
+        <div class="metric teal"><h3>Suspended Users</h3><p id="metricSuspended">0</p></div>
+      </div>
+    </div>
+
+    <!-- Lower section -->
+    <div class="lower-grid">
+      <div class="panel new-users">
+        <h2>New Users</h2>
+        <input type="text" placeholder="Search…" class="search" />
+        <ul class="user-list" id="newUsersList">
+          <li style="color:var(--muted)">Loading…</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="panel" id="pendingUsersPanel">
+      <div class="panel-header">
+        <h2>Pending User Approvals</h2>
+        <p id="pendingUsersCountLabel" class="pending-count">0 pending users</p>
+      </div>
+      <div class="pending-controls">
+        <input type="search" id="pendingSearch" class="search" placeholder="Search name, email, or specialty…" aria-label="Search pending users" />
+        <select id="pendingRoleFilter" aria-label="Filter by role">
+          <option value="all">All Roles</option>
+          <option value="attorney">Attorneys</option>
+          <option value="paralegal">Paralegals</option>
+        </select>
+        <button class="btn secondary" type="button" id="refreshPendingUsers">Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table class="pending-users-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Role</th>
+              <th>Email</th>
+              <th>Submitted</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pendingUsersBody">
+            <tr><td colspan="6" class="pending-empty">Loading pending users…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ESCROW -->
+  <section id="section-escrow" class="section">
+    <header>
+      <h1>Escrow Dashboard</h1>
+      <p>Monitor all escrow activities — deposits, withdrawals, charges, and tickets.</p>
+    </header>
+
+    <!-- Top Chart Row -->
+    <div class="grid-two">
+      <div class="panel">
+        <h2>Monthly Escrow Report</h2>
+        <canvas id="escrowReportChart" height="150"></canvas>
+      </div>
+
+      <div class="panel">
+        <h2>Daily Logins (Last 10 Days)</h2>
+        <canvas id="dailyLoginChart" height="150"></canvas>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="quick-stats">
+      <div><strong>3</strong><span>Total Users</span></div>
+      <div><strong>3</strong><span>Active Users</span></div>
+      <div><strong>0</strong><span>Email Unverified</span></div>
+      <div><strong>1</strong><span>Pending Withdrawals</span></div>
+      <div><strong>1</strong><span>Pending Deposits</span></div>
+      <div><strong>0</strong><span>Rejected Deposits</span></div>
+    </div>
+
+    <!-- Tickets -->
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Recent Tickets</h2>
+        <a href="#" class="view-all">View All</a>
+      </div>
+      <table class="tickets">
+        <thead>
+          <tr><th>Subject</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><a href="#">Ticket#125950 - dfsaf</a></td><td><span class="status open">Open</span></td></tr>
+          <tr><td><a href="#">Ticket#754912 - dfsaf</a></td><td><span class="status open">Open</span></td></tr>
+          <tr><td><a href="#">Ticket#94883578 - fsdfsd</a></td><td><span class="status open">Open</span></td></tr>
+          <tr><td><a href="#">Ticket#40031718 - In molestiae delenit</a></td><td><span class="status open">Open</span></td></tr>
+          <tr><td><a href="#">Ticket#70632904 - dfg</a></td><td><span class="status open">Open</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Hidden Detail Modal -->
+    <div id="escrowDetails" class="details-modal hidden">
+      <div class="details-content">
+        <div class="details-header">
+          <h2>Escrow Details</h2>
+          <button class="btn secondary" onclick="closeEscrowDetails()">Close ✕</button>
+        </div>
+        <div class="breadcrumb">
+          <a href="#" onclick="closeEscrowDetails()">🏠 Home</a> → Escrow Details
+        </div>
+
+        <div class="detail-panel">
+          <h3>Web Application</h3>
+          <button class="btn primary" style="float:right;">See Milestones →</button>
+          <table class="details-table">
+            <tr><td><strong>Escrow Number</strong></td><td>CBS50QN7F8JEM</td></tr>
+            <tr><td><strong>Title</strong></td><td>Website Development</td></tr>
+            <tr><td><strong>Attorney</strong></td><td>John Doe</td></tr>
+            <tr><td><strong>Paralegal</strong></td><td>Jane Smith</td></tr>
+            <tr><td><strong>Buyer’s Email</strong></td><td>client@email.com</td></tr>
+            <tr><td><strong>Charge Payer</strong></td><td><span class="highlight-text">Buyer(50%) - Seller(50%)</span></td></tr>
+            <tr><td><strong>Status</strong></td><td>Active</td></tr>
+            <tr><td><strong>Amount</strong></td><td>$30.00</td></tr>
+            <tr><td><strong>Charge</strong></td><td>$4.90</td></tr>
+            <tr><td><strong>Created Milestone</strong></td><td>$0.00 USD</td></tr>
+            <tr><td><strong>Milestone Funded</strong></td><td>$0.00 USD</td></tr>
+            <tr><td><strong>Milestone Unfunded</strong></td><td>$0.00 USD</td></tr>
+            <tr><td><strong>Rest Amount</strong></td><td>$32.45 USD</td></tr>
+            <tr><td><strong>Disputed By</strong></td><td>test12</td></tr>
+            <tr><td><strong>Dispute Reason</strong></td><td>Delayed delivery</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REVENUE -->
+  <section id="section-revenue" class="section">
+    <header>
+      <h1>Revenue & Accounting</h1>
+      <p>Monitor revenue flow, platform fees, and tax summaries — everything you need for stress-free bookkeeping.</p>
+    </header>
+
+    <!-- Overview Row -->
+    <div class="grid-four">
+      <div class="card"><h3>Total Revenue</h3><p>$42,560.00</p></div>
+      <div class="card highlight"><h3>Escrow Released</h3><p>$28,430.00</p></div>
+      <div class="card"><h3>Pending Payouts</h3><p>$4,120.00</p></div>
+      <div class="card highlight"><h3>Platform Fees Collected</h3><p>$2,835.00</p></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid-two" style="margin-top:2rem;">
+      <div class="panel">
+        <div class="panel-header"><h2>Monthly Revenue Trends</h2><select id="revView"><option>Show by Month</option><option>Show by Quarter</option></select></div>
+        <canvas id="revMainChart" height="150"></canvas>
+      </div>
+
+      <div class="panel">
+        <h2>Expense Breakdown</h2>
+        <canvas id="revExpenseChart" height="150"></canvas>
+      </div>
+    </div>
+
+    <!-- Accounting Table -->
+    <div class="panel" style="margin-top:2rem;">
+      <div class="panel-header">
+        <h2>Accounting Ledger</h2>
+        <button class="btn primary" onclick="downloadCSV()">Download CSV ⬇</button>
+      </div>
+      <table class="ledger-table">
+        <thead>
+          <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Type</th><th>Status</th></tr>
+        </thead>
+        <tbody id="ledgerBody">
+          <tr><td>2025-11-01</td><td>Attorney Payment</td><td>Case #1245 – Contract Draft</td><td>$1,200.00</td><td>Income</td><td><span class="status open">Cleared</span></td></tr>
+          <tr><td>2025-11-02</td><td>Paralegal Payout</td><td>Case #1198 – Research Support</td><td>-$350.00</td><td>Expense</td><td><span class="status open">Cleared</span></td></tr>
+          <tr><td>2025-11-03</td><td>Stripe Fee</td><td>Transaction Processing</td><td>-$9.75</td><td>Expense</td><td><span class="status open">Cleared</span></td></tr>
+          <tr><td>2025-11-05</td><td>Escrow Deposit</td><td>Case #1272 – Litigation Review</td><td>$2,450.00</td><td>Income</td><td><span class="status open">Pending</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Tax Summary -->
+    <div class="grid-two" style="margin-top:2rem;">
+      <div class="panel">
+        <h2>Tax Summary</h2>
+        <ul class="tax-summary">
+          <li><strong>Gross Earnings:</strong> $42,560.00</li>
+          <li><strong>Deductible Expenses:</strong> $12,475.00</li>
+          <li><strong>Estimated Tax Owed (22%):</strong> $6,615.00</li>
+          <li><strong>Next Filing Deadline:</strong> April 15 2026</li>
+        </ul>
+        <button class="btn secondary">Generate Tax Report</button>
+      </div>
+
+      <div class="panel">
+        <h2>Upcoming Payout Schedule</h2>
+        <ul class="payout-schedule">
+          <li>Nov 15 – $1,800 to Jane Smith</li>
+          <li>Nov 22 – $2,100 to John Doe</li>
+          <li>Dec 01 – $3,500 to Kelly Adams</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- POSTS -->
+  <section id="section-posts" class="section">
+    <header>
+      <h1>Review Job Posts</h1>
+      <p>Oversee attorney job listings. Approve, edit, or remove posts that don’t meet Let’s-ParaConnect standards.</p>
+    </header>
+
+    <!-- Analytics Summary -->
+    <div class="grid-four">
+      <div class="card"><h3>Total Posts</h3><p>1,248</p></div>
+      <div class="card highlight"><h3>Pending Review</h3><p>37</p></div>
+      <div class="card"><h3>Approved</h3><p>1,172</p></div>
+      <div class="card"><h3>Flagged</h3><p>39</p></div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid-two" style="margin-top:2rem;">
+      <div class="panel">
+        <h2>Posts by Category</h2>
+        <canvas id="postCategoryChart" height="150"></canvas>
+      </div>
+      <div class="panel">
+        <h2>Posts by State</h2>
+        <canvas id="postStateChart" height="150"></canvas>
+      </div>
+    </div>
+
+    <!-- Table of Posts -->
+    <div class="panel" style="margin-top:2rem;">
+      <div class="panel-header">
+        <h2>Latest Job Listings</h2>
+        <input type="text" id="postSearch" class="search" placeholder="Search by keyword or author…">
+      </div>
+      <table class="posts-table">
+        <thead>
+          <tr><th>Title</th><th>Author</th><th>Category</th><th>Location</th><th>Date</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody id="postsList">
+          <tr>
+            <td>Contract Drafting Assistance</td>
+            <td>Attorney J. Moore</td>
+            <td>Corporate</td>
+            <td>VA</td>
+            <td>Nov 10 2025</td>
+            <td><span class="status pending">Pending</span></td>
+            <td>
+              <button class="btn primary" onclick="approvePost(this)">Approve</button>
+              <button class="btn secondary" onclick="editPost(this)">Edit</button>
+              <button class="btn danger" onclick="flagPost(this)">Flag</button>
+            </td>
+          </tr>
+          <tr>
+            <td>Discovery Review Needed</td>
+            <td>Attorney R. Hughes</td>
+            <td>Litigation</td>
+            <td>MD</td>
+            <td>Nov 09 2025</td>
+            <td><span class="status approved">Approved</span></td>
+            <td>
+              <button class="btn secondary" onclick="editPost(this)">Edit</button>
+              <button class="btn danger" onclick="flagPost(this)">Flag</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid-two" style="margin-top:2rem;">
+      <div class="panel">
+        <h2>Content Quality Overview</h2>
+        <canvas id="qualityScoreChart" height="150"></canvas>
+        <p style="margin-top:1rem;">Average quality score for all reviewed posts this week.</p>
+      </div>
+
+      <div class="panel">
+        <h2>Flagged Content Summary</h2>
+        <ul class="flagged-list" id="flaggedList">
+          <li><strong>Contract Drafting Assistance</strong> – flagged for missing pay rate</li>
+          <li><strong>Discovery Review Needed</strong> – contains vague requirements</li>
+          <li><strong>Client Communication Post</strong> – unprofessional language detected</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Modal for Editing -->
+    <div id="editPostModal" class="details-modal hidden">
+      <div class="details-content">
+        <div class="details-header">
+          <h2>Edit Job Post</h2>
+          <button class="btn secondary" onclick="closeEditModal()">Close ✕</button>
+        </div>
+        <form id="editPostForm">
+          <label>Title</label><input type="text" id="editTitle" class="input-field">
+          <label>Description</label><textarea id="editDescription" class="input-field" rows="5"></textarea>
+          <label>Category</label>
+          <select id="editCategory" class="input-field">
+            <option>Corporate</option>
+            <option>Litigation</option>
+            <option>Family</option>
+            <option>Real Estate</option>
+            <option>Criminal</option>
+          </select>
+          <label>Status</label>
+          <select id="editStatus" class="input-field">
+            <option>Pending</option>
+            <option>Approved</option>
+            <option>Flagged</option>
+          </select>
+          <button type="button" class="btn primary" onclick="savePostEdits()">Save Changes</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- ACTIVITY LOGS -->
+  <section id="section-activity-logs" class="section">
+    <h2>Admin Activity Logs</h2>
+    <p>View and export full audit logs for compliance.</p>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="section-settings" class="section">
+    <h2>Settings</h2>
+    <p>Manage site preferences, API keys, and notifications.</p>
+</section>
+
+</main>
+
+<div id="pendingUserModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="pendingModalTitle">
+  <div class="details-content">
+    <div class="details-header">
+      <div>
+        <h2 id="pendingModalTitle">Applicant Details</h2>
+        <p id="pendingModalSubhead" class="pending-count"></p>
+      </div>
+      <button type="button" class="btn secondary" id="closePendingModal">Close ✕</button>
+    </div>
+    <table class="details-table">
+      <tbody id="pendingUserDetails"></tbody>
+    </table>
+    <div class="pending-modal-actions">
+      <button type="button" class="btn danger" id="denyUserBtn">Deny</button>
+      <button type="button" class="btn primary" id="approveUserBtn">Approve</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+
+<style>
+.section {display:none;opacity:0;transition:opacity .4s ease;}
+.section.visible {display:block;opacity:1;}
+nav a.active {background:rgba(255,255,255,0.25);}
+</style>
+
+<script src="assets/scripts/utils/toast.js"></script>
+<script>
+const adminSession = window.checkSession('admin');
+const navLinks=document.querySelectorAll("nav a");
+const sections=document.querySelectorAll(".section");
+const logoutButton=document.getElementById("logoutBtn");
+const refreshCharts=()=>{
+  if(!window.dashboardCharts?.length) return;
+  window.dashboardCharts.forEach(chart=>chart.resize());
+};
+
+function activateSection(sectionName){
+  if(!sectionName) return;
+  navLinks.forEach(link=>{
+    const match=link.dataset.section===sectionName;
+    link.classList.toggle("active",match);
+  });
+  sections.forEach(section=>{
+    section.classList.toggle("visible",section.id===`section-${sectionName}`);
+  });
+  requestAnimationFrame(refreshCharts);
+}
+window.activateAdminSection = activateSection;
+
+navLinks.forEach(link=>{
+  link.addEventListener("click",e=>{
+    e.preventDefault();
+    const target=link.dataset.section;
+    if(target) activateSection(target);
+  });
+});
+
+const pendingMetricCard=document.getElementById("pendingUsers")?.closest(".metric");
+if(pendingMetricCard){
+  pendingMetricCard.addEventListener("click",()=>{
+    activateSection("user-management");
+    setTimeout(()=>document.getElementById("pendingUsersPanel")?.scrollIntoView({behavior:"smooth",block:"start"}),60);
+  });
+}
+
+const WEATHER_CACHE_KEY="adminWeatherCache";
+const WEATHER_CACHE_MS=15*60*1000;
+function readCachedWeather(){
+  try{
+    const cached=JSON.parse(sessionStorage.getItem(WEATHER_CACHE_KEY)||"");
+    if(cached?.text&&Date.now()-(cached.timestamp||0)<WEATHER_CACHE_MS){
+      return cached.text;
+    }
+  }catch{}
+  return null;
+}
+function writeCachedWeather(text){
+  try{sessionStorage.setItem(WEATHER_CACHE_KEY,JSON.stringify({text,timestamp:Date.now()}));}catch{}
+}
+async function maybeGetGeo(){
+  if(!("geolocation" in navigator)) return null;
+  try{
+    const perm=await (navigator.permissions?.query?navigator.permissions.query({name:"geolocation"}):Promise.resolve(null));
+    if(perm&&perm.state!=="granted") return null;
+  }catch{}
+  try{
+    const position=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{maximumAge:300000,timeout:1500}));
+    if(position?.coords){
+      return{lat:position.coords.latitude,lon:position.coords.longitude};
+    }
+  }catch{}
+  return null;
+}
+async function loadSidebarWeather(){
+  const weatherEl=document.getElementById("weatherSidebar");
+  if(!weatherEl) return;
+  const cached=readCachedWeather();
+  if(cached) weatherEl.textContent=cached;
+  else weatherEl.textContent="Loading weather…";
+  const params=new URLSearchParams();
+  const coords=await maybeGetGeo();
+  if(coords){
+    params.set("lat",coords.lat.toFixed(3));
+    params.set("lon",coords.lon.toFixed(3));
+  }
+  try{
+    const res=await fetch(`/api/public/weather${params.toString()?`?${params.toString()}`:""}`,{headers:{Accept:"application/json"}});
+    if(!res.ok) throw new Error("weather");
+    const data=await res.json().catch(()=>({}));
+    const temp=typeof data.temperature==="number"?Math.round(data.temperature):null;
+    const condition=data?.condition||"Fair";
+    if(temp===null) throw new Error("weather");
+    const label=`${temp}\u00B0F ${condition}`;
+    weatherEl.textContent=label;
+    writeCachedWeather(label);
+  }catch(err){
+    if(!cached) weatherEl.textContent="Weather unavailable";
+  }
+}
+loadSidebarWeather();
+
+if(logoutButton&&!logoutButton.dataset.boundLogoutEnhanced){
+  logoutButton.dataset.boundLogoutEnhanced="true";
+  logoutButton.dataset.boundLogout="true";
+  const defaultLabel=(logoutButton.textContent||"").trim()||"Log Out";
+  logoutButton.addEventListener("click",async(event)=>{
+    event.preventDefault();
+    event.stopPropagation();
+    logoutButton.disabled=true;
+    logoutButton.textContent="Logging out…";
+    try{
+      if(typeof window.logoutUser==="function"){
+        await window.logoutUser(event);
+      }else{
+        try{await fetch("/api/auth/logout",{method:"POST",credentials:"include"});}catch{}
+        try{localStorage.removeItem("lpc_user");sessionStorage.removeItem("lpc_user");}catch{}
+        window.location.href="login.html";
+      }
+    }catch(err){
+      console.error("Logout failed",err);
+      logoutButton.disabled=false;
+      logoutButton.textContent=defaultLabel;
+    }
+  });
+}
+
+document.querySelector(".sidebar-footer")?.addEventListener("click",()=>{
+  window.location.href="index.html";
+});
+
+</script>
+
+
+<script type="module">
+import { secureFetch, fetchCSRF, logoutUser } from './assets/scripts/auth.js';
+const toastHelper = window.toastUtils;
+const toastTarget = 'toastBanner';
+
+function togglePanel(id){document.getElementById(id).classList.toggle('collapsed');}
+const dashboardCharts=window.dashboardCharts||(window.dashboardCharts=[]);
+const payoutTotalEl=document.getElementById("payoutTotal");
+const payoutCountEl=document.getElementById("payoutCount");
+const incomeTotalEl=document.getElementById("incomeTotal");
+const incomeCountEl=document.getElementById("incomeCount");
+
+async function fetchAdminJSON(url, fallback = null) {
+  try {
+    const res = await secureFetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } catch (err) {
+    console.warn(`Unable to fetch ${url}`, err);
+    return fallback;
+  }
+}
+
+function formatCurrencyFromCents(value) {
+  const dollars = Number(value || 0) / 100;
+  return dollars.toLocaleString(undefined, { style: "currency", currency: "USD" });
+}
+
+async function loadFinanceCards() {
+  if (!payoutTotalEl || !incomeTotalEl) return;
+  try {
+    const [payoutData, incomeData] = await Promise.all([
+      fetchAdminJSON("/api/admin/payouts", { totalAmount: 0, count: 0 }),
+      fetchAdminJSON("/api/admin/income", { totalAmount: 0, count: 0 }),
+    ]);
+    payoutTotalEl.textContent = formatCurrencyFromCents(payoutData.totalAmount);
+    payoutCountEl.textContent = `${payoutData.count || 0} payout${(payoutData.count || 0) === 1 ? "" : "s"} recorded`;
+    incomeTotalEl.textContent = formatCurrencyFromCents(incomeData.totalAmount);
+    incomeCountEl.textContent = `${incomeData.count || 0} income record${(incomeData.count || 0) === 1 ? "" : "s"}`;
+  } catch (err) {
+    console.warn("Unable to load finance cards", err);
+    payoutCountEl.textContent = "Unable to load payouts";
+    incomeCountEl.textContent = "Unable to load income";
+  }
+}
+
+/* -------- Charts (0 until data) -------- */
+dashboardCharts.push(new Chart(document.getElementById("userChart"),{type:"line",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],borderColor:"#b6a47a",backgroundColor:"rgba(182,164,122,0.15)",fill:true,tension:.4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}));
+dashboardCharts.push(new Chart(document.getElementById("revChart"),{type:"bar",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],backgroundColor:"#b6a47a"}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}));
+dashboardCharts.push(new Chart(document.getElementById("escrowChart"),{type:"doughnut",data:{labels:["Held","Released","Pending"],datasets:[{data:[0,0,0],backgroundColor:["#b6a47a","#e6d9b8","#dcd5c0"]}]},options:{plugins:{legend:{position:"bottom"}}}}));
+
+/* -------- User Management Combo Chart -------- */
+const ctx = document.getElementById("userMgmtComboChart");
+dashboardCharts.push(new Chart(ctx,{
+  type:"bar",
+  data:{
+    labels:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct"],
+    datasets:[
+      {
+        type:"bar",
+        label:"Registrations",
+        data:[25,40,30,50,70,60,90,85,75,95],
+        backgroundColor:"rgba(182,164,122,0.35)",
+        borderRadius:6,
+      },
+      {
+        type:"line",
+        label:"Growth Rate (%)",
+        data:[10,20,15,30,25,35,40,38,33,45],
+        borderColor:"#b6a47a",
+        backgroundColor:"rgba(182,164,122,0.15)",
+        fill:true,
+        tension:0.4,
+        yAxisID:"y1",
+      }
+    ]
+  },
+  options:{
+    responsive:true,
+    interaction:{mode:"index",intersect:false},
+    plugins:{legend:{position:"bottom"}},
+    scales:{
+      y:{beginAtZero:true,title:{display:true,text:"Users"}},
+      y1:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"Growth %"}}}
+  }
+}));
+
+/* -------- Escrow Charts -------- */
+dashboardCharts.push(new Chart(document.getElementById("escrowReportChart"), {
+  type:"line",
+  data:{
+    labels:["Mar 05","Mar 10","Mar 15","Mar 16","Mar 18"],
+    datasets:[{
+      label:"Deposits",
+      data:[2,7,2,1,3],
+      borderColor:"#1abc9c",
+      backgroundColor:"rgba(26,188,156,0.15)",
+      tension:0.4,
+      fill:true
+    }]
+  },
+  options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+}));
+
+dashboardCharts.push(new Chart(document.getElementById("dailyLoginChart"), {
+  type:"line",
+  data:{
+    labels:["Feb 27","Mar 01","Mar 02","Mar 04","Mar 05","Mar 10","Mar 15","Mar 16","Mar 18"],
+    datasets:[{
+      label:"Logins",
+      data:[1,5,6,0,2,4,1,6,3],
+      borderColor:"#1abc9c",
+      backgroundColor:"rgba(26,188,156,0.15)",
+      tension:0.4,
+      fill:true
+    }]
+  },
+  options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+}));
+
+/* -------- Escrow Details Modal Logic -------- */
+function openEscrowDetails(){
+  document.getElementById("escrowDetails").classList.remove("hidden");
+}
+function closeEscrowDetails(){
+  document.getElementById("escrowDetails").classList.add("hidden");
+}
+document.querySelectorAll(".tickets tbody tr td a").forEach(a=>{
+  a.addEventListener("click",e=>{
+    e.preventDefault();
+    openEscrowDetails();
+  });
+});
+
+/* -------- Revenue Charts -------- */
+dashboardCharts.push(new Chart(document.getElementById("revMainChart"),{
+  type:"bar",
+  data:{
+    labels:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov"],
+    datasets:[
+      {
+        label:"Revenue",
+        data:[4200,5100,4800,5300,6200,5700,6900,7100,6800,7200,7450],
+        backgroundColor:"rgba(182,164,122,0.6)",
+        borderRadius:6
+      },
+      {
+        type:"line",
+        label:"Profit Margin %",
+        data:[18,22,20,24,26,25,27,28,30,29,31],
+        borderColor:"#1abc9c",
+        tension:0.4,
+        yAxisID:"y1",
+        fill:false
+      }
+    ]
+  },
+  options:{
+    plugins:{legend:{position:"bottom"}},
+    scales:{
+      y:{beginAtZero:true,title:{display:true,text:"Revenue ($)"}},
+      y1:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"Margin %"}}
+    }
+  }
+}));
+
+dashboardCharts.push(new Chart(document.getElementById("revExpenseChart"),{
+  type:"doughnut",
+  data:{
+    labels:["Platform Fees","Taxes","Operational Costs","Payouts"],
+    datasets:[{
+      data:[2835,6615,4200,28430],
+      backgroundColor:["#b6a47a","#f4d03f","#95a5a6","#1abc9c"]
+    }]
+  },
+  options:{plugins:{legend:{position:"bottom"}}}
+}));
+
+/* -------- Accounting Download -------- */
+function downloadCSV(){
+  const rows=[["Date","Category","Description","Amount","Type","Status"]];
+  document.querySelectorAll("#ledgerBody tr").forEach(tr=>{
+    const cells=[...tr.children].map(td=>td.innerText.trim());
+    rows.push(cells);
+  });
+  const csv=rows.map(r=>r.join(",")).join("\n");
+  const blob=new Blob([csv],{type:"text/csv"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download="LetsParaConnect_RevenueLedger.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* -------- Post Analytics Charts -------- */
+const postsTableBody=document.getElementById("postsList");
+const postSearchInput=document.getElementById("postSearch");
+const flaggedList=document.getElementById("flaggedList");
+const postsSection=document.getElementById("section-posts");
+const postsSummaryCards=postsSection?Array.from(postsSection.querySelectorAll(".grid-four .card")):[];
+const postSummaryTargets={
+  total:postsSummaryCards[0]?.querySelector("p"),
+  pending:postsSummaryCards[1]?.querySelector("p"),
+  approved:postsSummaryCards[2]?.querySelector("p"),
+  flagged:postsSummaryCards[3]?.querySelector("p")
+};
+const pendingPostStatuses=new Set(["open","awaiting_documents","reviewing","pending"]);
+const flaggedPostStatuses=new Set(["disputed","cancelled"]);
+let adminPosts=[];
+
+const postCategoryCtx=document.getElementById("postCategoryChart");
+const postCategoryChart=postCategoryCtx?new Chart(postCategoryCtx,{
+  type:"doughnut",
+  data:{labels:[],datasets:[{data:[],backgroundColor:["#b6a47a","#1abc9c","#9b59b6","#f1c40f","#e67e22","#2c3e50"]}]},
+  options:{plugins:{legend:{position:"bottom"}}}
+}):null;
+if(postCategoryChart)dashboardCharts.push(postCategoryChart);
+
+const postStateCtx=document.getElementById("postStateChart");
+const postStateChart=postStateCtx?new Chart(postStateCtx,{
+  type:"bar",
+  data:{labels:[],datasets:[{label:"Posts",data:[],backgroundColor:"rgba(182,164,122,0.6)",borderRadius:6}]},
+  options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+}):null;
+if(postStateChart)dashboardCharts.push(postStateChart);
+
+const qualityScoreCtx=document.getElementById("qualityScoreChart");
+const qualityScoreChart=qualityScoreCtx?new Chart(qualityScoreCtx,{
+  type:"bar",
+  data:{labels:[],datasets:[{label:"Quality Score",data:[],backgroundColor:[],borderRadius:6}]},
+  options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,title:{display:true,text:"Score"}},x:{ticks:{autoSkip:false}}}}
+}):null;
+if(qualityScoreChart)dashboardCharts.push(qualityScoreChart);
+
+function escapeHtml(value=""){
+  return String(value||"").replace(/[&<>]/g,(char)=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[char]||char));
+}
+
+function formatPostDate(value){
+  if(!value)return"—";
+  const date=new Date(value);
+  return Number.isNaN(date.getTime())?"—":date.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});
+}
+
+function deriveState(entry={}){
+  const direct=entry.state||entry.locationState;
+  if(direct)return direct;
+  const summary=entry.briefSummary||entry.details||"";
+  const match=/State:\s*([^•\n]+)/i.exec(summary);
+  return match?match[1].trim():"";
+}
+
+function evaluatePostQuality(text="",title=""){
+  const combined=`${title||""} ${text||""}`.trim();
+  if(!combined)return{score:40,reasons:["Missing description"]};
+  let score=100;
+  const reasons=[];
+  if(combined.length<120){score-=20;reasons.push("Description too short");}
+  const penalties=[
+    {pattern:/lol|haha|hey/i,points:15,reason:"Unprofessional tone"},
+    {pattern:/urgent|asap|immediately/i,points:10,reason:"Overly urgent phrasing"},
+    {pattern:/tbd|unknown|n\/a/i,points:8,reason:"Incomplete details"},
+    {pattern:/\?\s*$/m,points:5,reason:"Unclear requirements"}
+  ];
+  penalties.forEach((rule)=>{
+    if(rule.pattern.test(combined)){
+      score-=rule.points;
+      reasons.push(rule.reason);
+    }
+  });
+  if(!/experience|years|skill/i.test(combined)){
+    score-=5;
+    reasons.push("Missing experience expectations");
+  }
+  score=Math.max(20,Math.min(100,score));
+  return{score,reasons};
+}
+
+function shapeAdminPost(entry={}){
+  const status=String(entry.status||"open").toLowerCase();
+  const quality=evaluatePostQuality(entry.details||entry.briefSummary||"",entry.title||"");
+  const flaggedByStatus=flaggedPostStatuses.has(status);
+  const isFlagged=flaggedByStatus||quality.score<75;
+  const attorney=entry.attorney||{};
+  const author=entry.authorName||attorney.name||`${attorney.firstName||""} ${attorney.lastName||""}`.trim()||attorney.email||"Unknown";
+  const state=deriveState(entry);
+  const statusLabel=isFlagged?"Flagged":toTitle(status.replace(/_/g," "))||"Pending";
+  const statusClass=isFlagged||pendingPostStatuses.has(status)?"pending":"approved";
+  return{
+    id:entry.id||entry._id,
+    title:entry.title||"Untitled Post",
+    authorName:author,
+    category:entry.category||entry.practiceArea||"General",
+    state:state||"—",
+    createdAt:entry.createdAt||entry.created_at||null,
+    status,
+    statusLabel,
+    statusClass,
+    isFlagged,
+    flaggedReason:flaggedByStatus?"Status requires admin review":quality.reasons[0]||"Low quality description",
+    qualityScore:quality.score,
+    qualityReasons:quality.reasons,
+    details:entry.details||entry.briefSummary||""
+  };
+}
+
+function setPostsTableMessage(message){
+  if(!postsTableBody)return;
+  postsTableBody.innerHTML=`<tr><td colspan="7" class="pending-empty">${message}</td></tr>`;
+  postsTableState.refresh();
+}
+
+function createActionButton(label,classes,handler){
+  const btn=document.createElement("button");
+  btn.type="button";
+  btn.className=`btn ${classes}`.trim();
+  btn.textContent=label;
+  btn.addEventListener("click",handler);
+  return btn;
+}
+
+function renderPostsTable(records=[]){
+  if(!postsTableBody)return;
+  if(!records.length){
+    setPostsTableMessage("No posts available yet.");
+    return;
+  }
+  postsTableBody.innerHTML="";
+  const fragment=document.createDocumentFragment();
+  records.forEach((record)=>{
+    const tr=document.createElement("tr");
+    tr.dataset.caseId=record.id||"";
+    tr.dataset.flagged=record.isFlagged?"true":"false";
+    const titleCell=document.createElement("td");
+    titleCell.textContent=record.title;
+    const authorCell=document.createElement("td");
+    authorCell.textContent=record.authorName;
+    const categoryCell=document.createElement("td");
+    categoryCell.textContent=record.category||"—";
+    const stateCell=document.createElement("td");
+    stateCell.textContent=record.state||"—";
+    const dateCell=document.createElement("td");
+    dateCell.textContent=formatPostDate(record.createdAt);
+    const statusCell=document.createElement("td");
+    const statusSpan=document.createElement("span");
+    statusSpan.className=`status ${record.statusClass}`;
+    statusSpan.textContent=record.statusLabel;
+    statusCell.appendChild(statusSpan);
+    const actionCell=document.createElement("td");
+    if(pendingPostStatuses.has(record.status)){
+      actionCell.appendChild(createActionButton("Approve","primary",(event)=>approvePost(event.currentTarget)));
+    }
+    actionCell.appendChild(createActionButton("Edit","secondary",(event)=>editPost(event.currentTarget)));
+    actionCell.appendChild(createActionButton("Flag","danger",(event)=>flagPost(event.currentTarget)));
+    tr.append(titleCell,authorCell,categoryCell,stateCell,dateCell,statusCell,actionCell);
+    fragment.appendChild(tr);
+  });
+  postsTableBody.appendChild(fragment);
+  postsTableState.refresh();
+}
+
+function aggregateCounts(records=[],accessor){
+  const map=new Map();
+  records.forEach((record)=>{
+    const key=accessor(record);
+    if(!key)return;
+    map.set(key,(map.get(key)||0)+1);
+  });
+  return map;
+}
+
+function selectTopEntries(map,limit=5,otherLabel="Other"){
+  const entries=Array.from(map.entries()).sort((a,b)=>b[1]-a[1]);
+  if(entries.length<=limit){
+    return{labels:entries.map(([label])=>label),values:entries.map(([,value])=>value)};
+  }
+  const top=entries.slice(0,limit-1);
+  const otherCount=entries.slice(limit-1).reduce((sum,[,value])=>sum+value,0);
+  top.push([otherLabel,otherCount]);
+  return{labels:top.map(([label])=>label),values:top.map(([,value])=>value)};
+}
+
+function updatePostsCharts(records=[]){
+  if(postCategoryChart){
+    const categoryCounts=aggregateCounts(records,(record)=>record.category&&record.category.trim());
+    const {labels,values}=selectTopEntries(categoryCounts);
+    postCategoryChart.data.labels=labels;
+    postCategoryChart.data.datasets[0].data=values;
+    postCategoryChart.update("none");
+  }
+  if(postStateChart){
+    const stateCounts=aggregateCounts(records,(record)=>record.state&&record.state!=="—"?record.state.trim():null);
+    const topStates=Array.from(stateCounts.entries()).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    postStateChart.data.labels=topStates.map(([label])=>label);
+    postStateChart.data.datasets[0].data=topStates.map(([,value])=>value);
+    postStateChart.update("none");
+  }
+}
+
+function updatePostsSummary(records=[]){
+  const stats={total:records.length,pending:0,approved:0,flagged:0};
+  records.forEach((record)=>{
+    if(record.isFlagged)stats.flagged+=1;
+    if(pendingPostStatuses.has(record.status)){
+      stats.pending+=1;
+    }else if(!record.isFlagged){
+      stats.approved+=1;
+    }
+  });
+  if(postSummaryTargets.total)postSummaryTargets.total.textContent=stats.total.toLocaleString();
+  if(postSummaryTargets.pending)postSummaryTargets.pending.textContent=stats.pending.toLocaleString();
+  if(postSummaryTargets.approved)postSummaryTargets.approved.textContent=stats.approved.toLocaleString();
+  if(postSummaryTargets.flagged)postSummaryTargets.flagged.textContent=stats.flagged.toLocaleString();
+}
+
+function updateFlaggedList(records=[]){
+  if(!flaggedList)return;
+  const flaggedEntries=records.filter((record)=>record.isFlagged).sort((a,b)=>a.qualityScore-b.qualityScore||new Date(b.createdAt||0)-new Date(a.createdAt||0)).slice(0,5);
+  if(!flaggedEntries.length){
+    flaggedList.innerHTML="<li>All posts look good right now.</li>";
+    return;
+  }
+  flaggedList.innerHTML="";
+  flaggedEntries.forEach((entry)=>{
+    const li=document.createElement("li");
+    const reason=entry.flaggedReason||"Needs review";
+    li.innerHTML=`<strong>${escapeHtml(entry.title)}</strong> – ${escapeHtml(reason)}`;
+    flaggedList.appendChild(li);
+  });
+}
+
+function updateQualityOutputs(records=[]){
+  updateFlaggedList(records);
+  if(!qualityScoreChart)return;
+  if(!records.length){
+    qualityScoreChart.data.labels=[];
+    qualityScoreChart.data.datasets[0].data=[];
+    qualityScoreChart.data.datasets[0].backgroundColor=[];
+    qualityScoreChart.update("none");
+    return;
+  }
+  const sample=records.slice().sort((a,b)=>a.qualityScore-b.qualityScore).slice(0,6);
+  qualityScoreChart.data.labels=sample.map((entry)=>entry.title);
+  qualityScoreChart.data.datasets[0].data=sample.map((entry)=>entry.qualityScore);
+  qualityScoreChart.data.datasets[0].backgroundColor=sample.map((entry)=>entry.qualityScore>=85?"#1abc9c":"#e67e22");
+  qualityScoreChart.update("none");
+}
+
+async function loadAdminPosts(){
+  if(!postsTableBody)return;
+  setPostsTableMessage("Loading posts...");
+  try{
+    const res=await secureFetch("/api/cases/admin",{headers:{Accept:"application/json"}});
+    if(!res.ok) throw new Error("Unable to load posts");
+    const payload=await res.json().catch(()=>({}));
+    const source=Array.isArray(payload?.cases)?payload.cases:[];
+    adminPosts=source.map((entry)=>shapeAdminPost(entry));
+    if(!adminPosts.length){
+      setPostsTableMessage("No posts found.");
+      updatePostsSummary([]);
+      updatePostsCharts([]);
+      updateQualityOutputs([]);
+      return;
+    }
+    renderPostsTable(adminPosts);
+    updatePostsSummary(adminPosts);
+    updatePostsCharts(adminPosts);
+    updateQualityOutputs(adminPosts);
+  }catch(err){
+    console.error("Unable to load admin posts",err);
+    setPostsTableMessage("Unable to load posts.");
+    updatePostsSummary([]);
+    updatePostsCharts([]);
+    updateQualityOutputs([]);
+  }
+}
+
+/* -------- Post Moderation Logic -------- */
+function approvePost(btn){
+  const row=btn.closest("tr");
+  if(!row)return;
+  const statusEl=row.querySelector(".status");
+  if(statusEl){
+    statusEl.className="status approved";
+    statusEl.textContent="Approved";
+  }
+  row.dataset.flagged="false";
+  alert("Post approved successfully.");
+  postsTableState.refresh();
+}
+function flagPost(btn){
+  const row=btn.closest("tr");
+  if(!row)return;
+  const statusEl=row.querySelector(".status");
+  if(statusEl){
+    statusEl.className="status pending";
+    statusEl.textContent="Flagged";
+  }
+  row.dataset.flagged="true";
+  alert("Post flagged for review.");
+  postsTableState.refresh();
+}
+function editPost(btn){
+  document.getElementById("editPostModal").classList.remove("hidden");
+  const row=btn.closest("tr");
+  document.getElementById("editTitle").value=row.children[0].innerText;
+  document.getElementById("editCategory").value=row.children[2].innerText;
+  document.getElementById("editStatus").value=row.children[5].innerText;
+}
+function closeEditModal(){
+  document.getElementById("editPostModal").classList.add("hidden");
+}
+function savePostEdits(){
+  alert("Post updated successfully!");
+  closeEditModal();
+}
+const postsTableState=(() => {
+  let rows=[];
+  const state={search:"",mode:"all"};
+  const capture=()=>{
+    rows=Array.from(document.querySelectorAll("#postsList tr")).map((row)=>{
+      const statusEl=row.querySelector(".status");
+      const statusText=statusEl?statusEl.textContent.toLowerCase():"";
+      const isFlagged=/flagged/.test(statusText)||row.dataset.flagged==="true";
+      return {row,status:statusText,isFlagged};
+    });
+  };
+  const apply=()=>{
+    if(!rows.length)capture();
+    if(!rows.length)return;
+    rows.forEach(({row,status,isFlagged})=>{
+      const matchesMode=
+        state.mode==="pending"
+          ? status.includes("pending")||status.includes("awaiting")
+          : state.mode==="flagged"
+          ? isFlagged
+          : true;
+      const matchesSearch=!state.search||row.innerText.toLowerCase().includes(state.search);
+      row.style.display=matchesMode&&matchesSearch?"":"none";
+    });
+  };
+  return {
+    setSearch(value){
+      state.search=value.trim().toLowerCase();
+      apply();
+    },
+    setMode(mode){
+      state.mode=mode;
+      apply();
+    },
+    getMode(){
+      return state.mode;
+    },
+    apply,
+    refresh(){
+      capture();
+      apply();
+    },
+  };
+})();
+
+postSearchInput?.addEventListener("input",function(){
+  postsTableState.setSearch(this.value||"");
+});
+
+function focusPostsSection(mode){
+  const nextMode=postsTableState.getMode()===mode?"all":mode;
+  postsTableState.setMode(nextMode);
+  window.activateAdminSection?.("posts");
+  setTimeout(()=>postsSection?.scrollIntoView({behavior:"smooth",block:"start"}),60);
+}
+const pendingReviewCard=postsSummaryCards.find(card=>/pending review/i.test(card.textContent));
+const flaggedCard=postsSummaryCards.find(card=>/flagged/i.test(card.textContent));
+pendingReviewCard?.addEventListener("click",()=>focusPostsSection("pending"));
+flaggedCard?.addEventListener("click",()=>focusPostsSection("flagged"));
+postsTableState.apply();
+
+loadAdminPosts();
+loadFinanceCards();
+/* -------- Pause & Report -------- */
+function pauseReportActivity(id){
+  const r=prompt(`Enter reason for pausing Case #${id||'Unknown'}:`); 
+  if(r)alert("Flag submitted to Admin. You will be contacted within 1 business day.\n\nReason: "+r);
+}
+
+/* -------- Auto-Refresh every 5 min -------- */
+setInterval(()=>location.reload(),300000);
+
+window.togglePanel = togglePanel;
+window.pauseReportActivity = pauseReportActivity;
+window.approvePost = approvePost;
+window.flagPost = flagPost;
+window.editPost = editPost;
+window.closeEditModal = closeEditModal;
+window.savePostEdits = savePostEdits;
+window.openEscrowDetails = openEscrowDetails;
+window.closeEscrowDetails = closeEscrowDetails;
+const pendingTableBody = document.getElementById('pendingUsersBody');
+const pendingMetric = document.getElementById('pendingUsers');
+const pendingCountLabel = document.getElementById('pendingUsersCountLabel');
+const pendingSearch = document.getElementById('pendingSearch');
+const pendingRoleFilter = document.getElementById('pendingRoleFilter');
+const refreshPendingBtn = document.getElementById('refreshPendingUsers');
+const modal = document.getElementById('pendingUserModal');
+const modalTitle = document.getElementById('pendingModalTitle');
+const modalSubhead = document.getElementById('pendingModalSubhead');
+const modalDetails = document.getElementById('pendingUserDetails');
+const closeModalBtn = document.getElementById('closePendingModal');
+const approveBtn = document.getElementById('approveUserBtn');
+const denyBtn = document.getElementById('denyUserBtn');
+
+let pendingUsers = [];
+let pendingRequestId = 0;
+let activeUserId = null;
+
+const showToast = (message, type = 'info') => {
+  if (toastHelper?.show) {
+    toastHelper.show(message, { targetId: toastTarget, type });
+  } else {
+    alert(message);
+  }
+};
+
+const toTitle = (value) => {
+  if (!value) return '—';
+  return String(value)
+    .split(/[\s_-]+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+const formatDate = (value) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString();
+};
+
+const listText = (list) => {
+  if (!Array.isArray(list) || !list.length) return '—';
+  return list.join(', ');
+};
+
+const richListText = (entries = []) => {
+  if (!Array.isArray(entries) || !entries.length) return '—';
+  return entries
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      const title = item.title || item.degree || '';
+      const years = item.years ? ` (${item.years})` : '';
+      const desc = item.description ? ` — ${item.description}` : '';
+      const combined = `${title}${years}${desc}`.trim();
+      return combined || JSON.stringify(item);
+    })
+    .join('\n');
+};
+
+const updatePendingCount = (count = 0) => {
+  if (pendingMetric) pendingMetric.textContent = count;
+  if (pendingCountLabel) {
+    pendingCountLabel.textContent =
+      count === 1 ? '1 pending user' : `${count} pending users`;
+  }
+};
+
+const setPendingLoading = (loading) => {
+  if (!refreshPendingBtn) return;
+  refreshPendingBtn.disabled = loading;
+  refreshPendingBtn.textContent = loading ? 'Refreshing…' : 'Refresh';
+};
+
+const displayName = (user = {}) => {
+  return (
+    user.name ||
+    `${user.firstName || ''} ${user.lastName || ''}`.trim() ||
+    '—'
+  );
+};
+
+const renderPendingUsers = () => {
+  if (!pendingTableBody) return;
+  if (!pendingUsers.length) {
+    pendingTableBody.innerHTML =
+      '<tr><td colspan="6" class="pending-empty">No pending applications found.</td></tr>';
+    return;
+  }
+  pendingTableBody.innerHTML = '';
+  pendingUsers.forEach((user) => {
+    const tr = document.createElement('tr');
+
+    const nameTd = document.createElement('td');
+    nameTd.textContent = displayName(user);
+
+    const roleTd = document.createElement('td');
+    roleTd.textContent = toTitle(user.role);
+
+    const emailTd = document.createElement('td');
+    emailTd.textContent = user.email || '—';
+
+    const submittedTd = document.createElement('td');
+    submittedTd.textContent = formatDate(user.createdAt);
+
+    const statusTd = document.createElement('td');
+    const badge = document.createElement('span');
+    const statusValue = (user.status || 'pending').toLowerCase();
+    badge.className = `status ${statusValue}`;
+    badge.textContent = toTitle(statusValue);
+    statusTd.appendChild(badge);
+
+    const actionsTd = document.createElement('td');
+    actionsTd.className = 'actions';
+    const viewBtn = document.createElement('button');
+    viewBtn.type = 'button';
+    viewBtn.className = 'btn secondary';
+    viewBtn.textContent = 'View';
+    viewBtn.addEventListener('click', () => openPendingModal(user.id));
+    actionsTd.appendChild(viewBtn);
+
+    [nameTd, roleTd, emailTd, submittedTd, statusTd, actionsTd].forEach((td) =>
+      tr.appendChild(td)
+    );
+    pendingTableBody.appendChild(tr);
+  });
+};
+
+const appendDetailRow = (label, value, options = {}) => {
+  if (!modalDetails) return;
+  const tr = document.createElement('tr');
+  const labelTd = document.createElement('td');
+  labelTd.textContent = label;
+  const valueTd = document.createElement('td');
+
+  if (options.link && value) {
+    const link = document.createElement('a');
+    link.href = value;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = options.linkLabel || 'View';
+    valueTd.appendChild(link);
+  } else {
+    const hasValue =
+      value !== undefined && value !== null && String(value).trim() !== '';
+    valueTd.textContent = hasValue ? String(value) : '—';
+  }
+
+  tr.appendChild(labelTd);
+  tr.appendChild(valueTd);
+  modalDetails.appendChild(tr);
+};
+
+const openPendingModal = (userId) => {
+  const user = pendingUsers.find((item) => String(item.id) === String(userId));
+  if (!user || !modal || !modalDetails) return;
+  activeUserId = user.id;
+  modalDetails.innerHTML = '';
+  modalTitle.textContent = displayName(user);
+  modalSubhead.textContent = `${toTitle(user.role)} • Submitted ${formatDate(
+    user.createdAt
+  )}`;
+
+  appendDetailRow('Email', user.email);
+  appendDetailRow('Role', toTitle(user.role));
+  appendDetailRow('Status', toTitle(user.status));
+  appendDetailRow('Availability', user.availability);
+  appendDetailRow('Timezone', user.timezone);
+  appendDetailRow('Location', user.location);
+  appendDetailRow('Bar Number', user.barNumber);
+  appendDetailRow('Resume', user.resumeURL, { link: true, linkLabel: 'Open' });
+  appendDetailRow('Certification', user.certificateURL, {
+    link: true,
+    linkLabel: 'Open',
+  });
+  appendDetailRow('Practice Areas', listText(user.practiceAreas));
+  appendDetailRow('Specialties', listText(user.specialties));
+  appendDetailRow('Jurisdictions', listText(user.jurisdictions));
+  appendDetailRow('Skills', listText(user.skills));
+  appendDetailRow('Languages', listText(user.languages));
+  appendDetailRow('Years Experience', user.yearsExperience ?? '—');
+  appendDetailRow('Bio', user.bio || '—');
+  appendDetailRow('About', user.about || '—');
+  appendDetailRow('Experience', richListText(user.experience));
+  appendDetailRow('Education', richListText(user.education));
+
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+};
+
+const closePendingModal = () => {
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+  activeUserId = null;
+  if (modalDetails) modalDetails.innerHTML = '';
+};
+
+const submitDecision = async (action) => {
+  if (!activeUserId) return;
+  const isApprove = action === 'approve';
+  const btn = isApprove ? approveBtn : denyBtn;
+  if (!btn) return;
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = isApprove ? 'Approving…' : 'Denying…';
+
+  try {
+    await fetchCSRF();
+    const res = await secureFetch(
+      `/api/admin/users/${encodeURIComponent(activeUserId)}/${isApprove ? 'approve' : 'deny'}`,
+      { method: 'POST', body: {} }
+    );
+    let payload = {};
+    try {
+      payload = await res.json();
+    } catch (_) {
+      payload = {};
+    }
+    if (!res.ok) {
+      throw new Error(payload?.msg || payload?.error || 'Unable to update user.');
+    }
+    showToast(
+      isApprove ? 'User approved.' : 'User denied.',
+      isApprove ? 'ok' : 'info'
+    );
+    closePendingModal();
+    await loadPendingUsers();
+  } catch (err) {
+    showToast(err?.message || 'Unable to update user.', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
+};
+
+const loadPendingUsers = async () => {
+  if (!pendingTableBody) return;
+  const requestId = ++pendingRequestId;
+  setPendingLoading(true);
+  pendingTableBody.innerHTML =
+    '<tr><td colspan="6" class="pending-empty">Loading pending users…</td></tr>';
+  const params = new URLSearchParams({ status: 'pending', limit: '50' });
+  const roleValue = (pendingRoleFilter?.value || '').toLowerCase();
+  if (roleValue && roleValue !== 'all') params.set('role', roleValue);
+  const query = pendingSearch?.value.trim();
+  if (query) params.set('q', query);
+
+  try {
+    const res = await secureFetch(`/api/admin/pending-users?${params.toString()}`, {
+      headers: { Accept: 'application/json' },
+    });
+    const data = res.ok ? await res.json() : { users: [] };
+    if (requestId !== pendingRequestId) return;
+    pendingUsers = Array.isArray(data.users) ? data.users : [];
+    renderPendingUsers();
+    updatePendingCount(
+      typeof data.total === 'number' ? data.total : pendingUsers.length
+    );
+  } catch (err) {
+    if (requestId !== pendingRequestId) return;
+    pendingUsers = [];
+    updatePendingCount(0);
+    pendingTableBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${err?.message || 'Unable to load pending users.'}</td></tr>`;
+  } finally {
+    if (requestId === pendingRequestId) setPendingLoading(false);
+  }
+};
+
+const debounce = (fn, wait = 320) => {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn.apply(null, args), wait);
+  };
+};
+
+pendingRoleFilter?.addEventListener('change', () => loadPendingUsers());
+refreshPendingBtn?.addEventListener('click', () => loadPendingUsers());
+pendingSearch?.addEventListener('input', debounce(() => loadPendingUsers()));
+closeModalBtn?.addEventListener('click', () => closePendingModal());
+modal?.addEventListener('click', (event) => {
+  if (event.target === modal) closePendingModal();
+});
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !modal?.classList.contains('hidden')) {
+    closePendingModal();
+  }
+});
+approveBtn?.addEventListener('click', () => submitDecision('approve'));
+denyBtn?.addEventListener('click', () => submitDecision('deny'));
+
+loadPendingUsers();
+</script>
+<script type="module" src="assets/scripts/admin-dashboard.js"></script>
+</body>
+</html>
