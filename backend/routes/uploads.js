@@ -124,6 +124,10 @@ const caseFileUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_CASE_FILE_BYTES },
 });
+const profilePhotoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_PROFILE_PHOTO_BYTES },
+});
 
 // ----------------------------------------
 // All routes require auth
@@ -369,8 +373,7 @@ router.post(
 router.post(
   "/profile-photo",
   requireRole(["paralegal", "attorney"]),
-  csrfProtection,
-  caseFileMiddleware,
+  profilePhotoUpload.single("file"),
   asyncHandler(async (req, res) => {
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
     if (!req.file) return res.status(400).json({ msg: "Profile photo is required" });
