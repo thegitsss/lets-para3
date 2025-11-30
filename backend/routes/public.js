@@ -160,8 +160,14 @@ router.get(
   "/weather",
   asyncHandler(async (req, res) => {
     const apiKey = process.env.WEATHER_API_KEY || process.env.OPENWEATHER_API_KEY || "";
+    const fallbackWeather = () =>
+      res.json({
+        temperature: 72,
+        condition: "Fair",
+        source: "fallback",
+      });
     if (!apiKey) {
-      return res.status(503).json({ error: "Weather unavailable" });
+      return fallbackWeather();
     }
 
     const fallbackLat = parseFloat(process.env.WEATHER_LAT || "");
@@ -192,7 +198,7 @@ router.get(
       res.json({ temperature, condition });
     } catch (err) {
       console.error("[public.weather] fetch failed", err?.message || err);
-      res.status(502).json({ error: "Unable to fetch weather" });
+      return fallbackWeather();
     }
   })
 );
