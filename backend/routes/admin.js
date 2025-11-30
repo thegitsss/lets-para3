@@ -6,6 +6,8 @@ const requireRole = require("../middleware/requireRole");
 const User = require("../models/User");
 const Case = require("../models/Case");
 const AuditLog = require("../models/AuditLog"); // NOTE: file name fix
+const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
 const sendEmail = require("../utils/email");
@@ -39,6 +41,37 @@ const formatFullName = (u = {}) => {
   const joined = `${u.firstName || ""} ${u.lastName || ""}`.trim();
   return joined || null;
 };
+
+const s3 = new S3Client({
+  region: process.env.S3_REGION,
+  credentials:
+    process.env.S3_ACCESS_KEY && process.env.S3_SECRET_KEY
+      ? {
+          accessKeyId: process.env.S3_ACCESS_KEY,
+          secretAccessKey: process.env.S3_SECRET_KEY,
+        }
+      : undefined,
+});
+const BUCKET = process.env.S3_BUCKET || "";
+
+async function signPrivateFile(key) {
+  if (!key) return null;
+  if (/^https?:\/\//i.test(String(key))) return key; // already a URL
+  if (!BUCKET) return null;
+  try {
+    return await getSignedUrl(
+      s3,
+      new GetObjectCommand({
+        Bucket: BUCKET,
+        Key: key,
+      }),
+      { expiresIn: 60 * 10 }
+    );
+  } catch (err) {
+    console.warn("[admin] Failed to sign file", err?.message || err);
+    return null;
+  }
+}
 
 function parsePagination(req, { maxLimit = 100, defaultLimit = 20 } = {}) {
   const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -766,9 +799,22 @@ const listUsersHandler = asyncHandler(async (req, res) => {
     User.countDocuments(filter),
   ]);
 
+  const usersWithSignedLinks = await Promise.all(
+    items.map(async (u) => {
+      const safe = pickUserSafe(u);
+      const signedResume = await signPrivateFile(u.resumeURL);
+      const signedCert = await signPrivateFile(u.certificateURL);
+      return {
+        ...safe,
+        resumeDownloadURL: signedResume || null,
+        certificateDownloadURL: signedCert || null,
+      };
+    })
+  );
+
   res.json({
     page, limit, total, pages: Math.ceil(total / limit),
-    users: items.map(pickUserSafe),
+    users: usersWithSignedLinks,
   });
 });
 

@@ -1657,8 +1657,10 @@ const openPendingModal = (userId) => {
   appendDetailRow('Timezone', user.timezone);
   appendDetailRow('Location', user.location);
   appendDetailRow('Bar Number', user.barNumber);
-  appendDetailRow('Resume', user.resumeURL, { link: true, linkLabel: 'Open' });
-  appendDetailRow('Certification', user.certificateURL, {
+  const resumeLink = user.resumeDownloadURL || user.resumeURL;
+  const certLink = user.certificateDownloadURL || user.certificateURL;
+  appendDetailRow('Resume', resumeLink, { link: true, linkLabel: 'Open' });
+  appendDetailRow('Certification', certLink, {
     link: true,
     linkLabel: 'Open',
   });

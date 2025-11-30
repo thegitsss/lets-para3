@@ -425,6 +425,132 @@ router.get("/open", verifyToken, requireRole(["paralegal"]), async (req, res) =>
 // ----------------------------------------
 router.use(verifyToken);
 router.use(requireRole(["admin", "attorney", "paralegal"]));
+
+// Invitations (must run before ensureCaseParticipant to allow pending paralegals)
+router.post(
+  "/:caseId/invite/:paralegalId",
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const role = String(req.user?.role || "").toLowerCase();
+    if (!["attorney", "admin"].includes(role)) {
+      return res.status(403).json({ error: "Only attorneys can invite paralegals" });
+    }
+    const { caseId, paralegalId } = req.params;
+    if (!isObjId(caseId) || !isObjId(paralegalId)) {
+      return res.status(400).json({ error: "Invalid caseId or paralegalId" });
+    }
+
+    const [caseDoc, paralegal] = await Promise.all([
+      Case.findById(caseId),
+      User.findById(paralegalId).select("role status firstName lastName"),
+    ]);
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+    const attorneyId = String(caseDoc.attorneyId || caseDoc.attorney || "");
+    if (role !== "admin" && (!attorneyId || attorneyId !== String(req.user.id))) {
+      return res.status(403).json({ error: "You are not the attorney for this case" });
+    }
+    if (!paralegal || String(paralegal.role).toLowerCase() !== "paralegal" || String(paralegal.status).toLowerCase() !== "approved") {
+      return res.status(400).json({ error: "Paralegal is not available for invitation" });
+    }
+    if (caseDoc.paralegalId) {
+      return res.status(400).json({ error: "A paralegal is already assigned to this case" });
+    }
+
+    caseDoc.pendingParalegalId = paralegal._id;
+    caseDoc.pendingParalegalInvitedAt = new Date();
+    caseDoc.paralegal = null;
+    caseDoc.paralegalId = null;
+    caseDoc.hiredAt = null;
+    if (caseDoc.status === "open") caseDoc.status = "assigned";
+    await caseDoc.save();
+
+    const inviterName = formatPersonName(req.user) || "An attorney";
+    await createCaseNotification({
+      userId: paralegal._id,
+      caseDoc,
+      title: "New case invitation",
+      body: `${inviterName} invited you to join "${caseDoc.title}".`,
+      type: "case-invite",
+    });
+
+    return res.json(caseSummary(caseDoc));
+  })
+);
+
+router.post(
+  "/:caseId/respond-invite",
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const role = String(req.user?.role || "").toLowerCase();
+    if (role !== "paralegal" && role !== "admin") {
+      return res.status(403).json({ error: "Only the invited paralegal may respond" });
+    }
+    const { caseId } = req.params;
+    const decision = String(req.body?.decision || "").toLowerCase();
+    if (!["accept", "decline"].includes(decision)) {
+      return res.status(400).json({ error: "Decision must be accept or decline" });
+    }
+    if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid case id" });
+
+    const caseDoc = await Case.findById(caseId);
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+    const pendingId = caseDoc.pendingParalegalId ? String(caseDoc.pendingParalegalId) : "";
+    if (!pendingId) return res.status(400).json({ error: "No pending invitation for this case" });
+    if (role !== "admin" && pendingId !== String(req.user.id)) {
+      return res.status(403).json({ error: "You are not the invited paralegal" });
+    }
+
+    const attorneyId = caseDoc.attorneyId || caseDoc.attorney;
+    const paralegalId = role === "admin" && req.body?.paralegalId && isObjId(req.body.paralegalId)
+      ? req.body.paralegalId
+      : req.user.id;
+
+    if (decision === "accept") {
+      caseDoc.paralegal = paralegalId;
+      caseDoc.paralegalId = paralegalId;
+      caseDoc.pendingParalegalId = null;
+      caseDoc.pendingParalegalInvitedAt = null;
+      caseDoc.hiredAt = new Date();
+      if (typeof caseDoc.canTransitionTo === "function" && caseDoc.canTransitionTo("in_progress")) {
+        caseDoc.transitionTo("in_progress");
+      } else {
+        caseDoc.status = "in_progress";
+      }
+      if (!Array.isArray(caseDoc.applicants)) caseDoc.applicants = [];
+      const existing = caseDoc.applicants.find((app) => String(app.paralegalId) === String(paralegalId));
+      if (existing) existing.status = "accepted";
+      else caseDoc.applicants.push({ paralegalId, status: "accepted" });
+
+      await caseDoc.save();
+      await createCaseNotification({
+        userId: attorneyId,
+        caseDoc,
+        title: "Invitation accepted",
+        body: "The invited paralegal accepted your case invitation.",
+        type: "case-invite-accepted",
+      });
+    } else {
+      caseDoc.pendingParalegalId = null;
+      caseDoc.pendingParalegalInvitedAt = null;
+      caseDoc.status = "open";
+      if (Array.isArray(caseDoc.applicants)) {
+        const existing = caseDoc.applicants.find((app) => String(app.paralegalId) === pendingId);
+        if (existing) existing.status = "rejected";
+      }
+      await caseDoc.save();
+      await createCaseNotification({
+        userId: attorneyId,
+        caseDoc,
+        title: "Invitation declined",
+        body: "The invited paralegal declined your case invitation.",
+        type: "case-invite-declined",
+      });
+    }
+
+    return res.json(caseSummary(caseDoc));
+  })
+);
+
 router.use("/:caseId", ensureCaseParticipant());
 
 /**

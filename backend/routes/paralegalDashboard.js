@@ -42,23 +42,32 @@ router.get("/", auth, requireRole(["paralegal"]), async (req, res) => {
 
     const paralegalId = req.user._id;
 
-    // 1. My active cases
-    const activeCases = await Case.find({
-      paralegalId,
-      status: { $in: ["active", "awaiting_documents", "reviewing"] },
+    // 1. Pending invitations for me
+    const invitations = await Case.find({
+      pendingParalegalId: paralegalId,
+      status: { $in: ["open", "assigned"] },
     })
       .populate("attorneyId", "firstName lastName email role")
       .populate("jobId", "title practiceArea")
       .sort({ createdAt: -1 });
 
-    // 2. Jobs I have applied to
+    // 2. My active cases
+    const activeCases = await Case.find({
+      paralegalId,
+      status: { $in: ["active", "awaiting_documents", "reviewing", "in_progress"] },
+    })
+      .populate("attorneyId", "firstName lastName email role")
+      .populate("jobId", "title practiceArea")
+      .sort({ createdAt: -1 });
+
+    // 3. Jobs I have applied to
     const myApplications = await Application.find({
       paralegalId,
     })
       .populate("jobId")
       .sort({ createdAt: -1 });
 
-    // 3. Jobs still open & available
+    // 4. Jobs still open & available
     // Exclude jobs the paralegal has already applied to
     const appliedJobIds = myApplications.map((app) => app.jobId?._id);
 
@@ -70,7 +79,7 @@ router.get("/", auth, requireRole(["paralegal"]), async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(10);
 
-    // 4. Metrics
+    // 5. Metrics
     const [
       activeCasesCount,
       pendingApplicationsCount,
@@ -86,11 +95,23 @@ router.get("/", auth, requireRole(["paralegal"]), async (req, res) => {
 
     const metrics = {
       activeCases: activeCasesCount,
+      invitations: invitations.length,
       pendingApplications: pendingApplicationsCount,
       earnings: totalEarnings, // always 0 unless Payment model exists
     };
 
-    // 5. Shape response for frontend
+    // 6. Shape response for frontend
+    const invitationsSummary = invitations.map((c) => ({
+      caseId: c._id,
+      jobId: c.jobId?._id,
+      jobTitle: c.jobId?.title || c.title,
+      practiceArea: c.jobId?.practiceArea || c.practiceArea,
+      attorneyName: c.attorneyId
+        ? `${c.attorneyId.firstName || ""} ${c.attorneyId.lastName || ""}`.trim()
+        : null,
+      invitedAt: c.pendingParalegalInvitedAt || c.createdAt,
+    }));
+
     const activeCasesSummary = activeCases.map((c) => ({
       caseId: c._id,
       jobId: c.jobId?._id,
@@ -126,6 +147,7 @@ router.get("/", auth, requireRole(["paralegal"]), async (req, res) => {
 
     return res.json({
       metrics,
+      invitations: invitationsSummary,
       activeCases: activeCasesSummary,
       availableJobs: availableJobsSummary,
       myApplications: myApplicationsSummary,

@@ -79,6 +79,11 @@ function draw(root, data, escapeHTML, caseId, session) {
   const isOwner = viewerRole === "attorney" && ownerId && viewerId && String(ownerId) === String(viewerId);
   const isAdmin = viewerRole === "admin";
   const paralegalOnCase = !!data?.paralegal;
+  const pendingParalegalId = data?.pendingParalegalId || data?.pendingParalegal?._id || data?.pendingParalegal?.id;
+  const pendingParalegalName =
+    data?.pendingParalegal?.name ||
+    [data?.pendingParalegal?.firstName, data?.pendingParalegal?.lastName].filter(Boolean).join(" ").trim();
+  const viewerIsInvited = viewerRole === "paralegal" && pendingParalegalId && viewerId && String(pendingParalegalId) === String(viewerId);
   const readOnly = !!data?.readOnly;
   const purgeAt = data?.purgeScheduledFor ? new Date(data.purgeScheduledFor) : null;
   const alreadyApplied = applicants.some((applicant) => {
@@ -91,22 +96,35 @@ function draw(root, data, escapeHTML, caseId, session) {
   });
   const showPayment = (isOwner || isAdmin) && paralegalOnCase && !data?.paymentReleased && !readOnly;
   const showCompleteButton = (isOwner || isAdmin) && paralegalOnCase && !data?.paymentReleased && !readOnly;
-  const canHire = isOwner || isAdmin;
+  const canInvite = (isOwner || isAdmin) && !paralegalOnCase && !pendingParalegalId;
   const canApply =
     viewerRole === "paralegal" &&
     statusRaw.toLowerCase() === "open" &&
     !paralegalOnCase &&
     !alreadyApplied &&
+    !pendingParalegalId &&
     !data?.paymentReleased;
 
   const applicantsMarkup =
     applicants.length
-      ? `<ul class="applicant-list">${applicants.map((app) => renderApplicant(app, escapeHTML, { canHire })).join("")}</ul>`
+      ? `<ul class="applicant-list">${applicants.map((app) => renderApplicant(app, escapeHTML, { canInvite })).join("")}</ul>`
       : `<div class="empty">No applicants yet.</div>`;
 
   let applicationSection = "";
   if (viewerRole === "paralegal") {
-    if (canApply) {
+    if (viewerIsInvited) {
+      applicationSection = `
+        <div class="case-section">
+          <div class="case-section-title">Invitation pending</div>
+          <p class="hint">You’ve been invited to this case. Accept to start or decline to pass.</p>
+          <div class="case-actions">
+            <button class="btn primary" type="button" data-accept-invite>Accept invite</button>
+            <button class="btn ghost" type="button" data-decline-invite>Decline</button>
+          </div>
+          <div class="apply-status" data-invite-status></div>
+        </div>
+      `;
+    } else if (canApply) {
       applicationSection = `
         <div class="case-section">
           <div class="case-section-title">Apply to this case</div>
@@ -126,6 +144,8 @@ function draw(root, data, escapeHTML, caseId, session) {
         note = "You already applied to this case. We’ll let the attorney know.";
       } else if (paralegalOnCase) {
         note = "An attorney has already hired a paralegal for this case.";
+      } else if (pendingParalegalId) {
+        note = "An invitation to another paralegal is pending.";
       } else if (data?.paymentReleased) {
         note = "This case has been completed.";
       } else if (statusRaw.toLowerCase() !== "open") {
@@ -183,6 +203,13 @@ function draw(root, data, escapeHTML, caseId, session) {
       <div class="section-title">${escapeHTML(title)}</div>
       <div class="case-meta">Practice area: ${escapeHTML(practiceArea)}</div>
       <div class="case-status-pill">${escapeHTML(status)}</div>
+      ${
+        pendingParalegalId
+          ? `<div class="notice">Invitation sent to ${escapeHTML(
+              pendingParalegalName || "a paralegal"
+            )}. Awaiting response.</div>`
+          : ""
+      }
 
       <div class="case-section">
         <div class="case-section-title">Zoom link</div>
@@ -211,6 +238,7 @@ function draw(root, data, escapeHTML, caseId, session) {
   bindCompleteButton(root, caseId);
   bindDownloadButton(root, caseId);
   bindApplicationForm(root, caseId);
+  bindInviteResponses(root, caseId);
   const checklistHost = root.querySelector("#caseChecklist");
   if (checklistHost) {
     renderChecklist(checklistHost, { caseId: data?._id || caseId }).catch((err) => {
@@ -295,7 +323,7 @@ function getRouteParams(explicit) {
   return new URLSearchParams();
 }
 
-function renderApplicant(applicant, escapeHTML, { canHire } = {}) {
+function renderApplicant(applicant, escapeHTML, { canInvite } = {}) {
   const person = applicant?.paralegal || {};
   const displayName =
     person?.name ||
@@ -304,7 +332,7 @@ function renderApplicant(applicant, escapeHTML, { canHire } = {}) {
   const status = (applicant?.status || "pending").replace(/_/g, " ");
   const paralegalId = applicant?.paralegal?.id || applicant?.paralegalId || "";
   const appliedAt = applicant?.appliedAt ? new Date(applicant.appliedAt).toLocaleDateString() : "";
-  const showHire = canHire && paralegalId;
+  const showInvite = canInvite && paralegalId;
   return `
     <li class="applicant-card">
       <div class="applicant-card-main">
@@ -312,10 +340,10 @@ function renderApplicant(applicant, escapeHTML, { canHire } = {}) {
         <div class="applicant-status">${escapeHTML(status)}${appliedAt ? ` · Applied ${escapeHTML(appliedAt)}` : ""}</div>
       </div>
       ${
-        showHire
-          ? `<button class="btn primary" data-hire-paralegal data-paralegal-id="${escapeHTML(
+        showInvite
+          ? `<button class="btn primary" data-invite-paralegal data-paralegal-id="${escapeHTML(
               paralegalId
-            )}">Hire</button>`
+            )}">Invite</button>`
           : ""
       }
     </li>
@@ -323,14 +351,14 @@ function renderApplicant(applicant, escapeHTML, { canHire } = {}) {
 }
 
 function bindHireButtons(root, caseId) {
-  root.querySelectorAll("[data-hire-paralegal]").forEach((btn) => {
+  root.querySelectorAll("[data-invite-paralegal]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const paralegalId = btn.dataset.paralegalId || prompt("Enter the paralegal ID to hire:") || "";
+      const paralegalId = btn.dataset.paralegalId || prompt("Enter the paralegal ID to invite:") || "";
       if (!paralegalId) {
         notify("Paralegal reference is required.", "error");
         return;
       }
-      hireParalegal(caseId, paralegalId, btn);
+      inviteParalegal(caseId, paralegalId, btn);
     });
   });
 }
@@ -345,6 +373,39 @@ function bindCompleteButton(root, caseId) {
   const btn = root.querySelector("[data-complete-case]");
   if (!btn) return;
   btn.addEventListener("click", () => showCompletionModal(caseId, btn));
+}
+
+function bindInviteResponses(root, caseId) {
+  const acceptBtn = root.querySelector("[data-accept-invite]");
+  const declineBtn = root.querySelector("[data-decline-invite]");
+  const statusNode = root.querySelector("[data-invite-status]");
+
+  const setStatus = (msg, ok = false) => {
+    if (!statusNode) return;
+    statusNode.textContent = msg || "";
+    statusNode.className = "apply-status" + (ok ? " ok" : " err");
+  };
+
+  const handle = async (decision) => {
+    try {
+      acceptBtn?.setAttribute("disabled", "disabled");
+      declineBtn?.setAttribute("disabled", "disabled");
+      setStatus(decision === "accept" ? "Accepting…" : "Declining…");
+      await j(`/api/cases/${encodeURIComponent(caseId)}/respond-invite`, {
+        method: "POST",
+        body: { decision },
+      });
+      setStatus("Updated. Reloading…", true);
+      setTimeout(() => window.location.reload(), 500);
+    } catch (err) {
+      setStatus(err?.message || "Unable to update invitation.", false);
+      acceptBtn?.removeAttribute("disabled");
+      declineBtn?.removeAttribute("disabled");
+    }
+  };
+
+  acceptBtn?.addEventListener("click", () => handle("accept"));
+  declineBtn?.addEventListener("click", () => handle("decline"));
 }
 
 function bindDownloadButton(root, caseId) {
@@ -403,24 +464,24 @@ function setupPaymentSection(root, caseId, enable) {
   }
 }
 
-async function hireParalegal(caseId, paralegalId, button) {
+async function inviteParalegal(caseId, paralegalId, button) {
   if (!caseId || !paralegalId) {
     notify("Missing case or paralegal identifier.", "error");
     return;
   }
   button?.setAttribute("disabled", "disabled");
   button?.setAttribute("data-btn-text", button.textContent || "Hire");
-  if (button) button.textContent = "Hiring…";
+  if (button) button.textContent = "Inviting…";
   try {
-    await j(`/api/cases/${encodeURIComponent(caseId)}/hire/${encodeURIComponent(paralegalId)}`, {
+    await j(`/api/cases/${encodeURIComponent(caseId)}/invite/${encodeURIComponent(paralegalId)}`, {
       method: "POST",
     });
     if (button) {
-      button.textContent = "Hired";
+      button.textContent = "Invited";
       button.classList.add("success");
       button.removeAttribute("data-btn-text");
     }
-    notify("Paralegal hired successfully.", "success");
+    notify("Invitation sent to paralegal.", "success");
   } catch (err) {
     if (button) {
       button.removeAttribute("disabled");
@@ -428,7 +489,7 @@ async function hireParalegal(caseId, paralegalId, button) {
       button.textContent = original;
       button.removeAttribute("data-btn-text");
     }
-    notify(err?.message || "Unable to hire paralegal.", "error");
+    notify(err?.message || "Unable to invite paralegal.", "error");
   }
 }
 

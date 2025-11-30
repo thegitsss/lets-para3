@@ -1,8 +1,6 @@
 // frontend/assets/scripts/views/browse-paralegals.js
 // Lightweight directory that pulls real paralegal data directly from /api/users/paralegals
 
-import { secureFetch } from "../auth.js";
-
 const grid = document.getElementById("paralegalGrid");
 const pagination = document.getElementById("paralegalPagination");
 const statusNode = document.getElementById("resultsStatus");
@@ -22,33 +20,12 @@ function init() {
   void hydrate(1);
 }
 
-async function bootBrowseParalegals() {
-  const user = typeof window.requireRole === "function" ? await window.requireRole("attorney") : null;
-  if (!user) return;
-  applyRoleVisibility(user);
-  init();
-}
-
-function applyRoleVisibility(user) {
-  const role = String(user?.role || "").toLowerCase();
-  if (role === "paralegal") {
-    document.querySelectorAll("[data-attorney-only]").forEach((el) => {
-      el.style.display = "none";
-    });
-  }
-  if (role === "attorney") {
-    document.querySelectorAll("[data-paralegal-only]").forEach((el) => {
-      el.style.display = "none";
-    });
-  }
-}
-
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
-    void bootBrowseParalegals();
+    void hydrate(1);
   }, { once: true });
 } else {
-  void bootBrowseParalegals();
+  void hydrate(1);
 }
 
 async function hydrate(page = 1) {
@@ -78,9 +55,9 @@ export async function loadParalegals(page = 1, pageSize = DEFAULT_PAGE_SIZE) {
     page: String(page),
     limit: String(pageSize),
   });
-  const res = await secureFetch(`/api/users/paralegals?${params.toString()}`, {
+  const res = await fetch(`/api/public/paralegals?${params.toString()}`, {
     headers: { Accept: "application/json" },
-    noRedirect: true,
+    credentials: "include",
   });
   const payload = await res.json();
   if (!res.ok) {

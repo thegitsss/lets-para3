@@ -38,8 +38,15 @@ async function evaluateCaseParticipant(req, caseId) {
   const isParalegal =
     (caseDoc.paralegal && String(caseDoc.paralegal) === uid) ||
     (caseDoc.paralegalId && String(caseDoc.paralegalId) === uid);
+  const isPendingParalegal = caseDoc.pendingParalegalId && String(caseDoc.pendingParalegalId) === uid;
 
   if (!isAttorney && !isParalegal) {
+    if (isPendingParalegal && String(req.method || "").toUpperCase() === "GET") {
+      return {
+        caseDoc,
+        acl: { isAdmin: false, isAttorney: false, isParalegal: false, isPendingParalegal: true },
+      };
+    }
     const err = new Error("Access denied");
     err.statusCode = 403;
     throw err;
@@ -47,7 +54,7 @@ async function evaluateCaseParticipant(req, caseId) {
 
   return {
     caseDoc,
-    acl: { isAdmin: false, isAttorney, isParalegal },
+    acl: { isAdmin: false, isAttorney, isParalegal, isPendingParalegal },
   };
 }
 

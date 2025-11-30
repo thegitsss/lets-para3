@@ -243,6 +243,10 @@
       margin-top: -8px;
       margin-bottom: 16px;
     }
+    .file-hint.selected {
+      color: var(--navy);
+      font-weight: 300;
+    }
 
     @media (max-width: 768px) {
       .overlay {
@@ -261,7 +265,8 @@
 
     /* Style ONLY the file input button */
     input[type="file"] {
-      font-size: 0;
+      font-size: 0.95rem;
+      color: var(--navy);
     }
 
     input[type="file"]::file-selector-button {
@@ -372,9 +377,9 @@
     const form = document.getElementById('signupForm');
     const msg = document.getElementById('msg');
     const submitBtn = document.getElementById('submitBtn');
-    const roleFieldWrap = document.getElementById('roleFieldWrap');
-    const togglePw = document.getElementById('togglePw');
-    const pw = document.getElementById('password');
+  const roleFieldWrap = document.getElementById('roleFieldWrap');
+  const togglePw = document.getElementById('togglePw');
+  const pw = document.getElementById('password');
     const emailEl = document.getElementById('email');
     const firstNameEl = document.getElementById('firstName');
     const lastNameEl = document.getElementById('lastName');
@@ -383,6 +388,22 @@
     emailEl.value = localStorage.getItem('lastEmail') || '';
 
     let role = 'attorney';
+
+    function attachResumeHandler() {
+      const resumeInput = document.getElementById('resumeUpload');
+      const resumeHint = document.getElementById('resumeHint');
+      if (!resumeInput || !resumeHint) return;
+      resumeInput.addEventListener('change', () => {
+        const file = resumeInput.files?.[0];
+        if (file) {
+          resumeHint.textContent = `Selected: ${file.name}`;
+          resumeHint.classList.add('selected');
+        } else {
+          resumeHint.textContent = 'Resume';
+          resumeHint.classList.remove('selected');
+        }
+      });
+    }
 
     function setRole(r) {
       role = r;
@@ -395,7 +416,8 @@
         ? `<input id="bar" type="text" autocomplete="off" placeholder="State Bar Number" required />`
         : `<input id="cert" type="text" autocomplete="off" placeholder="Certification / License (optional)" />
            <input id="resumeUpload" type="file" accept=".pdf,.doc,.docx" class="file-input" aria-label="Resume" required />
-           <div class="file-hint">Resume</div>`;
+           <div class="file-hint" id="resumeHint">Resume</div>`;
+      if (r === 'paralegal') attachResumeHandler();
     }
     setRole(role);
 
@@ -455,27 +477,36 @@
         submitBtn.textContent = 'Signing up…';
       }
 
-      try {
-        const payload = { firstName, lastName, email, password, role };
+    try {
+        const formData = new FormData();
+        formData.append('firstName', firstName);
+        formData.append('lastName', lastName);
+        formData.append('email', email);
+        formData.append('password', password);
+        formData.append('role', role);
+        formData.append('termsAccepted', 'true');
+        if (phoneNumber) formData.append('phoneNumber', phoneNumber);
+
         if (role === 'attorney') {
-          payload.barNumber = document.getElementById('bar').value.trim();
+          formData.append('barNumber', document.getElementById('bar').value.trim());
         } else {
           const resumeFile = document.getElementById('resumeUpload')?.files?.[0];
-          payload.resumeURL = resumeFile ? resumeFile.name : "";
-          payload.certificateURL = (document.getElementById('cert')?.value || '').trim() || undefined;
+          if (resumeFile) formData.append('resume', resumeFile, resumeFile.name || 'resume.pdf');
+          const certVal = (document.getElementById('cert')?.value || '').trim();
+          if (certVal) formData.append('certificateURL', certVal);
         }
-        if (phoneNumber) payload.phoneNumber = phoneNumber;
-        payload.recaptchaToken = await getRecaptchaToken('signup');
-        payload.termsAccepted = true;
 
-        const headers = { 'Content-Type': 'application/json' };
+        const recaptchaToken = await getRecaptchaToken('signup');
+        if (recaptchaToken) formData.append('recaptchaToken', recaptchaToken);
+
+        const headers = {};
         if (window.__CSRF__) headers['X-CSRF-Token'] = window.__CSRF__;
 
         const res = await fetch(`${API_BASE}/auth/register`, {
           method: 'POST',
           credentials: 'include',
           headers,
-          body: JSON.stringify(payload)
+          body: formData
         });
 
         let data = {};

@@ -3,7 +3,9 @@ const express = require("express");
 const router = express.Router();
 const rateLimit = require("express-rate-limit");
 const axios = require("axios");
+const mongoose = require("mongoose");
 
+const User = require("../models/User");
 const sendEmail = require("../utils/email");
 const { logAction } = require("../utils/audit");
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -57,6 +59,36 @@ function escapeHTML(s) {
 function sanitizeSubject(s = "") {
   // prevent header injection (\r or \n). Keep short.
   return String(s).replace(/[\r\n]/g, " ").trim().slice(0, 140);
+}
+
+const isObjId = (id) => mongoose.Types.ObjectId.isValid(id);
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+const escapeRegex = (str = "") => String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const PUBLIC_PAR_FIELDS =
+  "_id firstName lastName avatarURL profileImage location state specialties practiceAreas yearsExperience linkedInURL education bio about availability";
+
+function serializeParalegal(userDoc) {
+  if (!userDoc) return null;
+  const src = userDoc.toObject ? userDoc.toObject() : userDoc;
+  return {
+    _id: String(src._id),
+    id: String(src._id),
+    firstName: src.firstName || "",
+    lastName: src.lastName || "",
+    name: `${src.firstName || ""} ${src.lastName || ""}`.trim(),
+    avatarURL: src.avatarURL || "",
+    profileImage: src.profileImage || "",
+    location: src.location || src.state || "",
+    specialties: Array.isArray(src.specialties) ? src.specialties : [],
+    practiceAreas: Array.isArray(src.practiceAreas) ? src.practiceAreas : [],
+    yearsExperience: typeof src.yearsExperience === "number" ? src.yearsExperience : null,
+    linkedInURL: src.linkedInURL || "",
+    education: Array.isArray(src.education) ? src.education : [],
+    bio: src.bio || "",
+    about: src.about || "",
+    availability: src.availability || "",
+  };
 }
 // ----------------------------------------
 // POST /api/public/contact
@@ -200,6 +232,65 @@ router.get(
       console.error("[public.weather] fetch failed", err?.message || err);
       return fallbackWeather();
     }
+  })
+);
+
+// ----------------------------------------
+// Public paralegal directory
+// ----------------------------------------
+router.get(
+  "/paralegals",
+  asyncHandler(async (req, res) => {
+    const page = clamp(parseInt(req.query.page, 10) || 1, 1, 10_000);
+    const limit = clamp(parseInt(req.query.limit, 10) || 12, 1, 50);
+    const search = typeof req.query.q === "string" ? req.query.q.trim() : "";
+
+    const filter = { role: "paralegal", status: "approved" };
+    if (search) {
+      const rx = new RegExp(escapeRegex(search), "i");
+      filter.$or = [
+        { firstName: rx },
+        { lastName: rx },
+        { bio: rx },
+        { about: rx },
+        { specialties: rx },
+        { practiceAreas: rx },
+        { location: rx },
+        { state: rx },
+      ];
+    }
+
+    const [docs, total] = await Promise.all([
+      User.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .select(PUBLIC_PAR_FIELDS)
+        .lean(),
+      User.countDocuments(filter),
+    ]);
+
+    res.json({
+      items: docs.map(serializeParalegal),
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+      hasMore: page * limit < total,
+    });
+  })
+);
+
+router.get(
+  "/paralegals/:id",
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    if (!isObjId(id)) return res.status(400).json({ error: "Invalid paralegal id" });
+    const doc = await User.findById(id).select(PUBLIC_PAR_FIELDS).lean();
+    if (!doc || doc.role !== "paralegal" || doc.status !== "approved") {
+      return res.status(404).json({ error: "Paralegal not found" });
+    }
+    res.json(serializeParalegal(doc));
   })
 );
 

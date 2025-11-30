@@ -6,6 +6,8 @@ const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const axios = require("axios");
 const { URLSearchParams } = require("url");
+const multer = require("multer");
+const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 
 const User = require("../models/User");
 const AuditLog = require("../models/AuditLog"); // audit trail hooks
@@ -23,6 +25,41 @@ const AUTH_COOKIE_OPTIONS = {
   ...COOKIE_BASE_OPTIONS,
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
+const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
+const resumeUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_RESUME_FILE_BYTES },
+});
+
+// S3 client for resume uploads during registration
+const s3 = new S3Client({
+  region: process.env.S3_REGION,
+  credentials:
+    process.env.S3_ACCESS_KEY && process.env.S3_SECRET_KEY
+      ? {
+          accessKeyId: process.env.S3_ACCESS_KEY,
+          secretAccessKey: process.env.S3_SECRET_KEY,
+        }
+      : undefined,
+});
+const BUCKET = process.env.S3_BUCKET || "";
+
+function sseParams() {
+  if (process.env.S3_SSE_KMS_KEY_ID) {
+    return {
+      ServerSideEncryption: "aws:kms",
+      SSEKMSKeyId: process.env.S3_SSE_KMS_KEY_ID,
+    };
+  }
+  return { ServerSideEncryption: "AES256" };
+}
+
+function safeSegment(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "-")
+    .replace(/-+/g, "-");
+}
 
 // ----------------------------------------
 // Helpers
@@ -92,6 +129,7 @@ async function verifyRecaptcha(token, expectedAction) {
 // ----------------------------------------
 router.post(
   "/register",
+  resumeUpload.single("resume"),
   asyncHandler(async (req, res) => {
     const {
       firstName,
@@ -133,8 +171,25 @@ router.post(
         .json({ msg: "Password must be at least 8 characters." });
     }
 
+    // Paralegals must attach a PDF resume at signup
+    if (roleLc === "paralegal" && !req.file) {
+      return res.status(400).json({ msg: "Résumé file is required for paralegal registration." });
+    }
+
     const existing = await User.findOne({ email: String(email).toLowerCase() });
     if (existing) return res.status(400).json({ msg: "User already exists" });
+
+    if (roleLc === "paralegal" && req.file) {
+      if (req.file.mimetype !== "application/pdf") {
+        return res.status(400).json({ msg: "Résumé must be a PDF" });
+      }
+      if (req.file.size > MAX_RESUME_FILE_BYTES) {
+        return res.status(400).json({ msg: "Résumé exceeds maximum allowed size (10 MB)." });
+      }
+      if (!BUCKET) {
+        return res.status(500).json({ msg: "Resume upload unavailable. Please try again later." });
+      }
+    }
 
     // Let the model hash the password (pre-save hook)
     const user = new User({
@@ -145,11 +200,27 @@ router.post(
       role: roleLc,
       status: "pending",
       barNumber: roleLc === "attorney" ? String(barNumber || "") : "",
-      resumeURL: roleLc === "paralegal" ? String(resumeURL || "") : "",
+      resumeURL: roleLc === "paralegal" ? "" : "",
       certificateURL: roleLc === "paralegal" ? String(certificateURL || "") : "",
       termsAccepted: true,
       phoneNumber: phoneNumber ? String(phoneNumber).trim() || null : null,
     });
+
+    // Upload resume (paralegal) before saving
+    if (roleLc === "paralegal" && req.file) {
+      const key = `paralegal-resumes/${safeSegment(user._id)}/resume.pdf`;
+      const putParams = {
+        Bucket: BUCKET,
+        Key: key,
+        Body: req.file.buffer,
+        ContentType: "application/pdf",
+        ContentLength: req.file.size,
+        ACL: "private",
+        ...sseParams(),
+      };
+      await s3.send(new PutObjectCommand(putParams));
+      user.resumeURL = key;
+    }
 
     await user.save();
 

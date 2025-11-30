@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paralegal Profile | Let’s ParaConnect</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Sarabun:wght@200;300&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/styles/styles.css" />
+  <script type="module" src="assets/scripts/auth.js"></script>
+  <style>
+    body{margin:0;font-family:'Sarabun',sans-serif;font-weight:200;background:#f7f8fb;color:#1a2230;}
+    .shell{max-width:920px;margin:0 auto;padding:120px 20px 80px;}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:24px 28px;box-shadow:0 12px 40px rgba(0,0,0,0.06);}
+    .hero{display:flex;gap:18px;align-items:center;}
+    .avatar{width:96px;height:96px;border-radius:18px;background:#eef1f5;display:grid;place-items:center;font-size:28px;font-weight:600;color:#27394d;object-fit:cover;}
+    h1{font-family:'Cormorant Garamond',serif;font-weight:300;font-size:2.2rem;margin:0;}
+    .meta{color:#6b7280;font-size:0.95rem;margin-top:6px;}
+    .grid{display:grid;gap:16px;margin-top:24px;}
+    .pill{display:inline-block;padding:6px 10px;border-radius:999px;background:#f3f4f6;color:#374151;font-size:0.9rem;margin:0 8px 8px 0;}
+    .section-title{font-weight:600;margin:12px 0 6px;}
+    .cta-bar{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;}
+    .btn{border:1px solid #27394d;background:#27394d;color:#fff;border-radius:10px;padding:10px 14px;font-weight:400;cursor:pointer;}
+    .btn.secondary{background:#fff;color:#27394d;}
+    .empty{color:#6b7280;}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="card" id="profileCard">
+      <div class="meta">Loading profile…</div>
+    </div>
+  </div>
+  <script type="module" src="assets/scripts/paralegal-profile.js"></script>
+</body>
+</html>
