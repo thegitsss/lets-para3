@@ -44,6 +44,9 @@ const BUCKET = process.env.S3_BUCKET;
 if (!BUCKET) {
   console.warn("[uploads] S3_BUCKET not set; presign routes will fail.");
 }
+const PUBLIC_FILE_BASE =
+  (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
+  (BUCKET && process.env.S3_REGION ? `https://${BUCKET}.s3.${process.env.S3_REGION}.amazonaws.com` : "");
 
 // ----------------------------------------
 // Helpers
@@ -64,6 +67,11 @@ function buildCasePrefix(caseId) {
 
 function normalizeKeyPath(key) {
   return String(key || "").replace(/^\/+/, "");
+}
+
+function publicFileUrl(key) {
+  const cleaned = normalizeKeyPath(key);
+  return PUBLIC_FILE_BASE ? `${PUBLIC_FILE_BASE}/${cleaned}` : cleaned;
 }
 
 function extractCaseIdFromKey(key) {
@@ -397,10 +405,11 @@ router.post(
     };
     await s3.send(new PutObjectCommand(putParams));
 
+    const publicUrl = publicFileUrl(key);
     const user = await User.findById(ownerId);
     if (!user) return res.status(404).json({ msg: "User not found" });
-    user.profileImage = key;
-    user.avatarURL = key;
+    user.profileImage = publicUrl;
+    user.avatarURL = publicUrl;
     await user.save();
 
     try {
@@ -409,7 +418,7 @@ router.post(
       console.warn("[uploads] profile photo upload audit failed", err?.message || err);
     }
 
-    return res.json({ success: true, url: key });
+    return res.json({ success: true, url: publicUrl });
   })
 );
 
