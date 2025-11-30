@@ -161,8 +161,8 @@ function buildVerificationAcceptanceBody(user) {
   if (typeof sendEmail.sendAcceptedEmail === "function") {
     return sendEmail.sendAcceptedEmail(user?.lastName || "");
   }
-  const last = user?.lastName || "Applicant";
-  return `Dear Ms./Mr. ${last},<br/><br/>Congratulations! Your application has been approved. We will send onboarding instructions as we approach the official platform launch.<br/><br/>If you have any questions, contact us at admin@lets-paraconnect.com.<br/><br/>Let’s-ParaConnect Verification Division`;
+  const name = formatFullName(user) || user?.lastName || "Applicant";
+  return `Dear ${name},<br/><br/>Welcome to Let's-ParaConnect. Your account has been successfully reviewed and approved. You may now log in and begin using your dashboard.<br/><br/>We're excited to have you onboard.<br/><br/>— Let's-ParaConnect`;
 }
 
 function buildVerificationRejectionBody(user) {
@@ -170,7 +170,8 @@ function buildVerificationRejectionBody(user) {
     return sendEmail.sendNotAcceptedEmail(user?.lastName || "");
   }
   const last = user?.lastName || "Applicant";
-  return `Dear Ms./Mr. ${last},<br/><br/>Thank you for your interest in Let’s-ParaConnect. After reviewing your submission, we are unable to extend an invitation at this time. You are welcome to reapply in the future if circumstances change.<br/><br/>If you have any questions, contact us at admin@lets-paraconnect.com.<br/><br/>Let’s-ParaConnect Verification Division`;
+  const name = formatFullName(user) || last;
+  return `Dear ${name},<br/><br/>Your application to join Let's ParaConnect has been reviewed and was unfortunately not approved. Our team reviews every submission carefully, and you can reply to this email if you believe we missed important information.<br/><br/>Sincerely,<br/>The Let's-ParaConnect Verification Division`;
 }
 
 async function dispatchDecisionEmail(user, status) {
@@ -178,7 +179,7 @@ async function dispatchDecisionEmail(user, status) {
   const friendlyName = formatFullName(user) || "there";
   const loginLine = LOGIN_URL ? `<br/><br/>Log in here: <a href="${LOGIN_URL}">${LOGIN_URL}</a>` : "";
   if (status === "approved") {
-    const html = `Hi ${friendlyName},<br/><br/>Welcome to Let's ParaConnect. Your account has been approved. You may now log in and begin using your dashboard.${loginLine}<br/><br/>We're excited to have you onboard.<br/>— Let's ParaConnect`;
+    const html = `Dear ${friendlyName},<br/><br/>Welcome to Let's-ParaConnect. Your account has been successfully reviewed and approved. You may now log in and begin using your dashboard.${loginLine}<br/><br/>We're excited to have you onboard.<br/>— Let's-ParaConnect`;
     await sendEmail(user.email, APPROVAL_EMAIL_SUBJECT, html);
     return;
   }

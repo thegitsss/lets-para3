@@ -234,7 +234,7 @@ router.post(
       await sendEmail(
         user.email,
         "Registration received",
-        `Thanks for registering with Let's ParaConnect. An admin will review your account shortly.${
+        `Thank you for submitting your application to be part of Let’s-ParaConnect and join our highly curated, elite paralegal professional collective. Your application is now under review. Our team is thoroughly evaluating your credentials, experience, and references. You will receive an update within 24-48 business hours.\n\nRespectfully,\nThe Let’s-ParaConnect Verification Division${
           process.env.APP_BASE_URL ? `\n\nYou can verify your email here (optional): ${verifyUrl}` : ""
         }`
       );

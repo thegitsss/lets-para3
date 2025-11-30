@@ -522,7 +522,7 @@
         sessionStorage.setItem('signupToast', 'Your application has been submitted for approval.');
         say('Application submitted. Await approval.', 'ok');
         shouldRestoreButton = false;
-        setTimeout(() => location.href = 'login.html', 1000);
+        setTimeout(() => location.href = 'login.html', 5000);
       } catch (err) {
         console.error(err);
         say(err.message || 'Network error. Please try again.', 'err');

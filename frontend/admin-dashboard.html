@@ -333,7 +333,7 @@ th{color:var(--muted);font-weight:200;}
         <h2 onclick="togglePanel('userPanel')">New Users Analytics <span>▾</span></h2>
         <div class="panel-content">
           <canvas id="userChart" height="150"></canvas>
-          <button class="btn primary" onclick="alert('Opening Review Queue…')">Review New Users</button>
+          <button class="btn primary" onclick="document.getElementById('pendingUsersPanel')?.scrollIntoView({behavior:'smooth',block:'start'})">Review New Users</button>
         </div>
       </div>
 
@@ -375,45 +375,9 @@ th{color:var(--muted);font-weight:200;}
     <header>
       <div class="header-top">
         <h1>User Management</h1>
-        <div class="date-picker">
-          <span>August 1 – August 31, 2025</span>
-          <i class="calendar-icon">📅</i>
-        </div>
       </div>
       <p>Analyze user registrations, activity, and sales performance over time.</p>
     </header>
-
-    <!-- Chart + Cards -->
-    <div class="dashboard-grid">
-      <div class="chart-card">
-        <div class="chart-header">
-          <h2>Registration Trends</h2>
-          <select id="userMgmtView">
-            <option>Show By Month</option>
-            <option>Show By Week</option>
-          </select>
-        </div>
-        <canvas id="userMgmtComboChart" height="200"></canvas>
-      </div>
-
-      <div class="stats-cards">
-        <div class="metric pink"><h3>Attorneys</h3><p id="metricAttorneys">0</p></div>
-        <div class="metric blue"><h3>Paralegals</h3><p id="metricParalegals">0</p></div>
-        <div class="metric purple"><h3>Pending Approvals</h3><p id="metricPending">0</p></div>
-        <div class="metric teal"><h3>Suspended Users</h3><p id="metricSuspended">0</p></div>
-      </div>
-    </div>
-
-    <!-- Lower section -->
-    <div class="lower-grid">
-      <div class="panel new-users">
-        <h2>New Users</h2>
-        <input type="text" placeholder="Search…" class="search" />
-        <ul class="user-list" id="newUsersList">
-          <li style="color:var(--muted)">Loading…</li>
-        </ul>
-      </div>
-    </div>
 
     <div class="panel" id="pendingUsersPanel">
       <div class="panel-header">
@@ -445,6 +409,38 @@ th{color:var(--muted);font-weight:200;}
             <tr><td colspan="6" class="pending-empty">Loading pending users…</td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Lower section -->
+    <div class="lower-grid">
+      <div class="panel new-users">
+        <h2>New Users</h2>
+        <input type="text" placeholder="Search…" class="search" />
+        <ul class="user-list" id="newUsersList">
+          <li style="color:var(--muted)">Loading…</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Chart + Cards -->
+    <div class="dashboard-grid" style="margin-top:1.5rem;">
+      <div class="chart-card">
+        <div class="chart-header">
+          <h2>Registration Trends</h2>
+          <select id="userMgmtView">
+            <option>Show By Month</option>
+            <option>Show By Week</option>
+          </select>
+        </div>
+        <canvas id="userMgmtComboChart" height="200"></canvas>
+      </div>
+
+      <div class="stats-cards">
+        <div class="metric pink"><h3>Attorneys</h3><p id="metricAttorneys">0</p></div>
+        <div class="metric blue"><h3>Paralegals</h3><p id="metricParalegals">0</p></div>
+        <div class="metric purple"><h3>Pending Approvals</h3><p id="metricPending">0</p></div>
+        <div class="metric teal"><h3>Suspended Users</h3><p id="metricSuspended">0</p></div>
       </div>
     </div>
   </section>
