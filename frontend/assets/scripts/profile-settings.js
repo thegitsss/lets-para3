@@ -1,9 +1,10 @@
-import { secureFetch, logout } from "./auth.js";
+import { secureFetch } from "./auth.js";
+import { loadUserHeaderInfo } from "./auth.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   await window.checkSession("paralegal");
+  await loadUserHeaderInfo();
   await loadSettings();
-  console.log("Settings page loaded");
 });
 
 let settingsState = {

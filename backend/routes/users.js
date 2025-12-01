@@ -101,16 +101,29 @@ const parseParalegalFilters = (query = {}) => {
 
 const SAFE_PUBLIC_SELECT = "_id firstName lastName avatarURL profileImage location specialties yearsExperience linkedInURL certificateURL education resumeURL notificationPrefs";
 const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email`;
+const FILE_PUBLIC_BASE =
+  (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
+  (process.env.S3_BUCKET && process.env.S3_REGION
+    ? `https://${process.env.S3_BUCKET}.s3.${process.env.S3_REGION}.amazonaws.com`
+    : "");
+
+function toPublicUrl(val) {
+  if (!val) return "";
+  if (/^https?:\/\//i.test(val)) return val;
+  return FILE_PUBLIC_BASE ? `${FILE_PUBLIC_BASE}/${String(val).replace(/^\/+/, "")}` : val;
+}
 
 function serializePublicUser(user, { includeEmail = false } = {}) {
   if (!user) return null;
   const src = user.toObject ? user.toObject() : user;
+  const profileImage = toPublicUrl(src.profileImage || "");
+  const avatarURL = toPublicUrl(src.avatarURL || profileImage);
   const payload = {
     _id: String(src._id),
     firstName: src.firstName || "",
     lastName: src.lastName || "",
-    avatarURL: src.avatarURL || "",
-    profileImage: src.profileImage || "",
+    avatarURL,
+    profileImage,
     state: src.state || src.location || "",
     specialties: Array.isArray(src.specialties) ? src.specialties : [],
     yearsExperience:
