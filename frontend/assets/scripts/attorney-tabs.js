@@ -8,6 +8,9 @@ const STATUS_LABELS = {
   attorney_revision: "Attorney Revisions",
 };
 const CASE_FILE_MAX_BYTES = 20 * 1024 * 1024;
+function getProfileImageUrl(user = {}) {
+  return user.profileImage || user.avatarURL || "assets/images/default-avatar.png";
+}
 
 const state = {
   user: null,
@@ -278,7 +281,7 @@ async function loadUser() {
     const user = await res.json();
     state.user = user;
     const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.name || "Attorney";
-    const avatar = user.profileImage || user.avatarURL || "https://via.placeholder.com/36";
+    const avatar = getProfileImageUrl(user);
     const roleLabel = (user.role || "Attorney").replace(/\b\w/g, (c) => c.toUpperCase());
     const nameEl = document.getElementById("headerName");
     const avatarEl = document.getElementById("headerAvatar");

@@ -7,6 +7,9 @@ const statusNode = document.getElementById("resultsStatus");
 
 const DEFAULT_PAGE_SIZE = 12;
 const PLACEHOLDER_AVATAR = "https://via.placeholder.com/120?text=PL";
+function getProfileImageUrl(user = {}) {
+  return user.profileImage || user.avatarURL || "assets/images/default-avatar.png";
+}
 
 const state = {
   page: 1,
@@ -87,7 +90,7 @@ function renderGrid(items = []) {
     const avatar = document.createElement("img");
     avatar.className = "pl-avatar";
     avatar.alt = `${formatName(paralegal)} avatar`;
-    avatar.src = paralegal.profileImage || paralegal.avatarURL || PLACEHOLDER_AVATAR;
+    avatar.src = getProfileImageUrl(paralegal) || PLACEHOLDER_AVATAR;
 
     const name = document.createElement("div");
     name.className = "pl-name";

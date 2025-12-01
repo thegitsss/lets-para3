@@ -1,6 +1,9 @@
 import { secureFetch, requireAuth, logout } from "./auth.js";
 
 const MESSAGE_JUMP_KEY = "lpc_message_jump";
+function getProfileImageUrl(user = {}) {
+  return user.profileImage || user.avatarURL || "assets/images/default-avatar.png";
+}
 const elements = {
   error: document.getElementById("profileError"),
   inviteBtn: document.getElementById("inviteToCaseBtn"),
@@ -416,7 +419,7 @@ function hydrateHeader() {
   if (!state.viewer) return;
   if (elements.chipName) elements.chipName.textContent = formatName(state.viewer);
   if (elements.chipRole) elements.chipRole.textContent = prettyRole(state.viewer.role);
-  const avatarSrc = state.viewer.profileImage || state.viewer.avatarURL || buildInitialAvatar(getInitials(formatName(state.viewer)));
+  const avatarSrc = getProfileImageUrl(state.viewer) || buildInitialAvatar(getInitials(formatName(state.viewer)));
   if (elements.chipAvatar && avatarSrc) {
     elements.chipAvatar.src = avatarSrc;
     elements.chipAvatar.alt = `${formatName(state.viewer)} avatar`;
@@ -487,7 +490,7 @@ function renderProfile(profile) {
   const summary = profile.bio || profile.about || "This professional hasn’t added a summary yet.";
   setFieldText(elements.bioCopy, summary);
 
-  renderAvatar(fullName, profile.profileImage || profile.avatarURL);
+  renderAvatar(fullName, getProfileImageUrl(profile));
   renderStatus(profile);
   renderMetadata(profile);
   renderPills(elements.skillsList, profile.skills, "This paralegal hasn’t shared skills yet.");

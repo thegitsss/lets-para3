@@ -1,6 +1,10 @@
 import { secureFetch, logout } from "./auth.js";
 import { loadUserHeaderInfo } from "./auth.js";
 
+function getProfileImageUrl(user) {
+  return user.profileImage || user.avatarURL || "assets/images/default-avatar.png";
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await window.checkSession("paralegal");
   await loadUserHeaderInfo();
@@ -35,7 +39,7 @@ async function loadParalegalProfileCard() {
   if (!card) return;
   card.innerHTML = `
     <h3>My Profile</h3>
-    <img src="${user.profileImage || "default.jpg"}" class="profile-img">
+    <img src="${getProfileImageUrl(user)}" class="profile-img">
     <p><strong>${user.firstName || ""} ${user.lastName || ""}</strong></p>
     ${user.bio ? `<p>${user.bio}</p>` : ""}
     ${user.resumeURL ? `<a href="${user.resumeURL}" target="_blank">View Résumé</a>` : ""}
