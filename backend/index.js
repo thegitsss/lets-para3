@@ -39,7 +39,12 @@ app.use(
       scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https://images.unsplash.com"],
+      imgSrc: [
+        "'self'",
+        "data:",
+        "https://images.unsplash.com",
+        `https://${process.env.S3_BUCKET}.s3.${process.env.S3_REGION}.amazonaws.com`,
+      ],
     },
   })
 );
