@@ -1,454 +1,496 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Paralegal Dashboard | Let's-ParaConnect</title>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Let’s-ParaConnect | Paralegal Dashboard</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
 <script src="assets/scripts/utils/session.js"></script>
-<script type="module" src="assets/scripts/auth.js"></script>
-<style>
-:root{
-  --accent:#d19c3a;
-  --accent-2:#2f8c7a;
-  --bg:#ffffff;
-  --panel:#ffffff;
-  --line:rgba(12,18,37,.08);
-  --muted:#5c6475;
-  --ink:#0b1225;
-  --font-serif:'Cormorant Garamond',serif;
-  --font-sans:'Sarabun',sans-serif;
-  --shadow:0 18px 55px rgba(12,18,37,.08);
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{
-  font-family:var(--font-sans);
-  font-weight:200;
-  color:var(--ink);
-  background:var(--bg);
-  display:flex;
-  min-height:100vh;
-  overflow:hidden;
-}
+  <style>
+    :root {
+      --bg: #ffffff;
+      --sidebar-bg: #f5f5f5e6;
+      --accent: #b6a47a;
+      --ink: #1a1a1a;
+      --muted: #8a8a8a;
+      --line: rgba(0, 0, 0, 0.08);
+      --panel: #fcfcfc;
+      --radius: 14px;
+      --font-serif: 'Cormorant Garamond', serif;
+      --font-sans: 'Sarabun', sans-serif;
+    }
 
-/* Sidebar */
-.sidebar{
-  width:260px;
-  background:url('hero-mountain.jpg') center/cover no-repeat fixed;
-  color:#fff;
-  display:flex;
-  flex-direction:column;
-  font-weight:200;
-  padding:24px 20px;
-  border-right:1px solid var(--line);
-  position:relative;
-}
-.sidebar::before{
-  content:"";
-  position:absolute;
-  inset:0;
-  background:rgba(0,0,0,0.45);
-}
-.logo,nav,.sidebar-footer{position:relative;z-index:2;}
-.logo{
-  font-family:var(--font-serif);
-  font-size:1.7rem;
-  font-weight:300;
-  text-align:center;
-  margin-bottom:36px;
-}
-nav{display:flex;flex-direction:column;gap:14px;}
-nav a{
-  text-decoration:none;
-  color:#fff;
-  font-weight:200;
-  font-size:.95rem;
-  padding:10px 14px;
-  border-radius:8px;
-  transition:background .3s;
-}
-nav a.active,nav a:hover{background:rgba(255,255,255,0.15);}
-.sidebar-link{
-  display:block;
-  width:100%;
-  border:none;
-  background:none;
-  color:#fff;
-  font-size:.95rem;
-  font-family:var(--font-sans);
-  font-weight:200;
-  text-align:left;
-  padding:10px 14px;
-  border-radius:8px;
-  cursor:pointer;
-  position:relative;
-  z-index:2;
-}
-.sidebar-link:hover,.sidebar-link:focus{background:rgba(255,255,255,0.15);outline:none;}
-.sidebar-footer{
-  margin-top:auto;
-  font-size:.7rem;
-  color:#e8e8e8;
-  text-align:center;
-  position:relative;
-}
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-/* Weather widget footer */
-#weatherSidebar{
-  position:absolute;
-  bottom:48px;
-  left:0;
-  width:100%;
-  text-align:center;
-  color:#fff;
-  font-size:1rem;
-  font-family:var(--font-serif);
-  z-index:2;
-}
+    body {
+      font-family: var(--font-sans);
+      font-weight: 200;
+      background: var(--bg);
+      color: var(--ink);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
 
-/* Main */
-.main{
-  flex:1;
-  padding:40px;
-  overflow-y:auto;
-  scroll-behavior:smooth;
-}
-header h1{
-  font-family:var(--font-serif);
-  font-weight:300;
-  font-size:2.3rem;
-  margin-bottom:.25rem;
-}
-header p{color:var(--muted);font-size:.95rem;margin-bottom:2rem;}
-.page-header{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:16px;
-}
-.header-cluster{
-  display:flex;
-  align-items:center;
-  gap:14px;
-  position:relative;
-}
-.notification-icon{
-  position:relative;
-  cursor:pointer;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  width:42px;
-  height:42px;
-  border-radius:50%;
-  border:1px solid var(--line);
-  background:#fff;
-  transition:border-color .2s ease,transform .2s ease;
-}
-.notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
-.notification-icon svg{width:20px;height:20px;color:var(--ink);}
-.notification-badge{
-  position:absolute;
-  top:-6px;
-  right:-6px;
-  background:#e63946;
-  color:#fff;
-  border-radius:50%;
-  font-size:.7rem;
-  width:18px;
-  height:18px;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  font-weight:700;
-}
-.notification-badge.show{display:flex;}
-.user-profile{
-  display:flex;
-  align-items:center;
-  gap:.6rem;
-  padding:6px 10px;
-  border:1px solid var(--line);
-  border-radius:12px;
-  background:#fff;
-}
-.user-profile img{
-  width:42px;
-  height:42px;
-  border-radius:50%;
-  object-fit:cover;
-  box-shadow:0 6px 16px rgba(0,0,0,0.08);
-}
-.user-profile strong{display:block;font-weight:500;}
-.user-profile span{display:block;font-size:.85rem;color:var(--muted);font-weight:200;}
-.notification-panel{
-  position:absolute;
-  right:0;
-  top:calc(100% + 10px);
-  width:280px;
-  padding:14px;
-  background:#fff;
-  border:1px solid var(--line);
-  border-radius:14px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.1);
-  display:none;
-  z-index:50;
-}
-.notification-panel.show{display:block;}
-.notification-panel-header{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  margin-bottom:8px;
-  font-size:.92rem;
-}
-.notification-panel-header button{
-  border:none;
-  background:none;
-  color:var(--accent);
-  cursor:pointer;
-  font-size:.85rem;
-}
-[data-notification-list]{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;}
-[data-notification-list] li{
-  border:1px solid var(--line);
-  border-radius:12px;
-  padding:10px;
-  background:#fcfcfc;
-}
-[data-notification-list] li strong{display:block;font-weight:500;margin-bottom:4px;}
-[data-notification-list] li span{display:block;font-size:.8rem;color:var(--muted);}
-[data-notification-empty]{font-size:.85rem;color:var(--muted);}
+    .sidebar {
+      width: 240px;
+      background: var(--sidebar-bg);
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+      padding: 24px 16px;
+    }
 
-/* Metrics */
-.metrics{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
-  gap:1rem;
-  margin-bottom:2rem;
-}
-.metric{
-  border:1px solid var(--line);
-  border-radius:10px;
-  padding:1rem;
-  text-align:center;
-  background:#fff;
-}
-.metric.pink{background:#fff;} .metric.pink p{color:#e45a84;}
-.metric.blue{background:#fff;} .metric.blue p{color:#4a90e2;}
-.metric.purple{background:#fff;} .metric.purple p{color:#9b59b6;}
-.metric.teal{background:#fff;} .metric.teal p{color:#16a085;}
-.metric.violet{background:#fff;color:var(--ink);}
-.metric.violet p{color:var(--ink);}
-.dashboard-grid{display:grid;grid-template-columns:2fr 1fr;gap:2rem;align-items:start;}
-.chart-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.5rem;}
-.chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;}
-.stats-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;}
-.lower-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.5rem;margin-top:2rem;}
-.panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.5rem;}
-.panel.new-users .search{width:100%;padding:.5rem .75rem;margin-bottom:1rem;border:1px solid var(--line);border-radius:6px;}
-.user-list{list-style:none;padding:0;margin:0;} .user-list li{display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--line);}
-.circle-progress{width:120px;height:120px;border-radius:50%;border:6px solid var(--accent);display:flex;align-items:center;justify-content:center;margin:1rem auto;font-weight:600;}
-.sales-box{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;text-align:center;margin-top:1rem;}
-.sales-box div strong{display:block;font-size:1.3rem;color:var(--accent);}
-.sales-box div span{font-size:.85rem;color:var(--muted);}
-.grid-two {display:grid;grid-template-columns:2fr 1fr;gap:1.5rem;margin-bottom:2rem;}
-.escrow-summary {display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1.5rem;}
-.card {background:#fff;border:1px solid var(--line);border-radius:10px;padding:1rem;text-align:center;}
-.card.highlight {background:#fff;color:var(--ink);}
-.card.highlight h3,.card.highlight p{color:var(--ink);}
-.quick-stats {display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1rem;text-align:center;margin-bottom:2rem;}
-.quick-stats div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:.8rem;}
-.quick-stats strong{display:block;color:var(--accent);font-size:1.2rem;}
-.panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;}
-.view-all{font-size:.9rem;color:var(--accent);text-decoration:none;}
-tickets{width:100%;border-collapse:collapse;}
-tickets th,.tickets td{padding:.75rem;border-bottom:1px solid var(--line);}
-tickets th{color:var(--muted);text-align:left;}
-.status.open{background:#e2fff7;color:#16a085;padding:4px 8px;border-radius:6px;font-size:.8rem;}
-.details-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:1000;}
-.details-content{background:#fff;border-radius:12px;max-width:800px;width:90%;padding:2rem;max-height:90vh;overflow-y:auto;position:relative;}
-.details-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;}
-.details-table{width:100%;border-collapse:collapse;margin-top:1rem;}
-.details-table td{padding:.6rem .4rem;border-bottom:1px solid var(--line);}
-.highlight-text{background:#e6fff6;color:#16a085;padding:3px 8px;border-radius:4px;}
-.hidden{display:none;}
-.posts-table{width:100%;border-collapse:collapse;}
-.posts-table th,.posts-table td{padding:.75rem;border-bottom:1px solid var(--line);text-align:left;}
-.status.pending{background:#fff4e5;color:#e67e22;padding:4px 8px;border-radius:6px;font-size:.8rem;}
-.status.approved{background:#e2fff7;color:#16a085;padding:4px 8px;border-radius:6px;font-size:.8rem;}
-.flagged-list{list-style:none;padding:0;margin:0;}
-.flagged-list li{padding:.6rem .4rem;border-bottom:1px solid var(--line);font-size:.95rem;}
-.flagged-list li:last-child{border-bottom:none;}
-#section-user-management,
-#section-user-management *{
-  font-family:var(--font-sans);
-  font-weight:200;
-}
-#section-user-management h1,
-#section-user-management h2,
-#section-user-management h3{
-  font-family:var(--font-serif);
-  font-weight:300;
-}
-.quality-bar{height:10px;background:#e8e8e8;border-radius:6px;overflow:hidden;}
-.quality-fill{height:10px;background:var(--accent);border-radius:6px 0 0 6px;}
-.btn.danger{background:#ffebeb;color:#c0392b;border:1px solid #f8d7da;}
-.btn.danger:hover{background:#c0392b;color:#fff;}
-.input-field{width:100%;padding:.6rem .8rem;margin-bottom:1rem;border:1px solid var(--line);border-radius:6px;font-family:var(--font-sans);}
-.search{width:260px;padding:.5rem .75rem;border:1px solid var(--line);border-radius:6px;}
-.grid-four{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1.5rem;}
-.ledger-table{width:100%;border-collapse:collapse;}
-.ledger-table th,.ledger-table td{padding:.75rem;border-bottom:1px solid var(--line);text-align:left;}
-.tax-summary,.payout-schedule{list-style:none;padding:0;margin:0;}
-.tax-summary li,.payout-schedule li{padding:.4rem 0;border-bottom:1px solid var(--line);font-size:.95rem;}
-.tax-summary strong{color:var(--ink);}
-.payout-schedule li:last-child,.tax-summary li:last-child{border-bottom:none;}
-.metric h3{font-family:var(--font-serif);font-weight:400;font-size:1.1rem;margin-bottom:.25rem;}
-.metric p{font-size:1.6rem;color:var(--accent);font-weight:200;}
+    .logo {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+      margin-bottom: 36px;
+      text-align: center;
+    }
 
-/* Panels */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:1.5rem;margin-bottom:2rem;}
-.panel{
-  border:1px solid var(--line);
-  border-radius:10px;
-  padding:1.25rem 1.5rem;
-  background:#fff;
-  transition:all .25s ease;
-}
-.panel:hover{border-color:var(--accent);}
-.panel h2{
-  font-family:var(--font-serif);
-  font-weight:500;
-  font-size:1.3rem;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  cursor:pointer;
-}
-.panel h2 span{font-size:1.2rem;color:var(--muted);}
-.panel-content{margin-top:1rem;display:block;transition:max-height .4s ease;}
-.panel.collapsed .panel-content{display:none;}
-table{width:100%;border-collapse:collapse;font-size:.9rem;}
-th,td{text-align:left;padding:10px 6px;border-bottom:1px solid var(--line);}
-th{color:var(--muted);font-weight:200;}
-.btn{border:none;border-radius:6px;padding:6px 12px;font-size:.9rem;cursor:pointer;transition:all .2s ease;}
-.btn.primary{background:var(--accent);color:#fff;}
-.btn.primary:hover{background:#a38e5f;}
-.btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
-.btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
-.weather{display:flex;align-items:center;justify-content:space-between;}
-.weather h3{font-family:var(--font-serif);font-weight:400;}
-.toast{
-  position:fixed;
-  right:24px;
-  bottom:24px;
-  background:#fff;
-  color:var(--ink);
-  padding:12px 18px;
-  border-radius:999px;
-  border:1px solid var(--line);
-  opacity:0;
-  transform:translateY(20px);
-  transition:opacity .2s ease,transform .2s ease;
-  z-index:2000;
-  font-size:.95rem;
-}
-.toast.show{opacity:1;transform:translateY(0);}
-.toast[data-toast-type="ok"]{background:#fff;}
-.toast[data-toast-type="err"]{background:#fff;}
-.pending-controls{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem;align-items:flex-start;}
-.pending-controls .search{flex:1;min-width:220px;}
-.pending-controls select{padding:.55rem .8rem;border:1px solid var(--line);border-radius:6px;background:#fff;font-family:var(--font-sans);font-size:.95rem;}
-.pending-count{color:var(--muted);font-size:.9rem;}
-.pending-empty{padding:1rem;text-align:center;color:var(--muted);}
-.pending-users-table td.actions{width:140px;}
-.pending-users-table td.actions .btn{width:100%;}
-.pending-modal-actions{display:flex;justify-content:flex-end;gap:.75rem;margin-top:1.5rem;}
-#pendingUserModal .details-content{max-width:900px;}
-#pendingUserModal .details-table td:first-child{width:200px;font-weight:600;}
-#pendingUserModal .details-table td:last-child{white-space:pre-line;}
-.section {display:none;opacity:0;transition:opacity .4s ease;}
-.section.visible {display:block;opacity:1;}
-nav a.active {background:rgba(255,255,255,0.25);}
+    nav {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
 
-.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1.5rem;}
-.lpc-card{
-  border:1px solid var(--line);
-  border-radius:10px;
-  padding:1.5rem;
-  background:#fff;
-  box-shadow:var(--shadow);
-  scroll-margin-top:24px;
-}
-.lpc-card h3{font-family:var(--font-serif);font-weight:500;margin-bottom:.75rem;}
-.lpc-card h4{margin-top:1rem;margin-bottom:.5rem;font-family:var(--font-serif);font-weight:500;}
-.lpc-card ul{padding-left:1.1rem;line-height:1.5;}
-.lpc-card img.profile-img{width:120px;height:120px;border-radius:12px;object-fit:cover;display:block;margin:0 auto 1rem;box-shadow:0 10px 30px rgba(0,0,0,0.08);}
-</style>
+    nav a {
+      text-decoration: none;
+      color: var(--ink);
+      font-weight: 200;
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      transition: background 0.3s ease;
+    }
+
+    nav a.active,
+    nav a:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .main {
+      flex: 1;
+      padding: 40px;
+      overflow-y: auto;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 2rem;
+      gap: 1.5rem;
+    }
+
+    .notification-icon {
+      position: relative;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      transition: background 0.2s ease;
+    }
+
+    .notification-icon:hover {
+      background: rgba(0,0,0,0.05);
+    }
+
+    .notification-icon svg {
+      width: 20px;
+      height: 20px;
+      color: var(--ink);
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      background: red;
+      color: white;
+      border-radius: 50%;
+      font-size: 0.7rem;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .user-profile img {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+    }
+
+    .user-profile span {
+      font-weight: 200;
+      font-size: 0.95rem;
+    }
+
+    header h1 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 2.2rem;
+      margin-bottom: 0.25rem;
+    }
+
+    header p {
+      font-weight: 200;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+
+    .summary {
+      display: flex;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .info-box {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      font-size: 0.95rem;
+      flex: 1;
+      font-weight: 200;
+    }
+
+    .message-box {
+      cursor:pointer;
+      transition:background .25s ease, transform .15s ease;
+    }
+
+    .message-box:hover {
+      background:rgba(182,164,122,0.08);
+      border-color:var(--accent);
+      transform:scale(1.02);
+    }
+
+    .section-title {
+      font-family: var(--font-serif);
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+
+    .info-line {
+      font-size: 0.95rem;
+      margin-bottom: 0.25rem;
+      font-weight: 200;
+    }
+
+    .side-by-side-panels {
+      display: flex;
+      gap: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .side-by-side-panels > section {
+      flex: 1;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 1.25rem;
+      font-weight: 200;
+    }
+
+    .quick-actions {
+      margin-bottom: 2rem;
+    }
+
+    .quick-actions button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-family: var(--font-sans);
+      font-weight: 200;
+      cursor: pointer;
+      margin-right: 0.5rem;
+    }
+
+    .case-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .case-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      background: var(--panel);
+    }
+
+    .case-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .case-header h2 {
+      font-family: var(--font-serif);
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .case-subinfo {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-top: 0.25rem;
+    }
+
+    .case-content {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+      display: none;
+      font-size: 0.95rem;
+    }
+
+    .open .case-content {
+      display: block;
+    }
+
+    .case-actions {
+      margin-top: 1rem;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 30px;
+      transform: translate(-50%, 20px);
+      background: rgba(17, 17, 17, 0.92);
+      color: #fff;
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 3000;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    .notification-panel {
+      position: absolute;
+      top: 40px;
+      right: 0;
+      width: 280px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 15px 35px rgba(15, 23, 42, 0.18);
+      padding: 1rem;
+      display: none;
+      flex-direction: column;
+      gap: 0.75rem;
+      z-index: 100;
+    }
+
+    .notification-panel.show {
+      display: flex;
+    }
+
+    .notification-panel h4 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .notification-panel p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .notification-item {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 0.9rem;
+      line-height: 1.4;
+      color: var(--ink);
+    }
+
+    .notification-item:last-child {
+      border-bottom: none;
+    }
+
+  </style>
 </head>
-
 <body>
-<aside class="sidebar">
-  <div class="logo">Paralegal Panel</div>
-  <nav>
-    <a href="dashboard-paralegal.html" class="sideNavItem active" data-target="paraProfileCard">Home</a>
-    <a href="paralegal-invitations.html">Invitations</a>
-    <a href="paralegal-applications.html">Applications</a>
-    <a href="paralegal-assigned.html">Assigned Cases</a>
-    <a href="profile-settings.html">Settings</a>
-  </nav>
-  <button type="button" class="sidebar-link sideNavItem" data-target="logout" id="logoutBtn">Log Out</button>
-  <div id="weatherSidebar">Stay current</div>
-  <div class="sidebar-footer">© Let's-ParaConnect 2025</div>
-</aside>
-
-<main class="main">
-  <header class="page-header">
-    <div>
-      <h1>Welcome, Paralegal</h1>
-      <p>Review your profile overview.</p>
-    </div>
-    <div class="header-cluster" data-paralegal-cluster data-notification-center>
-      <button class="notification-icon" aria-label="View notifications" data-notification-toggle>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 01-3.46 0" />
-        </svg>
-        <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
-      </button>
-      <div id="profileHeaderBlock" class="user-profile">
-        <img id="clusterAvatar" class="globalProfileImage nav-profile-photo profile-img-small" src="https://via.placeholder.com/64x64.png?text=PL" alt="Paralegal avatar">
-        <div>
-          <span id="clusterName" class="globalProfileName"></span><br>
-          <span id="clusterRole" class="globalProfileRole"></span>
-        </div>
-      </div>
-      <div class="notification-panel" data-notification-panel>
-        <div class="notification-panel-header">
-          <h4 style="margin:0;font-size:0.95rem;">Notifications</h4>
-          <button type="button" data-notification-mark>Mark all read</button>
-        </div>
-        <ul data-notification-list></ul>
-        <p class="notification-item" data-notification-empty>Loading…</p>
-      </div>
-    </div>
-  </header>
-
-  <div class="card-grid">
-    <section id="paraProfileCard" class="lpc-card"></section>
+<div id="protectedContent" style="visibility:visible">
+  <aside class="sidebar">
+    <div class="logo">Dashboard</div>
+    <nav>
+      <a href="index.html#paralegal-dashboard" class="active">Home</a>
+      <a href="my-cases.html">My Assignments</a>
+      <a href="index.html#paralegal-messages">Messages</a>
+      <a href="documents.html">Documents</a>
+      <a href="review.html">Reviews</a>
+      <a href="case-files.html">Case Files</a>
+      <a href="payments-escrow.html">Billing</a>
+      <a href="tasks.html">Tasks</a>
+      <a href="help.html">Help</a>
+    </nav>
+      <div style="margin-top: auto; font-size: 0.7rem; color: var(--muted); text-align: center;">
+    <a href="/" style="color:inherit;text-decoration:none;">© Let’s‑ParaConnect 2025</a>
   </div>
-</main>
+</aside>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <div class="notification-icon" id="notificationBell">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+        <span class="notification-badge" id="paralegalNotificationBadge" data-field="notificationCount"></span>
+        <div class="notification-panel" id="notificationPanel">
+          <h4>Notifications</h4>
+          <div id="paralegalNotificationList" aria-live="polite">
+            <div class="notification-item" id="paralegalNotificationsEmpty" hidden>You're all caught up.</div>
+          </div>
+          <h4>Recent Activity</h4>
+          <p id="paralegalRecentActivity"></p>
+        </div>
+      </div>
+      <div class="user-profile">
+        <img src="assets/defaults/avatar-default.svg" alt="User avatar" id="paralegalAvatar" />
+        <span id="paralegalName" data-field="name"></span>
+      </div>
+    </div>
 
-<div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+    <header>
+      <h1>Welcome back, <span id="paralegalNameHeading" data-field="name"></span></h1>
+      <p><span id="paralegalWelcomeCopy" data-field="welcomeSubheading"></span></p>
+    </header>
 
-<script src="assets/scripts/utils/toast.js"></script>
-<script type="module" src="assets/scripts/utils/notifications.js"></script>
-<script src="assets/scripts/paralegal-cluster.js"></script>
-<script type="module" src="assets/scripts/paralegal-dashboard.js"></script>
-<script type="module">
-  import { loadUserHeaderInfo } from "./assets/scripts/auth.js";
-  loadUserHeaderInfo();
-</script>
+    <section class="summary">
+      <div class="info-box"><span id="paralegalActiveCases" data-field="activeCases"></span> active cases</div>
+      <div class="info-box message-box" id="messageBox">
+        <span id="paralegalMessageCount" data-field="unreadMessages"></span> message<span id="paralegalMessagePlural"></span>
+      </div>
+      <div class="info-box">Next deadline: <span id="paralegalNextDeadline" data-field="nextDeadline"></span></div>
+      <div class="info-box">$<span id="paralegalMonthEarnings" data-field="monthEarnings"></span> earned this month</div>
+    </section>
+
+    <section class="deadlines">
+      <div class="section-title">Upcoming Deadlines</div>
+      <div id="paralegalDeadlinesList">
+        <div class="info-line" id="paralegalDeadlinesEmpty" data-deadline-empty hidden>No assigned deadlines.</div>
+      </div>
+    </section>
+
+    <div class="side-by-side-panels">
+      <section>
+        <div class="section-title">Latest Messages</div>
+        <div class="info-line" id="paralegalLatestMessage">
+          <strong data-field="latestMessageName"></strong>: <span data-field="latestMessageExcerpt"></span> <a href="index.html#paralegal-messages">Open</a>
+        </div>
+      </section>
+      <section>
+        <div class="section-title">Payouts</div>
+        <div class="info-line" id="paralegalPayoutRecent">&bull; $<span id="paralegalPayout30Days" data-field="payout30Days"></span> paid out in the last 30 days</div>
+        <div class="info-line" id="paralegalNextPayoutLine">&bull; Next release scheduled: <span id="paralegalNextPayout" data-field="nextPayout"></span></div>
+      </section>
+    </div>
+
+    <section class="quick-actions">
+      <div class="section-title">Quick Actions</div>
+      <button data-action="browse">Browse new postings</button>
+      <button data-action="availability">Update availability</button>
+      <button data-action="upload">Upload document</button>
+    </section>
+
+    <section>
+      <div class="section-title">Case Invitations</div>
+      <div class="case-list" id="paralegalInviteList">
+        <div class="case-card empty-state" id="paralegalInvitesEmpty" hidden>
+          <div class="case-header">
+            <div>
+              <h2>No pending invitations</h2>
+              <div class="case-subinfo">New case invites will appear here.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="case-list" id="paralegalAssignmentList">
+      <div class="case-card empty-state" id="paralegalAssignmentsEmpty" hidden>
+        <div class="case-header">
+          <div>
+            <h2>No active assignments</h2>
+            <div class="case-subinfo">New invitations will appear here.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="assignedCases">
+      <h2>Assigned Cases</h2>
+      <div id="paralegalAssignedCasesList"></div>
+    </section>
+  </main>
+  <template id="assignmentCardTemplate">
+    <div class="case-card">
+      <div class="case-header">
+        <div>
+          <h2 data-field="assignmentTitle">Case name</h2>
+          <div class="case-subinfo" data-field="assignmentMeta"></div>
+        </div>
+        <div>▾</div>
+      </div>
+      <div class="case-content">
+        <p data-field="assignmentSummary"></p>
+        <div class="case-actions">
+          <button data-action="primary">Open Workspace</button>
+          <button data-action="secondary">Message Attorney</button>
+        </div>
+      </div>
+    </div>
+  </template>
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script src="assets/scripts/utils/toast.js"></script>
+  <script type="module" src="assets/scripts/paralegal-dashboard.js"></script>
+</div>
 </body>
 </html>

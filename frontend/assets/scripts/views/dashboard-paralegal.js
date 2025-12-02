@@ -38,7 +38,6 @@ function draw(root, payload, escapeHTML) {
   const metrics = payload?.metrics || {};
   const metricCards = [
     { label: "Active cases", value: metrics.activeCases ?? 0 },
-    { label: "Invitations", value: metrics.invitations ?? 0 },
     { label: "Pending applications", value: metrics.pendingApplications ?? 0 },
     { label: "Earnings", value: formatCurrency(metrics.earnings) },
   ]
@@ -49,27 +48,6 @@ function draw(root, payload, escapeHTML) {
           <div class="metric-value">${escapeHTML(m.value)}</div>
         </div>`
     )
-    .join("");
-
-  const invites = (payload?.invitations || [])
-    .map((invite) => {
-      const dateLabel = invite.invitedAt ? new Date(invite.invitedAt).toLocaleDateString() : "Recently";
-      return `
-        <article class="case-row">
-          <div>
-            <div class="case-title">${escapeHTML(invite.jobTitle || "Case invitation")}</div>
-            <div class="case-meta">${escapeHTML(invite.attorneyName || "Attorney")} · Invited ${escapeHTML(
-        dateLabel
-      )}</div>
-          </div>
-          <div class="invite-actions">
-            <button class="btn ghost" data-action="open-case" data-case-id="${escapeHTML(invite.caseId)}">View</button>
-            <button class="btn" data-action="accept-invite" data-case-id="${escapeHTML(invite.caseId)}">Accept</button>
-            <button class="btn" data-action="decline-invite" data-case-id="${escapeHTML(invite.caseId)}">Decline</button>
-          </div>
-        </article>
-      `;
-    })
     .join("");
 
   const activeCases = (payload?.activeCases || [])
@@ -143,14 +121,6 @@ function draw(root, payload, escapeHTML) {
       <div class="section-title">Paralegal Dashboard</div>
       <div class="metric-grid metric-grid--three">${metricCards}</div>
 
-      <div class="block">
-        <div class="block-title">Invitations</div>
-        ${
-          invites ||
-          `<div class="empty">No invitations right now. Attorneys will invite you directly to cases.</div>`
-        }
-      </div>
-
       <div class="grid two">
         <div class="block">
           <div class="block-title">Active cases</div>
@@ -192,25 +162,7 @@ function wire(root, navigateTo) {
         else window.location.href = `index.html#case-detail?caseId=${encodeURIComponent(caseId)}`;
       }
     }
-    if (action === "accept-invite" || action === "decline-invite") {
-      const caseId = event.target.dataset.caseId;
-      if (caseId) {
-        respondToInvite(caseId, action === "accept-invite" ? "accept" : "decline");
-      }
-    }
   });
-}
-
-async function respondToInvite(caseId, decision) {
-  try {
-    await j(`/api/cases/${encodeURIComponent(caseId)}/respond-invite`, {
-      method: "POST",
-      body: { decision },
-    });
-    window.location.reload();
-  } catch (err) {
-    alert(err?.message || "Unable to update invitation.");
-  }
 }
 
 function showError(el, err, escapeHTML) {

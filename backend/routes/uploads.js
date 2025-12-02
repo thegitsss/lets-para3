@@ -392,7 +392,7 @@ router.post(
       Body: req.file.buffer,
       ContentType: req.file.mimetype || "image/jpeg",
       ContentLength: req.file.size,
-      ACL: "private",
+      ACL: "public-read",
       ...sseParams(),
     };
     await s3.send(new PutObjectCommand(putParams));
