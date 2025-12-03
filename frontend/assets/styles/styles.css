@@ -32,6 +32,13 @@ header {
   justify-content: flex-start;
 }
 
+.header-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
 .header-inner nav a,
 .header-inner a.login-btn {
   font-family: 'Sarabun', sans-serif;
@@ -39,6 +46,46 @@ header {
   font-size: 16px;
   color: #1a2230;
   text-decoration: none;
+}
+
+.header-actions .login-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1px solid rgba(26, 34, 48, 0.25);
+  font-size: 12px;
+}
+
+.header-actions .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid rgba(26, 34, 48, 0.2);
+  border-radius: 999px;
+  font-size: 12px;
+  font-family: 'Sarabun', sans-serif;
+  font-weight: 200;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #1a2230;
+  text-decoration: none;
+  background: transparent;
+}
+
+.header-actions .login-btn.primary {
+  background: #1a2230;
+  color: #fff;
+  border-color: #1a2230;
+}
+
+.header-actions .login-btn.secondary {
+  background: transparent;
+  color: #1a2230;
 }
 
 .header-logo {
@@ -68,8 +115,10 @@ header {
     display: none;
   }
 
-  .login-btn {
-    justify-self: center;
+  .header-actions {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
   }
 }
 /* Smooth spacing for large viewports */
@@ -161,6 +210,23 @@ html {
   scroll-behavior: smooth;
 }
 
+/* GPU Layer Promotion for Smooth Scrolling */
+.hero-section,
+.hero-slide,
+.section,
+.hiw-card,
+.fade-in,
+.fade-element,
+.w-slider,
+.w-slide,
+.parallax-layer,
+.observed-element,
+.animated-block {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
 body {
   scroll-behavior: smooth;
   overscroll-behavior-y: contain;
@@ -216,19 +282,48 @@ html.lenis {
 }
 
 /* Home: Who We Are section */
-#about.section {
-  min-height: 420px;
-  padding: 80px 0;
+.who-wrapper {
+  width: 100%;
+  max-width: 100%;
+  padding: 80px 40px;
+  position: relative;
+  z-index: 1000;
+  background: #ffffff;
+  text-align: center;
   display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
   gap: 1.5rem;
 }
 
-@media (max-width: 768px) {
-  #about.section {
-    min-height: 360px;
-    padding: 60px 0;
+.who-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(28px, 4vw, 44px);
+  font-weight: 300;
+  color: #1a2230;
+  margin: 0;
+}
+
+.who-text {
+  width: 100%;
+  max-width: 100%;
+  margin: 20px auto 0 auto;
+  line-height: 1.6;
+  font-size: 1rem;
+  color: #303030;
+  text-align: center;
+  font-family: 'Sarabun', sans-serif;
+  font-weight: 200;
+}
+
+@media (max-width: 600px) {
+  .who-wrapper {
+    padding: 60px 20px;
+  }
+
+  .who-text {
+    font-size: 0.95rem;
   }
 }
 

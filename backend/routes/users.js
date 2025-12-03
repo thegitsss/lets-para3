@@ -99,9 +99,8 @@ const parseParalegalFilters = (query = {}) => {
   return { filter, sortOpt, page: p, limit: l };
 };
 
-const SAFE_PUBLIC_SELECT =
-  "_id firstName lastName email role status about bio availability avatarURL profileImage location state locationState timezone practiceAreas specialties skills jurisdictions yearsExperience linkedInURL certificateURL resumeURL education experience writingSamples notificationPrefs barNumber";
-const SAFE_SELF_SELECT = SAFE_PUBLIC_SELECT;
+const SAFE_PUBLIC_SELECT = "_id firstName lastName avatarURL profileImage location specialties yearsExperience linkedInURL certificateURL education resumeURL notificationPrefs";
+const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email`;
 const FILE_PUBLIC_BASE =
   (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
   (process.env.S3_BUCKET && process.env.S3_REGION
@@ -121,31 +120,18 @@ function serializePublicUser(user, { includeEmail = false } = {}) {
   const avatarURL = toPublicUrl(src.avatarURL || profileImage);
   const payload = {
     _id: String(src._id),
-    role: src.role || "",
-    status: src.status || "",
     firstName: src.firstName || "",
     lastName: src.lastName || "",
     avatarURL,
     profileImage,
-    about: src.about || "",
-    bio: src.bio || "",
-    location: src.location || "",
-    state: src.state || src.locationState || "",
-    locationState: src.locationState || src.state || "",
-    availability: src.availability || "",
+    state: src.state || src.location || "",
     specialties: Array.isArray(src.specialties) ? src.specialties : [],
-    practiceAreas: Array.isArray(src.practiceAreas) ? src.practiceAreas : [],
-    skills: Array.isArray(src.skills) ? src.skills : [],
-    jurisdictions: Array.isArray(src.jurisdictions) ? src.jurisdictions : [],
-    yearsExperience: typeof src.yearsExperience === "number" ? src.yearsExperience : 0,
+    yearsExperience:
+      typeof src.yearsExperience === "number" ? src.yearsExperience : 0,
     linkedInURL: src.linkedInURL || "",
     certificateURL: src.certificateURL || "",
     resumeURL: src.resumeURL || "",
-    barNumber: src.barNumber || "",
-    timezone: src.timezone || "",
     education: Array.isArray(src.education) ? src.education : [],
-    experience: Array.isArray(src.experience) ? src.experience : [],
-    writingSamples: Array.isArray(src.writingSamples) ? src.writingSamples : [],
     notificationPrefs: src.notificationPrefs || null,
   };
   if (includeEmail) {

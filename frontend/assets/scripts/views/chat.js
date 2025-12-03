@@ -29,6 +29,8 @@ export async function render(el, { escapeHTML, params: routeParams } = {}) {
   const form = el.querySelector("[data-chat-form]");
   const input = el.querySelector("[data-chat-input]");
   const status = el.querySelector("[data-chat-status]");
+  const submitBtn = form?.querySelector('button[type="submit"]');
+  const defaultText = submitBtn?.textContent || "Send";
 
   async function refresh() {
     try {
@@ -40,11 +42,26 @@ export async function render(el, { escapeHTML, params: routeParams } = {}) {
     }
   }
 
+  const scheduleSendReset = () => {
+    if (!submitBtn || !form) return;
+    const handler = () => {
+      submitBtn.disabled = false;
+      submitBtn.textContent = defaultText;
+      form.removeEventListener("input", handler);
+    };
+    form.addEventListener("input", handler, { once: true });
+  };
+
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const text = input?.value.trim();
     if (!text) return;
     if (status) status.textContent = "Sending…";
+    let restoreButton = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Sending…";
+    }
     try {
       await j(`/api/chat/${encodeURIComponent(caseId)}`, {
         method: "POST",
@@ -52,8 +69,15 @@ export async function render(el, { escapeHTML, params: routeParams } = {}) {
       });
       if (input) input.value = "";
       await refresh();
+      scheduleSendReset();
+      restoreButton = false;
     } catch (err) {
       if (status) status.textContent = err?.message || "Unable to send that message.";
+    } finally {
+      if (restoreButton && submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = defaultText;
+      }
     }
   });
 

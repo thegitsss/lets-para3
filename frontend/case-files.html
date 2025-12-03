@@ -4,8 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Case Files | Let’s-ParaConnect</title>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
-  <script src="assets/scripts/utils/session.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
   <style>
     :root {
       --bg:#fff;
@@ -31,40 +30,11 @@
     .sidebar{width:240px;background:#f5f5f5e6;display:flex;flex-direction:column;border-right:1px solid var(--line);padding:24px 16px;}
     .logo{font-family:var(--font-serif);font-size:1.6rem;text-align:center;margin-bottom:36px;}
     nav{display:flex;flex-direction:column;gap:14px;}
-    nav a{text-decoration:none;color:var(--ink);font-weight:200;font-size:.95rem;padding:10px 14px;border-radius:8px;transition:background .3s;}
+    nav a{text-decoration:none;color:var(--ink);font-weight:400;font-size:.95rem;padding:10px 14px;border-radius:8px;transition:background .3s;}
     nav a.active,nav a:hover{background:rgba(0,0,0,0.04);}
     .sidebar-footer{margin-top:auto;font-size:.7rem;color:var(--muted);text-align:center;}
 
     .main{flex:1;padding:40px;overflow-y:auto;}
-    .notification-icon{
-      width:46px;
-      height:46px;
-      border-radius:50%;
-      border:1px solid var(--line);
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      background:#fff;
-      cursor:pointer;
-      position:relative;
-      transition:border-color .2s ease, transform .2s ease;
-    }
-    .notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
-    .notification-icon svg{width:22px;height:22px;color:var(--ink);}
-    .notification-badge{
-      position:absolute;
-      top:-4px;
-      right:-4px;
-      background:#c0392b;
-      color:#fff;
-      border-radius:999px;
-      font-size:.75rem;
-      padding:2px 6px;
-      line-height:1;
-      display:none;
-      font-weight:600;
-    }
-    .notification-badge.show{display:inline-flex;}
     header h1{font-family:var(--font-serif);font-weight:300;font-size:2rem;margin-bottom:.25rem;}
     header p{color:var(--muted);margin-bottom:2rem;font-size:.95rem;}
 
@@ -160,13 +130,13 @@
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
     <nav>
-      <a href="dashboard-attorney.html">Home</a>
+      <a href="index.html#attorney-dashboard">Home</a>
       <a href="active-cases.html">Cases</a>
-      <a href="messages.html">Messages</a>
+      <a href="index.html#attorney-messages">Messages</a>
       <a href="documents.html">Documents</a>
       <a href="review.html">Review</a>
       <a href="case-files.html" class="active">Case Files</a>
-      <a href="billing-attorney.html">Billing</a>
+      <a href="payments-escrow.html">Billing</a>
       <a href="tasks.html">Tasks</a>
       <a href="help.html">Help</a>
     </nav>
@@ -174,24 +144,202 @@
   </aside>
 
   <main class="main">
-    <div class="topbar" data-attorney-header></div>
     <header>
       <h1>Case Files</h1>
       <p>View and manage all files associated with your cases. You can filter by approval status and download or print any document.</p>
     </header>
 
     <div class="filters">
-      <button class="active" data-filter="all" type="button">All</button>
-      <button data-filter="approved" type="button">Approved</button>
-      <button data-filter="pending_review" type="button">Pending Review</button>
-      <button data-filter="attorney_revision" type="button">Attorney Revisions</button>
+      <button class="active" data-filter="all" onclick="filterFiles('all', this)">All</button>
+      <button data-filter="approved" onclick="filterFiles('approved', this)">Approved</button>
+      <button data-filter="pending" onclick="filterFiles('pending', this)">Pending Review</button>
+      <button data-filter="revised" onclick="filterFiles('revised', this)">Attorney Revisions</button>
     </div>
 
     <div class="case-files" id="caseFilesContainer"></div>
   </main>
+
   <script>
-    window.__ATTORNEY_PAGE__ = "case-files";
+  const caseFiles = [
+    {
+      caseName:'Motion for Summary Judgment',
+      files:[
+        {name:'Draft_Motion_v2.0.docx', uploader:'J. Stone', date:'Nov 11 2025', status:'approved', url:'files/Draft_Motion_v2.0.docx'},
+        {name:'Exhibit_List.pdf', uploader:'J. Stone', date:'Nov 9 2025', status:'approved', url:'files/Exhibit_List.pdf'},
+        {name:'Attorney_Notes.pdf', uploader:'Attorney', date:'Nov 11 2025', status:'revised', url:'files/Attorney_Notes.pdf'}
+      ]
+    },
+    {
+      caseName:'Anderson Merger Filing',
+      files:[
+        {name:'Lease_Addendum.docx', uploader:'A. Bennett', date:'Nov 10 2025', status:'pending', url:'files/Lease_Addendum.docx'},
+        {name:'Financial_Summary.pdf', uploader:'A. Bennett', date:'Nov 9 2025', status:'approved', url:'files/Financial_Summary.pdf'}
+      ]
+    }
+  ];
+
+  const container = document.getElementById('caseFilesContainer');
+  let currentFilter = 'all';
+
+  function renderFiles(){
+    container.innerHTML='';
+    caseFiles.forEach(cs=>{
+      const block=document.createElement('div');
+      block.className='case-block';
+      block.innerHTML=`<h2>${cs.caseName}</h2>`;
+      const visible = cs.files.filter(f=>currentFilter==='all'||f.status===currentFilter);
+      if(!visible.length){
+        block.innerHTML += `<p style="color:var(--muted);font-size:.9rem;">No files in this category.</p>`;
+      } else {
+        visible.forEach(file=>{
+          const div=document.createElement('div');
+          div.className='file-item';
+          div.dataset.status=file.status;
+          const safeName = file.name.replace(/'/g,"\\'");
+          const safeUrl = file.url.replace(/'/g,"\\'");
+          div.innerHTML=`
+            <div class="file-info">
+              <h3 class="file-name" data-url="${file.url}">${file.name}</h3>
+              <p>${file.uploader} · ${file.date} · Status: ${file.status.charAt(0).toUpperCase()+file.status.slice(1)}</p>
+            </div>
+            <div class="file-actions">
+              <div class="menu-container">
+                <button class="menu-trigger" type="button">⋯</button>
+                <div class="menu-dropdown">
+                  <button onclick="shareFile('${safeUrl}')">Share</button>
+                  <button onclick="renameFile('${safeName}')">Rename</button>
+                  <button onclick="moveToCase('${safeName}')">Move to Case ▸</button>
+                  <hr>
+                  <button onclick="archiveFile('${safeName}')">Archive</button>
+                  <button class="delete" onclick="deleteFile('${safeName}')">Delete</button>
+                </div>
+              </div>
+            </div>`;
+          block.appendChild(div);
+        });
+      }
+      container.appendChild(block);
+    });
+    attachFileInteractions();
+  }
+
+  function filterFiles(status, btn){
+    currentFilter=status;
+    document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active'));
+    if(btn) btn.classList.add('active');
+    renderFiles();
+  }
+
+  function viewFile(url){ window.open(url,'_blank'); }
+  function downloadFile(url,name){
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=name;
+    a.click();
+  }
+  function printFile(url){
+    const win=window.open(url,'_blank');
+    if(win){
+      win.addEventListener('load',()=>win.print());
+    }
+  }
+
+  function findFileRecord(name){
+    for(const caseObj of caseFiles){
+      const index = caseObj.files.findIndex(f=>f.name===name);
+      if(index>-1){
+        return { caseObj, index, file: caseObj.files[index] };
+      }
+    }
+    return null;
+  }
+
+  function attachFileInteractions(){
+    document.querySelectorAll('.file-name').forEach(nameEl=>{
+      nameEl.addEventListener('click',()=>viewFile(nameEl.dataset.url));
+    });
+  }
+
+  // Toggle menu visibility
+  document.addEventListener('click', (e) => {
+    document.querySelectorAll('.menu-container').forEach(c => {
+      if (c.contains(e.target)) {
+        c.classList.toggle('active');
+      } else {
+        c.classList.remove('active');
+      }
+    });
+  });
+
+  // === Menu actions ===
+  function shareFile(url) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(()=>{
+        alert('Link copied to clipboard!');
+      }).catch(()=>{
+        alert('Unable to copy link automatically. URL: ' + url);
+      });
+    } else {
+      alert('Copy this link: ' + url);
+    }
+  }
+
+  function renameFile(name) {
+    const newName = prompt('Rename file:', name);
+    if (newName && newName !== name) {
+      const record = findFileRecord(name);
+      if(record){
+        record.caseObj.files[record.index].name = newName;
+        alert(`File renamed to ${newName}.`);
+        renderFiles();
+      }
+    }
+  }
+
+  function moveToCase(name) {
+    const caseName = prompt('Enter destination case name:');
+    if (!caseName) return;
+    const record = findFileRecord(name);
+    if(!record){
+      alert('File not found.');
+      return;
+    }
+    const [file] = record.caseObj.files.splice(record.index,1);
+    let target = caseFiles.find(c=>c.caseName===caseName);
+    if(!target){
+      target = { caseName, files: [] };
+      caseFiles.push(target);
+    }
+    target.files.push(file);
+    alert(`"${name}" moved to case "${caseName}".`);
+    renderFiles();
+  }
+
+  function archiveFile(name) {
+    const record = findFileRecord(name);
+    if(record){
+      const [file] = record.caseObj.files.splice(record.index,1);
+      const archived = JSON.parse(localStorage.getItem('archivedFiles')||'[]');
+      if(!archived.includes(file.name)) archived.push(file.name);
+      localStorage.setItem('archivedFiles', JSON.stringify(archived));
+      alert(`"${name}" archived successfully.`);
+      renderFiles();
+    }
+    window.location.href = 'documents.html?tab=archive';
+  }
+
+  function deleteFile(name) {
+    if (confirm(`Are you sure you want to delete "${name}"? This cannot be undone.`)) {
+      const record = findFileRecord(name);
+      if(record){
+        record.caseObj.files.splice(record.index,1);
+        alert(`"${name}" deleted.`);
+        renderFiles();
+      }
+    }
+  }
+
+  renderFiles();
   </script>
-  <script type="module" src="assets/scripts/attorney-tabs.js"></script>
 </body>
 </html>

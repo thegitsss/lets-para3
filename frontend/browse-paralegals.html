@@ -27,72 +27,112 @@
       font-size: 0.95rem;
     }
 
- /* -----------------------------------------
-   Attorney Dashboard Header Refinement
-------------------------------------------*/
-header {
-  border-bottom: 1px solid var(--line);
-  background: white;
+/* Global Header from homepage */
+.site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 68px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border-bottom: none;
+  backdrop-filter: saturate(160%) blur(10px);
+  transition: background-color 0.45s ease, box-shadow 0.45s ease, border-color 0.45s ease;
+}
+
+.site-header,
+.site-header nav a {
+  font-family: 'Sarabun', sans-serif;
+  font-weight: 200;
+  letter-spacing: 0.03em;
+}
+
+.brand {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 300;
+  font-size: 20px;
+  letter-spacing: 0.05em;
+  color: #1a2230;
+  text-decoration: none;
 }
 
 .header-inner {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 24px 40px;
+  width: min(1200px, 92vw);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  position: relative;
 }
 
-.header-logo {
-  font-family: 'Cormorant Garamond', serif;
+nav ul {
+  list-style: none;
+  display: flex;
+  gap: 28px;
+  padding: 0;
+  margin: 0;
+}
+
+nav a {
+  color: #1a2230;
   text-decoration: none;
-  color: var(--ink);
-  font-size: 20px;
-  letter-spacing: 1px;
+  opacity: .88;
   font-weight: 300;
 }
 
-.header-inner nav {
-  display: flex;
-  gap: 40px;
+nav a:hover {
+  opacity: 1;
 }
 
-    .header-inner nav a {
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      font-size: 0.95rem;
-      color: var(--ink);
-      text-decoration: none;
-      transition: color 0.2s, border-bottom 0.2s;
-  padding-bottom: 2px;
-  border-bottom: 1px solid transparent;
+.header-actions .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid rgba(26,34,48,0.2);
+  border-radius: 999px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: #1a2230;
+  text-decoration: none;
 }
 
-    .header-inner nav a:hover,
-    .header-inner nav a.active {
-      color: var(--gold);
-      border-bottom: 1px solid var(--gold);
-    }
+.site-header.over-image .brand,
+.site-header.over-image nav a,
+.site-header.over-image .header-actions .pill {
+  color: #f8f9fa;
+}
+
+.site-header.over-image .header-actions .pill {
+  border-color: rgba(255,255,255,0.6);
+}
 
     .page-intro {
       width: 100%;
       margin: 0;
-      padding: 32px 40px 0;
+      padding: 120px 0 0;
+      display: flex;
+      justify-content: center;
     }
 
     .unified-header {
       display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 32px;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      gap: 12px;
       margin-bottom: 32px;
       position: relative;
     }
 
     .unified-header .title-block {
-      max-width: 520px;
+      max-width: 640px;
     }
 
     .unified-header .eyebrow {
@@ -113,6 +153,7 @@ header {
     .unified-header p {
       color: var(--muted);
       font-size: 0.95rem;
+      margin: 0 auto;
     }
 
     .header-controls {
@@ -244,6 +285,7 @@ header {
       font-size: 1.1rem;
       font-weight: 300;
       margin-bottom: 0.6rem;
+      text-align: center;
     }
 
 
@@ -663,6 +705,8 @@ header {
       padding: 0.35rem 0.9rem;
       border-radius: 999px;
       font-size: 0.95rem;
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
       cursor: pointer;
       transition: all 0.2s ease;
     }
@@ -769,6 +813,7 @@ html, body {
 body {
   display: flex;
   flex-direction: column;
+  padding-top: 80px;
 }
 
 main {
@@ -779,164 +824,83 @@ footer {
   margin-top: auto; /* keeps footer anchored to the bottom */
 }
 
-.site-header {
-  display: none;
-  border-bottom: 1px solid var(--line);
-  background: #fff;
-  position: sticky;
-  top: 0;
-  z-index: 60;
-}
+@media (max-width: 600px) {
+  body {
+    padding-top: 0;
+  }
 
-.site-header .header-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 18px 32px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 30px;
-}
+  .site-header {
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom: 1px solid rgba(10, 15, 20, 0.08);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  }
 
-.site-header nav ul {
-  list-style: none;
-  display: flex;
-  gap: 20px;
-  padding: 0;
-  margin: 0;
-  font-size: 0.95rem;
-}
+  .header-inner {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
 
-.site-header nav a {
-  color: var(--navy);
-  text-decoration: none;
-  font-weight: 200;
-}
+  .brand {
+    position: static;
+    transform: none;
+    margin: 0;
+  }
 
-.site-header .brand {
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 1.3rem;
-  text-decoration: none;
-  color: var(--navy);
-  justify-self: center;
-}
+  .site-header nav {
+    display: none;
+  }
 
-.site-header .header-actions {
-  justify-self: end;
-  display: flex;
-  gap: 12px;
-}
+  .header-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
 
-.site-header .pill {
-  border: 1px solid rgba(0,0,0,0.12);
-  padding: 6px 16px;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  background: transparent;
-  text-decoration: none;
-  color: var(--navy);
-}
+  .header-actions .pill {
+    background: transparent;
+    color: #1a2230;
+    border: 1px solid rgba(26, 34, 48, 0.2);
+    box-shadow: none;
+  }
 
-.public-view .site-header {
-  display: block;
-}
+  .site-header.over-image .brand,
+  .site-header.over-image .header-actions .pill {
+    color: #1a2230;
+    border-color: rgba(26, 34, 48, 0.2);
+  }
 
-.public-view .auth-header {
-  display: none;
-}
-
-.public-view .filter,
-.public-view .invite-btn,
-.public-view .profile-link,
-.public-view .modal-overlay,
-.public-view .pagination-controls button {
-  display: none !important;
-}
-.public-view .auth-header .header-inner nav,
-.public-view .auth-header .header-controls {
-  display: none !important;
-}
-
-.public-view .auth-header .header-inner {
-  justify-content: center;
-}
-
-.public-view .auth-header .header-logo {
-  margin: 0 auto;
-  font-size: 1.4rem;
-  font-weight: 300;
-}
-
-.public-view .page-intro {
-  padding-top: 40px;
-  text-align: center;
-}
-
-.public-view .filter,
-.public-view .invite-btn,
-.public-view .profile-link,
-.public-view .modal-overlay,
-.public-view .pagination-controls button {
-  display: none !important;
+  .page-intro {
+    padding-top: 64px;
+  }
 }
 
 
   </style>
-  <script>
-    const isLoggedIn = localStorage.getItem("lpc_name");
-    document.addEventListener("DOMContentLoaded", () => {
-      if (!isLoggedIn) document.body.classList.add("public-view");
-    });
-  </script>
-<header class="site-header">
+</head>
+<body>
+  <header class="site-header">
   <div class="header-inner">
     <nav aria-label="Primary">
       <ul>
-        <li><a href="index.html#about">About</a></li>
-        <li><a href="index.html#services">Services</a></li>
+        <li><a href="index.html#who-we-are">About</a></li>
         <li><a href="index.html#how">How It Works</a></li>
+        <li><a href="paralegal-faq.html">Paralegal FAQ</a></li>
       </ul>
     </nav>
-    <a class="brand" href="index.html">Let’s-ParaConnect</a>
+    <a class="brand" href="index.html">
+      Let<span class="gold">’</span>s-ParaConnect
+    </a>
     <div class="header-actions">
-      <a class="pill" href="login.html">Sign In</a>
-      <a class="pill" href="signup.html">Create Account</a>
+      <a class="pill" href="login.html" id="authAction">Sign In</a>
+      <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
     </div>
   </div>
-</header>
-<header class="auth-header">
-  <div class="header-inner">
-    <a href="index.html" class="header-logo">Let’s ParaConnect</a>
-    <nav>
-      <a href="my-cases.html">My Cases</a>
-      <a href="browse-paralegals.html" class="active">Browse Paralegals</a>
-      <a href="create-case.html">Post Job</a>
-      <a href="index.html#paralegal-messages">Messages</a>
-    </nav>
-    <div class="header-controls">
-      <button class="notification-icon" id="notificationToggle" aria-label="View notifications">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 01-3.46 0" />
-        </svg>
-        <span class="notification-badge" id="notificationBadge">0</span>
-      </button>
-      <div class="user-chip" id="headerUser">
-        <img id="headerAvatar" alt="Attorney avatar" />
-        <div>
-          <strong id="headerName">Attorney</strong>
-          <span id="headerRole">Member</span>
-        </div>
-      </div>
-      <div class="notification-panel" id="notificationsPanel" role="region" aria-live="polite">
-        <h4>Notifications</h4>
-        <div id="notificationList">
-          <p class="notification-item">Loading…</p>
-        </div>
-      </div>
-    </div>
-  </div>
-</header>
+  </header>
 
   <div class="page-intro">
     <section class="unified-header" aria-label="Attorney header">
@@ -948,7 +912,7 @@ footer {
   </div>
   <main>
     <aside class="filter">
-      <h2>Filter Paralegals</h2>
+      <h2>Filter</h2>
 
 
       <div class="filter-group">
@@ -1021,13 +985,6 @@ footer {
       <span id="paginationLabel">Page 1</span>
       <button type="button" id="nextPage" class="invite-btn">Next</button>
     </div>
-    <label for="resultsPerPage">Results per page:</label>
-    <select id="resultsPerPage">
-      <option value="15">15</option>
-      <option value="30">30</option>
-      <option value="50">50</option>
-      <option value="100">100</option>
-    </select>
   </div>
 
 

@@ -109,6 +109,18 @@ function wire(root, me) {
   const availEl = root.querySelector("#pfAvail");
   const barEl = root.querySelector("#pfBar");
   const saveStatus = root.querySelector("#saveStatus");
+  const saveBtn = root.querySelector("#saveProfile");
+  const defaultSaveText = saveBtn?.textContent || "Save Profile";
+
+  const scheduleSaveReset = () => {
+    if (!form || !saveBtn) return;
+    const handler = () => {
+      saveBtn.disabled = false;
+      saveBtn.textContent = defaultSaveText;
+      form.removeEventListener("input", handler);
+    };
+    form.addEventListener("input", handler, { once: true });
+  };
 
   // Reset (reload from server)
   root.querySelector("#resetProfile")?.addEventListener("click", async () => {
@@ -127,16 +139,28 @@ function wire(root, me) {
       payload.barNumber = (barEl?.value || "").trim();
     }
 
+    let restoreButton = true;
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = "Saving…";
+    }
     try {
       saveStatus.textContent = "Saving…";
       await patchMe(payload);
       saveStatus.textContent = "Saved";
       saveStatus.classList.add("ok");
+      scheduleSaveReset();
+      restoreButton = false;
       setTimeout(() => { saveStatus.textContent = ""; saveStatus.classList.remove("ok"); }, 1400);
     } catch {
       saveStatus.textContent = "Save failed";
       saveStatus.classList.add("err");
       setTimeout(() => { saveStatus.textContent = ""; saveStatus.classList.remove("err"); }, 2000);
+    } finally {
+      if (restoreButton && saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = defaultSaveText;
+      }
     }
   });
 
@@ -195,7 +219,7 @@ async function presignedUpload(file, folder) {
   try {
     ({ url, key } = await j("/api/uploads/presign", {
       method: "POST",
-      body: { contentType: file.type, ext, folder },
+      body: { contentType: file.type, ext, folder, size: file.size },
     }));
   } catch {
     throw new Error("Could not get an upload link. Please try again.");

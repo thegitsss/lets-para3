@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tasks | Let’s-ParaConnect</title>
   <link rel="stylesheet" href="assets/styles/dashboard.css" />
-  <script src="assets/scripts/utils/session.js"></script>
   <style>
     :root {
       --accent: #b6a47a;
@@ -21,24 +20,6 @@
       align-items:center;
       margin-bottom:1.5rem;
     }
-    .sidebar nav {
-      display:flex;
-      flex-direction:column;
-      gap:14px;
-    }
-    .sidebar nav a {
-      text-decoration:none;
-      color:#1a1a1a;
-      font-weight:200;
-      font-size:0.95rem;
-      padding:10px 14px;
-      border-radius:12px;
-      transition:background 0.3s ease;
-    }
-    .sidebar nav a.active,
-    .sidebar nav a:hover {
-      background:rgba(0,0,0,0.04);
-    }
     .tasks-header h1 {
       font-family:var(--font-serif);
       font-weight:300;
@@ -53,35 +34,6 @@
       font-family:var(--font-sans);
       cursor:pointer;
     }
-    .notification-icon{
-      width:46px;
-      height:46px;
-      border-radius:50%;
-      border:1px solid var(--line);
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      background:#fff;
-      cursor:pointer;
-      position:relative;
-      transition:border-color .2s ease, transform .2s ease;
-    }
-    .notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
-    .notification-icon svg{width:22px;height:22px;color:#1a1a1a;}
-    .notification-badge{
-      position:absolute;
-      top:-4px;
-      right:-4px;
-      background:#c0392b;
-      color:#fff;
-      border-radius:999px;
-      font-size:.75rem;
-      padding:2px 6px;
-      line-height:1;
-      display:none;
-      font-weight:600;
-    }
-    .notification-badge.show{display:inline-flex;}
     .task-columns {
       display:grid;
       grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
@@ -123,38 +75,19 @@
       margin-top:0.5rem;
       color:#666;
     }
-    .modal.hidden { display:none; }
-    .modal {
-      position:fixed;
-      top:0;left:0;
-      width:100%;height:100%;
-      background:rgba(0,0,0,0.4);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      z-index:100;
-      padding:1rem;
-    }
-    .modal-content {
-      background:#fff;
-      border-radius:12px;
-      padding:1.5rem;
-      box-shadow:0 18px 40px rgba(0,0,0,0.2);
-      width:100%;
-    }
   </style>
 </head>
 <body>
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
     <nav>
-      <a href="dashboard-attorney.html">Home</a>
+      <a href="index.html#attorney-dashboard">Home</a>
       <a href="active-cases.html">Cases</a>
-      <a href="messages.html">Messages</a>
+      <a href="index.html#attorney-messages">Messages</a>
       <a href="documents.html">Documents</a>
       <a href="review.html">Review</a>
       <a href="case-files.html">Case Files</a>
-      <a href="billing-attorney.html">Billing</a>
+      <a href="payments-escrow.html">Billing</a>
       <a href="tasks.html" class="active">Tasks</a>
       <a href="help.html">Help</a>
     </nav>
@@ -162,57 +95,56 @@
   </aside>
 
   <main class="main">
-    <div class="topbar" data-attorney-header></div>
     <div class="tasks-header">
       <h1>Tasks</h1>
-      <button type="button" data-create-task>+ New Task</button>
+      <button onclick="alert('Task creation flow coming soon');">+ New Task</button>
     </div>
 
-    <div class="task-columns" id="taskColumns">
+    <div class="task-columns">
       <section class="task-column">
-        <h2>Loading…</h2>
-        <p style="color:var(--muted); font-size:0.9rem;">Fetching tasks from your cases.</p>
+        <h2>To Do</h2>
+        <article class="task-card">
+          <h3>Compile deposition digests</h3>
+          <p>Review the newest witness transcripts and highlight contradictions.</p>
+          <div class="task-meta">
+            <span>Due: May 12</span>
+            <span>J. Stone</span>
+          </div>
+        </article>
+        <article class="task-card">
+          <h3>Prep exhibits for MSJ</h3>
+          <p>Organize PDFs and verify bates labels.</p>
+          <div class="task-meta">
+            <span>Due: May 14</span>
+            <span>M. Chen</span>
+          </div>
+        </article>
+      </section>
+
+      <section class="task-column">
+        <h2>In Progress</h2>
+        <article class="task-card">
+          <h3>Draft client declaration</h3>
+          <p>Need final facts from Smith & Co. rep.</p>
+          <div class="task-meta">
+            <span>Due: May 16</span>
+            <span>S. Patel</span>
+          </div>
+        </article>
+      </section>
+
+      <section class="task-column">
+        <h2>Review</h2>
+        <article class="task-card">
+          <h3>Quality check citations</h3>
+          <p>Ensure references to prior rulings are accurate.</p>
+          <div class="task-meta">
+            <span>Due: May 18</span>
+            <span>You</span>
+          </div>
+        </article>
       </section>
     </div>
   </main>
-
-  <div id="taskDetailModal" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-content" style="max-width:420px;text-align:left;">
-      <h3 id="taskDetailTitle" style="margin-bottom:0.5rem;">Task</h3>
-      <p id="taskDetailNotes" style="color:var(--muted);font-size:0.9rem;margin-bottom:0.75rem;"></p>
-      <div id="taskDetailMeta" style="font-size:0.85rem;color:#555;margin-bottom:1rem;"></div>
-      <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
-        <button class="btn secondary" type="button" data-close-task-modal>Close</button>
-        <button class="btn primary" type="button" data-toggle-task></button>
-      </div>
-    </div>
-  </div>
-
-  <div id="taskCreateModal" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-content" style="max-width:420px;text-align:left;">
-      <form data-task-create-form>
-        <h3 style="margin-bottom:0.5rem;">Create Task</h3>
-        <label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:0.25rem;">Title</label>
-        <input type="text" name="title" required style="width:100%;border:1px solid var(--line);border-radius:8px;padding:0.6rem;margin-bottom:0.75rem;" />
-        <label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:0.25rem;">Case</label>
-        <select name="caseId" data-task-case style="width:100%;border:1px solid var(--line);border-radius:8px;padding:0.6rem;margin-bottom:0.75rem;">
-          <option value="">Select a case (optional)</option>
-        </select>
-        <label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:0.25rem;">Due Date</label>
-        <input type="date" name="due" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:0.6rem;margin-bottom:0.75rem;" />
-        <label style="display:block;font-size:0.85rem;color:var(--muted);margin-bottom:0.25rem;">Notes</label>
-        <textarea name="notes" rows="3" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:0.6rem;margin-bottom:1rem;"></textarea>
-        <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
-          <button class="btn secondary" type="button" data-close-task-create>Cancel</button>
-          <button class="btn primary" type="submit">Create Task</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <script>
-    window.__ATTORNEY_PAGE__ = "tasks";
-  </script>
-  <script type="module" src="assets/scripts/attorney-tabs.js"></script>
 </body>
 </html>

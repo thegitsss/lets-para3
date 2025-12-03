@@ -1,5 +1,3 @@
-import { persistSession, clearSession as clearAuthSession } from "./auth.js";
-
 const API_BASE = "/api";
 const RECAPTCHA_SITE_KEY = window.RECAPTCHA_SITE_KEY || "";
 
@@ -20,7 +18,6 @@ function getRecaptchaToken(action) {
 }
 
 const clearLocalSession = () => {
-  clearAuthSession();
   if (window.clearStoredSession) window.clearStoredSession();
   try {
     localStorage.removeItem("lpc_user");
@@ -130,13 +127,8 @@ if (!skipInit) {
         return;
       }
 
-      // API sets httpOnly cookie; the body does not include the JWT. Persist a sentinel token so
-      // front-end session checks don’t misread the user as logged out.
-      const token = data.token || data.accessToken || "cookie";
-      const user = data.user || {};
-      persistSession({ token, user });
-      localStorage.setItem("lpc_user", JSON.stringify(user || {}));
       shouldRestoreButton = false;
+      localStorage.setItem("lpc_user", JSON.stringify(data.user || {}));
 
       if (data.user.role === "admin") {
         window.location.href = "admin-dashboard.html";

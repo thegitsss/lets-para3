@@ -7,25 +7,19 @@
 
 export let CSRF_TOKEN = "";
 
-const TOKEN_KEY = "lpc_token";
 const USER_KEY = "lpc_user";
+const LEGACY_TOKEN_KEYS = ["LPC_JWT", "lpc_jwt"];
 let redirectingToLogin = false;
 
-function readStorage(key) {
-  try {
-    return localStorage.getItem(key) || "";
-  } catch {
-    return "";
-  }
-}
-
-function writeStorage(key, value) {
-  try {
-    if (!value) localStorage.removeItem(key);
-    else localStorage.setItem(key, value);
-  } catch {
-    /* noop */
-  }
+function clearLegacyTokens() {
+  LEGACY_TOKEN_KEYS.forEach((key) => {
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+    try {
+      sessionStorage.removeItem(key);
+    } catch {}
+  });
 }
 
 function redirectToLoginOnce() {
@@ -50,43 +44,47 @@ function readStoredUser() {
 }
 
 export function getStoredSession() {
-  const token = readStorage(TOKEN_KEY);
   const user = readStoredUser();
   return {
-    token,
     user,
     role: String(user?.role || ""),
     status: String(user?.status || ""),
   };
 }
 
-export function persistSession({ token, user } = {}) {
-  if (typeof token !== "undefined") writeStorage(TOKEN_KEY, token);
-  if (typeof user !== "undefined") {
+export function persistSession({ user } = {}) {
+  if (typeof user === "undefined") return;
+  try {
+    const payload = user ? JSON.stringify(user) : "";
+    if (payload) localStorage.setItem(USER_KEY, payload);
+    else localStorage.removeItem(USER_KEY);
+  } catch {
     try {
-      const payload = user ? JSON.stringify(user) : "";
-      writeStorage(USER_KEY, payload);
+      localStorage.removeItem(USER_KEY);
     } catch {
-      writeStorage(USER_KEY, "");
+      /* noop */
     }
   }
 }
 
 export function clearSession() {
-  writeStorage(TOKEN_KEY, "");
-  writeStorage(USER_KEY, "");
+  try {
+    localStorage.removeItem(USER_KEY);
+  } catch {
+    /* noop */
+  }
+  clearLegacyTokens();
 }
 
 export function requireAuth(expectedRole) {
   const session = getStoredSession();
-  const token = session.token;
+  const user = session.user;
   const role = String(session.role || "");
   const status = String(session.status || "");
   const normalizedRole = role.toLowerCase();
   const expected = typeof expectedRole === "string" ? expectedRole.toLowerCase() : "";
 
-  // Token may be in an httpOnly cookie; allow persisted user+role even if token string is blank
-  if ((!token && !session.user) || !role) {
+  if (!user || !role) {
     clearSession();
     redirectToLoginOnce();
     throw new Error("Authentication required");
@@ -132,13 +130,17 @@ export async function secureFetch(url, opts = {}) {
   const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
 
   const headers = new Headers(opts.headers || {});
-  const session = getStoredSession();
-  if (session.token && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${session.token}`);
-  }
   let body = opts.body;
 
   if (isMutation) {
+    if (typeof window !== "undefined" && typeof window.refreshSession === "function") {
+      const activeSession = await window.refreshSession();
+      if (!activeSession) {
+        clearSession();
+        redirectToLoginOnce();
+        throw new Error("Session expired");
+      }
+    }
     if (!CSRF_TOKEN) {
       try { await fetchCSRF(); } catch {}
     }
@@ -216,6 +218,23 @@ export async function logout(redirect = "login.html") {
   }
 }
 
+export async function logoutUser(event) {
+  if (event && typeof event.preventDefault === "function") event.preventDefault();
+  if (event && typeof event.stopPropagation === "function") event.stopPropagation();
+  clearLegacyTokens();
+  await logout("login.html");
+}
+
+window.logoutUser = logoutUser;
+
+function wireLogoutButton() {
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn && !logoutBtn.dataset.boundLogout) {
+    logoutBtn.dataset.boundLogout = "true";
+    logoutBtn.addEventListener("click", logoutUser);
+  }
+}
+
 // Boot-time: add 'loaded' class, fetch CSRF, and toggle role-based UI (best-effort)
 window.addEventListener("DOMContentLoaded", async () => {
   document.body.classList.add("loaded");
@@ -229,39 +248,29 @@ window.addEventListener("DOMContentLoaded", async () => {
   } catch {
     // non-fatal for public/unauthenticated pages
   }
+
+  wireLogoutButton();
 });
 // === Auto-inject logged-in user's name + avatar globally ===
-window.loadUserHeaderInfo = async function () {
+export async function loadUserHeaderInfo() {
   try {
-    // 1. Show cached info instantly
-    const cachedUser = JSON.parse(localStorage.getItem("userInfo") || "{}");
-    const nameEl = document.getElementById("user-name");
-    const avatarEl = document.querySelector(".user-profile img");
-
-    if (cachedUser.name && nameEl) nameEl.textContent = cachedUser.name;
-    if (cachedUser.avatarURL && avatarEl) avatarEl.src = cachedUser.avatarURL;
-
-    // 2. Refresh with live data
-    const res = await fetch("/api/users/me", { credentials: "include" });
+    const res = await secureFetch("/api/users/me", { method: "GET" });
     if (!res.ok) return;
-
     const user = await res.json();
-    if (!user || !user.name) return;
-    const avatar = user.avatarURL || user.profileImage || "";
 
-    // 3. Update UI
-    if (nameEl) nameEl.textContent = user.name;
-    if (avatarEl && avatar) avatarEl.src = avatar;
+    document.querySelectorAll(".globalProfileImage").forEach((img) => {
+      img.src = user.profileImage || "default.jpg";
+    });
 
-    // 4. Cache for next load
-    localStorage.setItem(
-      "userInfo",
-      JSON.stringify({
-        name: user.name,
-        avatarURL: avatar || cachedUser.avatarURL || ""
-      })
-    );
+    document.querySelectorAll(".globalProfileName").forEach((name) => {
+      name.textContent = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+    });
+
+    document.querySelectorAll(".globalProfileRole").forEach((role) => {
+      role.textContent = user.role === "paralegal" ? "Paralegal" : "Attorney";
+    });
   } catch (err) {
     console.warn("Could not load user header info:", err);
   }
-};
+}
+window.loadUserHeaderInfo = loadUserHeaderInfo;

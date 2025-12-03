@@ -3,6 +3,18 @@ const pagination = document.getElementById("pagination");
 
 let allJobs = [];
 let filteredJobs = [];
+const APPLY_MAX_CHARS = 2000;
+const APPLIED_STORAGE_KEY = "lpc_applied_jobs";
+const appliedJobs = new Set(loadAppliedJobs());
+let applyModal = null;
+let applyTextarea = null;
+let applyStatus = null;
+let applySubmitBtn = null;
+let applyTitle = null;
+let applyCounter = null;
+let currentApplyJob = null;
+let csrfToken = "";
+const toast = window.toastUtils;
 
 // Elements
 const filterToggle = document.getElementById("filterToggle");
@@ -20,6 +32,21 @@ const minExpValue = document.getElementById("minExpValue");
 
 const applyFiltersBtn = document.getElementById("applyFilters");
 const clearFiltersBtn = document.getElementById("clearFilters");
+
+let sessionReady = false;
+async function ensureSession() {
+  if (sessionReady) return true;
+  try {
+    if (typeof window.checkSession === "function") {
+      await window.checkSession("paralegal");
+    }
+    sessionReady = true;
+    return true;
+  } catch (err) {
+    console.warn("Paralegal session required", err);
+    return false;
+  }
+}
 
 // Toggle filter menu
 if (filterToggle && filterMenu) {
@@ -187,20 +214,54 @@ function renderJobs() {
 
     const payUSD = getJobPayUSD(job);
     const jobState = getJobState(job);
+    const title = escapeHtml(job.title || "Untitled Matter");
+    const practice = escapeHtml(job.practiceArea || "General Practice");
+    const when = job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Recently posted";
+    const jobId = String(job.id || job._id || "");
 
     card.innerHTML = `
-      <h3>${job.title || "Untitled Matter"}</h3>
-      <div class="area">${job.practiceArea || "General Practice"}</div>
+      <h3>${title}</h3>
+      <div class="area">${practice}</div>
       <div class="meta">
-        <span>${jobState}</span>
+        <span>${escapeHtml(jobState || "—")}</span>
         <span>$${formatPay(payUSD)}</span>
-        <span>${job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Recently posted"}</span>
+        <span>${escapeHtml(when)}</span>
       </div>
     `;
 
+    const actions = document.createElement("div");
+    actions.className = "job-actions";
+
+    const detailBtn = document.createElement("button");
+    detailBtn.type = "button";
+    detailBtn.className = "clear-button";
+    detailBtn.textContent = "View Details";
+    detailBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (jobId) window.location.href = `case-detail.html?caseId=${encodeURIComponent(jobId)}`;
+    });
+    actions.appendChild(detailBtn);
+
+    const applyBtn = document.createElement("button");
+    applyBtn.type = "button";
+    applyBtn.className = "apply-button";
+    applyBtn.dataset.jobId = jobId;
+    if (appliedJobs.has(jobId)) {
+      applyBtn.disabled = true;
+      applyBtn.textContent = "Application sent";
+    } else {
+      applyBtn.textContent = "Apply";
+      applyBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        openApplyModal(job);
+      });
+    }
+    actions.appendChild(applyBtn);
+
+    card.appendChild(actions);
+
     card.addEventListener("click", () => {
-      const id = job.id || job._id;
-      if (id) window.location.href = `case-detail.html?caseId=${id}`;
+      if (jobId) window.location.href = `case-detail.html?caseId=${encodeURIComponent(jobId)}`;
     });
 
     jobsGrid.appendChild(card);
@@ -215,10 +276,14 @@ function renderJobs() {
 
 // Fetch jobs
 async function fetchJobs() {
+  if (!sessionReady) return;
   try {
-    const res = await fetch("/cases/open", {
-      headers: { Authorization: `Bearer ${localStorage.getItem("lpc_token")}` },
+    const res = await fetch("/api/cases/open", {
+      headers: { Accept: "application/json" },
+      credentials: "include",
     });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const data = await res.json();
     allJobs = Array.isArray(data) ? data : [];
@@ -232,12 +297,233 @@ async function fetchJobs() {
     allJobs = [];
     filteredJobs = [];
     renderJobs();
+    if (jobsGrid) {
+      const error = document.createElement("p");
+      error.className = "area";
+      error.style.textAlign = "center";
+      error.textContent = "Unable to load open cases right now. Please refresh.";
+      jobsGrid.appendChild(error);
+    }
   }
 }
 
-fetchJobs();
+ensureSession().then((ready) => {
+  if (ready) fetchJobs();
+});
 
 sortSelect?.addEventListener("change", () => {
   applySort();
   renderJobs();
 });
+
+function openApplyModal(job) {
+  if (!job) return;
+  ensureApplyModal();
+  currentApplyJob = job;
+  const jobId = String(job.id || job._id || "");
+  if (!jobId) return;
+  applyModal.dataset.jobId = jobId;
+  applyTitle.textContent = `Apply to ${escapeHtml(job.title || "this job")}`;
+  applyTextarea.value = "";
+  applyStatus.textContent = "";
+  applyCounter.textContent = `0 / ${APPLY_MAX_CHARS}`;
+  applySubmitBtn.disabled = false;
+  applySubmitBtn.textContent = "Submit application";
+  applyModal.classList.add("show");
+  applyTextarea.focus();
+}
+
+function closeApplyModal() {
+  if (applyModal) {
+    applyModal.classList.remove("show");
+  }
+  currentApplyJob = null;
+}
+
+function ensureApplyModal() {
+  if (applyModal) return;
+  injectApplyStyles();
+  applyModal = document.createElement("div");
+  applyModal.className = "job-apply-overlay";
+  applyModal.innerHTML = `
+    <div class="job-apply-dialog" role="dialog" aria-modal="true">
+      <header>
+        <h3 data-apply-title>Apply to this job</h3>
+        <button type="button" class="close-btn" aria-label="Close apply form">&times;</button>
+      </header>
+      <p class="muted">Share why you are a great fit (max ${APPLY_MAX_CHARS} characters).</p>
+      <textarea rows="6" data-apply-text></textarea>
+      <div class="apply-meta">
+        <span data-apply-counter>0 / ${APPLY_MAX_CHARS}</span>
+        <span data-apply-status></span>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="clear-button" data-apply-cancel>Cancel</button>
+        <button type="button" class="apply-button" data-apply-submit>Submit application</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(applyModal);
+  applyTextarea = applyModal.querySelector("[data-apply-text]");
+  applyStatus = applyModal.querySelector("[data-apply-status]");
+  applySubmitBtn = applyModal.querySelector("[data-apply-submit]");
+  applyTitle = applyModal.querySelector("[data-apply-title]");
+  applyCounter = applyModal.querySelector("[data-apply-counter]");
+  applyModal.querySelector(".close-btn")?.addEventListener("click", closeApplyModal);
+  applyModal.querySelector("[data-apply-cancel]")?.addEventListener("click", closeApplyModal);
+  applyTextarea?.addEventListener("input", updateApplyCounter);
+  applySubmitBtn?.addEventListener("click", submitApplication);
+  applyModal.addEventListener("click", (event) => {
+    if (event.target === applyModal) closeApplyModal();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && applyModal?.classList.contains("show")) {
+      closeApplyModal();
+    }
+  });
+}
+
+function updateApplyCounter() {
+  if (!applyTextarea || !applyCounter) return;
+  const length = applyTextarea.value.length;
+  applyCounter.textContent = `${Math.min(length, APPLY_MAX_CHARS)} / ${APPLY_MAX_CHARS}`;
+  if (length > APPLY_MAX_CHARS) {
+    applyCounter.classList.add("error");
+  } else {
+    applyCounter.classList.remove("error");
+  }
+}
+
+async function submitApplication() {
+  if (!currentApplyJob || !applyTextarea || !applyStatus || !applySubmitBtn) return;
+  const jobId = String(currentApplyJob.id || currentApplyJob._id || "");
+  const note = applyTextarea.value.trim();
+  if (!note) {
+    applyStatus.textContent = "Add a short cover letter before submitting.";
+    return;
+  }
+  if (note.length > APPLY_MAX_CHARS) {
+    applyStatus.textContent = `Messages must be under ${APPLY_MAX_CHARS} characters.`;
+    return;
+  }
+
+  applySubmitBtn.disabled = true;
+  applySubmitBtn.textContent = "Applying…";
+  applyStatus.textContent = "Submitting application…";
+
+  try {
+    const active = await ensureSession();
+    if (!active) throw new Error("Session expired. Refresh and try again.");
+    const csrf = await ensureCsrfToken();
+    const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/apply`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        ...(csrf ? { "X-CSRF-Token": csrf } : {}),
+      },
+      body: JSON.stringify({ coverLetter: note }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error || "Unable to submit application.");
+    }
+    applyStatus.textContent = "Application submitted!";
+    markJobAsApplied(jobId);
+    showToast("Application submitted successfully.", "ok");
+    setTimeout(() => {
+      closeApplyModal();
+      fetchJobs();
+    }, 800);
+  } catch (error) {
+    console.error(error);
+    applyStatus.textContent = error.message || "Unable to submit application.";
+    applySubmitBtn.disabled = false;
+    applySubmitBtn.textContent = "Submit application";
+  }
+}
+
+function markJobAsApplied(jobId) {
+  appliedJobs.add(jobId);
+  persistAppliedJobs();
+  const selector = `[data-job-id="${escapeAttr(jobId)}"]`;
+  document.querySelectorAll(selector).forEach((btn) => {
+    btn.disabled = true;
+    btn.textContent = "Application sent";
+  });
+}
+
+function loadAppliedJobs() {
+  try {
+    const raw = sessionStorage.getItem(APPLIED_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function persistAppliedJobs() {
+  try {
+    sessionStorage.setItem(APPLIED_STORAGE_KEY, JSON.stringify([...appliedJobs]));
+  } catch {
+    /* ignore */
+  }
+}
+
+async function ensureCsrfToken() {
+  if (csrfToken) return csrfToken;
+  try {
+    const res = await fetch("/api/csrf", { credentials: "include" });
+    if (!res.ok) return "";
+    const data = await res.json().catch(() => ({}));
+    csrfToken = data?.csrfToken || "";
+  } catch {
+    csrfToken = "";
+  }
+  return csrfToken;
+}
+
+function injectApplyStyles() {
+  if (document.getElementById("job-apply-styles")) return;
+  const style = document.createElement("style");
+  style.id = "job-apply-styles";
+  style.textContent = `
+    .job-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .job-apply-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s ease}
+    .job-apply-overlay.show{opacity:1;pointer-events:auto}
+    .job-apply-dialog{background:#fff;border-radius:18px;padding:20px;max-width:480px;width:92%;box-shadow:0 30px 60px rgba(0,0,0,.15);display:grid;gap:12px}
+    .job-apply-dialog header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .job-apply-dialog .close-btn{border:none;background:none;font-size:1.5rem;line-height:1;cursor:pointer}
+    .job-apply-dialog textarea{width:100%;border:1px solid #d1d5db;border-radius:12px;padding:10px;font:inherit;resize:vertical;min-height:120px}
+    .job-apply-dialog .apply-meta{display:flex;align-items:center;justify-content:space-between;font-size:.85rem;color:#6b7280}
+    .job-apply-dialog .apply-meta .error{color:#b91c1c}
+    .job-apply-dialog .modal-actions{display:flex;justify-content:flex-end;gap:10px}
+    .job-apply-dialog .muted{color:#6b7280;font-size:.9rem;margin:0}
+  `;
+  document.head.appendChild(style);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function showToast(message, type = "info") {
+  if (toast?.show) {
+    toast.show(message, { targetId: "toastBanner", type });
+  } else {
+    alert(message);
+  }
+}
+
+function escapeAttr(value) {
+  if (window.CSS && typeof window.CSS.escape === "function") {
+    return window.CSS.escape(value);
+  }
+  return String(value || "").replace(/"/g, '\\"');
+}

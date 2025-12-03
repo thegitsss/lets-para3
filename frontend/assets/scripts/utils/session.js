@@ -1,8 +1,10 @@
-(function(){
-  const TOKEN_KEY = "lpc_token";
-  const USER_KEY = "lpc_user";
+(function () {
+  const DISABLED_ERROR = "This account has been disabled.";
+  const DISABLED_MSG_KEY = "disabledAccountMsg";
   let hasRedirected = false;
   let nukedOnRedirect = false;
+  let cachedUser = null;
+  let sessionPromise = null;
 
   function redirectToLogin() {
     if (hasRedirected) return;
@@ -12,36 +14,53 @@
     } catch (_) {}
   }
 
-  function readToken() {
+  function rememberDisabled(message) {
     try {
-      return localStorage.getItem(TOKEN_KEY) || "";
-    } catch {
-      return "";
-    }
+      sessionStorage.setItem(DISABLED_MSG_KEY, message || DISABLED_ERROR);
+    } catch (_) {}
   }
 
-  function readUser() {
-    try {
-      const raw = localStorage.getItem(USER_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
+  function handleDisabledAccount(message) {
+    rememberDisabled(message);
+    invalidateAndRedirect();
   }
 
-  function getSessionData() {
-    const user = readUser();
-    const token = readToken();
-    const role = String(user?.role || "").toLowerCase();
-    const status = String(user?.status || "").toLowerCase();
-    return { token, user, role, status };
+  async function fetchSession(force = false) {
+    if (force) sessionPromise = null;
+    if (!sessionPromise) {
+      sessionPromise = fetch("/api/auth/me", { credentials: "include" })
+        .then(async (res) => {
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const message = payload?.error || payload?.msg;
+            if (message === DISABLED_ERROR) {
+              handleDisabledAccount(message);
+              return null;
+            }
+            if (res.status === 401) return null;
+            return payload?.user || null;
+          }
+          return payload?.user || null;
+        })
+        .catch(() => null)
+        .then((user) => {
+          cachedUser = user;
+          return user;
+        });
+    }
+    return sessionPromise;
+  }
+
+  function getCachedUser() {
+    return cachedUser;
   }
 
   function clearStoredSession() {
+    cachedUser = null;
+    sessionPromise = null;
     try {
-      localStorage.removeItem(TOKEN_KEY);
-      localStorage.removeItem(USER_KEY);
-    } catch {}
+      localStorage.removeItem("lpc_user");
+    } catch (_) {}
   }
 
   function invalidateAndRedirect() {
@@ -52,43 +71,140 @@
     redirectToLogin();
   }
 
-  function checkSession(expectedRole) {
-    const { token, user, role, status } = getSessionData();
-    // Accept either a stored token or a persisted session user (token may be httpOnly cookie)
-    if ((!token && !user) || !user) {
-      invalidateAndRedirect();
+  async function getSessionData(force = false) {
+    const user = await fetchSession(force);
+    const role = String(user?.role || "").toLowerCase();
+    const status = String(user?.status || "").toLowerCase();
+    return { user, role, status };
+  }
+
+  async function checkSession(expectedRole, options = {}) {
+    const { redirectOnFail = true } = options;
+    let sessionData;
+    try {
+      sessionData = await getSessionData();
+    } catch (err) {
+      if (redirectOnFail) invalidateAndRedirect();
+      throw err;
+    }
+    const { user, role, status } = sessionData;
+    const normalizedRole = String(role || "").toLowerCase();
+    if (!user) {
+      if (redirectOnFail) invalidateAndRedirect();
       throw new Error("Authentication required");
     }
-    if (expectedRole && role !== String(expectedRole).toLowerCase()) {
-      invalidateAndRedirect();
+    if (user?.disabled) {
+      if (redirectOnFail) handleDisabledAccount(DISABLED_ERROR);
+      throw new Error(DISABLED_ERROR);
+    }
+    if (expectedRole && normalizedRole !== String(expectedRole).toLowerCase()) {
+      if (redirectOnFail) invalidateAndRedirect();
       throw new Error("Forbidden");
     }
     if (status && status !== "approved") {
-      invalidateAndRedirect();
+      if (redirectOnFail) invalidateAndRedirect();
       throw new Error("Not approved");
     }
     nukedOnRedirect = false;
-    return { token, role, status, user };
+    return { user, role: normalizedRole, status };
   }
 
   function redirectUserDashboard(roleOverride) {
-    let role = roleOverride;
-    if (!role) {
-      const user = readUser();
-      role = user?.role || "attorney";
-    }
-    const norm = String(role).toLowerCase();
-    const target = norm === "admin" ? "admin-dashboard.html" : norm === "paralegal"
-      ? "dashboard-paralegal.html" : "dashboard-attorney.html";
+    const roleValue = roleOverride || cachedUser?.role || "attorney";
+    const norm = String(roleValue).toLowerCase();
+    const target =
+      norm === "admin"
+        ? "admin-dashboard.html"
+        : norm === "paralegal"
+        ? "dashboard-paralegal.html"
+        : "dashboard-attorney.html";
     try {
       window.location.href = target;
     } catch (_) {}
   }
 
+  async function refreshSession(expectedRole) {
+    try {
+      return await checkSession(expectedRole);
+    } catch {
+      return null;
+    }
+  }
+
+  fetchSession().catch(() => {});
+
   window.checkSession = checkSession;
   window.redirectUserDashboard = redirectUserDashboard;
   window.clearStoredSession = clearStoredSession;
-  window.getSessionToken = readToken;
+  window.getSessionToken = () => "";
   window.getSessionData = getSessionData;
-  window.getStoredUser = readUser;
+  window.getStoredUser = getCachedUser;
+  window.refreshSession = refreshSession;
+
+  function updateHeaderBasedOnAuth(isLoggedIn) {
+    document.querySelectorAll("[data-authed-only]").forEach((el) => {
+      el.style.display = isLoggedIn ? "" : "none";
+    });
+    document.querySelectorAll("[data-public-only]").forEach((el) => {
+      el.style.display = isLoggedIn ? "none" : "";
+    });
+  }
+
+  async function runHeaderGuard() {
+    const headerRoot = document.getElementById("mainHeader");
+    if (!headerRoot) return;
+    headerRoot.style.visibility = "hidden";
+    let authed = false;
+    try {
+      await checkSession(undefined, { redirectOnFail: false });
+      authed = true;
+    } catch {}
+    updateHeaderBasedOnAuth(authed);
+    headerRoot.style.visibility = "visible";
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    runHeaderGuard();
+  });
+
+  window.updateHeaderBasedOnAuth = updateHeaderBasedOnAuth;
+
+  async function requireRole(expectedRole) {
+    try {
+      const session = await checkSession(undefined, { redirectOnFail: false });
+      const user = session?.user || session;
+      if (!user) throw new Error("Not logged-in");
+      const normalizedRole = String(user.role || session?.role || "").toLowerCase();
+      if (!user.role && normalizedRole) {
+        user.role = normalizedRole;
+      }
+      const normalizedExpected = expectedRole ? String(expectedRole).toLowerCase() : "";
+      if (normalizedExpected && normalizedRole !== normalizedExpected) {
+        redirectToRole(normalizedRole);
+        return null;
+      }
+      const protectedRoot = document.getElementById("protectedContent");
+      if (protectedRoot) {
+        protectedRoot.style.visibility = "visible";
+      }
+      return user;
+    } catch {
+      window.location.href = "login.html";
+      return null;
+    }
+  }
+
+  function redirectToRole(role) {
+    if (role === "attorney") {
+      window.location.href = "dashboard-attorney.html";
+    } else if (role === "paralegal") {
+      window.location.href = "dashboard-paralegal.html";
+    } else if (role === "admin") {
+      window.location.href = "admin-dashboard.html";
+    } else {
+      window.location.href = "login.html";
+    }
+  }
+
+  window.requireRole = requireRole;
 })();
