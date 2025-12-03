@@ -12,7 +12,6 @@ const csrf = require("csurf");
 
 // 2) App Init + Config
 const app = express();
-app.set("trust proxy", 1);
 const PROD = process.env.NODE_ENV === "production";
 const PORT = 5050;
 const FRONTEND_DIR = path.join(__dirname, "../frontend");
@@ -39,12 +38,7 @@ app.use(
       scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: [
-        "'self'",
-        "data:",
-        "https://images.unsplash.com",
-        `https://${process.env.S3_BUCKET}.s3.${process.env.S3_REGION}.amazonaws.com`,
-      ],
+      imgSrc: ["'self'", "data:", "https://images.unsplash.com"],
     },
   })
 );
@@ -83,7 +77,6 @@ const chatRouter = require("./routes/chat");
 const checklistRouter = require("./routes/checklist");
 const eventsRouter = require("./routes/events");
 const verificationRouter = require("./routes/verification");
-const publicRouter = require("./routes/public");
 const { startPurgeWorker } = require("./services/caseLifecycle");
 
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }), paymentsWebhookHandler);
@@ -94,6 +87,9 @@ app.use("/api/admin", adminRouter);
 app.use("/api/cases", casesRouter);
 app.use("/api/messages", messagesRouter);
 app.use("/api/uploads", uploadsRouter);
+if (uploadsRouter?.userPhotoRouter) {
+  app.use("/api/users", uploadsRouter.userPhotoRouter);
+}
 app.use("/api/payments", paymentsRouter);
 app.use("/api/checklist", checklistRouter);
 app.use("/api/events", eventsRouter);
@@ -104,8 +100,6 @@ app.use("/api/paralegal/dashboard", paralegalDashboardRouter);
 app.use("/api/chat", chatRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/verify", verificationRouter);
-app.use("/api/public", publicRouter);
-app.use("/public", publicRouter);
 if (usersRouter?.paralegalRouter) {
   app.use("/api/paralegals", usersRouter.paralegalRouter);
 }

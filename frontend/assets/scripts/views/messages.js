@@ -12,51 +12,6 @@ const aiOut = $("#ai-output");
 const sumMenu = $("#summarize-menu");
 const sumStart = $("#sum-start");
 const sumEnd = $("#sum-end");
-const sendBtn = document.getElementById("send-btn");
-const defaultSendText = sendBtn?.textContent || "Send";
-const attachmentBtn = document.getElementById("attachment-btn");
-const attachmentInput = document.getElementById("attachment-input");
-const defaultAttachmentText = attachmentBtn?.textContent || "Attach";
-const toastHelper = window.toastUtils;
-const viewerElements = {
-  name: document.querySelector("[data-viewer-name]"),
-  avatar: document.querySelector("[data-viewer-avatar]"),
-  state: document.querySelector("[data-viewer-state]"),
-  bio: document.querySelector("[data-viewer-bio]"),
-};
-
-const MAX_MESSAGE_CHARS = 2000;
-const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
-const ALLOWED_ATTACHMENT_TYPES = new Set([
-  "application/pdf",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "text/plain",
-  "text/csv",
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-]);
-const MIME_FALLBACKS = {
-  pdf: "application/pdf",
-  doc: "application/msword",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  xls: "application/vnd.ms-excel",
-  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  ppt: "application/vnd.ms-powerpoint",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  txt: "text/plain",
-  csv: "text/csv",
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  gif: "image/gif",
-};
-let viewerProfile = null;
 
 let currentThread = null;
 let CSRF = null;
@@ -162,6 +117,7 @@ function messageRow(caseId, m, isMine, senderName = "Unknown User") {
     const key = m.fileKey || m.key || "";
     const title = escapeHtml(m.fileName || "voice-note.webm");
     const transcript = m.transcript ? `<div style="margin-top:.35rem;border-top:1px dashed #e5e5e5;padding-top:.35rem;">${escapeHtml(m.transcript)}</div>` : "";
+    // Lazy load a signed URL on click so we don't prefetch all
     bodyHTML = `
       <div>
         <button class="play-audio btn" data-case="${caseId}" data-key="${escapeHtml(key)}" style="padding:6px 8px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;cursor:pointer">Play audio</button>
@@ -169,23 +125,9 @@ function messageRow(caseId, m, isMine, senderName = "Unknown User") {
         <div class="audio-holder"></div>
         ${transcript}
       </div>`;
-  } else if (m.type === "file") {
-    const safeName = escapeHtml(m.fileName || "Attachment");
-    const fileKey = escapeHtml(m.fileKey || "");
-    const sizeText = formatBytes(m.fileSize);
-    const meta = sizeText ? `<span class="muted" style="margin-left:8px;">${escapeHtml(sizeText)}</span>` : "";
-    const downloadBtn = fileKey
-      ? `<button class="btn secondary" data-attachment-download data-case="${caseId}" data-key="${fileKey}" style="margin-right:8px;">Download</button>`
-      : "";
-    bodyHTML = `
-      <div class="attachment-row" style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
-        ${downloadBtn}
-        <span class="attachment-name" style="font-weight:600;">${safeName}</span>
-        ${meta}
-      </div>`;
   } else {
-    const normalized = (m.content || m.text || "").replace(/\r\n/g, "\n");
-    const text = escapeHtml(normalized).replace(/\n/g, "<br>");
+    // default to text
+    const text = escapeHtml(m.content || m.text || "");
     bodyHTML = text || "<em class='muted'>[empty]</em>";
   }
 
@@ -234,316 +176,42 @@ function renderMessages(caseId, list) {
       }
     });
   });
-  msgListEl.querySelectorAll("[data-attachment-download]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const key = btn.getAttribute("data-key");
-      const caseId = btn.getAttribute("data-case");
-      if (!key) return;
-      btn.disabled = true;
-      try {
-        const u = new URL("/api/uploads/signed-get", location.origin);
-        u.searchParams.set("caseId", caseId || "");
-        u.searchParams.set("key", key);
-        const jres = await j(u.toString(), { method: "GET" });
-        const url = jres.url;
-        window.open(url, "_blank", "noopener");
-      } catch {
-        notify("Unable to download attachment. Please try again.", "err");
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  });
 
-  scrollMessagesToBottom();
-}
-
-function scrollMessagesToBottom() {
-  if (!msgListEl) return;
   msgListEl.scrollTop = msgListEl.scrollHeight;
 }
 
-function sanitizeMessageInput(value) {
-  if (typeof value !== "string") return "";
-  return value
-    .replace(/<[^>]*>/g, "")
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
-    .trim();
-}
-
-function sanitizeFilename(name) {
-  const safe = String(name || "")
-    .replace(/[\u0000-\u001F\u007F]/g, "")
-    .replace(/[\\/:*?"<>|]/g, "-")
-    .trim();
-  return safe.slice(0, 120) || "attachment";
-}
-
-function formatBytes(bytes) {
-  const value = Number(bytes);
-  if (!Number.isFinite(value) || value <= 0) return "";
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function notify(message, type = "info") {
-  if (toastHelper?.show) {
-    toastHelper.show(message, { targetId: "toastBanner", type });
-  } else {
-    alert(message);
-  }
-}
-
-async function loadViewerProfile() {
-  try {
-    const me = await j(`${API_BASE}/users/me`);
-    if (!me) return null;
-    const safeName = sanitizeMessageInput(`${me.firstName || ""} ${me.lastName || ""}`) || "Paralegal";
-    const safeState = sanitizeMessageInput(me.state || me.location || me.region || "");
-    const safeBio = sanitizeMessageInput(me.bio || "");
-    const avatar = me.profileImage || me.avatarURL || buildInitialsAvatar(safeName);
-    viewerProfile = { name: safeName, state: safeState, bio: safeBio, avatar };
-    applyViewerProfile(viewerProfile);
-    return viewerProfile;
-  } catch (err) {
-    console.warn("Unable to load viewer profile", err);
-    return null;
-  }
-}
-
-function applyViewerProfile(profile = {}) {
-  if (viewerElements.name) viewerElements.name.textContent = profile.name || "Paralegal";
-  if (viewerElements.state) viewerElements.state.textContent = profile.state || "—";
-  if (viewerElements.bio) viewerElements.bio.textContent = profile.bio || "—";
-  if (viewerElements.avatar && profile.avatar) {
-    viewerElements.avatar.src = profile.avatar;
-    viewerElements.avatar.alt = `${profile.name || "Paralegal"} avatar`;
-  }
-}
-
-async function ensureMessagesSession(expectedRole) {
-  if (typeof window.refreshSession !== "function") return { ok: true };
-  const session = await window.refreshSession(expectedRole);
-  if (!session) {
-    try {
-      window.location.href = "login.html";
-    } catch {}
-    return null;
-  }
-  return session;
-}
-
-function createUploadPlaceholder(name) {
-  if (!msgListEl) {
-    return {
-      update() {},
-      remove() {},
-    };
-  }
-  const row = document.createElement("div");
-  row.className = "msg uploading";
-  row.style.display = "flex";
-  row.style.gap = ".5rem";
-  row.style.margin = ".4rem 0";
-  row.innerHTML = `
-    <div style="background:#fffbea;border:1px solid #fcd34d;border-radius:14px;padding:.55rem .7rem;max-width:75%;">
-      <div style="font-weight:600;margin-bottom:.2rem;">Uploading attachment</div>
-      <div><strong>${escapeHtml(name)}</strong> · <span data-upload-progress>0%</span></div>
-    </div>
-  `;
-  msgListEl.appendChild(row);
-  scrollMessagesToBottom();
-  const progressEl = row.querySelector("[data-upload-progress]");
-  return {
-    update(pct) {
-      if (!progressEl) return;
-      const safePct = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 0;
-      progressEl.textContent = `${safePct.toFixed(0)}%`;
-    },
-    remove() {
-      row.remove();
-    },
-  };
-}
-
-function setAttachmentBusy(busy) {
-  if (!attachmentBtn) return;
-  if (busy) {
-    attachmentBtn.disabled = true;
-    attachmentBtn.textContent = "Uploading…";
-  } else {
-    attachmentBtn.disabled = false;
-    attachmentBtn.textContent = defaultAttachmentText;
-  }
-}
-
-function getFileExtension(name) {
-  const parts = String(name || "").split(".");
-  return parts.length > 1 ? parts.pop().toLowerCase() : "";
-}
-
-function resolveMimeType(file) {
-  const ext = getFileExtension(file?.name || "");
-  return file?.type || MIME_FALLBACKS[ext] || "";
-}
-
-function buildContentDisposition(name) {
-  const safe = String(name || "").replace(/"/g, "");
-  return `attachment; filename="${safe}"`;
-}
-
-function buildInitialsAvatar(name) {
-  const initials =
-    (name || "")
-      .split(" ")
-      .map((part) => part.charAt(0).toUpperCase())
-      .join("")
-      .slice(0, 2) || "P";
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' rx='16' fill='#e5e7eb'/><text x='50%' y='55%' text-anchor='middle' font-family='Sarabun, Arial' font-size='26' fill='#111827' font-weight='600'>${initials}</text></svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-
 async function sendMessage() {
-  if (!inputEl || !msgListEl) return;
-  const sanitized = sanitizeMessageInput(inputEl.value || "");
-  if (!sanitized) {
-    notify("Enter a message before sending.", "err");
-    return;
-  }
-  const activeSession = await ensureMessagesSession();
-  if (!activeSession) return;
-  if (!currentThread) {
-    notify("Select a conversation before sending.", "err");
-    return;
-  }
-  if (sanitized.length > MAX_MESSAGE_CHARS) {
-    notify("Message exceeds 2,000 characters.", "err");
-    return;
-  }
+  const text = (inputEl?.value || "").trim();
+  if (!text || !currentThread) return;
 
-  const buttonLabel = sendBtn?.textContent || defaultSendText;
-  let restoreSendButton = true;
-  if (sendBtn) {
-    sendBtn.disabled = true;
-    sendBtn.textContent = "Sending…";
-  }
-
+  // Optimistic UI
   const now = Date.now();
   const optimistic = {
     id: `tmp-${now}`,
-    senderId: CURRENT_USER_ID ? { _id: CURRENT_USER_ID, firstName: "You" } : "me",
+    senderId: CURRENT_USER_ID
+      ? { _id: CURRENT_USER_ID, firstName: "You" }
+      : "me",
     type: "text",
-    content: sanitized,
+    content: text,
     createdAt: now,
   };
   msgListEl.insertAdjacentHTML("beforeend", messageRow(currentThread, optimistic, true, "You"));
-  scrollMessagesToBottom();
+  msgListEl.scrollTop = msgListEl.scrollHeight;
   inputEl.value = "";
 
   try {
     const data = await j(`${API_BASE}/messages/${currentThread}`, {
       method: "POST",
-      body: { type: "text", content: sanitized },
+      body: { type: "text", content: text },
     });
+    // backend returns { message }
     const saved = data.message ? [savedNormalize(data.message)] : [];
+    // reload the thread to get consistent ordering + read receipts
     const refetch = await j(`${API_BASE}/messages/${currentThread}`);
     renderMessages(currentThread, refetch.messages || saved);
-    scheduleSendReset();
-    restoreSendButton = false;
-  } catch (err) {
-    notify("Unable to send that message. Please try again.", "err");
-    inputEl.value = sanitized;
-    inputEl.focus();
+  } catch {
+    // rollback via full reload
     await openThread(currentThread);
-  } finally {
-    if (restoreSendButton && sendBtn) {
-      sendBtn.disabled = false;
-      sendBtn.textContent = buttonLabel;
-    }
-  }
-}
-
-function scheduleSendReset() {
-  if (!inputEl || !sendBtn) return;
-  const handler = () => {
-    sendBtn.disabled = false;
-    sendBtn.textContent = defaultSendText;
-    inputEl.removeEventListener("input", handler);
-  };
-  inputEl.addEventListener("input", handler, { once: true });
-}
-
-function bindAttachmentControls() {
-  if (!attachmentInput) return;
-  if (attachmentBtn) {
-    attachmentBtn.addEventListener("click", () => attachmentInput.click());
-  }
-  attachmentInput.addEventListener("change", handleAttachmentSelection);
-}
-
-async function handleAttachmentSelection(event) {
-  const files = Array.from(event.target.files || []);
-  event.target.value = "";
-  if (!files.length) return;
-  if (!currentThread) {
-    notify("Select a conversation before uploading attachments.", "err");
-    return;
-  }
-  for (const file of files) {
-    // eslint-disable-next-line no-await-in-loop
-    await uploadAttachment(file);
-  }
-}
-
-async function uploadAttachment(file) {
-  if (!file || !currentThread) return;
-  const activeSession = await ensureMessagesSession();
-  if (!activeSession) return;
-  const mimeType = resolveMimeType(file);
-  if (!mimeType || !ALLOWED_ATTACHMENT_TYPES.has(mimeType)) {
-    notify("That file type is not allowed. Upload PDF, Word, Excel, or common image files.", "err");
-    return;
-  }
-  if (!Number.isFinite(file.size) || file.size <= 0) {
-    notify("File is empty or unreadable.", "err");
-    return;
-  }
-  if (file.size > MAX_ATTACHMENT_BYTES) {
-    notify("File exceeds the 25 MB limit.", "err");
-    return;
-  }
-
-  const safeName = sanitizeFilename(file.name);
-  setAttachmentBusy(true);
-  const placeholder = createUploadPlaceholder(safeName);
-  try {
-    const { url, key } = await presignUpload({
-      contentType: mimeType,
-      ext: getFileExtension(file.name),
-      folder: "messages",
-      caseId: currentThread,
-      size: file.size,
-      contentDisposition: buildContentDisposition(safeName),
-    });
-    await uploadToS3(url, file, mimeType, (pct) => placeholder.update(pct));
-    await j(`${API_BASE}/messages/${currentThread}/file`, {
-      method: "POST",
-      body: {
-        fileKey: key,
-        fileName: safeName,
-        fileSize: file.size,
-        mimeType,
-      },
-    });
-    await openThread(currentThread);
-    scrollMessagesToBottom();
-  } catch (err) {
-    console.error(err);
-    notify("Unable to upload attachment. Please try again.", "err");
-  } finally {
-    placeholder.remove();
-    setAttachmentBusy(false);
   }
 }
 
@@ -574,32 +242,16 @@ async function summarize(mode) {
 }
 
 // ---- Voice Notes: recorder + presign + upload + message ---------------------
-async function presignUpload({ contentType, ext, folder, size, caseId, contentDisposition }) {
-  const body = { contentType, ext, folder, size };
-  if (caseId) body.caseId = caseId;
-  if (contentDisposition) body.contentDisposition = contentDisposition;
+async function presignUpload({ contentType, ext, folder }) {
   return j("/api/uploads/presign", {
     method: "POST",
-    body,
+    body: { contentType, ext, folder },
   });
 }
 
-async function uploadToS3(url, blob, contentType, onProgress) {
-  await new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", url);
-    xhr.setRequestHeader("Content-Type", contentType);
-    if (onProgress) {
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          onProgress((event.loaded / event.total) * 100);
-        }
-      };
-    }
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("S3 upload failed")));
-    xhr.onerror = () => reject(new Error("S3 upload error"));
-    xhr.send(blob);
-  });
+async function uploadToS3(url, blob, contentType) {
+  const r = await fetch(url, { method: "PUT", headers: { "Content-Type": contentType }, body: blob });
+  if (!r.ok) throw new Error("S3 upload failed");
 }
 
 async function createVoiceMessage(caseId, { fileKey, fileName, mimeType, transcript }) {
@@ -753,36 +405,18 @@ async function startRecording() {
       try {
         if (!currentThread || !chunks.length) return;
         setStatus("Uploading…");
-        if (btn) {
-          btn.disabled = true;
-          btn.textContent = "Uploading…";
-        }
-        const activeSession = await ensureMessagesSession();
-        if (!activeSession) {
-          cleanupRecording(true);
-          return;
-        }
         const blob = new Blob(chunks, { type: "audio/webm" });
         const fileName = `voice-${Date.now()}.webm`;
-        const progressEl = document.createElement("div");
-        progressEl.className = "voice-progress";
-        progressEl.textContent = "Uploading 0%";
-        aiPanel?.appendChild(progressEl);
 
         // 1) presign
         const { url, key } = await presignUpload({
           contentType: "audio/webm",
           ext: "webm",
           folder: "voice-notes",
-          size: blob.size,
-          caseId: currentThread,
-          contentDisposition: buildContentDisposition(fileName),
         });
 
         // 2) PUT to S3
-        await uploadToS3(url, blob, "audio/webm", (pct) => {
-          if (progressEl) progressEl.textContent = `Uploading ${pct.toFixed(0)}%`;
-        });
+        await uploadToS3(url, blob, "audio/webm");
 
         // 3) create message with fileKey + transcript
         const transcript = (recTextFinal + (recTextInterim ? " " + recTextInterim : "")).trim();
@@ -800,8 +434,6 @@ async function startRecording() {
       } catch (e) {
         out.textContent = "Failed to add voice note.";
       } finally {
-        const prog = document.querySelector(".voice-progress");
-        prog?.remove();
         cleanupRecording();
       }
     };
@@ -869,10 +501,7 @@ function cleanupRecording(abort = false) {
   clearInterval(timerId);
   timerId = 0;
   const btn = $("#voice-note-btn");
-  if (btn) {
-    btn.textContent = "Record Voice Note";
-    btn.disabled = false;
-  }
+  if (btn) btn.textContent = "Record Voice Note";
 
   try { mediaRec?.stream?.getTracks()?.forEach((t) => t.stop()); } catch {}
   mediaRec = null;
@@ -945,14 +574,12 @@ function wireEvents() {
 async function init() {
   if (!threadListEl || !msgListEl) return;
   await ensureAuthed();
-  await loadViewerProfile();
   const threads = await loadThreads();
   const targetId = (pendingJump && pendingJump.caseId) || threads[0]?.id;
   pendingJump = null;
   if (targetId) {
     openThread(targetId);
   }
-  bindAttachmentControls();
   wireEvents();
 }
 document.addEventListener("DOMContentLoaded", init);

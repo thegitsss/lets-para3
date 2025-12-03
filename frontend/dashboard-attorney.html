@@ -4,13 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Let’s-ParaConnect | Attorney Dashboard</title>
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
-  <link rel="manifest" href="site.webmanifest" />
-  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
-
-
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
 <script src="assets/scripts/utils/session.js"></script>
   <style>
@@ -97,43 +90,46 @@
     }
 
     .notification-icon {
-      position: relative;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 32px;
-      height: 32px;
+      width: 46px;
+      height: 46px;
       border-radius: 50%;
-      transition: background 0.2s ease;
+      border: 1px solid var(--line);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #fff;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.2s ease, transform 0.2s ease;
     }
-
 
     .notification-icon:hover {
-      background: rgba(0,0,0,0.05);
+      border-color: var(--accent);
+      transform: translateY(-1px);
     }
 
-
     .notification-icon svg {
-      width: 20px;
-      height: 20px;
+      width: 22px;
+      height: 22px;
       color: var(--ink);
     }
 
     .notification-badge {
       position: absolute;
-      top: -6px;
-      right: -6px;
-      background: red;
-      color: white;
-      border-radius: 50%;
-      font-size: 0.7rem;
-      width: 16px;
-      height: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
+      top: -4px;
+      right: -4px;
+      background: #c0392b;
+      color: #fff;
+      font-size: 0.75rem;
+      border-radius: 999px;
+      padding: 2px 6px;
+      line-height: 1;
+      display: none;
+      font-weight: 600;
+    }
+
+    .notification-badge.show {
+      display: inline-flex;
     }
 
     .user-profile {
@@ -404,26 +400,26 @@
     <div class="topbar" data-attorney-header></div>
 
     <header>
-      <h1>Welcome back, <span id="user-name-heading"></span></h1>
-      <p id="activeCasesHeading"></p>
+      <h1>Welcome back, <span id="user-name-heading">Samantha</span></h1>
+      <p id="activeCasesHeading">Checking your active cases…</p>
     </header>
 
     <section class="summary">
-      <div class="info-box" id="attorneyActiveCases" data-metric="activeCases"></div>
+      <div class="info-box" data-metric="activeCases">Loading active cases…</div>
       <div class="info-box message-box" id="messageBox">
         <div>
-          <span id="messageCount"></span> message<span id="plural"></span>
+          <span id="messageCount">0</span> message<span id="plural">s waiting</span>
         </div>
-        <div id="messageSnippet" style="margin-top:.3rem;color:var(--muted);font-size:.85rem;"></div>
+        <div id="messageSnippet" style="margin-top:.3rem;color:var(--muted);font-size:.85rem;">Fetching latest updates…</div>
       </div>
-      <div class="info-box" id="attorneyOverdueTasks" data-metric="overdueTasks"></div>
-      <div class="info-box" id="attorneyEscrowTotal" data-metric="escrowTotal"></div>
+      <div class="info-box" data-metric="overdueTasks">Checking outstanding tasks…</div>
+      <div class="info-box" data-metric="escrowTotal">$0 held in escrow</div>
     </section>
 
     <section class="deadlines">
       <div class="section-title">Upcoming Deadlines</div>
       <div id="deadlineList">
-        <div class="info-line" id="attorneyDeadlinesEmpty" style="color:var(--muted);" hidden>No upcoming deadlines.</div>
+        <div class="info-line" style="color:var(--muted);">Loading deadlines…</div>
       </div>
     </section>
 
@@ -431,7 +427,7 @@
       <section id="latestMessagePreview">
         <div class="section-title">Unread Messages</div>
         <div class="info-line">
-          <strong id="messagePreviewSender"></strong>
+          <strong id="messagePreviewSender">Loading…</strong>
           <span id="messagePreviewText"></span>
           <a id="messagePreviewLink" href="messages.html">View</a>
         </div>
@@ -439,7 +435,7 @@
       <section>
         <div class="section-title">Escrow Status</div>
         <div id="escrowDetails">
-          <div class="info-line" id="attorneyEscrowEmpty" hidden>&bull; Escrow metrics unavailable.</div>
+          <div class="info-line">&bull; Calculating escrow totals…</div>
         </div>
       </section>
     </div>
@@ -452,11 +448,11 @@
     </section>
 
     <section class="case-list" id="caseCards">
-      <div class="case-card" id="attorneyCasesEmpty" hidden>
+      <div class="case-card">
         <div class="case-header">
           <div>
-            <h2>No active cases</h2>
-            <div class="case-subinfo">Your upcoming assignments will appear here.</div>
+            <h2>Loading recent cases…</h2>
+            <div class="case-subinfo">Please hold while we fetch your assignments.</div>
           </div>
         </div>
       </div>
@@ -465,7 +461,7 @@
     <section class="completed-section">
       <h2 class="section-title">Completed Jobs</h2>
       <div id="completedJobsList" class="completed-jobs-list">
-        <p class="info-line" id="attorneyCompletedEmpty" style="color:var(--muted);" hidden>No completed jobs yet.</p>
+        <p class="info-line" style="color:var(--muted);">Loading completed jobs…</p>
       </div>
     </section>
   </main>

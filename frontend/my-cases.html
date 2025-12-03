@@ -1,18 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <meta name="theme-color" content="#0B2A4A">
   <meta charset="UTF-8">
   <title>My Cases | Lets-ParaConnect</title>
-  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
-  <link rel="manifest" href="site.webmanifest" />
-  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
-
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
   <!-- Global styles + CSRF/role helpers -->
@@ -91,7 +81,6 @@
   </style>
 </head>
 <body>
-<div id="protectedContent" style="visibility:hidden">
   <header>
     <div class="title">My Cases</div>
     <nav>
@@ -135,11 +124,7 @@
   <script type="module">
     import { secureFetch } from './assets/scripts/auth.js';
 
-    const currentUser = typeof window.requireRole === 'function' ? await window.requireRole() : null;
-    if (!currentUser) {
-      // Guard will redirect unauthorized visitors.
-    } else {
-      applyRoleVisibility(currentUser);
+    window.checkSession();
     const API_BASE = '/api';
 
     const grid = document.getElementById('grid');
@@ -287,25 +272,9 @@
 
     // Initial load
     fetchCases();
-    }
-
-    function applyRoleVisibility(user) {
-      const role = String(user?.role || '').toLowerCase();
-      if (role === 'paralegal') {
-        document.querySelectorAll('[data-attorney-only]').forEach((el) => {
-          el.style.display = 'none';
-        });
-      }
-      if (role === 'attorney') {
-        document.querySelectorAll('[data-paralegal-only]').forEach((el) => {
-          el.style.display = 'none';
-        });
-      }
-    }
   </script>
   <script>
   loadUserHeaderInfo();
 </script>
-</div>
 </body>
 </html>

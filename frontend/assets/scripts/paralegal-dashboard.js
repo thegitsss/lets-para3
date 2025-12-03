@@ -1,100 +1,83 @@
 import { secureFetch } from "./auth.js";
-import { getAvatarUrl } from "./helpers.js";
+
+const defaultParalegalData = {
+  profile: {
+    name: 'Taylor',
+    avatar: 'https://via.placeholder.com/36',
+  },
+  stats: {
+    activeCases: 2,
+    unreadMessages: 2,
+    nextDeadline: 'Nov 25',
+    monthEarnings: 2050,
+    payout30Days: 2050,
+    nextPayout: 'Nov 30',
+  },
+  latestMessage: {
+    name: 'Samantha S.',
+    excerpt: 'Can you update the discovery log?',
+  },
+  deadlines: [
+    { title: 'Jones LLC collaboration', detail: 'Upload exhibit review', due: 'Nov 25' },
+    { title: 'Anderson merger support', detail: 'Draft summary', due: 'Nov 28' },
+  ],
+  notifications: [
+    { title: 'New Assignment', body: 'Johnson & Co. invited you to collaborate.' },
+    { title: 'Payment', body: '$820 released for “Samantha vs. Jones LLC”.' },
+    { title: 'Reminder', body: 'Submit summary for the Anderson filing.' },
+  ],
+  recentActivity: 'Discovery Responses · Draft revisions uploaded yesterday.',
+  assignments: [
+    {
+      title: 'Samantha vs. Jones LLC',
+      attorney: 'Samantha Sider',
+      due: 'Nov 30',
+      status: 'Active',
+      summary: 'Assist with drafting motions and reviewing exhibits. Focus on timeline summaries for court submission.',
+      actions: {
+        primary: { label: 'Open Workspace' },
+        secondary: { label: 'Message Attorney' },
+      },
+    },
+    {
+      title: 'Anderson Merger Filing',
+      attorney: 'J. Stone',
+      due: 'Awaiting response',
+      status: 'Invitation pending',
+      summary: 'Support requested for due diligence and document prep. Confirm interest or decline the invitation.',
+      actions: {
+        primary: { label: 'View Posting' },
+        secondary: { label: 'Respond' },
+      },
+    },
+  ],
+};
 
 const selectors = {
   messageBox: document.getElementById('messageBox'),
-  messageCount: document.getElementById('paralegalMessageCount'),
-  pluralText: document.getElementById('paralegalMessagePlural'),
+  messageCount: document.getElementById('messageCount'),
+  pluralText: document.getElementById('plural'),
   notificationBell: document.getElementById('notificationBell'),
   notificationPanel: document.getElementById('notificationPanel'),
-  notificationList: document.getElementById('paralegalNotificationList'),
-  notificationBadge: document.getElementById('paralegalNotificationBadge'),
-  deadlineList: document.getElementById('paralegalDeadlinesList'),
-  assignmentList: document.getElementById('paralegalAssignmentList'),
-  inviteList: document.getElementById('paralegalInviteList'),
-  assignedCasesList: document.getElementById('paralegalAssignedCasesList'),
-  recentActivity: document.getElementById('paralegalRecentActivity'),
+  notificationList: document.getElementById('notificationList'),
+  notificationBadge: document.querySelector('[data-field="notificationCount"]'),
+  deadlineList: document.getElementById('deadlineList'),
+  assignmentList: document.getElementById('assignmentList'),
+  recentActivity: document.getElementById('recentActivity'),
   assignmentTemplate: document.getElementById('assignmentCardTemplate'),
   toastBanner: document.getElementById('toastBanner'),
-  userAvatar: document.getElementById('paralegalAvatar'),
-  nameHeading: document.getElementById('paralegalNameHeading'),
-  welcomeCopy: document.getElementById('paralegalWelcomeCopy'),
+  userAvatar: document.getElementById('user-avatar'),
 };
 
-const JSON_HEADERS = { Accept: 'application/json' };
-
-async function fetchJson(url, options = {}) {
-  const res = await secureFetch(url, {
-    ...options,
-    headers: { ...JSON_HEADERS, ...(options.headers || {}) },
-  });
-  if (!res.ok) {
-    const error = new Error(`Failed to load ${url}`);
-    error.status = res.status;
-    throw error;
-  }
-  try {
-    return await res.json();
-  } catch {
-    return {};
-  }
-}
-
-async function loadViewerProfile() {
-  return fetchJson('/api/users/me');
-}
-
 async function fetchParalegalData() {
-  return fetchJson('/api/paralegal/dashboard');
-}
-
-async function loadNotificationsFeed() {
-  return fetchJson('/api/users/me/notifications').catch(() => ({ items: [], unread: 0 }));
-}
-
-async function loadDeadlineEvents(limit = 5) {
-  const params = new URLSearchParams({ limit: String(limit) });
-  return fetchJson(`/api/events?${params.toString()}`).then((data) => (Array.isArray(data.items) ? data.items : []));
-}
-
-async function loadMessageThreads(limit = 5) {
-  return fetchJson(`/api/messages/threads?limit=${limit}`).then((data) => (Array.isArray(data.threads) ? data.threads : []));
-}
-
-async function loadUnreadMessageCount() {
-  return fetchJson('/api/messages/unread-count').then((data) => Number(data.count) || 0);
-}
-
-function formatCurrency(value = 0) {
-  const amount = Number(value) || 0;
-  return amount.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
-}
-
-function showPlaceholder(container, placeholderId) {
-  if (!container) return;
-  const placeholder = document.getElementById(placeholderId);
-  if (!placeholder) return;
-  if (placeholder.parentElement) {
-    placeholder.remove();
+  try {
+    const response = await secureFetch('/api/paralegals/me', { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error('Unable to load paralegal data');
+    return await response.json();
+  } catch (error) {
+    console.warn('[Paralegal Dashboard] Using fallback data:', error.message);
+    return defaultParalegalData;
   }
-  placeholder.hidden = false;
-  container.innerHTML = '';
-  container.appendChild(placeholder);
-}
-
-function hidePlaceholder(placeholderId) {
-  const placeholder = document.getElementById(placeholderId);
-  if (!placeholder) return;
-  placeholder.hidden = true;
-  if (placeholder.parentElement) {
-    placeholder.parentElement.removeChild(placeholder);
-  }
-}
-
-function deriveNextDeadline(events = []) {
-  const next = events[0];
-  if (!next) return '--';
-  return next.start ? new Date(next.start).toLocaleDateString() : '--';
 }
 
 function setField(field, value) {
@@ -103,81 +86,81 @@ function setField(field, value) {
   });
 }
 
-function updateStats(stats = {}) {
-  const activeCases = Number(stats.activeCases ?? 0);
-  const unread = Number(stats.unreadMessages ?? 0);
-  const nextDeadline = stats.nextDeadline ?? '--';
-  const monthEarnings = Number(stats.monthEarnings ?? 0);
-  const payout30Days = Number(stats.payout30Days ?? 0);
-  const nextPayout = stats.nextPayout ?? '—';
-
-  setField('welcomeSubheading', `You have ${activeCases} active assignment${activeCases === 1 ? '' : 's'}`);
-  setField('activeCases', activeCases);
-  setField('unreadMessages', unread);
+function updateStats(data) {
+  const stats = data.stats || {};
+  setField('name', data.profile?.name || 'Paralegal');
+  setField('welcomeSubheading', `You have ${stats.activeCases ?? 0} active assignment${stats.activeCases === 1 ? '' : 's'}`);
+  setField('activeCases', stats.activeCases ?? 0);
+  setField('unreadMessages', stats.unreadMessages ?? 0);
   if (selectors.pluralText) {
-    selectors.pluralText.textContent = unread === 1 ? ' waiting' : 's waiting';
+    selectors.pluralText.textContent = stats.unreadMessages === 1 ? ' waiting' : 's waiting';
   }
-  setField('nextDeadline', nextDeadline);
-  const earningsDisplay = formatCurrency(monthEarnings).replace(/^\$/, '');
-  const payoutDisplay = formatCurrency(payout30Days).replace(/^\$/, '');
-  setField('monthEarnings', earningsDisplay);
-  setField('payout30Days', payoutDisplay);
-  setField('nextPayout', nextPayout);
+  setField('nextDeadline', stats.nextDeadline ?? '--');
+  setField('monthEarnings', stats.monthEarnings ?? 0);
+  setField('payout30Days', stats.payout30Days ?? 0);
+  setField('nextPayout', stats.nextPayout ?? '—');
 }
 
 function renderDeadlines(deadlines = []) {
   const container = selectors.deadlineList;
   if (!container) return;
+  container.innerHTML = '';
   if (!deadlines.length) {
-    showPlaceholder(container, 'paralegalDeadlinesEmpty');
+    const line = document.createElement('div');
+    line.className = 'info-line';
+    line.textContent = '• No assigned deadlines.';
+    container.appendChild(line);
     return;
   }
-  hidePlaceholder('paralegalDeadlinesEmpty');
-  container.innerHTML = deadlines
-    .map((deadline) => {
-      const title = deadline.title || 'Deadline';
-      const where = deadline.where ? ` · ${deadline.where}` : '';
-      const dueText = deadline.start ? ` due ${new Date(deadline.start).toLocaleDateString()}` : '';
-      return `<div class="info-line">• ${title}${where}${dueText}</div>`;
-    })
-    .join('');
+  deadlines.forEach((deadline) => {
+    const line = document.createElement('div');
+    line.className = 'info-line';
+    const detail = deadline.detail ? ` – ${deadline.detail}` : '';
+    const dueText = deadline.due ? ` by ${deadline.due}` : '';
+    line.textContent = `• ${deadline.title}${detail}${dueText}`;
+    container.appendChild(line);
+  });
 }
 
-function renderNotifications(items = [], unreadCount = 0) {
+function renderNotifications(data = []) {
   const list = selectors.notificationList;
   if (!list) return;
-  if (!items.length) {
-    showPlaceholder(list, 'paralegalNotificationsEmpty');
+  list.innerHTML = '';
+  if (!data.length) {
+    const empty = document.createElement('div');
+    empty.className = 'notification-item';
+    empty.textContent = "You're all caught up.";
+    list.appendChild(empty);
   } else {
-    hidePlaceholder('paralegalNotificationsEmpty');
-    list.innerHTML = items
-      .slice(0, 5)
-      .map((entry) => `<div class="notification-item"><strong>${entry.title || 'Update'}:</strong> ${entry.body || ''}</div>`)
-      .join('');
+    data.forEach((entry) => {
+      const item = document.createElement('div');
+      item.className = 'notification-item';
+      item.innerHTML = `<strong>${entry.title}:</strong> ${entry.body}`;
+      list.appendChild(item);
+    });
   }
   if (selectors.notificationBadge) {
-    if (unreadCount > 0) {
-      selectors.notificationBadge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
-      selectors.notificationBadge.hidden = false;
-    } else {
-      selectors.notificationBadge.textContent = '';
-      selectors.notificationBadge.hidden = true;
-    }
-  }
-  if (selectors.recentActivity) {
-    selectors.recentActivity.textContent = items[0]?.body || 'No updates yet.';
+    selectors.notificationBadge.textContent = data.length;
   }
 }
 
 function renderAssignments(assignments = []) {
   const container = selectors.assignmentList;
   if (!container || !selectors.assignmentTemplate) return;
+  container.innerHTML = '';
   if (!assignments.length) {
-    showPlaceholder(container, 'paralegalAssignmentsEmpty');
+    const empty = document.createElement('div');
+    empty.className = 'case-card empty-state';
+    empty.innerHTML = `
+      <div class="case-header">
+        <div>
+          <h2>No active assignments</h2>
+          <div class="case-subinfo">New invitations will appear here.</div>
+        </div>
+      </div>`;
+    container.appendChild(empty);
     return;
   }
-  hidePlaceholder('paralegalAssignmentsEmpty');
-  container.innerHTML = '';
 
   assignments.forEach((assignment) => {
     const node = selectors.assignmentTemplate.content.cloneNode(true);
@@ -212,170 +195,6 @@ function renderAssignments(assignments = []) {
   });
 }
 
-function mapActiveCasesToAssignments(activeCases = []) {
-  return activeCases.map((caseItem) => ({
-    title: caseItem.jobTitle || caseItem.title || 'Case',
-    attorney: caseItem.attorneyName || '',
-    due: caseItem.dueDate
-      ? new Date(caseItem.dueDate).toLocaleDateString()
-      : caseItem.createdAt
-        ? new Date(caseItem.createdAt).toLocaleDateString()
-        : '',
-    status: caseItem.status ? caseItem.status.replace(/_/g, ' ') : '',
-    summary: caseItem.practiceArea ? `Practice area: ${caseItem.practiceArea}` : '',
-  }));
-}
-
-async function loadInvites() {
-  try {
-    const res = await secureFetch('/api/cases/invited-to', { headers: { Accept: 'application/json' } });
-    if (!res.ok) throw new Error('Unable to load invites');
-    const payload = await res.json().catch(() => ({}));
-    return Array.isArray(payload?.items) ? payload.items : [];
-  } catch (error) {
-    console.warn('Unable to load invites', error);
-    return [];
-  }
-}
-
-function renderInvites(invites = []) {
-  const container = selectors.inviteList;
-  if (!container) return;
-  if (!invites.length) {
-    showPlaceholder(container, 'paralegalInvitesEmpty');
-    return;
-  }
-  hidePlaceholder('paralegalInvitesEmpty');
-  container.innerHTML = '';
-
-  invites.forEach((invite) => {
-    const card = document.createElement('div');
-    card.className = 'case-card';
-
-    const header = document.createElement('div');
-    header.className = 'case-header';
-    const headerBody = document.createElement('div');
-    const titleEl = document.createElement('h2');
-    titleEl.textContent = invite.title || 'Case Invitation';
-    const subInfo = document.createElement('div');
-    subInfo.className = 'case-subinfo';
-    const attorneyName =
-      invite.attorney?.name ||
-      [invite.attorney?.firstName, invite.attorney?.lastName].filter(Boolean).join(' ').trim() ||
-      'Attorney';
-    const invitedAt = invite.pendingParalegalInvitedAt
-      ? `Invited ${new Date(invite.pendingParalegalInvitedAt).toLocaleDateString()}`
-      : '';
-    subInfo.textContent = [attorneyName, invitedAt].filter(Boolean).join(' · ');
-    headerBody.appendChild(titleEl);
-    headerBody.appendChild(subInfo);
-    header.appendChild(headerBody);
-    card.appendChild(header);
-
-    const body = document.createElement('div');
-    body.className = 'case-content';
-    const summary = document.createElement('p');
-    summary.textContent = invite.practiceArea || 'General matter';
-    body.appendChild(summary);
-
-    const actions = document.createElement('div');
-    actions.className = 'case-actions';
-    const acceptBtn = document.createElement('button');
-    acceptBtn.textContent = 'Accept';
-    acceptBtn.dataset.inviteAction = 'accept';
-    acceptBtn.dataset.caseId = invite.id || invite._id;
-    const declineBtn = document.createElement('button');
-    declineBtn.textContent = 'Decline';
-    declineBtn.dataset.inviteAction = 'decline';
-    declineBtn.dataset.caseId = invite.id || invite._id;
-    actions.appendChild(acceptBtn);
-    actions.appendChild(declineBtn);
-    body.appendChild(actions);
-    card.appendChild(body);
-    container.appendChild(card);
-  });
-
-  container.querySelectorAll('[data-invite-action]').forEach((button) => {
-    button.addEventListener('click', () => respondToInvite(button.dataset.caseId, button.dataset.inviteAction, button));
-  });
-}
-
-async function respondToInvite(caseId, action, button) {
-  if (!caseId || !action) return;
-  const endpoint = `/api/cases/${encodeURIComponent(caseId)}/invite/${action}`;
-  const originalLabel = button?.textContent;
-  if (button) {
-    button.disabled = true;
-    button.textContent = action === 'accept' ? 'Accepting…' : 'Declining…';
-  }
-  const toastHelper = window.toastUtils;
-  let completed = false;
-  try {
-    const res = await secureFetch(endpoint, { method: 'POST' });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.error || 'Unable to update invitation');
-    const message = action === 'accept' ? 'Invitation accepted.' : 'Invitation declined.';
-    toastHelper?.show?.(message, { targetId: selectors.toastBanner?.id, type: 'success' });
-    completed = true;
-    if (action === 'accept') {
-      window.location.reload();
-      return;
-    }
-    const invites = await loadInvites();
-    renderInvites(invites);
-  } catch (error) {
-    toastHelper?.show?.(error.message || 'Unable to update invitation.', {
-      targetId: selectors.toastBanner?.id,
-      type: 'error',
-    });
-  } finally {
-    if (button && !completed) {
-      button.disabled = false;
-      button.textContent = originalLabel || (action === 'accept' ? 'Accept' : 'Decline');
-    }
-  }
-}
-
-async function loadAssignedCases() {
-  const list = selectors.assignedCasesList;
-  if (!list) return;
-  try {
-    const payload = await fetchJson('/api/cases/my-assigned');
-    renderAssignedCases(Array.isArray(payload?.items) ? payload.items : []);
-  } catch (error) {
-    renderAssignedCasesError(error.message || 'Unable to load assigned cases.');
-  }
-}
-
-function renderAssignedCases(items = []) {
-  const list = selectors.assignedCasesList;
-  if (!list) return;
-  if (!items.length) {
-    list.innerHTML = '<p>No assigned cases.</p>';
-    return;
-  }
-  list.innerHTML = items
-    .map(
-      (c) => `
-      <div class="case-item" data-id="${c._id}">
-        <div class="case-title">${c.title || 'Untitled Case'}</div>
-        <div class="case-meta">
-          <span>${c.caseNumber || ''}</span>
-          <span>Attorney: ${c.attorneyName || ''}</span>
-          <span>Status: ${c.status || 'Active'}</span>
-        </div>
-        <button class="open-case-btn" data-id="${c._id}">Open Case</button>
-      </div>`
-    )
-    .join('');
-}
-
-function renderAssignedCasesError(message = 'Unable to load assigned cases.') {
-  const list = selectors.assignedCasesList;
-  if (!list) return;
-  list.innerHTML = `<p>${message}</p>`;
-}
-
 function handleCaseAction(action, title) {
   const toastHelper = window.toastUtils;
   const message = `${action} for “${title}” is coming soon.`;
@@ -390,7 +209,7 @@ function attachUIHandlers() {
   }
 
   selectors.messageBox?.addEventListener('click', () => {
-    window.location.href = 'index.html#paralegal-messages';
+  window.location.href = 'index.html#paralegal-messages';
   });
 
   selectors.notificationBell?.addEventListener('click', (event) => {
@@ -406,27 +225,18 @@ function attachUIHandlers() {
 }
 
 function updateProfile(profile = {}) {
-  const composedName =
-    [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim() || profile.name || 'Paralegal';
-  setField('name', composedName);
-  if (selectors.nameHeading) {
-    selectors.nameHeading.textContent = composedName;
-  }
-  if (selectors.userAvatar) {
-    selectors.userAvatar.src = getAvatarUrl(profile);
-    selectors.userAvatar.alt = `${composedName}'s avatar`;
+  const name = profile.name || 'Paralegal';
+  setField('name', name);
+  const heading = document.getElementById('user-name-heading');
+  if (heading) heading.textContent = name;
+  if (selectors.userAvatar && profile.avatar) {
+    selectors.userAvatar.src = profile.avatar;
   }
 }
 
-function initLatestMessage(threads = []) {
-  if (!threads.length) {
-    setField('latestMessageName', 'Inbox');
-    setField('latestMessageExcerpt', 'No new messages.');
-    return;
-  }
-  const latest = threads[0];
-  setField('latestMessageName', latest.title || 'Case thread');
-  setField('latestMessageExcerpt', latest.lastMessageSnippet || 'No new messages.');
+function initLatestMessage(message = {}) {
+  setField('latestMessageName', message.name || '—');
+  setField('latestMessageExcerpt', message.excerpt || 'No new messages.');
 }
 
 function initQuickActions() {
@@ -440,77 +250,16 @@ function initQuickActions() {
 async function initDashboard() {
   attachUIHandlers();
   initQuickActions();
-  try {
-    const [profile, dashboard, invites, deadlines, threads, notifications, unreadCount] = await Promise.all([
-      loadViewerProfile().catch(() => ({})),
-      fetchParalegalData().catch(() => ({})),
-      loadInvites().catch(() => []),
-      loadDeadlineEvents().catch(() => []),
-      loadMessageThreads().catch(() => []),
-      loadNotificationsFeed().catch(() => ({ items: [], unread: 0 })),
-      loadUnreadMessageCount().catch(() => 0),
-    ]);
-    updateProfile(profile || {});
-    const paralegalAvatarEl = document.getElementById('paralegalAvatar');
-    if (paralegalAvatarEl) {
-      paralegalAvatarEl.src = getAvatarUrl(profile || {});
-    }
-    updateStats({
-      activeCases: dashboard?.metrics?.activeCases,
-      unreadMessages: unreadCount,
-      nextDeadline: deriveNextDeadline(deadlines),
-      monthEarnings: dashboard?.metrics?.earnings,
-      payout30Days: dashboard?.metrics?.earningsLast30Days,
-      nextPayout: dashboard?.metrics?.nextPayoutDate,
-    });
-    renderDeadlines(deadlines);
-    initLatestMessage(threads);
-    renderNotifications(notifications.items || [], notifications.unread || 0);
-    renderAssignments(mapActiveCasesToAssignments(dashboard?.activeCases || []));
-    renderInvites(invites);
-  } catch (err) {
-    console.warn('Paralegal dashboard init failed', err);
-    renderAssignments([]);
-    renderInvites([]);
-    renderDeadlines([]);
-    initLatestMessage([]);
-    renderNotifications([], 0);
+  const data = await fetchParalegalData();
+  updateProfile(data.profile);
+  updateStats(data);
+  renderDeadlines(data.deadlines);
+  initLatestMessage(data.latestMessage);
+  renderNotifications(data.notifications);
+  if (selectors.recentActivity) {
+    selectors.recentActivity.textContent = data.recentActivity || 'No updates yet.';
   }
-  await loadAssignedCases();
+  renderAssignments(data.assignments);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  void bootParalegalDashboard();
-});
-
-async function bootParalegalDashboard() {
-  const user = typeof window.requireRole === 'function' ? await window.requireRole('paralegal') : null;
-  if (!user) return;
-  applyRoleVisibility(user);
-  if (window.state) {
-    window.state.viewerRole = String(user.role || '').toLowerCase();
-  }
-  await initDashboard();
-  const assignedCasesEl = document.getElementById('paralegalAssignedCasesList');
-  assignedCasesEl?.addEventListener('click', (event) => {
-    const btn = event.target.closest('.open-case-btn');
-    if (!btn) return;
-    const caseId = btn.dataset.id;
-    if (!caseId) return;
-    window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
-  });
-}
-
-function applyRoleVisibility(user) {
-  const role = String(user?.role || '').toLowerCase();
-  if (role === 'paralegal') {
-    document.querySelectorAll('[data-attorney-only]').forEach((el) => {
-      el.style.display = 'none';
-    });
-  }
-  if (role === 'attorney') {
-    document.querySelectorAll('[data-paralegal-only]').forEach((el) => {
-      el.style.display = 'none';
-    });
-  }
-}
+initDashboard();

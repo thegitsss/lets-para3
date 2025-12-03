@@ -5,11 +5,6 @@
 import { j } from "../helpers.js";
 
 const API_BASE = "/api/checklist";
-const ACCESS_DENIED_MSG = "You don’t have access to this case’s tasks.";
-
-function escapeAttr(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
 
 function ensureStylesOnce() {
   if (document.getElementById("pc-checklist-styles")) return;
@@ -84,15 +79,8 @@ async function apiDelete(id) {
   });
 }
 
-export async function render(el, opts = {}) {
+export async function render(el) {
   ensureStylesOnce();
-  const fixedCaseId = opts?.caseId ? String(opts.caseId) : "";
-  const caseFilterInput = fixedCaseId
-    ? ""
-    : `<input type="text" name="caseId" placeholder="Filter by Case ID (optional)" inputmode="latin" pattern="[a-fA-F0-9]{24}" title="24-char Mongo ID">`;
-  const caseField = fixedCaseId
-    ? `<input type="hidden" name="caseId" value="${escapeAttr(fixedCaseId)}">`
-    : `<label>Case ID <input name="caseId" type="text" placeholder="(optional)" pattern="[a-fA-F0-9]{24}"></label>`;
 
   el.innerHTML = `
     <div class="section chk-wrap" aria-label="Checklist" role="region">
@@ -105,14 +93,14 @@ export async function render(el, opts = {}) {
           <option value="done">Completed</option>
           <option value="all">All</option>
         </select>
-        ${caseFilterInput}
+        <input type="text" name="caseId" placeholder="Filter by Case ID (optional)" inputmode="latin" pattern="[a-fA-F0-9]{24}" title="24-char Mongo ID">
         <button class="btn" data-act="refresh">Refresh</button>
       </div>
 
       <form class="chk-form" autocomplete="off" aria-label="Add task">
         <label>Title <input required name="title" type="text" placeholder="e.g., File motion, prep exhibits" maxlength="200"></label>
         <label>Due <input name="due" type="date"></label>
-        ${caseField}
+        <label>Case ID <input name="caseId" type="text" placeholder="(optional)" pattern="[a-fA-F0-9]{24}"></label>
         <label style="flex: 1 1 260px;">Notes
           <textarea name="notes" placeholder="(optional) brief notes" maxlength="1000"></textarea>
         </label>
@@ -147,13 +135,9 @@ export async function render(el, opts = {}) {
     skeleton();
     const q = toolbar.querySelector('[name="q"]').value.trim();
     const status = toolbar.querySelector('[name="status"]').value;
-    const caseInput = toolbar.querySelector('[name="caseId"]');
-    const caseIdEntry = caseInput ? caseInput.value.trim() : "";
-    const caseId = fixedCaseId || caseIdEntry;
+    const caseId = toolbar.querySelector('[name="caseId"]').value.trim();
     try {
-      const params = { q, status };
-      if (caseId) params.caseId = caseId;
-      const { items = [] } = await apiList(params);
+      const { items = [] } = await apiList({ q, status, caseId });
       // sort: due soonest first, then createdAt asc (if present)
       items.sort((a, b) => {
         const da = a.due ? new Date(a.due).getTime() : Infinity;
@@ -164,12 +148,8 @@ export async function render(el, opts = {}) {
         return ca - cb;
       });
       draw(items);
-    } catch (err) {
-      if (err?.status === 403) {
-        listEl.innerHTML = `<div style="color:#6b7280;">${ACCESS_DENIED_MSG}</div>`;
-      } else {
-        listEl.innerHTML = `<div style="color:#b91c1c;">Failed to load tasks.</div>`;
-      }
+    } catch {
+      listEl.innerHTML = `<div style="color:#b91c1c;">Failed to load tasks.</div>`;
     }
   }
 
@@ -303,36 +283,19 @@ export async function render(el, opts = {}) {
   toolbar.querySelector('[data-act="refresh"]').addEventListener("click", loadAndRender);
   toolbar.querySelector('[name="q"]').addEventListener("input", debounce(loadAndRender, 250));
   toolbar.querySelector('[name="status"]').addEventListener("change", loadAndRender);
-  const caseFilterEl = toolbar.querySelector('[name="caseId"]');
-  if (caseFilterEl) {
-    caseFilterEl.addEventListener("input", debounce(loadAndRender, 250));
-  }
-
-  const formSubmitBtn = formEl?.querySelector('button[type="submit"]');
-  const defaultSubmitText = formSubmitBtn?.textContent || "Add";
-
-  const scheduleFormReset = () => {
-    if (!formEl || !formSubmitBtn) return;
-    const handler = () => {
-      formSubmitBtn.disabled = false;
-      formSubmitBtn.textContent = defaultSubmitText;
-      formEl.removeEventListener("input", handler);
-    };
-    formEl.addEventListener("input", handler, { once: true });
-  };
+  toolbar.querySelector('[name="caseId"]').addEventListener("input", debounce(loadAndRender, 250));
 
   formEl.addEventListener("submit", async (e) => {
     e.preventDefault();
     const title = formEl.title.value.trim();
     if (!title) return;
     // simple pattern check for Case ID (optional)
-    const caseIdField = formEl.caseId;
-    const caseIdRaw = caseIdField?.value?.trim?.() || "";
-    if (!fixedCaseId && caseIdRaw && !/^[a-fA-F0-9]{24}$/.test(caseIdRaw)) {
+    const caseIdRaw = formEl.caseId.value.trim();
+    if (caseIdRaw && !/^[a-fA-F0-9]{24}$/.test(caseIdRaw)) {
       alert("Case ID must be a 24-char hex string"); return;
     }
     const due = formEl.due.value ? new Date(formEl.due.value + "T00:00:00").toISOString() : undefined;
-    const caseId = fixedCaseId || caseIdRaw || undefined;
+    const caseId = caseIdRaw || undefined;
     const notes = formEl.notes.value.trim() || undefined;
 
     // optimistic add
@@ -340,33 +303,14 @@ export async function render(el, opts = {}) {
     const temp = { id: tempId, title, due, caseId, notes, done: false, createdAt: new Date().toISOString() };
     draw([temp, ...Array.from(listEl.children).map(rowToTask)]);
 
-    let restoreButton = true;
-    if (formSubmitBtn) {
-      formSubmitBtn.disabled = true;
-      formSubmitBtn.textContent = "Saving…";
-    }
     try {
       await apiCreate({ title, due, caseId, notes });
       formEl.reset();
-      if (fixedCaseId && caseIdField) {
-        caseIdField.value = fixedCaseId;
-      }
       await loadAndRender();
       toast("Task added");
-      scheduleFormReset();
-      restoreButton = false;
-    } catch (err) {
-      if (err?.status === 403) {
-        toast(ACCESS_DENIED_MSG);
-      } else {
-        toast("Failed to add task");
-      }
+    } catch {
+      toast("Failed to add task");
       await loadAndRender(); // rollback to server truth
-    } finally {
-      if (restoreButton && formSubmitBtn) {
-        formSubmitBtn.disabled = false;
-        formSubmitBtn.textContent = defaultSubmitText;
-      }
     }
   });
 

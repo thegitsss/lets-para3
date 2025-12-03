@@ -59,8 +59,6 @@ function wire(root, jobId) {
   const form = root.querySelector("[data-job-apply]");
   const textarea = root.querySelector("#coverLetter");
   const status = root.querySelector("[data-apply-status]");
-  const submitBtn = form?.querySelector('button[type="submit"]');
-  const defaultText = submitBtn?.textContent || "Apply to this job";
 
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -72,11 +70,6 @@ function wire(root, jobId) {
 
     if (status) status.textContent = "Submitting application…";
 
-    let restoreButton = true;
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Applying…";
-    }
     try {
       await j(`/api/jobs/${encodeURIComponent(jobId)}/apply`, {
         method: "POST",
@@ -84,14 +77,8 @@ function wire(root, jobId) {
       });
       if (status) status.textContent = "Application submitted!";
       if (textarea) textarea.value = "";
-      restoreButton = false;
     } catch (err) {
       if (status) status.textContent = err?.message || "Unable to apply right now.";
-    } finally {
-      if (restoreButton && submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = defaultText;
-      }
     }
   });
 }

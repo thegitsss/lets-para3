@@ -32,18 +32,6 @@ async function getCSRF() {
   return CSRF;
 }
 
-async function ensureDocsSession(expectedRole) {
-  if (typeof window.refreshSession !== "function") return true;
-  const session = await window.refreshSession(expectedRole);
-  if (!session) {
-    try {
-      window.location.href = "login.html";
-    } catch {}
-    return false;
-  }
-  return true;
-}
-
 function ensureStylesOnce() {
   if (document.getElementById("pc-docs-styles")) return;
   const s = document.createElement("style");
@@ -63,7 +51,6 @@ function ensureStylesOnce() {
   .row-meta{display:flex;gap:8px;flex-wrap:wrap;color:#6b7280}
   .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .drop{border:2px dashed #d1d5db;border-radius:12px;padding:14px;display:flex;gap:10px;align-items:center;justify-content:space-between;background:#fafafa}
-  .drop.locked{opacity:.6;cursor:not-allowed}
   .drop.drag{background:#eef2ff;border-color:#6366f1}
   .queue{display:grid;gap:8px}
   .q-item{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;border:1px dashed #d1d5db;border-radius:10px;padding:8px;background:#fff}
@@ -83,11 +70,6 @@ function formatBytes(n=0) {
   if (n < 1024**2) return `${(n/1024).toFixed(1)} KB`;
   if (n < 1024**3) return `${(n/1024**2).toFixed(1)} MB`;
   return `${(n/1024**3).toFixed(1)} GB`;
-}
-
-function sanitizeDocText(value) {
-  const text = String(value || "").replace(/[\u0000-\u001F\u007F]/g, "").trim();
-  return text || FIELD_FALLBACK;
 }
 
 // --- tiny toast ---
@@ -113,18 +95,12 @@ async function fetchCase(caseId) {
   return r.json(); // expect { files: [...] }
 }
 
-async function presign({ caseId, contentType, ext, folder, size }) {
-  if (!caseId) throw new Error("caseId required for uploads");
-  const active = await ensureDocsSession();
-  if (!active) throw new Error("Session expired");
+async function presign({ contentType, ext, folder }) {
   const r = await fetch(API_PRESIGN, {
     method: "POST",
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      "X-CSRF-Token": await getCSRF(),
-    },
-    body: JSON.stringify({ caseId, contentType, ext, folder, size })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contentType, ext, folder })
   });
   if (!r.ok) throw new Error("Failed to presign");
   return r.json(); // { url, key }
@@ -133,8 +109,6 @@ async function presign({ caseId, contentType, ext, folder, size }) {
 // We probe which attach endpoint works the first time we need it.
 let attachProbe = null;
 async function attachToCase({ caseId, key, original }) {
-  const active = await ensureDocsSession();
-  if (!active) throw new Error("Session expired");
   if (!attachProbe) {
     attachProbe = (async () => {
       for (const make of CANDIDATE_ATTACH_ENDPOINTS) {
@@ -194,8 +168,6 @@ async function signedGet({ caseId, key }) {
 }
 
 async function deleteFile({ caseId, key }) {
-  const active = await ensureDocsSession();
-  if (!active) throw new Error("Session expired");
   // Try multiple delete shapes
   for (const make of CANDIDATE_DELETE_ENDPOINTS) {
     const cand = make(caseId);
@@ -253,8 +225,6 @@ export async function render(el) {
   const dropEl = el.querySelector(".drop");
   const queueEl = el.querySelector(".queue");
   const filePick = el.querySelector("#filepick");
-  const pickBtn = el.querySelector('[data-act="pick"]');
-  const pickDefaultText = pickBtn?.textContent || "Choose Files";
 
   const caseInput = toolbar.querySelector('input[name="caseId"]');
   const qInput = toolbar.querySelector('input[name="q"]');
@@ -262,7 +232,6 @@ export async function render(el) {
   const allowed = new Set(["application/pdf", "image/png", "image/jpeg"]);
 
   let currentCaseId = "";
-  let currentCaseReadOnly = false;
   let allFiles = []; // as returned by case.files
   let downloadingEnabled = true; // we’ll flip to false if signed-get not available
 
@@ -283,20 +252,6 @@ export async function render(el) {
     if (files && files.length) handleFiles(files);
   });
 
-  function applyLockedState() {
-    if (pickBtn) {
-      pickBtn.disabled = currentCaseReadOnly;
-      pickBtn.textContent = currentCaseReadOnly ? "Uploads locked" : pickDefaultText;
-    }
-    dropEl.classList.toggle("locked", currentCaseReadOnly);
-    const note = dropEl.querySelector(".muted");
-    if (note) {
-      note.textContent = currentCaseReadOnly
-        ? "This case is read-only. Uploads and deletions are disabled."
-        : "Drag & drop PDF/PNG/JPEG here, or choose…";
-    }
-  }
-
   async function loadCase() {
     const id = (caseInput.value || "").trim();
     if (!id) {
@@ -307,8 +262,6 @@ export async function render(el) {
     try {
       const c = await fetchCase(id);
       allFiles = Array.isArray(c.files) ? c.files : [];
-      currentCaseReadOnly = !!c.readOnly;
-      applyLockedState();
       if (!allFiles.length) {
         listEl.innerHTML = `<div class="muted">No files yet.</div>`;
       } else {
@@ -316,8 +269,6 @@ export async function render(el) {
       }
     } catch (e) {
       allFiles = [];
-      currentCaseReadOnly = false;
-      applyLockedState();
       listEl.innerHTML = `<div class="muted">Could not load case or you lack access.</div>`;
     }
   }
@@ -344,7 +295,7 @@ export async function render(el) {
 
       const name = document.createElement("div");
       name.className = "doc-name";
-      name.textContent = sanitizeDocText(f.original || f.filename || f.key || FIELD_FALLBACK);
+      name.textContent = f.original || f.filename || f.key || "(unnamed)";
       left.appendChild(name);
 
       const meta = document.createElement("div");
@@ -363,11 +314,13 @@ export async function render(el) {
         meta.appendChild(sizeChip);
       }
 
-      const when = f.createdAt ? new Date(f.createdAt).toLocaleString() : FIELD_FALLBACK;
-      const timeChip = document.createElement("span");
-      timeChip.className = "chip";
-      timeChip.textContent = when;
-      meta.appendChild(timeChip);
+      if (f.createdAt) {
+        const when = new Date(f.createdAt);
+        const timeChip = document.createElement("span");
+        timeChip.className = "chip";
+        timeChip.textContent = when.toLocaleString();
+        meta.appendChild(timeChip);
+      }
 
       left.appendChild(meta);
 
@@ -387,32 +340,32 @@ export async function render(el) {
         }
       });
 
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn danger";
+      delBtn.textContent = "Delete";
+      delBtn.addEventListener("click", async () => {
+        if (!confirm("Delete this file from the case?")) return;
+        const key = f.key || f.filename;
+        if (!key) return;
+
+        const prev = allFiles.slice();
+        // optimistic
+        allFiles = allFiles.filter(x => (x.key || x.filename) !== key);
+        drawFiles(allFiles, qInput.value);
+
+        try {
+          await deleteFile({ caseId: currentCaseId, key });
+          toast("File deleted");
+        } catch {
+          allFiles = prev;
+          drawFiles(allFiles, qInput.value);
+          toast("Delete failed (no endpoint?)");
+        }
+      });
+
       row.appendChild(left);
       row.appendChild(downloadBtn);
-      if (!currentCaseReadOnly) {
-        const delBtn = document.createElement("button");
-        delBtn.className = "btn danger";
-        delBtn.textContent = "Delete";
-        delBtn.addEventListener("click", async () => {
-          if (!confirm("Delete this file from the case?")) return;
-          const key = f.key || f.filename;
-          if (!key) return;
-
-          const prev = allFiles.slice();
-          allFiles = allFiles.filter(x => (x.key || x.filename) !== key);
-          drawFiles(allFiles, qInput.value);
-
-          try {
-            await deleteFile({ caseId: currentCaseId, key });
-            toast("File deleted");
-          } catch {
-            allFiles = prev;
-            drawFiles(allFiles, qInput.value);
-            toast("Delete failed (no endpoint?)");
-          }
-        });
-        row.appendChild(delBtn);
-      }
+      row.appendChild(delBtn);
       listEl.appendChild(row);
     }
   }
@@ -422,35 +375,21 @@ export async function render(el) {
       toast("Load a Case ID first.");
       return;
     }
-    if (currentCaseReadOnly) {
-      toast("This case is read-only. Uploads are disabled.");
-      return;
-    }
     const files = Array.from(fileList || []);
     if (!files.length) return;
-    if (pickBtn) {
-      pickBtn.disabled = true;
-      pickBtn.textContent = "Uploading…";
-    }
-    try {
-      for (const file of files) {
-        if (!allowed.has(file.type)) {
-          toast(`Type not allowed: ${file.name}`);
-          continue;
-        }
-        await uploadOne(file).catch((e) => {
-          console.error(e);
-          toast(`Failed: ${file.name}`);
-        });
+
+    for (const file of files) {
+      if (!allowed.has(file.type)) {
+        toast(`Type not allowed: ${file.name}`);
+        continue;
       }
-      // refresh list at the end
-      await loadCase();
-    } finally {
-      if (pickBtn) {
-        pickBtn.disabled = false;
-        pickBtn.textContent = pickDefaultText;
-      }
+      await uploadOne(file).catch((e) => {
+        console.error(e);
+        toast(`Failed: ${file.name}`);
+      });
     }
+    // refresh list at the end
+    await loadCase();
   }
 
   function makeQueueItem(label) {
@@ -473,11 +412,11 @@ export async function render(el) {
 
   async function uploadOne(file) {
     const ext = extFromName(file.name) || (file.type === "application/pdf" ? "pdf" : file.type === "image/png" ? "png" : "jpg");
-    const folder = "documents";
+    const folder = "case-files";
     const qi = makeQueueItem(`${file.name} — ${formatBytes(file.size)}`);
 
     // 1) presign
-    const { url, key } = await presign({ caseId: currentCaseId, contentType: file.type, ext, folder, size: file.size });
+    const { url, key } = await presign({ contentType: file.type, ext, folder });
 
     // 2) PUT to S3 with progress (fetch has no progress; use XHR for progress)
     await new Promise((resolve, reject) => {

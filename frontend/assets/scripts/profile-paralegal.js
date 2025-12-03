@@ -1,12 +1,9 @@
 import { secureFetch, requireAuth, logout } from "./auth.js";
 
 const MESSAGE_JUMP_KEY = "lpc_message_jump";
-function getProfileImageUrl(user = {}) {
-  return user.profileImage || user.avatarURL || "assets/images/default-avatar.png";
-}
 const elements = {
   error: document.getElementById("profileError"),
-  inviteBtn: document.getElementById("inviteToCaseBtn"),
+  inviteBtn: document.getElementById("inviteBtn"),
   messageBtn: document.getElementById("messageBtn"),
   editBtn: document.getElementById("editProfileBtn"),
   avatarWrapper: document.querySelector("[data-avatar-wrapper]"),
@@ -25,12 +22,12 @@ const elements = {
   educationList: document.getElementById("educationList"),
   funFactsCard: document.getElementById("funFactsCard"),
   funFactsCopy: document.getElementById("funFactsCopy"),
-  attorneyCard: document.getElementById("attorneyInsightsCard"),
-  attorneyHighlights: document.getElementById("attorneyHighlights"),
   inviteModal: document.getElementById("inviteModal"),
-  inviteCaseSelect: document.getElementById("inviteCaseSelect"),
-  sendInviteBtn: document.getElementById("sendInviteBtn"),
-  closeInviteBtn: document.getElementById("closeInviteBtn"),
+  jobOptions: document.getElementById("jobOptions"),
+  inviteSubtitle: document.getElementById("inviteSubtitle"),
+  inviteMessage: document.getElementById("inviteMessage"),
+  cancelInvite: document.getElementById("cancelInvite"),
+  confirmInvite: document.getElementById("confirmInvite"),
   notificationToggle: document.getElementById("notificationToggle"),
   notificationPanel: document.getElementById("notificationPanel"),
   userChip: document.getElementById("userChip"),
@@ -38,18 +35,6 @@ const elements = {
   chipAvatar: document.getElementById("chipAvatar"),
   chipName: document.getElementById("chipName"),
   chipRole: document.getElementById("chipRole"),
-  profileFormSection: document.getElementById("profileFormSection"),
-  profileForm: document.getElementById("paralegalProfileForm"),
-  linkedInInput: document.getElementById("linkedInURL"),
-  yearsExperienceInput: document.getElementById("yearsExperience"),
-  ref1NameInput: document.getElementById("ref1Name"),
-  ref1EmailInput: document.getElementById("ref1Email"),
-  ref2NameInput: document.getElementById("ref2Name"),
-  ref2EmailInput: document.getElementById("ref2Email"),
-  certificateUploadInput: document.getElementById("certificateUpload"),
-  resumeUploadInput: document.getElementById("resumeUpload"),
-  profilePhotoInput: document.getElementById("profilePhoto"),
-  profileSaveBtn: document.getElementById("saveProfileBtn"),
 };
 
 const state = {
@@ -65,50 +50,25 @@ const state = {
 
 const toast = window.toastUtils;
 
-function applyRoleVisibility(user) {
-  const role = String(user?.role || "").toLowerCase();
-  if (role === "paralegal") {
-    document.querySelectorAll("[data-attorney-only]").forEach((el) => {
-      el.style.display = "none";
-    });
-  }
-  if (role === "attorney") {
-    document.querySelectorAll("[data-paralegal-only]").forEach((el) => {
-      el.style.display = "none";
-    });
-  }
-}
-
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  let sessionUser;
+  let session;
   try {
-    if (typeof window.requireRole === "function") {
-      sessionUser = await window.requireRole();
-    } else if (typeof window.checkSession === "function") {
-      const session = await window.checkSession();
-      sessionUser = session?.user || session;
-    } else {
-      sessionUser = requireAuth();
-    }
+    session = requireAuth();
   } catch (err) {
     console.warn("Auth required", err);
     return;
   }
-  if (!sessionUser) return;
-
-  applyRoleVisibility(sessionUser);
 
   const storedUser = window.getStoredUser ? window.getStoredUser() : null;
-  state.viewer = storedUser || sessionUser || null;
-  state.viewerRole = String(state.viewer?.role || "").toLowerCase();
+  state.viewer = storedUser || session.user || null;
+  state.viewerRole = String(state.viewer?.role || session.role || "").toLowerCase();
   state.viewerId = String(state.viewer?.id || state.viewer?._id || "");
 
   hydrateHeader();
   bindHeaderEvents();
   bindCtaEvents();
-  bindProfileForm();
 
   const params = new URLSearchParams(window.location.search);
   state.caseContextId = params.get("caseId") || null;
@@ -153,273 +113,18 @@ function bindCtaEvents() {
   elements.editBtn?.addEventListener("click", () => {
     window.location.href = "profile-settings.html";
   });
-  elements.closeInviteBtn?.addEventListener("click", closeInviteModal);
+  elements.cancelInvite?.addEventListener("click", closeInviteModal);
   elements.inviteModal?.addEventListener("click", (event) => {
     if (event.target === elements.inviteModal) closeInviteModal();
   });
-  elements.sendInviteBtn?.addEventListener("click", sendInviteToCase);
+  elements.confirmInvite?.addEventListener("click", sendInviteToCase);
 }
 
-function bindProfileForm() {
-  if (!elements.profileForm) return;
-  elements.profileForm.addEventListener("submit", handleProfileFormSubmit);
-  elements.certificateUploadInput?.addEventListener("change", handleCertificateUpload);
-  elements.resumeUploadInput?.addEventListener("change", handleResumeUpload);
-  elements.profilePhotoInput?.addEventListener("change", handleProfilePhotoChange);
-  updateProfileFormVisibility();
-}
-
-function handleProfileFormSubmit(event) {
-  event.preventDefault();
-  if (!canEditProfile() || !state.profile) {
-    showToast("Only the profile owner can update these details.", "error");
-    return;
-  }
-  const payload = buildProfileUpdatePayload();
-  const submitBtn = elements.profileSaveBtn || elements.profileForm.querySelector('[type="submit"]');
-  const previousLabel = submitBtn?.textContent || "Save Profile";
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Saving…";
-  }
-  saveProfileDetails(payload)
-    .then(() => {
-      showToast("Profile updated.", "success");
-    })
-    .catch((err) => {
-      console.error(err);
-      showToast(err.message || "Unable to save profile.", "error");
-    })
-    .finally(() => {
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = previousLabel;
-      }
-    });
-}
-
-async function saveProfileDetails(payload) {
-  const url = `/api/paralegals/${encodeURIComponent(state.paralegalId || "me")}/update`;
-  const res = await secureFetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data?.error || "Unable to update profile");
-  }
-  const snapshot = state.profile || { id: state.paralegalId };
-  state.profile = { ...snapshot, ...payload };
-  populateProfileForm(state.profile);
-  renderProfile(state.profile);
-  renderMetadata(state.profile);
-  return data;
-}
-
-function buildProfileUpdatePayload() {
-  return {
-    linkedInURL: sanitizeUrl(elements.linkedInInput?.value),
-    yearsExperience: sanitizeYears(elements.yearsExperienceInput?.value),
-    ref1Name: sanitizeText(elements.ref1NameInput?.value),
-    ref1Email: sanitizeText(elements.ref1EmailInput?.value),
-    ref2Name: sanitizeText(elements.ref2NameInput?.value),
-    ref2Email: sanitizeText(elements.ref2EmailInput?.value),
-  };
-}
-
-function sanitizeText(value) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed || null;
-}
-
-function sanitizeUrl(value) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed || null;
-}
-
-function sanitizeYears(value) {
-  if (value === null || value === undefined || value === "") return null;
-  const num = parseInt(value, 10);
-  if (!Number.isFinite(num)) return null;
-  return Math.max(0, Math.min(80, num));
-}
-
-function handleCertificateUpload(event) {
-  const file = event.target?.files?.[0];
-  event.target.value = "";
-  if (!file) return;
-  if (!canEditProfile()) {
-    showToast("Only the profile owner can upload documents.", "error");
-    return;
-  }
-  if (file.type !== "application/pdf") {
-    showToast("Please upload a PDF certificate.", "error");
-    return;
-  }
-  if (file.size > 10 * 1024 * 1024) {
-    showToast("Certificate must be 10 MB or smaller.", "error");
-    return;
-  }
-  uploadCertificate(file);
-}
-
-async function uploadCertificate(file) {
-  if (!file) return;
-  const formData = new FormData();
-  formData.append("file", file, file.name || "certificate.pdf");
-  try {
-    const res = await secureFetch("/api/uploads/paralegal-certificate", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.error || "Unable to upload certificate");
-    }
-    const url = data?.url || data?.certificateURL || data?.location || data?.fileURL || null;
-    if (url) {
-      const snapshot = state.profile || { id: state.paralegalId };
-      state.profile = { ...snapshot, certificateURL: url };
-      renderMetadata(state.profile);
-      renderAttorneyHighlights(state.profile);
-    }
-    showToast("Certificate uploaded.", "success");
-  } catch (err) {
-    console.error(err);
-    showToast(err.message || "Certificate upload failed.", "error");
-  }
-}
-
-function handleResumeUpload(event) {
-  const file = event.target?.files?.[0];
-  event.target.value = "";
-  if (!file) return;
-  if (!canEditProfile()) {
-    showToast("Only the profile owner can upload documents.", "error");
-    return;
-  }
-  if (file.type !== "application/pdf") {
-    showToast("Please upload a PDF résumé.", "error");
-    return;
-  }
-  if (file.size > 10 * 1024 * 1024) {
-    showToast("Résumé must be 10 MB or smaller.", "error");
-    return;
-  }
-  uploadResume(file);
-}
-
-async function uploadResume(file) {
-  if (!file) return;
-  const formData = new FormData();
-  formData.append("file", file, file.name || "resume.pdf");
-  try {
-    const res = await secureFetch("/api/uploads/paralegal-resume", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.error || "Unable to upload résumé");
-    }
-    const url = data?.url || data?.resumeURL || data?.location || data?.fileURL || null;
-    if (url) {
-      const snapshot = state.profile || { id: state.paralegalId };
-      state.profile = { ...snapshot, resumeURL: url };
-      renderMetadata(state.profile);
-      renderAttorneyHighlights(state.profile);
-    }
-    showToast("Résumé uploaded.", "success");
-  } catch (err) {
-    console.error(err);
-    showToast(err.message || "Résumé upload failed.", "error");
-  }
-}
-
-function handleProfilePhotoChange(event) {
-  const file = event.target?.files?.[0];
-  event.target.value = "";
-  if (!file) return;
-  if (!canEditProfile()) {
-    showToast("Only the profile owner can upload photos.", "error");
-    return;
-  }
-  if (!/image\/(png|jpe?g)/i.test(file.type || "")) {
-    showToast("Upload a JPEG or PNG profile photo.", "error");
-    return;
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    showToast("Profile photo must be 5 MB or smaller.", "error");
-    return;
-  }
-  uploadProfilePhoto(file);
-}
-
-async function uploadProfilePhoto(file) {
-  if (!file) return;
-  const formData = new FormData();
-  formData.append("file", file, file.name || "profile.jpg");
-  try {
-    const res = await secureFetch("/api/uploads/profile-photo", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.error || "Unable to upload profile photo");
-    }
-    const url = data?.url || data?.profileImage || data?.location || null;
-    if (url) {
-      const snapshot = state.profile || { id: state.paralegalId };
-      state.profile = { ...snapshot, profileImage: url };
-      if (state.viewerRole === "paralegal" && state.viewerId === state.paralegalId) {
-        state.viewer = { ...(state.viewer || {}), profileImage: url };
-        hydrateHeader();
-      }
-      renderProfile(state.profile);
-    }
-    showToast("Profile photo updated.", "success");
-  } catch (err) {
-    console.error(err);
-    showToast(err.message || "Unable to upload profile photo.", "error");
-  }
-}
-
-function canEditProfile() {
-  return state.viewerRole === "paralegal" && state.viewerId && state.viewerId === state.paralegalId;
-}
-
-function updateProfileFormVisibility() {
-  const canEdit = canEditProfile();
-  if (elements.profileFormSection) {
-    elements.profileFormSection.classList.toggle("hidden", !canEdit);
-  }
-  const inputs = [
-    elements.linkedInInput,
-    elements.yearsExperienceInput,
-    elements.ref1NameInput,
-    elements.ref1EmailInput,
-    elements.ref2NameInput,
-    elements.ref2EmailInput,
-    elements.certificateUploadInput,
-    elements.resumeUploadInput,
-    elements.profilePhotoInput,
-  ].filter(Boolean);
-  inputs.forEach((input) => {
-    input.disabled = !canEdit;
-  });
-  if (elements.profileSaveBtn) {
-    elements.profileSaveBtn.disabled = !canEdit;
-  }
-}
 function hydrateHeader() {
   if (!state.viewer) return;
   if (elements.chipName) elements.chipName.textContent = formatName(state.viewer);
   if (elements.chipRole) elements.chipRole.textContent = prettyRole(state.viewer.role);
-  const avatarSrc = getProfileImageUrl(state.viewer) || buildInitialAvatar(getInitials(formatName(state.viewer)));
+  const avatarSrc = state.viewer.avatarURL || state.viewer.profileImage || buildInitialAvatar(getInitials(formatName(state.viewer)));
   if (elements.chipAvatar && avatarSrc) {
     elements.chipAvatar.src = avatarSrc;
     elements.chipAvatar.alt = `${formatName(state.viewer)} avatar`;
@@ -466,9 +171,7 @@ async function loadProfile() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.error || "Unable to load profile");
     state.profile = { ...data, id: data.id || data._id || state.paralegalId };
-    renderProfile(state.profile);
-    populateProfileForm(state.profile);
-    updateProfileFormVisibility();
+    renderProfile(data);
     updateButtonVisibility();
     elements.error?.classList.add("hidden");
     elements.error.textContent = "";
@@ -484,13 +187,13 @@ function renderProfile(profile) {
   setFieldText(elements.nameField, fullName);
 
   const experienceLabel = describeExperience(profile.yearsExperience);
-  const roleCopy = `${experienceLabel ? `${experienceLabel} • ` : ""}elite paralegal professional`;
+  const roleCopy = `${experienceLabel ? `${experienceLabel} • ` : ""}Freelance Paralegal`;
   setFieldText(elements.roleLine, roleCopy);
 
   const summary = profile.bio || profile.about || "This professional hasn’t added a summary yet.";
   setFieldText(elements.bioCopy, summary);
 
-  renderAvatar(fullName, getProfileImageUrl(profile));
+  renderAvatar(fullName, profile.avatarURL);
   renderStatus(profile);
   renderMetadata(profile);
   renderPills(elements.skillsList, profile.skills, "This paralegal hasn’t shared skills yet.");
@@ -498,26 +201,6 @@ function renderProfile(profile) {
   renderExperience(profile.experience);
   renderEducation(profile.education);
   renderFunFacts(profile.about, profile.writingSamples);
-  renderAttorneyHighlights(profile);
-}
-
-function populateProfileForm(profile) {
-  if (!elements.profileForm || !profile) return;
-  setInputValue(elements.linkedInInput, profile.linkedInURL);
-  setInputValue(elements.yearsExperienceInput, profile.yearsExperience ?? "");
-  setInputValue(elements.ref1NameInput, profile.ref1Name);
-  setInputValue(elements.ref1EmailInput, profile.ref1Email);
-  setInputValue(elements.ref2NameInput, profile.ref2Name);
-  setInputValue(elements.ref2EmailInput, profile.ref2Email);
-}
-
-function setInputValue(input, value) {
-  if (!input) return;
-  if (value === undefined || value === null) {
-    input.value = "";
-  } else {
-    input.value = String(value);
-  }
 }
 
 function renderAvatar(name, avatarUrl) {
@@ -684,72 +367,6 @@ function renderFunFacts(about, writingSamples = []) {
   elements.funFactsCard.classList.remove("hidden");
 }
 
-function renderAttorneyHighlights(profile) {
-  const card = elements.attorneyCard;
-  const container = elements.attorneyHighlights;
-  if (!card || !container) return;
-  const canView = state.viewerRole === "attorney" || state.viewerRole === "admin";
-  card.classList.toggle("hidden", !canView);
-  if (!canView) return;
-
-  const entries = [];
-  if (profile.linkedInURL) {
-    const safeUrl = escapeAttribute(profile.linkedInURL);
-    entries.push({
-      title: "LinkedIn",
-      content: `<a href="${safeUrl}" target="_blank" rel="noopener">View LinkedIn profile</a>`,
-    });
-  }
-  const experienceLabel = describeExperience(profile.yearsExperience);
-  if (experienceLabel) {
-    entries.push({
-      title: "Experience",
-      content: escapeHtml(experienceLabel),
-    });
-  }
-  if (profile.certificateURL) {
-    const certUrl = escapeAttribute(profile.certificateURL);
-    entries.push({
-      title: "Certificate",
-      content: `<a href="${certUrl}" target="_blank" rel="noopener">View credential</a>`,
-    });
-  }
-  if (profile.resumeURL) {
-    const resumeHref = escapeAttribute(profile.resumeURL);
-    entries.push({
-      title: "Résumé",
-      content: `<a href="${resumeHref}" target="_blank" rel="noopener">View Résumé</a>`,
-    });
-  }
-  if (profile.resumeURL) {
-    const resumeUrl = escapeAttribute(profile.resumeURL);
-    entries.push({
-      title: "Résumé",
-      content: `<a href="${resumeUrl}" target="_blank" rel="noopener">View Résumé</a>`,
-    });
-  }
-
-  container.innerHTML = "";
-  if (!entries.length) {
-    const empty = document.createElement("p");
-    empty.className = "muted";
-    empty.textContent = "Credentials forthcoming.";
-    container.appendChild(empty);
-    return;
-  }
-
-  entries.forEach((entry) => {
-    const block = document.createElement("article");
-    const title = document.createElement("h3");
-    title.textContent = entry.title;
-    block.appendChild(title);
-    const body = document.createElement("p");
-    body.innerHTML = entry.content;
-    block.appendChild(body);
-    container.appendChild(block);
-  });
-}
-
 function updateButtonVisibility() {
   const isOwner = state.viewerRole === "paralegal" && state.viewerId && state.viewerId === state.paralegalId;
   const isAttorney = state.viewerRole === "attorney";
@@ -773,12 +390,9 @@ function toggleElement(el, shouldShow) {
 
 function updateInviteButtonState() {
   if (!elements.inviteBtn) return;
-  const hasOpenCases = state.viewerRole === "attorney" && state.openCases.length > 0;
-  toggleElement(elements.inviteBtn, hasOpenCases);
-  elements.inviteBtn.disabled = !hasOpenCases;
-  if (elements.sendInviteBtn) {
-    elements.sendInviteBtn.disabled = !hasOpenCases;
-  }
+  const shouldShow = state.viewerRole === "attorney" && state.openCases.length > 0;
+  toggleElement(elements.inviteBtn, shouldShow);
+  elements.inviteBtn.disabled = !shouldShow;
 }
 
 function toggleSkeleton(enable) {
@@ -802,21 +416,13 @@ function showError(message) {
 
 async function loadAttorneyCases() {
   try {
-    const res = await secureFetch("/api/cases/my-active", {
+    const res = await secureFetch("/api/cases/my?limit=50&archived=false", {
       headers: { Accept: "application/json" },
     });
-    const payload = await res.json().catch(() => ({}));
-    const items = Array.isArray(payload?.items)
-      ? payload.items
-      : Array.isArray(payload)
-      ? payload
+    const data = await res.json().catch(() => []);
+    state.openCases = Array.isArray(data)
+      ? data.filter((c) => !["completed", "closed", "archived"].includes(String(c.status || "").toLowerCase()))
       : [];
-    state.openCases = items.filter((item) => {
-      const archived = Boolean(item.archived);
-      const assigned = Boolean(item.paralegal || item.paralegalId);
-      const pending = Boolean(item.pendingParalegalId);
-      return !archived && !assigned && !pending;
-    });
   } catch (err) {
     console.warn("Unable to load open cases", err);
     state.openCases = [];
@@ -826,35 +432,30 @@ async function loadAttorneyCases() {
 }
 
 function renderCaseOptions() {
-  const select = elements.inviteCaseSelect;
-  if (!select) return;
-  select.innerHTML = "";
+  if (!elements.jobOptions) return;
   if (!state.openCases.length) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "No active cases available";
-    select.appendChild(option);
-    select.disabled = true;
-    if (elements.sendInviteBtn) elements.sendInviteBtn.disabled = true;
+    elements.jobOptions.innerHTML = "<p>No active cases are available. Post or open a job first.</p>";
+    elements.confirmInvite.disabled = true;
     return;
   }
-  state.openCases.forEach((caseItem, index) => {
-    const option = document.createElement("option");
-    option.value = caseItem.id || caseItem._id;
-    option.textContent = caseItem.title || caseItem.caseNumber || "Untitled case";
-    if (index === 0) option.selected = true;
-    select.appendChild(option);
-  });
-  select.disabled = false;
-  if (elements.sendInviteBtn) elements.sendInviteBtn.disabled = false;
+  elements.jobOptions.innerHTML = state.openCases
+    .map(
+      (c) => `
+      <label class="job-option">
+        <input type="radio" name="inviteCase" value="${escapeHtml(c.id || c._id)}">
+        <span>${escapeHtml(c.title || "Untitled matter")}</span>
+      </label>`
+    )
+    .join("");
+  elements.confirmInvite.disabled = false;
 }
 
 function openInviteModal() {
   if (!elements.inviteModal || !state.profile) return;
-  if (!state.openCases.length) {
-    showToast("You need an active case before inviting a paralegal.", "info");
-    return;
-  }
+  elements.inviteSubtitle.textContent = `Send an invite to ${formatName(state.profile)}.`;
+  elements.inviteMessage.value = "";
+  const checked = elements.jobOptions?.querySelector("input[name='inviteCase']:checked");
+  if (checked) checked.checked = false;
   renderCaseOptions();
   elements.inviteModal.classList.add("show");
 }
@@ -864,41 +465,38 @@ function closeInviteModal() {
 }
 
 async function sendInviteToCase() {
-  if (!state.profile || !elements.inviteCaseSelect) return;
-  const caseId = elements.inviteCaseSelect.value;
-  if (!caseId) {
+  if (!state.profile || !elements.jobOptions) return;
+  const selected = elements.jobOptions.querySelector("input[name='inviteCase']:checked");
+  if (!selected) {
     showToast("Select a case to continue.", "info");
     return;
   }
   const payload = {
-    paralegalId: state.profile.id || state.paralegalId,
+    caseId: selected.value,
+    message: (elements.inviteMessage.value || "").trim(),
   };
-  const button = elements.sendInviteBtn;
-  const previousLabel = button?.textContent || "Send Invite";
-  if (button) {
-    button.disabled = true;
-    button.textContent = "Sending…";
-  }
+  elements.confirmInvite.disabled = true;
   try {
-    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/invite`, {
+    const res = await secureFetch(`/api/users/${encodeURIComponent(state.profile.id || state.paralegalId)}/invite`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.error || "Unable to send invite");
-    showToast("Invite sent.", "success");
+    showToast("Invite sent successfully.", "success");
     closeInviteModal();
-    await loadAttorneyCases();
   } catch (err) {
     console.error(err);
     showToast(err.message || "Unable to send invite.", "error");
   } finally {
-    if (button) {
-      button.textContent = previousLabel;
-      button.disabled = state.openCases.length === 0;
-    }
+    elements.confirmInvite.disabled = false;
   }
+}
+
+function updateInviteButtonState() {
+  if (!elements.inviteBtn) return;
+  elements.inviteBtn.disabled = state.openCases.length === 0;
 }
 
 function setFieldText(el, value) {
@@ -957,10 +555,6 @@ function escapeHtml(value = "") {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-function escapeAttribute(value = "") {
-  return String(value).replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
 function showToast(message, type = "info") {
