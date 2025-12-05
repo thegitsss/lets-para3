@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Attorney Profile | Let’s ParaConnect</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Sarabun:wght@200;300&display=swap" rel="stylesheet" />
+  <style>
+    body{margin:0;font-family:'Sarabun',sans-serif;font-weight:200;background:#f7f8fb;color:#1a2230;}
+    .shell{max-width:920px;margin:0 auto;padding:120px 20px 80px;}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:24px 28px;box-shadow:0 12px 40px rgba(0,0,0,0.06);}
+    .hero{display:flex;gap:18px;align-items:center;}
+    .avatar{width:96px;height:96px;border-radius:18px;background:#eef1f5;display:grid;place-items:center;font-size:28px;font-weight:600;color:#27394d;object-fit:cover;}
+    .btn{border:1px solid #27394d;background:#27394d;color:#fff;border-radius:10px;padding:10px 14px;font-weight:300;cursor:pointer;}
+    p.meta{color:#6b7280;font-size:0.95rem;margin-top:10px;}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="card">
+      <div class="hero">
+  <img id="profilePhotoPreview" class="avatar" src="" alt="Profile photo" />
+
+  <div>
+    <input type="file" id="photoInput" accept="image/*" style="display:none" />
+    <button class="btn" onclick="document.getElementById('photoInput').click()">Upload photo</button>
+    <p style="font-size:0.85rem;color:#6b7280;">JPEG or PNG up to 5 MB.</p>
+  </div>
+</div>
+      <p class="meta">Profile loading…</p>
+    </div>
+  </div>
+</body>
+</html>

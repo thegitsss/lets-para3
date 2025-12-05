@@ -45,6 +45,15 @@
         .catch(() => null)
         .then((user) => {
           cachedUser = user;
+          try {
+            if (user?.avatarURL) {
+              localStorage.setItem("avatarURL", user.avatarURL);
+            }
+            const avatarNodes = document.querySelectorAll("[data-avatar]");
+            avatarNodes.forEach((el) => {
+              if (el) el.src = user?.avatarURL || "assets/default-avatar.png";
+            });
+          } catch (_) {}
           return user;
         });
     }
@@ -131,6 +140,12 @@
     }
   }
 
+  function updateSessionUser(user) {
+    if (!user || typeof user !== "object") return;
+    cachedUser = { ...(cachedUser || {}), ...user };
+    sessionPromise = Promise.resolve(cachedUser);
+  }
+
   fetchSession().catch(() => {});
 
   window.checkSession = checkSession;
@@ -140,6 +155,7 @@
   window.getSessionData = getSessionData;
   window.getStoredUser = getCachedUser;
   window.refreshSession = refreshSession;
+  window.updateSessionUser = updateSessionUser;
 
   function updateHeaderBasedOnAuth(isLoggedIn) {
     document.querySelectorAll("[data-authed-only]").forEach((el) => {

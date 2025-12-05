@@ -1,9 +1,7 @@
-import { secureFetch } from "./auth.js";
-import { loadUserHeaderInfo } from "./auth.js";
+import { secureFetch, persistSession } from "./auth.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   await window.checkSession("paralegal");
-  await loadUserHeaderInfo();
   await loadSettings();
 });
 
@@ -18,6 +16,51 @@ let settingsState = {
   linkedInURL: "",
   notificationPrefs: {}
 };
+
+let currentUser = null;
+
+function showToast(message, type = "info") {
+  if (!message) return;
+  if (window.toastUtils?.show) {
+    window.toastUtils.show(message, { type });
+  } else {
+    const banner = document.getElementById("toastBanner");
+    if (banner) {
+      banner.textContent = message;
+      banner.dataset.toastType = type;
+      banner.classList.add("show");
+      setTimeout(() => banner.classList.remove("show"), 2500);
+    } else {
+      console.log(`[toast:${type}] ${message}`);
+    }
+  }
+}
+
+function applyAvatar(user) {
+  if (!user?.profileImage) return;
+  const cacheBusted = `${user.profileImage}${user.profileImage.includes("?") ? "&" : "?"}t=${Date.now()}`;
+
+  const header = document.getElementById("headerAvatar");
+  if (header) header.src = cacheBusted;
+
+  const preview = document.getElementById("avatarPreview");
+  if (preview) {
+    preview.src = cacheBusted;
+    preview.style.objectPosition = "center center";
+  }
+
+  const cluster = document.getElementById("clusterAvatar");
+  if (cluster) cluster.src = cacheBusted;
+
+  document.querySelectorAll(".nav-profile-photo, .globalProfileImage").forEach((el) => {
+    el.src = cacheBusted;
+  });
+
+  const frame = document.getElementById("avatarFrame");
+  const initials = document.getElementById("avatarInitials");
+  if (frame) frame.classList.add("has-photo");
+  if (initials) initials.style.display = "none";
+}
 
 function renderFallback(sectionId, title) {
   const section = document.getElementById(sectionId);
@@ -45,8 +88,21 @@ async function loadSettings() {
   try {
     const res = await secureFetch("/api/users/me");
     user = await res.json();
+    currentUser = user;
+    applyAvatar(user);
+    hydrateProfileForm(user);
+
+    const firstNameInput = document.getElementById("firstNameInput");
+    if (firstNameInput) firstNameInput.value = user.firstName || "";
+    const lastNameInput = document.getElementById("lastNameInput");
+    if (lastNameInput) lastNameInput.value = user.lastName || "";
+    const emailInput = document.getElementById("emailInput");
+    if (emailInput) emailInput.value = user.email || "";
+    const phoneInput = document.getElementById("phoneInput");
+    if (phoneInput) phoneInput.value = user.phoneNumber || user.phone || "";
+    const lawFirmInput = document.getElementById("lawFirmInput");
+    if (lawFirmInput) lawFirmInput.value = user.lawFirm || "";
   } catch (err) {
-    renderFallback("settingsProfilePhoto", "Profile Photo");
     renderFallback("settingsResume", "Résumé");
     renderFallback("settingsBio", "Bio");
     renderFallback("settingsEducation", "Education");
@@ -67,7 +123,6 @@ async function loadSettings() {
   settingsState.profileImage = user.profileImage || user.avatarURL || "";
 
   // Build UI
-  try { await loadProfilePhoto(user); } catch { renderFallback("settingsProfilePhoto", "Profile Photo"); }
   try { await loadResume(user); } catch { renderFallback("settingsResume", "Résumé"); }
   try { await loadBio(user); } catch { renderFallback("settingsBio", "Bio"); }
   try { await loadEducation(user); } catch { renderFallback("settingsEducation", "Education"); }
@@ -77,70 +132,21 @@ async function loadSettings() {
   try { await loadNotifications(user); } catch { renderFallback("settingsNotifications", "Notifications"); }
   syncCluster(user);
 
-  const saveBtn = document.getElementById("saveSettingsBtn");
-  if (saveBtn && !saveBtn.dataset.boundSave) {
-    saveBtn.dataset.boundSave = "true";
-    saveBtn.addEventListener("click", saveSettings);
-  }
 }
 
-
-// ================= PROFILE PHOTO =================
-
-function loadProfilePhoto(user) {
-  const section = document.getElementById("settingsProfilePhoto");
-  if (!section) return;
-  section.innerHTML = `
-    <h3>Profile Photo</h3>
-    <img id="profilePreview" src="${user.profileImage || "default.jpg"}" class="profile-img" style="object-fit:cover;"/>
-    <br><br>
-
-    <input id="profileInput" type="file" accept="image/png, image/jpeg">
-    <br><br>
-    <button id="uploadProfileBtn" class="primary-btn">Upload Photo</button>
-  `;
-
-  document.getElementById("profileInput").addEventListener("change", (evt) => {
-    const file = evt.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      document.getElementById("profilePreview").src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-
-    settingsState.profileImageFile = file;
-  });
-
-  document.getElementById("uploadProfileBtn").addEventListener("click", async () => {
-    if (!settingsState.profileImageFile) {
-      alert("Please choose a photo first.");
-      return;
-    }
-
-    const fd = new FormData();
-    fd.append("file", settingsState.profileImageFile);
-
-    const res = await secureFetch("/api/uploads/profile-photo", {
-      method: "POST",
-      body: fd
-    });
-
-    if (!res.ok) {
-      alert("Upload failed.");
-      return;
-    }
-
-    alert("Photo uploaded!");
-
-    const refreshed = await secureFetch("/api/users/me");
-    const updatedUser = await refreshed.json();
-
-    document.querySelectorAll(".globalProfileImage").forEach(img => {
-      img.src = updatedUser.profileImage;
-    });
-  });
+function hydrateProfileForm(user = {}) {
+  const firstNameInput = document.getElementById("firstNameInput");
+  if (firstNameInput) firstNameInput.value = user.firstName || "";
+  const lastNameInput = document.getElementById("lastNameInput");
+  if (lastNameInput) lastNameInput.value = user.lastName || "";
+  const emailInput = document.getElementById("emailInput");
+  if (emailInput) emailInput.value = user.email || "";
+  const phoneInput = document.getElementById("phoneInput");
+  if (phoneInput) phoneInput.value = user.phoneNumber || "";
+  const lawFirmInput = document.getElementById("lawFirmInput");
+  if (lawFirmInput) lawFirmInput.value = user.lawFirm || "";
+  const bioInput = document.getElementById("bio");
+  if (bioInput) bioInput.value = user.bio || "";
 }
 
 
@@ -408,9 +414,14 @@ function loadNotifications(user) {
 
 // ================= SAVE SETTINGS =================
 
-async function saveSettings() {
+async function saveProfileSettings() {
   const body = {
-    bio: settingsState.bio,
+    firstName: document.getElementById("firstNameInput")?.value || "",
+    lastName: document.getElementById("lastNameInput")?.value || "",
+    email: document.getElementById("emailInput")?.value || "",
+    phoneNumber: document.getElementById("phoneInput")?.value || "",
+    lawFirm: document.getElementById("lawFirmInput")?.value || "",
+    bio: document.getElementById("bio")?.value || "",
     education: settingsState.education,
     awards: settingsState.awards,
     highlightedSkills: settingsState.highlightedSkills,
@@ -418,15 +429,316 @@ async function saveSettings() {
     notificationPrefs: settingsState.notificationPrefs
   };
 
+  if (cropper) {
+    const canvas = cropper.getCroppedCanvas({ width: 480, height: 480 });
+    if (canvas) {
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      if (blob) {
+        const formData = new FormData();
+        formData.append("file", blob, "avatar.png");
+
+        try {
+          const uploadRes = await fetch("/api/uploads/profile-photo", {
+            method: "POST",
+            body: formData,
+            credentials: "include"
+          });
+
+          if (uploadRes.ok) {
+            const payload = await uploadRes.json();
+            const uploadedUrl = payload?.url || payload?.profileImage || payload?.avatarURL;
+            if (uploadedUrl) {
+              currentUser = { ...(currentUser || {}), profileImage: uploadedUrl };
+              settingsState.profileImage = uploadedUrl;
+              persistSession({ user: currentUser });
+              window.updateSessionUser?.(currentUser);
+              applyAvatar(currentUser);
+              window.hydrateParalegalCluster?.(currentUser);
+            }
+          }
+        } catch (err) {
+          console.error("Photo upload failed before save:", err);
+          showToast("Photo upload failed. Try again.", "err");
+        }
+      }
+    }
+  }
+
   const res = await secureFetch("/api/users/me", {
     method: "PATCH",
     body
   });
 
   if (!res.ok) {
-    alert("Could not save changes.");
+    showToast("Could not save settings.", "err");
     return;
   }
 
-  alert("Settings saved!");
+  let updatedUser = currentUser;
+  try {
+    const refreshed = await secureFetch("/api/users/me");
+    if (refreshed.ok) {
+      updatedUser = await refreshed.json();
+    }
+  } catch {
+    updatedUser = { ...(currentUser || {}), ...body };
+  }
+
+  currentUser = updatedUser;
+  settingsState.bio = updatedUser.bio || "";
+  settingsState.education = updatedUser.education || [];
+  settingsState.awards = updatedUser.awards || [];
+  settingsState.highlightedSkills = updatedUser.highlightedSkills || [];
+  settingsState.linkedInURL = updatedUser.linkedInURL || "";
+  settingsState.notificationPrefs = updatedUser.notificationPrefs || settingsState.notificationPrefs;
+  settingsState.profileImage = updatedUser.profileImage || settingsState.profileImage;
+
+  persistSession({ user: updatedUser });
+  window.updateSessionUser?.(updatedUser);
+
+  applyAvatar(updatedUser);
+  hydrateProfileForm(updatedUser);
+  syncCluster(updatedUser);
+  window.hydrateParalegalCluster?.(updatedUser);
+  showToast("Settings saved!", "ok");
+}
+
+// -----------------------------
+// PROFILE PHOTO UPLOAD FLOW
+// -----------------------------
+
+let cropper = null;
+
+// DOM Elements
+const avatarPreview = document.getElementById("avatarPreview");
+const avatarInitials = document.getElementById("avatarInitials");
+const avatarFrame = document.getElementById("avatarFrame");
+const avatarInput = document.getElementById("avatarInput");
+
+if (avatarInput) {
+  avatarInput.addEventListener("change", handleFileSelect);
+}
+
+const cropperModal = document.getElementById("cropperModal");
+const cropImage = document.getElementById("cropImage");
+const cropConfirmBtn = document.getElementById("cropConfirmBtn");
+const cropCancelBtn = document.getElementById("cropCancelBtn");
+
+// -----------------------------
+// STEP 1: User selects a photo
+// -----------------------------
+async function handleFileSelect() {
+  if (!avatarInput) return;
+  const file = avatarInput.files[0];
+  if (!file || !avatarPreview || !avatarFrame || !avatarInitials) return;
+
+  const reader = new FileReader();
+    reader.onload = (e) => {
+      avatarPreview.src = e.target.result;
+      avatarPreview.style.objectPosition = "center center";
+
+      avatarInitials.style.display = "none";
+      avatarFrame.classList.add("has-photo");
+
+    if (cropper) cropper.destroy();
+
+    cropper = new Cropper(avatarPreview, {
+      aspectRatio: 1,
+      viewMode: 1,
+      autoCropArea: 1,
+      background: false,
+      center: true,
+      dragMode: "move",
+      movable: true,
+      zoomable: true,
+      scalable: false,
+      rotatable: false,
+      cropBoxMovable: false,
+      cropBoxResizable: false,
+      guides: false,
+      highlight: false,
+      modal: false,
+      toggleDragModeOnDblclick: false,
+      ready() {
+        setTimeout(() => {
+          cropper.reset();
+          cropper.crop();
+          centerCropperCanvas(cropper);
+        }, 0);
+      }
+    });
+
+    settingsState.profileImageFile = file;
+  };
+  reader.readAsDataURL(file);
+}
+
+function centerCropperCanvas(instance) {
+  if (!instance) return;
+  const container = instance.getContainerData?.();
+  const canvas = instance.getCanvasData?.();
+  if (!container || !canvas) return;
+
+  const frameRect = avatarFrame?.getBoundingClientRect();
+  const containerWidth = frameRect?.width || container.width || canvas.width;
+  const containerHeight = frameRect?.height || container.height || canvas.height;
+  const scaleFactor = Math.max(
+    containerWidth / canvas.width,
+    containerHeight / canvas.height,
+    1
+  );
+  const scaledWidth = canvas.width * scaleFactor;
+  const scaledHeight = canvas.height * scaleFactor;
+
+  const centeredCanvas = {
+    ...canvas,
+    width: scaledWidth,
+    height: scaledHeight,
+    left: (containerWidth - scaledWidth) / 2,
+    top: (containerHeight - scaledHeight) / 2
+  };
+  instance.setCanvasData(centeredCanvas);
+
+  const cropBox = instance.getCropBoxData?.();
+  if (cropBox) {
+    instance.setCropBoxData({
+      ...cropBox,
+      width: containerWidth,
+      height: containerHeight,
+      left: 0,
+      top: 0
+    });
+  }
+}
+
+
+// -----------------------------
+// STEP 2: Save cropped photo
+// -----------------------------
+async function saveCroppedPhoto() {
+  if (!cropper) return;
+
+  cropConfirmBtn.disabled = true;
+  cropConfirmBtn.textContent = "Saving...";
+
+  const canvas = cropper.getCroppedCanvas({
+    width: 480,
+    height: 480
+  });
+
+  if (!canvas) {
+    showToast("Could not process image.");
+    resetSaveButton();
+    return;
+  }
+
+  // Immediately reflect preview so the gold frame updates even before upload completes
+  const dataUrl = canvas.toDataURL("image/png");
+  if (avatarPreview && dataUrl) {
+    avatarPreview.src = dataUrl;
+    const frame = document.getElementById("avatarFrame");
+    const initials = document.getElementById("avatarInitials");
+    if (frame) frame.classList.add("has-photo");
+    if (initials) initials.style.display = "none";
+  }
+
+  canvas.toBlob(async (blob) => {
+    if (!blob) {
+      showToast("Could not process image.");
+      resetSaveButton();
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", blob, "avatar.png");
+
+    try {
+      const res = await fetch("/api/uploads/profile-photo", {
+        method: "POST",
+        body: formData,
+        credentials: "include"
+      });
+
+      if (!res.ok) throw new Error("Upload failed");
+
+      const payload = await res.json();
+      const uploadedUrl = payload?.url || payload?.profileImage || payload?.avatarURL;
+      if (uploadedUrl) {
+        currentUser = { ...(currentUser || {}), profileImage: uploadedUrl };
+        settingsState.profileImage = uploadedUrl;
+        persistSession({ user: currentUser });
+        window.updateSessionUser?.(currentUser);
+        // Update avatar preview + header using shared helper
+        applyAvatar(currentUser);
+      }
+
+      showToast("Profile photo updated!");
+      resetCropperModal();
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to upload image. Try again.");
+    }
+
+    resetSaveButton();
+  }, "image/png");
+}
+
+
+// -----------------------------
+// Helpers
+// -----------------------------
+function resetSaveButton() {
+  cropConfirmBtn.disabled = false;
+  cropConfirmBtn.textContent = "Save Photo";
+}
+
+function resetCropperModal() {
+  if (cropper) {
+    cropper.destroy();
+    cropper = null;
+  }
+
+  if (cropperModal) cropperModal.style.display = "none";
+  if (cropImage) cropImage.src = "";
+  if (avatarInput) avatarInput.value = ""; // reset so selecting same file again still triggers change
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const frame = document.getElementById("avatarFrame");
+  const input = document.getElementById("avatarInput");
+  const cropConfirmBtn = document.getElementById("cropConfirmBtn");
+  const cropCancelBtn = document.getElementById("cropCancelBtn");
+
+  if (frame && input) {
+    frame.style.cursor = "pointer";
+    frame.addEventListener("click", () => input.click());
+    frame.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter" || evt.key === " ") {
+        evt.preventDefault();
+        input.click();
+      }
+    });
+  }
+
+  if (cropConfirmBtn) {
+    cropConfirmBtn.addEventListener("click", saveCroppedPhoto);
+  }
+
+  if (cropCancelBtn) {
+    cropCancelBtn.addEventListener("click", resetCropperModal);
+  }
+});
+
+function saveProfile() {
+  saveProfileSettings();
+}
+
+const profileSaveBtn = document.getElementById("profileSaveBtn");
+if (profileSaveBtn) {
+  profileSaveBtn.addEventListener("click", saveProfile);
+}
+
+const profileForm = document.getElementById("profileForm");
+if (profileForm) {
+  profileForm.addEventListener("submit", (e) => e.preventDefault());
 }

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Attorney Account Settings | Let’s-ParaConnect</title>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
   <script src="assets/scripts/utils/session.js"></script>
   <style>
     :root {
@@ -117,7 +118,7 @@
       font-family: var(--font-serif);
       font-size: 2.4rem;
       margin-bottom: 8px;
-      font-weight: 600;
+      font-weight: 300;
     }
 
     .unified-header p {
@@ -227,7 +228,7 @@
       margin: 0;
       font-family: var(--font-serif);
       font-size: 1.1rem;
-      font-weight: 600;
+      font-weight: 300;
     }
 
     .notification-panel p {
@@ -266,7 +267,7 @@
       font-family: var(--font-serif);
       font-size: 1.6rem;
       margin-bottom: 6px;
-      font-weight: 600;
+      font-weight: 300;
     }
 
     .settings-panel p {
@@ -653,7 +654,7 @@
           <span class="notification-badge" id="notificationBadge">0</span>
         </button>
         <div class="user-chip" id="headerUser">
-          <img id="headerAvatar" alt="Attorney avatar" />
+          <img id="headerAvatar" data-avatar alt="User avatar" />
           <div>
             <strong id="headerName">Attorney</strong>
             <span id="headerRole">Member</span>
@@ -673,37 +674,44 @@
       <p>Update your public-facing information and bio.</p>
       <form id="profileForm">
         <div class="photo-row">
-          <div class="avatar-frame" id="avatarFrame">
-            <img id="avatarPreview" alt="Profile preview" />
+          <div class="avatar-frame" id="avatarFrame" role="button" tabindex="0">
+            <img id="avatarPreview" data-avatar alt="Profile photo" />
             <span id="avatarInitials">A</span>
           </div>
-          <div class="avatar-actions">
-            <button type="button" id="triggerAvatarUpload">Upload photo</button>
-            <p class="hint" id="uploadHint">JPEG or PNG up to 5 MB.</p>
-            <p class="hint" id="uploadStatus" aria-live="polite"></p>
+        </div>
+
+        <input type="file" id="avatarInput" accept="image/*" hidden />
+
+        <!-- Cropping modal -->
+        <div id="cropperModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; z-index:999;">
+          <div style="background:white; padding:20px; border-radius:12px;">
+            <img id="cropImage" style="max-width:400px;" />
+            <div style="margin-top:12px; text-align:center;">
+              <button id="cropConfirmBtn" type="button" class="btn-primary">Save Photo</button>
+              <button id="cropCancelBtn" type="button" class="btn-outline">Cancel</button>
+            </div>
           </div>
         </div>
-        <input type="file" id="avatarInput" accept="image/png,image/jpeg" hidden />
         <div class="grid">
-          <label for="firstName">
+          <label for="firstNameInput">
             First name
-            <input type="text" id="firstName" name="firstName" autocomplete="given-name" required />
+            <input type="text" id="firstNameInput" name="firstName" autocomplete="given-name" required />
           </label>
-          <label for="lastName">
+          <label for="lastNameInput">
             Last name
-            <input type="text" id="lastName" name="lastName" autocomplete="family-name" required />
+            <input type="text" id="lastNameInput" name="lastName" autocomplete="family-name" required />
           </label>
-          <label for="email">
+          <label for="emailInput">
             Email
-            <input type="email" id="email" name="email" autocomplete="email" required />
+            <input type="email" id="emailInput" name="email" autocomplete="email" required />
           </label>
-          <label for="phone">
+          <label for="phoneInput">
             Phone
-            <input type="tel" id="phone" name="phone" autocomplete="tel" />
+            <input type="tel" id="phoneInput" name="phone" autocomplete="tel" />
           </label>
-          <label for="lawFirm">
+          <label for="lawFirmInput">
             Law firm (optional)
-            <input type="text" id="lawFirm" name="lawFirm" autocomplete="organization" />
+            <input type="text" id="lawFirmInput" name="lawFirm" autocomplete="organization" />
           </label>
         </div>
         <label for="bio">
@@ -811,6 +819,7 @@
   </div>
 
   <script src="assets/scripts/utils/toast.js"></script>
-  <script src="assets/scripts/profile-settings.js"></script>
+  <script type="module" src="assets/scripts/profile-settings.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 </body>
 </html>
