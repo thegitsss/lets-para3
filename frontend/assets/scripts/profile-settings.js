@@ -1,6 +1,10 @@
 import { secureFetch, persistSession } from "./auth.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
+  const cachedUser = getCachedUser();
+  if (cachedUser) {
+    enforceUnifiedRoleStyling(cachedUser);
+  }
   await window.checkSession();
   await loadSettings();
 });
@@ -19,6 +23,18 @@ let settingsState = {
 
 let currentUser = null;
 
+function getCachedUser() {
+  if (typeof window.getStoredUser === "function") {
+    const stored = window.getStoredUser();
+    if (stored) return stored;
+  }
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
 function showToast(message, type = "info") {
   if (!message) return;
   if (window.toastUtils?.show) {
@@ -34,6 +50,30 @@ function showToast(message, type = "info") {
       console.log(`[toast:${type}] ${message}`);
     }
   }
+}
+
+function applyUnifiedRoleStyling(user = {}) {
+  const role = (user.role || "").trim().toLowerCase();
+  const eyebrow = document.querySelector(".unified-header .eyebrow");
+  const title = document.querySelector(".unified-header h1");
+
+  if (eyebrow) eyebrow.textContent = "Account";
+  if (title) {
+    title.textContent = role === "paralegal" ? "Paralegal Account Settings" : "Attorney Account Settings";
+  }
+
+  document.querySelectorAll("[data-paralegal-only]").forEach((el) => {
+    el.style.display = role === "paralegal" ? "" : "none";
+  });
+
+  document.querySelectorAll("[data-attorney-only]").forEach((el) => {
+    el.style.display = role === "attorney" ? "" : "none";
+  });
+}
+
+function enforceUnifiedRoleStyling(user = {}) {
+  applyUnifiedRoleStyling(user);
+  requestAnimationFrame(() => applyUnifiedRoleStyling(user));
 }
 
 function applyAvatar(user) {
@@ -89,6 +129,7 @@ async function loadSettings() {
     const res = await secureFetch("/api/users/me");
     user = await res.json();
     currentUser = user;
+    enforceUnifiedRoleStyling(user);
     applyAvatar(user);
     hydrateProfileForm(user);
 
@@ -707,4 +748,16 @@ if (profileSaveBtn) {
 const profileForm = document.getElementById("profileForm");
 if (profileForm) {
   profileForm.addEventListener("submit", (e) => e.preventDefault());
+}
+
+const viewProfileBtn = document.getElementById("viewProfileBtn");
+if (viewProfileBtn) {
+  viewProfileBtn.addEventListener("click", () => {
+    if (!currentUser) return;
+    const role = (currentUser.role || "").trim().toLowerCase();
+    const id = currentUser.id || currentUser._id;
+    if (!id) return;
+    const target = role === "paralegal" ? "profile-paralegal.html" : "profile-attorney.html";
+    window.location.href = `${target}?id=${encodeURIComponent(id)}`;
+  });
 }

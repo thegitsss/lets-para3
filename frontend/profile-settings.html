@@ -258,9 +258,16 @@
       gap: 8px;
     }
 
+    .field-block {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
     input[type="text"],
     input[type="email"],
     input[type="tel"],
+    input[type="url"],
     input[type="password"],
     textarea {
       border-radius: 12px;
@@ -592,14 +599,14 @@
             Email
             <input type="email" id="emailInput" name="email" autocomplete="email" required />
           </label>
-          <label for="phoneInput">
-            Phone
-            <input type="tel" id="phoneInput" name="phone" autocomplete="tel" />
-          </label>
-          <label for="lawFirmInput">
-            Law firm (optional)
+          <div data-attorney-only class="field-block">
+            <label for="lawFirmInput">Law Firm</label>
             <input type="text" id="lawFirmInput" name="lawFirm" autocomplete="organization" />
-          </label>
+          </div>
+          <div class="field-block">
+            <label for="linkedInInput">LinkedIn</label>
+            <input type="url" id="linkedInInput" name="linkedInURL" placeholder="https://www.linkedin.com/in/username" />
+          </div>
         </div>
         <label for="bio">
           Bio (optional)
@@ -607,9 +614,17 @@
         </label>
         <div class="btn-row">
           <button class="btn btn-primary" type="button" id="profileSaveBtn">Save changes</button>
+           <button class="btn btn-outline" type="button" id="viewProfileBtn">
+    View Profile
+  </button>
         </div>
       </form>
     </section>
+
+    <section class="settings-panel" id="settingsResume" data-paralegal-only></section>
+    <section class="settings-panel" id="settingsSkills" data-paralegal-only></section>
+    <section class="settings-panel" id="settingsEducation" data-paralegal-only></section>
+    <section class="settings-panel" id="settingsAwards" data-paralegal-only></section>
 
     <section class="settings-panel" id="securitySection">
       <h2>Security</h2>
