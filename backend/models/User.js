@@ -115,6 +115,7 @@ const userSchema = new Schema(
     availability: { type: String, default: "Available Now", trim: true, maxlength: 200 },
     avatarURL: { type: String, default: "", trim: true },
     profileImage: { type: String, default: null },
+    lawFirm: { type: String, default: "", trim: true, maxlength: 300 },
     timezone: { type: String, default: "America/New_York", trim: true },
     location: { type: String, default: "", trim: true }, // City, State
     practiceAreas: { type: [String], default: [], set: uniqueStrings },

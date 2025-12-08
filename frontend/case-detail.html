@@ -45,6 +45,13 @@
     }
     .back-arrow:hover { opacity: 0.8; }
 
+    .case-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+    }
     .case-header h1 {
       font-family: var(--font-serif);
       font-weight: 300;
@@ -63,9 +70,12 @@
       padding: 4px 10px;
       border-radius: 6px;
       font-size: 0.8rem;
-      font-weight: 500;
+      font-weight: 300;
       margin-top: 6px;
       display: inline-block;
+    }
+    .case-header .btn {
+      align-self: center;
     }
 
     .case-actions {
@@ -81,7 +91,7 @@
       padding: 8px 16px;
       font-family: var(--font-sans);
       font-size: 0.9rem;
-      font-weight: 500;
+      font-weight: 300;
       cursor: pointer;
       transition: all 0.25s ease;
       display: inline-flex;
@@ -100,6 +110,27 @@
       border-radius: 8px;
       padding: 1rem;
       min-width: 260px;
+    }
+        .sidebar-link {
+      display: block;
+      width: 100%;
+      border: none;
+      background: none;
+      color: var(--ink);
+      font-size: 0.95rem;
+      font-family: var(--font-sans);
+      font-weight: 300;
+      text-align: left;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .sidebar-link:hover,
+    .sidebar-link:focus {
+      background: rgba(0, 0, 0, 0.04);
+      outline: none;
     }
     #card-element {
       padding: 12px;
@@ -128,9 +159,37 @@
     }
     .case-section h2 {
       font-family: var(--font-serif);
-      font-weight: 500;
+      font-weight: 300;
       font-size: 1.4rem;
       margin-bottom: 0.75rem;
+    }
+    .task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .task-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 0.9rem 1rem;
+    }
+    .task-card h3 {
+      margin: 0 0 0.3rem;
+      font-family: var(--font-serif);
+      font-weight: 300;
+    }
+    .task-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .task-card .task-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+      color: #666;
     }
 
     /* Uploaded Documents */
@@ -205,6 +264,69 @@
     }
     .meeting-options a:hover { background: #f7f7f7; color: var(--accent); }
     .meeting-dropdown.active .meeting-options { display: block; }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      padding: 20px;
+    }
+    .modal-overlay.show {
+      display: flex;
+    }
+    .modal-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+      font-family: var(--font-sans);
+      color: var(--ink);
+    }
+    .modal-card h3 {
+      margin: 0 0 12px;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 1.35rem;
+    }
+    .modal-field {
+      display: block;
+      margin-top: 14px;
+      font-size: 0.9rem;
+      font-weight: 300;
+    }
+    .modal-field span {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-family: var(--font-sans);
+    }
+    .modal-field input,
+    .modal-field textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      color: var(--ink);
+    }
+    .modal-field textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 22px;
+    }
 
     /* Notes */
     #caseNotes {
@@ -425,7 +547,7 @@
     }
     .modal-content h2 {
       font-family: var(--font-serif);
-      font-weight: 500;
+      font-weight: 300;
       margin-bottom: 0.75rem;
     }
     .modal-content p {
@@ -523,7 +645,7 @@
     }
     .party-card h4 {
       font-family:var(--font-serif);
-      font-weight:500;
+      font-weight:300;
       margin-bottom:.5rem;
     }
     .party-card a {color:var(--accent);text-decoration:none;font-size:.85rem;}
@@ -635,26 +757,30 @@
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
     <nav>
-      <a href="dashboard-attorney.html">Home</a>
-      <a href="active-cases.html" class="active">Cases</a>
+      <a href="dashboard-paralegal.html" class="active">Home</a>
       <a href="messages.html">Messages</a>
-      <a href="documents.html">Documents</a>
-      <a href="review.html">Review</a>
-      <a href="case-files.html">Case Files</a>
-      <a href="billing-attorney.html">Billing</a>
-      <a href="tasks.html">Tasks</a>
+      <a href="case-files.html">Active Cases</a>
+      <a href="profile-settings.html">Profile Settings</a>
       <a href="help.html">Help</a>
     </nav>
+        <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
     <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
   </aside>
 
   <main class="main">
+    <div class="topbar" data-attorney-header></div>
+
     <a href="active-cases.html" class="back-arrow">← Back to Cases</a>
 
     <div class="case-header">
-      <h1>Motion for Summary Judgment</h1>
-      <small>Client: Smith & Co. · Field: Litigation</small>
-      <span class="case-status">OPEN</span>
+      <div>
+        <h1>Motion for Summary Judgment</h1>
+        <small>Client: Smith & Co. · Field: Litigation</small>
+        <span class="case-status">OPEN</span>
+      </div>
+      <button class="btn primary" id="openTaskModalBtn" data-paralegal-only>
+        + Create Task
+      </button>
     </div>
 
     <!-- === Case Tabs (Activity | Details | Parties | Injuries) === -->
@@ -686,6 +812,7 @@
               <button
                 class="btn primary"
                 data-hire-button
+                data-attorney-only
                 data-paralegal-id="demo-paralegal-452676"
                 aria-label="Hire Drew Adams"
               >
@@ -715,22 +842,33 @@
     <div class="case-actions">
       <button class="btn secondary" id="saveBtn">Save</button>
       <button class="btn primary" onclick="window.location.href='create-case.html?ref=existing'">Add Additional Job</button>
-      <button class="btn primary hidden" id="fundEscrowBtn">Fund Escrow</button>
-      <div class="payment-panel hidden" id="escrowPayment">
-        <p style="margin-bottom:.6rem;font-weight:600;">Payment Method</p>
+      <button class="btn primary hidden" id="fundEscrowBtn" data-attorney-only>Fund Escrow</button>
+      <div class="payment-panel hidden" id="escrowPayment" data-attorney-only>
+        <p style="margin-bottom:.6rem;font-weight:300;">Payment Method</p>
         <div id="card-element"></div>
         <div id="card-errors" role="alert"></div>
       </div>
-      <button class="btn primary" id="releaseEscrowBtn">Mark Complete &amp; Release Funds</button>
-      <button class="btn primary" onclick="openExportModal()">Complete Case</button>
+      <button class="btn primary" id="releaseEscrowBtn" data-attorney-only>Mark Complete &amp; Release Funds</button>
+      <button class="btn primary" onclick="openExportModal()" data-attorney-only>Complete Case</button>
     </div>
 
     <div class="case-overview">
       <p>This case involves reviewing discovery responses and drafting a Motion for Summary Judgment for Smith & Co. The paralegal assists in organizing discovery, citing prior rulings, and preparing exhibit indexes.</p>
-      <p><strong>Deadline:</strong> November 30, 2025 · <strong>Assigned Paralegal:</strong> J. Stone</p>
+      <p>
+        <strong>Deadline:</strong> November 30, 2025 ·
+        <span data-attorney-only><strong>Assigned Paralegal:</strong> J. Stone</span>
+        <span data-paralegal-only><strong>Attorney:</strong> Samantha Sider</span>
+      </p>
     </div>
 
-    <section class="case-section">
+    <section class="case-section" id="caseTasksSection">
+      <h2>Case Tasks</h2>
+      <div id="caseTasksContainer" class="task-list">
+        <p style="color:var(--muted);">No tasks yet.</p>
+      </div>
+    </section>
+
+    <section class="case-section" data-paralegal-only>
       <h2>Uploaded Documents</h2>
       <ul class="doc-list" id="docList">
         <li class="doc-item">Exhibit_A.pdf</li>
@@ -756,7 +894,7 @@
     <section class="review-container">
       <div class="review-header">
         <h2>Review Submitted Work</h2>
-        <button class="btn primary">Review & Approve</button>
+        <button class="btn primary" data-attorney-only>Review & Approve</button>
       </div>
 
       <div class="review-body">
@@ -800,6 +938,27 @@
       </div>
     </section>
   </main>
+  <div id="taskModal" class="modal-overlay" data-paralegal-only>
+    <div class="modal-card">
+      <h3>New Task</h3>
+      <label class="modal-field" for="taskTitleInput">
+        <span>Title</span>
+        <input type="text" id="taskTitleInput" placeholder="e.g., Draft client declaration" />
+      </label>
+      <label class="modal-field" for="taskDescInput">
+        <span>Description (include context or deliverables)</span>
+        <textarea id="taskDescInput" placeholder="Add background details, files to reference, or specific outcomes needed."></textarea>
+      </label>
+      <label class="modal-field" for="taskDueInput">
+        <span>Due date (optional)</span>
+        <input type="date" id="taskDueInput" />
+      </label>
+      <div class="modal-actions">
+        <button id="cancelTaskBtn" class="btn btn-outline" type="button">Cancel</button>
+        <button id="saveTaskBtn" class="btn btn-primary" type="button">Save Task</button>
+      </div>
+    </div>
+  </div>
 
   <div id="exportPurgeModal" class="modal hidden">
     <div class="modal-content">
@@ -1380,8 +1539,18 @@
         });
       }
     }
+        const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', () => {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+      });
+    }
   </script>
+  <script type="module" src="assets/scripts/case-detail.js"></script>
 </div>
 </div>
+<script type="module" src="assets/scripts/attorney-tabs.js"></script>
 </body>
 </html>

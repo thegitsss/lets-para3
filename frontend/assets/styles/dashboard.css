@@ -96,7 +96,6 @@ nav a.active, nav a:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
 }
 .user-profile {
   display: flex;
@@ -169,7 +168,7 @@ th, td {
   border-bottom: 1px solid var(--line);
 }
 th {
-  font-weight: 600;
+  font-weight: 300;
   color: var(--muted);
   background: #fafbfc;
 }
@@ -187,7 +186,7 @@ td a:hover {
   font-size: 0.8rem;
   padding: 3px 8px;
   border-radius: 6px;
-  font-weight: 500;
+  font-weight: 300;
 }
 .status.public {
   background: rgba(31,122,74,0.1);
@@ -289,7 +288,7 @@ td a:hover {
 }
 .modal-content h3 {
   font-family: 'Cormorant Garamond', serif;
-  font-weight: 500;
+  font-weight: 300;
   font-size: 1.4rem;
   margin-bottom: 0.5rem;
 }
@@ -311,7 +310,7 @@ td a:hover {
 
 .case-header h1 {
   font-family: 'Cormorant Garamond', serif;
-  font-weight: 400;
+  font-weight: 300;
   font-size: 2rem;
   margin-bottom: 0.25rem;
 }
@@ -458,7 +457,7 @@ td a:hover {
 .escrow-cases th {
   background: #fafafa;
   color: var(--muted);
-  font-weight: 500;
+  font-weight: 300;
 }
 .dashboard-section {
   border: 1px solid var(--line);
@@ -481,7 +480,7 @@ td a:hover {
 .section-header:hover { background: #f0f0f0; }
 .section-header h2 {
   font-family: var(--font-serif);
-  font-weight: 400;
+  font-weight: 300;
   font-size: 1.4rem;
   margin: 0;
 }
@@ -513,7 +512,7 @@ td a:hover {
   padding: 4px 8px;
   border-radius: 6px;
   font-size: 0.8rem;
-  font-weight: 500;
+  font-weight: 300;
 }
 .status.pending { background: rgba(255, 193, 7, 0.15); color: #b68b00; }
 .status.released { background: rgba(31,122,74,0.1); color: #1f7a4a; }

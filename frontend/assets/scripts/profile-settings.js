@@ -1,7 +1,7 @@
 import { secureFetch, persistSession } from "./auth.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await window.checkSession("paralegal");
+  await window.checkSession();
   await loadSettings();
 });
 
@@ -414,55 +414,26 @@ function loadNotifications(user) {
 
 // ================= SAVE SETTINGS =================
 
-async function saveProfileSettings() {
+async function saveSettings() {
+  const firstNameInput = document.getElementById("firstNameInput");
+  const lastNameInput = document.getElementById("lastNameInput");
+  const emailInput = document.getElementById("emailInput");
+  const phoneInput = document.getElementById("phoneInput");
+  const lawFirmInput = document.getElementById("lawFirmInput");
+  const bioInput = document.getElementById("bioInput");
   const body = {
-    firstName: document.getElementById("firstNameInput")?.value || "",
-    lastName: document.getElementById("lastNameInput")?.value || "",
-    email: document.getElementById("emailInput")?.value || "",
-    phoneNumber: document.getElementById("phoneInput")?.value || "",
-    lawFirm: document.getElementById("lawFirmInput")?.value || "",
-    bio: document.getElementById("bio")?.value || "",
+    firstName: firstNameInput ? firstNameInput.value.trim() : "",
+    lastName: lastNameInput ? lastNameInput.value.trim() : "",
+    email: emailInput?.value || "",
+    phoneNumber: phoneInput?.value || "",
+    lawFirm: lawFirmInput?.value || "",
+    bio: bioInput?.value ?? settingsState.bio,
     education: settingsState.education,
     awards: settingsState.awards,
     highlightedSkills: settingsState.highlightedSkills,
     linkedInURL: settingsState.linkedInURL,
     notificationPrefs: settingsState.notificationPrefs
   };
-
-  if (cropper) {
-    const canvas = cropper.getCroppedCanvas({ width: 480, height: 480 });
-    if (canvas) {
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-      if (blob) {
-        const formData = new FormData();
-        formData.append("file", blob, "avatar.png");
-
-        try {
-          const uploadRes = await fetch("/api/uploads/profile-photo", {
-            method: "POST",
-            body: formData,
-            credentials: "include"
-          });
-
-          if (uploadRes.ok) {
-            const payload = await uploadRes.json();
-            const uploadedUrl = payload?.url || payload?.profileImage || payload?.avatarURL;
-            if (uploadedUrl) {
-              currentUser = { ...(currentUser || {}), profileImage: uploadedUrl };
-              settingsState.profileImage = uploadedUrl;
-              persistSession({ user: currentUser });
-              window.updateSessionUser?.(currentUser);
-              applyAvatar(currentUser);
-              window.hydrateParalegalCluster?.(currentUser);
-            }
-          }
-        } catch (err) {
-          console.error("Photo upload failed before save:", err);
-          showToast("Photo upload failed. Try again.", "err");
-        }
-      }
-    }
-  }
 
   const res = await secureFetch("/api/users/me", {
     method: "PATCH",
@@ -474,16 +445,8 @@ async function saveProfileSettings() {
     return;
   }
 
-  let updatedUser = currentUser;
-  try {
-    const refreshed = await secureFetch("/api/users/me");
-    if (refreshed.ok) {
-      updatedUser = await refreshed.json();
-    }
-  } catch {
-    updatedUser = { ...(currentUser || {}), ...body };
-  }
-
+  const updatedUser = await secureFetch("/api/users/me").then((r) => r.json());
+  localStorage.setItem("lpc_user", JSON.stringify(updatedUser));
   currentUser = updatedUser;
   settingsState.bio = updatedUser.bio || "";
   settingsState.education = updatedUser.education || [];
@@ -496,10 +459,13 @@ async function saveProfileSettings() {
   persistSession({ user: updatedUser });
   window.updateSessionUser?.(updatedUser);
 
-  applyAvatar(updatedUser);
+  applyAvatar?.(updatedUser);
   hydrateProfileForm(updatedUser);
-  syncCluster(updatedUser);
+  syncCluster?.(updatedUser);
   window.hydrateParalegalCluster?.(updatedUser);
+  try {
+    window.dispatchEvent(new CustomEvent("lpc:user-updated", { detail: updatedUser }));
+  } catch (_) {}
   showToast("Settings saved!", "ok");
 }
 
@@ -730,7 +696,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function saveProfile() {
-  saveProfileSettings();
+  saveSettings();
 }
 
 const profileSaveBtn = document.getElementById("profileSaveBtn");

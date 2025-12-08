@@ -4,6 +4,26 @@ const MESSAGE_JUMP_KEY = "lpc_message_jump";
 function getProfileImageUrl(user = {}) {
   return user.profileImage || user.avatarURL || "assets/images/default-avatar.png";
 }
+function applyGlobalAvatars(user = {}) {
+  if (!user.profileImage) return;
+  const els = document.querySelectorAll("#user-avatar, #headerAvatar, #avatarPreview");
+  els.forEach((el) => {
+    if (el) el.src = user.profileImage;
+  });
+  const frame = document.getElementById("avatarFrame");
+  const initials = document.getElementById("avatarInitials");
+  if (frame) frame.classList.add("has-photo");
+  if (initials) initials.style.display = "none";
+}
+
+function applyAvatar(user) {
+  if (!user?.profileImage) return;
+  const avatar = document.getElementById("user-avatar");
+  const preview = document.getElementById("profilePhotoPreview");
+
+  if (avatar) avatar.src = user.profileImage;
+  if (preview) preview.src = user.profileImage;
+}
 const elements = {
   error: document.getElementById("profileError"),
   inviteBtn: document.getElementById("inviteToCaseBtn"),
@@ -48,7 +68,7 @@ const elements = {
   ref2EmailInput: document.getElementById("ref2Email"),
   certificateUploadInput: document.getElementById("certificateUpload"),
   resumeUploadInput: document.getElementById("resumeUpload"),
-  profilePhotoInput: document.getElementById("profilePhoto"),
+  profilePhotoInput: document.getElementById("photoInput"),
   profileSaveBtn: document.getElementById("saveProfileBtn"),
 };
 
@@ -466,6 +486,8 @@ async function loadProfile() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.error || "Unable to load profile");
     state.profile = { ...data, id: data.id || data._id || state.paralegalId };
+    applyGlobalAvatars(state.profile);
+    applyAvatar(state.profile);
     renderProfile(state.profile);
     populateProfileForm(state.profile);
     updateProfileFormVisibility();
@@ -522,8 +544,8 @@ function setInputValue(input, value) {
 
 function renderAvatar(name, avatarUrl) {
   const fallback = buildInitialAvatar(getInitials(name));
+  const source = avatarUrl || fallback;
   if (elements.avatarImg) {
-    const source = avatarUrl || fallback;
     elements.avatarImg.src = source;
     elements.avatarImg.alt = `${name} portrait`;
     elements.avatarImg.loading = "lazy";
@@ -532,6 +554,14 @@ function renderAvatar(name, avatarUrl) {
   if (elements.avatarFallback) {
     elements.avatarFallback.textContent = getInitials(name);
     elements.avatarFallback.style.display = avatarUrl ? "none" : "flex";
+  }
+  const heroAvatar = document.getElementById("user-avatar");
+  if (heroAvatar && source) {
+    heroAvatar.src = source;
+  }
+  const previewAvatar = document.getElementById("profilePhotoPreview");
+  if (previewAvatar && source) {
+    previewAvatar.src = source;
   }
   elements.avatarWrapper?.classList.remove("skeleton-block");
 }

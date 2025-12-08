@@ -144,7 +144,7 @@ background:#fff;
 .panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.5rem;}
 .panel.new-users .search{width:100%;padding:.5rem .75rem;margin-bottom:1rem;border:1px solid var(--line);border-radius:6px;}
 .user-list{list-style:none;padding:0;margin:0;} .user-list li{display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--line);}
-.circle-progress{width:120px;height:120px;border-radius:50%;border:6px solid var(--accent);display:flex;align-items:center;justify-content:center;margin:1rem auto;font-weight:600;}
+.circle-progress{width:120px;height:120px;border-radius:50%;border:6px solid var(--accent);display:flex;align-items:center;justify-content:center;margin:1rem auto;font-weight:300;}
 .sales-box{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;text-align:center;margin-top:1rem;}
 .sales-box div strong{display:block;font-size:1.3rem;color:var(--accent);}
 .sales-box div span{font-size:.85rem;color:var(--muted);}
@@ -200,7 +200,7 @@ font-weight:300;
 .tax-summary li,.payout-schedule li{padding:.4rem 0;border-bottom:1px solid var(--line);font-size:.95rem;}
 .tax-summary strong{color:var(--ink);}
 .payout-schedule li:last-child,.tax-summary li:last-child{border-bottom:none;}
-.metric h3{font-family:var(--font-serif);font-weight:400;font-size:1.1rem;margin-bottom:.25rem;}
+.metric h3{font-family:var(--font-serif);font-weight:300;font-size:1.1rem;margin-bottom:.25rem;}
 .metric p{font-size:1.6rem;color:var(--accent);font-weight:200;}
 
 /* Panels */
@@ -215,7 +215,7 @@ transition:all .25s ease;
 .panel:hover{border-color:var(--accent);}
 .panel h2{
 font-family:var(--font-serif);
-font-weight:500;
+font-weight:300;
 font-size:1.3rem;
 display:flex;
 justify-content:space-between;
@@ -234,7 +234,7 @@ th{color:var(--muted);font-weight:200;}
 .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
 .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
 .weather{display:flex;align-items:center;justify-content:space-between;}
-.weather h3{font-family:var(--font-serif);font-weight:400;}
+.weather h3{font-family:var(--font-serif);font-weight:300;}
 .toast{
 position:fixed;
 right:24px;
@@ -261,7 +261,7 @@ font-size:.95rem;
 .pending-users-table td.actions .btn{width:100%;}
 .pending-modal-actions{display:flex;justify-content:flex-end;gap:.75rem;margin-top:1.5rem;}
 #pendingUserModal .details-content{max-width:900px;}
-#pendingUserModal .details-table td:first-child{width:200px;font-weight:600;}
+#pendingUserModal .details-table td:first-child{width:200px;font-weight:300;}
 #pendingUserModal .details-table td:last-child{white-space:pre-line;}
 </style>
 </head>
@@ -301,12 +301,12 @@ font-size:.95rem;
 <div class="grid-four" style="margin-bottom:1.5rem;">
 <div class="card" id="payoutCard">
 <h3>Payouts</h3>
-<p style="font-size:1.6rem;font-weight:600;color:var(--accent);" id="payoutTotal">$0</p>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="payoutTotal">$0</p>
 <p class="small" id="payoutCount">0 payouts recorded</p>
 </div>
 <div class="card" id="incomeCard">
 <h3>Platform Income</h3>
-<p style="font-size:1.6rem;font-weight:600;color:var(--accent);" id="incomeTotal">$0</p>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="incomeTotal">$0</p>
 <p class="small" id="incomeCount">0 income records</p>
 </div>
 </div>

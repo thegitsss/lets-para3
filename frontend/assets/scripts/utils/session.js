@@ -144,6 +144,11 @@
     if (!user || typeof user !== "object") return;
     cachedUser = { ...(cachedUser || {}), ...user };
     sessionPromise = Promise.resolve(cachedUser);
+    if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+      try {
+        window.dispatchEvent(new CustomEvent("lpc:user-updated", { detail: cachedUser }));
+      } catch (_) {}
+    }
   }
 
   fetchSession().catch(() => {});

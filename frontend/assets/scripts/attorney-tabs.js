@@ -1,7 +1,18 @@
 import { secureFetch, logout, loadUserHeaderInfo } from "./auth.js";
 
 const PAGE_ID = window.__ATTORNEY_PAGE__ || "overview";
+const ROLE_SPEC = window.__TAB_ROLE__;
+const REQUIRED_ROLES = Array.isArray(ROLE_SPEC)
+  ? ROLE_SPEC.map((role) => String(role || "").toLowerCase()).filter(Boolean)
+  : typeof ROLE_SPEC === "string" && ROLE_SPEC.includes(",")
+  ? ROLE_SPEC.split(",").map((role) => role.trim().toLowerCase()).filter(Boolean)
+  : ROLE_SPEC
+  ? [String(ROLE_SPEC).toLowerCase()]
+  : ["attorney"];
 const MESSAGE_JUMP_KEY = "lpc_message_jump";
+const HEADER_ONLY_ROUTES = {
+  paralegal: new Set(["overview", "case-files", "profile-settings"]),
+};
 const STATUS_LABELS = {
   pending_review: "Pending Review",
   approved: "Approved",
@@ -78,8 +89,32 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 async function bootAttorneyExperience() {
-  const user = typeof window.requireRole === "function" ? await window.requireRole("attorney") : null;
-  if (!user) return;
+  let sessionUser = null;
+  if (typeof window.checkSession === "function") {
+    try {
+      const session = await window.checkSession(undefined, { redirectOnFail: true });
+      sessionUser = session?.user || session;
+    } catch {
+      sessionUser = null;
+    }
+  }
+  if (!sessionUser && typeof window.requireRole === "function") {
+    const fallbackRole = REQUIRED_ROLES[0] || "attorney";
+    sessionUser = await window.requireRole(fallbackRole);
+  }
+  if (!sessionUser) return;
+
+  const normalizedRole = String(sessionUser.role || "").toLowerCase();
+  if (REQUIRED_ROLES.length && !REQUIRED_ROLES.includes(normalizedRole)) {
+    if (typeof window.redirectUserDashboard === "function") {
+      window.redirectUserDashboard(normalizedRole || "attorney");
+    } else {
+      window.location.href = "login.html";
+    }
+    return;
+  }
+
+  const user = sessionUser;
   await loadUserHeaderInfo();
   applyRoleVisibility(user);
   if (!state.user) {
@@ -106,8 +141,13 @@ async function bootstrap() {
 
   ensureHeaderStyles();
   await initHeader();
+  const pageKey = (PAGE_ID || "").toLowerCase();
+  const role = String(state.user?.role || "").toLowerCase();
+  if (HEADER_ONLY_ROUTES[role]?.has(pageKey)) {
+    return;
+  }
 
-  switch ((PAGE_ID || "").toLowerCase()) {
+  switch (pageKey) {
     case "messages":
       await initMessagesPage();
       break;
@@ -170,6 +210,74 @@ function ensureHeaderStyles() {
   .lpc-shared-header .notifications-panel li{padding:10px;border-radius:12px;background:#fcfcfc;border:1px solid rgba(0,0,0,0.08);font-size:.9rem;line-height:1.35}
   .lpc-shared-header .notifications-panel li span{display:block;font-size:.82rem;color:#6b6b6b;margin-top:4px}
   .lpc-shared-header .notifications-panel .empty-copy{margin:0;font-size:.9rem;color:#6b6b6b;text-align:center}
+  `;
+  document.head.appendChild(style);
+}
+
+function ensureSimpleMessageStyles() {
+  if (document.getElementById("simple-message-styles")) return;
+  const style = document.createElement("style");
+  style.id = "simple-message-styles";
+  style.textContent = `
+  #msgInterface{
+    margin-top:2rem;
+    border:1px solid var(--line, rgba(0,0,0,0.08));
+    border-radius:12px;
+    background:var(--panel, #fcfcfc);
+    padding:1.25rem;
+    display:flex;
+    flex-direction:column;
+    gap:1rem;
+    font-family:'Sarabun',sans-serif;
+    box-shadow:0 10px 30px rgba(0,0,0,0.06);
+  }
+  #msgInterface select{
+    width:100%;
+    border:1px solid var(--line, rgba(0,0,0,0.1));
+    border-radius:8px;
+    padding:0.55rem 0.75rem;
+    font-size:0.95rem;
+    background:#fff;
+  }
+  #msgInterface #msgThread{
+    min-height:140px;
+    border:1px dashed var(--line, rgba(0,0,0,0.15));
+    border-radius:8px;
+    padding:0.75rem;
+    font-size:0.9rem;
+    color:var(--muted,#6b6b6b);
+    background:#fff;
+  }
+  #msgInterface form{
+    display:flex;
+    flex-direction:column;
+    gap:0.75rem;
+  }
+  #msgInterface textarea{
+    width:100%;
+    border:1px solid var(--line, rgba(0,0,0,0.12));
+    border-radius:10px;
+    padding:0.65rem 0.85rem;
+    resize:vertical;
+    min-height:80px;
+    font-size:0.95rem;
+    background:#fff;
+  }
+  #msgInterface button{
+    align-self:flex-end;
+    border:none;
+    border-radius:999px;
+    padding:0.55rem 1.4rem;
+    font-size:0.95rem;
+    background:var(--accent,#b6a47a);
+    color:#fff;
+    cursor:pointer;
+    transition:background .2s ease, transform .2s ease;
+  }
+  #msgInterface button:hover{
+    background:var(--accent-dark,#9c8a63);
+    transform:translateY(-1px);
+  }
   `;
   document.head.appendChild(style);
 }
@@ -279,22 +387,49 @@ async function loadUser() {
     const res = await secureFetch("/api/users/me", { headers: { Accept: "application/json" } });
     if (!res.ok) throw new Error("Failed user fetch");
     const user = await res.json();
-    state.user = user;
-    const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.name || "Attorney";
-    const avatar = getProfileImageUrl(user);
-    const roleLabel = (user.role || "Attorney").replace(/\b\w/g, (c) => c.toUpperCase());
-    const nameEl = document.getElementById("headerName");
-    const avatarEl = document.getElementById("headerAvatar");
-    const roleEl = document.getElementById("headerRole");
-    const heading = document.getElementById("user-name-heading");
-    if (nameEl) nameEl.textContent = name;
-    if (avatarEl) avatarEl.src = avatar;
-    if (roleEl) roleEl.textContent = roleLabel;
-    if (heading) heading.textContent = user.firstName || heading.textContent;
+    applyUserToHeader(user);
   } catch (err) {
     console.warn("Unable to load user profile", err);
   }
 }
+
+function applyUserToHeader(user = {}) {
+  if (!user || typeof user !== "object") return;
+  state.user = { ...(state.user || {}), ...user };
+  const current = state.user;
+  const name = [current.firstName, current.lastName].filter(Boolean).join(" ") || current.name || "Attorney";
+  const avatar = getProfileImageUrl(current);
+  const roleLabel = (current.role || "Attorney").replace(/\b\w/g, (c) => c.toUpperCase());
+  const nameEl = document.getElementById("headerName");
+  const avatarEl = document.getElementById("headerAvatar");
+  const roleEl = document.getElementById("headerRole");
+  const heading = document.getElementById("user-name-heading");
+  if (nameEl) nameEl.textContent = name;
+  if (avatarEl) avatarEl.src = avatar;
+  if (roleEl) roleEl.textContent = roleLabel;
+  if (heading) heading.textContent = current.firstName || heading.textContent;
+  if (current.profileImage) {
+    const avatarNode = document.querySelector("#user-avatar");
+    if (avatarNode) avatarNode.src = current.profileImage;
+  }
+}
+
+function handleStoredUserUpdate(event) {
+  if (event.key !== "lpc_user") return;
+  if (!event.newValue) return;
+  try {
+    const user = JSON.parse(event.newValue);
+    applyUserToHeader(user || {});
+  } catch (_) {}
+}
+
+function handleLocalUserUpdate(event) {
+  if (!event?.detail) return;
+  applyUserToHeader(event.detail);
+}
+
+window.addEventListener("storage", handleStoredUserUpdate);
+window.addEventListener("lpc:user-updated", handleLocalUserUpdate);
 
 async function loadNotifications() {
   try {
@@ -2608,6 +2743,7 @@ function injectCaseScopedMessagingUI() {
   if (document.getElementById("msgInterface")) return;
   const host = document.querySelector(".main");
   if (!host) return;
+  ensureSimpleMessageStyles();
   const wrapper = document.createElement("section");
   wrapper.id = "msgInterface";
   wrapper.innerHTML = `

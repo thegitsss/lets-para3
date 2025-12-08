@@ -1,14 +1,14 @@
 // frontend/assets/scripts/views/browse-paralegals.js
-// Lightweight directory that pulls real paralegal data directly from /api/users/paralegals
+// Public directory that renders live, approved paralegals from the API
 
 const grid = document.getElementById("paralegalGrid");
 const pagination = document.getElementById("paralegalPagination");
 const statusNode = document.getElementById("resultsStatus");
 
 const DEFAULT_PAGE_SIZE = 12;
-const PLACEHOLDER_AVATAR = "https://via.placeholder.com/120?text=PL";
+const PLACEHOLDER_AVATAR = "assets/default-avatar.png";
 function getProfileImageUrl(user = {}) {
-  return user.profileImage || user.avatarURL || "assets/images/default-avatar.png";
+  return user.profileImage || user.avatarURL || "assets/default-avatar.png";
 }
 
 const state = {
@@ -35,12 +35,15 @@ async function hydrate(page = 1) {
   try {
     setStatus("Loading paralegals…");
     const payload = await loadParalegals(page, state.pageSize);
+    const items = Array.isArray(payload.items)
+      ? payload.items.filter((entry) => !entry.status || entry.status === "approved")
+      : [];
     state.page = payload.page || page;
     state.pageSize = payload.pageSize || payload.limit || state.pageSize;
-    state.total = payload.total ?? payload.items?.length ?? 0;
-    renderGrid(Array.isArray(payload.items) ? payload.items : []);
-    renderPagination(payload);
-    if (!payload.items?.length) {
+    state.total = payload.total ?? items.length ?? 0;
+    renderGrid(items);
+    renderPagination({ ...payload, items, total: state.total });
+    if (!items.length) {
       setStatus("No paralegals found.");
     } else {
       setStatus("");
@@ -87,8 +90,9 @@ function renderGrid(items = []) {
     const card = document.createElement("div");
     card.className = "pl-card";
 
-    const avatar = document.createElement("img");
-    avatar.className = "pl-avatar";
+  const avatar = document.createElement("img");
+  avatar.className = "pl-avatar";
+  avatar.setAttribute("data-avatar", "");
     avatar.alt = `${formatName(paralegal)} avatar`;
     avatar.src = getProfileImageUrl(paralegal) || PLACEHOLDER_AVATAR;
 

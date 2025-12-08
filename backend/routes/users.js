@@ -99,8 +99,9 @@ const parseParalegalFilters = (query = {}) => {
   return { filter, sortOpt, page: p, limit: l };
 };
 
-const SAFE_PUBLIC_SELECT = "_id firstName lastName avatarURL profileImage location specialties yearsExperience linkedInURL certificateURL education resumeURL notificationPrefs";
-const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email`;
+const SAFE_PUBLIC_SELECT =
+  "_id firstName lastName avatarURL profileImage location specialties yearsExperience linkedInURL certificateURL education resumeURL notificationPrefs lawFirm";
+const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email phoneNumber`;
 const FILE_PUBLIC_BASE =
   (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
   (process.env.S3_BUCKET && process.env.S3_REGION
@@ -125,6 +126,7 @@ function serializePublicUser(user, { includeEmail = false } = {}) {
     avatarURL,
     profileImage,
     state: src.state || src.location || "",
+    lawFirm: src.lawFirm || "",
     specialties: Array.isArray(src.specialties) ? src.specialties : [],
     yearsExperience:
       typeof src.yearsExperience === "number" ? src.yearsExperience : 0,
@@ -136,6 +138,7 @@ function serializePublicUser(user, { includeEmail = false } = {}) {
   };
   if (includeEmail) {
     payload.email = src.email || "";
+    payload.phoneNumber = src.phoneNumber || "";
   }
   return payload;
 }
@@ -312,7 +315,14 @@ router.patch(
     const me = await User.findById(req.user.id);
     if (!me) return res.status(404).json({ error: "Not found" });
 
+    const body = req.body || {};
     const {
+      firstName,
+      lastName,
+      email: nextEmail,
+      phoneNumber,
+      phone,
+      lawFirm,
       bio,
       availability,
       resumeURL,
@@ -321,7 +331,30 @@ router.patch(
       avatarURL,
       profileImage,
       timezone,
-    } = req.body || {};
+    } = body;
+
+    if (typeof firstName === "string" && firstName.trim()) {
+      me.firstName = normStr(firstName, { len: 150 }).trim();
+    }
+    if (typeof lastName === "string" && lastName.trim()) {
+      me.lastName = normStr(lastName, { len: 150 }).trim();
+    }
+    if (typeof nextEmail === "string" && nextEmail.trim()) {
+      const normalizedEmail = normStr(nextEmail, { len: 320 }).trim().toLowerCase();
+      if (normalizedEmail && normalizedEmail !== me.email) {
+        const exists = await User.countDocuments({ email: normalizedEmail, _id: { $ne: me._id } });
+        if (exists) return res.status(409).json({ error: "Email already in use" });
+        me.email = normalizedEmail;
+        me.emailVerified = false;
+      }
+    }
+    const phoneVal = typeof phoneNumber === "string" ? phoneNumber : typeof phone === "string" ? phone : null;
+    if (phoneVal !== null) {
+      me.phoneNumber = normStr(phoneVal, { len: 40 }).trim();
+    }
+    if (typeof lawFirm === "string") {
+      me.lawFirm = normStr(lawFirm, { len: 300 }).trim();
+    }
 
     if (typeof bio === "string") {
       const sanitized = normStr(maskProfanity(bio), { len: 4000 });
@@ -346,6 +379,13 @@ router.patch(
     }
     if (me.role === "attorney" && typeof barNumber === "string") {
       me.barNumber = normStr(barNumber, { len: 100 }).trim();
+    }
+    if (typeof body.firstName === "string") {
+      me.firstName = body.firstName.trim();
+    }
+
+    if (typeof body.lastName === "string") {
+      me.lastName = body.lastName.trim();
     }
 
     await me.save();
@@ -574,6 +614,12 @@ paralegalRouter.post(
       ["title", 400],
       ["content", 10_000],
     ]);
+    if (typeof req.body.firstName === "string") {
+      paralegal.firstName = req.body.firstName.trim();
+    }
+    if (typeof req.body.lastName === "string") {
+      paralegal.lastName = req.body.lastName.trim();
+    }
 
     await paralegal.save();
     try {

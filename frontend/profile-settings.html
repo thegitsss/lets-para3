@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Attorney Account Settings | Let’s-ParaConnect</title>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
+  <link rel="stylesheet" href="assets/libs/cropper/cropper.main.css" />
   <script src="assets/scripts/utils/session.js"></script>
   <style>
     :root {
@@ -94,6 +94,12 @@
       overflow-y: auto;
     }
 
+    .topbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 24px;
+    }
+
     .unified-header {
       display: flex;
       justify-content: space-between;
@@ -126,127 +132,8 @@
       font-size: 0.95rem;
     }
 
-    .header-controls {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-
-    .notification-icon {
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
-      border: 1px solid var(--line);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #fff;
-      cursor: pointer;
-      position: relative;
-      transition: border-color 0.2s ease, transform 0.2s ease;
-    }
-
-    .notification-icon:hover {
-      border-color: var(--accent);
-      transform: translateY(-1px);
-    }
-
-    .notification-icon svg {
-      width: 22px;
-      height: 22px;
-      color: var(--ink);
-    }
-
-    .notification-badge {
-      position: absolute;
-      top: -4px;
-      right: -4px;
-      background: var(--danger);
-      color: #fff;
-      font-size: 0.75rem;
-      border-radius: 999px;
-      padding: 2px 6px;
-      line-height: 1;
-      display: none;
-    }
-
-    .notification-badge.show {
-      display: inline-flex;
-    }
-
-    .user-chip {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: rgba(0, 0, 0, 0.03);
-      border: 1px solid transparent;
-      transition: border-color 0.2s ease;
-    }
-
-    .user-chip img {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      border: 2px solid #fff;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-      object-fit: cover;
-    }
-
-    .user-chip strong {
-      display: block;
-      font-weight: 200;
-    }
-
-    .user-chip span {
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-
-    .notification-panel {
-      position: absolute;
-      top: 60px;
-      right: 0;
-      width: 280px;
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
-      padding: 16px;
-      display: none;
-      flex-direction: column;
-      gap: 0.75rem;
-      z-index: 20;
-    }
-
-    .notification-panel.show {
-      display: flex;
-    }
-
-    .notification-panel h4 {
-      margin: 0;
-      font-family: var(--font-serif);
-      font-size: 1.1rem;
-      font-weight: 300;
-    }
-
-    .notification-panel p {
-      margin: 0;
-      font-size: 0.9rem;
-      color: var(--muted);
-    }
-
-    .notification-item {
-      padding: 0.5rem 0;
-      border-bottom: 1px solid var(--line);
-      font-size: 0.9rem;
-      line-height: 1.4;
-      color: var(--ink);
-    }
-
-    .notification-item:last-child {
-      border-bottom: none;
+    .lpc-shared-header .user-chip strong {
+      font-weight: 300 !important;
     }
 
     .settings-panel {
@@ -313,11 +200,34 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
+      object-position: center center !important;
       display: none;
     }
 
     .avatar-frame.has-photo img {
       display: block;
+    }
+
+    .avatar-frame .cropper-container,
+    .avatar-frame .cropper-wrap-box,
+    .avatar-frame .cropper-canvas,
+    .avatar-frame .cropper-crop-box,
+    .avatar-frame .cropper-view-box {
+      left: 0 !important;
+      top: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      transform: none !important;
+    }
+
+    .avatar-frame .cropper-crop-box,
+    .avatar-frame .cropper-view-box,
+    .avatar-frame .cropper-face,
+    .avatar-frame .cropper-line,
+    .avatar-frame .cropper-point,
+    .avatar-frame .cropper-dashed,
+    .avatar-frame .cropper-center {
+      display: none !important;
     }
 
     .avatar-frame span {
@@ -357,6 +267,7 @@
       border: 1px solid var(--line);
       padding: 12px 14px;
       font-size: 0.95rem;
+      font-family: inherit;
       background: #fff;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
@@ -620,9 +531,6 @@
         flex-direction: column;
         gap: 20px;
       }
-      .notifications-panel {
-        right: 12px;
-      }
     }
   </style>
 </head>
@@ -639,33 +547,12 @@
   </aside>
 
   <main class="content">
+    <div class="topbar" data-attorney-header></div>
     <section class="unified-header" aria-label="Attorney header">
       <div class="title-block">
         <p class="eyebrow">Account</p>
         <h1>Account Settings</h1>
         <p>Keep your LPC profile accurate, stay secure, and control how we notify you.</p>
-      </div>
-      <div class="header-controls">
-        <button class="notification-icon" id="notificationToggle" aria-label="View notifications">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 01-3.46 0" />
-          </svg>
-          <span class="notification-badge" id="notificationBadge">0</span>
-        </button>
-        <div class="user-chip" id="headerUser">
-          <img id="headerAvatar" data-avatar alt="User avatar" />
-          <div>
-            <strong id="headerName">Attorney</strong>
-            <span id="headerRole">Member</span>
-          </div>
-        </div>
-      </div>
-      <div class="notification-panel" id="notificationsPanel" role="region" aria-live="polite">
-        <h4>Notifications</h4>
-        <div id="notificationList">
-          <p class="notification-item">Loading…</p>
-        </div>
       </div>
     </section>
 
@@ -719,7 +606,7 @@
           <textarea id="bio" name="bio"></textarea>
         </label>
         <div class="btn-row">
-          <button class="btn btn-primary" type="submit" id="profileSaveBtn">Save changes</button>
+          <button class="btn btn-primary" type="button" id="profileSaveBtn">Save changes</button>
         </div>
       </form>
     </section>
@@ -818,8 +705,13 @@
     </div>
   </div>
 
+  <script src="assets/libs/cropper/cropper.main.js"></script>
   <script src="assets/scripts/utils/toast.js"></script>
+  <script>
+    window.__ATTORNEY_PAGE__ = "profile-settings";
+    window.__TAB_ROLE__ = "attorney,paralegal";
+  </script>
+  <script type="module" src="assets/scripts/attorney-tabs.js"></script>
   <script type="module" src="assets/scripts/profile-settings.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 </body>
 </html>

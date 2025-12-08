@@ -363,6 +363,8 @@ router.get(
           email: u.email,
           firstName: u.firstName,
           lastName: u.lastName,
+          avatarURL: u.avatarURL || null,
+          profileImage: u.profileImage || null,
           status: u.status,
           disabled: Boolean(u.disabled),
         },

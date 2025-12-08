@@ -40,6 +40,19 @@ async function fetchJson(url, options = {}) {
   }
 }
 
+function applyStoredProfile() {
+  try {
+    const stored = localStorage.getItem('lpc_user');
+    if (!stored) return;
+    const parsed = JSON.parse(stored);
+    if (parsed && typeof parsed === 'object') {
+      updateProfile(parsed);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 async function loadViewerProfile() {
   return fetchJson('/api/users/me');
 }
@@ -416,7 +429,29 @@ function updateProfile(profile = {}) {
     selectors.userAvatar.src = getAvatarUrl(profile);
     selectors.userAvatar.alt = `${composedName}'s avatar`;
   }
+  if (profile.profileImage) {
+    const a = document.querySelector('#user-avatar');
+    if (a) a.src = profile.profileImage;
+  }
 }
+
+function handleStoredUserUpdate(event) {
+  if (event.key !== 'lpc_user') return;
+  if (!event.newValue) return updateProfile({});
+  try {
+    const profile = JSON.parse(event.newValue);
+    updateProfile(profile || {});
+  } catch {
+    updateProfile({});
+  }
+}
+
+window.addEventListener('storage', handleStoredUserUpdate);
+window.addEventListener('lpc:user-updated', (event) => {
+  if (event?.detail) {
+    updateProfile(event.detail);
+  }
+});
 
 function initLatestMessage(threads = []) {
   if (!threads.length) {
@@ -487,9 +522,12 @@ async function bootParalegalDashboard() {
   const user = typeof window.requireRole === 'function' ? await window.requireRole('paralegal') : null;
   if (!user) return;
   applyRoleVisibility(user);
+  updateProfile(user || {});
+  window.hydrateParalegalCluster?.(user || {});
   if (window.state) {
     window.state.viewerRole = String(user.role || '').toLowerCase();
   }
+  applyStoredProfile();
   await initDashboard();
   const assignedCasesEl = document.getElementById('paralegalAssignedCasesList');
   assignedCasesEl?.addEventListener('click', (event) => {

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Paralegal Applications | Let's-ParaConnect</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/styles/paralegal-cluster.css" />
 <script src="assets/scripts/utils/session.js"></script>
 <script type="module" src="assets/scripts/auth.js"></script>
 <style>
@@ -126,61 +127,6 @@ header p{color:var(--muted);font-size:.95rem;margin-bottom:2rem;}
   align-items:center;
   gap:16px;
 }
-.header-cluster{
-  display:flex;
-  align-items:center;
-  gap:14px;
-  position:relative;
-}
-.notification-icon{
-  position:relative;
-  cursor:pointer;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  width:42px;
-  height:42px;
-  border-radius:50%;
-  border:1px solid var(--line);
-  background:#fff;
-  transition:border-color .2s ease,transform .2s ease;
-}
-.notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
-.notification-icon svg{width:20px;height:20px;color:var(--ink);}
-.notification-badge{
-  position:absolute;
-  top:-6px;
-  right:-6px;
-  background:#e63946;
-  color:#fff;
-  border-radius:50%;
-  font-size:.7rem;
-  width:18px;
-  height:18px;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  font-weight:700;
-}
-.notification-badge.show{display:flex;}
-.user-profile{
-  display:flex;
-  align-items:center;
-  gap:.6rem;
-  padding:6px 10px;
-  border:1px solid var(--line);
-  border-radius:12px;
-  background:#fff;
-}
-.user-profile img{
-  width:42px;
-  height:42px;
-  border-radius:50%;
-  object-fit:cover;
-  box-shadow:0 6px 16px rgba(0,0,0,0.08);
-}
-.user-profile strong{display:block;font-weight:500;}
-.user-profile span{display:block;font-size:.85rem;color:var(--muted);font-weight:200;}
 .notification-panel{
   position:absolute;
   right:0;
@@ -409,7 +355,7 @@ nav a.active {background:rgba(255,255,255,0.25);}
       <p>Review and track your job applications.</p>
     </div>
     <div class="header-cluster" data-paralegal-cluster data-notification-center>
-      <button class="notification-icon" aria-label="View notifications" data-notification-toggle>
+      <button type="button" class="notification-icon" aria-label="View notifications" data-notification-toggle>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 01-3.46 0" />
@@ -419,7 +365,7 @@ nav a.active {background:rgba(255,255,255,0.25);}
       <div id="profileHeaderBlock" class="user-profile">
         <img id="clusterAvatar" class="globalProfileImage nav-profile-photo profile-img-small" src="https://via.placeholder.com/64x64.png?text=PL" alt="Paralegal avatar">
         <div>
-          <span id="clusterName" class="globalProfileName"></span><br>
+          <strong id="clusterName" class="globalProfileName"></strong>
           <span id="clusterRole" class="globalProfileRole"></span>
         </div>
       </div>

@@ -385,7 +385,7 @@ router.post(
     const ownerId = String(req.user?.id || req.user?._id || "").trim();
     if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
 
-    const key = `profile-photos/${safeSegment(ownerId)}/profile.jpg`;
+    const key = `profile-photos/${safeSegment(ownerId)}/profile-${Date.now()}.jpg`;
     const putParams = {
       Bucket: BUCKET,
       Key: key,

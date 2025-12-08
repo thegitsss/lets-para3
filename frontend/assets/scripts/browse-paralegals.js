@@ -1,6 +1,6 @@
 import { requireAuth, secureFetch, logout } from "./auth.js";
 
-const isPublicView = !localStorage.getItem("lpc_name");
+const isPublicView = !localStorage.getItem("lpc_user");
 
 const states = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","Florida","Georgia",
@@ -23,7 +23,6 @@ const specialties = [
 ];
 
 const selectedSpecialties = new Set();
-const isPublicView = !localStorage.getItem("lpc_name");
 
 const elements = {
   results: document.getElementById("paralegalResults"),

@@ -182,11 +182,17 @@
     return "Paralegal";
   }
 
-  function hydrate(user={}){
+  function applyGlobalAvatars(user = {}) {
+    if (!user.profileImage) return;
+    const targets = document.querySelectorAll("#user-avatar, #headerAvatar, #avatarPreview");
+    targets.forEach((el) => {
+      if (el) el.src = user.profileImage;
+    });
+  }
+
+  function renderUserFields(user = {}){
     const els = targetEls();
     if (!hasTargets()) return;
-    hydrated = true;
-    window.__paralegalClusterHydrated = true;
     if (els.name) els.name.textContent = formatName(user);
     if (els.role) els.role.textContent = formatRole(user);
     const avatar = user.profileImage || user.avatarURL || FALLBACK_AVATAR;
@@ -200,6 +206,22 @@
       els.badge.textContent = label;
       els.badge.classList.toggle("show", count > 0);
     }
+    applyGlobalAvatars(user);
+  }
+
+  function hydrate(user={}){
+    renderUserFields(user);
+    hydrated = true;
+    window.__paralegalClusterHydrated = true;
+  }
+
+  function applyStoredUser(){
+    try{
+      const stored = localStorage.getItem("lpc_user");
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (parsed && typeof parsed === "object") renderUserFields(parsed);
+    }catch(_){}
   }
 
   async function loadCluster(){
@@ -219,5 +241,8 @@
   }
 
   window.hydrateParalegalCluster = hydrate;
-  document.addEventListener("DOMContentLoaded", loadCluster);
+  document.addEventListener("DOMContentLoaded", () => {
+    applyStoredUser();
+    loadCluster();
+  });
 })();
