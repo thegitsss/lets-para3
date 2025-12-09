@@ -402,10 +402,6 @@ function attachUIHandlers() {
     toastHelper.show(stagedToast.message, { targetId: selectors.toastBanner.id, type: stagedToast.type });
   }
 
-  selectors.messageBox?.addEventListener('click', () => {
-    window.location.href = 'index.html#paralegal-messages';
-  });
-
   selectors.notificationBell?.addEventListener('click', (event) => {
     event.stopPropagation();
     selectors.notificationPanel?.classList.toggle('show');
@@ -472,9 +468,48 @@ function initQuickActions() {
   });
 }
 
+async function loadRecommendedCases() {
+  try {
+    const res = await fetch('/api/cases/recommended', { credentials: 'include' });
+    const data = await res.json().catch(() => []);
+    const list = document.querySelector('#recommendedPostingsCard .recommendations-list');
+    if (!list) return;
+    list.innerHTML = '';
+    if (!Array.isArray(data) || !data.length) {
+      const empty = document.createElement('li');
+      empty.className = 'recommended-item';
+      const title = document.createElement('span');
+      title.classList.add('rec-title');
+      title.textContent = 'No recommended postings yet.';
+      empty.appendChild(title);
+      list.appendChild(empty);
+      return;
+    }
+    data.forEach((caseObj = {}) => {
+      const li = document.createElement('li');
+      li.classList.add('recommended-item');
+      const title = document.createElement('span');
+      title.classList.add('rec-title');
+      title.textContent = caseObj.title || 'Untitled posting';
+      const link = document.createElement('a');
+      link.classList.add('rec-open-link');
+      link.textContent = 'Open';
+      const id = caseObj._id || caseObj.id || '';
+      link.href = id ? `/case-detail.html?id=${encodeURIComponent(id)}` : '#';
+      link.target = '_self';
+      li.appendChild(title);
+      li.appendChild(link);
+      list.appendChild(li);
+    });
+  } catch (err) {
+    console.error('Failed to load recommended cases', err);
+  }
+}
+
 async function initDashboard() {
   attachUIHandlers();
   initQuickActions();
+  loadRecommendedCases();
   try {
     const [profile, dashboard, invites, deadlines, threads, notifications, unreadCount] = await Promise.all([
       loadViewerProfile().catch(() => ({})),

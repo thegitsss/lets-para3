@@ -1,6 +1,4 @@
-import { requireAuth, secureFetch, logout } from "./auth.js";
-
-const isPublicView = !localStorage.getItem("lpc_user");
+import { secureFetch, logout } from "./auth.js";
 
 const states = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","Florida","Georgia",
@@ -44,6 +42,9 @@ const elements = {
   selectedParalegalText: document.getElementById("selectedParalegalText"),
 };
 
+const viewer = getCachedUser();
+const viewerRole = String(viewer?.role || "").toLowerCase();
+
 const state = {
   page: 1,
   limit: 15,
@@ -55,6 +56,10 @@ const state = {
     location: "",
     specialties: selectedSpecialties,
   },
+  viewer,
+  viewerRole,
+  isLoggedIn: Boolean(viewer),
+  canInvite: viewerRole === "attorney",
 };
 
 let availableCases = [];
@@ -64,30 +69,37 @@ const toast = window.toastUtils;
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  document.getElementById("logoutBtn")?.addEventListener("click", (event) => {
-    event.preventDefault();
-    logout("login.html");
-  });
-
-  if (isPublicView) {
-    document.body.classList.add("public-view");
-    renderPublicSample();
-    return;
-  }
-
-  try {
-    requireAuth("attorney");
-  } catch {
-    return;
-  }
-
+  syncAuthButtons();
   initStateDropdown();
   initSpecialtyDropdown();
   bindFilterEvents();
   bindModalEvents();
 
-  await loadCases();
+  if (state.canInvite) {
+    await loadCases();
+  } else {
+    renderCaseOptions();
+  }
+
   await loadParalegals();
+}
+
+function syncAuthButtons() {
+  const signInLink = document.getElementById("authAction");
+  const logoutBtn = document.getElementById("logoutAction");
+  if (state.isLoggedIn) {
+    if (signInLink) signInLink.style.display = "none";
+    if (logoutBtn) {
+      logoutBtn.style.display = "inline-flex";
+      logoutBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        logout("login.html");
+      });
+    }
+  } else {
+    if (logoutBtn) logoutBtn.style.display = "none";
+    if (signInLink) signInLink.style.display = "inline-flex";
+  }
 }
 
 function bindFilterEvents() {
@@ -215,15 +227,16 @@ async function loadParalegals() {
   }
 
   try {
-    const res = await secureFetch(`/api/users/paralegals?${params.toString()}`, {
+    const res = await fetch(`/api/public/paralegals?${params.toString()}`, {
       headers: { Accept: "application/json" },
+      credentials: "include",
     });
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data?.error || "Unable to load paralegals");
     }
     renderParalegals(Array.isArray(data.items) ? data.items : []);
-    updatePagination(data);
+    updatePagination({ total: data.total, pages: data.pages, page: data.page });
   } catch (error) {
     console.error(error);
     renderParalegals([]);
@@ -276,15 +289,9 @@ function buildParalegalCard(paralegal) {
   const card = document.createElement("article");
   card.className = "paralegal-card";
 
-  const publicProfileUrl = `profile-paralegal.html?id=${paralegal.id || paralegal._id}`;
-
   const photoLink = document.createElement("a");
   photoLink.className = "profile-photo-link profile-link";
-  photoLink.href = publicProfileUrl;
-  if (isPublicView) {
-    photoLink.removeAttribute("href");
-    photoLink.setAttribute("aria-disabled", "true");
-  }
+  photoLink.href = `profile-paralegal.html?id=${paralegal.id || paralegal._id}`;
   const img = document.createElement("img");
   img.src = avatar;
   img.alt = `Portrait of ${name}`;
@@ -295,13 +302,9 @@ function buildParalegalCard(paralegal) {
   content.className = "card-content";
   const heading = document.createElement("h3");
   const headingLink = document.createElement("a");
-  headingLink.href = publicProfileUrl;
+  headingLink.href = `profile-paralegal.html?id=${paralegal.id || paralegal._id}`;
   headingLink.textContent = name;
   headingLink.className = "profile-name-link profile-link";
-  if (isPublicView) {
-    headingLink.removeAttribute("href");
-    headingLink.setAttribute("aria-disabled", "true");
-  }
   heading.appendChild(headingLink);
   content.appendChild(heading);
 
@@ -323,17 +326,24 @@ function buildParalegalCard(paralegal) {
   content.appendChild(meta);
   card.appendChild(content);
 
-  if (!isPublicView) {
-    const actions = document.createElement("div");
-    actions.className = "card-actions";
+  const actions = document.createElement("div");
+  actions.className = "card-actions";
+  const contactBtn = document.createElement("button");
+  contactBtn.type = "button";
+  contactBtn.className = "action-btn contact-btn";
+  contactBtn.dataset.id = paralegal.id || paralegal._id;
+  contactBtn.textContent = state.isLoggedIn ? "Message" : "Sign in to message";
+  contactBtn.addEventListener("click", () => handleContactClick(paralegal.id || paralegal._id));
+  actions.appendChild(contactBtn);
+  if (state.canInvite) {
     const inquireBtn = document.createElement("button");
     inquireBtn.type = "button";
     inquireBtn.className = "action-btn invite-btn";
     inquireBtn.textContent = "Invite to Job";
     inquireBtn.addEventListener("click", () => openInquireModal({ id: paralegal.id || paralegal._id, name }));
     actions.appendChild(inquireBtn);
-    card.appendChild(actions);
   }
+  card.appendChild(actions);
 
   return card;
 }
@@ -431,51 +441,30 @@ async function sendInquiry() {
   }
 }
 
-function renderPublicSample() {
-  const sample = [
-    {
-      id: "public-elena",
-      firstName: "Elena",
-      lastName: "Rhodes",
-      practiceAreas: ["Commercial Litigation", "E-Discovery"],
-      location: "New York, NY",
-      bio: "Litigation specialist managing large-scale discovery, deposition prep, and expert coordination for financial disputes.",
-      availability: "Accepting new matters · 30 hrs/week",
-      yearsExperience: 12,
-    },
-    {
-      id: "public-marcus",
-      firstName: "Marcus",
-      lastName: "Salgado",
-      practiceAreas: ["Immigration", "Removal Defense"],
-      location: "Miami, FL",
-      bio: "Bilingual immigration paralegal supporting removal defense, humanitarian relief, and complex family-based filings.",
-      availability: "Currently assisting two firms",
-      yearsExperience: 9,
-    },
-    {
-      id: "public-priya",
-      firstName: "Priya",
-      lastName: "Chandra",
-      practiceAreas: ["Corporate Transactions", "M&A"],
-      location: "San Francisco, CA",
-      bio: "Corporate paralegal focused on venture financings, M&A diligence, and secure data room administration.",
-      availability: "Project-based engagements preferred",
-      yearsExperience: 10,
-    },
-  ];
-
-  if (!elements.results) return;
-  setResultsStatus("");
-  elements.results.innerHTML = "";
-  const fragment = document.createDocumentFragment();
-  sample.forEach((item) => fragment.appendChild(buildParalegalCard(item)));
-  elements.results.appendChild(fragment);
-}
-
 function parseExperience(value = "") {
   const match = value.match(/\\d+/);
   return match ? parseInt(match[0], 10) : null;
+}
+
+function handleContactClick(paralegalId) {
+  if (!paralegalId) return;
+  if (!state.isLoggedIn) {
+    window.location.href = "login.html";
+    return;
+  }
+  window.location.href = `profile-paralegal.html?id=${encodeURIComponent(paralegalId)}`;
+}
+
+function getCachedUser() {
+  if (typeof window.getStoredUser === "function") {
+    const stored = window.getStoredUser();
+    if (stored) return stored;
+  }
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
 }
 
 function formatExperience(years) {

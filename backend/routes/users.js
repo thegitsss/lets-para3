@@ -100,7 +100,7 @@ const parseParalegalFilters = (query = {}) => {
 };
 
 const SAFE_PUBLIC_SELECT =
-  "_id firstName lastName avatarURL profileImage location specialties yearsExperience linkedInURL certificateURL education resumeURL notificationPrefs lawFirm";
+  "_id firstName lastName avatarURL profileImage location specialties practiceAreas skills experience yearsExperience linkedInURL certificateURL education resumeURL notificationPrefs lawFirm bio about availability writingSamples";
 const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email phoneNumber`;
 const FILE_PUBLIC_BASE =
   (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
@@ -125,15 +125,23 @@ function serializePublicUser(user, { includeEmail = false } = {}) {
     lastName: src.lastName || "",
     avatarURL,
     profileImage,
+    location: src.location || "",
     state: src.state || src.location || "",
     lawFirm: src.lawFirm || "",
     specialties: Array.isArray(src.specialties) ? src.specialties : [],
+    practiceAreas: Array.isArray(src.practiceAreas) ? src.practiceAreas : [],
+    skills: Array.isArray(src.skills) ? src.skills : [],
     yearsExperience:
       typeof src.yearsExperience === "number" ? src.yearsExperience : 0,
     linkedInURL: src.linkedInURL || "",
     certificateURL: src.certificateURL || "",
     resumeURL: src.resumeURL || "",
     education: Array.isArray(src.education) ? src.education : [],
+    experience: Array.isArray(src.experience) ? src.experience : [],
+    availability: src.availability || "",
+    bio: src.bio || "",
+    about: src.about || "",
+    writingSamples: Array.isArray(src.writingSamples) ? src.writingSamples : [],
     notificationPrefs: src.notificationPrefs || null,
   };
   if (includeEmail) {
@@ -376,6 +384,34 @@ router.patch(
     if (me.role === "paralegal") {
       if (typeof resumeURL === "string" && isURL(resumeURL)) me.resumeURL = resumeURL;
       if (typeof certificateURL === "string" && isURL(certificateURL)) me.certificateURL = certificateURL;
+      if (body.practiceAreas !== undefined) {
+        me.practiceAreas = cleanList(body.practiceAreas);
+      }
+      const rawSkills = body.highlightedSkills !== undefined ? body.highlightedSkills : body.skills;
+      if (rawSkills !== undefined) {
+        me.skills = cleanList(rawSkills);
+      }
+      if (body.experience !== undefined) {
+        me.experience = cleanCollection(body.experience, [
+          ["title", 300],
+          ["years", 120],
+          ["description", 5000]
+        ]);
+      }
+      if (body.education !== undefined) {
+        me.education = cleanCollection(body.education, [
+          ["degree", 200],
+          ["school", 200]
+        ]);
+      }
+      if (body.yearsExperience !== undefined) {
+        const years = Math.max(0, Math.min(80, parseInt(body.yearsExperience, 10) || 0));
+        me.yearsExperience = years;
+      }
+      if (typeof body.linkedInURL === "string") {
+        const trimmed = body.linkedInURL.trim();
+        me.linkedInURL = trimmed ? normStr(trimmed, { len: 500 }) : null;
+      }
     }
     if (me.role === "attorney" && typeof barNumber === "string") {
       me.barNumber = normStr(barNumber, { len: 100 }).trim();

@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Attorney Account Settings | Let’s-ParaConnect</title>
+  <title>Account Settings | Let<span class="gold">’</span>s-ParaConnect</title>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/libs/cropper/cropper.main.css" />
   <script src="assets/scripts/utils/session.js"></script>
   <style>
+    .gold{color:#b4975a;}
     :root {
       --bg: #ffffff;
       --sidebar-bg: #f5f5f5e6;
@@ -264,11 +265,16 @@
       gap: 8px;
     }
 
+    .field-block.full-width {
+      grid-column: 1 / -1;
+    }
+
     input[type="text"],
     input[type="email"],
     input[type="tel"],
     input[type="url"],
     input[type="password"],
+    input[type="number"],
     textarea {
       border-radius: 12px;
       border: 1px solid var(--line);
@@ -289,6 +295,73 @@
     textarea {
       min-height: 120px;
       resize: vertical;
+    }
+
+    #yearsExperienceInput {
+      max-width: 220px;
+      text-align: center;
+      font-weight: 400;
+      letter-spacing: 0.02em;
+    }
+
+    #yearsExperienceInput::-webkit-inner-spin-button,
+    #yearsExperienceInput::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    #yearsExperienceInput[type="number"] {
+      -moz-appearance: textfield;
+    }
+
+    #certificateUpload,
+    #resumeUpload {
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      padding: 10px 14px;
+      background: #fff;
+      font-family: var(--font-sans);
+      cursor: pointer;
+    }
+
+    #certificateUpload::file-selector-button,
+    #resumeUpload::file-selector-button {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 16px;
+      margin-right: 12px;
+      background: var(--accent);
+      color: #fff;
+      font-family: var(--font-sans);
+      font-weight: 400;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    #certificateUpload::file-selector-button:hover,
+    #resumeUpload::file-selector-button:hover {
+      background: var(--accent-dark);
+      transform: translateY(-1px);
+    }
+
+    #certificateUpload::-webkit-file-upload-button,
+    #resumeUpload::-webkit-file-upload-button {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 16px;
+      margin-right: 12px;
+      background: var(--accent);
+      color: #fff;
+      font-family: var(--font-sans);
+      font-weight: 400;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    #certificateUpload::-webkit-file-upload-button:hover,
+    #resumeUpload::-webkit-file-upload-button:hover {
+      background: var(--accent-dark);
+      transform: translateY(-1px);
     }
 
     .grid {
@@ -543,7 +616,7 @@
 </head>
 <body>
   <aside class="sidebar">
-    <div class="logo">Let’s-ParaConnect</div>
+    <div class="logo">Let<span class="gold">’</span>s-ParaConnect</div>
     <nav class="settings-nav" aria-label="Settings navigation">
       <button class="active" data-target="profileSection">Profile</button>
       <button data-target="securitySection">Security</button>
@@ -558,8 +631,8 @@
     <section class="unified-header" aria-label="Attorney header">
       <div class="title-block">
         <p class="eyebrow">Account</p>
-        <h1>Account Settings</h1>
-        <p>Keep your LPC profile accurate, stay secure, and control how we notify you.</p>
+        <h1 id="accountSettingsTitle">Account Settings</h1>
+        <p id="accountSettingsSubtitle">Keep your LPC profile accurate, stay secure, and control how we notify you.</p>
       </div>
     </section>
 
@@ -607,14 +680,44 @@
             <label for="linkedInInput">LinkedIn</label>
             <input type="url" id="linkedInInput" name="linkedInURL" placeholder="https://www.linkedin.com/in/username" />
           </div>
+          <div class="field-block" data-paralegal-only data-force-visible>
+            <label for="practiceAreasInput">Practice Areas (comma separated)</label>
+            <input type="text" id="practiceAreasInput" placeholder="Litigation, Family Law, Immigration" />
+          </div>
+          <div class="field-block" data-paralegal-only data-force-visible>
+            <label for="yearsExperienceInput">Years of Experience</label>
+            <input type="number" id="yearsExperienceInput" min="0" placeholder="e.g., 5" />
+          </div>
+          <div class="field-block" data-paralegal-only data-force-visible>
+            <label for="skillsInput">Skills (comma separated)</label>
+            <input type="text" id="skillsInput" placeholder="Legal Research, Drafting, Discovery" />
+          </div>
+          <div class="field-block full-width" data-paralegal-only data-force-visible>
+            <label for="educationInput">Education (one per line)</label>
+            <textarea id="educationInput" placeholder="B.A. Criminal Justice — UCLA
+Paralegal Certificate — UCSD"></textarea>
+          </div>
+          <div class="field-block full-width" data-paralegal-only data-force-visible>
+            <label for="experienceInput">Experience Timeline (one per line)</label>
+            <textarea id="experienceInput" placeholder="Paralegal at Smith & Co. (2020–2023)
+Legal Assistant at..."></textarea>
+          </div>
+          <div class="field-block" data-paralegal-only data-force-visible>
+            <label for="certificateUpload">Upload Certificate (PDF)</label>
+            <input type="file" id="certificateUpload" accept="application/pdf" />
+          </div>
+          <div class="field-block" data-paralegal-only data-force-visible>
+            <label for="resumeUpload">Upload Résumé (PDF)</label>
+            <input type="file" id="resumeUpload" accept="application/pdf" />
+          </div>
         </div>
-        <label for="bio">
+        <label for="bioInput">
           Bio (optional)
-          <textarea id="bio" name="bio"></textarea>
+          <textarea id="bioInput" name="bio"></textarea>
         </label>
         <div class="btn-row">
           <button class="btn btn-primary" type="button" id="profileSaveBtn">Save changes</button>
-           <button class="btn btn-outline" type="button" id="viewProfileBtn">
+          <button class="btn btn-outline" type="button" id="previewProfileBtn">
     View Profile
   </button>
         </div>

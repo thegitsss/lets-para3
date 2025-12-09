@@ -77,6 +77,7 @@ const state = {
   viewerRole: "",
   viewerId: "",
   paralegalId: "",
+  viewingSelf: false,
   profile: null,
   caseContextId: null,
   openCases: [],
@@ -132,11 +133,23 @@ async function init() {
 
   const params = new URLSearchParams(window.location.search);
   state.caseContextId = params.get("caseId") || null;
-  const explicitId = params.get("id");
+  const explicitId = params.get("id") || params.get("paralegalId");
+  state.viewingSelf = params.get("me") === "1";
 
   if (explicitId && explicitId.trim()) {
     state.paralegalId = explicitId.trim();
-  } else if (state.viewerRole === "paralegal") {
+  } else {
+    const slugMatch = window.location.pathname.match(/paralegal\/([^/?#]+)/i);
+    if (slugMatch && slugMatch[1]) {
+      state.paralegalId = slugMatch[1];
+    }
+  }
+
+  if (state.viewingSelf && state.viewerRole === "paralegal") {
+    state.paralegalId = state.viewerId;
+  }
+
+  if (!state.paralegalId && state.viewerRole === "paralegal") {
     state.paralegalId = state.viewerId;
   }
 
@@ -480,12 +493,28 @@ function bindHeaderEvents() {
 
 async function loadProfile() {
   try {
-    const res = await secureFetch(`/api/users/${encodeURIComponent(state.paralegalId)}`, {
-      headers: { Accept: "application/json" },
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.error || "Unable to load profile");
-    state.profile = { ...data, id: data.id || data._id || state.paralegalId };
+    let data;
+    if (state.viewingSelf) {
+      const res = await secureFetch("/api/users/me", {
+        headers: { Accept: "application/json" },
+        noRedirect: true,
+      });
+      data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to load profile");
+      state.profile = { ...data, id: data.id || data._id || state.viewerId || "" };
+      if (!state.paralegalId && state.profile.id) {
+        state.paralegalId = state.profile.id;
+      }
+    } else {
+      if (!state.paralegalId) throw new Error("Paralegal not found");
+      const res = await secureFetch(`/api/paralegals/${encodeURIComponent(state.paralegalId)}`, {
+        headers: { Accept: "application/json" },
+        noRedirect: true,
+      });
+      data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Unable to load profile");
+      state.profile = { ...data, id: data.id || data._id || state.paralegalId };
+    }
     applyGlobalAvatars(state.profile);
     applyAvatar(state.profile);
     renderProfile(state.profile);
@@ -515,9 +544,14 @@ function renderProfile(profile) {
   renderAvatar(fullName, getProfileImageUrl(profile));
   renderStatus(profile);
   renderMetadata(profile);
-  renderPills(elements.skillsList, profile.skills, "This paralegal hasn’t shared skills yet.");
-  renderPills(elements.practiceList, profile.practiceAreas, "No practice areas listed yet.");
-  renderExperience(profile.experience);
+  const skillValues =
+    (Array.isArray(profile.skills) && profile.skills.length ? profile.skills : null) ||
+    (Array.isArray(profile.highlightedSkills) && profile.highlightedSkills.length ? profile.highlightedSkills : null);
+  renderSkills(elements.skillsList, skillValues, "This paralegal hasn’t shared skills yet.");
+  const practiceValues =
+    (Array.isArray(profile.practiceAreas) && profile.practiceAreas.length ? profile.practiceAreas : null) ||
+    (Array.isArray(profile.specialties) && profile.specialties.length ? profile.specialties : null);
+    renderExperience(profile.experience);
   renderEducation(profile.education);
   renderFunFacts(profile.about, profile.writingSamples);
   renderAttorneyHighlights(profile);
@@ -621,6 +655,41 @@ function extractState(rawLocation = "") {
     .filter(Boolean);
   if (!parts.length) return "";
   return parts[parts.length - 1];
+}
+
+function renderSkills(container, values, emptyCopy) {
+  if (!container) return;
+  container.innerHTML = "";
+  const list = Array.isArray(values) ? values.filter(Boolean) : [];
+  if (!list.length) {
+    const empty = document.createElement("p");
+    empty.textContent = emptyCopy;
+    empty.style.color = "var(--muted)";
+    empty.style.fontSize = "0.95rem";
+    container.appendChild(empty);
+    return;
+  }
+  list.slice(0, 10).forEach((value, index) => {
+    const skill = document.createElement("div");
+    skill.className = "skill";
+
+    const label = document.createElement("span");
+    label.className = "skill-label";
+    label.textContent = value;
+
+    const line = document.createElement("div");
+    line.className = "skill-line";
+
+    const progress = document.createElement("div");
+    progress.className = "skill-progress";
+    const percent = 40 + ((index % 5) * 12);
+    progress.style.width = `${Math.min(percent, 100)}%`;
+
+    line.appendChild(progress);
+    skill.appendChild(label);
+    skill.appendChild(line);
+    container.appendChild(skill);
+  });
 }
 
 function renderPills(container, values, emptyCopy) {

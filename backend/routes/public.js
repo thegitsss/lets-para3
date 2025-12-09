@@ -243,7 +243,17 @@ router.get(
   asyncHandler(async (req, res) => {
     const page = clamp(parseInt(req.query.page, 10) || 1, 1, 10_000);
     const limit = clamp(parseInt(req.query.limit, 10) || 12, 1, 50);
-    const search = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    const search =
+      typeof req.query.q === "string" && req.query.q.trim()
+        ? req.query.q.trim()
+        : typeof req.query.search === "string"
+        ? req.query.search.trim()
+        : "";
+    const availability = typeof req.query.availability === "string" ? req.query.availability.trim() : "";
+    const location = typeof req.query.location === "string" ? req.query.location.trim() : "";
+    const practiceRaw = typeof req.query.practice === "string" ? req.query.practice.trim() : "";
+    const minYears = parseInt(req.query.minYears, 10);
+    const sortKey = typeof req.query.sort === "string" ? req.query.sort.trim().toLowerCase() : "recent";
 
     const filter = { role: "paralegal", status: "approved" };
     if (search) {
@@ -259,10 +269,36 @@ router.get(
         { state: rx },
       ];
     }
+    if (availability) {
+      filter.availability = new RegExp(escapeRegex(availability), "i");
+    }
+    if (location) {
+      filter.location = new RegExp(escapeRegex(location), "i");
+    }
+    if (practiceRaw) {
+      const tokens = practiceRaw
+        .split(/[|,]/)
+        .map((token) => token.trim())
+        .filter(Boolean)
+        .map((token) => new RegExp(escapeRegex(token), "i"));
+      if (tokens.length) {
+        filter.practiceAreas = { $in: tokens };
+      }
+    }
+    if (Number.isFinite(minYears) && minYears > 0) {
+      filter.yearsExperience = { $gte: minYears };
+    }
+
+    const sort =
+      sortKey === "alpha"
+        ? { firstName: 1, lastName: 1 }
+        : sortKey === "experience"
+        ? { yearsExperience: -1 }
+        : { createdAt: -1 };
 
     const [docs, total] = await Promise.all([
       User.find(filter)
-        .sort({ createdAt: -1 })
+        .sort(sort)
         .skip((page - 1) * limit)
         .limit(limit)
         .select(PUBLIC_PAR_FIELDS)

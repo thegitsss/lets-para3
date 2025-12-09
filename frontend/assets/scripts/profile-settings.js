@@ -52,17 +52,30 @@ function showToast(message, type = "info") {
   }
 }
 
+function showForceVisible() {
+  document.querySelectorAll("[data-force-visible]").forEach((el) => {
+    el.style.display = "block";
+    el.hidden = false;
+  });
+}
+
 function applyUnifiedRoleStyling(user = {}) {
+  showForceVisible();
   const role = (user.role || "").trim().toLowerCase();
   const eyebrow = document.querySelector(".unified-header .eyebrow");
   const title = document.querySelector(".unified-header h1");
 
   if (eyebrow) eyebrow.textContent = "Account";
   if (title) {
-    title.textContent = role === "paralegal" ? "Paralegal Account Settings" : "Attorney Account Settings";
+    title.textContent = role === "paralegal" ? "Account Settings" : "Account Settings";
   }
 
   document.querySelectorAll("[data-paralegal-only]").forEach((el) => {
+    if (el.dataset.forceVisible !== undefined) {
+      el.style.display = "";
+      el.hidden = false;
+      return;
+    }
     el.style.display = role === "paralegal" ? "" : "none";
   });
 
@@ -124,11 +137,24 @@ function syncCluster(user = {}) {
 }
 
 async function loadSettings() {
+  showForceVisible();
   let user = {};
   try {
     const res = await secureFetch("/api/users/me");
     user = await res.json();
     currentUser = user;
+    const titleEl = document.getElementById("accountSettingsTitle");
+    const subtitleEl = document.getElementById("accountSettingsSubtitle");
+
+    if (currentUser?.role === "paralegal") {
+      if (titleEl) titleEl.textContent = "Paralegal Account Settings";
+      if (subtitleEl) subtitleEl.textContent = "Keep your LPC profile accurate, stay secure, and manage your public paralegal profile.";
+    }
+
+    if (currentUser?.role === "attorney") {
+      if (titleEl) titleEl.textContent = "Account Settings";
+      if (subtitleEl) subtitleEl.textContent = "Keep your LPC profile accurate, stay secure, and control how we notify you.";
+    }
     enforceUnifiedRoleStyling(user);
     applyAvatar(user);
     hydrateProfileForm(user);
@@ -143,6 +169,31 @@ async function loadSettings() {
     if (phoneInput) phoneInput.value = user.phoneNumber || user.phone || "";
     const lawFirmInput = document.getElementById("lawFirmInput");
     if (lawFirmInput) lawFirmInput.value = user.lawFirm || "";
+    if (user.role === "paralegal") {
+      const linkedInInput = document.getElementById("linkedInInput");
+      if (linkedInInput) linkedInInput.value = user.linkedInURL || "";
+      const yearsExperienceInput = document.getElementById("yearsExperienceInput");
+      if (yearsExperienceInput) yearsExperienceInput.value = user.yearsExperience ?? "";
+      const practiceAreasInput = document.getElementById("practiceAreasInput");
+      if (practiceAreasInput) practiceAreasInput.value = (user.practiceAreas || []).join(", ");
+      const skillsInput = document.getElementById("skillsInput");
+      const skillValues = user.highlightedSkills || user.skills || [];
+      if (skillsInput) skillsInput.value = skillValues.join(", ");
+      const experienceInput = document.getElementById("experienceInput");
+      if (experienceInput) {
+        experienceInput.value = (user.experience || [])
+          .map((e) => `${e.title || ""} — ${e.years || ""}\n${e.description || ""}`.trim())
+          .filter(Boolean)
+          .join("\n\n");
+      }
+      const educationInput = document.getElementById("educationInput");
+      if (educationInput) {
+        educationInput.value = (user.education || [])
+          .map((e) => `${e.degree || ""} — ${e.school || ""}`.trim())
+          .filter(Boolean)
+          .join("\n");
+      }
+    }
   } catch (err) {
     renderFallback("settingsResume", "Résumé");
     renderFallback("settingsBio", "Bio");
@@ -158,7 +209,7 @@ async function loadSettings() {
   settingsState.bio = user.bio || "";
   settingsState.education = user.education || [];
   settingsState.awards = user.awards || [];
-  settingsState.highlightedSkills = user.highlightedSkills || [];
+  settingsState.highlightedSkills = user.highlightedSkills || user.skills || [];
   settingsState.linkedInURL = user.linkedInURL || "";
   settingsState.notificationPrefs = user.notificationPrefs || {};
   settingsState.profileImage = user.profileImage || user.avatarURL || "";
@@ -186,7 +237,7 @@ function hydrateProfileForm(user = {}) {
   if (phoneInput) phoneInput.value = user.phoneNumber || "";
   const lawFirmInput = document.getElementById("lawFirmInput");
   if (lawFirmInput) lawFirmInput.value = user.lawFirm || "";
-  const bioInput = document.getElementById("bio");
+  const bioInput = document.getElementById("bioInput");
   if (bioInput) bioInput.value = user.bio || "";
 }
 
@@ -350,7 +401,7 @@ function loadAwards(user) {
 function loadSkills(user) {
   const section = document.getElementById("settingsSkills");
   if (!section) return;
-  const items = user.highlightedSkills || [];
+  const items = user.highlightedSkills || user.skills || [];
 
   section.innerHTML = `
     <h3>Highlighted Skills (Top 3–5)</h3>
@@ -462,6 +513,12 @@ async function saveSettings() {
   const phoneInput = document.getElementById("phoneInput");
   const lawFirmInput = document.getElementById("lawFirmInput");
   const bioInput = document.getElementById("bioInput");
+  const linkedInInput = document.getElementById("linkedInInput");
+  const yearsExperienceInput = document.getElementById("yearsExperienceInput");
+  const practiceAreasInput = document.getElementById("practiceAreasInput");
+  const skillsInput = document.getElementById("skillsInput");
+  const experienceInput = document.getElementById("experienceInput");
+  const educationInput = document.getElementById("educationInput");
   const body = {
     firstName: firstNameInput ? firstNameInput.value.trim() : "",
     lastName: lastNameInput ? lastNameInput.value.trim() : "",
@@ -475,6 +532,51 @@ async function saveSettings() {
     linkedInURL: settingsState.linkedInURL,
     notificationPrefs: settingsState.notificationPrefs
   };
+
+  body.linkedInURL = linkedInInput?.value.trim() || null;
+  body.yearsExperience = yearsExperienceInput ? Number(yearsExperienceInput.value) || null : null;
+  body.practiceAreas = practiceAreasInput
+    ? practiceAreasInput.value
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+  body.highlightedSkills = skillsInput
+    ? skillsInput.value
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : [];
+  body.skills = body.highlightedSkills;
+  body.experience = experienceInput
+    ? experienceInput.value
+        .split(/\n\s*\n/)
+        .map((block) => block.trim())
+        .filter(Boolean)
+        .map((block) => {
+          const [header, ...rest] = block.split("\n");
+          const [titlePart = "", yearsPart = ""] = (header || "").split("—").map((s) => s.trim());
+          const description = rest.join("\n").trim();
+          return {
+            title: titlePart || header || "",
+            years: yearsPart,
+            description
+          };
+        })
+        .filter((entry) => entry.title || entry.description)
+        .filter((entry) => entry.title || entry.description)
+    : [];
+  body.education = educationInput
+    ? educationInput.value
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const [degreePart = "", schoolPart = ""] = line.split("—").map((s) => s.trim());
+          return { degree: degreePart || line, school: schoolPart };
+        })
+        .filter((entry) => entry.degree || entry.school)
+    : [];
 
   const res = await secureFetch("/api/users/me", {
     method: "PATCH",
@@ -492,7 +594,7 @@ async function saveSettings() {
   settingsState.bio = updatedUser.bio || "";
   settingsState.education = updatedUser.education || [];
   settingsState.awards = updatedUser.awards || [];
-  settingsState.highlightedSkills = updatedUser.highlightedSkills || [];
+  settingsState.highlightedSkills = updatedUser.highlightedSkills || updatedUser.skills || [];
   settingsState.linkedInURL = updatedUser.linkedInURL || "";
   settingsState.notificationPrefs = updatedUser.notificationPrefs || settingsState.notificationPrefs;
   settingsState.profileImage = updatedUser.profileImage || settingsState.profileImage;
@@ -750,14 +852,26 @@ if (profileForm) {
   profileForm.addEventListener("submit", (e) => e.preventDefault());
 }
 
-const viewProfileBtn = document.getElementById("viewProfileBtn");
-if (viewProfileBtn) {
-  viewProfileBtn.addEventListener("click", () => {
-    if (!currentUser) return;
-    const role = (currentUser.role || "").trim().toLowerCase();
-    const id = currentUser.id || currentUser._id;
-    if (!id) return;
-    const target = role === "paralegal" ? "profile-paralegal.html" : "profile-attorney.html";
-    window.location.href = `${target}?id=${encodeURIComponent(id)}`;
+const previewBtn = document.getElementById("previewProfileBtn");
+if (previewBtn) {
+  previewBtn.addEventListener("click", () => {
+    if (!currentUser) {
+      alert("Unable to load your profile.");
+      return;
+    }
+
+    const role = (currentUser.role || "").toLowerCase();
+    const id = currentUser._id || currentUser.id;
+
+    if (!id) {
+      alert("Missing user id.");
+      return;
+    }
+
+    if (role === "attorney") {
+      window.location.href = `profile-attorney.html?id=${id}`;
+    } else {
+      window.location.href = `profile-paralegal.html?id=${id}`;
+    }
   });
 }

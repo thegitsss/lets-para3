@@ -51,7 +51,7 @@ const ROUTES = {
     role: "paralegal",
     title: "Jobs",
   },
-  "paralegal-profile": {
+  "profile-paralegal": {
     loader: () => import("./views/profile.js"),
     role: "paralegal",
     title: "Profile",

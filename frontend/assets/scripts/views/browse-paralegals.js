@@ -153,7 +153,7 @@ function onGridClick(event) {
   const button = event.target.closest(".pl-view-btn");
   if (!button || !button.dataset.id) return;
   const targetId = button.dataset.id;
-  window.location.href = `paralegal-profile.html?id=${encodeURIComponent(targetId)}`;
+  window.location.href = `profile-paralegal.html?id=${encodeURIComponent(targetId)}`;
 }
 
 function setStatus(message, isError = false) {

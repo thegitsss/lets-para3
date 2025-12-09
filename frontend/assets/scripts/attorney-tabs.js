@@ -125,6 +125,10 @@ async function bootAttorneyExperience() {
 
 function applyRoleVisibility(user) {
   const role = String(user?.role || "").toLowerCase();
+  document.querySelectorAll("[data-force-visible]").forEach((el) => {
+    el.style.display = "";
+    el.hidden = false;
+  });
   if (role === "paralegal") {
     document.querySelectorAll("[data-attorney-only]").forEach((el) => {
       el.style.display = "none";
@@ -132,7 +136,12 @@ function applyRoleVisibility(user) {
   }
   if (role === "attorney") {
     document.querySelectorAll("[data-paralegal-only]").forEach((el) => {
-      el.style.display = "none";
+      if (el.dataset.forceVisible !== undefined) {
+        el.style.display = "";
+        el.hidden = false;
+      } else {
+        el.style.display = "none";
+      }
     });
   }
 }
