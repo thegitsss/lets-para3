@@ -1,5 +1,24 @@
 import { secureFetch, requireAuth, logout } from "./auth.js";
 
+async function persistDocumentField(field, value) {
+  const payload = { [field]: value };
+  const res = await secureFetch("/api/users/me", {
+    method: "PATCH",
+    body: payload,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.msg || `Unable to save ${field}.`);
+  }
+  try {
+    localStorage.setItem("lpc_user", JSON.stringify(data));
+    window.updateSessionUser?.(data);
+  } catch {
+    /* ignore */
+  }
+  return data;
+}
+
 const MESSAGE_JUMP_KEY = "lpc_message_jump";
 function getProfileImageUrl(user = {}) {
   return user.profileImage || user.avatarURL || "assets/images/default-avatar.png";
@@ -24,6 +43,13 @@ function applyAvatar(user) {
   if (avatar) avatar.src = user.profileImage;
   if (preview) preview.src = user.profileImage;
 }
+function friendlyAvailabilityDate(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 const elements = {
   error: document.getElementById("profileError"),
   inviteBtn: document.getElementById("inviteToCaseBtn"),
@@ -47,6 +73,8 @@ const elements = {
   funFactsCopy: document.getElementById("funFactsCopy"),
   attorneyCard: document.getElementById("attorneyInsightsCard"),
   attorneyHighlights: document.getElementById("attorneyHighlights"),
+  languagesList: document.getElementById("languagesList"),
+  languagesEmpty: document.getElementById("languagesEmpty"),
   inviteModal: document.getElementById("inviteModal"),
   inviteCaseSelect: document.getElementById("inviteCaseSelect"),
   sendInviteBtn: document.getElementById("sendInviteBtn"),
@@ -70,6 +98,11 @@ const elements = {
   resumeUploadInput: document.getElementById("resumeUpload"),
   profilePhotoInput: document.getElementById("photoInput"),
   profileSaveBtn: document.getElementById("saveProfileBtn"),
+  certificateLink: document.getElementById("certificateLink"),
+  resumeLink: document.getElementById("resumeLink"),
+  writingSampleLink: document.getElementById("writingSampleLink"),
+  documentsEmpty: document.getElementById("documentsEmpty"),
+  documentsCard: document.getElementById("documentsCard"),
 };
 
 const state = {
@@ -82,6 +115,17 @@ const state = {
   caseContextId: null,
   openCases: [],
   inviteTarget: null,
+};
+
+const LANGUAGE_RING_MAP = {
+  native: 1,
+  "native / bilingual": 1,
+  bilingual: 1,
+  fluent: 1,
+  professional: 0.7,
+  conversational: 0.55,
+  intermediate: 0.5,
+  basic: 0.35,
 };
 
 const toast = window.toastUtils;
@@ -101,6 +145,16 @@ function applyRoleVisibility(user) {
 }
 
 document.addEventListener("DOMContentLoaded", init);
+
+window.addEventListener("lpc:user-updated", (event) => {
+  const updated = event?.detail;
+  if (!updated || !state.profile) return;
+  const updatedId = String(updated._id || updated.id || "");
+  const currentId = String(state.profile.id || state.paralegalId || "");
+  if (!updatedId || updatedId !== currentId) return;
+  state.profile = { ...state.profile, ...updated };
+  renderProfile(state.profile);
+});
 
 async function init() {
   let sessionUser;
@@ -191,6 +245,35 @@ function bindCtaEvents() {
     if (event.target === elements.inviteModal) closeInviteModal();
   });
   elements.sendInviteBtn?.addEventListener("click", sendInviteToCase);
+
+  bindDocumentLinks();
+}
+
+function bindDocumentLinks() {
+  [elements.certificateLink, elements.resumeLink, elements.writingSampleLink].forEach((link) => {
+    if (!link) return;
+    link.addEventListener("click", async (event) => {
+      const key = link.dataset.key;
+      if (!key) return;
+      event.preventDefault();
+      try {
+        const signed = await fetchDocumentUrl(key);
+        if (signed) window.open(signed, "_blank", "noopener");
+        else showToast("Document is unavailable.", "error");
+      } catch (err) {
+        console.error(err);
+        showToast("Unable to open document.", "error");
+      }
+    });
+  });
+}
+
+async function fetchDocumentUrl(key) {
+  const params = new URLSearchParams({ key });
+  const res = await secureFetch(`/api/uploads/signed-get?${params.toString()}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.url) throw new Error(data?.msg || "Download failed");
+  return data.url;
 }
 
 function bindProfileForm() {
@@ -314,10 +397,13 @@ async function uploadCertificate(file) {
     }
     const url = data?.url || data?.certificateURL || data?.location || data?.fileURL || null;
     if (url) {
+      const updated = await persistDocumentField("certificateURL", url);
+      const certificateKey = updated?.certificateKey || updated?.certificateURL || url;
       const snapshot = state.profile || { id: state.paralegalId };
-      state.profile = { ...snapshot, certificateURL: url };
+      state.profile = { ...snapshot, certificateURL: certificateKey, certificateKey };
       renderMetadata(state.profile);
       renderAttorneyHighlights(state.profile);
+      renderDocumentLinks(state.profile);
     }
     showToast("Certificate uploaded.", "success");
   } catch (err) {
@@ -350,21 +436,31 @@ async function uploadResume(file) {
   const formData = new FormData();
   formData.append("file", file, file.name || "resume.pdf");
   try {
-    const res = await secureFetch("/api/uploads/paralegal-resume", {
+    const res = await fetch("/api/uploads/paralegal-resume", {
       method: "POST",
+      credentials: "include",
       body: formData,
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.error || "Unable to upload résumé");
+    if (!res.ok || !data?.url) {
+      throw new Error(data?.error || data?.msg || "Unable to upload résumé");
     }
-    const url = data?.url || data?.resumeURL || data?.location || data?.fileURL || null;
-    if (url) {
-      const snapshot = state.profile || { id: state.paralegalId };
-      state.profile = { ...snapshot, resumeURL: url };
-      renderMetadata(state.profile);
-      renderAttorneyHighlights(state.profile);
+    const key = data.key || data.url;
+    const patchRes = await fetch("/api/users/me", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resumeURL: key }),
+    });
+    if (!patchRes.ok) {
+      throw new Error("Could not save résumé to profile.");
     }
+    const resumeValue = key;
+    const snapshot = state.profile || { id: state.paralegalId };
+    state.profile = { ...snapshot, resumeURL: resumeValue };
+    renderMetadata(state.profile);
+    renderAttorneyHighlights(state.profile);
+    renderDocumentLinks(state.profile);
     showToast("Résumé uploaded.", "success");
   } catch (err) {
     console.error(err);
@@ -544,6 +640,7 @@ function renderProfile(profile) {
   renderAvatar(fullName, getProfileImageUrl(profile));
   renderStatus(profile);
   renderMetadata(profile);
+  renderLanguages(profile.languages || []);
   const skillValues =
     (Array.isArray(profile.skills) && profile.skills.length ? profile.skills : null) ||
     (Array.isArray(profile.highlightedSkills) && profile.highlightedSkills.length ? profile.highlightedSkills : null);
@@ -551,10 +648,12 @@ function renderProfile(profile) {
   const practiceValues =
     (Array.isArray(profile.practiceAreas) && profile.practiceAreas.length ? profile.practiceAreas : null) ||
     (Array.isArray(profile.specialties) && profile.specialties.length ? profile.specialties : null);
-    renderExperience(profile.experience);
+  renderPills(elements.practiceList, practiceValues, "This paralegal hasn’t listed practice areas yet.");
+  renderExperience(profile.experience);
   renderEducation(profile.education);
   renderFunFacts(profile.about, profile.writingSamples);
   renderAttorneyHighlights(profile);
+  renderDocumentLinks(profile);
 }
 
 function populateProfileForm(profile) {
@@ -603,7 +702,8 @@ function renderAvatar(name, avatarUrl) {
 function renderStatus(profile) {
   if (!elements.statusChip) return;
   const message = profile.availability || "Availability on request";
-  elements.statusChip.textContent = message;
+  const nextAvailable = friendlyAvailabilityDate(profile.availabilityDetails?.nextAvailable);
+  elements.statusChip.textContent = nextAvailable ? `${message} · Next opening ${nextAvailable}` : message;
 }
 
 function renderMetadata(profile) {
@@ -620,23 +720,161 @@ function renderMetadata(profile) {
   } else if (profile.barNumber) {
     renderMetaLine(elements.credentialMeta, "C", `Bar #${profile.barNumber}`);
   } else {
-    renderMetaLine(elements.credentialMeta, "C", "Credentials available upon request");
+    const linkedIn = profile.linkedInURL || profile.linkedin || "";
+    if (linkedIn) {
+      renderMetaLine(elements.credentialMeta, "C", "LinkedIn", linkedIn);
+    } else {
+      renderMetaLine(elements.credentialMeta, "C", "Credentials available upon request");
+    }
   }
 
-  const joined = profile.createdAt ? new Date(profile.createdAt).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }) : "Date unavailable";
-  renderMetaLine(elements.joinedMeta, "J", `Joined ${joined}`);
+  const joinedSource = profile.approvedAt || profile.createdAt || null;
+  const joined =
+    joinedSource && !Number.isNaN(new Date(joinedSource).getTime())
+      ? new Date(joinedSource).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })
+      : null;
+  renderMetaLine(elements.joinedMeta, "J", joined ? `Joined ${joined}` : "Joined date unavailable");
 }
 
-function renderMetaLine(el, iconLetter, text, href) {
+function renderDocumentLinks(profile) {
+  let hasDoc = false;
+  const deriveKey = (value = "") => {
+    if (!value) return "";
+    if (/^https?:\/\//i.test(value)) {
+      try {
+        const url = new URL(value);
+        return url.pathname.replace(/^\/+/, "");
+      } catch {
+        return value;
+      }
+    }
+    return value.replace(/^\/+/, "");
+  };
+  if (elements.certificateLink) {
+    elements.certificateLink.setAttribute("href", "#");
+    const certKey = profile.certificateKey || profile.certificateURL;
+    if (certKey) {
+      const key = deriveKey(certKey);
+      if (key) {
+        elements.certificateLink.dataset.key = key;
+        if (/^https?:\/\//i.test(certKey)) {
+          elements.certificateLink.href = `${certKey}${certKey.includes("?") ? "&" : "?"}v=${Date.now()}`;
+        }
+        elements.certificateLink.classList.remove("hidden");
+        hasDoc = true;
+      } else {
+        elements.certificateLink.dataset.key = "";
+        elements.certificateLink.classList.add("hidden");
+      }
+    } else {
+      elements.certificateLink.dataset.key = "";
+      elements.certificateLink.classList.add("hidden");
+    }
+  }
+  if (elements.resumeLink) {
+    elements.resumeLink.setAttribute("href", "#");
+    const resumeKey = profile.resumeURL;
+    if (resumeKey) {
+      const key = deriveKey(resumeKey);
+      if (key) {
+        elements.resumeLink.dataset.key = key;
+        if (/^https?:\/\//i.test(resumeKey)) {
+          elements.resumeLink.href = `${resumeKey}${resumeKey.includes("?") ? "&" : "?"}v=${Date.now()}`;
+        }
+        elements.resumeLink.classList.remove("hidden");
+        hasDoc = true;
+      } else {
+        elements.resumeLink.dataset.key = "";
+        elements.resumeLink.classList.add("hidden");
+      }
+    } else {
+      elements.resumeLink.dataset.key = "";
+      elements.resumeLink.classList.add("hidden");
+    }
+  }
+  if (elements.writingSampleLink) {
+    elements.writingSampleLink.setAttribute("href", "#");
+    const writingKey = profile.writingSampleURL;
+    if (writingKey) {
+      const key = deriveKey(writingKey);
+      if (key) {
+        elements.writingSampleLink.dataset.key = key;
+        if (/^https?:\/\//i.test(writingKey)) {
+          elements.writingSampleLink.href = `${writingKey}${writingKey.includes("?") ? "&" : "?"}v=${Date.now()}`;
+        }
+        elements.writingSampleLink.classList.remove("hidden");
+        hasDoc = true;
+      } else {
+        elements.writingSampleLink.dataset.key = "";
+        elements.writingSampleLink.classList.add("hidden");
+      }
+    } else {
+      elements.writingSampleLink.dataset.key = "";
+      elements.writingSampleLink.classList.add("hidden");
+    }
+  }
+  if (elements.documentsEmpty) {
+    elements.documentsEmpty.classList.toggle("hidden", hasDoc);
+  }
+  if (elements.documentsCard) {
+    elements.documentsCard.classList.toggle("hidden", !hasDoc);
+  }
+}
+
+function normalizeLanguagesList(languages = []) {
+  if (!Array.isArray(languages)) return [];
+  return languages
+    .map((entry) => {
+      if (!entry) return null;
+      if (typeof entry === "string") {
+        const cleaned = entry.trim();
+        return cleaned ? { name: cleaned, proficiency: "" } : null;
+      }
+      const name = String(entry.name || entry.language || "").trim();
+      const proficiency = String(entry.proficiency || entry.level || "").trim();
+      if (!name) return null;
+      return { name, proficiency };
+    })
+    .filter(Boolean);
+}
+
+function renderLanguages(languages = []) {
+  const container = elements.languagesList;
+  const emptyState = elements.languagesEmpty;
+  if (!container) return;
+  container.innerHTML = "";
+  const normalized = normalizeLanguagesList(languages);
+  if (!normalized.length) {
+    if (emptyState) emptyState.classList.remove("hidden");
+    return;
+  }
+  if (emptyState) emptyState.classList.add("hidden");
+  normalized.forEach((lang) => {
+    const key = String(lang.proficiency || "").toLowerCase();
+    const rawValue = LANGUAGE_RING_MAP[key] ?? 0.5;
+    const ratio = Math.max(0.1, Math.min(1, rawValue));
+    const pct = Math.round(ratio * 100);
+    const item = document.createElement("div");
+    item.className = "language-item";
+    item.innerHTML = `
+      <div class="language-ring" style="--val:${ratio}turn;">${pct}%</div>
+      <div class="language-label">${escapeHtml(lang.name)}</div>
+      <div class="language-level">${lang.proficiency || "—"}</div>
+    `;
+    container.appendChild(item);
+  });
+}
+
+function renderMetaLine(el, _iconLetter, text, href) {
   if (!el) return;
   el.classList.remove("skeleton-block");
   el.classList.remove("hidden");
   if (href) {
-    el.innerHTML = `<span aria-hidden="true" style="font-weight:600;">${escapeHtml(iconLetter)}</span><a href="${escapeHtml(
-      href
-    )}" target="_blank" rel="noopener">${escapeHtml(text)}</a>`;
+    el.innerHTML = `<a class="hero-meta-link" href="${escapeHtml(href)}" target="_blank" rel="noopener">${escapeHtml(
+      text
+    )}</a>`;
   } else {
-    el.innerHTML = `<span aria-hidden="true" style="font-weight:600;">${escapeHtml(iconLetter)}</span>${escapeHtml(text)}`;
+    el.textContent = text || "";
   }
 }
 

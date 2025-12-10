@@ -47,6 +47,8 @@ const notificationSettingsSchema = new Schema(
     emailCase: { type: Boolean, default: true },
     smsMessages: { type: Boolean, default: false },
     smsCase: { type: Boolean, default: false },
+    email: { type: Boolean, default: true },
+    sms: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -72,6 +74,46 @@ const educationEntrySchema = new Schema(
   {
     degree: { type: String, trim: true, maxlength: 200 },
     school: { type: String, trim: true, maxlength: 200 },
+  },
+  { _id: false }
+);
+
+const sanitizeLanguageEntries = (value = []) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (!entry) return null;
+      if (typeof entry === "string") {
+        const clean = entry.trim().slice(0, 120);
+        return clean ? { name: clean, proficiency: "" } : null;
+      }
+      const name = String(entry.name || entry.language || "").trim().slice(0, 120);
+      const proficiency = String(entry.proficiency || entry.level || "").trim().slice(0, 120);
+      if (!name) return null;
+      return { name, proficiency };
+    })
+    .filter(Boolean);
+};
+
+const languageEntrySchema = new Schema(
+  {
+    name: { type: String, trim: true, maxlength: 120 },
+    proficiency: { type: String, trim: true, maxlength: 120 },
+  },
+  { _id: false }
+);
+
+const availabilityDetailsSchema = new Schema(
+  {
+    status: {
+      type: String,
+      enum: ["available", "unavailable"],
+      default: "available",
+      lowercase: true,
+      trim: true,
+    },
+    nextAvailable: { type: Date, default: null },
+    updatedAt: { type: Date, default: null },
   },
   { _id: false }
 );
@@ -105,14 +147,20 @@ const userSchema = new Schema(
     barNumber: { type: String, default: "", trim: true },         // attorneys
     resumeURL: { type: String, default: null },
     certificateURL: { type: String, default: "", trim: true },    // paralegals
+    writingSampleURL: { type: String, default: "", trim: true },
 
     // Status
     status: { type: String, enum: STATUS_ENUM, default: "pending", index: true },
+    approvedAt: { type: Date, default: null },
 
     // Optional profile
     bio: { type: String, default: "", trim: true, maxlength: 20_000 },
     about: { type: String, default: "", trim: true, maxlength: 20_000 },
     availability: { type: String, default: "Available Now", trim: true, maxlength: 200 },
+    availabilityDetails: {
+      type: availabilityDetailsSchema,
+      default: () => ({ status: "available", nextAvailable: null, updatedAt: null }),
+    },
     avatarURL: { type: String, default: "", trim: true },
     profileImage: { type: String, default: null },
     lawFirm: { type: String, default: "", trim: true, maxlength: 300 },
@@ -125,7 +173,7 @@ const userSchema = new Schema(
     jurisdictions: { type: [String], default: [], set: uniqueStrings },
     skills: { type: [String], default: [], set: uniqueStrings },
     yearsExperience: { type: Number, min: 0, max: 80, default: 0 },
-    languages: { type: [String], default: [], set: uniqueStrings },
+    languages: { type: [languageEntrySchema], default: [], set: sanitizeLanguageEntries },
     writingSamples: { type: [writingSampleSchema], default: [] },
     experience: { type: [experienceEntrySchema], default: [] },
     education: { type: [educationEntrySchema], default: [] },
@@ -141,6 +189,12 @@ const userSchema = new Schema(
       type: Map,
       of: Date,
       default: () => ({}),
+    },
+    twoFactorEnabled: { type: Boolean, default: false },
+    twoFactorBackupCodes: { type: [String], default: [] },
+    blockedUsers: {
+      type: [{ type: Types.ObjectId, ref: "User" }],
+      default: [],
     },
 
     // KYC / payouts (non-sensitive markers; do NOT store secrets)

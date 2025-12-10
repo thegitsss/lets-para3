@@ -89,6 +89,29 @@
       color: var(--ink);
     }
 
+    .settings-section {
+      display: none;
+    }
+
+    .settings-section.active {
+      display: block;
+    }
+
+    .settings-item {
+      width: 100%;
+      padding: 14px 20px;
+      text-align: left;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: 1.05rem;
+    }
+
+    .settings-item.active {
+      background: rgba(0, 0, 0, 0.06);
+      border-radius: 12px;
+    }
+
     .content {
       flex: 1;
       padding: 40px 48px;
@@ -161,6 +184,42 @@
     .settings-panel p {
       color: var(--muted);
       margin-bottom: 24px;
+    }
+
+    #securitySection {
+      margin-bottom: 28px;
+    }
+
+    #securitySection .settings-block:first-child {
+      margin-top: 0;
+    }
+
+    .settings-block {
+      margin-top: 22px;
+      padding: 18px 22px;
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+    }
+
+    .settings-block h3 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      margin-bottom: 12px;
+      font-size: 1.3rem;
+    }
+
+    .small-btn {
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 0.9rem;
     }
 
     form {
@@ -269,6 +328,58 @@
       grid-column: 1 / -1;
     }
 
+    .language-editor {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .language-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .language-row .language-name {
+      flex: 1 1 200px;
+      min-width: 160px;
+    }
+
+    .language-row .language-level {
+      flex: 1 1 180px;
+      min-width: 150px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      padding: 10px 36px 10px 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background:
+        linear-gradient(135deg, rgba(182, 164, 122, 0.18), rgba(0, 0, 0, 0)) padding-box,
+        linear-gradient(135deg, rgba(182, 164, 122, 0.35), rgba(0, 0, 0, 0.05)) border-box;
+      color: var(--ink);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath fill='%23a08655' d='M7 9L0 0h14z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      background-size: 12px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .language-row .language-level:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.25);
+    }
+
+    .language-row .remove-language {
+      border: none;
+      background: none;
+      color: var(--danger);
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 6px 10px;
+    }
+
     input[type="text"],
     input[type="email"],
     input[type="tel"],
@@ -312,57 +423,78 @@
 
     #yearsExperienceInput[type="number"] {
       -moz-appearance: textfield;
+      appearance: textfield;
     }
 
-    #certificateUpload,
-    #resumeUpload {
-      border-radius: 12px;
+    .file-input-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .upload-card {
       border: 1px solid var(--line);
-      padding: 10px 14px;
-      background: #fff;
-      font-family: var(--font-sans);
-      cursor: pointer;
+      border-radius: 22px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.8);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
 
-    #certificateUpload::file-selector-button,
-    #resumeUpload::file-selector-button {
+    .upload-card h3 {
+      margin: 0;
+      font-size: 1.1rem;
+      font-weight: 300;
+    }
+
+    .upload-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .file-trigger {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
       border: none;
       border-radius: 999px;
-      padding: 8px 16px;
-      margin-right: 12px;
       background: var(--accent);
       color: #fff;
+      padding: 10px 22px;
+      font-size: 0.95rem;
+      cursor: pointer;
       font-family: var(--font-sans);
       font-weight: 400;
-      cursor: pointer;
       transition: background 0.2s ease, transform 0.2s ease;
     }
 
-    #certificateUpload::file-selector-button:hover,
-    #resumeUpload::file-selector-button:hover {
+    .file-trigger:hover {
       background: var(--accent-dark);
       transform: translateY(-1px);
     }
 
-    #certificateUpload::-webkit-file-upload-button,
-    #resumeUpload::-webkit-file-upload-button {
-      border: none;
-      border-radius: 999px;
-      padding: 8px 16px;
-      margin-right: 12px;
-      background: var(--accent);
-      color: #fff;
-      font-family: var(--font-sans);
-      font-weight: 400;
-      cursor: pointer;
-      transition: background 0.2s ease, transform 0.2s ease;
+    .file-name {
+      font-size: 0.92rem;
+      color: var(--muted);
     }
 
-    #certificateUpload::-webkit-file-upload-button:hover,
-    #resumeUpload::-webkit-file-upload-button:hover {
-      background: var(--accent-dark);
-      transform: translateY(-1px);
+    .file-input-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      clip-path: inset(50%);
+      border: 0;
+      white-space: nowrap;
     }
+
 
     .grid {
       display: grid;
@@ -443,47 +575,45 @@
     .switch {
       position: relative;
       display: inline-block;
-      width: 54px;
-      height: 30px;
+      width: 46px;
+      height: 24px;
     }
 
     .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
+      display: none;
+    }
+
+    .hidden {
+      display: none !important;
     }
 
     .slider {
       position: absolute;
+      inset: 0;
+      background: #ccc;
+      border-radius: 24px;
       cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: rgba(0, 0, 0, 0.12);
       transition: 0.2s;
-      border-radius: 999px;
     }
 
     .slider:before {
-      position: absolute;
       content: "";
-      height: 22px;
-      width: 22px;
-      left: 4px;
-      top: 4px;
-      background-color: #fff;
-      transition: 0.2s;
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      top: 3px;
+      background: #fff;
       border-radius: 50%;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      transition: 0.2s;
     }
 
-    .switch input:checked + .slider {
-      background-color: var(--accent);
+    input:checked + .slider {
+      background: var(--accent);
     }
 
-    .switch input:checked + .slider:before {
-      transform: translateX(24px);
+    input:checked + .slider:before {
+      transform: translateX(22px);
     }
 
     .danger-panel {
@@ -618,10 +748,10 @@
   <aside class="sidebar">
     <div class="logo">Let<span class="gold">’</span>s-ParaConnect</div>
     <nav class="settings-nav" aria-label="Settings navigation">
-      <button class="active" data-target="profileSection">Profile</button>
-      <button data-target="securitySection">Security</button>
-      <button data-target="preferencesSection">Preferences</button>
-      <button data-target="dangerSection">Delete Account</button>
+      <button id="navProfile" class="settings-item active" data-target="profileSection">Profile</button>
+      <button id="navSecurity" class="settings-item" data-target="securitySection">Security</button>
+      <button id="navPreferences" class="settings-item" data-target="preferencesSection">Preferences</button>
+      <button id="navDelete" class="settings-item" data-target="deleteSection">Delete Account</button>
     </nav>
     <a class="btn btn-outline btn-light" href="dashboard-attorney.html" style="margin-top:auto;">Return to Dashboard</a>
   </aside>
@@ -636,7 +766,8 @@
       </div>
     </section>
 
-    <section class="settings-panel active" id="profileSection">
+    <div id="settingsContent">
+    <section class="settings-panel settings-section active" id="profileSection">
       <h2>Profile</h2>
       <p>Update your public-facing information and bio.</p>
       <form id="profileForm">
@@ -702,14 +833,14 @@ Paralegal Certificate — UCSD"></textarea>
             <textarea id="experienceInput" placeholder="Paralegal at Smith & Co. (2020–2023)
 Legal Assistant at..."></textarea>
           </div>
-          <div class="field-block" data-paralegal-only data-force-visible>
-            <label for="certificateUpload">Upload Certificate (PDF)</label>
-            <input type="file" id="certificateUpload" accept="application/pdf" />
+          <div class="field-block full-width" data-paralegal-only data-force-visible>
+            <label>Languages &amp; proficiency</label>
+            <div id="languagesEditor" class="language-editor"></div>
+            <button type="button" class="btn btn-outline" id="addLanguageBtn">Add language</button>
           </div>
-          <div class="field-block" data-paralegal-only data-force-visible>
-            <label for="resumeUpload">Upload Résumé (PDF)</label>
-            <input type="file" id="resumeUpload" accept="application/pdf" />
-          </div>
+          <div class="field-block" data-paralegal-only data-force-visible id="settingsCertificate"></div>
+          <div class="field-block" data-paralegal-only data-force-visible id="settingsResume"></div>
+          <div class="field-block" data-paralegal-only data-force-visible id="settingsWritingSample"></div>
         </div>
         <label for="bioInput">
           Bio (optional)
@@ -724,90 +855,64 @@ Legal Assistant at..."></textarea>
       </form>
     </section>
 
+    <section id="securitySection" class="settings-section">
+      <!-- Password -->
+      <div class="settings-block">
+        <h3>Change Password</h3>
+        <label>New Password</label>
+        <input type="password" id="newPassword" autocomplete="new-password">
+
+        <label>Confirm Password</label>
+        <input type="password" id="confirmPassword" autocomplete="new-password">
+
+        <button id="savePasswordBtn" class="btn btn-primary">Save Password</button>
+      </div>
+
+      <!-- 2FA -->
+      <div class="settings-block">
+        <h3>Two-Step Verification</h3>
+        <label class="switch">
+          <input type="checkbox" id="twoStepToggle">
+          <span class="slider"></span>
+        </label>
+        <p id="twoStepStatus" class="muted"></p>
+        <button id="generateBackupCodesBtn" class="small-btn hidden">Generate Backup Codes</button>
+        <div id="backupCodesContainer" class="hidden"></div>
+      </div>
+
+      <!-- Blocked Users -->
+      <div class="settings-block">
+        <h3>Blocked Users</h3>
+        <div id="blockedUsersList">Loading…</div>
+      </div>
+
+      <!-- Payouts / Stripe -->
+      <div class="settings-block">
+        <h3>Payouts Setup</h3>
+        <p>Connect your Stripe account to receive payouts.</p>
+        <button id="connectStripeBtn" class="btn btn-primary">Connect Stripe Account →</button>
+        <p id="stripeStatus" class="muted"></p>
+      </div>
+    </section>
+
+    <section class="settings-panel settings-section" id="preferencesSection">
+      <h2>Preferences</h2>
+      <label><input type="checkbox" id="emailNotifications" /> Email notifications</label><br />
+      <label><input type="checkbox" id="smsNotifications" /> SMS notifications</label><br />
+      <button id="savePreferencesBtn" class="btn btn-primary" type="button">Save Preferences</button>
+    </section>
+
+    <section class="settings-panel settings-section danger-panel" id="deleteSection">
+      <h2>Delete Account</h2>
+      <p>This action cannot be undone.</p>
+      <button id="deleteAccountBtn" class="btn danger-btn" type="button">Delete My Account</button>
+    </section>
+    </div>
+
     <section class="settings-panel" id="settingsResume" data-paralegal-only></section>
     <section class="settings-panel" id="settingsSkills" data-paralegal-only></section>
     <section class="settings-panel" id="settingsEducation" data-paralegal-only></section>
     <section class="settings-panel" id="settingsAwards" data-paralegal-only></section>
-
-    <section class="settings-panel" id="securitySection">
-      <h2>Security</h2>
-      <p>Require a strong password to keep client work protected.</p>
-      <form id="passwordForm">
-        <label for="currentPassword">
-          Current password
-          <input type="password" id="currentPassword" name="currentPassword" autocomplete="current-password" required />
-        </label>
-        <div class="grid">
-          <label for="newPassword">
-            New password
-            <input type="password" id="newPassword" name="newPassword" autocomplete="new-password" required />
-          </label>
-          <label for="confirmPassword">
-            Confirm new password
-            <input type="password" id="confirmPassword" name="confirmPassword" autocomplete="new-password" required />
-          </label>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-primary" type="submit" id="passwordSaveBtn">Change password</button>
-        </div>
-      </form>
-    </section>
-
-    <section class="settings-panel" id="preferencesSection">
-      <h2>Preferences</h2>
-      <p>Decide when LPC should reach out.</p>
-      <form id="preferencesForm">
-        <div class="toggle-row">
-          <div>
-            <h3>Email notifications</h3>
-            <p>General updates for your matters and account.</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="prefEmail" />
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="toggle-row">
-          <div>
-            <h3>Case update alerts</h3>
-            <p>Be notified when a paralegal moves a case forward.</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="prefCaseUpdates" />
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="toggle-row">
-          <div>
-            <h3>Message notifications</h3>
-            <p>Know when a paralegal drops you a new message.</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="prefMessages" />
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="toggle-row">
-          <div>
-            <h3>Task reminders</h3>
-            <p>Stay on track with subtle nudges for open tasks.</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="prefTasks" />
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-primary" type="submit" id="preferencesSaveBtn">Save preferences</button>
-        </div>
-      </form>
-    </section>
-
-    <section class="settings-panel danger-panel" id="dangerSection">
-      <h2>Delete Account</h2>
-      <p>Once you delete this account, there is no going back.</p>
-      <button class="btn danger-btn" id="deleteAccountBtn" type="button">Delete account</button>
-    </section>
   </main>
 
   <div id="toastBanner" class="toast" role="status" aria-live="assertive"></div>

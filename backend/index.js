@@ -16,6 +16,7 @@ app.set("trust proxy", 1);
 const PROD = process.env.NODE_ENV === "production";
 const PORT = 5050;
 const FRONTEND_DIR = path.join(__dirname, "../frontend");
+const PUBLIC_DIR = path.join(__dirname, "../public");
 
 // 3) Global Middleware
 app.use((req, res, next) => {
@@ -80,11 +81,14 @@ const jobsRouter = require("./routes/jobs");
 const applicationsRouter = require("./routes/applications");
 const attorneyDashboardRouter = require("./routes/attorneyDashboard");
 const paralegalDashboardRouter = require("./routes/paralegalDashboard");
+const paralegalsRouter = require("./routes/paralegals");
 const chatRouter = require("./routes/chat");
 const checklistRouter = require("./routes/checklist");
 const eventsRouter = require("./routes/events");
 const verificationRouter = require("./routes/verification");
 const publicRouter = require("./routes/public");
+const accountRouter = require("./routes/account");
+const stripeRouter = require("./routes/stripe");
 const { startPurgeWorker } = require("./services/caseLifecycle");
 
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }), paymentsWebhookHandler);
@@ -103,8 +107,11 @@ app.use("/api/jobs", jobsRouter);
 app.use("/api/applications", applicationsRouter);
 app.use("/api/attorney/dashboard", attorneyDashboardRouter);
 app.use("/api/paralegal/dashboard", paralegalDashboardRouter);
+app.use("/api/paralegals", paralegalsRouter);
 app.use("/api/chat", chatRouter);
 app.use("/api/users", usersRouter);
+app.use("/api/account", accountRouter);
+app.use("/api/stripe", stripeRouter);
 app.use("/api/verify", verificationRouter);
 app.use("/api/public", publicRouter);
 app.use("/public", publicRouter);
@@ -130,6 +137,7 @@ app.use((req, res, next) => {
 });
 
 // 6) Static + SPA fallback
+app.use(express.static(PUBLIC_DIR));
 app.use(express.static(FRONTEND_DIR));
 app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/index.html"));

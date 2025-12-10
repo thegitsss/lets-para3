@@ -1,9 +1,96 @@
 import { secureFetch, persistSession } from "./auth.js";
 
+document.addEventListener("DOMContentLoaded", () => {
+  const navItems = {
+    navProfile: "profileSection",
+    navSecurity: "securitySection",
+    navPreferences: "preferencesSection",
+    navDelete: "deleteSection"
+  };
+
+  Object.keys(navItems).forEach(navId => {
+    const btn = document.getElementById(navId);
+    const sectionId = navItems[navId];
+
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".settings-item").forEach(el => el.classList.remove("active"));
+      btn.classList.add("active");
+
+      document.querySelectorAll(".settings-section").forEach(sec => sec.classList.remove("active"));
+      const section = document.getElementById(sectionId);
+      section?.classList.add("active");
+    });
+  });
+
+  const passwordBtn = document.getElementById("savePasswordBtn");
+  if (passwordBtn) {
+    passwordBtn.addEventListener("click", async () => {
+      const newPass = document.getElementById("newPassword")?.value || "";
+      const confirm = document.getElementById("confirmPassword")?.value || "";
+
+      if (newPass !== confirm) {
+        alert("Passwords do not match!");
+        return;
+      }
+
+      const res = await fetch("/api/account/update-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ password: newPass })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      alert(data.msg || "Password updated!");
+    });
+  }
+
+  const prefBtn = document.getElementById("savePreferencesBtn");
+  if (prefBtn) {
+    prefBtn.addEventListener("click", async () => {
+      const email = document.getElementById("emailNotifications")?.checked || false;
+      const sms = document.getElementById("smsNotifications")?.checked || false;
+
+      const res = await fetch("/api/account/preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, sms })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      alert(data.msg || "Preferences saved!");
+    });
+  }
+
+  const deleteBtn = document.getElementById("deleteAccountBtn");
+  if (deleteBtn) {
+    deleteBtn.addEventListener("click", async () => {
+      if (!confirm("Are you sure? This action cannot be undone.")) return;
+
+      const res = await fetch("/api/account/delete", {
+        method: "DELETE",
+        credentials: "include"
+      });
+
+      if (res.ok) {
+        window.location.href = "/goodbye.html";
+      } else {
+        alert("Error deleting account.");
+      }
+    });
+  }
+});
+
+const PREFILL_CACHE_KEY = "lpc_edit_profile_prefill";
+
 document.addEventListener("DOMContentLoaded", async () => {
-  const cachedUser = getCachedUser();
+  const prefill = consumeEditPrefillUser();
+  const cachedUser = prefill || getCachedUser();
   if (cachedUser) {
-    enforceUnifiedRoleStyling(cachedUser);
+    bootstrapProfileSettings(cachedUser);
   }
   await window.checkSession();
   await loadSettings();
@@ -13,6 +100,9 @@ let settingsState = {
   profileImageFile: null,
   profileImage: "",
   resumeFile: null,
+  pendingResumeKey: "",
+  pendingCertificateKey: "",
+  pendingWritingSampleKey: "",
   bio: "",
   education: [],
   awards: [],
@@ -22,6 +112,126 @@ let settingsState = {
 };
 
 let currentUser = null;
+
+const LANGUAGE_PROFICIENCY_OPTIONS = [
+  { value: "Native", label: "Native / Bilingual" },
+  { value: "Fluent", label: "Fluent" },
+  { value: "Professional", label: "Professional" },
+  { value: "Conversational", label: "Conversational" },
+  { value: "Basic", label: "Basic" }
+];
+
+const languagesEditor = document.getElementById("languagesEditor");
+const addLanguageBtn = document.getElementById("addLanguageBtn");
+
+if (addLanguageBtn && languagesEditor) {
+  addLanguageBtn.addEventListener("click", () => addLanguageRow());
+}
+
+function consumeEditPrefillUser() {
+  try {
+    const raw = localStorage.getItem(PREFILL_CACHE_KEY);
+    if (!raw) return null;
+    localStorage.removeItem(PREFILL_CACHE_KEY);
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function seedSettingsState(user = {}) {
+  settingsState.bio = user.bio || "";
+  settingsState.education = user.education || [];
+  settingsState.awards = user.awards || [];
+  settingsState.highlightedSkills = user.highlightedSkills || user.skills || [];
+  settingsState.linkedInURL = user.linkedInURL || "";
+  settingsState.notificationPrefs = user.notificationPrefs || settingsState.notificationPrefs;
+}
+
+function bootstrapProfileSettings(user) {
+  enforceUnifiedRoleStyling(user);
+  currentUser = user;
+  hydrateProfileForm(user);
+  seedSettingsState(user);
+  renderLanguageEditor(user.languages || []);
+  try { loadCertificate(user); } catch {}
+  try { loadResume(user); } catch {}
+  try { loadWritingSample(user); } catch {}
+  try { loadBio(user); } catch {}
+  try { loadEducation(user); } catch {}
+  try { loadAwards(user); } catch {}
+  try { loadSkills(user); } catch {}
+  try { loadLinkedIn(user); } catch {}
+  try { loadNotifications(user); } catch {}
+}
+
+function normalizeLanguageEntry(entry) {
+  if (!entry) return { name: "", proficiency: "" };
+  if (typeof entry === "string") return { name: entry, proficiency: "" };
+  return {
+    name: entry.name || entry.language || "",
+    proficiency: entry.proficiency || entry.level || ""
+  };
+}
+
+function addLanguageRow(entry = {}) {
+  if (!languagesEditor) return;
+  const row = document.createElement("div");
+  row.className = "language-row";
+
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.placeholder = "Language (e.g., Spanish)";
+  nameInput.className = "language-name";
+  nameInput.value = entry.name || entry.language || "";
+  row.appendChild(nameInput);
+
+  const select = document.createElement("select");
+  select.className = "language-level";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Select proficiency";
+  select.appendChild(placeholder);
+  LANGUAGE_PROFICIENCY_OPTIONS.forEach((opt) => {
+    const option = document.createElement("option");
+    option.value = opt.value;
+    option.textContent = opt.label;
+    select.appendChild(option);
+  });
+  select.value = entry.proficiency || entry.level || "";
+  row.appendChild(select);
+
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "remove-language";
+  removeBtn.textContent = "Remove";
+  removeBtn.addEventListener("click", () => row.remove());
+  row.appendChild(removeBtn);
+
+  languagesEditor.appendChild(row);
+}
+
+function renderLanguageEditor(languages = []) {
+  if (!languagesEditor) return;
+  languagesEditor.innerHTML = "";
+  const entries =
+    Array.isArray(languages) && languages.length
+      ? languages.map((entry) => normalizeLanguageEntry(entry))
+      : [normalizeLanguageEntry()];
+  entries.forEach((entry) => addLanguageRow(entry));
+}
+
+function collectLanguagesFromEditor() {
+  if (!languagesEditor) return [];
+  return Array.from(languagesEditor.querySelectorAll(".language-row"))
+    .map((row) => {
+      const name = row.querySelector(".language-name")?.value.trim();
+      const proficiency = row.querySelector(".language-level")?.value || "";
+      if (!name) return null;
+      return { name, proficiency };
+    })
+    .filter(Boolean);
+}
 
 function getCachedUser() {
   if (typeof window.getStoredUser === "function") {
@@ -193,9 +403,12 @@ async function loadSettings() {
           .filter(Boolean)
           .join("\n");
       }
+      renderLanguageEditor(user.languages || []);
     }
   } catch (err) {
+    renderFallback("settingsCertificate", "Certificate");
     renderFallback("settingsResume", "Résumé");
+    renderFallback("settingsWritingSample", "Writing Sample");
     renderFallback("settingsBio", "Bio");
     renderFallback("settingsEducation", "Education");
     renderFallback("settingsAwards", "Awards");
@@ -206,16 +419,13 @@ async function loadSettings() {
   }
 
   // Store existing data
-  settingsState.bio = user.bio || "";
-  settingsState.education = user.education || [];
-  settingsState.awards = user.awards || [];
-  settingsState.highlightedSkills = user.highlightedSkills || user.skills || [];
-  settingsState.linkedInURL = user.linkedInURL || "";
-  settingsState.notificationPrefs = user.notificationPrefs || {};
+  seedSettingsState(user);
   settingsState.profileImage = user.profileImage || user.avatarURL || "";
 
   // Build UI
+  try { await loadCertificate(user); } catch { renderFallback("settingsCertificate", "Certificate"); }
   try { await loadResume(user); } catch { renderFallback("settingsResume", "Résumé"); }
+  try { await loadWritingSample(user); } catch { renderFallback("settingsWritingSample", "Writing Sample"); }
   try { await loadBio(user); } catch { renderFallback("settingsBio", "Bio"); }
   try { await loadEducation(user); } catch { renderFallback("settingsEducation", "Education"); }
   try { await loadAwards(user); } catch { renderFallback("settingsAwards", "Awards"); }
@@ -239,45 +449,267 @@ function hydrateProfileForm(user = {}) {
   if (lawFirmInput) lawFirmInput.value = user.lawFirm || "";
   const bioInput = document.getElementById("bioInput");
   if (bioInput) bioInput.value = user.bio || "";
+  const role = (user.role || "").toLowerCase();
+  if (role === "paralegal") {
+    const linkedInInput = document.getElementById("linkedInInput");
+    if (linkedInInput) linkedInInput.value = user.linkedInURL || "";
+    const yearsExperienceInput = document.getElementById("yearsExperienceInput");
+    if (yearsExperienceInput) yearsExperienceInput.value = user.yearsExperience ?? "";
+    const practiceAreasInput = document.getElementById("practiceAreasInput");
+    const practiceValues = Array.isArray(user.practiceAreas) ? user.practiceAreas : [];
+    if (practiceAreasInput) practiceAreasInput.value = practiceValues.join(", ");
+    const skillsInput = document.getElementById("skillsInput");
+    const skillsSource =
+      Array.isArray(user.highlightedSkills) && user.highlightedSkills.length
+        ? user.highlightedSkills
+        : Array.isArray(user.skills)
+        ? user.skills
+        : [];
+    if (skillsInput) skillsInput.value = skillsSource.join(", ");
+    const experienceInput = document.getElementById("experienceInput");
+    if (experienceInput) {
+      const experiences = Array.isArray(user.experience) ? user.experience : [];
+      experienceInput.value = experiences
+        .map((entry = {}) => {
+          const header = [entry.title, entry.years].filter(Boolean).join(" — ");
+          const details = entry.description ? `\n${entry.description}` : "";
+          return `${header}${details}`.trim();
+        })
+        .filter(Boolean)
+        .join("\n\n");
+    }
+    const educationInput = document.getElementById("educationInput");
+    if (educationInput) {
+      const schools = Array.isArray(user.education) ? user.education : [];
+      educationInput.value = schools
+        .map((entry = {}) => {
+          const line = [entry.degree, entry.school].filter(Boolean).join(" — ");
+          return line || "";
+        })
+        .filter(Boolean)
+        .join("\n");
+    }
+    renderLanguageEditor(user.languages || []);
+  }
 }
 
 
 // ================= RESUME =================
 
-function loadResume(user) {
-  const section = document.getElementById("settingsResume");
+function loadCertificate(user) {
+  const section = document.getElementById("settingsCertificate");
   if (!section) return;
   section.innerHTML = `
-    <h3>Résumé</h3>
-    ${user.resumeURL ? `<a href="${user.resumeURL}" target="_blank">View current résumé</a><br><br>` : ""}
-    <input id="resumeInput" type="file" accept="application/pdf">
-    <br><br>
-    <button id="uploadResumeBtn" class="primary-btn">Upload Résumé</button>
+    <div class="upload-card">
+      <h3>Upload Certificate (PDF)</h3>
+      <p>Share verified certifications or licenses with attorneys.</p>
+      <div class="file-input-row">
+        <label for="certificateInput" class="file-trigger">Choose File</label>
+        <span id="certificateFileName" class="file-name">${user.certificateURL ? "Certificate on file" : "No file chosen"}</span>
+      </div>
+      <input id="certificateInput" type="file" accept="application/pdf" class="file-input-hidden">
+      <button id="uploadCertificateBtn" class="file-trigger upload-action-btn" type="button">Upload Certificate</button>
+    </div>
   `;
 
-  document.getElementById("uploadResumeBtn").addEventListener("click", async () => {
-    const file = document.getElementById("resumeInput").files[0];
+  const certInput = document.getElementById("certificateInput");
+  const certFileName = document.getElementById("certificateFileName");
+  if (certInput) {
+    certInput.addEventListener("change", (event) => {
+      const file = event.target.files?.[0] || null;
+      if (certFileName) {
+        certFileName.textContent = file ? file.name : "No file chosen";
+      }
+    });
+  }
+
+  document.getElementById("uploadCertificateBtn")?.addEventListener("click", async () => {
+    const file = certInput?.files?.[0];
     if (!file) {
-      alert("Please choose a PDF résumé first.");
+      alert("Please choose a PDF certificate first.");
+      return;
+    }
+    if (file.type !== "application/pdf") {
+      alert("Certificate must be a PDF.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Certificate must be 10 MB or smaller.");
       return;
     }
 
     const fd = new FormData();
     fd.append("file", file);
 
-    const res = await secureFetch("/api/uploads/paralegal-resume", {
+    const res = await secureFetch("/api/uploads/paralegal-certificate", {
       method: "POST",
       body: fd
     });
-
+    const payload = await res.json().catch(() => ({}));
     if (!res.ok) {
-      alert("Resume upload failed.");
+      alert(payload.msg || "Certificate upload failed.");
       return;
     }
 
-    alert("Résumé uploaded!");
+    alert("Certificate uploaded! Click Save to publish the update.");
+
+    const certHidden = document.getElementById("certificateKeyInput") || (() => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.id = "certificateKeyInput";
+      input.name = "certificateKey";
+      section.appendChild(input);
+      return input;
+    })();
+    const latestKey = payload.url || payload.key || "";
+    certHidden.value = latestKey;
+    settingsState.pendingCertificateKey = latestKey;
+    if (certInput) certInput.value = "";
+    if (certFileName) certFileName.textContent = "Uploaded!";
   });
 }
+
+function loadResume(user) {
+  const section = document.getElementById("settingsResume");
+  if (!section) return;
+  section.innerHTML = `
+    <div class="upload-card">
+      <h3>Upload Résumé (PDF)</h3>
+      <p>Upload a polished résumé so attorneys can verify your expertise.</p>
+      <div class="file-input-row">
+        <label for="resumeInput" class="file-trigger">Choose File</label>
+        <span id="resumeFileName" class="file-name">${user.resumeURL ? "Résumé on file" : "No file chosen"}</span>
+      </div>
+      <input id="resumeInput" type="file" accept="application/pdf" class="file-input-hidden">
+      <button id="uploadResumeBtn" class="file-trigger upload-action-btn" type="button">Upload Résumé</button>
+    </div>
+  `;
+
+  const resumeInput = document.getElementById("resumeInput");
+  const resumeFileName = document.getElementById("resumeFileName");
+  if (resumeInput) {
+    resumeInput.addEventListener("change", (event) => {
+      const file = event.target.files?.[0] || null;
+      if (resumeFileName) {
+        resumeFileName.textContent = file ? file.name : "No file chosen";
+      }
+    });
+  }
+
+  document.getElementById("uploadResumeBtn")?.addEventListener("click", async () => {
+    const file = resumeInput?.files?.[0];
+    if (!file) {
+      alert("Please choose a PDF résumé first.");
+      return;
+    }
+
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const res = await secureFetch("/api/uploads/paralegal-resume", {
+    method: "POST",
+    body: fd
+  });
+
+    const payload = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      alert(payload.msg || "Resume upload failed.");
+      return;
+    }
+
+    alert("Résumé uploaded! Click Save to publish the update.");
+
+    // Populate hidden field so Save captures the new key
+    const resumeHidden = document.getElementById("resumeKeyInput") || (() => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.id = "resumeKeyInput";
+      input.name = "resumeKey";
+      section.appendChild(input);
+      return input;
+    })();
+    const latestKey = payload.url || payload.key || "";
+    resumeHidden.value = latestKey;
+    settingsState.pendingResumeKey = latestKey;
+    if (resumeInput) resumeInput.value = "";
+    if (resumeFileName) resumeFileName.textContent = "Uploaded!";
+  });
+}
+
+function loadWritingSample(user) {
+  const section = document.getElementById("settingsWritingSample");
+  if (!section) return;
+  section.innerHTML = `
+    <div class="upload-card">
+      <h3>Upload Writing Sample (PDF)</h3>
+      <p>Attach a representative writing sample for attorneys to review.</p>
+      <div class="file-input-row">
+        <label for="writingSampleInput" class="file-trigger">Choose File</label>
+        <span id="writingSampleFileName" class="file-name">${user.writingSampleURL ? "Writing sample on file" : "No file chosen"}</span>
+      </div>
+      <input id="writingSampleInput" type="file" accept="application/pdf" class="file-input-hidden">
+      <button id="uploadWritingSampleBtn" class="file-trigger upload-action-btn" type="button">Upload Writing Sample</button>
+    </div>
+  `;
+
+  const sampleInput = document.getElementById("writingSampleInput");
+  const sampleFileName = document.getElementById("writingSampleFileName");
+  if (sampleInput) {
+    sampleInput.addEventListener("change", (event) => {
+      const file = event.target.files?.[0] || null;
+      if (sampleFileName) {
+        sampleFileName.textContent = file ? file.name : "No file chosen";
+      }
+    });
+  }
+
+  document.getElementById("uploadWritingSampleBtn")?.addEventListener("click", async () => {
+    const file = sampleInput?.files?.[0];
+    if (!file) {
+      alert("Please choose a PDF writing sample first.");
+      return;
+    }
+    if (file.type !== "application/pdf") {
+      alert("Writing sample must be a PDF.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Writing sample must be 10 MB or smaller.");
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append("file", file);
+
+    const res = await secureFetch("/api/uploads/paralegal-writing-sample", {
+      method: "POST",
+      body: fd
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(payload.msg || "Writing sample upload failed.");
+      return;
+    }
+
+    alert("Writing sample uploaded! Click Save to publish the update.");
+
+    const hidden = document.getElementById("writingSampleKeyInput") || (() => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.id = "writingSampleKeyInput";
+      input.name = "writingSampleKey";
+      section.appendChild(input);
+      return input;
+    })();
+    const latestKey = payload.url || payload.key || "";
+    hidden.value = latestKey;
+    settingsState.pendingWritingSampleKey = latestKey;
+    if (sampleInput) sampleInput.value = "";
+    if (sampleFileName) sampleFileName.textContent = "Uploaded!";
+  });
+}
+
 
 
 // ================= BIO =================
@@ -519,6 +951,9 @@ async function saveSettings() {
   const skillsInput = document.getElementById("skillsInput");
   const experienceInput = document.getElementById("experienceInput");
   const educationInput = document.getElementById("educationInput");
+  const resumeKeyInput = document.getElementById("resumeKeyInput");
+  const certificateKeyInput = document.getElementById("certificateKeyInput");
+  const writingSampleKeyInput = document.getElementById("writingSampleKeyInput");
   const body = {
     firstName: firstNameInput ? firstNameInput.value.trim() : "",
     lastName: lastNameInput ? lastNameInput.value.trim() : "",
@@ -577,6 +1012,23 @@ async function saveSettings() {
         })
         .filter((entry) => entry.degree || entry.school)
     : [];
+  const resumeKeyValue = resumeKeyInput?.value || settingsState.pendingResumeKey || "";
+  if (resumeKeyValue) {
+    body.resumeURL = resumeKeyValue;
+  }
+  const certificateKeyValue = certificateKeyInput?.value || settingsState.pendingCertificateKey || "";
+  if (certificateKeyValue) {
+    body.certificateURL = certificateKeyValue;
+  }
+  const writingSampleInput = document.getElementById("writingSampleKeyInput");
+  const writingSampleValue = writingSampleInput?.value || settingsState.pendingWritingSampleKey || "";
+  if (writingSampleValue) {
+    body.writingSampleURL = writingSampleValue;
+  }
+
+  if (languagesEditor) {
+    body.languages = collectLanguagesFromEditor();
+  }
 
   const res = await secureFetch("/api/users/me", {
     method: "PATCH",
@@ -598,17 +1050,29 @@ async function saveSettings() {
   settingsState.linkedInURL = updatedUser.linkedInURL || "";
   settingsState.notificationPrefs = updatedUser.notificationPrefs || settingsState.notificationPrefs;
   settingsState.profileImage = updatedUser.profileImage || settingsState.profileImage;
+  settingsState.pendingResumeKey = "";
+  settingsState.pendingCertificateKey = "";
+  settingsState.pendingWritingSampleKey = "";
+  if (resumeKeyInput) resumeKeyInput.value = "";
+  if (certificateKeyInput) certificateKeyInput.value = "";
+  if (writingSampleKeyInput) writingSampleKeyInput.value = "";
+  if (writingSampleInput) writingSampleInput.value = "";
 
   persistSession({ user: updatedUser });
   window.updateSessionUser?.(updatedUser);
 
   applyAvatar?.(updatedUser);
   hydrateProfileForm(updatedUser);
+  renderLanguageEditor(updatedUser.languages || []);
+  bootstrapProfileSettings(updatedUser);
   syncCluster?.(updatedUser);
   window.hydrateParalegalCluster?.(updatedUser);
   try {
     window.dispatchEvent(new CustomEvent("lpc:user-updated", { detail: updatedUser }));
   } catch (_) {}
+  try {
+    localStorage.removeItem(PREFILL_CACHE_KEY);
+  } catch {}
   showToast("Settings saved!", "ok");
 }
 

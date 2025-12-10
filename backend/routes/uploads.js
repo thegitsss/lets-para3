@@ -71,20 +71,47 @@ function extractCaseIdFromKey(key) {
   return match ? match[1] : null;
 }
 
+function extractPersonalOwnerId(key) {
+  const normalized = normalizeKeyPath(key);
+  const personalPrefix = normalized.match(/^(paralegal-(?:resumes|certificates|writing-samples))\/([a-f0-9]{24})\//i);
+  if (!personalPrefix) return null;
+  return personalPrefix[2];
+}
+
+function buildPersonalKey(type, ownerId, ext = "pdf") {
+  const nonce = crypto.randomBytes(6).toString("hex");
+  let dir = "resume";
+  if (type === "paralegal-certificates") dir = "certificate";
+  else if (type === "paralegal-writing-samples") dir = "writing-sample";
+  return `${type}/${safeSegment(ownerId)}/${dir}-${Date.now()}-${nonce}.${ext}`;
+}
+
 async function ensureKeyAccess(req, key, explicitCaseId) {
   if (!req.user) return false;
   const cleaned = normalizeKeyPath(key);
   if (!cleaned || cleaned.includes("..")) return false;
-  if (!cleaned.startsWith("cases/")) return false;
   if (req.user.role === "admin") return true;
 
-  const caseId = explicitCaseId || extractCaseIdFromKey(cleaned);
-  if (caseId) {
-    if (explicitCaseId && !cleaned.includes(buildCasePrefix(caseId))) {
-      return false;
+  if (cleaned.startsWith("cases/")) {
+    const caseId = explicitCaseId || extractCaseIdFromKey(cleaned);
+    if (caseId) {
+      if (explicitCaseId && !cleaned.includes(buildCasePrefix(caseId))) {
+        return false;
+      }
+      return hasCaseAccess(req, caseId);
     }
-    return hasCaseAccess(req, caseId);
+    return false;
   }
+
+  const ownerId = extractPersonalOwnerId(cleaned);
+  if (ownerId) {
+    const viewerRole = String(req.user.role || "").toLowerCase();
+    const viewerId = String(req.user.id || req.user._id || "");
+    if (viewerRole === "admin") return true;
+    if (viewerRole === "attorney") return true;
+    return ownerId === viewerId;
+  }
+
   return false;
 }
 
@@ -297,7 +324,7 @@ router.post(
     const ownerId = String(req.user?.id || req.user?._id || "").trim();
     if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
 
-    const key = `paralegal-certificates/${safeSegment(ownerId)}/certificate.pdf`;
+    const key = buildPersonalKey("paralegal-certificates", ownerId);
     const putParams = {
       Bucket: BUCKET,
       Key: key,
@@ -325,6 +352,50 @@ router.post(
 );
 
 router.post(
+  "/paralegal-writing-sample",
+  requireRole(["paralegal"]),
+  caseFileMiddleware,
+  asyncHandler(async (req, res) => {
+    if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
+    if (!req.file) return res.status(400).json({ msg: "Writing sample file is required" });
+    if (req.file.mimetype !== "application/pdf") {
+      return res.status(400).json({ msg: "Writing sample must be a PDF" });
+    }
+    if (req.file.size > MAX_CERT_FILE_BYTES) {
+      return res.status(400).json({ msg: "Writing sample exceeds maximum allowed size" });
+    }
+
+    const ownerId = String(req.user?.id || req.user?._id || "").trim();
+    if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
+
+    const key = buildPersonalKey("paralegal-writing-samples", ownerId);
+    const putParams = {
+      Bucket: BUCKET,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: "application/pdf",
+      ContentLength: req.file.size,
+      ACL: "private",
+      ...sseParams(),
+    };
+    await s3.send(new PutObjectCommand(putParams));
+
+    const user = await User.findById(ownerId);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+    user.writingSampleURL = key;
+    await user.save();
+
+    try {
+      await logAction(req, "paralegal.writingSample.upload", { targetType: "user", targetId: user._id });
+    } catch (err) {
+      console.warn("[uploads] writing sample upload audit failed", err?.message || err);
+    }
+
+    return res.json({ success: true, url: key });
+  })
+);
+
+router.post(
   "/paralegal-resume",
   requireRole(["paralegal"]),
   caseFileMiddleware,
@@ -341,7 +412,8 @@ router.post(
     const ownerId = String(req.user?.id || req.user?._id || "").trim();
     if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
 
-    const key = `paralegal-resumes/${safeSegment(ownerId)}/resume.pdf`;
+    const timestamp = Date.now();
+    const key = `paralegal-resumes/${safeSegment(ownerId)}/resume-${timestamp}.pdf`;
     const putParams = {
       Bucket: BUCKET,
       Key: key,
@@ -364,6 +436,7 @@ router.post(
       console.warn("[uploads] resume upload audit failed", err?.message || err);
     }
 
+    res.set("Cache-Control", "no-store");
     return res.json({ success: true, url: key });
   })
 );

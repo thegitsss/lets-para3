@@ -9,8 +9,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Paralegal Profile | Let<span class="gold">’</span>s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
@@ -54,6 +54,160 @@
       max-width: 1350px;
       margin: 0 auto;
       padding: 24px 32px 48px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 24px;
+      gap: 16px;
+    }
+
+    .profile-header-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .notification-wrapper {
+      position: relative;
+    }
+
+    .notification-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+      position: relative;
+    }
+
+    .notification-icon:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #e63946;
+      color: #fff;
+      font-size: 0.7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      display: none;
+    }
+
+    .notification-badge.show {
+      display: flex;
+    }
+
+    .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.06);
+    }
+
+    .user-chip img {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    .user-chip strong {
+      font-weight: 400;
+      display: block;
+    }
+
+    .user-chip span {
+      font-size: 0.85rem;
+      color: var(--muted);
+      display: block;
+    }
+
+    .notification-panel {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 10px);
+      width: 280px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
+      padding: 14px;
+      display: none;
+      z-index: 100;
+    }
+
+    .notification-panel.show {
+      display: block;
+    }
+
+    .notification-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .notification-panel-header h4 {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 400;
+    }
+
+    .notification-panel-header button {
+      border: none;
+      background: none;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .notification-panel ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .notification-panel li {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      font-size: 0.9rem;
+    }
+
+    .notification-panel li strong {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .notification-panel li span {
+      font-size: 0.8rem;
+      color: var(--muted);
     }
 
     /* HERO CARD (matches UX layout) */
@@ -142,6 +296,16 @@
       border-radius: 999px;
       background: var(--panel);
       border: 1px solid var(--line);
+    }
+
+    .hero-meta-pill a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 400;
+    }
+
+    .hero-meta-pill a:hover {
+      text-decoration: underline;
     }
 
     .status-chip {
@@ -252,6 +416,42 @@
       opacity: 0.7;
     }
 
+    .pill-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .pill-group .pill {
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--ink);
+      font-size: 0.9rem;
+      border: 1px solid var(--line);
+    }
+
+    .document-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .doc-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      text-decoration: none;
+      color: var(--accent);
+      font-size: 0.9rem;
+    }
+
     /* Degrees & Experience cards */
 
     .list-stack {
@@ -309,6 +509,12 @@
       gap: 14px;
     }
 
+    .languages-empty {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
     .language-item {
       display: flex;
       flex-direction: column;
@@ -338,6 +544,10 @@
     .language-level {
       font-size: 0.78rem;
       color: var(--muted);
+    }
+
+    .documents-card {
+      margin-top: 24px;
     }
 
     /* Toast, modal, error */
@@ -468,6 +678,34 @@
 </head>
 <body>
   <div class="page-shell">
+    <div class="topbar">
+      <div class="profile-header-controls" data-notification-center>
+        <div class="notification-wrapper">
+          <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 01-3.46 0"></path>
+            </svg>
+            <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
+          </button>
+          <div class="notification-panel" data-notification-panel>
+            <div class="notification-panel-header">
+              <h4>Notifications</h4>
+              <button type="button" data-notification-mark>Mark all read</button>
+            </div>
+            <ul data-notification-list></ul>
+            <p class="notification-item" data-notification-empty>Loading…</p>
+          </div>
+        </div>
+        <div class="user-chip">
+          <img id="clusterAvatar" class="nav-profile-photo" src="https://via.placeholder.com/64x64.png?text=PL" alt="Profile" />
+          <div>
+            <strong id="clusterName">Paralegal</strong>
+            <span id="clusterRole">Member</span>
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="profileError" class="error-card hidden"></div>
 
     <!-- HERO CARD -->
@@ -563,28 +801,20 @@
         <div class="card-header-label">Languages I speak</div>
         <div class="card-title">Languages</div>
       </div>
-      <div class="languages-row">
-        <div class="language-item">
-          <div class="language-ring" style="--val: 1turn;">100%</div>
-          <div class="language-label">English</div>
-          <div class="language-level">Proficient</div>
-        </div>
-        <div class="language-item">
-          <div class="language-ring" style="--val: 0.6turn;">60%</div>
-          <div class="language-label">Spanish</div>
-          <div class="language-level">Fluent</div>
-        </div>
-        <div class="language-item">
-          <div class="language-ring" style="--val: 0.43turn;">43%</div>
-          <div class="language-label">French</div>
-          <div class="language-level">Intermediate</div>
-        </div>
-        <div class="language-item">
-          <div class="language-ring" style="--val: 0.18turn;">18%</div>
-          <div class="language-label">Italian</div>
-          <div class="language-level">Basic</div>
-        </div>
+      <div class="languages-row" id="languagesList"></div>
+      <p class="languages-empty hidden" id="languagesEmpty">No languages added yet.</p>
+    </section>
+
+    <section class="card documents-card hidden" id="documentsCard">
+      <div class="card-header-label">Documents</div>
+      <div class="card-title">Professional Credentials</div>
+      <p class="muted">Download verified files shared by this paralegal.</p>
+      <div class="document-links">
+        <a href="#" target="_blank" rel="noopener" id="certificateLink" class="doc-chip hidden">Certificate</a>
+        <a href="#" target="_blank" rel="noopener" id="resumeLink" class="doc-chip hidden">Résumé</a>
+        <a href="#" target="_blank" rel="noopener" id="writingSampleLink" class="doc-chip hidden">Writing Sample</a>
       </div>
+      <p class="muted hidden" id="documentsEmpty">No documents available yet.</p>
     </section>
   </div>
 

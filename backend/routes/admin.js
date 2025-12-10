@@ -170,8 +170,11 @@ const error = new Error("Invalid status");
 error.statusCode = 400;
 throw error;
 }
-const cleanNote = sanitizeNote(note);
-user.status = normalized;
+  const cleanNote = sanitizeNote(note);
+  user.status = normalized;
+  if (normalized === "approved" && !user.approvedAt) {
+    user.approvedAt = new Date();
+  }
 if (!Array.isArray(user.audit)) user.audit = [];
 user.audit.push({
 adminId: req.user?.id || null,
@@ -289,14 +292,17 @@ router.post(
 "/approve/:id",
 asyncHandler(async (req, res) => {
 const { id } = req.params;
-if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
-const user = await User.findById(id);
-if (!user) return res.status(404).json({ error: "User not found" });
-if (user.role !== "paralegal") return res.status(400).json({ error: "Only paralegals can be approved here" });
-user.status = "approved";
-if (Object.prototype.hasOwnProperty.call(user, "verified")) {
-user.verified = true;
-}
+  if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
+  const user = await User.findById(id);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  if (user.role !== "paralegal") return res.status(400).json({ error: "Only paralegals can be approved here" });
+  user.status = "approved";
+  if (!user.approvedAt) {
+    user.approvedAt = new Date();
+  }
+  if (Object.prototype.hasOwnProperty.call(user, "verified")) {
+    user.verified = true;
+  }
 await user.save();
 await sendWelcomePacket(user);
 const html = buildVerificationAcceptanceBody(user);

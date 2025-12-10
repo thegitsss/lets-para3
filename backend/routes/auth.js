@@ -334,6 +334,103 @@ router.post(
   })
 );
 
+router.post(
+  "/2fa-verify",
+  asyncHandler(async (req, res) => {
+    const { email, code } = req.body || {};
+    if (!isEmail(email) || !code) {
+      return res.status(400).json({ error: "Invalid 2FA attempt." });
+    }
+
+    const user = await User.findOne({ email: String(email).toLowerCase() });
+    if (!user || !user.twoFactorEnabled) {
+      return res.status(400).json({ error: "Invalid 2FA attempt." });
+    }
+
+    if (!user.twoFactorTempCode || !user.twoFactorExpiresAt || user.twoFactorExpiresAt < new Date()) {
+      return res.status(400).json({ error: "Code expired." });
+    }
+
+    const match = await bcrypt.compare(String(code), user.twoFactorTempCode);
+    if (!match) {
+      return res.status(400).json({ error: "Incorrect code." });
+    }
+
+    user.twoFactorTempCode = null;
+    user.twoFactorExpiresAt = null;
+    await user.save();
+
+    const token = signAccess(user);
+    res.cookie("token", token, AUTH_COOKIE_OPTIONS);
+    await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
+
+    res.json({
+      success: true,
+      user: {
+        _id: user._id,
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        disabled: Boolean(user.disabled),
+      },
+    });
+  })
+);
+
+router.post(
+  "/2fa-backup",
+  asyncHandler(async (req, res) => {
+    const { email, code } = req.body || {};
+    if (!isEmail(email) || !code) {
+      return res.status(400).json({ error: "Invalid request." });
+    }
+
+    const user = await User.findOne({ email: String(email).toLowerCase() });
+    if (!user || !user.twoFactorEnabled) {
+      return res.status(400).json({ error: "Invalid request." });
+    }
+
+    if (!Array.isArray(user.twoFactorBackupCodes) || user.twoFactorBackupCodes.length === 0) {
+      return res.status(400).json({ error: "No backup codes available." });
+    }
+
+    const matchIndex = await Promise.all(
+      user.twoFactorBackupCodes.map(async (hashed) => bcrypt.compare(String(code), hashed))
+    );
+    const index = matchIndex.findIndex(Boolean);
+
+    if (index === -1) {
+      return res.status(400).json({ error: "Invalid backup code." });
+    }
+
+    user.twoFactorBackupCodes.splice(index, 1);
+    user.twoFactorTempCode = null;
+    user.twoFactorExpiresAt = null;
+    await user.save();
+
+    const token = signAccess(user);
+    res.cookie("token", token, AUTH_COOKIE_OPTIONS);
+    await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
+
+    res.json({
+      success: true,
+      user: {
+        _id: user._id,
+        id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        disabled: Boolean(user.disabled),
+      },
+    });
+  })
+);
+
 // ----------------------------------------
 // ME
 // GET /api/auth/me  (reads Bearer token)

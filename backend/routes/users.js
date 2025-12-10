@@ -56,12 +56,30 @@ const cleanCollection = (value, fields = []) => {
     })
     .filter((entry) => Object.values(entry).some(Boolean));
 };
+
+const cleanLanguages = (value) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (!entry) return null;
+      if (typeof entry === "string") {
+        const name = normStr(entry, { len: 120 }).trim();
+        return name ? { name, proficiency: "" } : null;
+      }
+      const name = normStr(entry.name || entry.language || "", { len: 120 }).trim();
+      const proficiency = normStr(entry.proficiency || entry.level || "", { len: 120 }).trim();
+      if (!name) return null;
+      return { name, proficiency };
+    })
+    .filter(Boolean);
+};
 const resolveParalegalId = (rawId, userId) => (rawId === "me" ? userId : rawId);
 const normalizeAvailability = (val) => {
   if (typeof val === "string" && val.trim()) return normStr(val, { len: 200 });
   if (typeof val === "boolean") return val ? "Available Now" : "Unavailable";
   return null;
 };
+const isStorageKey = (value) => typeof value === "string" && /^paralegal-(?:resumes|certificates)\//i.test(value.trim());
 const parseParalegalFilters = (query = {}) => {
   const {
     search = "",
@@ -100,7 +118,7 @@ const parseParalegalFilters = (query = {}) => {
 };
 
 const SAFE_PUBLIC_SELECT =
-  "_id firstName lastName avatarURL profileImage location specialties practiceAreas skills experience yearsExperience linkedInURL certificateURL education resumeURL notificationPrefs lawFirm bio about availability writingSamples";
+  "_id firstName lastName avatarURL profileImage location specialties practiceAreas skills experience yearsExperience linkedInURL certificateURL writingSampleURL education resumeURL notificationPrefs lawFirm bio about availability availabilityDetails approvedAt languages writingSamples";
 const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email phoneNumber`;
 const FILE_PUBLIC_BASE =
   (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
@@ -119,6 +137,9 @@ function serializePublicUser(user, { includeEmail = false } = {}) {
   const src = user.toObject ? user.toObject() : user;
   const profileImage = toPublicUrl(src.profileImage || "");
   const avatarURL = toPublicUrl(src.avatarURL || profileImage);
+  const certificateURL = toPublicUrl(src.certificateURL || "");
+  const writingSampleURL = toPublicUrl(src.writingSampleURL || "");
+  const resumeURL = toPublicUrl(src.resumeURL || "");
   const payload = {
     _id: String(src._id),
     firstName: src.firstName || "",
@@ -134,14 +155,21 @@ function serializePublicUser(user, { includeEmail = false } = {}) {
     yearsExperience:
       typeof src.yearsExperience === "number" ? src.yearsExperience : 0,
     linkedInURL: src.linkedInURL || "",
-    certificateURL: src.certificateURL || "",
-    resumeURL: src.resumeURL || "",
+    certificateURL,
+    writingSampleURL,
+    resumeURL,
+    certificateKey: src.certificateURL || "",
+    resumeKey: src.resumeURL || "",
+    writingSampleKey: src.writingSampleURL || "",
     education: Array.isArray(src.education) ? src.education : [],
     experience: Array.isArray(src.experience) ? src.experience : [],
     availability: src.availability || "",
+    availabilityDetails: src.availabilityDetails || null,
+    approvedAt: src.approvedAt || null,
     bio: src.bio || "",
     about: src.about || "",
     writingSamples: Array.isArray(src.writingSamples) ? src.writingSamples : [],
+    languages: cleanLanguages(src.languages || []),
     notificationPrefs: src.notificationPrefs || null,
   };
   if (includeEmail) {
@@ -149,6 +177,14 @@ function serializePublicUser(user, { includeEmail = false } = {}) {
     payload.phoneNumber = src.phoneNumber || "";
   }
   return payload;
+}
+
+function formatDisplayName(user) {
+  const first = user?.firstName || "";
+  const last = user?.lastName || "";
+  const full = `${first} ${last}`.trim();
+  if (full) return full;
+  return user?.email || "User";
 }
 
 async function buildNotifications(userDoc) {
@@ -312,6 +348,80 @@ router.post(
   })
 );
 
+router.get(
+  "/me/blocked",
+  asyncHandler(async (req, res) => {
+    const me = await User.findById(req.user.id).select("blockedUsers");
+    if (!me) return res.status(404).json({ error: "Not found" });
+    const ids = (me.blockedUsers || []).map((id) => String(id));
+    if (!ids.length) return res.json([]);
+
+    const blockedUsers = await User.find({ _id: { $in: ids } }).select("firstName lastName email").lean();
+    const lookup = blockedUsers.reduce((acc, user) => {
+      acc[String(user._id)] = user;
+      return acc;
+    }, {});
+
+    const ordered = ids
+      .map((id) => lookup[id])
+      .filter(Boolean)
+      .map((user) => ({
+        _id: String(user._id),
+        name: formatDisplayName(user),
+      }));
+
+    res.json(ordered);
+  })
+);
+
+router.post(
+  "/block",
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const { userId } = req.body || {};
+    if (!isObjId(userId)) return res.status(400).json({ error: "Invalid userId" });
+    if (String(userId) === String(req.user.id)) {
+      return res.status(400).json({ error: "Cannot block yourself" });
+    }
+
+    const [me, target] = await Promise.all([
+      User.findById(req.user.id).select("blockedUsers"),
+      User.findById(userId).select("_id firstName lastName email"),
+    ]);
+    if (!me) return res.status(404).json({ error: "User not found" });
+    if (!target) return res.status(404).json({ error: "Target not found" });
+
+    if (!Array.isArray(me.blockedUsers)) {
+      me.blockedUsers = [];
+    }
+    const already = me.blockedUsers.some((id) => String(id) === String(target._id));
+    if (!already) {
+      me.blockedUsers.push(target._id);
+      await me.save();
+    }
+
+    res.json({ ok: true, blocked: true });
+  })
+);
+
+router.post(
+  "/unblock",
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const { userId } = req.body || {};
+    if (!isObjId(userId)) return res.status(400).json({ error: "Invalid userId" });
+
+    const me = await User.findById(req.user.id).select("blockedUsers");
+    if (!me) return res.status(404).json({ error: "User not found" });
+
+    const current = Array.isArray(me.blockedUsers) ? me.blockedUsers : [];
+    me.blockedUsers = current.filter((id) => String(id) !== String(userId));
+    await me.save();
+
+    res.json({ ok: true, blocked: false });
+  })
+);
+
 /**
  * PATCH /api/users/me
  * Body: { bio?, availability?, resumeURL?, certificateURL?, barNumber?, avatarURL?, timezone? }
@@ -382,8 +492,15 @@ router.patch(
     }
 
     if (me.role === "paralegal") {
-      if (typeof resumeURL === "string" && isURL(resumeURL)) me.resumeURL = resumeURL;
-      if (typeof certificateURL === "string" && isURL(certificateURL)) me.certificateURL = certificateURL;
+      if (typeof resumeURL === "string" && (isURL(resumeURL) || isStorageKey(resumeURL))) {
+        me.resumeURL = resumeURL.trim();
+      }
+      if (typeof certificateURL === "string" && (isURL(certificateURL) || isStorageKey(certificateURL))) {
+        me.certificateURL = certificateURL.trim();
+      }
+      if (typeof body.writingSampleURL === "string" && (isURL(body.writingSampleURL) || isStorageKey(body.writingSampleURL))) {
+        me.writingSampleURL = body.writingSampleURL.trim();
+      }
       if (body.practiceAreas !== undefined) {
         me.practiceAreas = cleanList(body.practiceAreas);
       }
@@ -403,6 +520,9 @@ router.patch(
           ["degree", 200],
           ["school", 200]
         ]);
+      }
+      if (body.languages !== undefined) {
+        me.languages = cleanLanguages(body.languages);
       }
       if (body.yearsExperience !== undefined) {
         const years = Math.max(0, Math.min(80, parseInt(body.yearsExperience, 10) || 0));

@@ -23,6 +23,9 @@ async function seedAdmin() {
     admin.lastName = "User";
     admin.role = "admin";
     admin.status = "approved";
+    if (!admin.approvedAt) {
+      admin.approvedAt = new Date();
+    }
     admin.password = ADMIN_PASSWORD;
 
     await admin.save();
