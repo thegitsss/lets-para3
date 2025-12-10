@@ -14,6 +14,7 @@ const Case = require("../models/Case");
 const CaseFile = require("../models/CaseFile");
 const User = require("../models/User");
 const { logAction } = require("../utils/audit");
+const { notifyUser } = require("../utils/notifyUser");
 
 // ----------------------------------------
 // Optional CSRF (enable via ENABLE_CSRF=true)
@@ -434,6 +435,12 @@ router.post(
       await logAction(req, "paralegal.resume.upload", { targetType: "user", targetId: user._id });
     } catch (err) {
       console.warn("[uploads] resume upload audit failed", err?.message || err);
+    }
+
+    try {
+      await notifyUser(user._id, "resume_uploaded", {});
+    } catch (err) {
+      console.warn("[uploads] notifyUser resume_uploaded failed", err);
     }
 
     res.set("Cache-Control", "no-store");

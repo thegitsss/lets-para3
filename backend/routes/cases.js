@@ -11,8 +11,8 @@ const Case = require("../models/Case");
 const User = require("../models/User");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
-const Notification = require("../models/Notification");
 const sendEmail = require("../utils/email");
+const { notifyUser } = require("../utils/notifyUser");
 const stripe = require("../utils/stripe");
 const { cleanText, cleanTitle, cleanMessage } = require("../utils/sanitize");
 const { logAction } = require("../utils/audit");
@@ -243,40 +243,22 @@ function normalizeFile(file) {
   };
 }
 
-async function createCaseNotification({ userId, caseDoc, title, body, type = "case-event", meta = {} }) {
+async function sendCaseNotification(userId, type, caseDoc, payload = {}) {
   if (!userId) return;
-  const recipient = await User.findById(userId).select("notificationPrefs email phoneNumber");
-  if (!recipient) return;
-  const prefs = recipient.notificationPrefs || {};
   try {
-    if (prefs.inAppCase !== false) {
-      await Notification.create({
-        userId,
-        caseId: caseDoc?._id || null,
-        title,
-        body,
-        type,
-        meta: {
-          ...(meta || {}),
-          caseId: caseDoc?._id || null,
+    await notifyUser(
+      userId,
+      type,
+      Object.assign(
+        {
+          caseId: caseDoc?._id,
+          caseTitle: caseDoc?.title || "Case",
         },
-        read: false,
-      });
-    }
-    if (prefs.emailCase !== false && recipient.email) {
-      const subject = title || "Case update";
-      const emailBody = `${body || "You have a new case update."}<br/><br/>Sign in to view details.`;
-      if (typeof sendEmail.sendNotificationEmail === "function") {
-        await sendEmail.sendNotificationEmail(recipient.email, subject, emailBody);
-      } else {
-        await sendEmail(recipient.email, subject, body || emailBody);
-      }
-    }
-    if (prefs.smsCase && recipient.phoneNumber && typeof sendEmail.sendNotificationSMS === "function") {
-      sendEmail.sendNotificationSMS(recipient.phoneNumber, body || title || "Case update");
-    }
+        payload || {}
+      )
+    );
   } catch (err) {
-    console.warn("[cases] notification create failed", err);
+    console.warn("[cases] notifyUser failed", err);
   }
 }
 
@@ -465,12 +447,8 @@ router.post(
     await caseDoc.save();
 
     const inviterName = formatPersonName(req.user) || "An attorney";
-    await createCaseNotification({
-      userId: paralegal._id,
-      caseDoc,
-      title: "New case invitation",
-      body: `${inviterName} invited you to join "${caseDoc.title}".`,
-      type: "case-invite",
+    await sendCaseNotification(paralegal._id, "case_invite", caseDoc, {
+      inviterName,
     });
 
     return res.json(caseSummary(caseDoc));
@@ -504,6 +482,8 @@ router.post(
     const paralegalId = role === "admin" && req.body?.paralegalId && isObjId(req.body.paralegalId)
       ? req.body.paralegalId
       : req.user.id;
+    const paralegalProfile = await User.findById(paralegalId).select("firstName lastName");
+    const paralegalName = formatPersonName(paralegalProfile) || "Paralegal";
 
     if (decision === "accept") {
       caseDoc.paralegal = paralegalId;
@@ -522,12 +502,10 @@ router.post(
       else caseDoc.applicants.push({ paralegalId, status: "accepted" });
 
       await caseDoc.save();
-      await createCaseNotification({
-        userId: attorneyId,
-        caseDoc,
-        title: "Invitation accepted",
-        body: "The invited paralegal accepted your case invitation.",
-        type: "case-invite-accepted",
+      await sendCaseNotification(attorneyId, "case_invite_response", caseDoc, {
+        response: "accepted",
+        paralegalId,
+        paralegalName,
       });
     } else {
       caseDoc.pendingParalegalId = null;
@@ -538,12 +516,10 @@ router.post(
         if (existing) existing.status = "rejected";
       }
       await caseDoc.save();
-      await createCaseNotification({
-        userId: attorneyId,
-        caseDoc,
-        title: "Invitation declined",
-        body: "The invited paralegal declined your case invitation.",
-        type: "case-invite-declined",
+      await sendCaseNotification(attorneyId, "case_invite_response", caseDoc, {
+        response: "declined",
+        paralegalId: pendingId,
+        paralegalName,
       });
     }
 
@@ -1321,13 +1297,8 @@ router.post(
     } catch {}
 
     const attorneyName = formatPersonName(caseDoc.attorney || caseDoc.attorneyId) || "An attorney";
-    const caseTitle = caseDoc.title || "a case";
-    await createCaseNotification({
-      userId: invitee._id,
-      caseDoc,
-      title: "New Case Invitation",
-      body: `Attorney ${attorneyName} has invited you to ${caseTitle}.`,
-      type: "case-invite",
+    await sendCaseNotification(invitee._id, "case_invite", caseDoc, {
+      inviterName: attorneyName,
     });
 
     res.json({ success: true });
@@ -1385,12 +1356,10 @@ router.post(
 
     const attorneyId = caseDoc.attorney?._id || caseDoc.attorneyId || null;
     if (attorneyId) {
-      await createCaseNotification({
-        userId: attorneyId,
-        caseDoc,
-        title: "Invitation Accepted",
-        body: `Paralegal ${formatPersonName(paralegal)} accepted your invitation to ${caseDoc.title || "a case"}.`,
-        type: "case-invite-response",
+      await sendCaseNotification(attorneyId, "case_invite_response", caseDoc, {
+        response: "accepted",
+        paralegalId: req.user.id,
+        paralegalName: formatPersonName(paralegal),
       });
     }
 
@@ -1429,12 +1398,10 @@ router.post(
 
     const attorneyId = caseDoc.attorney?._id || caseDoc.attorneyId || null;
     if (attorneyId) {
-      await createCaseNotification({
-        userId: attorneyId,
-        caseDoc,
-        title: "Invitation Declined",
-        body: `Paralegal ${formatPersonName(paralegal)} declined your invitation to ${caseDoc.title || "a case"}.`,
-        type: "case-invite-response",
+      await sendCaseNotification(attorneyId, "case_invite_response", caseDoc, {
+        response: "declined",
+        paralegalId: req.user.id,
+        paralegalName: formatPersonName(paralegal),
       });
     }
 

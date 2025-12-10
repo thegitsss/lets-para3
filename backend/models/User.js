@@ -39,16 +39,22 @@ const notificationPrefsSchema = new Schema(
   { _id: false }
 );
 
+const notificationCategorySettingsSchema = new Schema(
+  {
+    messages: { type: Boolean, default: true },
+    invites: { type: Boolean, default: true },
+    caseUpdates: { type: Boolean, default: true },
+    payouts: { type: Boolean, default: true },
+    system: { type: Boolean, default: true },
+  },
+  { _id: false }
+);
+
 const notificationSettingsSchema = new Schema(
   {
-    inAppMessages: { type: Boolean, default: true },
-    inAppCase: { type: Boolean, default: true },
-    emailMessages: { type: Boolean, default: true },
-    emailCase: { type: Boolean, default: true },
-    smsMessages: { type: Boolean, default: false },
-    smsCase: { type: Boolean, default: false },
     email: { type: Boolean, default: true },
-    sms: { type: Boolean, default: false },
+    browser: { type: Boolean, default: false },
+    categories: { type: notificationCategorySettingsSchema, default: () => ({}) },
   },
   { _id: false }
 );
@@ -206,6 +212,8 @@ const userSchema = new Schema(
     // Notifications
     notifications: { type: notificationPrefsSchema, default: () => ({}) },
     notificationPrefs: { type: notificationSettingsSchema, default: () => ({}) },
+    pushSubscription: { type: Object, default: null },
+    digestFrequency: { type: String, enum: ["off", "daily", "weekly"], default: "daily" },
     emailPref: {
       marketing: { type: Boolean, default: true },
       product: { type: Boolean, default: true },

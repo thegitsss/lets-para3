@@ -10,6 +10,7 @@ const Task = require("../models/Task");
 const Notification = require("../models/Notification");
 const { maskProfanity } = require("../utils/badWords");
 const { logAction } = require("../utils/audit");
+const { notifyUser } = require("../utils/notifyUser");
 
 // ----------------------------------------
 // Optional CSRF (enable via ENABLE_CSRF=true)
@@ -544,6 +545,25 @@ router.patch(
       me.lastName = body.lastName.trim();
     }
 
+    if (typeof body.digestFrequency === "string") {
+      const normalized = body.digestFrequency.toLowerCase();
+      if (["off", "daily", "weekly"].includes(normalized)) {
+        me.digestFrequency = normalized;
+      }
+    }
+
+    if (body.notificationPrefs && typeof body.notificationPrefs === "object") {
+      const currentPrefs =
+        me.notificationPrefs && typeof me.notificationPrefs.toObject === "function"
+          ? me.notificationPrefs.toObject()
+          : { ...(me.notificationPrefs || {}) };
+      const updates = body.notificationPrefs;
+      if (Object.prototype.hasOwnProperty.call(updates, "email")) {
+        currentPrefs.email = !!updates.email;
+      }
+      me.notificationPrefs = currentPrefs;
+    }
+
     await me.save();
     try {
       await logAction(req, "user.me.update", { targetType: "user", targetId: me._id });
@@ -565,7 +585,7 @@ router.patch(
         : { ...me.notificationPrefs }
       : {};
     const updates = req.body || {};
-    const allowed = ["inAppMessages", "inAppCase", "emailMessages", "emailCase", "smsMessages", "smsCase"];
+    const allowed = ["inAppMessages", "inAppCase", "emailMessages", "emailCase", "email"];
     allowed.forEach((key) => {
       if (Object.prototype.hasOwnProperty.call(updates, key)) {
         current[key] = !!updates[key];
@@ -850,6 +870,14 @@ router.patch(
     try {
       await logAction(req, "admin.user.approve", { targetType: "user", targetId: user._id });
     } catch {}
+
+    if (String(user.role).toLowerCase() === "paralegal") {
+      try {
+        await notifyUser(user._id, "profile_approved", {});
+      } catch (err) {
+        console.warn("[users] notifyUser profile_approved failed", err);
+      }
+    }
 
     res.json({ ok: true, user: user.toJSON() });
   })

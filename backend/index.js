@@ -89,6 +89,7 @@ const verificationRouter = require("./routes/verification");
 const publicRouter = require("./routes/public");
 const accountRouter = require("./routes/account");
 const stripeRouter = require("./routes/stripe");
+const notificationRouter = require("./routes/notifications");
 const { startPurgeWorker } = require("./services/caseLifecycle");
 
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }), paymentsWebhookHandler);
@@ -112,6 +113,7 @@ app.use("/api/chat", chatRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/account", accountRouter);
 app.use("/api/stripe", stripeRouter);
+app.use("/api/notifications", notificationRouter);
 app.use("/api/verify", verificationRouter);
 app.use("/api/public", publicRouter);
 app.use("/public", publicRouter);

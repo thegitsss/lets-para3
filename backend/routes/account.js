@@ -44,7 +44,6 @@ router.get(
     const prefs = user.notificationPrefs || {};
     res.json({
       email: !!prefs.email,
-      sms: !!prefs.sms,
     });
   })
 );
@@ -52,7 +51,7 @@ router.get(
 router.post(
   "/preferences",
   asyncHandler(async (req, res) => {
-    const { email, sms } = req.body || {};
+    const { email } = req.body || {};
     const user = await User.findById(req.user.id).select("notificationPrefs");
     if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -64,7 +63,6 @@ router.post(
     user.notificationPrefs = {
       ...current,
       email: !!email,
-      sms: !!sms,
     };
     await user.save();
 
