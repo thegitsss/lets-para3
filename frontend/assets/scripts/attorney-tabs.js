@@ -1,4 +1,5 @@
 import { secureFetch, logout, loadUserHeaderInfo } from "./auth.js";
+import { scanNotificationCenters } from "./utils/notifications.js";
 
 const PAGE_ID = window.__ATTORNEY_PAGE__ || "overview";
 const ROLE_SPEC = window.__TAB_ROLE__;
@@ -12,6 +13,7 @@ const REQUIRED_ROLES = Array.isArray(ROLE_SPEC)
 const MESSAGE_JUMP_KEY = "lpc_message_jump";
 const HEADER_ONLY_ROUTES = {
   paralegal: new Set(["overview", "case-files", "profile-settings"]),
+  attorney: new Set(["create-case"]),
 };
 const STATUS_LABELS = {
   pending_review: "Pending Review",
@@ -149,10 +151,11 @@ function applyRoleVisibility(user) {
 async function bootstrap() {
 
   ensureHeaderStyles();
-  await initHeader();
   const pageKey = (PAGE_ID || "").toLowerCase();
   const role = String(state.user?.role || "").toLowerCase();
-  if (HEADER_ONLY_ROUTES[role]?.has(pageKey)) {
+  const headerOnly = HEADER_ONLY_ROUTES[role]?.has(pageKey);
+  await initHeader({ skipNotifications: headerOnly });
+  if (headerOnly) {
     return;
   }
 
@@ -202,6 +205,19 @@ function ensureHeaderStyles() {
   .lpc-shared-header .notification-icon svg{width:22px;height:22px;color:#1a1a1a}
   .lpc-shared-header .notification-badge{position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;font-size:.75rem;border-radius:999px;padding:2px 6px;line-height:1;display:none;font-weight:600}
   .lpc-shared-header .notification-badge.show{display:inline-flex}
+  .lpc-shared-header [data-notification-toggle][data-count]:after{
+    content:attr(data-count);
+    position:absolute;
+    top:-4px;
+    right:-4px;
+    background:#b6a47a;
+    color:#fff;
+    font-family:'Sarabun',sans-serif;
+    font-weight:200;
+    font-size:0.7rem;
+    padding:2px 6px;
+    border-radius:999px;
+  }
   .lpc-shared-header .user-chip{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(0,0,0,0.03);border:1px solid transparent;transition:border-color .2s ease}
   .lpc-shared-header .user-chip img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,0.08);object-fit:cover}
   .lpc-shared-header .user-chip strong{display:block;font-weight:600;color:#1a1a1a}
@@ -210,15 +226,19 @@ function ensureHeaderStyles() {
   .lpc-shared-header .profile-dropdown.show{display:flex}
   .lpc-shared-header .profile-dropdown button{background:none;border:none;padding:.85rem 1.1rem;text-align:left;font-size:.92rem;cursor:pointer}
   .lpc-shared-header .profile-dropdown button:hover{background:rgba(0,0,0,0.04)}
-  .lpc-shared-header .notifications-panel{position:absolute;top:72px;right:0;width:320px;background:#fff;border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,0.15);border:1px solid rgba(0,0,0,0.08);padding:16px;opacity:0;pointer-events:none;transform:translateY(-10px);transition:opacity .2s ease,transform .2s ease;z-index:30}
+  .lpc-shared-header .notifications-panel{position:absolute;top:72px;right:0;width:340px;background:#fff;border-radius:14px;border:1px solid rgba(0,0,0,0.08);box-shadow:0 24px 48px rgba(0,0,0,0.15);padding:0;opacity:0;pointer-events:none;transform:translateY(-10px);transition:opacity .2s ease,transform .2s ease;z-index:30;display:flex;flex-direction:column}
   .lpc-shared-header .notifications-panel.show{opacity:1;pointer-events:auto;transform:translateY(0)}
-  .lpc-shared-header .notifications-panel header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-  .lpc-shared-header .notifications-panel header h3{margin:0;font-size:1rem;font-weight:600;font-family:'Cormorant Garamond',serif}
-  .lpc-shared-header .notifications-panel header button{border:none;background:none;color:#b6a47a;font-size:.85rem;cursor:pointer}
-  .lpc-shared-header .notifications-panel ul{list-style:none;max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:0;margin:0}
-  .lpc-shared-header .notifications-panel li{padding:10px;border-radius:12px;background:#fcfcfc;border:1px solid rgba(0,0,0,0.08);font-size:.9rem;line-height:1.35}
-  .lpc-shared-header .notifications-panel li span{display:block;font-size:.82rem;color:#6b6b6b;margin-top:4px}
-  .lpc-shared-header .notifications-panel .empty-copy{margin:0;font-size:.9rem;color:#6b6b6b;text-align:center}
+  .lpc-shared-header .notifications-panel.hidden{display:none}
+  .lpc-shared-header .notifications-panel .notif-header{font-family:'Cormorant Garamond',serif;font-weight:300;font-size:1.2rem;padding:14px 18px;border-bottom:1px solid rgba(0,0,0,0.08);background:#fafafa;margin:0}
+  .lpc-shared-header .notifications-panel #notifList{max-height:320px;overflow-y:auto}
+  .lpc-shared-header .notifications-panel .notif-item{padding:14px 18px;border-bottom:1px solid rgba(0,0,0,0.06);cursor:pointer}
+  .lpc-shared-header .notifications-panel .notif-item.unread{border-left:3px solid #b6a47a}
+  .lpc-shared-header .notifications-panel .notif-item.read{opacity:.75}
+  .lpc-shared-header .notifications-panel .notif-title{font-family:'Cormorant Garamond',serif;font-weight:300;font-size:1.1rem;margin-bottom:2px}
+  .lpc-shared-header .notifications-panel .notif-body{font-family:'Sarabun',sans-serif;font-weight:200;font-size:.92rem;color:#4b4b4b}
+  .lpc-shared-header .notifications-panel .notif-time{font-family:'Sarabun',sans-serif;font-weight:200;font-size:.78rem;color:#888;margin-top:4px}
+  .lpc-shared-header .notifications-panel .notif-empty{padding:16px;text-align:center;font-size:.9rem;color:#777;margin:0}
+  .lpc-shared-header .notifications-panel .notif-markall{border:none;border-top:1px solid rgba(0,0,0,0.08);background:#fafafa;padding:12px;text-align:left;font-size:.9rem;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:200}
   `;
   document.head.appendChild(style);
 }
@@ -291,20 +311,27 @@ function ensureSimpleMessageStyles() {
   document.head.appendChild(style);
 }
 
-async function initHeader() {
+async function initHeader(options = {}) {
+  const { skipNotifications = false } = options;
   const target = document.querySelector("[data-attorney-header]");
   if (!target) return;
   target.innerHTML = `
     <div class="lpc-shared-header">
-      <div class="header-controls">
+      <div class="header-controls" data-notification-center>
         <div class="notification-wrapper">
-          <button class="notification-icon" id="notificationToggle" aria-label="View notifications">
+          <button class="notification-icon" aria-label="View notifications" data-notification-toggle>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
               <path d="M13.73 21a2 2 0 01-3.46 0" />
             </svg>
-            <span class="notification-badge" id="notificationBadge">0</span>
+            <span class="notification-badge" data-notification-badge>0</span>
           </button>
+          <div class="notifications-panel notif-panel hidden" role="region" aria-live="polite" data-notification-panel>
+            <div class="notif-header">Notifications</div>
+            <div class="notif-scroll" data-notification-list></div>
+            <div class="notif-empty" data-notification-empty>Loading…</div>
+            <button type="button" class="notif-markall" data-notification-mark>Mark All Read</button>
+          </div>
         </div>
         <div class="user-chip" id="headerUser">
           <img id="headerAvatar" src="https://via.placeholder.com/60" alt="Attorney avatar" />
@@ -318,51 +345,21 @@ async function initHeader() {
           </div>
         </div>
       </div>
-      <div class="notifications-panel" id="notificationsPanel" role="region" aria-live="polite">
-        <header>
-          <h3>Notifications</h3>
-          <button type="button" id="markNotifications">Mark all read</button>
-        </header>
-        <ul id="notificationList">
-          <li>Loading…</li>
-        </ul>
-        <p id="notificationsEmpty" class="empty-copy" style="display:none;">You’re all caught up.</p>
-      </div>
     </div>
   `;
 
   await loadUser();
-  await loadNotifications();
   bindHeaderEvents();
+  if (!skipNotifications) {
+    scanNotificationCenters();
+  }
 }
 
 function bindHeaderEvents() {
-  const bell = document.getElementById("notificationToggle");
-  const panel = document.getElementById("notificationsPanel");
   const profileTrigger = document.getElementById("headerUser");
   const profileMenu = document.getElementById("profileDropdown");
   const settingsBtn = profileMenu?.querySelector("[data-account-settings]");
   const logoutBtn = profileMenu?.querySelector("[data-logout]");
-  const markBtn = document.getElementById("markNotifications");
-
-  if (bell && panel) {
-    bell.addEventListener("click", () => toggleNotificationPanel());
-    bell.addEventListener("keydown", (evt) => {
-      if (evt.key === "Enter" || evt.key === " ") {
-        evt.preventDefault();
-        toggleNotificationPanel();
-      }
-    });
-  }
-
-  function toggleNotificationPanel(force) {
-    const show = typeof force === "boolean" ? force : !panel.classList.contains("show");
-    document.querySelectorAll(".notifications-panel").forEach((el) => el.classList.remove("show"));
-    panel.classList.toggle("show", show);
-    if (show) {
-      markNotificationsRead();
-    }
-  }
 
   if (profileTrigger && profileMenu) {
     profileTrigger.addEventListener("click", (evt) => {
@@ -379,12 +376,8 @@ function bindHeaderEvents() {
   logoutBtn?.addEventListener("click", async () => {
     await logout("login.html");
   });
-  markBtn?.addEventListener("click", () => markNotificationsRead());
 
   document.addEventListener("click", (evt) => {
-    if (panel && !panel.contains(evt.target) && !bell.contains(evt.target)) {
-      panel.classList.remove("show");
-    }
     if (profileMenu && !profileMenu.contains(evt.target) && !profileTrigger.contains(evt.target)) {
       profileMenu.classList.remove("show");
     }
@@ -440,92 +433,48 @@ function handleLocalUserUpdate(event) {
 window.addEventListener("storage", handleStoredUserUpdate);
 window.addEventListener("lpc:user-updated", handleLocalUserUpdate);
 
-async function loadNotifications() {
-  try {
-    const res = await secureFetch("/api/users/me/notifications", { headers: { Accept: "application/json" }, noRedirect: true });
-    if (!res.ok) throw new Error("Failed notifications");
-    const payload = await res.json();
-    state.notifications = Array.isArray(payload.items) ? payload.items : [];
-    const unread = state.notifications.filter((item) => item && item.read === false).length;
-    updateNotificationUI(unread);
-  } catch (err) {
-    console.warn("Notifications unavailable", err);
-    updateNotificationUI(0, "No notifications available.");
-  }
-}
-
-function updateNotificationUI(unread = 0, fallbackText) {
-  const badge = document.getElementById("notificationBadge");
-  if (badge) {
-    badge.textContent = unread > 9 ? "9+" : String(unread || 0);
-    badge.classList.toggle("show", unread > 0);
-  }
-  const list = document.getElementById("notificationList");
-  const empty = document.getElementById("notificationsEmpty");
-  if (!list || !empty) return;
-  list.innerHTML = "";
-  if (fallbackText) {
-    empty.style.display = "block";
-    empty.textContent = fallbackText;
-    return;
-  }
-  if (!state.notifications.length) {
-    empty.style.display = "block";
-    empty.textContent = "You’re all caught up.";
-    return;
-  }
-  empty.style.display = "none";
-  state.notifications.forEach((item) => {
-    const li = document.createElement("li");
-    const title = document.createElement("strong");
-    title.textContent = item.title || "Notification";
-    const body = document.createElement("p");
-    body.textContent = item.body || "";
-    const meta = document.createElement("span");
-    meta.textContent = formatRelativeTime(item.createdAt);
-    li.appendChild(title);
-    li.appendChild(body);
-    li.appendChild(meta);
-    list.appendChild(li);
-  });
-}
-
 async function markNotificationsRead(options = {}) {
-  const payload = {};
-  if (options.caseId) payload.caseId = options.caseId;
-  if (options.type) payload.type = options.type;
   try {
-    await secureFetch("/api/users/me/notifications/read", { method: "POST", body: payload });
-    const targetCase = options.caseId ? String(options.caseId) : null;
-    const targetType = options.type ? String(options.type) : null;
-    if (state.notifications.length) {
-      state.notifications = state.notifications.map((item) => {
-        if (!item) return item;
-        if (targetCase && String(item.caseId || "") !== targetCase) return item;
-        if (targetType && String(item.type || "") !== targetType) return item;
-        return { ...item, read: true };
-      });
+    const normalizedCase = options.caseId ? String(options.caseId) : "";
+    const normalizedType = options.type ? String(options.type) : "";
+    if (!normalizedCase && !normalizedType) {
+      await secureFetch("/api/notifications/read-all", { method: "POST" });
+      window.refreshNotificationCenters?.();
+      return;
     }
-    const unread = state.notifications.filter((item) => item && item.read === false).length;
-    updateNotificationUI(unread);
+    const res = await secureFetch("/api/notifications", {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("Unable to load notifications");
+    const items = await res.json().catch(() => []);
+    const targets = (Array.isArray(items) ? items : []).filter((item) => {
+      if (!item) return false;
+      if (normalizedType && String(item.type || "") !== normalizedType) return false;
+      if (normalizedCase) {
+        const payloadCase =
+          item.caseId ||
+          item.payload?.caseId ||
+          item.payload?.caseID ||
+          item.payload?.case?.id ||
+          item.payload?.case;
+        if (String(payloadCase || "") !== normalizedCase) return false;
+      }
+      return true;
+    });
+    await Promise.all(
+      targets.map((item) =>
+        secureFetch(`/api/notifications/${item._id || item.id}/read`, {
+          method: "POST",
+          credentials: "include",
+        })
+      )
+    );
+    window.refreshNotificationCenters?.();
   } catch (err) {
     console.warn("Notifications mark read failed", err);
   }
-}
-
-function formatRelativeTime(value) {
-  if (!value) return "";
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const diff = Date.now() - date.getTime();
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return "Moments ago";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString();
 }
 
 // -------------------------
@@ -572,7 +521,7 @@ async function initOverviewPage() {
       const action = btn.dataset.quickLink;
       if (action === "create-case") window.location.href = "create-case.html";
       else if (action === "browse-paralegals") window.location.href = "browse-paralegals.html";
-      else if (action === "upload-doc") window.location.href = "documents.html";
+      else if (action === "upload-doc") window.location.href = "case-files.html";
     });
   });
 
@@ -2522,7 +2471,6 @@ async function selectMessageCase(caseId) {
     renderMessageThreads(caseId);
     renderChatMessages();
     await markNotificationsRead({ caseId: String(caseId) });
-    await loadNotifications();
   } catch (err) {
     console.warn(err);
     notifyMessages(err.message || "Unable to load messages for that case.", "error");

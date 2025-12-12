@@ -47,21 +47,42 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  async function loadPreferences() {
+    try {
+      const res = await fetch("/api/account/preferences", {
+        credentials: "include"
+      });
+      if (!res.ok) return;
+      const prefs = await res.json();
+      const emailToggle = document.getElementById("emailNotificationsToggle");
+      if (emailToggle) emailToggle.checked = !!prefs.email;
+    } catch (err) {
+      console.error("Failed to load preferences", err);
+    }
+  }
+  loadPreferences();
+
   const prefBtn = document.getElementById("savePreferencesBtn");
   if (prefBtn) {
     prefBtn.addEventListener("click", async () => {
-      const email = document.getElementById("emailNotifications")?.checked || false;
-      const sms = document.getElementById("smsNotifications")?.checked || false;
+      const emailToggle = document.getElementById("emailNotificationsToggle");
+      const email = emailToggle ? emailToggle.checked : false;
 
       const res = await fetch("/api/account/preferences", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, sms })
+        body: JSON.stringify({ email })
       });
 
       const data = await res.json().catch(() => ({}));
-      alert(data.msg || "Preferences saved!");
+
+      if (!res.ok) {
+        alert(data.error || "Unable to save preferences.");
+        return;
+      }
+
+      alert("Preferences saved");
     });
   }
 
@@ -82,9 +103,76 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  // --- BLOCKED USERS ---
+  async function loadBlockedUsers() {
+    const container = document.getElementById("blockedUsersList");
+    if (!container) return;
+
+    try {
+      const res = await fetch("/api/users/me/blocked", { credentials: "include" });
+      const data = await res.json();
+
+      if (!Array.isArray(data) || !data.length) {
+        container.innerHTML = "<p class='muted'>No blocked users.</p>";
+        return;
+      }
+
+      container.innerHTML = data.map(
+        (u) => `
+        <div class="blocked-user-row">
+          ${u.name}
+          <button class="small-btn unblock-btn" data-id="${u._id}">Unblock</button>
+        </div>
+      `
+      ).join("");
+
+      container.querySelectorAll(".unblock-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          await fetch("/api/users/unblock", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ userId: btn.dataset.id })
+          });
+          loadBlockedUsers();
+        });
+      });
+    } catch (err) {
+      console.error("Failed to load blocked users", err);
+      container.innerHTML = "<p class='muted'>Unable to load blocked users.</p>";
+    }
+  }
+  loadBlockedUsers();
+
+  // --- STRIPE CONNECT ---
+  const connectStripeBtn = document.getElementById("connectStripeBtn");
+  if (connectStripeBtn) {
+    connectStripeBtn.addEventListener("click", async () => {
+      try {
+        const res = await fetch("/api/stripe/connect", {
+          method: "POST",
+          credentials: "include"
+        });
+        const data = await res.json();
+        if (data?.url) {
+          window.location.href = data.url;
+        }
+      } catch (err) {
+        console.error("Failed to start Stripe connect flow", err);
+        alert("Unable to connect Stripe right now.");
+      }
+    });
+  }
 });
 
 const PREFILL_CACHE_KEY = "lpc_edit_profile_prefill";
+
+const paralegalSettingsSection = document.getElementById("paralegalSettings");
+const attorneySettingsSection = document.getElementById("attorneySettings");
+
+paralegalSettingsSection?.classList.add("hidden");
+attorneySettingsSection?.classList.add("hidden");
 
 document.addEventListener("DOMContentLoaded", async () => {
   const prefill = consumeEditPrefillUser();
@@ -108,10 +196,15 @@ let settingsState = {
   awards: [],
   highlightedSkills: [],
   linkedInURL: "",
-  notificationPrefs: {}
+  notificationPrefs: { email: true, emailMessages: true, emailCase: true, sms: false },
+  digestFrequency: "off",
+  practiceDescription: ""
 };
 
 let currentUser = null;
+let attorneyAvatarBound = false;
+let attorneyPrefsBound = false;
+let attorneySaveBound = false;
 
 const LANGUAGE_PROFICIENCY_OPTIONS = [
   { value: "Native", label: "Native / Bilingual" },
@@ -126,6 +219,23 @@ const addLanguageBtn = document.getElementById("addLanguageBtn");
 
 if (addLanguageBtn && languagesEditor) {
   addLanguageBtn.addEventListener("click", () => addLanguageRow());
+}
+
+function buildInitials(name = "", fallback = "A") {
+  const trimmed = String(name || "").trim();
+  if (!trimmed) return fallback;
+  const letters = trimmed
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("")
+    .slice(0, 2);
+  return letters || fallback;
+}
+
+function getAttorneyInitials(user = {}) {
+  const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.name || "";
+  return buildInitials(fullName, "A");
 }
 
 function consumeEditPrefillUser() {
@@ -145,12 +255,42 @@ function seedSettingsState(user = {}) {
   settingsState.awards = user.awards || [];
   settingsState.highlightedSkills = user.highlightedSkills || user.skills || [];
   settingsState.linkedInURL = user.linkedInURL || "";
-  settingsState.notificationPrefs = user.notificationPrefs || settingsState.notificationPrefs;
+  settingsState.notificationPrefs = {
+    email: true,
+    emailMessages: true,
+    emailCase: true,
+    sms: false,
+    ...(user.notificationPrefs || {})
+  };
+  settingsState.practiceDescription = user.practiceDescription || user.bio || "";
+  const freq = typeof user.digestFrequency === "string" ? user.digestFrequency : "off";
+  settingsState.digestFrequency = ["off", "daily", "weekly"].includes(freq) ? freq : "off";
 }
 
 function bootstrapProfileSettings(user) {
   enforceUnifiedRoleStyling(user);
   currentUser = user;
+  const role = (user.role || "").toLowerCase();
+  if (role === "attorney") {
+    initAttorneySettings(user);
+    return;
+  }
+  initParalegalSettings(user);
+}
+
+function initAttorneySettings(user = {}) {
+  seedSettingsState(user);
+  showAttorneySettings();
+  hydrateAttorneyProfileForm(user);
+  bindAttorneyAvatarUploader();
+  bindAttorneyPracticeEditor();
+  bindAttorneySaveButton();
+  bindAttorneyNotificationToggles();
+  syncCluster(user);
+}
+
+function initParalegalSettings(user = {}) {
+  showParalegalSettings();
   hydrateProfileForm(user);
   seedSettingsState(user);
   renderLanguageEditor(user.languages || []);
@@ -163,6 +303,276 @@ function bootstrapProfileSettings(user) {
   try { loadSkills(user); } catch {}
   try { loadLinkedIn(user); } catch {}
   try { loadNotifications(user); } catch {}
+  syncCluster(user);
+}
+
+function showParalegalSettings() {
+  paralegalSettingsSection?.classList.remove("hidden");
+  attorneySettingsSection?.classList.add("hidden");
+}
+
+function showAttorneySettings() {
+  attorneySettingsSection?.classList.remove("hidden");
+  paralegalSettingsSection?.classList.add("hidden");
+}
+
+function hydrateAttorneyProfileForm(user = {}) {
+  const first = document.getElementById("attorneyFirstName");
+  if (first) first.value = user.firstName || "";
+  const last = document.getElementById("attorneyLastName");
+  if (last) last.value = user.lastName || "";
+  const emailInput = document.getElementById("attorneyEmail");
+  if (emailInput) emailInput.value = user.email || "";
+  const linkedInInput = document.getElementById("attorneyLinkedIn");
+  if (linkedInInput) linkedInInput.value = user.linkedInURL || "";
+  const firmNameInput = document.getElementById("attorneyFirmName");
+  if (firmNameInput) firmNameInput.value = user.lawFirm || user.firmName || "";
+  const firmWebsiteInput = document.getElementById("attorneyFirmWebsite");
+  if (firmWebsiteInput) firmWebsiteInput.value = user.firmWebsite || "";
+  const practiceInput = document.getElementById("attorneyPracticeDescription");
+  const practiceValue = user.practiceDescription || user.bio || "";
+  if (practiceInput) practiceInput.value = practiceValue;
+  settingsState.practiceDescription = practiceValue;
+  updateAttorneyPracticeCount();
+  hydrateAttorneyNotificationPrefs(user);
+  updateAttorneyAvatarPreview(user);
+}
+
+function updateAttorneyAvatarPreview(user = {}) {
+  const preview = document.getElementById("attorneyAvatarPreview");
+  const initials = document.getElementById("attorneyAvatarInitials");
+  const frame = document.getElementById("attorneyAvatarFrame");
+  const avatarUrl = user.profileImage || user.avatarURL || settingsState.profileImage || "";
+  if (preview) {
+    if (avatarUrl) {
+      preview.src = avatarUrl;
+      preview.hidden = false;
+      frame?.classList.add("has-photo");
+      if (initials) initials.style.display = "none";
+    } else {
+      preview.hidden = true;
+      frame?.classList.remove("has-photo");
+      if (initials) {
+        initials.style.display = "flex";
+        initials.textContent = getAttorneyInitials(user);
+      }
+    }
+  } else if (initials) {
+    initials.textContent = getAttorneyInitials(user);
+  }
+}
+
+function bindAttorneyAvatarUploader() {
+  const frame = document.getElementById("attorneyAvatarFrame");
+  const input = document.getElementById("attorneyAvatarInput");
+  const uploadBtn = document.getElementById("attorneyAvatarUploadBtn");
+  if (!frame || !input) return;
+  if (attorneyAvatarBound) return;
+
+  const triggerUpload = () => input.click();
+  frame.style.cursor = "pointer";
+  frame.addEventListener("click", triggerUpload);
+  frame.addEventListener("keydown", (evt) => {
+    if (evt.key === "Enter" || evt.key === " ") {
+      evt.preventDefault();
+      triggerUpload();
+    }
+  });
+  if (uploadBtn) uploadBtn.addEventListener("click", triggerUpload);
+  input.addEventListener("change", handleAttorneyAvatarFile);
+  attorneyAvatarBound = true;
+}
+
+function bindAttorneySaveButton() {
+  if (attorneySaveBound) return;
+  const saveBtn = document.getElementById("saveAttorneyProfile");
+  if (!saveBtn) return;
+  saveBtn.addEventListener("click", handleAttorneyProfileSave);
+  attorneySaveBound = true;
+}
+
+function bindAttorneyPracticeEditor() {
+  const practiceInput = document.getElementById("attorneyPracticeDescription");
+  if (!practiceInput) return;
+  practiceInput.addEventListener("input", () => {
+    settingsState.practiceDescription = practiceInput.value;
+    updateAttorneyPracticeCount();
+  });
+  updateAttorneyPracticeCount();
+}
+
+function bindAttorneyNotificationToggles() {
+  if (attorneyPrefsBound) return;
+  [
+    { id: "attorneyEmailNotifications", key: "email" },
+    { id: "attorneyMessageAlerts", key: "emailMessages" },
+    { id: "attorneyCaseUpdates", key: "emailCase" }
+  ].forEach(({ id, key }) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener("change", async () => {
+      const checked = input.checked;
+      try {
+        await saveAttorneyNotificationPref(key, checked);
+        settingsState.notificationPrefs[key] = checked;
+        showToast("Notification preference updated", "ok");
+      } catch (err) {
+        console.error("Unable to update notification preference", err);
+        input.checked = !checked;
+        showToast("Unable to update preference right now.", "err");
+      }
+    });
+  });
+  attorneyPrefsBound = true;
+}
+
+function hydrateAttorneyNotificationPrefs(user = {}) {
+  const prefs = user.notificationPrefs || {};
+  const emailToggle = document.getElementById("attorneyEmailNotifications");
+  if (emailToggle) emailToggle.checked = prefs.email !== false;
+  const messageToggle = document.getElementById("attorneyMessageAlerts");
+  if (messageToggle) messageToggle.checked = prefs.emailMessages !== false;
+  const caseToggle = document.getElementById("attorneyCaseUpdates");
+  if (caseToggle) caseToggle.checked = prefs.emailCase !== false;
+  settingsState.notificationPrefs = {
+    ...settingsState.notificationPrefs,
+    email: prefs.email !== false,
+    emailMessages: prefs.emailMessages !== false,
+    emailCase: prefs.emailCase !== false
+  };
+}
+
+async function handleAttorneyAvatarFile(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const dataUrl = reader.result;
+    if (!dataUrl) return;
+    const preview = document.getElementById("attorneyAvatarPreview");
+    const initials = document.getElementById("attorneyAvatarInitials");
+    if (preview) {
+      preview.src = dataUrl;
+      preview.hidden = false;
+      initials?.classList.add("hidden");
+    }
+    try {
+      await uploadAttorneyAvatar(dataUrl);
+      showToast("Profile photo updated!", "ok");
+    } catch (err) {
+      console.error("Unable to upload attorney avatar", err);
+      showToast("Unable to upload photo. Please try again.", "err");
+    } finally {
+      event.target.value = "";
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function uploadAttorneyAvatar(imageDataUrl) {
+  if (!imageDataUrl) throw new Error("Missing image data");
+  const res = await secureFetch("/api/users/profile-photo", {
+    method: "POST",
+    body: { image: imageDataUrl }
+  });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok || !payload?.url) {
+    throw new Error(payload?.error || "Upload failed");
+  }
+  const updatedUser = { ...(currentUser || {}), profileImage: payload.url };
+  currentUser = updatedUser;
+  settingsState.profileImage = payload.url;
+  persistSession({ user: updatedUser });
+  window.updateSessionUser?.(updatedUser);
+  applyAvatar(updatedUser);
+  return payload.url;
+}
+
+function collectAttorneyPayload() {
+  const first = document.getElementById("attorneyFirstName")?.value.trim() || "";
+  const last = document.getElementById("attorneyLastName")?.value.trim() || "";
+  const email = document.getElementById("attorneyEmail")?.value.trim() || "";
+  const linkedIn = document.getElementById("attorneyLinkedIn")?.value.trim() || "";
+  const lawFirm = document.getElementById("attorneyFirmName")?.value.trim() || "";
+  const firmWebsite = document.getElementById("attorneyFirmWebsite")?.value.trim() || "";
+  const practiceDescription = document.getElementById("attorneyPracticeDescription")?.value.trim() || "";
+  const emailToggle = document.getElementById("attorneyEmailNotifications");
+  const payload = {
+    firstName: first,
+    lastName: last,
+    email,
+    linkedInURL: linkedIn || null,
+    lawFirm,
+    practiceDescription,
+    bio: practiceDescription,
+    notificationPrefs: {
+      email: emailToggle ? emailToggle.checked : settingsState.notificationPrefs.email !== false
+    }
+  };
+  settingsState.practiceDescription = practiceDescription;
+  if (firmWebsite) {
+    payload.firmWebsite = firmWebsite;
+  }
+  if (settingsState.profileImage) {
+    payload.profileImage = settingsState.profileImage;
+  }
+  return payload;
+}
+
+function updateAttorneyPracticeCount() {
+  const practiceInput = document.getElementById("attorneyPracticeDescription");
+  const counter = document.getElementById("attorneyPracticeCount");
+  if (!practiceInput || !counter) return;
+  const length = practiceInput.value?.length || 0;
+  counter.textContent = `${length} / 4000 characters`;
+}
+async function handleAttorneyProfileSave() {
+  const saveBtn = document.getElementById("attorneyProfileSaveBtn");
+  if (!saveBtn) return;
+  const originalLabel = saveBtn.textContent;
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Saving…";
+  try {
+    const payload = collectAttorneyPayload();
+    const res = await secureFetch("/api/users/me", {
+      method: "PATCH",
+      body: payload
+    });
+    const updatedUser = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(updatedUser?.error || "Unable to save profile");
+    }
+    currentUser = updatedUser;
+    persistSession({ user: updatedUser });
+    window.updateSessionUser?.(updatedUser);
+    settingsState.profileImage = updatedUser.profileImage || settingsState.profileImage;
+    settingsState.practiceDescription = updatedUser.practiceDescription || updatedUser.bio || "";
+    settingsState.notificationPrefs = {
+      ...settingsState.notificationPrefs,
+      email: updatedUser.notificationPrefs?.email !== false,
+      emailMessages: updatedUser.notificationPrefs?.emailMessages !== false,
+      emailCase: updatedUser.notificationPrefs?.emailCase !== false
+    };
+    hydrateAttorneyProfileForm(updatedUser);
+    showToast("Profile updated!", "ok");
+  } catch (err) {
+    console.error("Failed to save attorney profile", err);
+    showToast("Unable to save profile right now.", "err");
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = originalLabel || "Save profile";
+  }
+}
+
+async function saveAttorneyNotificationPref(key, value) {
+  const res = await secureFetch("/api/users/me/notification-prefs", {
+    method: "PATCH",
+    body: { [key]: !!value }
+  });
+  if (!res.ok) {
+    const errPayload = await res.json().catch(() => ({}));
+    throw new Error(errPayload?.error || "Preference update failed");
+  }
 }
 
 function normalizeLanguageEntry(entry) {
@@ -292,6 +702,12 @@ function applyUnifiedRoleStyling(user = {}) {
   document.querySelectorAll("[data-attorney-only]").forEach((el) => {
     el.style.display = role === "attorney" ? "" : "none";
   });
+
+  if (role === "attorney") {
+    showAttorneySettings();
+  } else {
+    showParalegalSettings();
+  }
 }
 
 function enforceUnifiedRoleStyling(user = {}) {
@@ -311,6 +727,11 @@ function applyAvatar(user) {
     preview.src = cacheBusted;
     preview.style.objectPosition = "center center";
   }
+  const attorneyPreview = document.getElementById("attorneyAvatarPreview");
+  if (attorneyPreview) {
+    attorneyPreview.src = cacheBusted;
+    attorneyPreview.hidden = false;
+  }
 
   const cluster = document.getElementById("clusterAvatar");
   if (cluster) cluster.src = cacheBusted;
@@ -323,6 +744,10 @@ function applyAvatar(user) {
   const initials = document.getElementById("avatarInitials");
   if (frame) frame.classList.add("has-photo");
   if (initials) initials.style.display = "none";
+  const attorneyFrame = document.getElementById("attorneyAvatarFrame");
+  const attorneyInitials = document.getElementById("attorneyAvatarInitials");
+  if (attorneyFrame) attorneyFrame.classList.add("has-photo");
+  if (attorneyInitials) attorneyInitials.style.display = "none";
 }
 
 function renderFallback(sectionId, title) {
@@ -352,7 +777,18 @@ async function loadSettings() {
   try {
     const res = await secureFetch("/api/users/me");
     user = await res.json();
+    if ((!user?.role || !user.role.trim()) && typeof window.refreshSession === "function") {
+      try {
+        const session = await window.refreshSession();
+        const sessionUser = session?.user || session;
+        if (sessionUser?.role) {
+          user.role = sessionUser.role;
+        }
+      } catch (_) {}
+    }
     currentUser = user;
+    window.currentUser = user;
+    persistSession({ user });
     const titleEl = document.getElementById("accountSettingsTitle");
     const subtitleEl = document.getElementById("accountSettingsSubtitle");
 
@@ -365,8 +801,20 @@ async function loadSettings() {
       if (titleEl) titleEl.textContent = "Account Settings";
       if (subtitleEl) subtitleEl.textContent = "Keep your LPC profile accurate, stay secure, and control how we notify you.";
     }
-    enforceUnifiedRoleStyling(user);
-    applyAvatar(user);
+  enforceUnifiedRoleStyling(user);
+  applyAvatar(user);
+  bootstrapProfileSettings(user);
+
+    const role = (currentUser?.role || "").toLowerCase();
+
+    if (role === "attorney") {
+      // Attorney: ONLY attorney UI should show.
+      showAttorneySettings();
+      return; // IMPORTANT → stops all paralegal hydration
+    }
+
+    // Paralegal: ONLY paralegal UI should show.
+    showParalegalSettings();
     hydrateProfileForm(user);
 
     const firstNameInput = document.getElementById("firstNameInput");
@@ -898,41 +1346,61 @@ function loadLinkedIn(user) {
 // ================= NOTIFICATION PREFS =================
 
 function loadNotifications(user) {
-  const prefs = user.notificationPrefs || {};
-
   const section = document.getElementById("settingsNotifications");
   if (!section) return;
+  const prefs = {
+    email: true,
+    sms: false,
+    ...(user.notificationPrefs || {})
+  };
+
   section.innerHTML = `
     <h3>Notification Preferences</h3>
-    <label><input type="checkbox" id="prefInAppMessages"> In-app: Messages</label><br>
-    <label><input type="checkbox" id="prefInAppCase"> In-app: Case Updates</label><br>
-    <label><input type="checkbox" id="prefEmailMessages"> Email: Messages</label><br>
-    <label><input type="checkbox" id="prefEmailCase"> Email: Case Updates</label><br>
+    <label class="pref-row">
+      <input type="checkbox" id="prefEmailNotify"> Email notifications
+    </label><br>
+    <label class="pref-row">
+      <input type="checkbox" id="prefSmsNotify"> SMS notifications
+      <small style="margin-left: 0.5rem; opacity: 0.75;">Requires a verified phone number.</small>
+    </label>
+    <div class="pref-row" style="flex-wrap: wrap; gap: 10px;">
+      <div style="flex: 1; min-width: 220px;">
+        <strong>Digest emails</strong>
+        <p style="margin:4px 0 0; font-size: 0.9rem; color: var(--muted);">Receive a summary of messages, invites, and updates.</p>
+      </div>
+      <select id="digestFrequencySelect" style="padding:6px 10px;border-radius:12px;border:1px solid var(--line);font-size:0.95rem;min-width:160px;">
+        <option value="off">Off</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+      </select>
+    </div>
   `;
 
-  const inAppMsg = document.getElementById("prefInAppMessages");
-  const inAppCase = document.getElementById("prefInAppCase");
-  const emailMsg = document.getElementById("prefEmailMessages");
-  const emailCase = document.getElementById("prefEmailCase");
+  const emailToggle = document.getElementById("prefEmailNotify");
+  const smsToggle = document.getElementById("prefSmsNotify");
+  const digestSelect = document.getElementById("digestFrequencySelect");
 
-  if (inAppMsg) {
-    inAppMsg.checked = !!prefs.inAppMessages;
-    inAppMsg.addEventListener("change", (e) => { prefs.inAppMessages = e.target.checked; });
+  if (emailToggle) {
+    emailToggle.checked = prefs.email !== false;
+    emailToggle.addEventListener("change", (e) => {
+      settingsState.notificationPrefs.email = e.target.checked;
+    });
   }
-  if (inAppCase) {
-    inAppCase.checked = !!prefs.inAppCase;
-    inAppCase.addEventListener("change", (e) => { prefs.inAppCase = e.target.checked; });
+  if (smsToggle) {
+    smsToggle.checked = !!prefs.sms;
+    smsToggle.addEventListener("change", (e) => {
+      settingsState.notificationPrefs.sms = e.target.checked;
+    });
   }
-  if (emailMsg) {
-    emailMsg.checked = !!prefs.emailMessages;
-    emailMsg.addEventListener("change", (e) => { prefs.emailMessages = e.target.checked; });
-  }
-  if (emailCase) {
-    emailCase.checked = !!prefs.emailCase;
-    emailCase.addEventListener("change", (e) => { prefs.emailCase = e.target.checked; });
+  if (digestSelect) {
+    digestSelect.value = settingsState.digestFrequency;
+    digestSelect.addEventListener("change", (e) => {
+      const value = e.target.value;
+      settingsState.digestFrequency = ["off", "daily", "weekly"].includes(value) ? value : "off";
+    });
   }
 
-  settingsState.notificationPrefs = prefs;
+  settingsState.notificationPrefs = { ...prefs };
 }
 
 
@@ -965,7 +1433,8 @@ async function saveSettings() {
     awards: settingsState.awards,
     highlightedSkills: settingsState.highlightedSkills,
     linkedInURL: settingsState.linkedInURL,
-    notificationPrefs: settingsState.notificationPrefs
+    notificationPrefs: settingsState.notificationPrefs,
+    digestFrequency: settingsState.digestFrequency
   };
 
   body.linkedInURL = linkedInInput?.value.trim() || null;
@@ -1048,7 +1517,13 @@ async function saveSettings() {
   settingsState.awards = updatedUser.awards || [];
   settingsState.highlightedSkills = updatedUser.highlightedSkills || updatedUser.skills || [];
   settingsState.linkedInURL = updatedUser.linkedInURL || "";
-  settingsState.notificationPrefs = updatedUser.notificationPrefs || settingsState.notificationPrefs;
+  settingsState.notificationPrefs = {
+    email: true,
+    sms: false,
+    ...(updatedUser.notificationPrefs || {})
+  };
+  const newFreq = typeof updatedUser.digestFrequency === "string" ? updatedUser.digestFrequency : "off";
+  settingsState.digestFrequency = ["off", "daily", "weekly"].includes(newFreq) ? newFreq : "off";
   settingsState.profileImage = updatedUser.profileImage || settingsState.profileImage;
   settingsState.pendingResumeKey = "";
   settingsState.pendingCertificateKey = "";

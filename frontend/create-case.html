@@ -9,8 +9,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Create Case | Let<span class="gold">’</span>s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
@@ -191,6 +191,20 @@
     .step span{font-size:0.85rem;color:var(--muted);}
 
     /* Form */
+    .input-error{
+      border-color:#c0392b !important;
+      background:rgba(192,57,43,0.05);
+    }
+    button.input-error{
+      border-color:#c0392b !important;
+      box-shadow:0 0 0 1px rgba(192,57,43,0.2);
+    }
+    .field-error{
+      color:#b91c1c;
+      font-size:0.8rem;
+      margin-top:6px;
+    }
+
     form{
       background:var(--panel);
       border:1px solid var(--line);
@@ -295,6 +309,62 @@
   border-color: var(--accent);
   color: var(--accent);
 }
+.select-field .select-wrapper {
+  position: relative;
+}
+.select-field select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.65rem 2.6rem 0.65rem 0.85rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: #fff;
+  appearance: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.select-field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(182,164,122,0.18);
+  outline: none;
+}
+.select-field .select-arrow {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.select-field .select-wrapper {
+  position: relative;
+}
+.select-field select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.65rem 2.8rem 0.65rem 0.9rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: #fff;
+  appearance: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.select-field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(182,164,122,0.18);
+  outline: none;
+}
+.select-field .select-arrow {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
 .steps a {
   text-decoration: none;
   color: inherit;
@@ -345,22 +415,19 @@
 
     <!-- Step Progress -->
     <div class="steps">
-  <a href="create-case.html" class="step active">
-    <div class="circle">1</div><span>Case details</span>
-  </a>
-  <a href="create-case-step2.html" class="step">
-    <div class="circle">2</div><span>Description</span>
-  </a>
-  <a href="create-case-step3.html" class="step">
-    <div class="circle">3</div><span>Requirements</span>
-  </a>
-  <a href="create-case-step4.html" class="step">
-    <div class="circle">4</div><span>Questions</span>
-  </a>
-  <a href="create-case-step5.html" class="step">
-    <div class="circle">5</div><span>Review & Post</span>
-  </a>
-</div>
+      <a href="create-case.html" class="step active">
+        <div class="circle">1</div><span>Case details</span>
+      </a>
+      <a href="create-case-step2.html" class="step">
+        <div class="circle">2</div><span>Description</span>
+      </a>
+      <a href="create-case-step4.html" class="step">
+        <div class="circle">3</div><span>Questions</span>
+      </a>
+      <a href="create-case-step5.html" class="step">
+        <div class="circle">4</div><span>Review &amp; Post</span>
+      </a>
+    </div>
 
     <!-- Form -->
     <form>
@@ -481,30 +548,25 @@
 </div>
 
       <div class="field">
-        <label for="employment">Engagement Type</label>
-        <select id="employment">
-          <option value="">Select…</option>
-          <option>One-time Project</option>
-          <option>Ongoing Support</option>
-          <option>Temporary Contract</option>
-        </select>
-      </div>
-
-      <div class="field">
   <label for="comp">Compensation</label>
   <div class="comp-wrapper">
     <span class="dollar-sign">$</span>
     <input id="comp" type="number" min="0" placeholder="Amount" />
-    <div class="comp-type">
-      <button type="button" class="type-btn active" data-type="hourly">Hourly</button>
-      <button type="button" class="type-btn" data-type="flat">Flat Fee</button>
-    </div>
   </div>
 </div>
 
-      <div class="field">
+      <div class="field select-field">
         <label for="experience">Preferred Experience (Optional)</label>
-        <input id="experience" placeholder="e.g., 3+ years litigation experience" />
+        <div class="select-wrapper">
+          <select id="experience">
+            <option value="">No preference</option>
+            <option value="1–3 years (Early Career)">1–3 years (Early Career)</option>
+            <option value="3–7 years (Intermediate)">3–7 years (Intermediate)</option>
+            <option value="7–12 years (Experienced)">7–12 years (Experienced)</option>
+            <option value="12+ years (Advanced)">12+ years (Advanced)</option>
+          </select>
+          <span class="select-arrow">▾</span>
+        </div>
       </div>
 
       <div class="actions">
@@ -515,29 +577,122 @@
   </main>
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
   <script src="assets/scripts/utils/toast.js"></script>
-  <script>window.__ATTORNEY_PAGE__ = "create-case";</script>
+  <script>
+    window.__ATTORNEY_PAGE__ = "create-case";
+    window.__SKIP_NOTIFICATIONS__ = true;
+  </script>
   <script type="module" src="assets/scripts/attorney-tabs.js"></script>
 
   <script>
-document.querySelector('.btn.primary').addEventListener('click', () => {
-  localStorage.setItem('caseTitle', document.getElementById('title').value);
-  localStorage.setItem('caseSpecialty', document.getElementById('specialty').value);
-  localStorage.setItem('caseState', document.getElementById('state').value);
-  localStorage.setItem('caseEmployment', document.getElementById('employment').value);
-  localStorage.setItem('caseComp', document.getElementById('comp').value);
-  localStorage.setItem('caseExperience', document.getElementById('experience').value);
-});
-</script>
-<script>
-const compBtns = document.querySelectorAll('.type-btn');
-compBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    compBtns.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    localStorage.setItem('caseCompType', btn.dataset.type);
-  });
-});
+  (function () {
+    const nextStepBtn = document.getElementById("nextStepBtn");
+    const fields = {
+      title: document.getElementById("title"),
+      specialty: document.getElementById("specialty"),
+      state: document.getElementById("state"),
+      comp: document.getElementById("comp"),
+      experience: document.getElementById("experience"),
+    };
+    const toastHelper = window.toastUtils;
 
+    const validators = [
+      {
+        field: fields.title,
+        check: (value) => value.trim().length >= 3,
+        message: "Add a descriptive case title.",
+      },
+      {
+        field: fields.specialty,
+        check: (value) => Boolean(value.trim()),
+        message: "Select the primary practice area.",
+      },
+      {
+        field: fields.state,
+        check: (value) => Boolean(value.trim()),
+        message: "Select the state or jurisdiction.",
+      },
+      {
+        field: fields.comp,
+        check: (value) => Number(value) > 0,
+        message: "Enter the compensation amount.",
+      },
+    ];
+
+    nextStepBtn?.addEventListener("click", (event) => {
+      let hasErrors = false;
+      validators.forEach(({ field, check, message }) => {
+        clearFieldError(field);
+        if (!field) return;
+        if (!check(field.value || "")) {
+          showFieldError(field, message);
+          hasErrors = true;
+        }
+      });
+
+      if (hasErrors) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        showToastBanner("Fill in the highlighted fields before continuing.", "error");
+        return;
+      }
+
+      persistDraft();
+    });
+
+    Object.values(fields).forEach((field) => {
+      if (!field) return;
+      const eventName = field.tagName === "SELECT" ? "change" : "input";
+      field.addEventListener(eventName, () => clearFieldError(field));
+    });
+
+    function persistDraft() {
+      localStorage.setItem("caseTitle", fields.title?.value?.trim() || "");
+      localStorage.setItem("caseSpecialty", fields.specialty?.value || "");
+      localStorage.setItem("caseState", fields.state?.value || "");
+      localStorage.setItem("caseComp", fields.comp?.value || "");
+      localStorage.setItem("caseCompAmount", fields.comp?.value || "");
+      localStorage.setItem("caseExperience", fields.experience?.value || "");
+    }
+
+    function showFieldError(field, message) {
+      if (!field) return;
+      clearFieldError(field);
+      field.classList.add("input-error");
+      field.setAttribute("aria-invalid", "true");
+      const error = document.createElement("div");
+      error.className = "field-error";
+      error.textContent = message;
+      const wrapper = field.closest(".field") || field.closest("[data-field-wrapper]");
+      if (wrapper) wrapper.appendChild(error);
+      else field.insertAdjacentElement("afterend", error);
+    }
+
+    function clearFieldError(field) {
+      if (!field) return;
+      field.classList.remove("input-error");
+      field.removeAttribute("aria-invalid");
+      const wrapper = field.closest(".field") || field.closest("[data-field-wrapper]");
+      if (wrapper) {
+        const existing = wrapper.querySelector(".field-error");
+        if (existing) existing.remove();
+        return;
+      }
+      const next = field.nextElementSibling;
+      if (next?.classList.contains("field-error")) {
+        next.remove();
+      }
+    }
+
+    function showToastBanner(message, type = "info") {
+      if (toastHelper?.show) {
+        toastHelper.show(message, { targetId: "toastBanner", type });
+      } else {
+        alert(message);
+      }
+    }
+  })();
+  </script>
+<script>
 const compInput = document.getElementById('comp');
 compInput.addEventListener('input', () => {
   localStorage.setItem('caseCompAmount', compInput.value);

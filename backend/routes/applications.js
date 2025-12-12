@@ -3,8 +3,10 @@ const mongoose = require("mongoose");
 const router = express.Router();
 const Application = require("../models/Application");
 const Job = require("../models/Job");
+const User = require("../models/User");
 const auth = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
+const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
 
 function sanitizeMessage(value, { min = 0, max = 2000 } = {}) {
   if (typeof value !== "string") return "";
@@ -51,10 +53,22 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     throw err;
   }
 
+  const applicant = await User.findById(user._id).select(
+    "role resumeURL linkedInURL availability availabilityDetails location languages specialties yearsExperience bio profileImage avatarURL"
+  );
+  if (!applicant) {
+    const err = new Error("Unable to load your profile details.");
+    err.status = 404;
+    throw err;
+  }
+
   const application = await Application.create({
     jobId,
     paralegalId: user._id,
     coverLetter: note,
+    resumeURL: applicant.resumeURL || "",
+    linkedInURL: applicant.linkedInURL || "",
+    profileSnapshot: shapeParalegalSnapshot(applicant),
   });
   await Job.findByIdAndUpdate(jobId, { $inc: { applicantsCount: 1 } });
   return application;

@@ -280,8 +280,8 @@ recentUsers,
 router.get(
 "/pending-paralegals",
 asyncHandler(async (_req, res) => {
-const pending = await User.find({ role: "paralegal", status: "pending" })
-.select("firstName lastName email linkedInURL certificateURL yearsExperience ref1Name ref1Email ref2Name ref2Email createdAt")
+  const pending = await User.find({ role: "paralegal", status: "pending" })
+    .select("firstName lastName email linkedInURL certificateURL yearsExperience createdAt")
 .sort({ createdAt: 1 })
 .lean();
 res.json({ items: pending });

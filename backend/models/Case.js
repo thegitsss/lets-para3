@@ -78,12 +78,28 @@ const fileSchema = new Schema(
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
+const profileSnapshotSchema = new Schema(
+  {
+    location: { type: String, trim: true, maxlength: 300, default: "" },
+    availability: { type: String, trim: true, maxlength: 200, default: "" },
+    yearsExperience: { type: Number, min: 0, max: 80, default: null },
+    languages: [{ type: String, trim: true }],
+    specialties: [{ type: String, trim: true }],
+    bio: { type: String, trim: true, maxlength: 1_000, default: "" },
+    profileImage: { type: String, trim: true, default: "" },
+  },
+  { _id: false }
+);
+
 const applicantSchema = new Schema(
   {
     paralegalId: { type: Types.ObjectId, ref: "User", required: true },
     status: { type: String, enum: APPLICANT_STATUS, default: "pending", index: true },
     appliedAt: { type: Date, default: Date.now },
     note: { type: String, trim: true, maxlength: 10_000 }, // optional cover note
+    resumeURL: { type: String, trim: true, default: "" },
+    linkedInURL: { type: String, trim: true, default: "" },
+    profileSnapshot: { type: profileSnapshotSchema, default: () => ({}) },
   },
   { _id: false }
 );
@@ -281,10 +297,17 @@ caseSchema.methods.snapshotFees = function () {
 };
 
 // Add an applicant (safe-guarded)
-caseSchema.methods.addApplicant = function (paralegalId, note) {
+caseSchema.methods.addApplicant = function (paralegalId, note, extras = {}) {
   const exists = (this.applicants || []).some(a => String(a.paralegalId) === String(paralegalId));
   if (exists) throw new Error("This paralegal has already applied.");
-  this.applicants.push({ paralegalId, note, status: "pending" });
+  this.applicants.push({
+    paralegalId,
+    note,
+    status: "pending",
+    resumeURL: extras.resumeURL || "",
+    linkedInURL: extras.linkedInURL || "",
+    profileSnapshot: extras.profileSnapshot || {},
+  });
   return this;
 };
 

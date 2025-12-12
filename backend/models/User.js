@@ -226,10 +226,6 @@ const userSchema = new Schema(
     deleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
     linkedInURL: { type: String, default: null },
-    ref1Name: { type: String, default: null },
-    ref1Email: { type: String, default: null },
-    ref2Name: { type: String, default: null },
-    ref2Email: { type: String, default: null },
   },
   {
     timestamps: true,

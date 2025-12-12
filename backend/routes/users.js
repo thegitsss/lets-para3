@@ -8,6 +8,7 @@ const User = require("../models/User");
 const Case = require("../models/Case");
 const Task = require("../models/Task");
 const Notification = require("../models/Notification");
+const Job = require("../models/Job");
 const { maskProfanity } = require("../utils/badWords");
 const { logAction } = require("../utils/audit");
 const { notifyUser } = require("../utils/notifyUser");
@@ -672,6 +673,53 @@ router.get(
   })
 );
 
+router.get(
+  "/attorneys/:attorneyId",
+  verifyToken,
+  asyncHandler(async (req, res) => {
+    const { attorneyId } = req.params;
+    const jobId = (req.query?.job || "").trim();
+    const requester = req.user;
+
+    if (!requester) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    if (!isObjId(attorneyId)) {
+      return res.status(400).json({ error: "Invalid attorney id" });
+    }
+
+    if (requester.role === "admin") {
+      return sendAttorney(attorneyId, res);
+    }
+
+    if (requester.role === "attorney") {
+      if (String(requester._id || requester.id) !== String(attorneyId)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      return sendAttorney(attorneyId, res);
+    }
+
+    if (requester.role === "paralegal") {
+      if (!jobId) {
+        return res.status(403).json({ error: "Job context required" });
+      }
+      if (!isObjId(jobId)) {
+        return res.status(400).json({ error: "Invalid job id" });
+      }
+      const job = await Job.findById(jobId).select("attorneyId").lean();
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      if (String(job.attorneyId) !== String(attorneyId)) {
+        return res.status(403).json({ error: "Not authorized to view this attorney." });
+      }
+      return sendAttorney(attorneyId, res);
+    }
+
+    return res.status(403).json({ error: "Access denied" });
+  })
+);
+
 /**
  * GET /api/users/:userId
  * Public paralegal profile (only if approved); must be logged in.
@@ -695,6 +743,7 @@ router.get(
     return res.json(serializePublicUser(u));
   })
 );
+
 
 // ----------------------------------------
 // Paralegal Directory Routes (/api/paralegals)
@@ -905,6 +954,34 @@ router.patch(
     res.json({ ok: true, user: user.toJSON() });
   })
 );
+
+async function sendAttorney(attorneyId, res) {
+  const attorney = await User.findById(attorneyId).select(
+    "firstName lastName lawFirm firmName email linkedInURL firmWebsite practiceDescription bio languages availability profileImage avatarURL experience practiceAreas specialties yearsExperience location"
+  );
+  if (!attorney) {
+    return res.status(404).json({ error: "Attorney not found" });
+  }
+
+  return res.json({
+    id: attorney._id,
+    firstName: attorney.firstName || "",
+    lastName: attorney.lastName || "",
+    lawFirm: attorney.lawFirm || attorney.firmName || "",
+    email: attorney.email || "",
+    linkedInURL: attorney.linkedInURL || "",
+    firmWebsite: attorney.firmWebsite || "",
+    practiceDescription: attorney.practiceDescription || attorney.bio || "",
+    languages: attorney.languages || [],
+    availability: attorney.availability || "Available now",
+    profileImage: attorney.profileImage || attorney.avatarURL || "",
+    experience: attorney.experience || [],
+    practiceAreas: attorney.practiceAreas || [],
+    specialties: attorney.specialties || [],
+    yearsExperience: attorney.yearsExperience || 0,
+    location: attorney.location || ""
+  });
+}
 
 // ----------------------------------------
 // Route-level error fallback

@@ -17,6 +17,7 @@ const stripe = require("../utils/stripe");
 const { cleanText, cleanTitle, cleanMessage } = require("../utils/sanitize");
 const { logAction } = require("../utils/audit");
 const { generateArchiveZip } = require("../services/caseLifecycle");
+const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
 
 // ----------------------------------------
 // Optional CSRF (enable via ENABLE_CSRF=true)
@@ -129,13 +130,10 @@ function parseDeadline(raw) {
   return date;
 }
 
-function buildDetails(description, requirements = [], questions = []) {
+function buildDetails(description, questions = []) {
   const parts = [];
   const base = cleanString(description || "", { len: 100_000 });
   if (base) parts.push(base);
-  if (requirements.length) {
-    parts.push(`Requirements:\n- ${requirements.join("\n- ")}`);
-  }
   if (questions.length) {
     parts.push(`Screening questions:\n- ${questions.join("\n- ")}`);
   }
@@ -543,7 +541,6 @@ router.post(
       practiceArea,
       description,
       details,
-      requirements,
       questions,
       employmentType,
       experience,
@@ -551,13 +548,12 @@ router.post(
       deadline,
     } = req.body || {};
     const safeTitle = cleanTitle(title || "", 300);
-    const requirementList = parseListField(requirements);
     const questionList = parseListField(questions);
     const combinedDetails = [details || description, instructions]
       .filter(Boolean)
       .map((entry) => cleanText(entry, { max: 100_000 }))
       .join("\n\n");
-    const narrative = cleanText(buildDetails(combinedDetails, requirementList, questionList), { max: 100_000 });
+    const narrative = cleanText(buildDetails(combinedDetails, questionList), { max: 100_000 });
     if (!safeTitle || safeTitle.length < 5 || !narrative || narrative.length < 50) {
       return res.status(400).json({ error: "Title and description are required." });
     }
@@ -1234,8 +1230,18 @@ router.post(
     if (rawNote && rawNote.length < 20) {
       return res.status(400).json({ error: "Please provide more detail in your note (20+ characters)." });
     }
+    const applicant = await User.findById(req.user.id).select(
+      "role resumeURL linkedInURL availability availabilityDetails location languages specialties yearsExperience bio profileImage avatarURL"
+    );
+    if (!applicant) {
+      return res.status(404).json({ error: "Unable to load your profile details." });
+    }
     try {
-      doc.addApplicant(req.user.id, rawNote);
+      doc.addApplicant(req.user.id, rawNote, {
+        resumeURL: applicant.resumeURL || "",
+        linkedInURL: applicant.linkedInURL || "",
+        profileSnapshot: shapeParalegalSnapshot(applicant),
+      });
     } catch (err) {
       return res.status(400).json({ error: err?.message || "You have already applied to this case" });
     }
@@ -1622,13 +1628,30 @@ router.get(
     if (!doc) return res.status(404).json({ error: "Case not found" });
 
     const applicants = Array.isArray(doc.applicants)
-      ? doc.applicants.map((entry) => ({
-          status: entry.status,
-          appliedAt: entry.appliedAt,
-          note: entry.note || "",
-          paralegalId: entry.paralegalId ? String(entry.paralegalId._id || entry.paralegalId) : null,
-          paralegal: summarizeUser(entry.paralegalId),
-        }))
+      ? doc.applicants.map((entry) => {
+          const paralegalDoc =
+            entry.paralegalId && typeof entry.paralegalId === "object" ? entry.paralegalId : null;
+          const coverLetter = entry.note || "";
+          const baseSnapshot = shapeParalegalSnapshot(paralegalDoc || {});
+          const storedSnapshot =
+            entry.profileSnapshot && typeof entry.profileSnapshot === "object"
+              ? entry.profileSnapshot
+              : {};
+          const profileSnapshot = { ...baseSnapshot, ...storedSnapshot };
+          const resumeURL = entry.resumeURL || paralegalDoc?.resumeURL || "";
+          const linkedInURL = entry.linkedInURL || paralegalDoc?.linkedInURL || "";
+          return {
+            status: entry.status,
+            appliedAt: entry.appliedAt,
+            note: coverLetter,
+            coverLetter,
+            resumeURL,
+            linkedInURL,
+            profileSnapshot,
+            paralegalId: entry.paralegalId ? String(entry.paralegalId._id || entry.paralegalId) : null,
+            paralegal: summarizeUser(entry.paralegalId),
+          };
+        })
       : [];
 
     res.json({

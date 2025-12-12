@@ -77,11 +77,34 @@ router.post("/", auth, requireRole(["attorney"]), async (req, res) => {
 // GET /jobs/open — paralegals view available jobs
 router.get("/open", auth, requireRole(["paralegal"]), async (req, res) => {
   try {
-    const jobs = await Job.find({ status: "open" }).populate(
-      "attorneyId",
-      "firstName lastName email role"
-    );
-    res.json(jobs);
+    const jobs = await Job.find({ status: "open" })
+      .populate({
+        path: "attorneyId",
+        select: "firstName lastName lawFirm firmName profileImage avatarURL"
+      })
+      .lean();
+
+    const shapedJobs = jobs.map((job) => {
+      const attorneyDoc = job.attorneyId && typeof job.attorneyId === "object" ? job.attorneyId : null;
+      const normalizedAttorneyId = attorneyDoc?._id || job.attorneyId || null;
+      const attorneyPreview = attorneyDoc
+        ? {
+            _id: attorneyDoc._id,
+            firstName: attorneyDoc.firstName || "",
+            lastName: attorneyDoc.lastName || "",
+            lawFirm: attorneyDoc.lawFirm || attorneyDoc.firmName || "",
+            profileImage: attorneyDoc.profileImage || attorneyDoc.avatarURL || ""
+          }
+        : null;
+
+      return {
+        ...job,
+        attorneyId: normalizedAttorneyId,
+        attorney: attorneyPreview
+      };
+    });
+
+    res.json(shapedJobs);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
