@@ -100,6 +100,16 @@ const elements = {
   documentsCard: document.getElementById("documentsCard"),
 };
 
+const PENDING_PROFILE_MESSAGE =
+  "Your account is pending admin approval. Profiles unlock once your application is reviewed.";
+
+function hasViewerAccess(user = {}) {
+  const role = String(user.role || "").toLowerCase();
+  if (role === "admin") return true;
+  const status = String(user.status || "").toLowerCase();
+  return status === "approved";
+}
+
 if (elements.inviteCaseSelect) {
   elements.inviteCaseSelect.addEventListener("change", () => clearFieldError(elements.inviteCaseSelect));
 }
@@ -236,10 +246,20 @@ async function init() {
   }
   if (!sessionUser) return;
 
+  if (!hasViewerAccess(sessionUser)) {
+    showError(PENDING_PROFILE_MESSAGE);
+    toggleSkeleton(false);
+    disableCtas();
+    return;
+  }
+
   applyRoleVisibility(sessionUser);
 
   const storedUser = window.getStoredUser ? window.getStoredUser() : null;
   state.viewer = storedUser || sessionUser || null;
+  if (sessionUser?.status && state.viewer && !state.viewer.status) {
+    state.viewer = { ...state.viewer, status: sessionUser.status };
+  }
   state.viewerRole = String(state.viewer?.role || "").toLowerCase();
   state.viewerId = String(state.viewer?.id || state.viewer?._id || "");
 

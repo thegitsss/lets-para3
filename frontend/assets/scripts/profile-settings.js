@@ -47,6 +47,36 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  const themeSelect = document.getElementById("themePreference");
+  const emailToggle = document.getElementById("emailNotificationsToggle");
+  statePreferenceSelect = document.getElementById("statePreference");
+
+  async function persistThemePreference(themeValue) {
+    try {
+      const payload = {
+        theme: themeValue,
+        email: emailToggle ? !!emailToggle.checked : false,
+        state: statePreferenceSelect ? statePreferenceSelect.value : undefined
+      };
+      await fetch("/api/account/preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload)
+      });
+    } catch (err) {
+      console.error("Failed to persist theme preference", err);
+    }
+  }
+
+  if (themeSelect && typeof window.applyThemePreference === "function") {
+    themeSelect.addEventListener("change", () => {
+      const selectedTheme = themeSelect.value;
+      window.applyThemePreference(selectedTheme);
+      persistThemePreference(selectedTheme);
+    });
+  }
+
   async function loadPreferences() {
     try {
       const res = await fetch("/api/account/preferences", {
@@ -54,8 +84,22 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       if (!res.ok) return;
       const prefs = await res.json();
-      const emailToggle = document.getElementById("emailNotificationsToggle");
       if (emailToggle) emailToggle.checked = !!prefs.email;
+      if (themeSelect) {
+        const resolvedTheme =
+          prefs.theme ||
+          (typeof window.getThemePreference === "function"
+            ? window.getThemePreference()
+            : "mountain");
+        themeSelect.value = resolvedTheme;
+        if (typeof window.applyThemePreference === "function") {
+          window.applyThemePreference(resolvedTheme);
+        }
+      }
+      const stateValue = prefs.state || currentUser?.location || currentUser?.state || "";
+      if (statePreferenceSelect) {
+        setStatePreferenceValue(stateValue);
+      }
     } catch (err) {
       console.error("Failed to load preferences", err);
     }
@@ -65,24 +109,34 @@ document.addEventListener("DOMContentLoaded", () => {
   const prefBtn = document.getElementById("savePreferencesBtn");
   if (prefBtn) {
     prefBtn.addEventListener("click", async () => {
-      const emailToggle = document.getElementById("emailNotificationsToggle");
       const email = emailToggle ? emailToggle.checked : false;
+      const theme = themeSelect ? themeSelect.value : "mountain";
+      const state = statePreferenceSelect ? statePreferenceSelect.value : "";
 
       const res = await fetch("/api/account/preferences", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email })
+        body: JSON.stringify({ email, theme, state })
       });
 
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        alert(data.error || "Unable to save preferences.");
+        showToast(data.error || "Unable to save preferences.", "err");
         return;
       }
 
-      alert("Preferences saved");
+      if (theme && typeof window.applyThemePreference === "function") {
+        window.applyThemePreference(theme);
+      }
+      if (currentUser) {
+        currentUser.location = state || "";
+        currentUser.state = state || "";
+        persistSession({ user: currentUser });
+      }
+      hydrateStatePreference(currentUser || { state });
+      showToast("Preferences saved", "ok");
     });
   }
 
@@ -171,6 +225,59 @@ const PREFILL_CACHE_KEY = "lpc_edit_profile_prefill";
 const paralegalSettingsSection = document.getElementById("paralegalSettings");
 const attorneySettingsSection = document.getElementById("attorneySettings");
 
+function resolveSessionUser() {
+  if (typeof window.getStoredUser === "function") {
+    try {
+      return window.getStoredUser();
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function ensureUserStatus(user = {}) {
+  if (!user) return user;
+  if (user.status) return user;
+  const snapshot = resolveSessionUser();
+  if (snapshot?.status) {
+    user.status = snapshot.status;
+  }
+  return user;
+}
+
+function resolveAccountStatus(user = {}) {
+  if (user?.status) return String(user.status).toLowerCase();
+  const snapshot = resolveSessionUser();
+  if (snapshot?.status) return String(snapshot.status).toLowerCase();
+  return "";
+}
+
+function hasSettingsAccess(user = {}) {
+  const role = String(user.role || "").toLowerCase();
+  if (role === "admin") return true;
+  return resolveAccountStatus(user) === "approved";
+}
+
+function showPendingSettingsNotice() {
+  const title = document.getElementById("accountSettingsTitle");
+  if (title) title.textContent = "Account pending approval";
+  const subtitle = document.getElementById("accountSettingsSubtitle");
+  if (subtitle) {
+    subtitle.textContent = "Once an administrator approves your account, you can edit your LPC profile.";
+  }
+  const content = document.getElementById("settingsContent");
+  if (content) {
+    content.innerHTML = `
+      <section class="settings-panel active">
+        <h2>Awaiting approval</h2>
+        <p>Your application is under review. You'll receive an email as soon as an administrator approves your access.</p>
+        <p class="muted">Need help? Contact support and reference your signup email.</p>
+      </section>
+    `;
+  }
+}
+
 paralegalSettingsSection?.classList.add("hidden");
 attorneySettingsSection?.classList.add("hidden");
 
@@ -201,6 +308,7 @@ let settingsState = {
 };
 
 let currentUser = null;
+let statePreferenceSelect = null;
 let attorneyPrefsBound = false;
 let attorneySaveBound = false;
 
@@ -211,6 +319,26 @@ const LANGUAGE_PROFICIENCY_OPTIONS = [
   { value: "Conversational", label: "Conversational" },
   { value: "Basic", label: "Basic" }
 ];
+
+function normalizeStateValue(raw = "") {
+  return String(raw || "")
+    .trim()
+    .toUpperCase();
+}
+
+function setStatePreferenceValue(rawValue = "") {
+  if (!statePreferenceSelect) return;
+  const normalized = normalizeStateValue(rawValue);
+  const hasOption = Array.from(statePreferenceSelect.options || []).some(
+    (opt) => opt.value === normalized
+  );
+  statePreferenceSelect.value = normalized && hasOption ? normalized : "";
+}
+
+function hydrateStatePreference(user = {}) {
+  const candidate = user.state || user.location || "";
+  setStatePreferenceValue(candidate);
+}
 
 const languagesEditor = document.getElementById("languagesEditor");
 const addLanguageBtn = document.getElementById("addLanguageBtn");
@@ -720,9 +848,16 @@ async function loadSettings() {
         }
       } catch (_) {}
     }
+    ensureUserStatus(user);
     currentUser = user;
     window.currentUser = user;
     persistSession({ user });
+    hydrateStatePreference(user);
+
+    if (!hasSettingsAccess(user)) {
+      showPendingSettingsNotice();
+      return;
+    }
     const titleEl = document.getElementById("accountSettingsTitle");
     const subtitleEl = document.getElementById("accountSettingsSubtitle");
 
@@ -735,9 +870,9 @@ async function loadSettings() {
       if (titleEl) titleEl.textContent = "Account Settings";
       if (subtitleEl) subtitleEl.textContent = "Keep your LPC profile accurate, stay secure, and control how we notify you.";
     }
-  enforceUnifiedRoleStyling(user);
-  applyAvatar(user);
-  bootstrapProfileSettings(user);
+    enforceUnifiedRoleStyling(user);
+    applyAvatar(user);
+    bootstrapProfileSettings(user);
 
     const role = (currentUser?.role || "").toLowerCase();
 

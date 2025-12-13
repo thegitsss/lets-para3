@@ -319,12 +319,27 @@ list.innerHTML = '<li style="color:var(--muted)">No recent users found.</li>';
 return;
 }
 list.innerHTML = "";
-users.forEach((user) => {
-const li = document.createElement("li");
-const created = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "";
-li.innerHTML = `<strong>${escapeHTML(user.name || user.email || "User")}</strong> <span>${escapeHTML(user.role || "—")}</span> <small style="display:block;color:var(--muted)">${created}</small>`;
-list.appendChild(li);
-});
+  users.forEach((user) => {
+    const li = document.createElement("li");
+    const created = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "";
+    const name = user.name || user.email || "User";
+    const role = (user.role || "user").toLowerCase();
+    const profilePath = role === "paralegal" ? "profile-paralegal" : "profile-attorney";
+    const link = document.createElement("a");
+    link.href = `${profilePath}.html?id=${encodeURIComponent(user.id || user._id || "")}`;
+    link.textContent = name;
+    link.className = "user-link";
+    const roleSpan = document.createElement("span");
+    roleSpan.textContent = user.role || "—";
+    const time = document.createElement("small");
+    time.style.display = "block";
+    time.style.color = "var(--muted)";
+    time.textContent = created;
+    li.appendChild(link);
+    li.appendChild(roleSpan);
+    li.appendChild(time);
+    list.appendChild(li);
+  });
 }
 
 function applyAnalyticsPayload(data) {

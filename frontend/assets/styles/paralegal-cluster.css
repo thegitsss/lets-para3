@@ -83,35 +83,40 @@
   margin-top: 2px;
 }
 
-body.theme-dark [data-paralegal-cluster] .user-profile,
-body.theme-mountain [data-paralegal-cluster] .user-profile {
+body.theme-dark [data-paralegal-cluster] .user-profile {
   background: rgba(0, 0, 0, 0.25);
   border-color: rgba(255, 255, 255, 0.18);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
 }
 
-body.theme-dark [data-paralegal-cluster] .user-profile strong,
-body.theme-mountain [data-paralegal-cluster] .user-profile strong {
+body.theme-dark [data-paralegal-cluster] .user-profile strong {
   color: #fff;
 }
 
-body.theme-dark [data-paralegal-cluster] .user-profile span,
-body.theme-mountain [data-paralegal-cluster] .user-profile span {
+body.theme-dark [data-paralegal-cluster] .user-profile span {
   color: rgba(255, 255, 255, 0.8);
 }
 
 body.theme-dark #clusterName,
-body.theme-dark .globalProfileName,
-body.theme-mountain #clusterName,
-body.theme-mountain .globalProfileName {
+body.theme-dark .globalProfileName {
   color: #fff !important;
 }
 
 body.theme-dark #clusterRole,
-body.theme-dark .globalProfileRole,
-body.theme-mountain #clusterRole,
-body.theme-mountain .globalProfileRole {
+body.theme-dark .globalProfileRole {
   color: rgba(255, 255, 255, 0.78) !important;
+}
+
+body.theme-mountain [data-paralegal-cluster] .user-profile strong,
+body.theme-mountain .globalProfileName,
+body.theme-mountain #clusterName {
+  color: #1b1b1b !important;
+}
+
+body.theme-mountain [data-paralegal-cluster] .user-profile span,
+body.theme-mountain .globalProfileRole,
+body.theme-mountain #clusterRole {
+  color: #7b7b7b !important;
 }
 
 [data-paralegal-cluster] .notification-panel,

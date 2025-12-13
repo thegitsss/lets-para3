@@ -94,8 +94,12 @@ function draw(root, data, escapeHTML, caseId, session) {
       applicant?.paralegal?.id;
     return entry && viewerId && String(entry) === String(viewerId);
   });
-  const showPayment = (isOwner || isAdmin) && paralegalOnCase && !data?.paymentReleased && !readOnly;
-  const showCompleteButton = (isOwner || isAdmin) && paralegalOnCase && !data?.paymentReleased && !readOnly;
+  const termination = normalizeTermination(data?.termination);
+  const caseLocked = statusRaw === "disputed" || termination.status === "disputed";
+  const showPayment =
+    !caseLocked && (isOwner || isAdmin) && paralegalOnCase && !data?.paymentReleased && !readOnly;
+  const showCompleteButton =
+    !caseLocked && (isOwner || isAdmin) && paralegalOnCase && !data?.paymentReleased && !readOnly;
   const canInvite = (isOwner || isAdmin) && !paralegalOnCase && !pendingParalegalId;
   const canApply =
     viewerRole === "paralegal" &&
@@ -163,8 +167,15 @@ function draw(root, data, escapeHTML, caseId, session) {
     }
   }
 
+  const canTerminate =
+    !caseLocked &&
+    (isOwner || isAdmin) &&
+    paralegalOnCase &&
+    !readOnly &&
+    !["cancelled", "closed"].includes(statusRaw) &&
+    termination.status === "none";
   const actionsSection =
-    showPayment || showCompleteButton
+    showPayment || showCompleteButton || canTerminate
       ? `
       <div class="case-section">
         <div class="case-section-title">Actions</div>
@@ -183,9 +194,15 @@ function draw(root, data, escapeHTML, caseId, session) {
               ? `<button class="btn secondary" data-complete-case>Mark Case Complete &amp; Archive</button>`
               : ""
           }
+          ${
+            canTerminate
+              ? `<button class="btn danger" data-terminate-case>Terminate Engagement</button>`
+              : ""
+          }
         </div>
       </div>`
       : "";
+  const terminationNotice = renderTerminationNotice(termination, escapeHTML);
 
   const archiveSection = readOnly
     ? `
@@ -227,6 +244,7 @@ function draw(root, data, escapeHTML, caseId, session) {
       </div>
 
       ${applicationSection}
+      ${terminationNotice}
       ${actionsSection}
       ${archiveSection}
       <div id="caseChecklist"></div>
@@ -240,6 +258,7 @@ function draw(root, data, escapeHTML, caseId, session) {
   bindDownloadButton(root, caseId);
   bindApplicationForm(root, caseId);
   bindInviteResponses(root, caseId);
+  bindTerminationButton(root, caseId);
   const checklistHost = root.querySelector("#caseChecklist");
   if (checklistHost) {
     renderChecklist(checklistHost, { caseId: data?._id || caseId }).catch((err) => {
@@ -415,6 +434,53 @@ function renderApplicant(applicant, escapeHTML, { canInvite } = {}) {
   `;
 }
 
+function normalizeTermination(raw) {
+  if (!raw || typeof raw !== "object") {
+    return {
+      status: "none",
+      reason: "",
+      requestedAt: null,
+      requestedBy: null,
+      disputeId: null,
+      terminatedAt: null,
+    };
+  }
+  return {
+    status: raw.status || "none",
+    reason: raw.reason || "",
+    requestedAt: raw.requestedAt ? new Date(raw.requestedAt) : null,
+    requestedBy: raw.requestedBy || null,
+    disputeId: raw.disputeId || null,
+    terminatedAt: raw.terminatedAt ? new Date(raw.terminatedAt) : null,
+  };
+}
+
+function renderTerminationNotice(termination, escapeHTML) {
+  if (!termination || termination.status === "none") return "";
+  if (termination.status === "disputed") {
+    return `
+      <div class="case-section notice">
+        <div class="case-section-title">Termination under review</div>
+        <p class="notice">This engagement is paused while our admin team reviews the dispute${
+          termination.reason ? `: ${escapeHTML(termination.reason)}` : "."
+        }</p>
+      </div>
+    `;
+  }
+  if (termination.status === "auto_cancelled") {
+    const reason = termination.reason
+      ? escapeHTML(termination.reason)
+      : "The case was cancelled before work began.";
+    return `
+      <div class="case-section notice">
+        <div class="case-section-title">Engagement ended</div>
+        <p class="notice">${reason}</p>
+      </div>
+    `;
+  }
+  return "";
+}
+
 function bindHireButtons(root, caseId) {
   root.querySelectorAll("[data-invite-paralegal]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -438,6 +504,17 @@ function bindCompleteButton(root, caseId) {
   const btn = root.querySelector("[data-complete-case]");
   if (!btn) return;
   btn.addEventListener("click", () => showCompletionModal(caseId, btn));
+}
+
+function bindTerminationButton(root, caseId) {
+  const btn = root.querySelector("[data-terminate-case]");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const confirmed = window.confirm("Terminate this engagement? This cannot be undone.");
+    if (!confirmed) return;
+    const reason = window.prompt("Share any context for the admin team (optional):", "") || "";
+    submitTerminationRequest(caseId, btn, reason);
+  });
 }
 
 function bindInviteResponses(root, caseId) {
@@ -471,6 +548,26 @@ function bindInviteResponses(root, caseId) {
 
   acceptBtn?.addEventListener("click", () => handle("accept"));
   declineBtn?.addEventListener("click", () => handle("decline"));
+}
+
+async function submitTerminationRequest(caseId, button, reason) {
+  if (!caseId) return;
+  button?.setAttribute("disabled", "disabled");
+  try {
+    const payload = await j(`/api/cases/${encodeURIComponent(caseId)}/terminate`, {
+      method: "POST",
+      body: { reason },
+    });
+    const message = payload?.requiresAdmin
+      ? "Case paused while an admin reviews the dispute."
+      : "Case terminated successfully.";
+    notify(message, "success");
+    setTimeout(() => window.location.reload(), 900);
+  } catch (err) {
+    notify(err?.message || "Unable to terminate this case.", "error");
+  } finally {
+    button?.removeAttribute("disabled");
+  }
 }
 
 function bindDownloadButton(root, caseId) {

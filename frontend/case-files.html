@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Case Files | Let<span class="gold">’</span>s-ParaConnect</title>
+  <title>Case Files – Let’s-ParaConnect</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
   <script src="assets/scripts/utils/session.js"></script>
   <style>
@@ -15,9 +15,28 @@
       --muted:#8a8a8a;
       --ink:#1a1a1a;
       --panel:#fcfcfc;
+      --sidebar-text:#1a1a1a;
+      --sidebar-bg:#f5f5f5e6;
       --font-serif:'Cormorant Garamond',serif;
       --font-sans:'Sarabun',sans-serif;
       --radius:12px;
+    }
+
+    body.theme-dark {
+      --bg:#0f172a;
+      --panel:#151b29;
+      --ink:#f5f6fb;
+      --muted:#9aa7c4;
+      --line:rgba(255,255,255,0.08);
+      --sidebar-text:#f8fbff;
+      --sidebar-bg:#1c2333;
+    }
+
+    body.theme-mountain {
+      --bg:#f8f6f1;
+      --panel:#ffffff;
+      --muted:#7a736a;
+      --sidebar-text:#ffffff;
     }
     *{box-sizing:border-box;margin:0;padding:0;}
     body{
@@ -25,21 +44,51 @@
       background:var(--bg);
       color:var(--ink);
       margin:0;
+      display:flex;
+      min-height:100vh;
+      overflow:hidden;
     }
 
     .role-shell{
       display:flex;
       min-height:100vh;
+      width:100%;
     }
 
-    .sidebar{width:240px;background:#f5f5f5e6;display:flex;flex-direction:column;border-right:1px solid var(--line);padding:24px 16px;}
+    .sidebar{
+      width:240px;
+      background:var(--sidebar-bg);
+      display:flex;
+      flex-direction:column;
+      border-right:1px solid var(--line);
+      padding:24px 16px;
+      color:var(--sidebar-text);
+      position:sticky;
+      top:0;
+      height:100vh;
+      overflow-y:auto;
+      position:relative;
+    }
+    .sidebar::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:transparent;
+      pointer-events:none;
+      transition:background .3s ease;
+    }
     .logo{font-family:var(--font-serif);font-size:1.6rem;text-align:center;margin-bottom:36px;}
     nav{display:flex;flex-direction:column;gap:14px;}
-    nav a{text-decoration:none;color:var(--ink);font-weight:300;font-size:.95rem;padding:10px 14px;border-radius:8px;transition:background .3s;}
+    nav a{text-decoration:none;color:var(--sidebar-text);font-weight:300;font-size:.95rem;padding:10px 14px;border-radius:8px;transition:background .3s;}
     nav a.active,nav a:hover{background:rgba(0,0,0,0.04);}
+    body.theme-dark nav a.active, body.theme-dark nav a:hover{background:rgba(255,255,255,0.12);}
+    body.theme-mountain nav a{color:#fff;}
+    body.theme-mountain nav a.active,body.theme-mountain nav a:hover{background:rgba(255,255,255,0.18);}
     .sidebar-footer{margin-top:auto;font-size:.7rem;color:var(--muted);text-align:center;}
-
-    .main{flex:1;padding:40px;overflow-y:auto;}
+    body.theme-mountain .sidebar{background:url('hero-mountain.jpg') center/cover no-repeat;}
+    body.theme-mountain .sidebar::before{background:rgba(0,0,0,0.45);}
+    body.theme-mountain .sidebar > *{position:relative;z-index:1;}
+    .main{flex:1;padding:40px;overflow-y:auto;background:var(--bg);}
     .topbar{display:flex;justify-content:flex-end;margin-bottom:1.5rem;}
     .notification-icon{
       width:46px;
@@ -49,7 +98,7 @@
       display:flex;
       justify-content:center;
       align-items:center;
-      background:#fff;
+      background:var(--panel);
       cursor:pointer;
       position:relative;
       transition:border-color .2s ease, transform .2s ease;
@@ -83,12 +132,13 @@
     .filters{display:flex;gap:.75rem;margin-bottom:1.5rem;flex-wrap:wrap;}
     .filters button{
       border:1px solid var(--line);
-      background:#fff;
+      background:var(--panel);
       border-radius:8px;
       padding:.5rem 1rem;
       cursor:pointer;
       font-size:.9rem;
       transition:all .2s ease;
+      color:var(--ink);
     }
     .filters button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
     .filters button:hover{border-color:var(--accent);}
@@ -105,6 +155,7 @@
       padding:0.4rem 1.1rem;
       font-size:0.9rem;
       color:var(--ink);
+      background:var(--panel);
       transition:background 0.2s ease,color 0.2s ease,border-color 0.2s ease;
     }
     .case-switcher a.active{
@@ -117,7 +168,7 @@
     .file-card{
       border:1px solid var(--line);
       border-radius:var(--radius);
-      background:#fff;
+      background:var(--panel);
       padding:1rem 1.25rem;
       display:flex;
       flex-direction:column;
@@ -166,7 +217,7 @@
     .info-banner{
       border:1px solid var(--line);
       border-radius:var(--radius);
-      background:rgba(0,0,0,0.02);
+      background:var(--panel);
       padding:1rem 1.25rem;
       margin-bottom:1.25rem;
       font-size:0.95rem;
@@ -189,7 +240,7 @@
       border-radius:var(--radius);
       padding:0.6rem 1rem;
       background:transparent;
-      color:var(--ink);
+      color:var(--sidebar-text);
       font-size:0.9rem;
       font-family:var(--font-sans);
       cursor:pointer;
@@ -201,12 +252,14 @@
       color:var(--accent);
       outline:none;
     }
-    .sidebar-footer{
-      margin-top:auto;
-      font-size:0.7rem;
-      color:var(--muted);
-      text-align:center;
+    body.theme-dark .sidebar-link:hover,
+    body.theme-dark .sidebar-link:focus,
+    body.theme-mountain .sidebar-link:hover,
+    body.theme-mountain .sidebar-link:focus{
+      color:#fff;
+      background:rgba(255,255,255,0.12);
     }
+    body.theme-mountain .sidebar-link{color:#fff;}
     .hidden{
       display:none !important;
     }
@@ -223,7 +276,7 @@
         <a href="help.html">Help</a>
       </nav>
       <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-      <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let<span class="gold">’</span>s-ParaConnect 2025</a></div>
+      <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
     </aside>
 
     <main class="main">
@@ -256,7 +309,7 @@
         <a href="help.html">Help</a>
       </nav>
       <button type="button" class="sidebar-link" id="attorneyLogoutBtn">Log Out</button>
-      <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let<span class="gold">’</span>s-ParaConnect 2025</a></div>
+      <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
     </aside>
 
     <main class="main">

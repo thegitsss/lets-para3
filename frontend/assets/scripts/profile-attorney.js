@@ -28,6 +28,16 @@ const elements = {
   avatarFallback: document.getElementById("avatarFallback")
 };
 
+const PENDING_ACCESS_MESSAGE =
+  "Your account is pending admin approval. Profiles open up once an administrator approves your access.";
+
+function hasProfileAccess(user = {}) {
+  const role = String(user.role || "").toLowerCase();
+  if (role === "admin") return true;
+  const status = String(user.status || "").toLowerCase();
+  return status === "approved";
+}
+
 document.addEventListener("DOMContentLoaded", init);
 
 function getQueryParams() {
@@ -44,6 +54,10 @@ async function init() {
   } catch (err) {
     console.warn("[profile-attorney] viewer load failed", err);
     return showError("Please sign in to view attorney profiles.");
+  }
+
+  if (!hasProfileAccess(state.viewer)) {
+    return showError(PENDING_ACCESS_MESSAGE);
   }
 
   const viewerId = normalizeId(state.viewer);
@@ -88,6 +102,10 @@ async function loadSelfProfile() {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || "Unable to load your profile.");
+  const sessionUser = typeof window.getStoredUser === "function" ? window.getStoredUser() : null;
+  if (!data.status && (state.viewer?.status || sessionUser?.status)) {
+    data.status = state.viewer?.status || sessionUser?.status;
+  }
   persistSession({ user: data });
   return data;
 }

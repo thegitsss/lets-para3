@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Let<span class="gold">’</span>s-ParaConnect | Attorney Dashboard</title>
+<title>Attorney Dashboard – Let’s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -24,6 +24,7 @@
       --muted: #8a8a8a;
       --line: rgba(0, 0, 0, 0.08);
       --panel: #fcfcfc;
+      --sidebar-text: #1a1a1a;
       --radius: 14px;
       --font-serif: 'Cormorant Garamond', serif;
       --font-sans: 'Sarabun', sans-serif;
@@ -52,6 +53,8 @@
       flex-direction: column;
       border-right: 1px solid var(--line);
       padding: 24px 16px;
+      color: var(--sidebar-text);
+      position: relative;
     }
 
     .logo {
@@ -95,6 +98,7 @@
       font-size: 0.9rem;
       cursor: pointer;
       transition: background 0.2s ease, color 0.2s ease;
+      color: var(--sidebar-text);
     }
 
     .sidebar-link:hover,
@@ -103,7 +107,17 @@
       color: var(--accent);
       outline: none;
     }
-
+    .sidebar-bottom{
+      margin-top:auto;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .sidebar-footer{
+      font-size:0.7rem;
+      color:var(--muted);
+      text-align:center;
+    }
     .main {
       flex: 1;
       padding: 40px;
@@ -129,7 +143,7 @@
       border-radius: 50%;
       border: 1px solid rgba(0, 0, 0, 0.08);
       transition: border-color 0.2s ease, background 0.2s ease;
-      background: #fff;
+      background: var(--panel);
     }
 
     .notification-icon:hover {
@@ -142,6 +156,7 @@
       height: 20px;
       color: var(--ink);
     }
+    body.theme-dark .notification-icon svg{color:#f8fbff;}
 
     [data-notification-toggle][data-count]:after {
       content: attr(data-count);
@@ -157,12 +172,95 @@
       border-radius: 999px;
     }
 
+    .sidebar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: transparent;
+      pointer-events: none;
+      transition: background 0.3s ease;
+    }
+
+    body.theme-mountain .sidebar {
+      background: url('hero-mountain.jpg') center/cover no-repeat;
+    }
+
+    body.theme-mountain .sidebar::before {
+      background: rgba(0, 0, 0, 0.45);
+    }
+
+    body.theme-mountain .sidebar > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    body.theme-dark {
+      --bg: #0f172a;
+      --sidebar-bg: #1c2333;
+      --panel: #151b29;
+      --ink: #f5f6fb;
+      --muted: #9aa7c4;
+      --line: rgba(255, 255, 255, 0.08);
+      --sidebar-text: #f8fbff;
+    }
+
+    body.theme-mountain {
+      --bg: #f8f6f1;
+      --panel: #ffffff;
+      --muted: #7a736a;
+      --sidebar-text: #ffffff;
+    }
+
+    body.theme-dark nav a.active,
+    body.theme-dark nav a:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    body.theme-mountain nav a {
+      color: #fff;
+    }
+
+    body.theme-mountain nav a.active,
+    body.theme-mountain nav a:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    body.theme-dark .sidebar-link:hover,
+    body.theme-dark .sidebar-link:focus,
+    body.theme-mountain .sidebar-link:hover,
+    body.theme-mountain .sidebar-link:focus {
+      color: #fff;
+    }
+
+    body.theme-mountain .sidebar-link {
+      color: #fff;
+    }
+
+    body.theme-dark .info-box,
+    body.theme-dark .panel,
+    body.theme-dark .case-card,
+    body.theme-dark .dashboard-card,
+    body.theme-dark .history-card,
+    body.theme-dark table,
+    body.theme-dark .notif-panel,
+    body.theme-dark .notification-icon {
+      background: rgba(18, 23, 36, 0.92);
+      border-color: rgba(255, 255, 255, 0.08);
+      color: var(--ink);
+    }
+
+    body.theme-dark .case-subinfo,
+    body.theme-dark .info-line,
+    body.theme-dark .muted {
+      color: var(--muted);
+    }
+
     .notif-panel {
       position: absolute;
       top: 56px;
       right: 0;
       width: 340px;
-      background: #fff;
+      background: var(--panel);
       border: 1px solid rgba(0, 0, 0, 0.08);
       border-radius: 12px;
       box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
@@ -186,7 +284,26 @@
       font-size: 1.2rem;
       padding: 14px 18px;
       border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-      background: #fafafa;
+      background: var(--panel);
+    }
+
+    body.theme-dark .notif-panel,
+    body.theme-dark .notification-panel {
+      background: rgba(18, 23, 36, 0.96);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+    body.theme-dark .notif-header,
+    body.theme-dark .notification-panel .notif-header {
+      background: transparent;
+      border-color: rgba(255, 255, 255, 0.08);
+      color: #f8fbff;
+    }
+    body.theme-dark .notif-empty,
+    body.theme-dark .notification-panel p,
+    body.theme-dark .notification-panel button,
+    body.theme-dark .notification-panel li,
+    body.theme-dark .notif-scroll {
+      color: #f8fbff;
     }
 
     .notif-scroll {
@@ -393,7 +510,7 @@
       font-size: 0.9rem;
       font-weight: 300;
       border: 1px solid rgba(0, 0, 0, 0.15);
-      background: #fff;
+      background: var(--panel);
       color: var(--ink);
       letter-spacing: 0.02em;
       transition: background 0.2s ease, color 0.2s ease, border 0.2s ease, transform 0.15s ease;
@@ -433,6 +550,13 @@
     }
 
     .case-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      background: var(--panel);
+    }
+
+    .dashboard-card {
       border: 1px solid var(--line);
       border-radius: var(--radius);
       padding: 1.25rem 1.5rem;
@@ -500,7 +624,7 @@
     }
 
     .case-actions button[data-case-link="view"] {
-      background: #fff;
+      background: var(--panel);
       color: var(--ink);
       border-color: rgba(0, 0, 0, 0.25);
     }
@@ -536,7 +660,7 @@
       top: 40px;
       right: 0;
       width: 280px;
-      background: #fff;
+      background: var(--panel);
       border: 1px solid var(--line);
       border-radius: 12px;
       box-shadow: 0 15px 35px rgba(15, 23, 42, 0.18);
@@ -574,6 +698,20 @@
       font-size: 0.9rem;
       line-height: 1.4;
       color: var(--ink);
+    }
+
+    body.theme-dark .notification-panel{
+      background: rgba(18,23,36,0.96);
+      border-color: rgba(255,255,255,0.08);
+    }
+    body.theme-dark .notification-panel h4,
+    body.theme-dark .notification-panel p,
+    body.theme-dark .notification-panel button,
+    body.theme-dark .notification-item{
+      color:#f8fbff;
+    }
+    body.theme-dark .notification-item{
+      border-color:rgba(255,255,255,0.08);
     }
 
 
@@ -647,7 +785,7 @@
       border-radius: 999px;
       padding: 0.55rem 1rem;
       font-size: 0.9rem;
-      background: #fff;
+      background: var(--panel);
       cursor: pointer;
       margin-bottom: 0.55rem;
       transition: background 0.2s ease;
@@ -764,9 +902,9 @@
       <a href="billing-attorney.html">Escrow</a>
       <a href="help.html">Help</a>
     </nav>
-    <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-    <div style="margin-top: auto; font-size: 0.7rem; color: var(--muted); text-align: center;">
-      © Let’s‑ParaConnect 2025
+    <div class="sidebar-bottom">
+      <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
+      <div class="sidebar-footer">© Let’s‑ParaConnect 2025</div>
     </div>
   </aside>
   <main class="main">
@@ -802,7 +940,7 @@
           <div class="info-line">
             <strong id="messagePreviewSender"></strong>
             <span id="messagePreviewText"></span>
-            <a id="messagePreviewLink" href="#">View</a>
+            <a id="messagePreviewLink" href="#" style="color:var(--accent);font-weight:500;">View</a>
           </div>
       </section>
       <section>

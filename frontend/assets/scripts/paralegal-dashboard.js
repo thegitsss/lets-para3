@@ -33,8 +33,12 @@ async function fetchJson(url, options = {}) {
   }
 }
 
+let viewerProfile = null;
+
 async function loadViewerProfile() {
-  return fetchJson('/api/users/me');
+  const profile = await fetchJson('/api/users/me');
+  viewerProfile = profile || null;
+  return profile;
 }
 
 async function fetchParalegalData() {
@@ -412,55 +416,152 @@ function initLatestMessage(threads = []) {
 }
 
 function initQuickActions() {
-  document.querySelectorAll('.quick-actions button[data-action]').forEach((button) => {
-    button.addEventListener('click', () => {
+  document.querySelectorAll('.quick-actions [data-action]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      const action = button.dataset.action;
+      if (action === 'browse') {
+        if (button.tagName !== 'A') {
+          event.preventDefault();
+          window.location.href = 'browse-jobs.html';
+        }
+        return;
+      }
+      event.preventDefault();
       handleCaseAction(button.textContent || 'Action', 'your assignments');
     });
   });
 }
 
-async function loadRecommendedCases() {
+function normalizeState(value = '') {
+  return String(value || '').trim().toLowerCase();
+}
+
+function parseStateFromLocation(value = '') {
+  const parts = String(value || '').split(',');
+  if (parts.length < 2) return '';
+  return parts[parts.length - 1].trim();
+}
+
+function deriveProfileState(profile = {}) {
+  return (
+    profile.locationState ||
+    profile.state ||
+    profile.jurisdiction ||
+    parseStateFromLocation(profile.location || profile.address || '')
+  );
+}
+
+function parseExperience(value) {
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 ? num : 0;
+}
+
+function deriveExperience(profile = {}) {
+  return (
+    parseExperience(profile.yearsExperience) ||
+    parseExperience(profile.experienceYears) ||
+    parseExperience(profile.paralegalProfile?.yearsExperience)
+  );
+}
+
+function extractJobState(job = {}) {
+  return (
+    job.state ||
+    job.locationState ||
+    job.location?.state ||
+    job.location ||
+    job.jurisdiction ||
+    job.region ||
+    ''
+  );
+}
+
+function extractJobExperience(job = {}) {
+  return (
+    parseExperience(job.minimumExperienceRequired) ||
+    parseExperience(job.minExperience) ||
+    parseExperience(job.yearsExperience) ||
+    parseExperience(job.experienceRequired)
+  );
+}
+
+function formatExperienceLabel(years = 0) {
+  if (!years) return '';
+  return years === 1 ? '1 year experience' : `${years} years experience`;
+}
+
+function escapeHtml(value = '') {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+async function loadRecommendedJobs(profile = {}) {
+  const list = document.querySelector('#recommendedPostingsCard .recommendations-list');
+  if (!list) return;
+  list.innerHTML =
+    '<li class="recommended-item"><span class="rec-title">Finding postings for you…</span></li>';
+
   try {
-    const res = await fetch('/api/cases/recommended', { credentials: 'include' });
-    const data = await res.json().catch(() => []);
-    const list = document.querySelector('#recommendedPostingsCard .recommendations-list');
-    if (!list) return;
-    list.innerHTML = '';
-    if (!Array.isArray(data) || !data.length) {
-      const empty = document.createElement('li');
-      empty.className = 'recommended-item';
-      const title = document.createElement('span');
-      title.classList.add('rec-title');
-      title.textContent = 'No recommended postings yet.';
-      empty.appendChild(title);
-      list.appendChild(empty);
+    const res = await secureFetch('/api/jobs/open', { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const jobs = await res.json().catch(() => []);
+    if (!Array.isArray(jobs) || !jobs.length) {
+      list.innerHTML =
+        '<li class="recommended-item"><span class="rec-title">No open postings yet.</span></li>';
       return;
     }
-    data.forEach((caseObj = {}) => {
-      const li = document.createElement('li');
-      li.classList.add('recommended-item');
-      const title = document.createElement('span');
-      title.classList.add('rec-title');
-      title.textContent = caseObj.title || 'Untitled posting';
-      const link = document.createElement('a');
-      link.classList.add('rec-open-link');
-      link.textContent = 'Open';
-      const id = caseObj._id || caseObj.id || '';
-      link.href = id ? `/case-detail.html?id=${encodeURIComponent(id)}` : '#';
-      link.target = '_self';
-      li.appendChild(title);
-      li.appendChild(link);
-      list.appendChild(li);
+
+    const desiredState = normalizeState(deriveProfileState(profile));
+    const yearsExperience = deriveExperience(profile);
+
+    const matched = jobs.filter((job) => {
+      const jobState = normalizeState(extractJobState(job));
+      const jobExp = extractJobExperience(job);
+      const stateOk = desiredState ? jobState === desiredState : true;
+      const expOk = yearsExperience ? jobExp === yearsExperience : true;
+      return stateOk && expOk;
     });
+
+    const shortlist = (matched.length ? matched : jobs).slice(0, 2);
+
+    list.innerHTML = shortlist
+      .map((job) => {
+        const id = job._id || job.id || '';
+        const title = escapeHtml(job.title || 'Untitled posting');
+        const jobState = escapeHtml(extractJobState(job) || 'Multi-state');
+        const jobExpLabel = formatExperienceLabel(extractJobExperience(job));
+        const payDisplay =
+          job.compensationDisplay ||
+          job.payDisplay ||
+          (typeof job.budget === 'number' ? `$${job.budget.toLocaleString()}` : '');
+        const meta = [jobState, jobExpLabel, payDisplay].filter(Boolean).join(' • ');
+
+        const href = id ? `browse-jobs.html?id=${encodeURIComponent(id)}` : 'browse-jobs.html';
+        return `
+          <li class="recommended-item">
+            <div>
+              <span class="rec-title">${title}</span>
+              <div class="rec-status">${escapeHtml(meta)}</div>
+            </div>
+            <a class="rec-open-link" href="${href}">View</a>
+          </li>
+        `;
+      })
+      .join('');
   } catch (err) {
-    console.error('Failed to load recommended cases', err);
+    console.error('Failed to load recommended jobs', err);
+    list.innerHTML =
+      '<li class="recommended-item"><span class="rec-title">Unable to load recommendations.</span></li>';
   }
 }
 
 async function initDashboard() {
   attachUIHandlers();
   initQuickActions();
-  loadRecommendedCases();
   try {
     const [profile, dashboard, invites, deadlines, threads, unreadCount] = await Promise.all([
       loadViewerProfile().catch(() => ({})),
@@ -470,7 +571,8 @@ async function initDashboard() {
       loadMessageThreads().catch(() => []),
       loadUnreadMessageCount().catch(() => 0),
     ]);
-    updateProfile(profile || {});
+    const viewer = profile || {};
+    updateProfile(viewer);
     updateStats({
       activeCases: dashboard?.metrics?.activeCases,
       unreadMessages: unreadCount,
@@ -479,6 +581,7 @@ async function initDashboard() {
       payout30Days: dashboard?.metrics?.earningsLast30Days,
       nextPayout: dashboard?.metrics?.nextPayoutDate,
     });
+    loadRecommendedJobs(viewer);
     renderDeadlines(deadlines);
     initLatestMessage(threads);
     renderAssignments(mapActiveCasesToAssignments(dashboard?.activeCases || []));
@@ -489,6 +592,7 @@ async function initDashboard() {
     renderInvites([]);
     renderDeadlines([]);
     initLatestMessage([]);
+    loadRecommendedJobs({});
   }
   await loadAssignedCases();
 }
@@ -540,7 +644,7 @@ function initAvailabilityModal() {
   const dateInput = document.getElementById("availabilityDateInput");
   const statusDisplay = document.getElementById("availabilityStatus");
   const nextDisplay = document.getElementById("availabilityNext");
-  const quickActionBtn = document.querySelector('.quick-actions button[data-action="availability"]');
+  const quickActionBtn = document.querySelector('.quick-actions [data-action="availability"]');
 
   if (!modal) console.error("❌ availabilityModal not found");
   if (!openBtn) console.error("❌ updateAvailabilityLink not found");

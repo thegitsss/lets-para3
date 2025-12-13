@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Let<span class="gold">’</span>s-ParaConnect | Paralegal Dashboard</title>
+<title>Paralegal Dashboard – Let’s-ParaConnect</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
 <script src="assets/scripts/utils/session.js"></script>
   <style>
@@ -16,6 +16,7 @@
       --muted: #8a8a8a;
       --line: rgba(0, 0, 0, 0.08);
       --panel: #fcfcfc;
+      --sidebar-text: #1a1a1a;
       --radius: 14px;
       --font-serif: 'Cormorant Garamond', serif;
       --font-sans: 'Sarabun', sans-serif;
@@ -44,6 +45,10 @@
       flex-direction: column;
       border-right: 1px solid var(--line);
       padding: 24px 16px;
+      color: var(--sidebar-text);
+      position: sticky;
+      top: 0;
+      height: 100vh;
     }
 
     .logo {
@@ -81,7 +86,7 @@
       width: 100%;
       border: none;
       background: none;
-      color: var(--ink);
+      color: var(--sidebar-text);
       font-size: 0.95rem;
       font-family: var(--font-sans);
       font-weight: 300;
@@ -138,24 +143,103 @@
       margin-bottom: 2rem;
     }
 
-.info-box {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 1rem 1.25rem;
-  font-size: 0.95rem;
-  flex: 1;
-  font-weight: 200;
-  display: block;
-  min-height: 90px;
-}
-
+    .info-box {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      font-size: 0.95rem;
+      flex: 1;
+      font-weight: 200;
+      display: block;
+      min-height: 90px;
+    }
     .message-box {
       cursor:pointer;
       transition:background .25s ease, transform .15s ease;
       display:block;
       text-decoration:none;
       color:var(--accent);
+    }
+
+    .sidebar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: transparent;
+      pointer-events: none;
+      transition: background 0.3s ease;
+    }
+
+    body.theme-mountain .sidebar {
+      background: url('hero-mountain.jpg') center/cover no-repeat;
+    }
+
+    body.theme-mountain .sidebar::before {
+      background: rgba(0, 0, 0, 0.45);
+    }
+
+    body.theme-mountain .sidebar > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    body.theme-dark {
+      --bg: #0f172a;
+      --sidebar-bg: #1c2333;
+      --panel: #151b29;
+      --ink: #f5f6fb;
+      --muted: #9aa7c4;
+      --line: rgba(255, 255, 255, 0.08);
+      --sidebar-text: #f8fbff;
+    }
+
+    body.theme-mountain {
+      --bg: #f8f6f1;
+      --panel: #ffffff;
+      --muted: #7a736a;
+      --sidebar-text: #ffffff;
+    }
+
+    body.theme-dark nav a.active,
+    body.theme-dark nav a:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    body.theme-mountain nav a {
+      color: #fff;
+    }
+
+    body.theme-mountain nav a.active,
+    body.theme-mountain nav a:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    body.theme-mountain .sidebar-link {
+      color: #fff;
+    }
+
+    body.theme-dark .sidebar-link:hover,
+    body.theme-mountain .sidebar-link:hover,
+    body.theme-mountain .sidebar-link:focus,
+    body.theme-dark .sidebar-link:focus {
+      color: #fff;
+    }
+
+    body.theme-dark .info-box,
+    body.theme-dark .case-card,
+    body.theme-dark .dashboard-card,
+    body.theme-dark .panel,
+    body.theme-dark table {
+      background: rgba(18, 23, 36, 0.92);
+      border-color: rgba(255, 255, 255, 0.08);
+      color: var(--ink);
+    }
+
+    body.theme-dark .case-subinfo,
+    body.theme-dark .info-line,
+    body.theme-dark .muted {
+      color: var(--muted);
     }
 
     .message-box:hover {
@@ -290,6 +374,13 @@
       background: var(--panel);
     }
 
+    .dashboard-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      background: var(--panel);
+    }
+
     .case-header {
       display: flex;
       justify-content: space-between;
@@ -366,7 +457,7 @@
       top: 48px;
       right: 0;
       width: 340px;
-      background: #fff;
+      background: var(--panel);
       border: 1px solid rgba(0, 0, 0, 0.08);
       border-radius: 12px;
       padding: 0;
@@ -390,7 +481,7 @@
       font-size: 1.3rem;
       padding: 14px 18px;
       border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-      background: #fafafa;
+      background: var(--panel);
     }
 
     #notifList {
@@ -499,7 +590,7 @@
     /* Availability Modal (same styling philosophy as Invite Modal) */
     .availability-modal {
       width: min(420px, 90%);
-      background: #fff;
+      background: var(--panel);
       border-radius: 20px;
       padding: 24px;
       border: 1px solid var(--line);
@@ -554,7 +645,7 @@
     .modal-actions button:hover {
       transform: translateY(-1px);
       box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
-      background: #fff;
+      background: var(--panel);
     }
 
     .modal-actions .confirm {
@@ -590,7 +681,7 @@
       <a href="help.html">Help</a>
     </nav>
     <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let<span class="gold">’</span>s-ParaConnect 2025</a></div>
+    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
   </aside>
   <main class="main">
     <div class="topbar" data-attorney-header></div>
@@ -633,7 +724,7 @@
 
     <section class="quick-actions">
       <div class="section-title">Quick Actions</div>
-      <button data-action="browse">Browse new postings</button>
+      <button type="button" data-action="browse">Browse new postings</button>
       <button data-action="availability">Update availability</button>
     </section>
 

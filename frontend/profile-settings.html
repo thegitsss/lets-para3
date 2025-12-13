@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Account Settings | Let<span class="gold">’</span>s-ParaConnect</title>
+  <title>Account Settings – Let’s-ParaConnect</title>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
   <script src="assets/scripts/utils/session.js"></script>
   <style>
@@ -11,17 +11,35 @@
     :root {
       --bg: #ffffff;
       --sidebar-bg: #f5f5f5e6;
+      --panel: #fcfcfc;
       --accent: #b6a47a;
       --accent-dark: #9c8a63;
       --ink: #1a1a1a;
       --muted: #6b6b6b;
       --line: rgba(0, 0, 0, 0.08);
-      --panel: #fcfcfc;
+      --sidebar-text: #1a1a1a;
       --danger: #c0392b;
       --danger-dark: #962d22;
       --radius: 14px;
       --font-serif: 'Cormorant Garamond', serif;
       --font-sans: 'Sarabun', sans-serif;
+    }
+
+    body.theme-dark {
+      --bg: #0f172a;
+      --sidebar-bg: #1c2333;
+      --panel: #151b29;
+      --ink: #f4f6fb;
+      --muted: #9aa7c4;
+      --line: rgba(255, 255, 255, 0.08);
+      --sidebar-text: #f8fbff;
+    }
+
+    body.theme-mountain {
+      --bg: #f8f6f1;
+      --panel: #ffffff;
+      --muted: #7a736a;
+      --sidebar-text: #ffffff;
     }
 
     * {
@@ -50,8 +68,32 @@
       position: sticky;
       top: 0;
       height: 100vh;
+      overflow-y: auto;
       font-family: var(--font-sans);
       font-weight: 200;
+      color: var(--sidebar-text);
+    }
+
+    .sidebar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: transparent;
+      pointer-events: none;
+      transition: background 0.3s ease;
+    }
+
+    body.theme-mountain .sidebar {
+      background: url('hero-mountain.jpg') center/cover no-repeat;
+    }
+
+    body.theme-mountain .sidebar::before {
+      background: rgba(0, 0, 0, 0.45);
+    }
+
+    body.theme-mountain .sidebar > * {
+      position: relative;
+      z-index: 1;
     }
 
     .logo {
@@ -75,7 +117,7 @@
       border-radius: var(--radius);
       text-align: left;
       font-size: 0.95rem;
-      color: var(--ink);
+      color: var(--sidebar-text);
       transition: background 0.2s ease, color 0.2s ease;
       cursor: pointer;
       font-family: inherit;
@@ -119,6 +161,7 @@
       flex: 1;
       padding: 40px 48px;
       overflow-y: auto;
+      background: var(--bg);
     }
 
     .topbar {
@@ -171,10 +214,70 @@
       margin-bottom: 28px;
       display: none;
       animation: fadeIn 0.25s ease forwards;
+      color: var(--ink);
     }
 
     .settings-panel.active {
       display: block;
+    }
+
+    body.theme-dark .sidebar-link,
+    body.theme-dark .settings-nav button {
+      color: #f8fbff;
+    }
+
+    body.theme-dark .settings-nav button.active,
+    body.theme-dark .settings-nav button:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #f8fbff;
+    }
+
+    body.theme-mountain .settings-nav button,
+    body.theme-mountain .sidebar-link {
+      color: #fff;
+    }
+
+    body.theme-mountain .settings-nav button.active,
+    body.theme-mountain .settings-nav button:hover {
+      background: rgba(255, 255, 255, 0.18);
+      color: #fff;
+    }
+
+    body.theme-dark .settings-panel,
+    body.theme-dark .role-settings .settings-section {
+      background: rgba(20, 25, 38, 0.9);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    body.theme-dark input,
+    body.theme-dark textarea,
+    body.theme-dark select {
+      background: rgba(10, 14, 24, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: #f8fbff;
+    }
+
+    body.theme-dark #attorneySettings .form-field input,
+    body.theme-dark #attorneySettings .form-field textarea,
+    body.theme-dark #paralegalSettings input,
+    body.theme-dark #paralegalSettings textarea,
+    body.theme-dark #paralegalSettings select {
+      background: rgba(10, 14, 24, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #f8fbff;
+      font-weight: 300;
+    }
+
+    body.theme-dark input::placeholder,
+    body.theme-dark textarea::placeholder,
+    body.theme-dark select option {
+      color: rgba(248, 251, 255, 0.65);
+    }
+
+    body.theme-mountain .sidebar-link:hover,
+    body.theme-mountain .sidebar-link:focus {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
     }
 
     .settings-panel h2 {
@@ -284,8 +387,9 @@
       margin-top: 22px;
       padding: 18px 22px;
       border-radius: 14px;
-      background: #fff;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
     }
 
     .settings-block h3 {
@@ -502,6 +606,16 @@
       font-size: 1.1rem;
     }
 
+    .pref-row select {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.35rem 0.75rem;
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      background: var(--panel);
+      color: var(--ink);
+    }
+
     .switch {
       position: relative;
       display: inline-block;
@@ -584,11 +698,20 @@
       border: 1px solid var(--line);
       border-radius: 22px;
       padding: 20px;
-      background: rgba(255, 255, 255, 0.8);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+      background: var(--panel);
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
       display: flex;
       flex-direction: column;
       gap: 12px;
+      min-height: 220px;
+      height: 100%;
+      justify-content: space-between;
+    }
+
+    #settingsCertificate,
+    #settingsResume,
+    #settingsWritingSample {
+      height: 100%;
     }
 
     .upload-card h3 {
@@ -619,6 +742,11 @@
       transition: background 0.2s ease, transform 0.2s ease;
     }
 
+    .upload-card .file-trigger {
+      padding: 8px 16px;
+      font-size: 0.85rem;
+    }
+
     .file-trigger:hover {
       background: var(--accent-dark);
       transform: translateY(-1px);
@@ -647,6 +775,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 20px;
+      align-items: stretch;
     }
 
     .btn-row {
@@ -693,6 +822,15 @@
 
     .btn-light {
       font-weight: 200;
+    }
+    body.theme-mountain .btn-outline.btn-light{
+      color:#fff;
+      border-color:rgba(255,255,255,0.7);
+      background:rgba(255,255,255,0.08);
+    }
+    body.theme-mountain .btn-outline.btn-light:hover{
+      background:rgba(255,255,255,0.16);
+      color:#fff;
     }
 
     .toggle-row {
@@ -853,7 +991,7 @@
 </head>
 <body>
   <aside class="sidebar">
-    <div class="logo">Let<span class="gold">’</span>s-ParaConnect</div>
+    <div class="logo">Let’s-ParaConnect</div>
     <nav class="settings-nav" aria-label="Settings navigation">
       <button id="navProfile" class="settings-item active" data-target="profileSection">Profile</button>
       <button id="navSecurity" class="settings-item" data-target="securitySection">Security</button>
@@ -1095,7 +1233,74 @@ Legal Assistant at..."></textarea>
           <span class="slider"></span>
         </label>
       </div>
-      <button id="savePreferencesBtn" class="btn btn-primary" type="button">Save Preferences</button>
+      <div class="pref-row">
+        <span>Theme</span>
+        <select id="themePreference">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+          <option value="mountain">Mountain</option>
+        </select>
+      </div>
+      <div class="pref-row">
+        <span>Update State</span>
+        <select id="statePreference">
+          <option value="">Select state</option>
+          <option value="AL">Alabama</option>
+          <option value="AK">Alaska</option>
+          <option value="AZ">Arizona</option>
+          <option value="AR">Arkansas</option>
+          <option value="CA">California</option>
+          <option value="CO">Colorado</option>
+          <option value="CT">Connecticut</option>
+          <option value="DE">Delaware</option>
+          <option value="DC">District of Columbia</option>
+          <option value="FL">Florida</option>
+          <option value="GA">Georgia</option>
+          <option value="HI">Hawaii</option>
+          <option value="ID">Idaho</option>
+          <option value="IL">Illinois</option>
+          <option value="IN">Indiana</option>
+          <option value="IA">Iowa</option>
+          <option value="KS">Kansas</option>
+          <option value="KY">Kentucky</option>
+          <option value="LA">Louisiana</option>
+          <option value="ME">Maine</option>
+          <option value="MD">Maryland</option>
+          <option value="MA">Massachusetts</option>
+          <option value="MI">Michigan</option>
+          <option value="MN">Minnesota</option>
+          <option value="MS">Mississippi</option>
+          <option value="MO">Missouri</option>
+          <option value="MT">Montana</option>
+          <option value="NE">Nebraska</option>
+          <option value="NV">Nevada</option>
+          <option value="NH">New Hampshire</option>
+          <option value="NJ">New Jersey</option>
+          <option value="NM">New Mexico</option>
+          <option value="NY">New York</option>
+          <option value="NC">North Carolina</option>
+          <option value="ND">North Dakota</option>
+          <option value="OH">Ohio</option>
+          <option value="OK">Oklahoma</option>
+          <option value="OR">Oregon</option>
+          <option value="PA">Pennsylvania</option>
+          <option value="RI">Rhode Island</option>
+          <option value="SC">South Carolina</option>
+          <option value="SD">South Dakota</option>
+          <option value="TN">Tennessee</option>
+          <option value="TX">Texas</option>
+          <option value="UT">Utah</option>
+          <option value="VT">Vermont</option>
+          <option value="VA">Virginia</option>
+          <option value="WA">Washington</option>
+          <option value="WV">West Virginia</option>
+          <option value="WI">Wisconsin</option>
+          <option value="WY">Wyoming</option>
+        </select>
+      </div>
+      <div class="btn-row" style="justify-content:center;margin-top:20px;">
+        <button id="savePreferencesBtn" class="btn btn-primary" type="button">Save Preferences</button>
+      </div>
     </section>
 
     <section class="settings-panel settings-section danger-panel" id="deleteSection">

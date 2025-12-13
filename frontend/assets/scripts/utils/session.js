@@ -7,6 +7,78 @@
   let sessionPromise = null;
   let cachedSessionToken = null;
   const LEGACY_TOKEN_KEYS = ["lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"];
+  const THEME_STORAGE_KEY = "lpc_theme";
+  const VALID_THEMES = ["light", "dark", "mountain"];
+  let currentTheme = null;
+
+  function normalizeTheme(value) {
+    const candidate = String(value || "").toLowerCase();
+    return VALID_THEMES.includes(candidate) ? candidate : "mountain";
+  }
+
+  function applyClassToBody(className) {
+    const targets = [];
+    if (document.body) targets.push(document.body);
+    if (document.documentElement) targets.push(document.documentElement);
+    targets.forEach((node) => {
+      VALID_THEMES.forEach((theme) => node.classList.remove(`theme-${theme}`));
+      node.classList.add(className);
+    });
+  }
+
+  function setThemeClass(theme) {
+    const normalized = normalizeTheme(theme);
+    if (currentTheme === normalized) return normalized;
+    const className = `theme-${normalized}`;
+    if (document.body) {
+      applyClassToBody(className);
+    } else {
+      document.addEventListener(
+        "DOMContentLoaded",
+        () => {
+          applyClassToBody(className);
+        },
+        { once: true }
+      );
+    }
+    currentTheme = normalized;
+    return normalized;
+  }
+
+  function readStoredTheme() {
+    try {
+      const stored = localStorage.getItem(THEME_STORAGE_KEY);
+      if (stored) return normalizeTheme(stored);
+    } catch (_) {}
+    return "mountain";
+  }
+
+  function persistTheme(theme) {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch (_) {}
+  }
+
+  function applyThemePreference(theme) {
+    const normalized = setThemeClass(theme);
+    persistTheme(normalized);
+    if (cachedUser) {
+      cachedUser.preferences = { ...(cachedUser.preferences || {}), theme: normalized };
+      try {
+        localStorage.setItem("lpc_user", JSON.stringify(cachedUser));
+      } catch (_) {}
+    }
+    return normalized;
+  }
+
+  function applyThemeFromUser(user) {
+    const theme =
+      (user && user.preferences && user.preferences.theme) ||
+      readStoredTheme();
+    applyThemePreference(theme);
+  }
+
+  applyThemePreference(readStoredTheme());
 
   function redirectToLogin() {
     if (hasRedirected) return;
@@ -47,6 +119,7 @@
         .catch(() => null)
         .then((user) => {
           cachedUser = user;
+          applyThemeFromUser(user);
           try {
             if (user?.avatarURL) {
               localStorage.setItem("avatarURL", user.avatarURL);
@@ -154,6 +227,7 @@
   function updateSessionUser(user) {
     if (!user || typeof user !== "object") return;
     cachedUser = { ...(cachedUser || {}), ...user };
+    applyThemeFromUser(cachedUser);
     sessionPromise = Promise.resolve(cachedUser);
     if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
       try {
@@ -207,6 +281,8 @@
   window.getStoredUser = getCachedUser;
   window.refreshSession = refreshSession;
   window.updateSessionUser = updateSessionUser;
+  window.applyThemePreference = applyThemePreference;
+  window.getThemePreference = () => currentTheme || readStoredTheme();
 
   function updateHeaderBasedOnAuth(isLoggedIn) {
     document.querySelectorAll("[data-authed-only]").forEach((el) => {
