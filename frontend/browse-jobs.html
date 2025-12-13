@@ -19,6 +19,20 @@
       --font-serif:'Cormorant Garamond',serif;
       --font-sans:'Sarabun',sans-serif;
     }
+    body.theme-dark{
+      --bg:#0f172a;
+      --panel:#151b29;
+      --line:rgba(255,255,255,0.12);
+      --muted:#a5b3d8;
+      --ink:#f8fbff;
+    }
+    body.theme-mountain{
+      --bg:#f8f6f1;
+      --panel:#ffffff;
+      --line:rgba(0,0,0,0.08);
+      --muted:#7a736a;
+      --ink:#1d1a16;
+    }
     *{box-sizing:border-box;margin:0;padding:0;}
     body{font-family:var(--font-sans);font-weight:200;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;flex-direction:column;}
     header{display:flex;justify-content:space-between;align-items:center;padding:20px 28px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:10;}
@@ -49,8 +63,18 @@
     }
     .user-profile{display:flex;align-items:center;gap:.6rem;padding:6px 10px;border:1px solid var(--line);border-radius:12px;background:#fff;}
     .user-profile img{width:42px;height:42px;border-radius:50%;object-fit:cover;box-shadow:0 6px 16px rgba(0,0,0,0.08);}
-    .user-profile strong{display:block;font-weight:300;}
+    .user-profile strong{display:block;font-weight:300;color:var(--ink);}
     .user-profile span{display:block;font-size:.85rem;color:var(--muted);font-weight:200;}
+    body.theme-dark .user-profile,
+    body.theme-mountain .user-profile{background:rgba(0,0,0,0.25);border-color:rgba(255,255,255,0.2);}
+    body.theme-dark .user-profile strong,
+    body.theme-mountain .user-profile strong{color:#fff;}
+    body.theme-dark .user-profile span,
+    body.theme-mountain .user-profile span{color:rgba(255,255,255,0.78);}
+    body.theme-dark #clusterName,
+    body.theme-mountain #clusterName{color:#fff;}
+    body.theme-dark #clusterRole,
+    body.theme-mountain #clusterRole{color:rgba(255,255,255,0.78);}
     .notif-panel{position:absolute;right:0;top:48px;width:340px;background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:12px;padding:0;z-index:2000;display:none;flex-direction:column;box-shadow:0 24px 48px rgba(0,0,0,0.12);}
     .notif-panel.show{display:flex;}
     .notif-panel.hidden{display:none;}

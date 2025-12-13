@@ -55,8 +55,8 @@
   gap: 0.75rem;
   padding: 0.35rem 1rem 0.35rem 0.35rem;
   border-radius: 999px;
-  background: #f9f9f9;
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  background: var(--panel, #f9f9f9);
+  border: 1px solid var(--line, rgba(0, 0, 0, 0.04));
   box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
 }
 
@@ -73,14 +73,45 @@
   display: block;
   font-weight: 600;
   font-size: 1.02rem;
-  color: #1b1b1b;
+  color: var(--ink, #1b1b1b);
 }
 
 [data-paralegal-cluster] .user-profile span {
   display: block;
   font-size: 0.9rem;
-  color: #7b7b7b;
+  color: var(--muted, #7b7b7b);
   margin-top: 2px;
+}
+
+body.theme-dark [data-paralegal-cluster] .user-profile,
+body.theme-mountain [data-paralegal-cluster] .user-profile {
+  background: rgba(0, 0, 0, 0.25);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+body.theme-dark [data-paralegal-cluster] .user-profile strong,
+body.theme-mountain [data-paralegal-cluster] .user-profile strong {
+  color: #fff;
+}
+
+body.theme-dark [data-paralegal-cluster] .user-profile span,
+body.theme-mountain [data-paralegal-cluster] .user-profile span {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+body.theme-dark #clusterName,
+body.theme-dark .globalProfileName,
+body.theme-mountain #clusterName,
+body.theme-mountain .globalProfileName {
+  color: #fff !important;
+}
+
+body.theme-dark #clusterRole,
+body.theme-dark .globalProfileRole,
+body.theme-mountain #clusterRole,
+body.theme-mountain .globalProfileRole {
+  color: rgba(255, 255, 255, 0.78) !important;
 }
 
 [data-paralegal-cluster] .notification-panel,

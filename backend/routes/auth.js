@@ -145,6 +145,7 @@ router.post(
       recaptchaToken,
       termsAccepted,
       phoneNumber,
+      barState,
     } = req.body || {};
 
     const captchaOk = await verifyRecaptcha(recaptchaToken, "signup");
@@ -194,6 +195,9 @@ router.post(
     }
 
     // Let the model hash the password (pre-save hook)
+    const normalizedBarState =
+      typeof barState === "string" ? barState.trim().toUpperCase() : "";
+
     const user = new User({
       firstName: safeFirst,
       lastName: safeLast,
@@ -209,6 +213,10 @@ router.post(
       termsAccepted: true,
       phoneNumber: phoneNumber ? String(phoneNumber).trim() || null : null,
     });
+
+    if (roleLc === "attorney" && normalizedBarState) {
+      user.location = normalizedBarState;
+    }
 
     // Upload resume (paralegal) before saving
     if (roleLc === "paralegal" && req.file) {
@@ -238,7 +246,7 @@ router.post(
       await sendEmail(
         user.email,
         "Registration received",
-        `Thank you for submitting your application to be part of Let’s-ParaConnect and join our highly curated, elite paralegal professional collective. Your application is now under review. Our team is thoroughly evaluating your credentials and experience. You will receive an update within 24-48 business hours.\n\nRespectfully,\nThe Let’s-ParaConnect Verification Division${
+        `Thank you for submitting your application to be part of Let’s-ParaConnect. Your application is now under review. Please expect to see an update within 24-48 business hours.\n\nRespectfully,\nThe Let’s-ParaConnect Verification Division${
           process.env.APP_BASE_URL ? `\n\nYou can verify your email here (optional): ${verifyUrl}` : ""
         }`
       );
@@ -468,6 +476,11 @@ router.get(
           profileImage: u.profileImage || null,
           status: u.status,
           disabled: Boolean(u.disabled),
+          preferences: {
+            theme:
+              (u.preferences && typeof u.preferences === "object" && u.preferences.theme) ||
+              "mountain",
+          },
         },
       });
     } catch {

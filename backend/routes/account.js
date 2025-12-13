@@ -39,11 +39,15 @@ router.use(verifyToken);
 router.get(
   "/preferences",
   asyncHandler(async (req, res) => {
-    const user = await User.findById(req.user.id).select("notificationPrefs");
+    const user = await User.findById(req.user.id).select("notificationPrefs preferences location state");
     if (!user) return res.status(404).json({ error: "User not found" });
     const prefs = user.notificationPrefs || {};
     res.json({
       email: !!prefs.email,
+      theme:
+        (user.preferences && typeof user.preferences === "object" && user.preferences.theme) ||
+        "mountain",
+      state: user.location || user.state || "",
     });
   })
 );
@@ -51,8 +55,8 @@ router.get(
 router.post(
   "/preferences",
   asyncHandler(async (req, res) => {
-    const { email } = req.body || {};
-    const user = await User.findById(req.user.id).select("notificationPrefs");
+    const { email, theme, state } = req.body || {};
+    const user = await User.findById(req.user.id).select("notificationPrefs preferences location");
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const current =
@@ -64,9 +68,39 @@ router.post(
       ...current,
       email: !!email,
     };
+
+    const normalizedTheme =
+      typeof theme === "string" && ["light", "dark", "mountain"].includes(theme.toLowerCase())
+        ? theme.toLowerCase()
+        : null;
+    if (normalizedTheme) {
+      user.preferences = {
+        ...(typeof user.preferences?.toObject === "function"
+          ? user.preferences.toObject()
+          : user.preferences || {}),
+        theme: normalizedTheme,
+      };
+    }
+
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "state")) {
+      const normalizedState =
+        typeof state === "string" ? state.trim().toUpperCase() : "";
+      if (normalizedState && !/^[A-Z]{2}$/.test(normalizedState)) {
+        return res.status(400).json({ error: "Invalid state selection" });
+      }
+      user.location = normalizedState;
+    }
+
     await user.save();
 
-    res.json({ success: true });
+    res.json({
+      success: true,
+      preferences: {
+        email: !!email,
+        theme: normalizedTheme || user.preferences?.theme || "mountain",
+      },
+      state: user.location || "",
+    });
   })
 );
 

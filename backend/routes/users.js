@@ -4,6 +4,7 @@ const paralegalRouter = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
+const requireApprovedUser = require("../middleware/requireApprovedUser");
 const User = require("../models/User");
 const Case = require("../models/Case");
 const Task = require("../models/Task");
@@ -120,7 +121,7 @@ const parseParalegalFilters = (query = {}) => {
 };
 
 const SAFE_PUBLIC_SELECT =
-  "_id firstName lastName avatarURL profileImage location specialties practiceAreas skills experience yearsExperience linkedInURL certificateURL writingSampleURL education resumeURL notificationPrefs lawFirm bio about availability availabilityDetails approvedAt languages writingSamples";
+  "_id firstName lastName avatarURL profileImage location specialties practiceAreas skills experience yearsExperience linkedInURL certificateURL writingSampleURL education resumeURL notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt languages writingSamples status";
 const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email phoneNumber`;
 const FILE_PUBLIC_BASE =
   (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
@@ -134,7 +135,7 @@ function toPublicUrl(val) {
   return FILE_PUBLIC_BASE ? `${FILE_PUBLIC_BASE}/${String(val).replace(/^\/+/, "")}` : val;
 }
 
-function serializePublicUser(user, { includeEmail = false } = {}) {
+function serializePublicUser(user, { includeEmail = false, includeStatus = false } = {}) {
   if (!user) return null;
   const src = user.toObject ? user.toObject() : user;
   const profileImage = toPublicUrl(src.profileImage || "");
@@ -173,10 +174,18 @@ function serializePublicUser(user, { includeEmail = false } = {}) {
     writingSamples: Array.isArray(src.writingSamples) ? src.writingSamples : [],
     languages: cleanLanguages(src.languages || []),
     notificationPrefs: src.notificationPrefs || null,
+    preferences: {
+      theme:
+        (src.preferences && typeof src.preferences === "object" && src.preferences.theme) ||
+        "mountain",
+    },
   };
   if (includeEmail) {
     payload.email = src.email || "";
     payload.phoneNumber = src.phoneNumber || "";
+  }
+  if (includeStatus) {
+    payload.status = src.status || "";
   }
   return payload;
 }
@@ -313,7 +322,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const me = await User.findById(req.user.id).select(SAFE_SELF_SELECT).lean();
     if (!me) return res.status(404).json({ error: "Not found" });
-    return res.json(serializePublicUser(me, { includeEmail: true }));
+    return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true }));
   })
 );
 
@@ -431,6 +440,7 @@ router.post(
 router.patch(
   "/me",
   csrfProtection,
+  requireApprovedUser,
   asyncHandler(async (req, res) => {
     const me = await User.findById(req.user.id);
     if (!me) return res.status(404).json({ error: "Not found" });
@@ -570,13 +580,14 @@ router.patch(
       await logAction(req, "user.me.update", { targetType: "user", targetId: me._id });
     } catch {}
 
-    return res.json(serializePublicUser(me, { includeEmail: true }));
+    return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true }));
   })
 );
 
 router.patch(
   "/me/notification-prefs",
   csrfProtection,
+  requireApprovedUser,
   asyncHandler(async (req, res) => {
     const me = await User.findById(req.user.id);
     if (!me) return res.status(404).json({ error: "Not found" });
@@ -606,6 +617,7 @@ router.patch(
 router.post(
   "/me/availability",
   csrfProtection,
+  requireApprovedUser,
   asyncHandler(async (req, res) => {
     const availabilityStr = normalizeAvailability(req.body?.availability);
     if (!availabilityStr) {
@@ -624,7 +636,7 @@ router.post(
         meta: { availability: me.availability },
       });
     } catch {}
-    return res.json(serializePublicUser(me, { includeEmail: true }));
+    return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true }));
   })
 );
 
@@ -636,6 +648,7 @@ router.post(
 router.post(
   "/me/email-pref",
   csrfProtection,
+  requireApprovedUser,
   asyncHandler(async (req, res) => {
     const updates = {};
     if (typeof req.body?.marketing === "boolean") updates["emailPref.marketing"] = req.body.marketing;
@@ -648,7 +661,7 @@ router.post(
     try {
       await logAction(req, "user.me.emailPref", { targetType: "user", targetId: me._id, meta: updates });
     } catch {}
-    return res.json(serializePublicUser(me, { includeEmail: true }));
+    return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true }));
   })
 );
 
@@ -795,12 +808,13 @@ paralegalRouter.get(
       await logAction(req, "paralegal.profile.view", { targetType: "user", targetId: profile._id });
     } catch {}
 
-    return res.json(serializePublicUser(profile, { includeEmail: isOwner }));
+    return res.json(serializePublicUser(profile, { includeEmail: isOwner, includeStatus: isOwner }));
   })
 );
 
 paralegalRouter.post(
   "/:paralegalId/update",
+  requireApprovedUser,
   asyncHandler(async (req, res) => {
     const targetId = resolveParalegalId(req.params.paralegalId, req.user.id);
     if (!isObjId(targetId)) return res.status(400).json({ error: "Invalid paralegal id" });
@@ -851,7 +865,7 @@ paralegalRouter.post(
       await logAction(req, "paralegal.profile.update", { targetType: "user", targetId: paralegal._id });
     } catch {}
 
-    return res.json(serializePublicUser(paralegal, { includeEmail: isSelf }));
+    return res.json(serializePublicUser(paralegal, { includeEmail: isSelf, includeStatus: isSelf }));
   })
 );
 

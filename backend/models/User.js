@@ -212,6 +212,13 @@ const userSchema = new Schema(
     // Notifications
     notifications: { type: notificationPrefsSchema, default: () => ({}) },
     notificationPrefs: { type: notificationSettingsSchema, default: () => ({}) },
+    preferences: {
+      theme: {
+        type: String,
+        enum: ["light", "dark", "mountain"],
+        default: "mountain",
+      },
+    },
     pushSubscription: { type: Object, default: null },
     digestFrequency: { type: String, enum: ["off", "daily", "weekly"], default: "daily" },
     emailPref: {
