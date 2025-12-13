@@ -61,6 +61,7 @@ const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
   acc[name.toLowerCase()] = name;
   return acc;
 }, {});
+const WORK_STARTED_STATUSES = new Set(["active", "awaiting_documents", "reviewing", "in_progress", "completed", "disputed"]);
 
 const S3_BUCKET = process.env.S3_BUCKET || "";
 const s3 = new S3Client({
@@ -118,6 +119,14 @@ function normalizePracticeArea(value) {
   const cleaned = cleanString(value || "", { len: 200 }).toLowerCase();
   if (!cleaned) return "";
   return PRACTICE_AREA_LOOKUP[cleaned] || "";
+}
+
+function hasWorkStarted(caseDoc) {
+  if (!caseDoc) return false;
+  const status = String(caseDoc.status || "").toLowerCase();
+  if (WORK_STARTED_STATUSES.has(status)) return true;
+  if (Array.isArray(caseDoc.files) && caseDoc.files.length > 0) return true;
+  return false;
 }
 
 function parseDeadline(raw) {
@@ -225,6 +234,16 @@ function caseSummary(doc, { includeFiles = false } = {}) {
     updatedAt: doc.updatedAt,
     createdAt: doc.createdAt,
     internalNotes: shapeInternalNote(doc.internalNotes),
+    termination: {
+      status: doc.terminationStatus || "none",
+      reason: doc.terminationReason || "",
+      requestedAt: doc.terminationRequestedAt || null,
+      requestedBy: doc.terminationRequestedBy
+        ? summarizeUser(doc.terminationRequestedBy) || { id: String(doc.terminationRequestedBy) }
+        : null,
+      disputeId: doc.terminationDisputeId || null,
+      terminatedAt: doc.terminatedAt || null,
+    },
   };
   summary.filesCount = Array.isArray(doc.files) ? doc.files.length : 0;
   if (includeFiles) {
@@ -996,6 +1015,93 @@ router.patch(
 );
 
 /**
+ * POST /api/cases/:caseId/terminate
+ * End the attorney/paralegal engagement. If work has begun, open a dispute for admin review.
+ * Body: { reason? }
+ */
+router.post(
+  "/:caseId/terminate",
+  csrfProtection,
+  requireCaseAccess("caseId"),
+  asyncHandler(async (req, res) => {
+    if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
+      return res.status(403).json({ error: "Only the attorney or an admin can terminate this case." });
+    }
+
+    const doc = await Case.findById(req.params.caseId)
+      .populate("paralegal", "firstName lastName email role avatarURL")
+      .populate("attorney", "firstName lastName email role avatarURL")
+      .populate("terminationRequestedBy", "firstName lastName email role");
+    if (!doc) return res.status(404).json({ error: "Case not found." });
+
+    if (!doc.paralegal) {
+      return res.status(400).json({ error: "No paralegal is currently assigned to this case." });
+    }
+    if (["cancelled", "closed"].includes(String(doc.status || "").toLowerCase())) {
+      return res.status(400).json({ error: "This case is already closed." });
+    }
+    if (doc.terminationStatus && !["none", "resolved"].includes(doc.terminationStatus)) {
+      return res.status(400).json({ error: "A termination request is already in progress." });
+    }
+
+    const reason = cleanMessage(req.body?.reason || "", { len: 2000 });
+    const workStarted = hasWorkStarted(doc);
+    doc.terminationRequestedAt = new Date();
+    doc.terminationRequestedBy = req.user.id;
+    doc.terminationReason = reason;
+    doc.terminatedAt = null;
+    doc.terminationDisputeId = null;
+
+    if (workStarted) {
+      const message = reason
+        ? `Attorney requested termination: ${reason}`
+        : "Attorney requested termination of this case.";
+      doc.createDispute({ message, raisedBy: req.user.id });
+      const lastDispute = doc.disputes[doc.disputes.length - 1];
+      doc.terminationStatus = "disputed";
+      doc.terminationDisputeId = lastDispute?.disputeId || (lastDispute?._id ? String(lastDispute._id) : null);
+      doc.paralegalAccessRevokedAt = new Date();
+    } else {
+      try {
+        doc.transitionTo("cancelled");
+      } catch (err) {
+        return res.status(400).json({ error: "This case cannot be cancelled right now." });
+      }
+      doc.terminationStatus = "auto_cancelled";
+      doc.terminatedAt = new Date();
+      doc.paralegalAccessRevokedAt = new Date();
+      doc.paralegal = null;
+      doc.paralegalId = null;
+      doc.pendingParalegalId = null;
+      doc.pendingParalegalInvitedAt = null;
+    }
+
+    await doc.save();
+    await doc.populate([
+      { path: "paralegal", select: "firstName lastName email role avatarURL" },
+      { path: "attorney", select: "firstName lastName email role avatarURL" },
+      { path: "terminationRequestedBy", select: "firstName lastName email role" },
+    ]);
+
+    try {
+      await logAction(req, "case.terminate", {
+        targetType: "case",
+        targetId: doc._id,
+        caseId: doc._id,
+        meta: { mode: workStarted ? "disputed" : "auto_cancelled" },
+      });
+    } catch {}
+
+    const payload = {
+      ok: true,
+      requiresAdmin: workStarted,
+      case: caseSummary(doc),
+    };
+    res.status(workStarted ? 202 : 200).json(payload);
+  })
+);
+
+/**
  * POST /api/cases/:caseId/files
  * Body: { key, original?, mime?, size? }
  * Attaches a file record (S3 key) to the case.
@@ -1672,11 +1778,12 @@ router.get(
   asyncHandler(async (req, res) => {
     const doc = await Case.findById(req.params.caseId)
       .select(
-        "title status practiceArea deadline zoomLink paymentReleased escrowIntentId totalAmount currency files attorney paralegal applicants hiredAt completedAt briefSummary archived downloadUrl"
+        "title status practiceArea deadline zoomLink paymentReleased escrowIntentId totalAmount currency files attorney paralegal applicants hiredAt completedAt briefSummary archived downloadUrl terminationReason terminationStatus terminationRequestedAt terminationRequestedBy terminationDisputeId terminatedAt paralegalAccessRevokedAt archiveReadyAt archiveDownloadedAt purgeScheduledFor readOnly"
       )
       .populate("paralegal", "firstName lastName email role")
       .populate("attorney", "firstName lastName email role")
       .populate("applicants.paralegalId", "firstName lastName email role")
+      .populate("terminationRequestedBy", "firstName lastName email role")
       .lean();
     if (!doc) return res.status(404).json({ error: "Case not found" });
 
@@ -1733,6 +1840,14 @@ router.get(
       paralegalNameSnapshot: doc.paralegalNameSnapshot || "",
       files: Array.isArray(doc.files) ? doc.files.map(normalizeFile) : [],
       applicants,
+      termination: {
+        status: doc.terminationStatus || "none",
+        reason: doc.terminationReason || "",
+        requestedAt: doc.terminationRequestedAt || null,
+        requestedBy: summarizeUser(doc.terminationRequestedBy) || (doc.terminationRequestedBy ? { id: String(doc.terminationRequestedBy) } : null),
+        disputeId: doc.terminationDisputeId || null,
+        terminatedAt: doc.terminatedAt || null,
+      },
     });
   })
 );

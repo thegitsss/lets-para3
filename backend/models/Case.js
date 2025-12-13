@@ -142,6 +142,12 @@ const caseSchema = new Schema(
     purgedAt: { type: Date, default: null },
     paralegalNameSnapshot: { type: String, trim: true, default: "" },
     attorneyNameSnapshot: { type: String, trim: true, default: "" },
+    terminationReason: { type: String, trim: true, maxlength: 2000, default: "" },
+    terminationStatus: { type: String, enum: ["none", "auto_cancelled", "disputed", "resolved"], default: "none", index: true },
+    terminationRequestedAt: { type: Date, default: null },
+    terminationRequestedBy: { type: Types.ObjectId, ref: "User", default: null },
+    terminationDisputeId: { type: String, default: null },
+    terminatedAt: { type: Date, default: null },
     internalNotes: {
       text: { type: String, trim: true, maxlength: 10_000, default: "" },
       updatedBy: { type: Types.ObjectId, ref: "User", default: null },
