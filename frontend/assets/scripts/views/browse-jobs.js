@@ -1,5 +1,18 @@
 const jobsGrid = document.getElementById("jobs-grid");
 const pagination = document.getElementById("pagination");
+const jobModal = document.getElementById("jobModal");
+const jobModalClose = document.getElementById("jobModalClose");
+const jobModalBackdrop = jobModal?.querySelector(".job-modal-backdrop");
+const jobTitleEl = document.getElementById("jobTitle");
+const jobSummaryEl = document.getElementById("jobSummary");
+const jobBodyEl = document.getElementById("jobBody");
+const jobCompensationEl = document.getElementById("jobCompensation");
+const jobApplyBtn = document.getElementById("jobApplyBtn");
+const jobAttorneyButton = document.getElementById("jobAttorneyButton");
+const jobAttorneyAvatar = document.getElementById("jobAttorneyAvatar");
+const jobAttorneyName = document.getElementById("jobAttorneyName");
+const jobAttorneyFirm = document.getElementById("jobAttorneyFirm");
+const FALLBACK_AVATAR = "https://via.placeholder.com/64x64.png?text=A";
 
 let allJobs = [];
 let filteredJobs = [];
@@ -34,6 +47,7 @@ const applyFiltersBtn = document.getElementById("applyFilters");
 const clearFiltersBtn = document.getElementById("clearFilters");
 
 let sessionReady = false;
+let modalJob = null;
 async function ensureSession() {
   if (sessionReady) return true;
   try {
@@ -235,12 +249,22 @@ function renderJobs() {
     const detailBtn = document.createElement("button");
     detailBtn.type = "button";
     detailBtn.className = "clear-button";
-    detailBtn.textContent = "View Details";
+    detailBtn.textContent = "Preview";
     detailBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openJobModal(job);
+    });
+    actions.appendChild(detailBtn);
+
+    const caseBtn = document.createElement("button");
+    caseBtn.type = "button";
+    caseBtn.className = "clear-button";
+    caseBtn.textContent = "View Case";
+    caseBtn.addEventListener("click", (event) => {
       event.stopPropagation();
       if (jobId) window.location.href = `case-detail.html?caseId=${encodeURIComponent(jobId)}`;
     });
-    actions.appendChild(detailBtn);
+    actions.appendChild(caseBtn);
 
     const applyBtn = document.createElement("button");
     applyBtn.type = "button";
@@ -261,7 +285,7 @@ function renderJobs() {
     card.appendChild(actions);
 
     card.addEventListener("click", () => {
-      if (jobId) window.location.href = `case-detail.html?caseId=${encodeURIComponent(jobId)}`;
+      openJobModal(job);
     });
 
     jobsGrid.appendChild(card);
@@ -278,7 +302,7 @@ function renderJobs() {
 async function fetchJobs() {
   if (!sessionReady) return;
   try {
-    const res = await fetch("/api/cases/open", {
+    const res = await fetch("/api/jobs/open", {
       headers: { Accept: "application/json" },
       credentials: "include",
     });
@@ -286,7 +310,13 @@ async function fetchJobs() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const data = await res.json();
-    allJobs = Array.isArray(data) ? data : [];
+    if (Array.isArray(data)) {
+      allJobs = data;
+    } else if (Array.isArray(data?.items)) {
+      allJobs = data.items;
+    } else {
+      allJobs = [];
+    }
     filteredJobs = [...allJobs];
 
     populateFilters();
@@ -353,6 +383,7 @@ function ensureApplyModal() {
       </header>
       <p class="muted">Share why you are a great fit (max ${APPLY_MAX_CHARS} characters).</p>
       <textarea rows="6" data-apply-text></textarea>
+      <p class="apply-footnote">Your résumé, LinkedIn profile, and saved cover letter are included automatically.</p>
       <div class="apply-meta">
         <span data-apply-counter>0 / ${APPLY_MAX_CHARS}</span>
         <span data-apply-status></span>
@@ -484,6 +515,75 @@ async function ensureCsrfToken() {
   return csrfToken;
 }
 
+function openJobModal(job) {
+  if (!jobModal || !job) return;
+  modalJob = job;
+  const title = job.title || "Untitled job";
+  const summary = job.shortDescription || job.practiceArea || job.briefSummary || "";
+  const description = job.description || job.details || "No additional description provided.";
+  const payUSD = getJobPayUSD(job);
+  const budget = typeof job.budget === "number" ? job.budget : null;
+  const compensation =
+    job.compensationDisplay ||
+    (budget ? `$${formatPay(budget)} budget` : payUSD ? `$${formatPay(payUSD)} total` : "Rate negotiable");
+
+  if (jobTitleEl) jobTitleEl.textContent = title;
+  if (jobSummaryEl) jobSummaryEl.textContent = summary;
+  if (jobBodyEl) jobBodyEl.textContent = description;
+  if (jobCompensationEl) jobCompensationEl.textContent = compensation;
+
+  const attorney = job.attorney || {};
+  const name = [attorney.firstName, attorney.lastName].filter(Boolean).join(" ") || "Attorney";
+  if (jobAttorneyName) jobAttorneyName.textContent = name;
+  if (jobAttorneyFirm) jobAttorneyFirm.textContent = attorney.lawFirm || "";
+  if (jobAttorneyAvatar) {
+    jobAttorneyAvatar.src = attorney.profileImage || FALLBACK_AVATAR;
+    jobAttorneyAvatar.alt = `Profile photo of ${name}`;
+  }
+  if (jobAttorneyButton) {
+    jobAttorneyButton.dataset.attorneyId = attorney._id || job.attorneyId || "";
+    jobAttorneyButton.dataset.jobId = job.id || job._id || "";
+  }
+
+  jobModal.classList.remove("hidden");
+  jobModal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+}
+
+function closeJobModal() {
+  if (!jobModal) return;
+  jobModal.classList.add("hidden");
+  jobModal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+  modalJob = null;
+}
+
+jobModalClose?.addEventListener("click", closeJobModal);
+jobModalBackdrop?.addEventListener("click", closeJobModal);
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !jobModal?.classList.contains("hidden")) {
+    closeJobModal();
+  }
+});
+
+jobAttorneyButton?.addEventListener("click", () => {
+  const attorneyId = jobAttorneyButton.dataset.attorneyId;
+  const jobId = jobAttorneyButton.dataset.jobId;
+  if (!attorneyId) return;
+  const url = new URL("profile-attorney.html", window.location.href);
+  url.searchParams.set("id", attorneyId);
+  if (jobId) url.searchParams.set("job", jobId);
+  window.location.href = url.toString();
+});
+
+jobApplyBtn?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  if (modalJob) {
+    openApplyModal(modalJob);
+  }
+});
+
 function injectApplyStyles() {
   if (document.getElementById("job-apply-styles")) return;
   const style = document.createElement("style");
@@ -500,6 +600,7 @@ function injectApplyStyles() {
     .job-apply-dialog .apply-meta .error{color:#b91c1c}
     .job-apply-dialog .modal-actions{display:flex;justify-content:flex-end;gap:10px}
     .job-apply-dialog .muted{color:#6b7280;font-size:.9rem;margin:0}
+    .job-apply-dialog .apply-footnote{margin:4px 0 0;color:#6b7280;font-size:.8rem}
   `;
   document.head.appendChild(style);
 }

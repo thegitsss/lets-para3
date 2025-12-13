@@ -9,8 +9,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Let<span class="gold">’</span>s-ParaConnect | Stripe Billing & Payments</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
@@ -78,11 +78,34 @@
       padding: 10px 14px;
       border-radius: var(--radius);
       transition: background 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
     }
 
     nav a.active,
     nav a:hover {
       background: rgba(0, 0, 0, 0.04);
+    }
+
+    .sidebar-link {
+      margin-top: 1.5rem;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 0.6rem 1rem;
+      background: transparent;
+      font-size: 0.9rem;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .sidebar-link:hover,
+    .sidebar-link:focus {
+      background: rgba(0, 0, 0, 0.05);
+      color: var(--accent);
+      outline: none;
     }
 
     .main {
@@ -261,6 +284,188 @@
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.09);
     }
 
+    .finance-alerts {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      margin-bottom: 2rem;
+    }
+
+    .finance-alerts .finance-alert {
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: var(--radius);
+      background: #fff;
+      padding: 1.1rem 1.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.85rem;
+    }
+
+    .finance-alert .alert-title {
+      font-family: var(--font-serif);
+      font-size: 1.15rem;
+      font-weight: 300;
+      margin-bottom: 0.15rem;
+    }
+
+    .finance-alert p {
+      margin: 0;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    .finance-alert .alert-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .pill-btn {
+      border-radius: 999px;
+      border: 1px solid rgba(0, 0, 0, 0.18);
+      padding: 0.45rem 1.25rem;
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 300;
+      letter-spacing: 0.02em;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 120px;
+    }
+
+    .pill-btn:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+      background: rgba(182, 164, 122, 0.08);
+    }
+
+    .pill-btn.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .pill-btn.primary:hover {
+      background: #9c8a63;
+      border-color: #9c8a63;
+    }
+
+    .ghost-btn {
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      background: transparent;
+      border-radius: 999px;
+      padding: 0.4rem 1.1rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .ghost-btn:hover {
+      border-color: var(--accent);
+      color: var(--ink);
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+    }
+
+    .escrow-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 640px;
+    }
+
+    .escrow-table th,
+    .escrow-table td {
+      padding: 0.75rem 0.5rem;
+      text-align: left;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    }
+
+    .escrow-table th {
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .escrow-table td .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.15rem 0.65rem;
+      border-radius: 999px;
+      background: rgba(182, 164, 122, 0.15);
+      color: var(--ink);
+      font-size: 0.8rem;
+    }
+
+    .action-drawer {
+      position: relative;
+      display: inline-flex;
+    }
+
+    .action-toggle {
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      border-radius: 999px;
+      padding: 0.4rem 1.2rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: #fff;
+      cursor: pointer;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .action-drawer.open .action-toggle {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .action-menu {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      background: #fff;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 12px;
+      box-shadow: 0 15px 40px rgba(15, 23, 42, 0.15);
+      padding: 0.65rem;
+      display: none;
+      flex-direction: column;
+      min-width: 180px;
+      z-index: 40;
+    }
+
+    .action-drawer.open .action-menu {
+      display: flex;
+    }
+
+    .action-menu button {
+      border: none;
+      background: transparent;
+      padding: 0.5rem 0.35rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .action-menu button:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
     .history-empty {
       text-align: center;
       color: var(--muted);
@@ -331,14 +536,11 @@
     <div class="logo">Dashboard</div>
     <nav>
       <a href="dashboard-attorney.html">Home</a>
-      <a href="active-cases.html">Cases</a>
-      <a href="messages.html">Messages</a>
-      <a href="documents.html">Documents</a>
-      <a href="review.html">Review</a>
-      <a href="case-files.html">Case Files</a>
-      <a href="billing-attorney.html" class="active">Completed Assignments</a>
+      <a href="active-cases.html">Cases &amp; Files</a>
+      <a href="billing-attorney.html" class="active">Escrow</a>
       <a href="help.html">Help</a>
     </nav>
+    <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
     <div style="margin-top: auto; font-size: 0.7rem; color: var(--muted); text-align: center;">
       © Let’s‑ParaConnect 2025
     </div>
@@ -347,13 +549,42 @@
     <div class="topbar" data-attorney-header></div>
     <header class="page-header">
       <div>
-        <h1>Billing &amp; Payments</h1>
+        <h1>Billing &amp; Escrow</h1>
         <p>Manage invoices, receipts, and escrow releases without leaving your dashboard.</p>
       </div>
       <div class="actions">
         <button type="button" class="primary-btn" id="openPortalBtn">Open Stripe Billing Portal</button>
       </div>
     </header>
+
+    <section id="financeAlerts" class="finance-alerts" aria-live="polite"></section>
+
+    <section class="panel" aria-labelledby="escrow-heading">
+      <div class="panel-header">
+        <div>
+          <h2 id="escrow-heading">Active Escrow</h2>
+          <p>Funds currently held in trust for ongoing cases.</p>
+        </div>
+        <button type="button" class="ghost-btn" id="refreshEscrowsBtn">Refresh</button>
+      </div>
+      <div class="table-wrapper">
+        <table class="escrow-table" aria-describedby="escrow-heading">
+          <thead>
+            <tr>
+              <th>Case</th>
+              <th>Paralegal</th>
+              <th>Held Amount</th>
+              <th>Funded</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="escrowTableBody">
+            <tr><td colspan="6" class="history-empty">Loading active escrows…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <section class="panel" aria-labelledby="history-heading">
       <div class="panel-header">
@@ -379,7 +610,13 @@
 
     const historyList = document.getElementById("historyList");
     const portalBtn = document.getElementById("openPortalBtn");
+    const financeAlertsEl = document.getElementById("financeAlerts");
+    const escrowTableBody = document.getElementById("escrowTableBody");
+    const refreshEscrowsBtn = document.getElementById("refreshEscrowsBtn");
     const currencyFormatter = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" });
+
+    let cachedEscrows = [];
+    let openDrawerEl = null;
 
     init();
 
@@ -391,7 +628,8 @@
         return;
       }
       bindEvents();
-      await loadHistory();
+      const activeItems = await loadActiveEscrows(true);
+      await Promise.all([loadFinanceAlerts(activeItems), loadHistory()]);
     }
 
     function bindEvents() {
@@ -401,8 +639,232 @@
         if (!btn) return;
         const caseId = btn.getAttribute("data-case-id");
         if (!caseId) return;
-        window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
+        viewCase(caseId);
       });
+      refreshEscrowsBtn?.addEventListener("click", () => {
+        loadActiveEscrows(true, { syncAlerts: true });
+      });
+      escrowTableBody?.addEventListener("click", handleEscrowClick);
+      financeAlertsEl?.addEventListener("click", handleAlertAction);
+      document.addEventListener("click", handleGlobalClick);
+    }
+
+    async function loadActiveEscrows(showLoading = false, { syncAlerts = false } = {}) {
+      if (!escrowTableBody) return [];
+      if (showLoading) {
+        escrowTableBody.innerHTML = `<tr><td colspan="6" class="history-empty">Loading active escrows…</td></tr>`;
+      }
+      try {
+        const res = await secureFetch("/api/payments/escrow/active", { headers: { Accept: "application/json" } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const payload = await res.json().catch(() => ({}));
+        const items = Array.isArray(payload?.items) ? payload.items : [];
+        cachedEscrows = items;
+        if (!items.length) {
+          escrowTableBody.innerHTML = `<tr><td colspan="6" class="history-empty">No funds currently held in escrow.</td></tr>`;
+        } else {
+          escrowTableBody.innerHTML = items.map(renderEscrowRow).join("");
+        }
+        if (syncAlerts) {
+          await loadFinanceAlerts(items);
+        }
+        return items;
+      } catch (err) {
+        console.warn("Unable to load active escrows", err);
+        escrowTableBody.innerHTML = `<tr><td colspan="6" class="history-empty error">Unable to load active escrow records.</td></tr>`;
+        return [];
+      }
+    }
+
+    function renderEscrowRow(entry = {}) {
+      const caseName = escapeHtml(entry.caseName || entry.caseTitle || entry.title || "Case");
+      const paralegal = escapeHtml(entry.paralegalName || "Paralegal pending");
+      const amount = formatCurrency(entry.amountHeld ?? entry.amount ?? entry.totalAmount);
+      const funded = formatDate(entry.fundedAt || entry.updatedAt);
+      const statusLabel = formatStatusLabel(entry.status || "");
+      const caseId = String(entry.caseId || entry.id || "");
+      return `
+        <tr>
+          <td>${caseName}</td>
+          <td>${paralegal}</td>
+          <td>${amount}</td>
+          <td>${funded}</td>
+          <td><span class="pill">${statusLabel}</span></td>
+          <td>
+            <div class="action-drawer" data-case-id="${caseId}">
+              <button type="button" class="action-toggle" aria-haspopup="true" aria-expanded="false">
+                Actions <span aria-hidden="true">⋯</span>
+              </button>
+              <div class="action-menu" role="menu">
+                <button type="button" data-escrow-action="view" data-case-id="${caseId}">View Case</button>
+                <button type="button" data-escrow-action="release" data-case-id="${caseId}">Release Funds</button>
+                <button type="button" data-escrow-action="messages" data-case-id="${caseId}">Message Paralegal</button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    async function loadFinanceAlerts(activeItems) {
+      if (!financeAlertsEl) return;
+      financeAlertsEl.innerHTML = `<div class="finance-alert"><div><div class="alert-title">Checking finance alerts…</div><p>Give us a moment.</p></div></div>`;
+      try {
+        const [summaryRes, pendingRes] = await Promise.all([
+          secureFetch("/api/payments/summary", { headers: { Accept: "application/json" } }),
+          secureFetch("/api/payments/escrow/pending", { headers: { Accept: "application/json" } }),
+        ]);
+        if (!summaryRes.ok) throw new Error(`HTTP ${summaryRes.status}`);
+        if (!pendingRes.ok) throw new Error(`HTTP ${pendingRes.status}`);
+        const summary = await summaryRes.json().catch(() => ({}));
+        const pendingPayload = await pendingRes.json().catch(() => ({}));
+        const pendingItems = Array.isArray(pendingPayload?.items) ? pendingPayload.items : [];
+        const activeList = Array.isArray(activeItems) ? activeItems : cachedEscrows;
+        const alerts = buildFinanceAlerts({ summary, active: activeList, pending: pendingItems });
+        renderFinanceAlerts(alerts);
+      } catch (err) {
+        console.warn("Unable to load finance alerts", err);
+        financeAlertsEl.innerHTML = `<div class="finance-alert"><div><div class="alert-title">Finance alerts unavailable</div><p class="muted">Please refresh the page or try again shortly.</p></div></div>`;
+      }
+    }
+
+    function buildFinanceAlerts({ active = [], pending = [] } = {}) {
+      const alerts = [];
+      if (pending.length) {
+        const first = pending[0];
+        const count = pending.length;
+        const label = count === 1 ? first.caseName || "This case" : `${count} cases`;
+        const summary = count === 1 ? `${first.paralegalName || "Your paralegal"} is ready to start.` : "Fund escrow to unblock your assignments.";
+        alerts.push({
+          id: `fund-${first.caseId}`,
+          type: "fund",
+          title: `${label} ${count === 1 ? "needs" : "need"} funding`,
+          body: summary,
+          actions: [
+            first.checkoutUrl
+              ? { type: "link", label: "Fund Now", href: first.checkoutUrl, external: true, primary: true }
+              : { type: "view", label: "View Case", caseId: first.caseId, primary: true },
+            { type: "view", label: "View Case", caseId: first.caseId },
+          ],
+        });
+      }
+      const releaseCandidates = active.filter((item) => isReleaseCandidate(item.status)).slice(0, 3);
+      releaseCandidates.forEach((item) => {
+        alerts.push({
+          id: `release-${item.caseId}`,
+          type: "release",
+          title: `Release funds for ${item.caseName || "a case"}`,
+          body: "The paralegal has wrapped. Release escrow to pay them.",
+          actions: [
+            { type: "release", label: "Release Funds", caseId: item.caseId, primary: true },
+            { type: "view", label: "View Case", caseId: item.caseId },
+            { type: "messages", label: "Message Paralegal", caseId: item.caseId },
+          ],
+        });
+      });
+      return alerts;
+    }
+
+    function renderFinanceAlerts(alerts = []) {
+      if (!alerts.length) {
+        financeAlertsEl.innerHTML = `
+          <div class="finance-alert calm">
+            <div>
+              <div class="alert-title">No urgent finance actions</div>
+              <p>You're caught up on escrow, funding, and payouts.</p>
+            </div>
+          </div>`;
+        return;
+      }
+      financeAlertsEl.innerHTML = alerts.map(renderFinanceAlert).join("");
+    }
+
+    function renderFinanceAlert(alert) {
+      const actionsHtml = (alert.actions || [])
+        .map((action) => {
+          if (action.type === "link" && action.href) {
+            const target = action.external ? ' target="_blank" rel="noopener"' : "";
+            return `<a class="pill-btn ${action.primary ? "primary" : ""}" href="${action.href}"${target}>${escapeHtml(action.label)}</a>`;
+          }
+          const attrs = [
+            `class="pill-btn ${action.primary ? "primary" : ""}"`,
+            `data-alert-action="${action.type}"`,
+            action.caseId ? `data-case-id="${action.caseId}"` : "",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          return `<button type="button" ${attrs}>${escapeHtml(action.label)}</button>`;
+        })
+        .join("");
+      return `
+        <article class="finance-alert ${alert.type || ""}">
+          <div>
+            <div class="alert-title">${escapeHtml(alert.title)}</div>
+            <p>${escapeHtml(alert.body)}</p>
+          </div>
+          ${actionsHtml ? `<div class="alert-actions">${actionsHtml}</div>` : ""}
+        </article>
+      `;
+    }
+
+    function handleEscrowClick(event) {
+      const toggle = event.target.closest(".action-toggle");
+      if (toggle) {
+        const drawer = toggle.closest(".action-drawer");
+        toggleActionDrawer(drawer);
+        return;
+      }
+      const actionBtn = event.target.closest("[data-escrow-action]");
+      if (actionBtn) {
+        const action = actionBtn.dataset.escrowAction;
+        const caseId = actionBtn.dataset.caseId;
+        closeActionDrawers();
+        if (action === "view") {
+          viewCase(caseId);
+        } else if (action === "messages") {
+          jumpToMessages(caseId);
+        } else if (action === "release") {
+          releaseEscrowCase(caseId, actionBtn);
+        }
+      }
+    }
+
+    function handleAlertAction(event) {
+      const btn = event.target.closest("[data-alert-action]");
+      if (!btn) return;
+      const action = btn.dataset.alertAction;
+      const caseId = btn.dataset.caseId;
+      if (action === "view") {
+        viewCase(caseId);
+      } else if (action === "messages") {
+        jumpToMessages(caseId);
+      } else if (action === "release") {
+        releaseEscrowCase(caseId, btn);
+      }
+    }
+
+    function toggleActionDrawer(drawer) {
+      if (!drawer) return;
+      const willOpen = openDrawerEl !== drawer;
+      closeActionDrawers();
+      if (willOpen) {
+        drawer.classList.add("open");
+        drawer.querySelector(".action-toggle")?.setAttribute("aria-expanded", "true");
+        openDrawerEl = drawer;
+      }
+    }
+
+    function closeActionDrawers() {
+      document.querySelectorAll(".action-drawer.open").forEach((drawer) => {
+        drawer.classList.remove("open");
+        drawer.querySelector(".action-toggle")?.setAttribute("aria-expanded", "false");
+      });
+      openDrawerEl = null;
+    }
+
+    function handleGlobalClick(event) {
+      if (event.target.closest(".action-drawer")) return;
+      closeActionDrawers();
     }
 
     async function loadHistory() {
@@ -491,6 +953,51 @@
       `;
     }
 
+    function releaseEscrowCase(caseId, trigger) {
+      if (!caseId) return;
+      const confirmRelease = window.confirm("Release funds for this case?");
+      if (!confirmRelease) return;
+      const btn = trigger;
+      if (btn) {
+        btn.disabled = true;
+        btn.setAttribute("aria-busy", "true");
+      }
+      secureFetch("/api/payments/release", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caseId }),
+      })
+        .then(async (res) => {
+          let payload = {};
+          try {
+            payload = await res.json();
+          } catch (_) {
+            payload = {};
+          }
+          if (!res.ok) throw new Error(payload?.error || payload?.msg || "Unable to release funds.");
+          showToast("Funds released successfully.", "success");
+          await loadActiveEscrows(true, { syncAlerts: true });
+        })
+        .catch((err) => {
+          console.error("Release escrow error", err);
+          showToast(err.message || "Unable to release funds.", "error");
+        })
+        .finally(() => {
+          if (btn) {
+            btn.disabled = false;
+            btn.removeAttribute("aria-busy");
+          }
+        });
+    }
+
+    function jumpToMessages(caseId) {
+      if (!caseId) {
+        showToast("Open a case to view messages.", "info");
+        return;
+      }
+      window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}#messages`;
+    }
+
     function formatCurrency(value) {
       const cents = normalizeToCents(value);
       return currencyFormatter.format(cents / 100);
@@ -508,6 +1015,23 @@
         return cleaned.includes(".") ? Math.round(parsed * 100) : Math.round(parsed);
       }
       return 0;
+    }
+
+    function isReleaseCandidate(status = "") {
+      const normalized = String(status).toLowerCase();
+      return ["awaiting_release", "release", "ready", "complete"].some((term) => normalized.includes(term));
+    }
+
+    function formatStatusLabel(status = "") {
+      const safe = String(status || "In progress")
+        .replace(/[_-]/g, " ")
+        .trim();
+      return safe ? safe.replace(/\b\w/g, (c) => c.toUpperCase()) : "In Progress";
+    }
+
+    function viewCase(caseId) {
+      if (!caseId) return;
+      window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
     }
 
     function formatDate(raw) {

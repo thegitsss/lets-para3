@@ -24,9 +24,12 @@
       font-family:var(--font-sans);
       background:var(--bg);
       color:var(--ink);
+      margin:0;
+    }
+
+    .role-shell{
       display:flex;
-      height:100vh;
-      overflow:hidden;
+      min-height:100vh;
     }
 
     .sidebar{width:240px;background:#f5f5f5e6;display:flex;flex-direction:column;border-right:1px solid var(--line);padding:24px 16px;}
@@ -89,6 +92,26 @@
     }
     .filters button.active{background:var(--accent);color:#fff;border-color:var(--accent);}
     .filters button:hover{border-color:var(--accent);}
+    .case-switcher{
+      display:flex;
+      flex-wrap:wrap;
+      gap:0.6rem;
+      margin:1.5rem 0 1rem;
+    }
+    .case-switcher a{
+      text-decoration:none;
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:0.4rem 1.1rem;
+      font-size:0.9rem;
+      color:var(--ink);
+      transition:background 0.2s ease,color 0.2s ease,border-color 0.2s ease;
+    }
+    .case-switcher a.active{
+      background:var(--accent);
+      border-color:var(--accent);
+      color:#fff;
+    }
 
     .case-files{display:flex;flex-direction:column;gap:1rem;}
     .file-card{
@@ -117,6 +140,11 @@
       color:var(--accent);
       text-transform:capitalize;
     }
+    .case-files-empty{
+      padding:16px;
+      color:var(--muted);
+      font-size:.95rem;
+    }
     .file-meta{
       display:flex;
       gap:1rem;
@@ -135,33 +163,42 @@
       font-weight:600;
     }
     .btn-link:hover{text-decoration:underline;}
+    .info-banner{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background:rgba(0,0,0,0.02);
+      padding:1rem 1.25rem;
+      margin-bottom:1.25rem;
+      font-size:0.95rem;
+    }
+    .info-banner strong{font-family:var(--font-serif);font-weight:400;}
+    .info-banner a{color:var(--accent);}
 
     @media(max-width:900px){
-      body{flex-direction:column;overflow:auto;}
+      .role-shell{flex-direction:column;overflow:auto;}
       .sidebar{width:100%;flex-direction:column;align-items:center;gap:12px;}
-      .sidebar nav{width:100%;flex-direction:row;flex-wrap:wrap;justify-content:center;}
+    .sidebar nav{width:100%;flex-direction:row;flex-wrap:wrap;justify-content:center;}
     .sidebar nav a{flex:1 1 120px;text-align:center;}
     .main{padding:24px;}
     }
 
     .sidebar-link{
-      display:block;
+      margin-top:1.5rem;
       width:100%;
-      border:none;
-      background:none;
-      color:var(--ink);
-      font-size:0.95rem;
-      font-family:var(--font-sans);
-      font-weight:300;
-      text-align:left;
-      padding:10px 14px;
+      border:1px solid var(--line);
       border-radius:var(--radius);
+      padding:0.6rem 1rem;
+      background:transparent;
+      color:var(--ink);
+      font-size:0.9rem;
+      font-family:var(--font-sans);
       cursor:pointer;
-      transition:background .3s ease;
+      transition:background .2s ease,color .2s ease;
     }
     .sidebar-link:hover,
     .sidebar-link:focus{
-      background:rgba(0,0,0,0.04);
+      background:rgba(0,0,0,0.05);
+      color:var(--accent);
       outline:none;
     }
     .sidebar-footer{
@@ -170,45 +207,98 @@
       color:var(--muted);
       text-align:center;
     }
+    .hidden{
+      display:none !important;
+    }
   </style>
 </head>
 <body>
-  <aside class="sidebar">
-    <div class="logo">Dashboard</div>
-    <nav>
-      <a href="dashboard-paralegal.html">Home</a>
-      <a href="messages.html">Messages</a>
-      <a href="case-files.html" class="active">Active Cases</a>
-      <a href="profile-settings.html">Profile Settings</a>
-      <a href="help.html">Help</a>
-    </nav>
-    <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let<span class="gold">’</span>s-ParaConnect 2025</a></div>
-  </aside>
+  <div id="paralegalCaseFiles" class="role-shell hidden">
+    <aside class="sidebar">
+      <div class="logo">Dashboard</div>
+      <nav>
+        <a href="dashboard-paralegal.html">Home</a>
+        <a href="case-files.html" class="active">Active Cases</a>
+        <a href="profile-settings.html">Profile Settings</a>
+        <a href="help.html">Help</a>
+      </nav>
+      <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
+      <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let<span class="gold">’</span>s-ParaConnect 2025</a></div>
+    </aside>
 
-  <main class="main">
-    <div class="topbar" data-attorney-header></div>
-    <header class="page-header">
-      <div>
-        <h1>Case Files</h1>
-        <p>View and manage all files associated with your cases. You can filter by approval status and download or print any document.</p>
+    <main class="main">
+      <div class="topbar" data-attorney-header></div>
+      <header class="page-header">
+        <div>
+          <h1>Case Files</h1>
+          <p>View and manage all files associated with your cases. You can filter by approval status and download or print any document.</p>
+        </div>
+      </header>
+
+      <div class="filters">
+        <button type="button" id="filterAll" class="active">All</button>
+        <button type="button" id="filterApproved">Approved</button>
+        <button type="button" id="filterPending">Pending Review</button>
+        <button type="button" id="filterRevisions">Requested Revisions</button>
       </div>
-    </header>
 
-    <div class="filters">
-      <button type="button" id="filterAll" class="active">All</button>
-      <button type="button" id="filterApproved">Approved</button>
-      <button type="button" id="filterPending">Pending Review</button>
-      <button type="button" id="filterRevisions">Requested Revisions</button>
-    </div>
+      <div class="case-files" id="filesContainer"></div>
+    </main>
+  </div>
 
-    <div class="case-files" id="filesContainer"></div>
-  </main>
+  <div id="attorneyCaseFiles" class="role-shell hidden">
+    <aside class="sidebar">
+      <div class="logo">Dashboard</div>
+      <nav>
+        <a href="dashboard-attorney.html">Home</a>
+        <a href="active-cases.html" class="active">Cases &amp; Files</a>
+        <a href="billing-attorney.html">Escrow</a>
+        <a href="help.html">Help</a>
+      </nav>
+      <button type="button" class="sidebar-link" id="attorneyLogoutBtn">Log Out</button>
+      <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let<span class="gold">’</span>s-ParaConnect 2025</a></div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar" data-attorney-header></div>
+      <div class="info-banner">
+        <strong>Looking for Case Files?</strong> Manage uploads, downloads, and approvals from the unified
+        <a href="active-cases.html">Cases &amp; Files</a> dashboard. This legacy view will remain read-only.
+      </div>
+      <header class="page-header">
+        <div>
+          <h1>Paralegal Revisions</h1>
+          <p>Oversee your paralegal’s work. Approve submissions, request revisions, or download final files.</p>
+        </div>
+      </header>
+      <div class="case-switcher" role="tablist" aria-label="Case views">
+        <a href="active-cases.html" role="tab" aria-selected="false">Cases</a>
+        <a href="case-files.html" class="active" role="tab" aria-selected="true">Case Files</a>
+      </div>
+
+      <div class="filters">
+        <button type="button" id="attorneyFilterAll" class="active">All Files</button>
+        <button type="button" id="attorneyFilterApproved">Approved</button>
+        <button type="button" id="attorneyFilterPending">Awaiting Your Review</button>
+        <button type="button" id="attorneyFilterRevisions">Revisions Requested</button>
+      </div>
+
+      <div class="case-files" id="attorneyFilesContainer"></div>
+    </main>
+  </div>
 
   <script>
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.href = 'index.html';
+      });
+    }
+    const attorneyLogoutBtn = document.getElementById('attorneyLogoutBtn');
+    if (attorneyLogoutBtn) {
+      attorneyLogoutBtn.addEventListener('click', () => {
         localStorage.clear();
         sessionStorage.clear();
         window.location.href = 'index.html';
@@ -223,130 +313,53 @@
   <script type="module" src="assets/scripts/utils/notifications.js"></script>
   <script type="module" src="assets/scripts/attorney-tabs.js"></script>
   <script type="module">
-import { secureFetch } from "./assets/scripts/auth.js";
+    import { initCaseFilesView } from "./assets/scripts/case-files-view.js";
 
-// ============================================
-// PARalegal Case Files Filters (Fully Wired)
-// ============================================
+    const paralegalShell = document.getElementById("paralegalCaseFiles");
+    const attorneyShell = document.getElementById("attorneyCaseFiles");
 
-let allFiles = [];
-
-document.addEventListener("DOMContentLoaded", async () => {
-  await loadParalegalFiles();
-  setupFileFilters();
-  renderFiles(allFiles); // default view
-});
-
-// Load all case files assigned to this paralegal
-async function loadParalegalFiles() {
-  const container = document.getElementById("filesContainer");
-  try {
-    const res = await secureFetch("/api/cases/my?withFiles=true&limit=100", {
-      headers: { Accept: "application/json" },
-      noRedirect: true,
+    document.addEventListener("DOMContentLoaded", async () => {
+      const role = await resolveRole();
+      paralegalShell?.classList.add("hidden");
+      attorneyShell?.classList.add("hidden");
+      if (role === "paralegal") {
+        paralegalShell?.classList.remove("hidden");
+        await initCaseFilesView({
+          containerId: "filesContainer",
+          filters: [
+            { id: "filterAll", fn: (files) => files },
+            { id: "filterApproved", fn: (files) => files.filter((f) => f.status === "approved") },
+            { id: "filterPending", fn: (files) => files.filter((f) => f.status === "pending_review") },
+            { id: "filterRevisions", fn: (files) => files.filter((f) => f.status === "attorney_revision") },
+          ],
+          emptyCopy: "No files found.",
+          unauthorizedCopy: "You need a paralegal account to view these files.",
+        });
+      } else {
+        attorneyShell?.classList.remove("hidden");
+        await initCaseFilesView({
+          containerId: "attorneyFilesContainer",
+          filters: [
+            { id: "attorneyFilterAll", fn: (files) => files },
+            { id: "attorneyFilterApproved", fn: (files) => files.filter((f) => f.status === "approved") },
+            { id: "attorneyFilterPending", fn: (files) => files.filter((f) => f.status === "pending_review") },
+            { id: "attorneyFilterRevisions", fn: (files) => files.filter((f) => f.status === "attorney_revision") },
+          ],
+          emptyCopy: "Awaiting paralegal submissions.",
+          emptySubtext: "Once your paralegal uploads a file, you’ll be able to review it here.",
+          unauthorizedCopy: "You need an attorney account to view these files.",
+        });
+      }
     });
-    const status = res.status;
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(`HTTP ${status}`);
-      err.status = status;
-      throw err;
+
+    async function resolveRole() {
+      try {
+        const session = await window.checkSession?.(undefined, { redirectOnFail: false });
+        return String(session?.user?.role || session?.role || "attorney").toLowerCase();
+      } catch {
+        return "attorney";
+      }
     }
-    const cases = Array.isArray(data?.cases) ? data.cases : [];
-
-    allFiles = cases.flatMap((c = {}) =>
-      (c.files || []).map((f) => ({
-        ...f,
-        caseId: c.id || c._id,
-        caseTitle: c.title || c.name || "Untitled Case",
-      }))
-    );
-  } catch (err) {
-    console.warn("Unable to load files", err);
-    allFiles = [];
-    if (container) {
-      const message =
-        err?.status === 401 || err?.status === 403
-          ? "You need a paralegal account to view these files."
-          : "Unable to load files.";
-      container.innerHTML = `<p style="padding:16px;color:#777;">${message}</p>`;
-    }
-  }
-}
-
-// Attach filter buttons
-function setupFileFilters() {
-  const bindings = [
-    ["filterAll", () => allFiles],
-    ["filterApproved", () => allFiles.filter((f) => f.status === "approved")],
-    ["filterPending", () => allFiles.filter((f) => f.status === "pending_review")],
-    ["filterRevisions", () => allFiles.filter((f) => f.status === "attorney_revision")],
-  ];
-
-  bindings.forEach(([id, getter]) => {
-    const btn = document.getElementById(id);
-    if (!btn) return;
-    btn.addEventListener("click", () => {
-      activateFilter(id);
-      renderFiles(getter());
-    });
-  });
-}
-
-// Highlight active tab
-function activateFilter(id) {
-  ["filterAll", "filterApproved", "filterPending", "filterRevisions"].forEach((btnId) => {
-    const btn = document.getElementById(btnId);
-    if (btn) btn.classList.toggle("active", btnId === id);
-  });
-}
-
-// Render files
-function renderFiles(files) {
-  const container = document.getElementById("filesContainer");
-  if (!container) return;
-
-  if (!files.length) {
-    container.innerHTML = `<p style="padding:16px;color:#777;">No files found.</p>`;
-    return;
-  }
-
-  container.innerHTML = files
-    .map((f) => {
-      const downloadUrl = f.downloadUrl || f.key || f.url || "#";
-      const sizeLabel = typeof f.size === "number" ? `${(f.size / 1024).toFixed(1)} KB` : "—";
-      return `
-        <div class="file-card">
-          <div class="file-line">
-            <span class="file-name">${sanitize(f.original || f.filename || "Untitled document")}</span>
-            <span class="file-status">${formatStatus(f.status)}</span>
-          </div>
-          <div class="file-meta">
-            <span>Case: ${sanitize(f.caseTitle || "Case")}</span>
-            <span>${sizeLabel}</span>
-          </div>
-          <div class="file-actions">
-            <a href="${downloadUrl}" class="btn-link" download>Download</a>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-}
-
-// Convert backend status → pretty text
-function formatStatus(s) {
-  if (s === "pending_review") return "Pending Review";
-  if (s === "approved") return "Approved";
-  if (s === "attorney_revision") return "Requested Revisions";
-  return s || "Unknown";
-}
-
-function sanitize(value = "") {
-  const div = document.createElement("div");
-  div.textContent = value;
-  return div.innerHTML;
-}
   </script>
 </body>
 </html>

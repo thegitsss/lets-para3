@@ -106,10 +106,45 @@
       color: var(--navy);
     }
 
+    .field-label {
+      display: block;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.95rem;
+      margin-bottom: 4px;
+      color: var(--navy);
+    }
+
+    .field-note {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .role-note {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin: -8px 0 16px;
+      line-height: 1.3;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+
     input[type="text"],
     input[type="email"],
     input[type="password"],
-    input[type="tel"] {
+    input[type="tel"],
+    input[type="url"] {
       width: 100%;
       padding: 0.7rem 0.85rem;
       font-size: 0.95rem;
@@ -126,6 +161,17 @@
       border-color: var(--gold);
       box-shadow: 0 0 0 3px rgba(180, 151, 90, 0.15);
       outline: none;
+    }
+
+    .select-field {
+      width: 100%;
+      padding: 0.7rem 0.85rem;
+      font-size: 0.95rem;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background-color: #ffffff;
+      margin-bottom: 16px;
+      font-family: 'Sarabun', sans-serif;
     }
 
     .seg {
@@ -172,6 +218,26 @@
       cursor: pointer;
     }
 
+    .step-panel {
+      transition: opacity 0.35s ease, max-height 0.35s ease;
+      max-height: 2000px;
+      opacity: 1;
+    }
+
+    .step-panel.hidden-step {
+      opacity: 0;
+      max-height: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .step-note {
+      font-size: 0.88rem;
+      color: var(--muted);
+      margin: -4px 0 14px;
+      line-height: 1.35;
+    }
+
     .btn {
       background-color: transparent;
       color: var(--navy);
@@ -194,6 +260,24 @@
       color: #1a2230;
       border-color: #1a2230;
       transform: scale(1.01);
+    }
+
+    .msg {
+      min-height: 1px;
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-top: 0.75rem;
+      opacity: 0;
+      transition: opacity 0.35s ease;
+    }
+    .msg.show {
+      opacity: 1;
+    }
+    .msg.err {
+      color: #b5463b;
+    }
+    .msg.ok {
+      color: #1f7a4a;
     }
 
     .extra-links {
@@ -235,6 +319,27 @@
       font-family: 'Sarabun', sans-serif;
       font-size: 0.9rem;
       background-color: rgba(255,255,255,0.9);
+      margin-bottom: 12px;
+    }
+
+    .upload-wrapper {
+      position: relative;
+      width: 100%;
+    }
+    .upload-input {
+      display: none;
+    }
+    .upload-placeholder {
+      display: block;
+      width: 100%;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      padding: 0.65rem;
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--navy);
+      background: rgba(255,255,255,0.9);
+      cursor: pointer;
       margin-bottom: 12px;
     }
 
@@ -313,37 +418,48 @@
         </div>
 
         <form id="signupForm" novalidate>
-          <div class="name-row">
-            <div class="field-col">
-              <input id="firstName" type="text" autocomplete="given-name" placeholder="First name" required />
+          <div id="stepOnePanel" class="step-panel">
+            <div class="name-row">
+              <div class="field-col">
+                <input id="firstName" type="text" autocomplete="given-name" placeholder="First name" required />
+              </div>
+              <div class="field-col">
+                <input id="lastName" type="text" autocomplete="family-name" placeholder="Last name" required />
+              </div>
             </div>
-            <div class="field-col">
-              <input id="lastName" type="text" autocomplete="family-name" placeholder="Last name" required />
+
+            <input id="email" type="email" autocomplete="email" placeholder="Email" required />
+
+            <div class="pw-wrap">
+              <input id="password" type="password" autocomplete="new-password" placeholder="Password" required />
+              <button id="togglePw" class="pw-toggle" aria-controls="password">Show</button>
+            </div>
+
+            <button id="nextStepBtn" class="btn" type="button">Next →</button>
+            <div class="extra-links">
+              <p>Already have an account? <a href="login.html">Log in</a></p>
             </div>
           </div>
 
-          <input id="email" type="email" autocomplete="email" placeholder="Email" required />
+          <div id="stepTwoPanel" class="step-panel hidden-step">
+            <p class="step-note">We require this information to complete verification before approval.</p>
+            <div id="roleFieldWrap"></div>
 
-          <div class="pw-wrap">
-            <input id="password" type="password" autocomplete="new-password" placeholder="Password" required />
-            <button id="togglePw" class="pw-toggle" aria-controls="password">Show</button>
+            <label class="terms-label" style="margin-top:16px;display:flex;align-items:flex-start;gap:8px;font-size:0.9rem;font-weight:200;color:var(--muted);">
+              <input type="checkbox" id="termsAccept" required style="margin-top:4px;">
+              <span>I have read and agree to the
+                <a href="terms.html" target="_blank" style="color:var(--gold);text-decoration:none;">Terms of Use</a> and
+                <a href="privacy.html" target="_blank" style="color:var(--gold);text-decoration:none;">Privacy Policy</a>.
+              </span>
+            </label>
+
+            <button id="submitBtn" class="btn" type="submit">Create Account</button>
+            <div class="extra-links">
+              <p>Already have an account? <a href="login.html">Log in</a></p>
+            </div>
           </div>
-          <div id="roleFieldWrap"></div>
 
-          <label class="terms-label" style="margin-top:16px;display:flex;align-items:flex-start;gap:8px;font-size:0.9rem;font-weight:200;color:var(--muted);">
-            <input type="checkbox" id="termsAccept" required style="margin-top:4px;">
-            <span>I have read and agree to the
-              <a href="terms.html" target="_blank" style="color:var(--gold);text-decoration:none;">Terms of Use</a> and
-              <a href="privacy.html" target="_blank" style="color:var(--gold);text-decoration:none;">Privacy Policy</a>.
-            </span>
-          </label>
-
-          <button id="submitBtn" class="btn" type="submit">Create Account</button>
           <div id="msg" class="msg" role="status" aria-live="polite"></div>
-
-          <div class="extra-links">
-            <p>Already have an account? <a href="login.html">Log in</a></p>
-          </div>
         </form>
       </div>
     </div>
@@ -378,9 +494,14 @@
     const form = document.getElementById('signupForm');
     const msg = document.getElementById('msg');
     const submitBtn = document.getElementById('submitBtn');
-  const roleFieldWrap = document.getElementById('roleFieldWrap');
-  const togglePw = document.getElementById('togglePw');
-  const pw = document.getElementById('password');
+    const roleFieldWrap = document.getElementById('roleFieldWrap');
+    const togglePw = document.getElementById('togglePw');
+    const pw = document.getElementById('password');
+    const stepOnePanel = document.getElementById('stepOnePanel');
+    const stepTwoPanel = document.getElementById('stepTwoPanel');
+    const nextStepBtn = document.getElementById('nextStepBtn');
+    const prelaunchNote = document.querySelector('.prelaunch-note');
+    let msgFadeTimer = null;
     const emailEl = document.getElementById('email');
     const firstNameEl = document.getElementById('firstName');
     const lastNameEl = document.getElementById('lastName');
@@ -389,21 +510,42 @@
     emailEl.value = localStorage.getItem('lastEmail') || '';
 
     let role = 'attorney';
+    let currentStep = 1;
 
-    function attachResumeHandler() {
-      const resumeInput = document.getElementById('resumeUpload');
-      const resumeHint = document.getElementById('resumeHint');
-      if (!resumeInput || !resumeHint) return;
-      resumeInput.addEventListener('change', () => {
-        const file = resumeInput.files?.[0];
-        if (file) {
-          resumeHint.textContent = `Selected: ${file.name}`;
-          resumeHint.classList.add('selected');
-        } else {
-          resumeHint.textContent = 'Resume';
-          resumeHint.classList.remove('selected');
-        }
-      });
+    function goToStep(step) {
+      currentStep = step;
+      if (!stepOnePanel || !stepTwoPanel) return;
+      if (step === 1) {
+        stepOnePanel.classList.remove('hidden-step');
+        stepTwoPanel.classList.add('hidden-step');
+        if (prelaunchNote) prelaunchNote.style.display = '';
+      } else {
+        stepOnePanel.classList.add('hidden-step');
+        stepTwoPanel.classList.remove('hidden-step');
+        if (prelaunchNote) prelaunchNote.style.display = 'none';
+      }
+    }
+
+    function attachResumeHandler() {}
+
+    function validateStepOne() {
+      const firstName = firstNameEl.value.trim();
+      const lastName = lastNameEl.value.trim();
+      const email = emailEl.value.trim();
+      const password = pw.value;
+      if (!firstName || !lastName || !email || !password) {
+        say('Please complete your basic account information.', 'err');
+        return false;
+      }
+      if (!isValidEmail(email)) {
+        say('Enter a valid email address.', 'err');
+        return false;
+      }
+      if (password.length < 8) {
+        say('Use 8+ characters with letters and numbers.', 'err');
+        return false;
+      }
+      return true;
     }
 
     function setRole(r) {
@@ -414,13 +556,106 @@
         b.setAttribute('aria-selected', on ? 'true' : 'false');
       });
       roleFieldWrap.innerHTML = r === 'attorney'
-        ? `<input id="bar" type="text" autocomplete="off" placeholder="State Bar Number" required />`
-        : `<input id="cert" type="text" autocomplete="off" placeholder="Certification / License (optional)" />
-           <input id="resumeUpload" type="file" accept=".pdf,.doc,.docx" class="file-input" aria-label="Resume" required />
-           <div class="file-hint" id="resumeHint">Resume</div>`;
+        ? `<label for="bar"><span class="sr-only">Bar Number</span></label>
+           <div class="name-row" style="gap:12px;">
+             <div class="field-col">
+               <input id="bar" type="text" autocomplete="off" placeholder="State Bar Number" required />
+             </div>
+             <div class="field-col">
+               <select id="barState" aria-label="Bar State" class="select-field">
+                 <option value="">State</option>
+                 <option value="AL">AL</option>
+                 <option value="AK">AK</option>
+                 <option value="AZ">AZ</option>
+                 <option value="AR">AR</option>
+                 <option value="CA">CA</option>
+                 <option value="CO">CO</option>
+                 <option value="CT">CT</option>
+                 <option value="DE">DE</option>
+                 <option value="DC">DC</option>
+                 <option value="FL">FL</option>
+                 <option value="GA">GA</option>
+                 <option value="HI">HI</option>
+                 <option value="ID">ID</option>
+                 <option value="IL">IL</option>
+                 <option value="IN">IN</option>
+                 <option value="IA">IA</option>
+                 <option value="KS">KS</option>
+                 <option value="KY">KY</option>
+                 <option value="LA">LA</option>
+                 <option value="ME">ME</option>
+                 <option value="MD">MD</option>
+                 <option value="MA">MA</option>
+                 <option value="MI">MI</option>
+                 <option value="MN">MN</option>
+                 <option value="MS">MS</option>
+                 <option value="MO">MO</option>
+                 <option value="MT">MT</option>
+                 <option value="NE">NE</option>
+                 <option value="NV">NV</option>
+                 <option value="NH">NH</option>
+                 <option value="NJ">NJ</option>
+                 <option value="NM">NM</option>
+                 <option value="NY">NY</option>
+                 <option value="NC">NC</option>
+                 <option value="ND">ND</option>
+                 <option value="OH">OH</option>
+                 <option value="OK">OK</option>
+                 <option value="OR">OR</option>
+                 <option value="PA">PA</option>
+                 <option value="RI">RI</option>
+                 <option value="SC">SC</option>
+                 <option value="SD">SD</option>
+                 <option value="TN">TN</option>
+                 <option value="TX">TX</option>
+                 <option value="UT">UT</option>
+                 <option value="VT">VT</option>
+                 <option value="VA">VA</option>
+                 <option value="WA">WA</option>
+                 <option value="WV">WV</option>
+                 <option value="WI">WI</option>
+                 <option value="WY">WY</option>
+               </select>
+             </div>
+           </div>
+           <p class="field-note" style="margin-top:4px;margin-bottom:12px;">Your bar number is used only for verification and is never shared.</p>
+           <label for="attorneyLinkedIn">
+             <span class="sr-only">LinkedIn</span>
+           </label>
+           <input id="attorneyLinkedIn" type="url" autocomplete="url" placeholder="https://www.linkedin.com/in/username" />
+           <label for="lawFirm"><span class="sr-only">Law Firm</span></label>
+           <input id="lawFirm" type="text" autocomplete="organization" placeholder="Law Firm (optional)" />
+           <p</p>`
+        : `<div class="name-row" style="gap:12px; align-items:flex-end;">
+             <div class="field-col">
+               <div class="upload-wrapper">
+                 <input id="resumeUpload" type="file" accept=".pdf,.doc,.docx" class="upload-input" aria-label="Resume" required />
+                 <label for="resumeUpload" class="upload-placeholder">Resume</label>
+               </div>
+             </div>
+             <div class="field-col">
+               <label for="paralegalExperience"><span class="sr-only">Years of experience</span></label>
+               <select id="paralegalExperience" class="select-field">
+                 <option value="">Years of experience</option>
+                 <option value="0–1 years (Emerging)">0–1 years (Emerging)</option>
+                 <option value="1–3 years (Early Career)">1–3 years (Early Career)</option>
+                 <option value="3–7 years (Intermediate)">3–7 years (Intermediate)</option>
+                 <option value="7–12 years (Experienced)">7–12 years (Experienced)</option>
+                 <option value="12+ years (Advanced)">12+ years (Advanced)</option>
+               </select>
+             </div>
+           </div>
+           <label for="paralegalLinkedIn"><span class="sr-only">LinkedIn</span></label>
+           <input id="paralegalLinkedIn" type="url" autocomplete="url" placeholder="https://www.linkedin.com/in/username" />
+           <label for="certUpload"><span class="sr-only">Certification or License</span></label>
+           <div class="upload-wrapper">
+             <input id="certUpload" type="file" accept=".pdf,.doc,.docx" class="upload-input" aria-label="Certification document" />
+             <label for="certUpload" class="upload-placeholder">Certificate / License</label>
+           </div>`;
       if (r === 'paralegal') attachResumeHandler();
     }
     setRole(role);
+    goToStep(1);
 
     btnA.addEventListener('click', () => setRole('attorney'));
     btnP.addEventListener('click', () => setRole('paralegal'));
@@ -432,9 +667,29 @@
       togglePw.textContent = show ? 'Hide' : 'Show';
     });
 
-    function say(text, cls='') {
-      msg.className = 'msg ' + cls;
-      msg.textContent = text || '';
+    nextStepBtn?.addEventListener('click', () => {
+      if (validateStepOne()) {
+        goToStep(2);
+      }
+    });
+
+    function say(text, cls = '') {
+      if (!msg) return;
+      clearTimeout(msgFadeTimer);
+      if (!text) {
+        msg.textContent = '';
+        msg.className = 'msg';
+        msg.classList.remove('show');
+        return;
+      }
+      msg.textContent = text;
+      msg.className = `msg ${cls}`.trim();
+      msg.classList.add('show');
+      msgFadeTimer = setTimeout(() => {
+        msg.classList.remove('show');
+        msg.textContent = '';
+        msg.className = 'msg';
+      }, 5000);
     }
 
     function isValidEmail(email) {
@@ -463,12 +718,25 @@
       if (!isValidEmail(email)) { say('Enter a valid email address.', 'err'); return; }
       if (password.length < 8) { say('Use 8+ characters with letters and numbers.', 'err'); return; }
 
+      let attorneyBar = '';
+      let attorneyLinkedIn = '';
+      let attorneyBarState = '';
+      let attorneyLawFirm = '';
+      let paralegalLinkedIn = '';
+      let paralegalCertFile = null;
+
       if (role === 'attorney') {
-        const bar = (document.getElementById('bar')?.value || '').trim();
-        if (!bar) { say('State Bar Number is required for attorneys.', 'err'); return; }
+        attorneyBar = (document.getElementById('bar')?.value || '').trim();
+        attorneyLinkedIn = (document.getElementById('attorneyLinkedIn')?.value || '').trim();
+        attorneyBarState = (document.getElementById('barState')?.value || '').trim();
+        attorneyLawFirm = (document.getElementById('lawFirm')?.value || '').trim();
+        if (!attorneyBar) { say('State Bar Number is required for attorneys.', 'err'); return; }
+        if (!attorneyBarState) { say('Please select the state for your bar number.', 'err'); return; }
       } else {
         const resumeInput = document.getElementById('resumeUpload');
         if (!resumeInput || !resumeInput.files?.length) { say('Please upload your resume.', 'err'); return; }
+        paralegalLinkedIn = (document.getElementById('paralegalLinkedIn')?.value || '').trim();
+        paralegalCertFile = document.getElementById('certUpload')?.files?.[0] || null;
       }
 
       const originalText = submitBtn?.textContent || defaultSubmitText;
@@ -489,12 +757,15 @@
         if (phoneNumber) formData.append('phoneNumber', phoneNumber);
 
         if (role === 'attorney') {
-          formData.append('barNumber', document.getElementById('bar').value.trim());
+          formData.append('barNumber', attorneyBar);
+          if (attorneyBarState) formData.append('barState', attorneyBarState);
+          if (attorneyLinkedIn) formData.append('linkedInURL', attorneyLinkedIn);
+          if (attorneyLawFirm) formData.append('lawFirm', attorneyLawFirm);
         } else {
           const resumeFile = document.getElementById('resumeUpload')?.files?.[0];
           if (resumeFile) formData.append('resume', resumeFile, resumeFile.name || 'resume.pdf');
-          const certVal = (document.getElementById('cert')?.value || '').trim();
-          if (certVal) formData.append('certificateURL', certVal);
+          if (paralegalCertFile) formData.append('certificateFile', paralegalCertFile, paralegalCertFile.name || 'certificate.pdf');
+          if (paralegalLinkedIn) formData.append('linkedInURL', paralegalLinkedIn);
         }
 
         const recaptchaToken = await getRecaptchaToken('signup');

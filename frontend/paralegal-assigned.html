@@ -128,44 +128,100 @@ header p{color:var(--muted);font-size:.95rem;margin-bottom:2rem;}
   align-items:center;
   gap:16px;
 }
-.notification-panel{
+.header-cluster [data-notification-toggle][data-count]:after,
+#notificationToggle[data-count]:after{
+  content:attr(data-count);
+  position:absolute;
+  top:-4px;
+  right:-4px;
+  background:var(--accent);
+  color:#fff;
+  font-family:'Sarabun',sans-serif;
+  font-weight:200;
+  font-size:0.7rem;
+  padding:2px 6px;
+  border-radius:999px;
+}
+.notif-panel{
   position:absolute;
   right:0;
-  top:calc(100% + 10px);
-  width:280px;
-  padding:14px;
+  top:48px;
+  width:340px;
   background:#fff;
-  border:1px solid var(--line);
-  border-radius:14px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.1);
-  display:none;
-  z-index:50;
-}
-.notification-panel.show{display:block;}
-.notification-panel-header{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  margin-bottom:8px;
-  font-size:.92rem;
-}
-.notification-panel-header button{
-  border:none;
-  background:none;
-  color:var(--accent);
-  cursor:pointer;
-  font-size:.85rem;
-}
-[data-notification-list]{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;}
-[data-notification-list] li{
-  border:1px solid var(--line);
+  border:1px solid rgba(0,0,0,0.08);
   border-radius:12px;
-  padding:10px;
-  background:#fcfcfc;
+  padding:0;
+  z-index:2000;
+  display:none;
+  flex-direction:column;
+  box-shadow:0 24px 48px rgba(0,0,0,0.12);
 }
-[data-notification-list] li strong{display:block;font-weight:500;margin-bottom:4px;}
-[data-notification-list] li span{display:block;font-size:.8rem;color:var(--muted);}
-[data-notification-empty]{font-size:.85rem;color:var(--muted);}
+.notif-panel.show{display:flex;}
+.notif-panel.hidden{display:none;}
+.notif-header{
+  font-family:'Cormorant Garamond',serif;
+  font-weight:300;
+  font-size:1.3rem;
+  padding:14px 18px;
+  border-bottom:1px solid rgba(0,0,0,0.08);
+  background:#fafafa;
+}
+#notifList{
+  max-height:360px;
+  overflow-y:auto;
+}
+.notif-item{
+  padding:14px 18px;
+  border-bottom:1px solid rgba(0,0,0,0.06);
+  cursor:pointer;
+  transition:background .15s ease;
+}
+.notif-item:last-child{border-bottom:none;}
+.notif-item:hover{background:#f6f6f6;}
+.notif-item.unread{
+  background:#fff;
+  border-left:3px solid var(--accent);
+}
+.notif-item.read{opacity:.75;}
+.notif-title{
+  font-family:'Cormorant Garamond',serif;
+  font-weight:300;
+  font-size:1.15rem;
+  margin-bottom:2px;
+  color:#1a1a1a;
+}
+.notif-body{
+  font-family:'Sarabun',sans-serif;
+  font-weight:200;
+  font-size:.92rem;
+  color:#444;
+  line-height:1.45;
+}
+.notif-time{
+  margin-top:4px;
+  font-family:'Sarabun',sans-serif;
+  font-weight:200;
+  font-size:.8rem;
+  color:#888;
+}
+.notif-empty{
+  padding:18px;
+  text-align:center;
+  font-size:.9rem;
+  color:#8a8a8a;
+}
+.notif-markall{
+  border:none;
+  border-top:1px solid rgba(0,0,0,0.08);
+  background:#fafafa;
+  padding:12px;
+  font-family:'Sarabun',sans-serif;
+  font-weight:200;
+  font-size:.9rem;
+  cursor:pointer;
+  text-align:left;
+}
+.notif-markall:hover{background:#f0f0f0;}
 
 /* Metrics */
 .metrics{
@@ -356,7 +412,7 @@ nav a.active {background:rgba(255,255,255,0.25);}
       <p>View and manage your assigned cases.</p>
     </div>
     <div class="header-cluster" data-paralegal-cluster data-notification-center>
-      <button type="button" class="notification-icon" aria-label="View notifications" data-notification-toggle>
+      <button type="button" class="notification-icon" aria-label="View notifications" data-notification-toggle id="notificationToggle">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 01-3.46 0" />
@@ -370,13 +426,11 @@ nav a.active {background:rgba(255,255,255,0.25);}
           <span id="clusterRole" class="globalProfileRole"></span>
         </div>
       </div>
-      <div class="notification-panel" data-notification-panel>
-        <div class="notification-panel-header">
-          <h4 style="margin:0;font-size:0.95rem;">Notifications</h4>
-          <button type="button" data-notification-mark>Mark all read</button>
-        </div>
-        <ul data-notification-list></ul>
-        <p class="notification-item" data-notification-empty>Loading…</p>
+      <div id="notificationPanel" class="notif-panel hidden" data-notification-panel>
+        <div class="notif-header">Notifications</div>
+        <div id="notifList" data-notification-list></div>
+        <div class="notif-empty" data-notification-empty>Loading…</div>
+        <button id="markAllReadBtn" class="notif-markall" type="button" data-notification-mark>Mark All Read</button>
       </div>
     </div>
   </header>

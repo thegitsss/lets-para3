@@ -142,6 +142,11 @@ const caseSchema = new Schema(
     purgedAt: { type: Date, default: null },
     paralegalNameSnapshot: { type: String, trim: true, default: "" },
     attorneyNameSnapshot: { type: String, trim: true, default: "" },
+    internalNotes: {
+      text: { type: String, trim: true, maxlength: 10_000, default: "" },
+      updatedBy: { type: Types.ObjectId, ref: "User", default: null },
+      updatedAt: { type: Date, default: null },
+    },
 
     // Zoom / meeting info
     zoomLink: {

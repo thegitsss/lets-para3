@@ -5,6 +5,8 @@
   let nukedOnRedirect = false;
   let cachedUser = null;
   let sessionPromise = null;
+  let cachedSessionToken = null;
+  const LEGACY_TOKEN_KEYS = ["lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"];
 
   function redirectToLogin() {
     if (hasRedirected) return;
@@ -67,9 +69,18 @@
   function clearStoredSession() {
     cachedUser = null;
     sessionPromise = null;
+    cachedSessionToken = null;
     try {
       localStorage.removeItem("lpc_user");
     } catch (_) {}
+    LEGACY_TOKEN_KEYS.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch (_) {}
+      try {
+        sessionStorage.removeItem(key);
+      } catch (_) {}
+    });
   }
 
   function invalidateAndRedirect() {
@@ -151,12 +162,47 @@
     }
   }
 
+  function readLegacyToken() {
+    for (const key of LEGACY_TOKEN_KEYS) {
+      try {
+        const value = localStorage.getItem(key) || sessionStorage.getItem(key);
+        if (value) return value;
+      } catch (_) {}
+    }
+    return "";
+  }
+
+  function readStoredUser() {
+    if (cachedUser) return cachedUser;
+    try {
+      const raw = localStorage.getItem("lpc_user");
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function getSessionToken() {
+    if (cachedSessionToken) return cachedSessionToken;
+    const legacy = readLegacyToken();
+    if (legacy) {
+      cachedSessionToken = legacy;
+      return cachedSessionToken;
+    }
+    const user = readStoredUser();
+    if (user?.id || user?._id) {
+      cachedSessionToken = "__cookie_session__";
+      return cachedSessionToken;
+    }
+    return "";
+  }
+
   fetchSession().catch(() => {});
 
   window.checkSession = checkSession;
   window.redirectUserDashboard = redirectUserDashboard;
   window.clearStoredSession = clearStoredSession;
-  window.getSessionToken = () => "";
+  window.getSessionToken = getSessionToken;
   window.getSessionData = getSessionData;
   window.getStoredUser = getCachedUser;
   window.refreshSession = refreshSession;

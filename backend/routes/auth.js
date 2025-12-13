@@ -138,6 +138,8 @@ router.post(
       password,
       role,
       barNumber,
+      linkedInURL,
+      lawFirm,
       resumeURL,
       certificateURL,
       recaptchaToken,
@@ -202,6 +204,8 @@ router.post(
       barNumber: roleLc === "attorney" ? String(barNumber || "") : "",
       resumeURL: roleLc === "paralegal" ? "" : "",
       certificateURL: roleLc === "paralegal" ? String(certificateURL || "") : "",
+      linkedInURL: linkedInURL ? String(linkedInURL).trim() : "",
+      lawFirm: roleLc === "attorney" ? (String(lawFirm || "").trim() || null) : null,
       termsAccepted: true,
       phoneNumber: phoneNumber ? String(phoneNumber).trim() || null : null,
     });

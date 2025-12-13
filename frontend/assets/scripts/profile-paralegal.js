@@ -19,7 +19,6 @@ async function persistDocumentField(field, value) {
   return data;
 }
 
-const MESSAGE_JUMP_KEY = "lpc_message_jump";
 function getProfileImageUrl(user = {}) {
   return user.profileImage || user.avatarURL || "assets/images/default-avatar.png";
 }
@@ -90,10 +89,6 @@ const elements = {
   profileForm: document.getElementById("paralegalProfileForm"),
   linkedInInput: document.getElementById("linkedInURL"),
   yearsExperienceInput: document.getElementById("yearsExperience"),
-  ref1NameInput: document.getElementById("ref1Name"),
-  ref1EmailInput: document.getElementById("ref1Email"),
-  ref2NameInput: document.getElementById("ref2Name"),
-  ref2EmailInput: document.getElementById("ref2Email"),
   certificateUploadInput: document.getElementById("certificateUpload"),
   resumeUploadInput: document.getElementById("resumeUpload"),
   profilePhotoInput: document.getElementById("photoInput"),
@@ -104,6 +99,10 @@ const elements = {
   documentsEmpty: document.getElementById("documentsEmpty"),
   documentsCard: document.getElementById("documentsCard"),
 };
+
+if (elements.inviteCaseSelect) {
+  elements.inviteCaseSelect.addEventListener("change", () => clearFieldError(elements.inviteCaseSelect));
+}
 
 const state = {
   viewer: null,
@@ -116,6 +115,70 @@ const state = {
   openCases: [],
   inviteTarget: null,
 };
+
+const PREFILL_CACHE_KEY = "lpc_edit_profile_prefill";
+
+async function cacheProfileForEditing() {
+  if (!state.profile) return;
+  const profileId = String(state.profile.id || state.profile._id || "");
+  const isSelf =
+    state.viewerRole === "paralegal" && state.viewerId && profileId && state.viewerId === profileId;
+
+  const target = isSelf ? await fetchSelfProfileSnapshot() : await fetchPublicProfileSnapshot();
+  const payload = target || state.profile;
+  persistPrefill(payload);
+  persistCachedUser(payload);
+}
+
+function persistCachedUser(user) {
+  if (!user) return;
+  const base = (window.getStoredUser && window.getStoredUser()) || {};
+  const merged = { ...base, ...user };
+  if (!merged.role) merged.role = base.role || user.role || "paralegal";
+  const userId = user.id || user._id;
+  if (!merged.id && userId) merged.id = userId;
+  if (!merged._id && user._id) merged._id = user._id;
+  try {
+    localStorage.setItem("lpc_user", JSON.stringify(merged));
+    window.updateSessionUser?.(merged);
+  } catch (err) {
+    console.warn("Unable to cache profile locally", err);
+  }
+}
+
+function persistPrefill(user) {
+  if (!user) return;
+  try {
+    localStorage.setItem(PREFILL_CACHE_KEY, JSON.stringify(user));
+  } catch (err) {
+    console.warn("Unable to cache edit prefill", err);
+  }
+}
+
+async function fetchSelfProfileSnapshot() {
+  try {
+    const res = await secureFetch("/api/users/me", { headers: { Accept: "application/json" }, noRedirect: true });
+    const data = await res.json().catch(() => null);
+    return res.ok ? data : null;
+  } catch (err) {
+    console.warn("Unable to fetch self profile snapshot", err);
+    return null;
+  }
+}
+
+async function fetchPublicProfileSnapshot() {
+  try {
+    const res = await secureFetch(`/api/paralegals/${encodeURIComponent(state.paralegalId || "")}`, {
+      headers: { Accept: "application/json" },
+      noRedirect: true,
+    });
+    const data = await res.json().catch(() => null);
+    return res.ok ? data : null;
+  } catch (err) {
+    console.warn("Unable to fetch profile snapshot", err);
+    return null;
+  }
+}
 
 const LANGUAGE_RING_MAP = {
   native: 1,
@@ -230,15 +293,19 @@ function bindCtaEvents() {
   });
   elements.messageBtn?.addEventListener("click", () => {
     if (!state.profile) return;
-    if (state.caseContextId) {
-      try {
-        sessionStorage.setItem(MESSAGE_JUMP_KEY, JSON.stringify({ caseId: state.caseContextId }));
-      } catch {}
+    if (!state.caseContextId) {
+      showError("Messaging is only available for active cases.");
+      return;
     }
-    window.location.href = "messages.html";
+    window.location.href = `case-detail.html?caseId=${encodeURIComponent(state.caseContextId)}#messages`;
   });
-  elements.editBtn?.addEventListener("click", () => {
-    window.location.href = "profile-settings.html";
+  elements.editBtn?.addEventListener("click", async (event) => {
+    event.preventDefault();
+    try {
+      await cacheProfileForEditing();
+    } finally {
+      window.location.href = "profile-settings.html";
+    }
   });
   elements.closeInviteBtn?.addEventListener("click", closeInviteModal);
   elements.inviteModal?.addEventListener("click", (event) => {
@@ -337,10 +404,6 @@ function buildProfileUpdatePayload() {
   return {
     linkedInURL: sanitizeUrl(elements.linkedInInput?.value),
     yearsExperience: sanitizeYears(elements.yearsExperienceInput?.value),
-    ref1Name: sanitizeText(elements.ref1NameInput?.value),
-    ref1Email: sanitizeText(elements.ref1EmailInput?.value),
-    ref2Name: sanitizeText(elements.ref2NameInput?.value),
-    ref2Email: sanitizeText(elements.ref2EmailInput?.value),
   };
 }
 
@@ -529,10 +592,6 @@ function updateProfileFormVisibility() {
   const inputs = [
     elements.linkedInInput,
     elements.yearsExperienceInput,
-    elements.ref1NameInput,
-    elements.ref1EmailInput,
-    elements.ref2NameInput,
-    elements.ref2EmailInput,
     elements.certificateUploadInput,
     elements.resumeUploadInput,
     elements.profilePhotoInput,
@@ -558,7 +617,8 @@ function hydrateHeader() {
 function bindHeaderEvents() {
   if (elements.notificationToggle && elements.notificationPanel) {
     elements.notificationToggle.addEventListener("click", () => {
-      elements.notificationPanel.classList.toggle("show");
+      const isShowing = elements.notificationPanel.classList.toggle("show");
+      elements.notificationPanel.classList.toggle("hidden", !isShowing);
     });
     document.addEventListener("click", (event) => {
       if (
@@ -567,6 +627,7 @@ function bindHeaderEvents() {
         !elements.notificationToggle.contains(event.target)
       ) {
         elements.notificationPanel.classList.remove("show");
+        elements.notificationPanel.classList.add("hidden");
       }
     });
   }
@@ -660,10 +721,6 @@ function populateProfileForm(profile) {
   if (!elements.profileForm || !profile) return;
   setInputValue(elements.linkedInInput, profile.linkedInURL);
   setInputValue(elements.yearsExperienceInput, profile.yearsExperience ?? "");
-  setInputValue(elements.ref1NameInput, profile.ref1Name);
-  setInputValue(elements.ref1EmailInput, profile.ref1Email);
-  setInputValue(elements.ref2NameInput, profile.ref2Name);
-  setInputValue(elements.ref2EmailInput, profile.ref2Email);
 }
 
 function setInputValue(input, value) {
@@ -1192,18 +1249,22 @@ function openInviteModal() {
     showToast("You need an active case before inviting a paralegal.", "info");
     return;
   }
+  clearFieldError(elements.inviteCaseSelect);
   renderCaseOptions();
   elements.inviteModal.classList.add("show");
 }
 
 function closeInviteModal() {
   elements.inviteModal?.classList.remove("show");
+  clearFieldError(elements.inviteCaseSelect);
 }
 
 async function sendInviteToCase() {
   if (!state.profile || !elements.inviteCaseSelect) return;
   const caseId = elements.inviteCaseSelect.value;
+  clearFieldError(elements.inviteCaseSelect);
   if (!caseId) {
+    showFieldError(elements.inviteCaseSelect, "Select a case to continue.");
     showToast("Select a case to continue.", "info");
     return;
   }
@@ -1298,6 +1359,33 @@ function escapeHtml(value = "") {
 
 function escapeAttribute(value = "") {
   return String(value).replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+function showFieldError(field, message) {
+  if (!field) return;
+  clearFieldError(field);
+  field.classList?.add("input-error");
+  if (typeof field.setAttribute === "function") field.setAttribute("aria-invalid", "true");
+  const error = document.createElement("div");
+  error.className = "field-error";
+  error.textContent = message;
+  const wrapper = field.closest(".field") || field.closest("[data-field-wrapper]");
+  if (wrapper) wrapper.appendChild(error);
+  else field.insertAdjacentElement("afterend", error);
+}
+
+function clearFieldError(field) {
+  if (!field) return;
+  field.classList?.remove("input-error");
+  if (typeof field.removeAttribute === "function") field.removeAttribute("aria-invalid");
+  const wrapper = field.closest(".field") || field.closest("[data-field-wrapper]");
+  if (wrapper) {
+    const existing = wrapper.querySelector(".field-error");
+    if (existing) existing.remove();
+    return;
+  }
+  const next = field.nextElementSibling;
+  if (next?.classList.contains("field-error")) next.remove();
 }
 
 function showToast(message, type = "info") {

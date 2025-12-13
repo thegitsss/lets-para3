@@ -65,12 +65,31 @@
       transition:background .3s;
     }
     nav a.active,nav a:hover{background:rgba(0,0,0,0.04);}
+    .sidebar-link{
+      margin-top:1.5rem;
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:0.6rem 1rem;
+      background:transparent;
+      font-size:0.9rem;
+      font-family:var(--font-sans);
+      cursor:pointer;
+      transition:background .2s,color .2s;
+    }
+    .sidebar-link:hover,
+    .sidebar-link:focus{
+      background:rgba(0,0,0,0.05);
+      color:var(--accent);
+      outline:none;
+    }
     .sidebar-footer{
       margin-top:auto;
       font-size:0.7rem;
       color:var(--muted);
       text-align:center;
     }
+    .muted{color:var(--muted);}
 
     .main{
       flex:1;
@@ -301,6 +320,170 @@
       opacity:1;
       transform:translate(-50%,0);
     }
+    .case-switcher{
+      display:flex;
+      flex-wrap:wrap;
+      gap:0.6rem;
+      margin:1.5rem 0 1rem;
+    }
+    .case-switcher button{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:0.45rem 1.2rem;
+      font-size:0.9rem;
+      color:var(--ink);
+      cursor:pointer;
+      transition:background 0.2s ease,color 0.2s ease,border-color 0.2s ease;
+    }
+    .case-switcher button.active{
+      background:var(--accent);
+      border-color:var(--accent);
+      color:#fff;
+    }
+    .hidden{display:none !important;}
+    .case-files-pane{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background:#fff;
+      padding:1.5rem;
+      margin-top:1.5rem;
+    }
+    .case-files-filters{
+      display:flex;
+      gap:.75rem;
+      flex-wrap:wrap;
+      margin-bottom:1.25rem;
+    }
+    .case-files-filters button{
+      border:1px solid var(--line);
+      border-radius:8px;
+      padding:0.5rem 1rem;
+      cursor:pointer;
+      background:#fff;
+      font-size:0.9rem;
+      transition:all .2s ease;
+    }
+    .case-files-filters button.active{
+      background:var(--accent);
+      color:#fff;
+      border-color:var(--accent);
+    }
+    .case-files-empty{
+      padding:1rem;
+      color:var(--muted);
+      font-size:0.95rem;
+    }
+    .case-files-grid{
+      display:flex;
+      flex-direction:column;
+      gap:1rem;
+    }
+    .case-files-grid .file-card{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background:#fff;
+      padding:1rem 1.25rem;
+      display:flex;
+      flex-direction:column;
+      gap:.6rem;
+    }
+    .case-files-grid .file-line{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:1rem;
+    }
+    .case-files-grid .file-name{
+      font-family:var(--font-serif);
+      font-size:1.05rem;
+      word-break:break-word;
+    }
+    .case-files-grid .file-status{
+      font-size:.85rem;
+      font-weight:600;
+      color:var(--accent);
+      text-transform:capitalize;
+    }
+    .case-files-grid .file-meta{
+      display:flex;
+      gap:1rem;
+      font-size:.85rem;
+      color:var(--muted);
+      flex-wrap:wrap;
+    }
+    .case-files-grid .file-actions{
+      display:flex;
+      gap:.75rem;
+      flex-wrap:wrap;
+    }
+    .note-cell{
+      max-width:260px;
+      font-size:0.85rem;
+      color:var(--muted);
+    }
+    .note-cell .note-preview{margin-bottom:0.25rem;}
+    .note-cell .note-edit-btn{
+      border:none;
+      background:none;
+      color:var(--accent);
+      font-size:0.8rem;
+      cursor:pointer;
+      padding:0;
+    }
+    .note-cell .note-edit-btn:hover{text-decoration:underline;}
+    .note-modal{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.35);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:3000;
+    }
+    .note-modal.hidden{display:none;}
+    .note-modal-card{
+      background:#fff;
+      border-radius:12px;
+      padding:1.25rem;
+      width:min(90vw,440px);
+      box-shadow:0 30px 80px rgba(15,23,42,0.25);
+      display:flex;
+      flex-direction:column;
+      gap:0.85rem;
+    }
+    .note-modal-card textarea{
+      min-height:140px;
+      border:1px solid var(--line);
+      border-radius:10px;
+      padding:0.75rem;
+      resize:vertical;
+      font-family:inherit;
+      font-size:0.95rem;
+    }
+    .note-modal-actions{
+      display:flex;
+      justify-content:flex-end;
+      gap:0.75rem;
+      flex-wrap:wrap;
+    }
+    .btn{
+      border-radius:999px;
+      padding:0.55rem 1.4rem;
+      border:1px solid transparent;
+      font-family:inherit;
+      font-size:0.9rem;
+      cursor:pointer;
+      transition:background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+    .btn.primary{background:var(--accent);color:#fff;}
+    .btn.primary:hover{background:#9a8459;}
+    .btn.secondary{
+      background:#fff;
+      border:1px solid var(--line);
+      color:var(--ink);
+    }
+    .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
   </style>
 </head>
 <body>
@@ -308,14 +491,11 @@
     <div class="logo">Dashboard</div>
     <nav>
       <a href="dashboard-attorney.html">Home</a>
-      <a href="active-cases.html" class="active">Cases</a>
-      <a href="messages.html">Messages</a>
-      <a href="documents.html">Documents</a>
-      <a href="review.html">Review</a>
-      <a href="case-files.html">Case Files</a>
-      <a href="billing-attorney.html">Billing</a>
+      <a href="active-cases.html" class="active">Cases &amp; Files</a>
+      <a href="billing-attorney.html">Escrow</a>
       <a href="help.html">Help</a>
     </nav>
+    <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
     <div class="sidebar-footer">© Let’s‑ParaConnect 2025</div>
   </aside>
 
@@ -326,96 +506,134 @@
       <h1>Active Cases</h1>
       <p>Manage and monitor your open matters below.</p>
     </header>
+    <div class="case-switcher" role="tablist" aria-label="Case views">
+      <button type="button" class="active" data-case-view="cases" role="tab" aria-selected="true">Cases</button>
+      <button type="button" data-case-view="files" role="tab" aria-selected="false">Case Files</button>
+    </div>
 
-    <div class="page-header">
-      <h2>All Active Cases</h2>
-      <div class="actions">
-        <input type="search" placeholder="Search cases..." data-cases-search />
-        <button class="add-btn" type="button" data-case-quick="create">＋ New Case</button>
+    <section id="casesViewSection">
+      <div class="page-header">
+        <h2>All Active Cases</h2>
+        <div class="actions">
+          <input type="search" placeholder="Search cases..." data-cases-search />
+          <button class="add-btn" type="button" data-case-quick="create">＋ New Case</button>
+        </div>
       </div>
-    </div>
 
-    <div class="filter-tabs">
-      <button class="filter-tab active" data-case-filter="active">Active (<span data-case-count="active">0</span>)</button>
-      <button class="filter-tab" data-case-filter="draft">Draft (<span data-case-count="draft">0</span>)</button>
-      <button class="filter-tab" data-case-filter="archived">Archived (<span data-case-count="archived">0</span>)</button>
-      <button class="filter-tab" data-case-filter="inquiries">Inquiries (<span data-case-count="inquiries">0</span>)</button>
-    </div>
+      <div class="filter-tabs">
+        <button class="filter-tab active" data-case-filter="active">Active (<span data-case-count="active">0</span>)</button>
+        <button class="filter-tab" data-case-filter="draft">Draft (<span data-case-count="draft">0</span>)</button>
+        <button class="filter-tab" data-case-filter="archived">Archived (<span data-case-count="archived">0</span>)</button>
+        <button class="filter-tab" data-case-filter="inquiries">Inquiries (<span data-case-count="inquiries">0</span>)</button>
+      </div>
 
-    <div data-cases-wrapper>
-      <div class="case-table" data-case-table="active">
-        <table>
-          <thead>
+      <div data-cases-wrapper>
+        <div class="case-table" data-case-table="active">
+          <table>
+            <thead>
             <tr>
               <th>Title</th>
               <th>Client</th>
               <th>Specialty</th>
               <th>Status</th>
+              <th>Notes</th>
               <th>Posted</th>
               <th class="actions"></th>
             </tr>
           </thead>
           <tbody data-table-body="active">
-            <tr><td colspan="6" class="empty-row">Loading cases…</td></tr>
+            <tr><td colspan="7" class="empty-row">Loading cases…</td></tr>
           </tbody>
         </table>
-      </div>
+        </div>
 
-      <div class="case-table hidden" data-case-table="draft">
-        <table>
-          <thead>
+        <div class="case-table hidden" data-case-table="draft">
+          <table>
+            <thead>
             <tr>
               <th>Title</th>
               <th>Client</th>
               <th>Specialty</th>
               <th>Status</th>
+              <th>Notes</th>
               <th>Last Edited</th>
               <th class="actions"></th>
             </tr>
           </thead>
           <tbody data-table-body="draft">
-            <tr><td colspan="6" class="empty-row">Loading draft cases…</td></tr>
+            <tr><td colspan="7" class="empty-row">Loading draft cases…</td></tr>
           </tbody>
         </table>
-      </div>
+        </div>
 
-      <div class="case-table hidden" data-case-table="archived">
-        <table>
-          <thead>
+        <div class="case-table hidden" data-case-table="archived">
+          <table>
+            <thead>
             <tr>
               <th>Title</th>
               <th>Client</th>
               <th>Specialty</th>
               <th>Status</th>
+              <th>Notes</th>
               <th>Archived</th>
               <th class="actions"></th>
             </tr>
           </thead>
           <tbody data-table-body="archived">
-            <tr><td colspan="6" class="empty-row">Loading archived cases…</td></tr>
+            <tr><td colspan="7" class="empty-row">Loading archived cases…</td></tr>
           </tbody>
         </table>
-      </div>
+        </div>
 
-      <div class="case-table hidden" data-case-table="inquiries">
-        <table>
-          <thead>
+        <div class="case-table hidden" data-case-table="inquiries">
+          <table>
+            <thead>
             <tr>
               <th>Title</th>
               <th>Client</th>
               <th>Specialty</th>
               <th>Status</th>
+              <th>Notes</th>
               <th>Posted</th>
               <th class="actions"></th>
             </tr>
           </thead>
           <tbody data-table-body="inquiries">
-            <tr><td colspan="6" class="empty-row">Loading inquiries…</td></tr>
+            <tr><td colspan="7" class="empty-row">Loading inquiries…</td></tr>
           </tbody>
         </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="caseFilesSection" class="case-files-pane hidden" aria-labelledby="caseFilesHeading">
+      <div class="page-header">
+        <div>
+          <h2 id="caseFilesHeading">Case Files</h2>
+          <p>Review uploaded work, download approved files, or request revisions.</p>
+        </div>
+      </div>
+      <div class="case-files-filters">
+        <button type="button" id="caseFilesEmbedFilterAll" class="active">All Files</button>
+        <button type="button" id="caseFilesEmbedFilterApproved">Approved</button>
+        <button type="button" id="caseFilesEmbedFilterPending">Awaiting Review</button>
+        <button type="button" id="caseFilesEmbedFilterRevisions">Revisions Requested</button>
+      </div>
+      <div class="case-files-grid" id="caseFilesEmbedContainer">
+        <p class="case-files-empty">Loading files…</p>
+      </div>
+    </section>
+  </main>
+  <div id="caseNoteModal" class="note-modal hidden" role="dialog" aria-modal="true">
+    <div class="note-modal-card">
+      <h3 style="font-family:var(--font-serif);font-weight:300;">Edit Case Note</h3>
+      <textarea id="caseNoteTextarea" placeholder="Add internal notes for this case."></textarea>
+      <div class="note-modal-actions">
+        <button type="button" class="btn secondary" data-note-cancel>Cancel</button>
+        <button type="button" class="btn primary" data-note-save>Save Note</button>
       </div>
     </div>
-  </main>
+  </div>
 
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
   <script>
@@ -423,5 +641,48 @@
   </script>
   <script src="assets/scripts/utils/toast.js"></script>
   <script type="module" src="assets/scripts/attorney-tabs.js"></script>
+  <script type="module">
+    import { initCaseFilesView } from "./assets/scripts/case-files-view.js";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const viewButtons = document.querySelectorAll("[data-case-view]");
+      const sections = {
+        cases: document.getElementById("casesViewSection"),
+        files: document.getElementById("caseFilesSection"),
+      };
+      let filesReady = false;
+
+      viewButtons.forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const targetView = btn.dataset.caseView;
+          if (!targetView || btn.classList.contains("active")) return;
+          viewButtons.forEach((node) => {
+            const isActive = node === btn;
+            node.classList.toggle("active", isActive);
+            node.setAttribute("aria-selected", isActive ? "true" : "false");
+          });
+          Object.entries(sections).forEach(([key, node]) => {
+            if (!node) return;
+            node.classList.toggle("hidden", key !== targetView);
+          });
+          if (targetView === "files" && !filesReady) {
+            filesReady = true;
+            await initCaseFilesView({
+              containerId: "caseFilesEmbedContainer",
+              filters: [
+                { id: "caseFilesEmbedFilterAll", fn: (files) => files },
+                { id: "caseFilesEmbedFilterApproved", fn: (files) => files.filter((f) => f.status === "approved") },
+                { id: "caseFilesEmbedFilterPending", fn: (files) => files.filter((f) => f.status === "pending_review") },
+                { id: "caseFilesEmbedFilterRevisions", fn: (files) => files.filter((f) => f.status === "attorney_revision") },
+              ],
+              emptyCopy: "Awaiting paralegal submissions.",
+              emptySubtext: "Once files arrive, they’ll show up here automatically.",
+              unauthorizedCopy: "You need an attorney account to view these files.",
+            });
+          }
+        });
+      });
+    });
+  </script>
 </body>
 </html>

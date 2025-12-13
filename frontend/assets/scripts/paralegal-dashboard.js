@@ -3,22 +3,15 @@ import { getAvatarUrl } from "./helpers.js";
 
 const selectors = {
   messageBox: document.getElementById('messageBox'),
-  messageCount: document.getElementById('paralegalMessageCount'),
-  pluralText: document.getElementById('paralegalMessagePlural'),
-  notificationBell: document.getElementById('notificationBell'),
-  notificationPanel: document.getElementById('notificationPanel'),
-  notificationList: document.getElementById('paralegalNotificationList'),
-  notificationBadge: document.getElementById('paralegalNotificationBadge'),
-  deadlineList: document.getElementById('paralegalDeadlinesList'),
-  assignmentList: document.getElementById('paralegalAssignmentList'),
-  inviteList: document.getElementById('paralegalInviteList'),
-  assignedCasesList: document.getElementById('paralegalAssignedCasesList'),
-  recentActivity: document.getElementById('paralegalRecentActivity'),
+  messageCount: document.getElementById('messageCount'),
+  pluralText: document.getElementById('plural'),
+  deadlineList: document.getElementById('deadlineList'),
+  assignmentList: document.getElementById('assignmentList'),
+  inviteList: document.getElementById('inviteList'),
+  assignedCasesList: document.getElementById('assignedCasesList'),
   assignmentTemplate: document.getElementById('assignmentCardTemplate'),
   toastBanner: document.getElementById('toastBanner'),
-  userAvatar: document.getElementById('paralegalAvatar'),
-  nameHeading: document.getElementById('paralegalNameHeading'),
-  welcomeCopy: document.getElementById('paralegalWelcomeCopy'),
+  nameHeading: document.getElementById('user-name-heading'),
 };
 
 const JSON_HEADERS = { Accept: 'application/json' };
@@ -40,29 +33,12 @@ async function fetchJson(url, options = {}) {
   }
 }
 
-function applyStoredProfile() {
-  try {
-    const stored = localStorage.getItem('lpc_user');
-    if (!stored) return;
-    const parsed = JSON.parse(stored);
-    if (parsed && typeof parsed === 'object') {
-      updateProfile(parsed);
-    }
-  } catch {
-    /* ignore */
-  }
-}
-
 async function loadViewerProfile() {
   return fetchJson('/api/users/me');
 }
 
 async function fetchParalegalData() {
   return fetchJson('/api/paralegal/dashboard');
-}
-
-async function loadNotificationsFeed() {
-  return fetchJson('/api/users/me/notifications').catch(() => ({ items: [], unread: 0 }));
 }
 
 async function loadDeadlineEvents(limit = 5) {
@@ -81,27 +57,6 @@ async function loadUnreadMessageCount() {
 function formatCurrency(value = 0) {
   const amount = Number(value) || 0;
   return amount.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
-}
-
-function showPlaceholder(container, placeholderId) {
-  if (!container) return;
-  const placeholder = document.getElementById(placeholderId);
-  if (!placeholder) return;
-  if (placeholder.parentElement) {
-    placeholder.remove();
-  }
-  placeholder.hidden = false;
-  container.innerHTML = '';
-  container.appendChild(placeholder);
-}
-
-function hidePlaceholder(placeholderId) {
-  const placeholder = document.getElementById(placeholderId);
-  if (!placeholder) return;
-  placeholder.hidden = true;
-  if (placeholder.parentElement) {
-    placeholder.parentElement.removeChild(placeholder);
-  }
 }
 
 function deriveNextDeadline(events = []) {
@@ -142,10 +97,9 @@ function renderDeadlines(deadlines = []) {
   const container = selectors.deadlineList;
   if (!container) return;
   if (!deadlines.length) {
-    showPlaceholder(container, 'paralegalDeadlinesEmpty');
+    container.innerHTML = '<div class="info-line">No assigned deadlines.</div>';
     return;
   }
-  hidePlaceholder('paralegalDeadlinesEmpty');
   container.innerHTML = deadlines
     .map((deadline) => {
       const title = deadline.title || 'Deadline';
@@ -156,40 +110,22 @@ function renderDeadlines(deadlines = []) {
     .join('');
 }
 
-function renderNotifications(items = [], unreadCount = 0) {
-  const list = selectors.notificationList;
-  if (!list) return;
-  if (!items.length) {
-    showPlaceholder(list, 'paralegalNotificationsEmpty');
-  } else {
-    hidePlaceholder('paralegalNotificationsEmpty');
-    list.innerHTML = items
-      .slice(0, 5)
-      .map((entry) => `<div class="notification-item"><strong>${entry.title || 'Update'}:</strong> ${entry.body || ''}</div>`)
-      .join('');
-  }
-  if (selectors.notificationBadge) {
-    if (unreadCount > 0) {
-      selectors.notificationBadge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
-      selectors.notificationBadge.hidden = false;
-    } else {
-      selectors.notificationBadge.textContent = '';
-      selectors.notificationBadge.hidden = true;
-    }
-  }
-  if (selectors.recentActivity) {
-    selectors.recentActivity.textContent = items[0]?.body || 'No updates yet.';
-  }
-}
-
 function renderAssignments(assignments = []) {
   const container = selectors.assignmentList;
   if (!container || !selectors.assignmentTemplate) return;
   if (!assignments.length) {
-    showPlaceholder(container, 'paralegalAssignmentsEmpty');
+    container.innerHTML = `
+      <div class="case-card empty-state">
+        <div class="case-header">
+          <div>
+            <h2>No active assignments</h2>
+            <div class="case-subinfo">New invitations will appear here.</div>
+          </div>
+        </div>
+      </div>
+    `;
     return;
   }
-  hidePlaceholder('paralegalAssignmentsEmpty');
   container.innerHTML = '';
 
   assignments.forEach((assignment) => {
@@ -255,10 +191,9 @@ function renderInvites(invites = []) {
   const container = selectors.inviteList;
   if (!container) return;
   if (!invites.length) {
-    showPlaceholder(container, 'paralegalInvitesEmpty');
+    container.innerHTML = '<p class="info-line">No invitations yet.</p>';
     return;
   }
-  hidePlaceholder('paralegalInvitesEmpty');
   container.innerHTML = '';
 
   invites.forEach((invite) => {
@@ -398,20 +333,9 @@ function handleCaseAction(action, title) {
 function attachUIHandlers() {
   const toastHelper = window.toastUtils;
   const stagedToast = toastHelper?.consume?.();
-  if (stagedToast?.message) {
+  if (stagedToast?.message && selectors.toastBanner) {
     toastHelper.show(stagedToast.message, { targetId: selectors.toastBanner.id, type: stagedToast.type });
   }
-
-  selectors.notificationBell?.addEventListener('click', (event) => {
-    event.stopPropagation();
-    selectors.notificationPanel?.classList.toggle('show');
-  });
-
-  document.addEventListener('click', (event) => {
-    if (!selectors.notificationBell?.contains(event.target)) {
-      selectors.notificationPanel?.classList.remove('show');
-    }
-  });
 }
 
 function updateProfile(profile = {}) {
@@ -421,14 +345,41 @@ function updateProfile(profile = {}) {
   if (selectors.nameHeading) {
     selectors.nameHeading.textContent = composedName;
   }
-  if (selectors.userAvatar) {
-    selectors.userAvatar.src = getAvatarUrl(profile);
-    selectors.userAvatar.alt = `${composedName}'s avatar`;
-  }
+  const avatarUrl = getAvatarUrl(profile);
+  document.querySelectorAll('[data-avatar]').forEach((node) => {
+    node.src = avatarUrl;
+    node.alt = `${composedName}'s avatar`;
+  });
   if (profile.profileImage) {
     const a = document.querySelector('#user-avatar');
     if (a) a.src = profile.profileImage;
   }
+}
+
+function persistAvailabilityState(availabilityText, details = {}) {
+  try {
+    const raw = localStorage.getItem('lpc_user');
+    if (!raw) return;
+    const user = JSON.parse(raw);
+    if (!user || typeof user !== 'object') return;
+    if (availabilityText) user.availability = availabilityText;
+    user.availabilityDetails = details;
+    localStorage.setItem('lpc_user', JSON.stringify(user));
+    window.updateSessionUser?.(user);
+    window.hydrateParalegalCluster?.(user);
+    try {
+      window.dispatchEvent(new CustomEvent('lpc:user-updated', { detail: user }));
+    } catch (_) {}
+  } catch (err) {
+    console.warn('Unable to persist availability', err);
+  }
+}
+
+function formatAvailabilityDate(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function handleStoredUserUpdate(event) {
@@ -511,20 +462,15 @@ async function initDashboard() {
   initQuickActions();
   loadRecommendedCases();
   try {
-    const [profile, dashboard, invites, deadlines, threads, notifications, unreadCount] = await Promise.all([
+    const [profile, dashboard, invites, deadlines, threads, unreadCount] = await Promise.all([
       loadViewerProfile().catch(() => ({})),
       fetchParalegalData().catch(() => ({})),
       loadInvites().catch(() => []),
       loadDeadlineEvents().catch(() => []),
       loadMessageThreads().catch(() => []),
-      loadNotificationsFeed().catch(() => ({ items: [], unread: 0 })),
       loadUnreadMessageCount().catch(() => 0),
     ]);
     updateProfile(profile || {});
-    const paralegalAvatarEl = document.getElementById('paralegalAvatar');
-    if (paralegalAvatarEl) {
-      paralegalAvatarEl.src = getAvatarUrl(profile || {});
-    }
     updateStats({
       activeCases: dashboard?.metrics?.activeCases,
       unreadMessages: unreadCount,
@@ -535,7 +481,6 @@ async function initDashboard() {
     });
     renderDeadlines(deadlines);
     initLatestMessage(threads);
-    renderNotifications(notifications.items || [], notifications.unread || 0);
     renderAssignments(mapActiveCasesToAssignments(dashboard?.activeCases || []));
     renderInvites(invites);
   } catch (err) {
@@ -544,7 +489,6 @@ async function initDashboard() {
     renderInvites([]);
     renderDeadlines([]);
     initLatestMessage([]);
-    renderNotifications([], 0);
   }
   await loadAssignedCases();
 }
@@ -559,13 +503,12 @@ async function bootParalegalDashboard() {
   applyRoleVisibility(user);
   updateProfile(user || {});
   window.hydrateParalegalCluster?.(user || {});
+  window.initNotificationCenters?.();
   if (window.state) {
     window.state.viewerRole = String(user.role || '').toLowerCase();
   }
-  applyStoredProfile();
   await initDashboard();
-  const assignedCasesEl = document.getElementById('paralegalAssignedCasesList');
-  assignedCasesEl?.addEventListener('click', (event) => {
+  selectors.assignedCasesList?.addEventListener('click', (event) => {
     const btn = event.target.closest('.open-case-btn');
     if (!btn) return;
     const caseId = btn.dataset.id;
@@ -586,4 +529,108 @@ function applyRoleVisibility(user) {
       el.style.display = 'none';
     });
   }
+}
+
+function initAvailabilityModal() {
+  const modal = document.getElementById("availabilityModal");
+  const openBtn = document.getElementById("updateAvailabilityLink");
+  const saveBtn = document.getElementById("saveAvailabilityBtn");
+  const cancelBtn = document.getElementById("cancelAvailabilityBtn");
+  const statusInput = document.getElementById("availabilityStatusInput");
+  const dateInput = document.getElementById("availabilityDateInput");
+  const statusDisplay = document.getElementById("availabilityStatus");
+  const nextDisplay = document.getElementById("availabilityNext");
+  const quickActionBtn = document.querySelector('.quick-actions button[data-action="availability"]');
+
+  if (!modal) console.error("❌ availabilityModal not found");
+  if (!openBtn) console.error("❌ updateAvailabilityLink not found");
+
+  if (!modal) return;
+
+  const showModal = (event) => {
+    event?.preventDefault();
+    if (!modal) return;
+    modal.style.display = "flex";
+    modal.classList.add("show");
+  };
+
+  const hideModal = () => {
+    if (!modal) return;
+    modal.classList.remove("show");
+    modal.style.display = "none";
+  };
+
+  if (openBtn) {
+    openBtn.addEventListener("click", showModal);
+  }
+
+  if (quickActionBtn) {
+    quickActionBtn.addEventListener("click", showModal);
+  }
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", hideModal);
+  }
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      hideModal();
+    }
+  });
+
+  if (saveBtn && statusInput && dateInput && statusDisplay && nextDisplay) {
+    saveBtn.addEventListener("click", async () => {
+      const status = statusInput.value;
+      const nextDate = dateInput.value;
+
+      const payload = {
+        status,
+        nextAvailable: nextDate || null
+      };
+
+      try {
+        const res = await secureFetch("/api/paralegals/update-availability", {
+          method: "POST",
+          body: payload
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          alert(data.msg || "Failed to update availability.");
+          return;
+        }
+
+        const fallbackAvailability = status === "available" ? "Available now" : "Unavailable";
+        const details = data.availabilityDetails || {};
+        const availabilityLabel = data.availability || fallbackAvailability;
+        const nextSource = nextDate || details.nextAvailable || null;
+        const friendly = formatAvailabilityDate(nextSource);
+
+        statusDisplay.textContent = fallbackAvailability;
+        if (friendly) {
+          nextDisplay.textContent = `Available on ${friendly}`;
+        } else {
+          nextDisplay.textContent = "This week";
+        }
+
+        persistAvailabilityState(availabilityLabel, {
+          status: details.status || status,
+          nextAvailable: details.nextAvailable || (nextDate ? new Date(nextDate).toISOString() : null),
+          updatedAt: details.updatedAt || new Date().toISOString()
+        });
+
+        hideModal();
+      } catch (err) {
+        console.error(err);
+        alert("Server error updating availability.");
+      }
+    });
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initAvailabilityModal);
+} else {
+  initAvailabilityModal();
 }

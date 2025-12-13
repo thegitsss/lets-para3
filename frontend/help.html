@@ -9,8 +9,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Help & Support • Let’s‑ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
@@ -78,23 +78,22 @@
       background: rgba(0, 0, 0, 0.04);
     }
     .sidebar-link{
-      display:block;
+      margin-top:1.5rem;
       width:100%;
-      border:none;
-      background:none;
-      color:var(--ink);
-      font-size:0.95rem;
-      font-family:var(--font-sans);
-      font-weight:300;
-      text-align:left;
-      padding:10px 14px;
+      border:1px solid rgba(0,0,0,0.08);
       border-radius:var(--radius);
+      padding:0.6rem 1rem;
+      background:transparent;
+      color:var(--ink);
+      font-size:0.9rem;
+      font-family:var(--font-sans);
       cursor:pointer;
-      transition:background .3s ease;
+      transition:background .2s ease,color .2s ease;
     }
     .sidebar-link:hover,
     .sidebar-link:focus{
-      background:rgba(0,0,0,0.04);
+      background:rgba(0,0,0,0.05);
+      color:var(--accent);
       outline:none;
     }
     .sidebar-footer{
@@ -204,10 +203,9 @@
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
     <nav>
-      <a href="dashboard-paralegal.html">Home</a>
-      <a href="messages.html">Messages</a>
-      <a href="case-files.html">Active Cases</a>
-      <a href="profile-settings.html">Profile Settings</a>
+      <a href="dashboard-attorney.html">Home</a>
+      <a href="active-cases.html">Cases &amp; Files</a>
+      <a href="billing-attorney.html">Escrow</a>
       <a href="help.html" class="active">Help</a>
     </nav>
     <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
@@ -226,12 +224,12 @@
     <section id="cases">
       <h2>2) Case Management</h2>
       <p>Paralegals receive invitations once an attorney posts a matter. Accept the work that fits your scope and timeline.</p>
-      <p>All active and archived assignments live under <a href="case-files.html">Case Files</a>, and new invitations will surface on your dashboard.</p>
+      <p>All active and archived assignments live under the Cases &amp; Files area (open the <a href="case-files.html">Case Files view</a>), and new invitations will surface on your dashboard.</p>
     </section>
 
     <section id="messages">
       <h2>3) Messaging &amp; Collaboration</h2>
-      <p>Each case has its own thread inside the Messages tab so conversations stay organized. Case cards display unread counts so you never miss an update.</p>
+      <p>Each case has its own thread directly inside the case workspace so conversations stay organized. Open an active case to chat with your paralegal or attorney.</p>
       <p>Real-time collaboration and document annotations are on the roadmap—watch release notes for timing.</p>
     </section>
 

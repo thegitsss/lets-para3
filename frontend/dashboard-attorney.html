@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Let<span class="gold">’</span>s-ParaConnect | Attorney Dashboard</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
 
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/libs/cropper/cropper.main.css" />
 <script src="assets/scripts/utils/session.js"></script>
   <style>
     .gold{color:#b4975a;}
@@ -83,6 +84,26 @@
       background: rgba(0, 0, 0, 0.04);
     }
 
+    .sidebar-link {
+      margin-top: 1.5rem;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 0.6rem 1rem;
+      background: transparent;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .sidebar-link:hover,
+    .sidebar-link:focus {
+      background: rgba(0, 0, 0, 0.05);
+      color: var(--accent);
+      outline: none;
+    }
+
     .main {
       flex: 1;
       padding: 40px;
@@ -103,17 +124,18 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 32px;
-      height: 32px;
+      width: 46px;
+      height: 46px;
       border-radius: 50%;
-      transition: background 0.2s ease;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      transition: border-color 0.2s ease, background 0.2s ease;
+      background: #fff;
     }
-
 
     .notification-icon:hover {
-      background: rgba(0,0,0,0.05);
+      border-color: var(--accent);
+      background: rgba(0, 0, 0, 0.02);
     }
-
 
     .notification-icon svg {
       width: 20px;
@@ -121,20 +143,114 @@
       color: var(--ink);
     }
 
-    .notification-badge {
+    [data-notification-toggle][data-count]:after {
+      content: attr(data-count);
       position: absolute;
-      top: -6px;
-      right: -6px;
-      background: red;
-      color: white;
-      border-radius: 50%;
+      top: -4px;
+      right: -4px;
+      background: var(--accent);
+      color: #fff;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
       font-size: 0.7rem;
-      width: 16px;
-      height: 16px;
+      padding: 2px 6px;
+      border-radius: 999px;
+    }
+
+    .notif-panel {
+      position: absolute;
+      top: 56px;
+      right: 0;
+      width: 340px;
+      background: #fff;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 12px;
+      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
+      padding: 0;
+      display: none;
+      flex-direction: column;
+      z-index: 220;
+    }
+
+    .notif-panel.show {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
+    }
+
+    .notif-panel.hidden {
+      display: none;
+    }
+
+    .notif-header {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 1.2rem;
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      background: #fafafa;
+    }
+
+    .notif-scroll {
+      max-height: 360px;
+      overflow-y: auto;
+    }
+
+    .notif-item {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .notif-item:last-child {
+      border-bottom: none;
+    }
+
+    .notif-item.unread {
+      border-left: 3px solid var(--accent);
+    }
+
+    .notif-item.read {
+      opacity: 0.75;
+    }
+
+    .notif-title {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 1.1rem;
+      margin-bottom: 2px;
+      color: var(--ink);
+    }
+
+    .notif-body {
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.92rem;
+      color: #4b4b4b;
+      line-height: 1.45;
+    }
+
+    .notif-time {
+      margin-top: 4px;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.8rem;
+      color: #888;
+    }
+
+    .notif-markall {
+      border: none;
+      border-top: 1px solid rgba(0, 0, 0, 0.08);
+      background: #fafafa;
+      padding: 12px;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.9rem;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .notif-markall:hover {
+      background: #f0f0f0;
     }
 
     .user-profile {
@@ -263,6 +379,53 @@
       margin-right: 0.5rem;
     }
 
+    .btn-group {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 0.55rem;
+    }
+
+    .btn-group button {
+      appearance: none;
+      border-radius: 999px;
+      padding: 0.45rem 1.35rem;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      font-weight: 300;
+      border: 1px solid rgba(0, 0, 0, 0.15);
+      background: #fff;
+      color: var(--ink);
+      letter-spacing: 0.02em;
+      transition: background 0.2s ease, color 0.2s ease, border 0.2s ease, transform 0.15s ease;
+      min-width: 130px;
+    }
+
+    .btn-group button:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+    }
+
+    .btn-group button.secondary {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: #fff;
+    }
+
+    .btn-group button.secondary:hover {
+      background: #000;
+    }
+
+    .btn-group button:not(.secondary) {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .btn-group button:not(.secondary):hover {
+      background: #9d895c;
+      border-color: #9d895c;
+    }
+
     .case-list {
       display: flex;
       flex-direction: column;
@@ -309,6 +472,42 @@
 
     .case-actions {
       margin-top: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+    }
+
+    .case-actions button {
+      appearance: none;
+      border-radius: 999px;
+      padding: 0.5rem 1.4rem;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      font-weight: 300;
+      border: 1px solid rgba(0, 0, 0, 0.18);
+      background: var(--accent);
+      color: #fff;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+      min-width: 140px;
+    }
+
+    .case-actions button:hover {
+      transform: translateY(-1px);
+      background: #9a8253;
+      border-color: #9a8253;
+    }
+
+    .case-actions button[data-case-link="view"] {
+      background: #fff;
+      color: var(--ink);
+      border-color: rgba(0, 0, 0, 0.25);
+    }
+
+    .case-actions button[data-case-link="view"]:hover {
+      background: rgba(0, 0, 0, 0.04);
+      border-color: var(--accent);
     }
 
     .toast {
@@ -381,6 +580,179 @@
     .notification-item:last-child {
       border-bottom: none;
     }
+
+    .settings-card {
+      margin: 2rem 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 1.75rem;
+    }
+
+    .settings-card h2 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      margin-bottom: 0.25rem;
+    }
+
+    .settings-card p {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .settings-grid {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .settings-avatar {
+      flex: 0 0 240px;
+    }
+
+    .avatar-frame {
+      width: 180px;
+      height: 180px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      background: rgba(0, 0, 0, 0.03);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+
+    .avatar-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .avatar-initials {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      font-weight: 300;
+      color: var(--muted);
+    }
+
+    .avatar-actions button {
+      display: block;
+      width: 100%;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      border-radius: 999px;
+      padding: 0.55rem 1rem;
+      font-size: 0.9rem;
+      background: #fff;
+      cursor: pointer;
+      margin-bottom: 0.55rem;
+      transition: background 0.2s ease;
+    }
+
+    .avatar-actions button:last-child {
+      margin-bottom: 0;
+    }
+
+    .avatar-actions button:hover {
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    .settings-fields {
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .settings-fields textarea {
+      width: 100%;
+      min-height: 140px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      padding: 0.85rem;
+      font-family: inherit;
+      font-size: 0.95rem;
+      resize: vertical;
+      margin-bottom: 0.35rem;
+    }
+
+    .settings-fields small {
+      display: block;
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 1.1rem;
+    }
+
+    .pref-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .pref-row {
+      display: flex;
+      gap: 0.85rem;
+      align-items: center;
+    }
+
+    .pref-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .pref-desc {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin: 0.15rem 0 0;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 42px;
+      height: 24px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .switch .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 999px;
+      transition: background 0.2s ease;
+    }
+
+    .switch .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 2px;
+      bottom: 2px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s ease;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    .switch input:checked + .slider {
+      background: var(--accent);
+    }
+
+    .switch input:checked + .slider:before {
+      transform: translateX(18px);
+    }
   </style>
 </head>
 <body>
@@ -388,14 +760,11 @@
     <div class="logo">Dashboard</div>
     <nav>
       <a href="dashboard-attorney.html" class="active">Home</a>
-      <a href="active-cases.html">Cases</a>
-      <a href="messages.html">Messages</a>
-      <a href="documents.html">Documents</a>
-      <a href="review.html">Review</a>
-      <a href="case-files.html">Case Files</a>
-      <a href="payments-escrow.html">Billing</a>
+      <a href="active-cases.html">Cases &amp; Files</a>
+      <a href="billing-attorney.html">Escrow</a>
       <a href="help.html">Help</a>
     </nav>
+    <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
     <div style="margin-top: auto; font-size: 0.7rem; color: var(--muted); text-align: center;">
       © Let’s‑ParaConnect 2025
     </div>
@@ -430,11 +799,11 @@
     <div class="side-by-side-panels">
       <section id="latestMessagePreview">
         <div class="section-title">Unread Messages</div>
-        <div class="info-line">
-          <strong id="messagePreviewSender"></strong>
-          <span id="messagePreviewText"></span>
-          <a id="messagePreviewLink" href="messages.html">View</a>
-        </div>
+          <div class="info-line">
+            <strong id="messagePreviewSender"></strong>
+            <span id="messagePreviewText"></span>
+            <a id="messagePreviewLink" href="#">View</a>
+          </div>
       </section>
       <section>
         <div class="section-title">Escrow Status</div>
@@ -474,6 +843,8 @@
 <script>
   window.__ATTORNEY_PAGE__ = "overview";
 </script>
+<script src="assets/libs/cropper/cropper.main.js"></script>
 <script type="module" src="assets/scripts/attorney-tabs.js"></script>
+<script type="module" src="assets/scripts/attorney-settings.js"></script>
 </body>
 </html>

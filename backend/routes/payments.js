@@ -534,7 +534,6 @@ router.post(
     c.downloadUrl = downloadPaths;
     if (Array.isArray(c.applicants)) c.applicants = [];
     if (Array.isArray(c.updates)) c.updates = [];
-    if (typeof c.internalNotes !== "undefined") c.internalNotes = undefined;
     await c.save();
 
     const attorneyObjectId = c.attorney?._id || c.attorneyId || c.attorney;

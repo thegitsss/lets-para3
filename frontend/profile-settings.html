@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Account Settings | Let<span class="gold">’</span>s-ParaConnect</title>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/libs/cropper/cropper.main.css" />
   <script src="assets/scripts/utils/session.js"></script>
   <style>
     .gold{color:#b4975a;}
@@ -250,6 +249,9 @@
     #attorneySettings .actions-row {
       display: flex;
       justify-content: flex-end;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
       margin-top: 12px;
     }
 
@@ -350,28 +352,6 @@
 
     .avatar-frame.has-photo img {
       display: block;
-    }
-
-    .avatar-frame .cropper-container,
-    .avatar-frame .cropper-wrap-box,
-    .avatar-frame .cropper-canvas,
-    .avatar-frame .cropper-crop-box,
-    .avatar-frame .cropper-view-box {
-      left: 0 !important;
-      top: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
-      transform: none !important;
-    }
-
-    .avatar-frame .cropper-crop-box,
-    .avatar-frame .cropper-view-box,
-    .avatar-frame .cropper-face,
-    .avatar-frame .cropper-line,
-    .avatar-frame .cropper-point,
-    .avatar-frame .cropper-dashed,
-    .avatar-frame .cropper-center {
-      display: none !important;
     }
 
     .avatar-frame span {
@@ -900,16 +880,12 @@
 
       <div id="attorneySettings" class="role-settings hidden" data-attorney-settings>
         <div class="settings-section">
-          <h2 class="section-title">Profile</h2>
-          <p class="section-subtitle">Update your public-facing information and bio.</p>
-
           <div class="avatar-block">
             <div class="photo-row">
               <div class="avatar-frame" id="attorneyAvatarFrame" role="button" tabindex="0">
                 <img id="attorneyAvatarPreview" alt="Profile photo" hidden />
                 <span id="attorneyAvatarInitials">A</span>
               </div>
-              <button class="btn btn-outline" type="button" id="attorneyAvatarUploadBtn">Upload Photo</button>
             </div>
             <input type="file" id="attorneyAvatarInput" accept="image/*" hidden />
           </div>
@@ -950,6 +926,7 @@
           <div class="form-field">
             <label for="attorneyPracticeDescription">Practice Description (optional)</label>
             <textarea id="attorneyPracticeDescription" rows="5" placeholder="Briefly describe your practice, areas of focus, or how you collaborate with paralegals."></textarea>
+            <div id="attorneyPracticeCount" class="muted">0 / 4000 characters</div>
           </div>
         </div>
 
@@ -995,6 +972,7 @@
 
         <div class="actions-row">
           <button id="saveAttorneyProfile" class="save-btn" type="button">Save changes</button>
+          <button id="attorneyPreviewProfileBtn" class="btn btn-outline" type="button">View Profile</button>
         </div>
       </div>
 
@@ -1009,16 +987,6 @@
 
           <input type="file" id="avatarInput" accept="image/*" hidden />
 
-          <!-- Cropping modal -->
-          <div id="cropperModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; z-index:999;">
-            <div style="background:white; padding:20px; border-radius:12px;">
-              <img id="cropImage" style="max-width:400px;" />
-              <div style="margin-top:12px; text-align:center;">
-                <button id="cropConfirmBtn" type="button" class="btn-primary">Save Photo</button>
-                <button id="cropCancelBtn" type="button" class="btn-outline">Cancel</button>
-              </div>
-            </div>
-          </div>
           <div class="grid">
             <label for="firstNameInput">
               First name
@@ -1151,7 +1119,6 @@ Legal Assistant at..."></textarea>
     </div>
   </div>
 
-  <script src="assets/libs/cropper/cropper.main.js"></script>
   <script src="assets/scripts/utils/toast.js"></script>
   <script>
     window.__ATTORNEY_PAGE__ = "profile-settings";

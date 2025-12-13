@@ -10,7 +10,6 @@ const REQUIRED_ROLES = Array.isArray(ROLE_SPEC)
   : ROLE_SPEC
   ? [String(ROLE_SPEC).toLowerCase()]
   : ["attorney"];
-const MESSAGE_JUMP_KEY = "lpc_message_jump";
 const HEADER_ONLY_ROUTES = {
   paralegal: new Set(["overview", "case-files", "profile-settings"]),
   attorney: new Set(["create-case"]),
@@ -41,6 +40,7 @@ const state = {
   tasks: [],
   tasksPromise: null,
   latestThreadId: null,
+  latestThreadCaseId: null,
   billing: {
     summary: null,
     posted: [],
@@ -502,7 +502,7 @@ async function initOverviewPage() {
 
   if (messageBox) {
     messageBox.addEventListener("click", () => {
-      goToMessages(state.latestThreadId);
+      goToMessages(state.latestThreadCaseId);
     });
   }
 
@@ -527,7 +527,7 @@ async function initOverviewPage() {
 
   messagePreviewLink?.addEventListener("click", (evt) => {
     evt.preventDefault();
-    goToMessages(state.latestThreadId);
+    goToMessages(state.latestThreadCaseId);
   });
 
   async function fetchUnreadMessages() {
@@ -600,12 +600,12 @@ function renderCompletedJobCard(job) {
 }
 
 function goToMessages(caseId) {
-  if (caseId) {
-    try {
-      sessionStorage.setItem(MESSAGE_JUMP_KEY, JSON.stringify({ caseId }));
-    } catch {}
+  if (!caseId) {
+    notifyMessages("Open an active case to view messages.", "info");
+    return;
   }
-  window.location.href = "messages.html";
+  const target = `case-detail.html?caseId=${encodeURIComponent(caseId)}#messages`;
+  window.location.href = target;
 }
 // -------------------------
 // Billing Page
@@ -2061,6 +2061,18 @@ async function initCasesPage() {
       }
     });
   });
+  setupCaseNoteModal();
+  window.addEventListener("lpc-case-notes-updated", async (event) => {
+    const targetId = event?.detail?.caseId;
+    if (!targetId) return;
+    try {
+      const payload = await fetchCaseNote(targetId);
+      applyNoteToState(targetId, payload);
+      renderCasesView();
+    } catch (err) {
+      console.warn("External note refresh failed", err);
+    }
+  });
 }
 
 async function loadArchivedCases(force = false) {
@@ -2101,7 +2113,7 @@ function renderCasesView() {
     if (!records.length) {
       const searchActive = state.casesSearchTerm && key === state.casesViewFilter;
       const message = searchActive ? "No cases match your search." : "No cases in this category.";
-      body.innerHTML = `<tr><td colspan="6" class="empty-row">${message}</td></tr>`;
+      body.innerHTML = `<tr><td colspan="7" class="empty-row">${message}</td></tr>`;
       return;
     }
     body.innerHTML = records.map((item) => renderCaseRow(item, key)).join("");
@@ -2156,6 +2168,7 @@ function matchesCaseSearch(item, term) {
     item.paralegal?.name,
     item.paralegal?.firstName,
     item.paralegal?.lastName,
+    item.internalNotes?.note,
   ]
     .filter(Boolean)
     .join(" ")
@@ -2180,12 +2193,22 @@ function renderCaseRow(item, filterKey = "active") {
     filterKey === "draft" ? updated : filterKey === "archived" ? updated : created;
   const statusText = formatCaseStatus(item.status);
   const statusClass = getStatusClass(item.status);
+  const rawNote = (item.internalNotes?.note || "").trim();
+  const notePreview = rawNote.length > 140 ? `${rawNote.slice(0, 137)}…` : rawNote;
+  const noteDisplay = notePreview ? `<div class="note-preview">${sanitize(notePreview)}</div>` : '<span class="muted">—</span>';
+  const noteAction =
+    canEditCaseNotes() && item.id
+      ? `<button type="button" class="note-edit-btn" data-case-action="edit-note" data-case-id="${item.id}">${
+          rawNote ? "Edit Note" : "Add Note"
+        }</button>`
+      : "";
   return `
     <tr data-case-id="${item.id}">
       <td><a href="case-detail.html?caseId=${encodeURIComponent(item.id)}">${sanitize(item.title || "Untitled Case")}</a></td>
       <td>${sanitize(client)}</td>
       <td>${sanitize(practice)}</td>
       <td><span class="status ${statusClass}">${statusText}</span></td>
+      <td class="note-cell">${noteDisplay}${noteAction ? `<div>${noteAction}</div>` : ""}</td>
       <td>${displayedDate}</td>
       <td class="actions">${renderCaseMenu(item)}</td>
     </tr>
@@ -2226,6 +2249,123 @@ function hasDeliverables(item) {
     (Array.isArray(item.downloadUrl) && item.downloadUrl.length > 0) ||
     (Array.isArray(item.files) && item.files.length > 0)
   );
+}
+
+function canEditCaseNotes() {
+  const role = String(state.user?.role || "").toLowerCase();
+  return role === "attorney" || role === "admin";
+}
+
+let caseNoteModalRef = null;
+let caseNoteTextarea = null;
+let caseNoteSaveBtn = null;
+let caseNoteCancelBtn = null;
+let caseNoteTargetId = null;
+let caseNoteSaving = false;
+
+function setupCaseNoteModal() {
+  caseNoteModalRef = document.getElementById("caseNoteModal");
+  if (!caseNoteModalRef) return;
+  caseNoteTextarea = document.getElementById("caseNoteTextarea") || caseNoteModalRef.querySelector("textarea");
+  caseNoteSaveBtn = caseNoteModalRef.querySelector("[data-note-save]");
+  caseNoteCancelBtn = caseNoteModalRef.querySelector("[data-note-cancel]");
+  caseNoteCancelBtn?.addEventListener("click", closeCaseNoteModal);
+  caseNoteModalRef.addEventListener("click", (event) => {
+    if (event.target === caseNoteModalRef) {
+      closeCaseNoteModal();
+    }
+  });
+  caseNoteSaveBtn?.addEventListener("click", async () => {
+    if (!caseNoteTargetId || caseNoteSaving) return;
+    const note = caseNoteTextarea?.value?.trim() || "";
+    await persistCaseNote(caseNoteTargetId, note);
+  });
+}
+
+function closeCaseNoteModal() {
+  if (caseNoteModalRef) {
+    caseNoteModalRef.classList.add("hidden");
+    caseNoteModalRef.removeAttribute("aria-busy");
+  }
+  caseNoteTargetId = null;
+}
+
+async function openCaseNoteModal(caseId) {
+  if (!caseId || !caseNoteModalRef) return;
+  caseNoteTargetId = caseId;
+  caseNoteModalRef.classList.remove("hidden");
+  caseNoteModalRef.removeAttribute("aria-hidden");
+  if (caseNoteTextarea) {
+    caseNoteTextarea.value = "";
+    caseNoteTextarea.focus();
+  }
+  try {
+    const payload = await fetchCaseNote(caseId);
+    if (caseNoteTextarea && payload?.note) {
+      caseNoteTextarea.value = payload.note;
+    }
+  } catch (err) {
+    notifyCases(err?.message || "Unable to load notes.", "error");
+  }
+}
+
+async function fetchCaseNote(caseId) {
+  const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/notes`, {
+    headers: { Accept: "application/json" },
+    noRedirect: true,
+  });
+  if (!res.ok) throw new Error("Unable to load notes.");
+  return res.json();
+}
+
+async function persistCaseNote(caseId, note) {
+  caseNoteSaving = true;
+  if (caseNoteSaveBtn) {
+    caseNoteSaveBtn.disabled = true;
+    caseNoteSaveBtn.textContent = "Saving…";
+  }
+  try {
+    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/notes`, {
+      method: "PUT",
+      headers: { Accept: "application/json" },
+      body: { note },
+    });
+    if (!res.ok) throw new Error("Unable to save note.");
+    const payload = await res.json();
+    applyNoteToState(caseId, payload);
+    renderCasesView();
+    closeCaseNoteModal();
+    notifyCases("Note updated.", "success");
+  } catch (err) {
+    console.warn("Note save failed", err);
+    notifyCases(err?.message || "Unable to save note.", "error");
+  } finally {
+    caseNoteSaving = false;
+    if (caseNoteSaveBtn) {
+      caseNoteSaveBtn.disabled = false;
+      caseNoteSaveBtn.textContent = "Save Note";
+    }
+  }
+}
+
+function applyNoteToState(caseId, payload) {
+  if (!caseId) return;
+  const normalized = {
+    note: payload?.note || "",
+    updatedAt: payload?.updatedAt || null,
+    updatedBy: payload?.updatedBy || null,
+  };
+  const caseIdStr = String(caseId);
+  const syncCollection = (collection = []) => {
+    const entry = collection.find((c) => String(c.id) === caseIdStr);
+    if (entry) entry.internalNotes = normalized;
+  };
+  syncCollection(state.cases);
+  syncCollection(state.casesArchived);
+  if (state.caseLookup.has(caseIdStr)) {
+    const target = state.caseLookup.get(caseIdStr);
+    if (target) target.internalNotes = normalized;
+  }
 }
 
 function onCasesTableClick(event) {
@@ -2270,6 +2410,9 @@ async function handleCaseAction(action, caseId) {
       window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
     } else if (action === "messages") {
       goToMessages(caseId);
+    } else if (action === "edit-note") {
+      openCaseNoteModal(caseId);
+      return;
     } else if (action === "download") {
       await downloadCaseDeliverables(caseId);
     } else if (action === "archive") {
@@ -2429,7 +2572,7 @@ function renderMessageCases() {
   if (!container) return;
   const list = state.messages.cases;
   if (!list.length) {
-    container.innerHTML = `<p style="color:var(--muted);font-size:.9rem;">You have no active cases yet.</p>`;
+    container.innerHTML = `<div class="messages-placeholder" role="status">You have no active cases yet.</div>`;
     return;
   }
   const activeId = state.messages.activeCaseId;
@@ -2527,7 +2670,7 @@ function renderMessageThreads(caseId) {
   const container = document.querySelector("[data-message-threads]");
   if (!container) return;
   if (!caseId) {
-    container.innerHTML = `<p style="color:var(--muted);font-size:.9rem;">Select a case to view conversations.</p>`;
+    container.innerHTML = `<div class="messages-placeholder" role="status">Select a case to view conversations.</div>`;
     return;
   }
   const messages = state.messages.messagesByCase.get(String(caseId)) || [];
@@ -3744,6 +3887,7 @@ function updateMessagePreviewUI({ threads = [], messageSnippet, messagePreviewSe
     if (messagePreviewSender) messagePreviewSender.textContent = "Inbox";
     if (messagePreviewText) messagePreviewText.textContent = " – You're all caught up.";
     state.latestThreadId = null;
+    state.latestThreadCaseId = null;
     return;
   }
   const nextThread = threads.find((t) => (t.unread || 0) > 0) || threads[0];
@@ -3752,6 +3896,7 @@ function updateMessagePreviewUI({ threads = [], messageSnippet, messagePreviewSe
   if (messagePreviewSender) messagePreviewSender.textContent = nextThread.title || "Case thread";
   if (messagePreviewText) messagePreviewText.textContent = ` – ${snippet}`;
   state.latestThreadId = nextThread.id || null;
+  state.latestThreadCaseId = nextThread.caseId || nextThread.case?.id || null;
 }
 
 function renderEscrowPanel(container, metrics = {}) {

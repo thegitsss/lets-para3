@@ -1531,7 +1531,19 @@ return date.toLocaleString();
 
 const listText = (list) => {
 if (!Array.isArray(list) || !list.length) return '—';
-return list.join(', ');
+const mapped = list
+  .map((item) => {
+    if (typeof item === 'string') return item;
+    if (item && typeof item === 'object') {
+      const name = item.name || item.language || '';
+      const proficiency = item.proficiency || item.level || '';
+      if (!name) return '';
+      return proficiency ? `${name} (${proficiency})` : name;
+    }
+    return '';
+  })
+  .filter(Boolean);
+return mapped.length ? mapped.join(', ') : '—';
 };
 
 const richListText = (entries = []) => {

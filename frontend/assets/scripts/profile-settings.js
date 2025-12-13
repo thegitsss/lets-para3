@@ -185,7 +185,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 let settingsState = {
-  profileImageFile: null,
   profileImage: "",
   resumeFile: null,
   pendingResumeKey: "",
@@ -202,7 +201,6 @@ let settingsState = {
 };
 
 let currentUser = null;
-let attorneyAvatarBound = false;
 let attorneyPrefsBound = false;
 let attorneySaveBound = false;
 
@@ -282,7 +280,6 @@ function initAttorneySettings(user = {}) {
   seedSettingsState(user);
   showAttorneySettings();
   hydrateAttorneyProfileForm(user);
-  bindAttorneyAvatarUploader();
   bindAttorneyPracticeEditor();
   bindAttorneySaveButton();
   bindAttorneyNotificationToggles();
@@ -362,27 +359,6 @@ function updateAttorneyAvatarPreview(user = {}) {
   }
 }
 
-function bindAttorneyAvatarUploader() {
-  const frame = document.getElementById("attorneyAvatarFrame");
-  const input = document.getElementById("attorneyAvatarInput");
-  const uploadBtn = document.getElementById("attorneyAvatarUploadBtn");
-  if (!frame || !input) return;
-  if (attorneyAvatarBound) return;
-
-  const triggerUpload = () => input.click();
-  frame.style.cursor = "pointer";
-  frame.addEventListener("click", triggerUpload);
-  frame.addEventListener("keydown", (evt) => {
-    if (evt.key === "Enter" || evt.key === " ") {
-      evt.preventDefault();
-      triggerUpload();
-    }
-  });
-  if (uploadBtn) uploadBtn.addEventListener("click", triggerUpload);
-  input.addEventListener("change", handleAttorneyAvatarFile);
-  attorneyAvatarBound = true;
-}
-
 function bindAttorneySaveButton() {
   if (attorneySaveBound) return;
   const saveBtn = document.getElementById("saveAttorneyProfile");
@@ -442,52 +418,6 @@ function hydrateAttorneyNotificationPrefs(user = {}) {
   };
 }
 
-async function handleAttorneyAvatarFile(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async () => {
-    const dataUrl = reader.result;
-    if (!dataUrl) return;
-    const preview = document.getElementById("attorneyAvatarPreview");
-    const initials = document.getElementById("attorneyAvatarInitials");
-    if (preview) {
-      preview.src = dataUrl;
-      preview.hidden = false;
-      initials?.classList.add("hidden");
-    }
-    try {
-      await uploadAttorneyAvatar(dataUrl);
-      showToast("Profile photo updated!", "ok");
-    } catch (err) {
-      console.error("Unable to upload attorney avatar", err);
-      showToast("Unable to upload photo. Please try again.", "err");
-    } finally {
-      event.target.value = "";
-    }
-  };
-  reader.readAsDataURL(file);
-}
-
-async function uploadAttorneyAvatar(imageDataUrl) {
-  if (!imageDataUrl) throw new Error("Missing image data");
-  const res = await secureFetch("/api/users/profile-photo", {
-    method: "POST",
-    body: { image: imageDataUrl }
-  });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok || !payload?.url) {
-    throw new Error(payload?.error || "Upload failed");
-  }
-  const updatedUser = { ...(currentUser || {}), profileImage: payload.url };
-  currentUser = updatedUser;
-  settingsState.profileImage = payload.url;
-  persistSession({ user: updatedUser });
-  window.updateSessionUser?.(updatedUser);
-  applyAvatar(updatedUser);
-  return payload.url;
-}
-
 function collectAttorneyPayload() {
   const first = document.getElementById("attorneyFirstName")?.value.trim() || "";
   const last = document.getElementById("attorneyLastName")?.value.trim() || "";
@@ -527,11 +457,13 @@ function updateAttorneyPracticeCount() {
   counter.textContent = `${length} / 4000 characters`;
 }
 async function handleAttorneyProfileSave() {
-  const saveBtn = document.getElementById("attorneyProfileSaveBtn");
-  if (!saveBtn) return;
-  const originalLabel = saveBtn.textContent;
-  saveBtn.disabled = true;
-  saveBtn.textContent = "Saving…";
+  const saveBtn =
+    document.getElementById("saveAttorneyProfile") || document.getElementById("attorneyProfileSaveBtn");
+  const originalLabel = saveBtn?.textContent || "";
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving…";
+  }
   try {
     const payload = collectAttorneyPayload();
     const res = await secureFetch("/api/users/me", {
@@ -559,8 +491,10 @@ async function handleAttorneyProfileSave() {
     console.error("Failed to save attorney profile", err);
     showToast("Unable to save profile right now.", "err");
   } finally {
-    saveBtn.disabled = false;
-    saveBtn.textContent = originalLabel || "Save profile";
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = originalLabel || "Save profile";
+    }
   }
 }
 
@@ -1555,209 +1489,22 @@ async function saveSettings() {
 // PROFILE PHOTO UPLOAD FLOW
 // -----------------------------
 
-let cropper = null;
-
-// DOM Elements
-const avatarPreview = document.getElementById("avatarPreview");
-const avatarInitials = document.getElementById("avatarInitials");
-const avatarFrame = document.getElementById("avatarFrame");
-const avatarInput = document.getElementById("avatarInput");
-
-if (avatarInput) {
-  avatarInput.addEventListener("change", handleFileSelect);
-}
-
-const cropperModal = document.getElementById("cropperModal");
-const cropImage = document.getElementById("cropImage");
-const cropConfirmBtn = document.getElementById("cropConfirmBtn");
-const cropCancelBtn = document.getElementById("cropCancelBtn");
-
-// -----------------------------
-// STEP 1: User selects a photo
-// -----------------------------
-async function handleFileSelect() {
-  if (!avatarInput) return;
-  const file = avatarInput.files[0];
-  if (!file || !avatarPreview || !avatarFrame || !avatarInitials) return;
-
-  const reader = new FileReader();
-    reader.onload = (e) => {
-      avatarPreview.src = e.target.result;
-      avatarPreview.style.objectPosition = "center center";
-
-      avatarInitials.style.display = "none";
-      avatarFrame.classList.add("has-photo");
-
-    if (cropper) cropper.destroy();
-
-    cropper = new Cropper(avatarPreview, {
-      aspectRatio: 1,
-      viewMode: 1,
-      autoCropArea: 1,
-      background: false,
-      center: true,
-      dragMode: "move",
-      movable: true,
-      zoomable: true,
-      scalable: false,
-      rotatable: false,
-      cropBoxMovable: false,
-      cropBoxResizable: false,
-      guides: false,
-      highlight: false,
-      modal: false,
-      toggleDragModeOnDblclick: false,
-      ready() {
-        setTimeout(() => {
-          cropper.reset();
-          cropper.crop();
-          centerCropperCanvas(cropper);
-        }, 0);
-      }
-    });
-
-    settingsState.profileImageFile = file;
-  };
-  reader.readAsDataURL(file);
-}
-
-function centerCropperCanvas(instance) {
-  if (!instance) return;
-  const container = instance.getContainerData?.();
-  const canvas = instance.getCanvasData?.();
-  if (!container || !canvas) return;
-
-  const frameRect = avatarFrame?.getBoundingClientRect();
-  const containerWidth = frameRect?.width || container.width || canvas.width;
-  const containerHeight = frameRect?.height || container.height || canvas.height;
-  const scaleFactor = Math.max(
-    containerWidth / canvas.width,
-    containerHeight / canvas.height,
-    1
-  );
-  const scaledWidth = canvas.width * scaleFactor;
-  const scaledHeight = canvas.height * scaleFactor;
-
-  const centeredCanvas = {
-    ...canvas,
-    width: scaledWidth,
-    height: scaledHeight,
-    left: (containerWidth - scaledWidth) / 2,
-    top: (containerHeight - scaledHeight) / 2
-  };
-  instance.setCanvasData(centeredCanvas);
-
-  const cropBox = instance.getCropBoxData?.();
-  if (cropBox) {
-    instance.setCropBoxData({
-      ...cropBox,
-      width: containerWidth,
-      height: containerHeight,
-      left: 0,
-      top: 0
-    });
+const avatarUploadConfigs = [
+  { frameId: "avatarFrame", inputId: "avatarInput", previewId: "avatarPreview", initialsId: "avatarInitials" },
+  {
+    frameId: "attorneyAvatarFrame",
+    inputId: "attorneyAvatarInput",
+    previewId: "attorneyAvatarPreview",
+    initialsId: "attorneyAvatarInitials"
   }
-}
+];
 
+function initAvatarUploaders() {
+  avatarUploadConfigs.forEach((config) => {
+    const frame = document.getElementById(config.frameId);
+    const input = document.getElementById(config.inputId);
+    if (!frame || !input) return;
 
-// -----------------------------
-// STEP 2: Save cropped photo
-// -----------------------------
-async function saveCroppedPhoto() {
-  if (!cropper) return;
-
-  cropConfirmBtn.disabled = true;
-  cropConfirmBtn.textContent = "Saving...";
-
-  const canvas = cropper.getCroppedCanvas({
-    width: 480,
-    height: 480
-  });
-
-  if (!canvas) {
-    showToast("Could not process image.");
-    resetSaveButton();
-    return;
-  }
-
-  // Immediately reflect preview so the gold frame updates even before upload completes
-  const dataUrl = canvas.toDataURL("image/png");
-  if (avatarPreview && dataUrl) {
-    avatarPreview.src = dataUrl;
-    const frame = document.getElementById("avatarFrame");
-    const initials = document.getElementById("avatarInitials");
-    if (frame) frame.classList.add("has-photo");
-    if (initials) initials.style.display = "none";
-  }
-
-  canvas.toBlob(async (blob) => {
-    if (!blob) {
-      showToast("Could not process image.");
-      resetSaveButton();
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", blob, "avatar.png");
-
-    try {
-      const res = await fetch("/api/uploads/profile-photo", {
-        method: "POST",
-        body: formData,
-        credentials: "include"
-      });
-
-      if (!res.ok) throw new Error("Upload failed");
-
-      const payload = await res.json();
-      const uploadedUrl = payload?.url || payload?.profileImage || payload?.avatarURL;
-      if (uploadedUrl) {
-        currentUser = { ...(currentUser || {}), profileImage: uploadedUrl };
-        settingsState.profileImage = uploadedUrl;
-        persistSession({ user: currentUser });
-        window.updateSessionUser?.(currentUser);
-        // Update avatar preview + header using shared helper
-        applyAvatar(currentUser);
-      }
-
-      showToast("Profile photo updated!");
-      resetCropperModal();
-    } catch (err) {
-      console.error(err);
-      showToast("Failed to upload image. Try again.");
-    }
-
-    resetSaveButton();
-  }, "image/png");
-}
-
-
-// -----------------------------
-// Helpers
-// -----------------------------
-function resetSaveButton() {
-  cropConfirmBtn.disabled = false;
-  cropConfirmBtn.textContent = "Save Photo";
-}
-
-function resetCropperModal() {
-  if (cropper) {
-    cropper.destroy();
-    cropper = null;
-  }
-
-  if (cropperModal) cropperModal.style.display = "none";
-  if (cropImage) cropImage.src = "";
-  if (avatarInput) avatarInput.value = ""; // reset so selecting same file again still triggers change
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  const frame = document.getElementById("avatarFrame");
-  const input = document.getElementById("avatarInput");
-  const cropConfirmBtn = document.getElementById("cropConfirmBtn");
-  const cropCancelBtn = document.getElementById("cropCancelBtn");
-
-  if (frame && input) {
     frame.style.cursor = "pointer";
     frame.addEventListener("click", () => input.click());
     frame.addEventListener("keydown", (evt) => {
@@ -1766,16 +1513,72 @@ document.addEventListener("DOMContentLoaded", () => {
         input.click();
       }
     });
-  }
 
-  if (cropConfirmBtn) {
-    cropConfirmBtn.addEventListener("click", saveCroppedPhoto);
-  }
+    input.addEventListener("change", () => handleAvatarUpload(config));
+  });
+}
 
-  if (cropCancelBtn) {
-    cropCancelBtn.addEventListener("click", resetCropperModal);
+async function handleAvatarUpload(config) {
+  const input = document.getElementById(config.inputId);
+  const preview = document.getElementById(config.previewId);
+  const initials = document.getElementById(config.initialsId);
+  const frame = document.getElementById(config.frameId);
+  if (!input || !frame || !preview) return;
+
+  const file = input.files?.[0];
+  if (!file) return;
+
+  const localUrl = URL.createObjectURL(file);
+  updateAvatarPreview(preview, frame, initials, localUrl);
+
+  try {
+    const uploadedUrl = await uploadProfilePhotoFile(file);
+    if (uploadedUrl) {
+      const updatedUser = { ...(currentUser || {}), profileImage: uploadedUrl };
+      currentUser = updatedUser;
+      settingsState.profileImage = uploadedUrl;
+      persistSession({ user: updatedUser });
+      window.updateSessionUser?.(updatedUser);
+      applyAvatar(updatedUser);
+      showToast("Profile photo updated!", "ok");
+    }
+  } catch (err) {
+    console.error("Unable to upload profile photo", err);
+    showToast("Unable to upload photo. Please try again.", "err");
+  } finally {
+    URL.revokeObjectURL(localUrl);
+    input.value = "";
   }
-});
+}
+
+function updateAvatarPreview(preview, frame, initials, src) {
+  if (preview) {
+    preview.src = src;
+    preview.hidden = false;
+    preview.style.objectPosition = "center center";
+  }
+  if (frame) frame.classList.add("has-photo");
+  if (initials) initials.style.display = "none";
+}
+
+async function uploadProfilePhotoFile(file) {
+  const formData = new FormData();
+  formData.append("file", file, file.name || "avatar.png");
+
+  const res = await fetch("/api/uploads/profile-photo", {
+    method: "POST",
+    body: formData,
+    credentials: "include"
+  });
+
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload?.error || "Upload failed");
+  }
+  return payload?.url || payload?.profileImage || payload?.avatarURL || "";
+}
+
+document.addEventListener("DOMContentLoaded", initAvatarUploaders);
 
 function saveProfile() {
   saveSettings();
@@ -1791,26 +1594,27 @@ if (profileForm) {
   profileForm.addEventListener("submit", (e) => e.preventDefault());
 }
 
-const previewBtn = document.getElementById("previewProfileBtn");
-if (previewBtn) {
-  previewBtn.addEventListener("click", () => {
-    if (!currentUser) {
-      alert("Unable to load your profile.");
-      return;
-    }
+function handleProfilePreviewNavigation() {
+  if (!currentUser) {
+    alert("Unable to load your profile.");
+    return;
+  }
 
-    const role = (currentUser.role || "").toLowerCase();
-    const id = currentUser._id || currentUser.id;
+  const role = (currentUser.role || "").toLowerCase();
+  const id = currentUser._id || currentUser.id;
 
-    if (!id) {
-      alert("Missing user id.");
-      return;
-    }
+  if (!id) {
+    alert("Missing user id.");
+    return;
+  }
 
-    if (role === "attorney") {
-      window.location.href = `profile-attorney.html?id=${id}`;
-    } else {
-      window.location.href = `profile-paralegal.html?id=${id}`;
-    }
-  });
+  if (role === "attorney") {
+    window.location.href = `profile-attorney.html?id=${id}`;
+  } else {
+    window.location.href = `profile-paralegal.html?id=${id}`;
+  }
 }
+
+[document.getElementById("previewProfileBtn"), document.getElementById("attorneyPreviewProfileBtn")]
+  .filter(Boolean)
+  .forEach((btn) => btn.addEventListener("click", handleProfilePreviewNavigation));

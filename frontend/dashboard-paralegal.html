@@ -346,49 +346,113 @@
       transform: translate(-50%, 0);
     }
 
-    .notification-panel {
+    .header-cluster [data-notification-toggle][data-count]:after,
+    #notificationToggle[data-count]:after {
+      content: attr(data-count);
       position: absolute;
-      top: 40px;
-      right: 0;
-      width: 280px;
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      box-shadow: 0 15px 35px rgba(15, 23, 42, 0.18);
-      padding: 1rem;
-      display: none;
-      flex-direction: column;
-      gap: 0.75rem;
-      z-index: 100;
+      top: -4px;
+      right: -4px;
+      background: var(--accent);
+      color: #fff;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 999px;
     }
 
-    .notification-panel.show {
+    .notif-panel {
+      position: absolute;
+      top: 48px;
+      right: 0;
+      width: 340px;
+      background: #fff;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 12px;
+      padding: 0;
+      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
+      display: none;
+      flex-direction: column;
+      z-index: 200;
+    }
+
+    .notif-panel.show {
       display: flex;
     }
 
-    .notification-panel h4 {
-      margin: 0;
+    .notif-panel.hidden {
+      display: none;
+    }
+
+    .notif-header {
       font-family: var(--font-serif);
-      font-size: 1.1rem;
       font-weight: 300;
+      font-size: 1.3rem;
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      background: #fafafa;
     }
 
-    .notification-panel p {
-      margin: 0;
-      font-size: 0.9rem;
-      color: var(--muted);
+    #notifList {
+      max-height: 360px;
+      overflow-y: auto;
     }
 
-    .notification-item {
-      padding: 0.5rem 0;
-      border-bottom: 1px solid var(--line);
-      font-size: 0.9rem;
-      line-height: 1.4;
-      color: var(--ink);
+    .notif-item {
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+      cursor: pointer;
+      transition: background 0.15s ease;
     }
 
-    .notification-item:last-child {
+    .notif-item:last-child {
       border-bottom: none;
+    }
+
+    .notif-item.unread {
+      border-left: 3px solid var(--accent);
+    }
+
+    .notif-item.read {
+      opacity: 0.75;
+    }
+
+    .notif-title {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 1.15rem;
+      margin-bottom: 2px;
+    }
+
+    .notif-body {
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      font-size: 0.92rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .notif-time {
+      margin-top: 4px;
+      font-size: 0.8rem;
+      color: #888;
+    }
+
+    .notif-empty {
+      padding: 16px;
+      text-align: center;
+      font-size: 0.9rem;
+      color: #888;
+    }
+
+    .notif-markall {
+      border: none;
+      border-top: 1px solid rgba(0, 0, 0, 0.08);
+      background: #fafafa;
+      padding: 12px;
+      text-align: left;
+      font-size: 0.9rem;
+      cursor: pointer;
     }
 
     #latestMessage a {
@@ -412,6 +476,108 @@
       text-decoration: underline;
     }
 
+    /* Availability modal overlay must match Invite Modal */
+    #availabilityModal.modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 24px;
+    }
+
+    #availabilityModal.show {
+      display: flex;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    /* Availability Modal (same styling philosophy as Invite Modal) */
+    .availability-modal {
+      width: min(420px, 90%);
+      background: #fff;
+      border-radius: 20px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      box-shadow: 0 40px 80px rgba(0, 0, 0, 0.18);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .availability-modal h3 {
+      font-size: 1.4rem;
+      font-weight: 300;
+      margin-bottom: 4px;
+    }
+
+    .field-label {
+      font-size: 0.95rem;
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field-label input,
+    .field-label select {
+      padding: 8px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      font-family: inherit;
+      font-size: 0.95rem;
+    }
+
+    .modal-actions {
+      margin-top: 8px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+    }
+
+    .modal-actions button {
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      padding: 0.55rem 1.4rem;
+      font-size: 0.95rem;
+      font-family: inherit;
+      cursor: pointer;
+      background: var(--panel);
+      color: var(--ink);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease, color 0.2s ease;
+    }
+
+    .modal-actions button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+      background: #fff;
+    }
+
+    .modal-actions .confirm {
+      background: var(--accent);
+      border: none;
+      color: #fff;
+    }
+
+    .modal-actions .confirm:hover {
+      background: #c2b082;
+      box-shadow: 0 10px 24px rgba(182, 164, 122, 0.35);
+    }
+
+    .modal-actions .cancel {
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .modal-actions .cancel:hover {
+      background: rgba(0, 0, 0, 0.04);
+      color: var(--ink);
+    }
+
   </style>
 </head>
 <body>
@@ -419,7 +585,6 @@
     <div class="logo">Dashboard</div>
     <nav>
       <a href="dashboard-paralegal.html" class="active">Home</a>
-      <a href="messages.html">Messages</a>
       <a href="case-files.html">Active Cases</a>
       <a href="profile-settings.html">Profile Settings</a>
       <a href="help.html">Help</a>
@@ -437,9 +602,9 @@
 
     <section class="summary">
       <div class="info-box"><span data-field="activeCases">0</span> active cases</div>
-      <a class="info-box message-box" id="messageBox" href="messages.html">
+      <div class="info-box message-box" id="messageBox">
         <span id="messageCount" data-field="unreadMessages">0</span> message<span id="plural">s waiting</span>
-      </a>
+      </div>
       <div class="info-box">Next deadline: <span data-field="nextDeadline">--</span></div>
       <div class="info-box">$<span data-field="monthEarnings">0</span> earned this month</div>
     </section>
@@ -455,14 +620,14 @@
       <section>
         <div class="section-title">Latest Messages</div>
         <div class="info-line" id="latestMessage">
-          <strong data-field="latestMessageName">—</strong>: <span data-field="latestMessageExcerpt">No new messages.</span> <a href="messages.html">Open</a>
+          <strong data-field="latestMessageName">—</strong>: <span data-field="latestMessageExcerpt">No new messages.</span>
         </div>
       </section>
       <section>
         <div class="section-title">Availability</div>
         <div class="info-line">Status: <span id="availabilityStatus">Available now</span></div>
         <div class="info-line">Next available date: <span id="availabilityNext">This week</span></div>
-        <div class="info-line"><a href="#" id="updateAvailabilityLink">Update availability →</a></div>
+        <div class="info-line"><a href="#" id="updateAvailabilityLink" class="card-link">Update availability →</a></div>
       </section>
     </div>
 
@@ -471,6 +636,29 @@
       <button data-action="browse">Browse new postings</button>
       <button data-action="availability">Update availability</button>
     </section>
+
+    <div class="side-by-side-panels">
+      <section class="case-list" id="inviteList">
+        <div class="case-card empty-state">
+          <div class="case-header">
+            <div>
+              <h2>No invitations yet</h2>
+              <div class="case-subinfo">Case invites will appear here.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="case-list" id="assignedCasesList">
+        <div class="case-card empty-state">
+          <div class="case-header">
+            <div>
+              <h2>No assigned cases</h2>
+              <div class="case-subinfo">Accepted cases will be listed here.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
 
     <div class="side-by-side-panels">
       <section class="dashboard-card full-width" id="recommendedPostingsCard">
@@ -509,6 +697,30 @@
       </div>
     </div>
   </template>
+  <!-- AVAILABILITY MODAL -->
+  <div class="modal-overlay" id="availabilityModal">
+    <div class="availability-modal">
+      <h3>Update Availability</h3>
+
+      <label class="field-label">
+        Status
+        <select id="availabilityStatusInput">
+          <option value="available">Available now</option>
+          <option value="unavailable">Not available</option>
+        </select>
+      </label>
+
+      <label class="field-label">
+        Next available date
+        <input type="date" id="availabilityDateInput" />
+      </label>
+
+      <div class="modal-actions">
+        <button type="button" id="saveAvailabilityBtn" class="confirm">Save</button>
+        <button type="button" id="cancelAvailabilityBtn" class="cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
   <script src="assets/scripts/utils/toast.js"></script>
   <script>
@@ -541,6 +753,32 @@
     })();
   </script>
   <script type="module" src="assets/scripts/paralegal-dashboard.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const modal = document.getElementById("availabilityModal");
+      const link = document.getElementById("updateAvailabilityLink");
+      const cancel = document.getElementById("cancelAvailabilityBtn");
+      const quickAction = document.querySelector('.quick-actions button[data-action="availability"]');
+
+      if (!modal) return;
+
+      const showModal = (event) => {
+        event?.preventDefault();
+        modal.classList.add("show");
+      };
+
+      const hideModal = () => {
+        modal.classList.remove("show");
+      };
+
+      link?.addEventListener("click", showModal);
+      quickAction?.addEventListener("click", showModal);
+      cancel?.addEventListener("click", hideModal);
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) hideModal();
+      });
+    });
+  </script>
   <script>
     window.checkSession('paralegal');
     const logoutBtn = document.getElementById('logoutBtn');

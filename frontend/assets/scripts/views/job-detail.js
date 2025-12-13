@@ -46,6 +46,7 @@ function draw(root, job, escapeHTML) {
       <form class="apply-form" data-job-apply>
         <label for="coverLetter">Cover letter</label>
         <textarea id="coverLetter" name="coverLetter" rows="6" placeholder="Explain why you are a great fit for this job."></textarea>
+        <p class="apply-footnote">Your résumé, LinkedIn profile, and saved cover letter are included automatically.</p>
         <div class="apply-actions">
           <button class="btn primary" type="submit">Apply to this job</button>
           <span class="apply-status" data-apply-status></span>
@@ -116,6 +117,7 @@ function ensureStyles() {
     .apply-form{display:grid;gap:8px}
     .apply-form label{font-weight:600}
     .apply-form textarea{border:1px solid #d1d5db;border-radius:10px;padding:10px;font:inherit;resize:vertical}
+    .apply-footnote{font-size:.85rem;color:#6b7280;margin:0}
     .apply-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
     .apply-status{font-size:.9rem;color:#6b7280}
     .btn{padding:10px 16px;border-radius:999px;border:1px solid #d1d5db;cursor:pointer;font-weight:600}

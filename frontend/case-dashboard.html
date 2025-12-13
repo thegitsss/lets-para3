@@ -9,8 +9,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Case Dashboard | Let<span class="gold">’</span>s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
@@ -38,6 +38,24 @@
     nav{display:flex;flex-direction:column;gap:14px;}
     nav a{text-decoration:none;color:var(--ink);font-weight:200;font-size:.95rem;padding:10px 14px;border-radius:var(--radius);transition:background .3s ease;}
     nav a.active,nav a:hover{background:rgba(0,0,0,0.04);}
+    .sidebar-link{
+      margin-top:1.5rem;
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:0.6rem 1rem;
+      background:transparent;
+      font-size:0.9rem;
+      font-family:var(--font-sans);
+      cursor:pointer;
+      transition:background .2s,color .2s;
+    }
+    .sidebar-link:hover,
+    .sidebar-link:focus{
+      background:rgba(0,0,0,0.05);
+      color:var(--accent);
+      outline:none;
+    }
     .sidebar-footer{margin-top:auto;font-size:.7rem;color:var(--muted);text-align:center;}
 
     .main{flex:1;padding:40px;overflow-y:auto;background:var(--bg);}
@@ -98,14 +116,11 @@
     <div class="logo">Dashboard</div>
     <nav>
       <a href="dashboard-attorney.html">Home</a>
-      <a href="active-cases.html" class="active">Cases</a>
-      <a href="messages.html">Messages</a>
-      <a href="documents.html">Documents</a>
-      <a href="review.html">Review</a>
-      <a href="case-files.html">Case Files</a>
-      <a href="billing-attorney.html">Billing</a>
+      <a href="active-cases.html" class="active">Cases &amp; Files</a>
+      <a href="billing-attorney.html">Escrow</a>
       <a href="help.html">Help</a>
     </nav>
+    <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
     <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let<span class="gold">’</span>s-ParaConnect 2025</a></div>
   </aside>
 
@@ -148,7 +163,6 @@
           <button class="tab-btn" data-tab="invoices" onclick="window.location.href='case-invoices.html'">Invoices</button>
           <button class="tab-btn" data-tab="payments">Payments</button>
           <button class="tab-btn" data-tab="trust">Trust Transactions</button>
-          <button class="tab-btn" data-tab="messages" onclick="window.location.href='messages.html'">Messages</button>
           <button class="tab-btn" data-tab="settings">Settings</button>
         </div>
 
@@ -179,6 +193,7 @@
     </div>
   </main>
 
+  <script type="module" src="assets/scripts/auth.js"></script>
   <script>
     const clients=[
       { name:'Smith & Co.', cases:3, trust:'$1,050.00' },
@@ -261,7 +276,7 @@
       if(tab==='summary'){
         document.getElementById('summaryTab').classList.remove('hidden');
         document.getElementById('placeholderTab').classList.add('hidden');
-      } else if(tab==='invoices' || tab==='messages') {
+      } else if(tab==='invoices') {
         return; // handled via href
       } else {
         document.getElementById('summaryTab').classList.add('hidden');

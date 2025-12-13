@@ -2,6 +2,13 @@ let cropper;
 let saveTimer = null;
 let uploading = false;
 let uploaderObserver = null;
+const showToast = window.showToast || ((message, type = "info") => {
+    if (window.toastUtils?.show) {
+        window.toastUtils.show(message, { type });
+    } else {
+        console[type === "error" ? "error" : "log"](message);
+    }
+});
 
 function initProfileUploader() {
     const input = document.getElementById("profile-photo-input");
@@ -114,4 +121,92 @@ document.addEventListener("DOMContentLoaded", () => {
     initProfileUploader();
     uploaderObserver = new MutationObserver(() => initProfileUploader());
     uploaderObserver.observe(document.body, { childList: true, subtree: true });
+    initAttorneySettings();
 });
+
+function getAttorneyUser() {
+    if (window.currentUser) return window.currentUser;
+    try {
+        const raw = localStorage.getItem("lpc_user");
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
+
+function initAttorneySettings() {
+    const container = document.getElementById("attorneySettings");
+    if (!container) return;
+    const user = getAttorneyUser();
+    if (!user || (user.role && user.role !== "attorney")) return;
+
+    const first = document.getElementById("attorneyFirstName");
+    const last = document.getElementById("attorneyLastName");
+    const email = document.getElementById("attorneyEmail");
+    const linkedIn = document.getElementById("attorneyLinkedIn");
+    const firmName = document.getElementById("attorneyFirmName");
+    const firmWebsite = document.getElementById("attorneyFirmWebsite");
+    const practice = document.getElementById("attorneyPracticeDescription");
+
+    if (first) first.value = user.firstName || "";
+    if (last) last.value = user.lastName || "";
+    if (email) email.value = user.email || "";
+    if (linkedIn) linkedIn.value = user.linkedInURL || "";
+    if (firmName) firmName.value = user.firmName || user.lawFirm || "";
+    if (firmWebsite) firmWebsite.value = user.firmWebsite || "";
+    if (practice) practice.value = user.practiceDescription || user.bio || "";
+
+    const prefs = user.notificationPrefs || {};
+    const emailToggle = document.getElementById("attorneyEmailNotifications");
+    const messageToggle = document.getElementById("attorneyMessageAlerts");
+    const caseToggle = document.getElementById("attorneyCaseUpdates");
+    if (emailToggle) emailToggle.checked = !!(prefs.emailNotifications ?? prefs.email);
+    if (messageToggle) messageToggle.checked = !!(prefs.messageAlerts ?? prefs.emailMessages);
+    if (caseToggle) caseToggle.checked = !!(prefs.caseUpdates ?? prefs.emailCase);
+
+    const saveBtn = document.getElementById("saveAttorneyProfile");
+    if (saveBtn && !saveBtn.dataset.bound) {
+        saveBtn.dataset.bound = "true";
+        saveBtn.addEventListener("click", saveAttorneyProfile);
+    }
+}
+
+async function saveAttorneyProfile() {
+    const saveBtn = document.getElementById("saveAttorneyProfile");
+    if (saveBtn) saveBtn.disabled = true;
+
+    const payload = {
+        firstName: document.getElementById("attorneyFirstName")?.value || "",
+        lastName: document.getElementById("attorneyLastName")?.value || "",
+        linkedInURL: document.getElementById("attorneyLinkedIn")?.value || "",
+        firmName: document.getElementById("attorneyFirmName")?.value || "",
+        firmWebsite: document.getElementById("attorneyFirmWebsite")?.value || "",
+        practiceDescription: document.getElementById("attorneyPracticeDescription")?.value || "",
+        notificationPrefs: {
+            emailNotifications: document.getElementById("attorneyEmailNotifications")?.checked || false,
+            messageAlerts: document.getElementById("attorneyMessageAlerts")?.checked || false,
+            caseUpdates: document.getElementById("attorneyCaseUpdates")?.checked || false
+        }
+    };
+
+    try {
+        const res = await fetch("/api/users/profile", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error("Failed to save");
+
+        if (window.currentUser && typeof window.currentUser === "object") {
+            window.currentUser = { ...window.currentUser, ...payload, notificationPrefs: { ...window.currentUser.notificationPrefs, ...payload.notificationPrefs } };
+        }
+        showToast("Profile updated successfully.");
+    } catch (err) {
+        console.error(err);
+        showToast("Unable to save profile.", "error");
+    } finally {
+        if (saveBtn) saveBtn.disabled = false;
+    }
+}

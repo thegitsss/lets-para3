@@ -31,11 +31,6 @@ const ROUTES = {
     role: "attorney",
     title: "Settings",
   },
-  "attorney-messages": {
-    loader: () => import("./views/messages.js"),
-    role: "attorney",
-    title: "Messages",
-  },
   "paralegal-dashboard": {
     loader: () => import("./views/dashboard-paralegal.js"),
     role: "paralegal",
@@ -61,11 +56,6 @@ const ROUTES = {
     role: "paralegal",
     title: "Settings",
   },
-  "paralegal-messages": {
-    loader: () => import("./views/messages.js"),
-    role: "paralegal",
-    title: "Messages",
-  },
   pending: {
     loader: () => import("./views/pending.js"),
     role: false,
@@ -82,7 +72,6 @@ const ROUTES = {
     title: "Pending Users",
   },
   documents: { loader: () => import("./views/documents.js"), role: true, title: "Documents" },
-  messages: { loader: () => import("./views/messages.js"), role: true, title: "Messages" },
   checklist: { loader: () => import("./views/checklist.js"), role: true, title: "Checklist" },
   deadlines: { loader: () => import("./views/deadlines.js"), role: true, title: "Deadlines" },
   calendar: { loader: () => import("./views/calendar.js"), role: true, title: "Calendar" },

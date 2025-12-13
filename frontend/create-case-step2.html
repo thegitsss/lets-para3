@@ -9,8 +9,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Create Case – Description | Let<span class="gold">’</span>s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
@@ -66,6 +66,24 @@
       transition:background .3s;
     }
     nav a.active,nav a:hover{background:rgba(0,0,0,0.04);}
+    .sidebar-link{
+      margin-top:1.5rem;
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:0.6rem 1rem;
+      background:transparent;
+      font-size:0.9rem;
+      font-family:var(--font-sans);
+      cursor:pointer;
+      transition:background .2s,color .2s;
+    }
+    .sidebar-link:hover,
+    .sidebar-link:focus{
+      background:rgba(0,0,0,0.05);
+      color:var(--accent);
+      outline:none;
+    }
     .sidebar-footer{margin-top:auto;font-size:0.7rem;color:var(--muted);text-align:center;}
 
     /* Main */
@@ -137,6 +155,22 @@
       font-size:0.9rem;
       color:var(--ink);
     }
+    .field input[type="text"]{
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:10px;
+      padding:0.65rem 0.9rem;
+      font-size:0.95rem;
+      font-family:inherit;
+      background:#fff;
+      transition:border-color .2s ease, box-shadow .2s ease;
+      box-shadow:0 6px 16px rgba(0,0,0,0.04);
+    }
+    .field input[type="text"]:focus{
+      border-color:var(--accent);
+      box-shadow:0 0 0 3px rgba(182,164,122,0.18);
+      outline:none;
+    }
     textarea{
       width:100%;
       min-height:280px;
@@ -160,6 +194,23 @@
       font-size:0.8rem;
       color:var(--muted);
       margin-top:6px;
+    }
+    .case-title-preview{
+      background:#fffbe8;
+      border:1px solid rgba(182,164,122,0.4);
+      border-radius:12px;
+      padding:0.9rem 1.2rem;
+      font-weight:600;
+      color:#7a622f;
+      margin-bottom:1.25rem;
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .case-title-preview span{
+      font-weight:400;
+      color:#9a8453;
+      font-size:0.9rem;
     }
 
     /* Tips panel */
@@ -235,15 +286,11 @@
     <div class="logo">Dashboard</div>
     <nav>
       <a href="dashboard-attorney.html">Home</a>
-      <a href="active-cases.html">Cases</a>
-      <a href="create-case.html" class="active">Create Case</a>
-      <a href="messages.html">Messages</a>
-      <a href="documents.html">Documents</a>
-      <a href="review.html">Review</a>
-      <a href="case-files.html">Case Files</a>
-      <a href="billing-attorney.html">Billing</a>
+      <a href="active-cases.html">Cases &amp; Files</a>
+      <a href="billing-attorney.html">Escrow</a>
       <a href="help.html">Help</a>
     </nav>
+    <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
     <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let<span class="gold">’</span>s-ParaConnect 2025</a></div>
   </aside>
 
@@ -263,20 +310,21 @@
   <a href="create-case-step2.html" class="step active">
     <div class="circle">2</div><span>Description</span>
   </a>
-  <a href="create-case-step3.html" class="step">
-    <div class="circle">3</div><span>Requirements</span>
-  </a>
-  <a href="create-case-step4.html" class="step">
-    <div class="circle">4</div><span>Questions</span>
-  </a>
   <a href="create-case-step5.html" class="step">
-    <div class="circle">5</div><span>Review & Post</span>
+    <div class="circle">3</div><span>Review &amp; Post</span>
   </a>
 </div>
 
     <div class="form-wrapper">
       <!-- Left: main form -->
       <form>
+        <div class="case-title-preview" id="caseTitlePreview">
+          <strong>Case Title:</strong> <span id="caseTitlePreviewText">Untitled Case</span>
+        </div>
+        <div class="field">
+          <label for="caseTitle">Case Title</label>
+          <input id="caseTitle" type="text" placeholder="e.g., Discovery support for civil litigation" />
+        </div>
         <div class="field">
           <label for="description">Case Description</label>
           <textarea id="description" placeholder="Describe your case, goals, and expectations for the paralegal..."></textarea>
@@ -286,7 +334,7 @@
         <div class="actions">
   <button type="button" class="btn secondary" data-nav="back" data-target="create-case.html">Back</button>
   <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html">Save and Exit</button>
-  <button type="button" class="btn primary" data-nav="next" id="nextStepBtn" data-target="create-case-step3.html">Next Step</button>
+  <button type="button" class="btn primary" data-nav="next" id="nextStepBtn" data-target="create-case-step5.html">Next Step</button>
 </div>
       </form>
 
@@ -296,9 +344,7 @@
         <ul>
           <li>Be clear, well-written, and detailed about your case needs.</li>
           <li>Include the scope of work, deliverables, and deadlines.</li>
-          <li>Use 700–2000 characters for best engagement.</li>
           <li>Avoid sensitive or identifying details in the posting.</li>
-          <li>Explain why this work matters to your client or case.</li>
         </ul>
         <p>For examples of effective job descriptions, <a href="help.html">read our help article</a>.</p>
       </div>
@@ -311,14 +357,36 @@
 
 
   <script>
+    const titleInput = document.getElementById('caseTitle');
     const textarea = document.getElementById('description');
     const count = document.getElementById('charCount');
-    textarea.addEventListener('input', () => {
+    const titlePreview = document.getElementById('caseTitlePreviewText');
+    const updateTitlePreview = (value) => {
+      if (!titlePreview) return;
+      const display = value?.trim() ? value.trim() : "Untitled Case";
+      titlePreview.textContent = display;
+    };
+    if (titleInput) {
+      const storedTitle = localStorage.getItem('caseTitle') || '';
+      titleInput.value = storedTitle;
+      updateTitlePreview(storedTitle);
+      titleInput.addEventListener('input', () => {
+        localStorage.setItem('caseTitle', titleInput.value);
+        updateTitlePreview(titleInput.value);
+      });
+    }
+    if (textarea) {
+      textarea.value = localStorage.getItem('caseDescription') || '';
       count.textContent = `${textarea.value.length} / 4000`;
-    });
+      textarea.addEventListener('input', () => {
+        count.textContent = `${textarea.value.length} / 4000`;
+        localStorage.setItem('caseDescription', textarea.value);
+      });
+    }
   </script>
   <script>
 document.querySelector('.btn.primary').addEventListener('click', () => {
+  localStorage.setItem('caseTitle', document.getElementById('caseTitle').value);
   localStorage.setItem('caseDescription', document.getElementById('description').value);
 });
 </script>

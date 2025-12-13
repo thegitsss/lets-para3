@@ -142,6 +142,12 @@ function bindModalEvents() {
     }
   });
   elements.confirmInquire?.addEventListener("click", sendInquiry);
+  elements.jobList?.addEventListener("change", (event) => {
+    if (event.target.matches("input[name='jobOption']")) {
+      clearFieldError(elements.jobList);
+    }
+  });
+  elements.inquireMessage?.addEventListener("input", () => clearFieldError(elements.inquireMessage));
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeInquireModal();
   });
@@ -380,6 +386,8 @@ function updatePaginationLabel() {
 function openInquireModal(paralegal) {
   activeParalegal = paralegal;
   if (!elements.inquireModal) return;
+  clearFieldError(elements.jobList);
+  clearFieldError(elements.inquireMessage);
   elements.selectedParalegalText.textContent = `Select the open case for ${paralegal.name}.`;
   elements.inquireMessage.value = "";
   const firstOption = elements.jobList.querySelector("input[name='jobOption']");
@@ -392,6 +400,8 @@ function closeInquireModal() {
   activeParalegal = null;
   elements.inquireModal?.classList.remove("show");
   elements.inquireMessage.value = "";
+  clearFieldError(elements.jobList);
+  clearFieldError(elements.inquireMessage);
   const checked = elements.jobList?.querySelector("input[name='jobOption']:checked");
   if (checked) checked.checked = false;
 }
@@ -418,7 +428,9 @@ function renderCaseOptions() {
 async function sendInquiry() {
   if (!activeParalegal || !elements.jobList) return;
   const selected = elements.jobList.querySelector("input[name='jobOption']:checked");
+  clearFieldError(elements.jobList);
   if (!selected) {
+    showFieldError(elements.jobList, "Select an open case before sending.");
     showToast("Select an open case first.", "err");
     return;
   }
@@ -505,6 +517,37 @@ function escapeHtml(value = "") {
     .replace(/>/g, "&gt;")
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function showFieldError(target, message) {
+  if (!target) return;
+  clearFieldError(target);
+  target.classList?.add("input-error");
+  if (typeof target.setAttribute === "function") {
+    target.setAttribute("aria-invalid", "true");
+  }
+  const error = document.createElement("div");
+  error.className = "field-error";
+  error.textContent = message;
+  const wrapper = target.closest(".field") || target.closest("[data-field-wrapper]");
+  if (wrapper) wrapper.appendChild(error);
+  else target.insertAdjacentElement("afterend", error);
+}
+
+function clearFieldError(target) {
+  if (!target) return;
+  target.classList?.remove("input-error");
+  if (typeof target.removeAttribute === "function") {
+    target.removeAttribute("aria-invalid");
+  }
+  const wrapper = target.closest(".field") || target.closest("[data-field-wrapper]");
+  if (wrapper) {
+    const existing = wrapper.querySelector(".field-error");
+    if (existing) existing.remove();
+    return;
+  }
+  const next = target.nextElementSibling;
+  if (next?.classList.contains("field-error")) next.remove();
 }
 
 function showToast(message, type = "info") {

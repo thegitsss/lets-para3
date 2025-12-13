@@ -77,6 +77,19 @@
         justify-content:center;
         font-weight:700;
       }
+      #paralegalFloatingCluster [data-notification-toggle][data-count]:after{
+        content:attr(data-count);
+        position:absolute;
+        top:-4px;
+        right:-4px;
+        background:#b4975a;
+        color:#fff;
+        font-family:'Sarabun',sans-serif;
+        font-weight:200;
+        font-size:0.7rem;
+        padding:2px 6px;
+        border-radius:999px;
+      }
       #paralegalFloatingCluster .user-profile{
         display:flex;
         align-items:center;
@@ -91,43 +104,62 @@
         object-fit:cover;
         box-shadow:0 6px 16px rgba(0,0,0,0.1);
       }
-      #paralegalFloatingCluster .notification-panel{
+      #paralegalFloatingCluster .notif-panel{
         position:absolute;
         right:0;
-        top:calc(100% + 10px);
-        width:280px;
-        padding:14px;
+        top:48px;
+        width:320px;
+        padding:0;
         background:#fff;
         border:1px solid rgba(12,18,37,0.08);
-        border-radius:14px;
-        box-shadow:0 10px 30px rgba(0,0,0,0.12);
-        display:none;
-      }
-      #paralegalFloatingCluster .notification-panel.show{display:block;}
-      #paralegalFloatingCluster .notification-panel-header{
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        margin-bottom:8px;
-        font-size:0.92rem;
-      }
-      #paralegalFloatingCluster .notification-panel-header button{
-        border:none;
-        background:none;
-        color:#d19c3a;
-        cursor:pointer;
-        font-size:0.85rem;
-      }
-      #paralegalFloatingCluster [data-notification-list]{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;}
-      #paralegalFloatingCluster [data-notification-list] li{
-        border:1px solid rgba(12,18,37,0.08);
         border-radius:12px;
-        padding:10px;
-        background:#fcfcfc;
+        display:none;
+        flex-direction:column;
+        box-shadow:0 18px 45px rgba(0,0,0,0.12);
       }
-      #paralegalFloatingCluster [data-notification-list] li strong{display:block;font-weight:500;margin-bottom:4px;}
-      #paralegalFloatingCluster [data-notification-list] li span{display:block;font-size:0.8rem;color:#5c6475;}
-      #paralegalFloatingCluster [data-notification-empty]{font-size:0.85rem;color:#5c6475;}
+      #paralegalFloatingCluster .notif-panel.show{display:flex;}
+      #paralegalFloatingCluster .notif-panel.hidden{display:none;}
+      #paralegalFloatingCluster .notif-header{
+        font-family:'Cormorant Garamond',serif;
+        font-weight:300;
+        font-size:1.15rem;
+        padding:12px 16px;
+        border-bottom:1px solid rgba(0,0,0,0.08);
+        background:#fafafa;
+      }
+      #paralegalFloatingCluster #notifList{
+        max-height:300px;
+        overflow-y:auto;
+      }
+      #paralegalFloatingCluster .notif-item{
+        padding:12px 16px;
+        border-bottom:1px solid rgba(0,0,0,0.06);
+      }
+      #paralegalFloatingCluster .notif-item:last-child{border-bottom:none;}
+      #paralegalFloatingCluster .notif-item.unread{border-left:3px solid #b4975a;}
+      #paralegalFloatingCluster .notif-title{
+        font-family:'Cormorant Garamond',serif;
+        font-weight:300;
+        font-size:1.05rem;
+        margin-bottom:2px;
+      }
+      #paralegalFloatingCluster .notif-body{
+        font-family:'Sarabun',sans-serif;
+        font-weight:200;
+        font-size:0.88rem;
+        color:#5c6475;
+      }
+      #paralegalFloatingCluster .notif-time{
+        font-size:0.75rem;
+        color:#9aa0b0;
+        margin-top:4px;
+      }
+      #paralegalFloatingCluster .notif-empty{
+        padding:16px;
+        text-align:center;
+        color:#7c8295;
+        font-size:0.88rem;
+      }
       #paralegalFloatingCluster .notification-badge{display:none;}
       #paralegalFloatingCluster .notification-badge.show{display:flex;}
     `;
@@ -158,13 +190,11 @@
           <span id="clusterRole">Logged in</span>
         </div>
       </div>
-      <div class="notification-panel" data-notification-panel>
-        <div class="notification-panel-header">
-          <h4 style="margin:0;font-size:0.95rem;">Notifications</h4>
-          <button type="button" data-notification-mark>Mark all read</button>
-        </div>
-        <ul data-notification-list></ul>
-        <p class="notification-item" data-notification-empty>Loading…</p>
+      <div id="notificationPanel" class="notif-panel hidden" data-notification-panel>
+        <div class="notif-header">Notifications</div>
+        <div id="notifList" data-notification-list></div>
+        <div class="notif-empty" data-notification-empty>Loading…</div>
+        <button id="markAllReadBtn" class="notif-markall" type="button" data-notification-mark>Mark All Read</button>
       </div>
     `;
     document.body.appendChild(wrap);

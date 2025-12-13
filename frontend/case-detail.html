@@ -9,8 +9,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Case Detail | Let<span class="gold">’</span>s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
@@ -31,6 +31,55 @@
       --font-serif: 'Cormorant Garamond', serif;
       --font-sans: 'Sarabun', sans-serif;
       --radius: 12px;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 32px;
+      transform: translate(-50%, 30px);
+      background: rgba(15, 23, 42, 0.92);
+      color: #fff;
+      padding: 0.85rem 1.25rem;
+      border-radius: 14px;
+      font-size: 0.9rem;
+      font-family: var(--font-sans);
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      box-shadow: 0 20px 45px rgba(15, 23, 42, 0.22);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 4000;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+    .toast[data-toast-type="success"] {
+      background: #1f7a4a;
+    }
+    .toast[data-toast-type="error"],
+    .toast[data-toast-type="err"] {
+      background: #8c2f2f;
+    }
+    .toast[data-toast-type="info"] {
+      background: rgba(11, 42, 74, 0.92);
+    }
+    .toast-cta {
+      border: 1px solid rgba(255,255,255,0.7);
+      border-radius: 999px;
+      padding: 0.25rem 0.9rem;
+      font-size: 0.85rem;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 500;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    .toast-cta:hover {
+      background: rgba(255,255,255,0.12);
+      color: #fff;
     }
 
     /* Case Layout */
@@ -473,6 +522,12 @@
       background: #fdfbf6;
       border-color: #a58c5c;
     }
+    .dropzone.drag-over,
+    .dropzone.uploading {
+      border-color: #a58c5c;
+      background: rgba(182, 164, 122, 0.08);
+      color: var(--ink);
+    }
     .video-box .btn {
       margin-top: 1rem;
     }
@@ -759,7 +814,6 @@
     <div class="logo">Dashboard</div>
     <nav>
       <a href="dashboard-paralegal.html" class="active">Home</a>
-      <a href="messages.html">Messages</a>
       <a href="case-files.html">Active Cases</a>
       <a href="profile-settings.html">Profile Settings</a>
       <a href="help.html">Help</a>
@@ -916,6 +970,7 @@
               <div class="dropzone">
                 <span>📂 Drag & Drop or click to upload</span>
               </div>
+              <input type="file" id="caseDocumentInput" hidden accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip" />
             </div>
             <div class="video-box">
               <h3>Video Meeting</h3>
@@ -948,7 +1003,7 @@
       </label>
       <label class="modal-field" for="taskDescInput">
         <span>Description (include context or deliverables)</span>
-        <textarea id="taskDescInput" placeholder="Add background details, files to reference, or specific outcomes needed."></textarea>
+        <textarea id="taskDescInput" placeholder="Add background details, files to cite, or specific outcomes needed."></textarea>
       </label>
       <label class="modal-field" for="taskDueInput">
         <span>Due date (optional)</span>
@@ -987,8 +1042,86 @@
     </div>
   </div>
 
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
   <script src="assets/scripts/utils/toast.js"></script>
   <script type="module">
+    import { secureFetch } from "./assets/scripts/auth.js";
+
+    const toastHelper = window.toastUtils;
+    const toastBannerEl = document.getElementById('toastBanner');
+    let toastHideTimerId;
+
+    function showToastBanner(message, type = 'info', options = {}) {
+      if (!toastBannerEl || !message) return;
+      const normalizedOptions = (options && typeof options === 'object') ? options : {};
+      let actionConfig = normalizedOptions.cta;
+      if (!actionConfig && (normalizedOptions.label || normalizedOptions.href || normalizedOptions.onClick)) {
+        actionConfig = {
+          label: normalizedOptions.label,
+          href: normalizedOptions.href,
+          target: normalizedOptions.target,
+          onClick: normalizedOptions.onClick,
+        };
+      }
+      const hasAction = actionConfig && actionConfig.label && (actionConfig.href || typeof actionConfig.onClick === 'function');
+      toastBannerEl.innerHTML = '';
+      const textSpan = document.createElement('span');
+      textSpan.className = 'toast-message';
+      textSpan.textContent = message;
+      toastBannerEl.appendChild(textSpan);
+
+      if (hasAction) {
+        const action = document.createElement('a');
+        action.className = 'toast-cta';
+        action.textContent = actionConfig.label;
+        if (actionConfig.href) {
+          action.href = actionConfig.href;
+          if (actionConfig.target) {
+            action.target = actionConfig.target;
+            action.rel = 'noopener noreferrer';
+          } else {
+            action.rel = 'noopener';
+          }
+        } else {
+          action.href = '#';
+        }
+        if (typeof actionConfig.onClick === 'function') {
+          action.addEventListener('click', (event) => {
+            event.preventDefault();
+            actionConfig.onClick(event);
+          });
+        }
+        toastBannerEl.appendChild(action);
+      }
+
+      toastBannerEl.dataset.toastType = type;
+      toastBannerEl.classList.add('show');
+      clearTimeout(toastHideTimerId);
+      const hideDelay = typeof normalizedOptions.duration === 'number'
+        ? normalizedOptions.duration
+        : hasAction ? 6500 : 4000;
+      toastHideTimerId = setTimeout(() => toastBannerEl.classList.remove('show'), hideDelay);
+    }
+
+    if (toastHelper && typeof toastHelper.show === 'function') {
+      const originalShow = toastHelper.show.bind(toastHelper);
+      toastHelper.show = (message, options = {}) => {
+        if (!message) return;
+        const opts = options || {};
+        if (toastBannerEl) {
+          showToastBanner(message, opts.type || 'info', opts);
+        } else {
+          originalShow(message, options);
+        }
+      };
+    }
+
+    const FALLBACK_TOAST_KEY = toastHelper?.STORAGE_KEY || 'lpDashboardToast';
+    const stagedToast = toastHelper?.consume?.();
+    if (stagedToast?.message) {
+      showToastBanner(stagedToast.message, stagedToast.type || 'info');
+    }
+
     const currentUser = typeof window.requireRole === "function" ? await window.requireRole() : null;
     if (!currentUser) {
       // Guard will redirect unauthorized visitors.
@@ -1024,20 +1157,69 @@
     const reviewApproveBtn = document.querySelector('.review-header .btn.primary');
     reviewApproveBtn?.addEventListener('click', () => alert('Work approved and archived.'));
 
+    const params = new URLSearchParams(window.location.search || '');
+    const queryCaseId = params.get('caseId');
+    if (queryCaseId) {
+      document.body.dataset.caseId = queryCaseId;
+    }
+    const caseId = queryCaseId || document.body?.dataset?.caseId || '';
     const notesTextarea = document.querySelector('.notes-section textarea');
     const notesSaveBtn = document.querySelector('.notes-section .btn.secondary');
-    notesSaveBtn?.addEventListener('click', () => {
-      const content = notesTextarea?.value.trim();
-      if (!content) {
-        alert('Please add notes before saving.');
+    if (caseId) {
+      try {
+        const existing = await fetchCaseNotes(caseId);
+        if (notesTextarea) notesTextarea.value = existing?.note || '';
+      } catch (err) {
+        console.warn('Unable to load case notes', err);
+      }
+    }
+    notesSaveBtn?.addEventListener('click', async () => {
+      if (!caseId) {
+        alert('Case not identified. Please refresh and try again.');
         return;
       }
-      localStorage.setItem('caseNotes', content);
-      alert('Notes saved.');
+      const content = notesTextarea?.value.trim();
+      try {
+        await persistCaseNote(caseId, content || '');
+        showToastBanner('Notes saved.', 'success');
+        window.dispatchEvent(new CustomEvent('lpc-case-notes-updated', { detail: { caseId } }));
+      } catch (err) {
+        console.error('Save note error', err);
+        showToastBanner(err?.message || 'Unable to save notes.', 'error');
+      }
     });
 
+    const CASE_UPLOAD_LIMIT = 20 * 1024 * 1024;
     const dropzoneEl = document.querySelector('.upload-box .dropzone');
-    dropzoneEl?.addEventListener('click', () => alert('Upload feature coming soon (cloud storage integration pending).'));
+    const dropzoneInput = document.getElementById('caseDocumentInput');
+    const dropzoneLabel = dropzoneEl?.querySelector('span');
+    const baseDropzoneCopy = dropzoneLabel?.textContent || '📂 Drag & Drop or click to upload';
+
+    if (dropzoneEl && dropzoneInput) {
+      dropzoneEl.addEventListener('click', () => dropzoneInput.click());
+      dropzoneInput.addEventListener('change', () => {
+        const file = dropzoneInput.files?.[0];
+        if (file) {
+          uploadCaseFile(file);
+        }
+        dropzoneInput.value = '';
+      });
+      dropzoneEl.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        dropzoneEl.classList.add('drag-over');
+      });
+      dropzoneEl.addEventListener('dragleave', () => {
+        dropzoneEl.classList.remove('drag-over');
+      });
+      dropzoneEl.addEventListener('drop', (event) => {
+        event.preventDefault();
+        dropzoneEl.classList.remove('drag-over');
+        const file = event.dataTransfer?.files?.[0];
+        if (file) {
+          uploadCaseFile(file);
+        }
+      });
+    }
 
     const meetingBtn = document.querySelector('.video-box .btn.dropdown');
     meetingBtn?.addEventListener('click', () => {
@@ -1056,6 +1238,72 @@
       }
     });
 
+    async function fetchCaseNotes(caseId) {
+      const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/notes`, {
+        headers: { Accept: "application/json" },
+        noRedirect: true,
+      });
+      if (!res.ok) throw new Error('Unable to load notes.');
+      return res.json();
+    }
+
+    async function persistCaseNote(caseId, note) {
+      const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/notes`, {
+        method: "PUT",
+        headers: { Accept: "application/json" },
+        body: { note },
+      });
+      if (!res.ok) throw new Error('Unable to save notes.');
+      return res.json();
+    }
+
+    async function uploadCaseFile(file) {
+      if (!caseId) {
+        alert('Case not identified. Please refresh and try again.');
+        return;
+      }
+      if (!file || file.size <= 0) {
+        alert('Please choose a valid file.');
+        return;
+      }
+      if (file.size > CASE_UPLOAD_LIMIT) {
+        alert('Files must be 20MB or less.');
+        return;
+      }
+      if (!dropzoneEl) return;
+      setDropzoneBusy(true);
+      try {
+        const form = new FormData();
+        form.append('file', file);
+        const res = await secureFetch(`/api/uploads/case/${encodeURIComponent(caseId)}`, {
+          method: 'POST',
+          body: form,
+          noRedirect: true,
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(payload?.msg || payload?.error || 'Upload failed.');
+        }
+        showToastBanner('File uploaded to this case.', 'success', {
+          label: 'View Document',
+          href: `case-detail.html?caseId=${encodeURIComponent(caseId)}#caseFilesSection`,
+        });
+      } catch (err) {
+        console.error('Case file upload error', err);
+        showToastBanner(err?.message || 'Unable to upload file.', 'error');
+      } finally {
+        setDropzoneBusy(false);
+      }
+    }
+
+    function setDropzoneBusy(isBusy) {
+      if (!dropzoneEl) return;
+      dropzoneEl.classList.toggle('uploading', isBusy);
+      if (dropzoneLabel) {
+        dropzoneLabel.textContent = isBusy ? 'Uploading…' : baseDropzoneCopy;
+      }
+    }
+
     // Export & Purge Modal Controls
     const exportModal = document.getElementById('exportPurgeModal');
     const exportBtn = document.getElementById('exportBtn');
@@ -1067,8 +1315,6 @@
     const caseStatus = document.querySelector('.case-status');
     const caseMain = document.querySelector('.main');
     const CASE_ID = document.body.dataset.caseId || 'demo-case-0001';
-    const toastHelper = window.toastUtils;
-    const FALLBACK_TOAST_KEY = toastHelper?.STORAGE_KEY || 'lpDashboardToast';
     const AUTH_TOKEN_STORAGE_KEY = 'lpc_token';
     const USER_STORAGE_KEY = 'lpc_user';
     const paymentPanel = document.getElementById('escrowPayment');
@@ -1085,11 +1331,42 @@
     const fundEscrowBtn = document.getElementById('fundEscrowBtn');
     const releaseEscrowBtn = document.getElementById('releaseEscrowBtn');
 
+    function showFieldError(target, message) {
+      if (!target) return;
+      clearFieldError(target);
+      target.classList?.add('input-error');
+      if (typeof target.setAttribute === 'function') {
+        target.setAttribute('aria-invalid', 'true');
+      }
+      const error = document.createElement('div');
+      error.className = 'field-error';
+      error.textContent = message;
+      const wrapper = target.closest('.field') || target.closest('[data-field-wrapper]');
+      if (wrapper) wrapper.appendChild(error);
+      else target.insertAdjacentElement('afterend', error);
+    }
+
+    function clearFieldError(target) {
+      if (!target) return;
+      target.classList?.remove('input-error');
+      if (typeof target.removeAttribute === 'function') {
+        target.removeAttribute('aria-invalid');
+      }
+      const wrapper = target.closest('.field') || target.closest('[data-field-wrapper]');
+      if (wrapper) {
+        const existing = wrapper.querySelector('.field-error');
+        if (existing) existing.remove();
+        return;
+      }
+      const next = target.nextElementSibling;
+      if (next?.classList.contains('field-error')) next.remove();
+    }
+
     hireButtons.forEach(btn => {
       btn.addEventListener('click', () => {
         const paralegalId = btn.dataset.paralegalId || prompt('Enter the paralegal ID to hire:');
         if (!paralegalId) {
-          alert('Paralegal reference is required.');
+          alert('Paralegal ID is required.');
           return;
         }
         const targetCase = btn.dataset.caseId || CASE_ID;
@@ -1380,9 +1657,17 @@
 
     async function releaseEscrow(caseId, button) {
       if (!caseId) {
-        alert('Missing case identifier.');
+        showFieldError(button, 'Missing case ID.');
+        if (toastHelper?.show) {
+          toastHelper.show('Missing case identifier.', { targetId: 'toastBanner', type: 'error' });
+        } else if (toastHelper?.stage) {
+          toastHelper.stage('Missing case identifier.', 'error');
+        } else {
+          alert('Missing case identifier.');
+        }
         return;
       }
+      clearFieldError(button);
       button?.setAttribute('disabled', 'disabled');
       const headers = new Headers({ 'Content-Type': 'application/json' });
       const token = readStoredToken();
@@ -1390,7 +1675,6 @@
       const csrfToken = await ensureCsrfToken();
       if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
 
-      let payload = {};
       try {
         const response = await fetch('/api/payments/release', {
           method: 'POST',
@@ -1398,18 +1682,28 @@
           credentials: 'include',
           body: JSON.stringify({ caseId })
         });
-        payload = await response.json();
+        const payload = await response.json();
         if (!response.ok) {
           throw new Error(payload?.error || payload?.msg || 'Unable to release funds.');
         }
       } catch (err) {
         button?.removeAttribute('disabled');
-        alert(err.message || 'Unable to release funds.');
+        showFieldError(button, err.message || 'Unable to release funds.');
+        if (toastHelper?.show) {
+          toastHelper.show(err.message || 'Unable to release funds.', { targetId: 'toastBanner', type: 'error' });
+        } else if (toastHelper?.stage) {
+          toastHelper.stage(err.message || 'Unable to release funds.', 'error');
+        } else {
+          alert(err.message || 'Unable to release funds.');
+        }
         return;
       }
 
+      clearFieldError(button);
       if (toastHelper?.stage) {
         toastHelper.stage('Funds released successfully.', 'success');
+      } else if (toastHelper?.show) {
+        toastHelper.show('Funds released successfully.', { targetId: 'toastBanner', type: 'success' });
       } else {
         alert('Funds released successfully.');
       }

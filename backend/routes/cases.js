@@ -169,6 +169,18 @@ function formatPersonName(person) {
   return `${person.firstName || ""} ${person.lastName || ""}`.trim();
 }
 
+function shapeInternalNote(note) {
+  if (!note) {
+    return { note: "", updatedAt: null, updatedBy: null };
+  }
+  const base = typeof note === "string" ? { text: note } : note;
+  return {
+    note: base.text || "",
+    updatedAt: base.updatedAt || null,
+    updatedBy: summarizeUser(base.updatedBy) || (base.updatedBy ? { id: String(base.updatedBy) } : null),
+  };
+}
+
 function caseSummary(doc, { includeFiles = false } = {}) {
   const paralegal = summarizeUser(doc.paralegal || doc.paralegalId);
   const pendingParalegal = summarizeUser(doc.pendingParalegal || doc.pendingParalegalId);
@@ -212,6 +224,7 @@ function caseSummary(doc, { includeFiles = false } = {}) {
     paralegalNameSnapshot: doc.paralegalNameSnapshot || "",
     updatedAt: doc.updatedAt,
     createdAt: doc.createdAt,
+    internalNotes: shapeInternalNote(doc.internalNotes),
   };
   summary.filesCount = Array.isArray(doc.files) ? doc.files.length : 0;
   if (includeFiles) {
@@ -725,12 +738,13 @@ router.get(
       .sort({ updatedAt: -1 })
       .limit(limit)
       .select(
-        "title details practiceArea status deadline zoomLink paymentReleased escrowIntentId applicants files jobId createdAt updatedAt attorney attorneyId paralegal paralegalId pendingParalegalId pendingParalegalInvitedAt hiredAt completedAt briefSummary archived downloadUrl"
+        "title details practiceArea status deadline zoomLink paymentReleased escrowIntentId applicants files jobId createdAt updatedAt attorney attorneyId paralegal paralegalId pendingParalegalId pendingParalegalInvitedAt hiredAt completedAt briefSummary archived downloadUrl internalNotes"
       )
       .populate("paralegalId", "firstName lastName email role avatarURL")
       .populate("attorneyId", "firstName lastName email role avatarURL")
       .populate("paralegal", "firstName lastName email role avatarURL")
       .populate("attorney", "firstName lastName email role avatarURL")
+      .populate("internalNotes.updatedBy", "firstName lastName email role avatarURL")
       .lean();
 
     res.json(docs.map((doc) => caseSummary(doc, { includeFiles })));
@@ -1597,6 +1611,45 @@ router.post(
       purgeScheduledFor: doc.purgeScheduledFor,
       archiveReadyAt: doc.archiveReadyAt,
     });
+  })
+);
+
+router.get(
+  "/:caseId/notes",
+  verifyToken,
+  requireCaseAccess("caseId", { project: "internalNotes" }),
+  asyncHandler(async (req, res) => {
+    if (!req.acl?.isAttorney && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Only attorneys can view notes" });
+    }
+    const doc = await Case.findById(req.case.id)
+      .select("internalNotes")
+      .populate("internalNotes.updatedBy", "firstName lastName email role avatarURL");
+    if (!doc) return res.status(404).json({ error: "Case not found" });
+    return res.json(shapeInternalNote(doc.internalNotes));
+  })
+);
+
+router.put(
+  "/:caseId/notes",
+  verifyToken,
+  csrfProtection,
+  requireCaseAccess("caseId", { project: "internalNotes" }),
+  asyncHandler(async (req, res) => {
+    if (!req.acl?.isAttorney && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Only attorneys can update notes" });
+    }
+    const doc = await Case.findById(req.case.id).select("internalNotes");
+    if (!doc) return res.status(404).json({ error: "Case not found" });
+    const text = cleanMessage(req.body?.note || "", 10_000);
+    doc.internalNotes = {
+      text,
+      updatedBy: req.user.id,
+      updatedAt: new Date(),
+    };
+    await doc.save();
+    await doc.populate("internalNotes.updatedBy", "firstName lastName email role avatarURL");
+    return res.json(shapeInternalNote(doc.internalNotes));
   })
 );
 

@@ -397,20 +397,13 @@ const certificateHref = p.certificateURL
 const certificate = certificateHref
 ? `<p><a href="${escapeAttribute(certificateHref)}" target="_blank" rel="noopener">Certificate</a></p>`
 : "<p>Certificate not uploaded.</p>";
-const ref1 = `${escapeHTML(p.ref1Name || "N/A")} — ${escapeHTML(p.ref1Email || "N/A")}`;
-const ref2 = `${escapeHTML(p.ref2Name || "N/A")} — ${escapeHTML(p.ref2Email || "N/A")}`;
-return `
+    return `
        <div class="verify-card" data-id="${id}">
          <strong>${lastName || "N/A"}, ${firstName || "N/A"}</strong>
          <p>Email: ${email || "N/A"}</p>
          <p>Years Experience: ${yearsLabel}</p>
          ${linkedIn}
          ${certificate}
-         <details>
-           <summary>References</summary>
-           <p>${ref1}</p>
-           <p>${ref2}</p>
-         </details>
          <button class="approveParalegalBtn" data-id="${id}">Approve</button>
          <button class="rejectParalegalBtn" data-id="${id}">Reject</button>
          <div class="user-card-actions">

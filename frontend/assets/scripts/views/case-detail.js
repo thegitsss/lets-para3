@@ -131,6 +131,7 @@ function draw(root, data, escapeHTML, caseId, session) {
           <form class="apply-form" data-case-apply-form>
             <label for="caseApplyNote">Cover letter (optional)</label>
             <textarea id="caseApplyNote" data-apply-note rows="5" placeholder="Explain why you are a strong fit."></textarea>
+            <p class="apply-footnote">Your résumé, LinkedIn profile, and saved cover letter are included automatically.</p>
             <div class="case-actions">
               <button class="btn primary" type="submit">Submit application</button>
               <span class="apply-status" data-apply-status></span>
@@ -282,10 +283,23 @@ function ensureStyles() {
     .empty{color:#6b7280;font-size:.95rem}
     .error{padding:16px;border:1px solid #fecaca;background:#fef2f2;border-radius:12px;color:#b91c1c}
     .applicant-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
-    .applicant-card{display:flex;align-items:center;justify-content:space-between;border:1px solid #e5e7eb;padding:12px 16px;border-radius:12px}
-    .applicant-card-main{display:flex;flex-direction:column;gap:4px}
+    .applicant-card{display:flex;align-items:flex-start;gap:16px;border:1px solid #e5e7eb;padding:16px;border-radius:14px;background:#fff}
+    .applicant-card-main{display:grid;gap:8px;flex:1}
     .applicant-name{font-weight:600;font-size:1rem}
     .applicant-status{font-size:.85rem;color:#6b7280;text-transform:capitalize}
+    .applicant-summary{display:flex;flex-wrap:wrap;gap:8px}
+    .applicant-summary span{font-size:.8rem;color:#374151;background:#f3f4f6;padding:2px 10px;border-radius:999px}
+    .applicant-cover{border:1px solid #e5e7eb;border-radius:12px;padding:10px}
+    .applicant-cover .cover-label{font-size:.75rem;color:#6b7280;letter-spacing:.05em;text-transform:uppercase;margin-bottom:4px}
+    .applicant-cover p{margin:0;font-size:.95rem;line-height:1.5;color:#111827}
+    .applicant-links{display:flex;flex-wrap:wrap;gap:8px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-size:.85rem;border:1px solid #d1d5db;text-decoration:none;color:#111827;background:#fff}
+    .chip.muted{color:#9ca3af;border-color:#e5e7eb;background:#f9fafb}
+    .applicant-avatar img,.applicant-avatar .avatar-fallback{width:56px;height:56px;border-radius:50%}
+    .applicant-avatar img{object-fit:cover;border:1px solid #e5e7eb}
+    .avatar-fallback{display:flex;align-items:center;justify-content:center;font-weight:600;color:#4b5563;background:#f3f4f6}
+    .applicant-actions{display:flex;align-items:center}
+    .apply-footnote{font-size:.85rem;color:#6b7280;margin:0}
     .shimmer{background:linear-gradient(90deg,#f3f4f6 25%,#e5e7eb 37%,#f3f4f6 63%);background-size:400% 100%;animation:shimmer 1.4s ease infinite;border-radius:10px;height:18px}
     @keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
     .case-modal-overlay{position:fixed;inset:0;background:rgba(17,24,39,.45);display:flex;align-items:center;justify-content:center;z-index:999}
@@ -323,6 +337,10 @@ function getRouteParams(explicit) {
   return new URLSearchParams();
 }
 
+function escapeAttribute(value = "") {
+  return String(value ?? "").replace(/"/g, "&quot;");
+}
+
 function renderApplicant(applicant, escapeHTML, { canInvite } = {}) {
   const person = applicant?.paralegal || {};
   const displayName =
@@ -333,17 +351,64 @@ function renderApplicant(applicant, escapeHTML, { canInvite } = {}) {
   const paralegalId = applicant?.paralegal?.id || applicant?.paralegalId || "";
   const appliedAt = applicant?.appliedAt ? new Date(applicant.appliedAt).toLocaleDateString() : "";
   const showInvite = canInvite && paralegalId;
+  const snapshot = applicant?.profileSnapshot && typeof applicant.profileSnapshot === "object" ? applicant.profileSnapshot : {};
+  const languages = Array.isArray(snapshot.languages) ? snapshot.languages.filter(Boolean) : [];
+  const specialties = Array.isArray(snapshot.specialties) ? snapshot.specialties.filter(Boolean) : [];
+  const summaryBits = [];
+  if (snapshot.location) summaryBits.push(snapshot.location);
+  if (snapshot.availability) summaryBits.push(snapshot.availability);
+  if (typeof snapshot.yearsExperience === "number") {
+    summaryBits.push(`${snapshot.yearsExperience}+ yrs experience`);
+  }
+  if (languages.length) summaryBits.push(`Languages: ${languages.join(", ")}`);
+  if (!languages.length && specialties.length) {
+    summaryBits.push(`Focus: ${specialties.slice(0, 2).join(", ")}`);
+  }
+  const summaryHtml = summaryBits.length
+    ? `<div class="applicant-summary">${summaryBits.map((bit) => `<span>${escapeHTML(bit)}</span>`).join("")}</div>`
+    : "";
+  const coverLetter = applicant?.coverLetter || applicant?.note || "";
+  const coverLetterHtml = coverLetter
+    ? `<div class="applicant-cover">
+        <div class="cover-label">Cover letter</div>
+        <p>${escapeHTML(coverLetter).replace(/\n/g, "<br>")}</p>
+      </div>`
+    : "";
+  const resumeURL = applicant?.resumeURL || "";
+  const linkedInURL = applicant?.linkedInURL || "";
+  const avatar = snapshot.profileImage || person?.profileImage || person?.avatarURL || "";
+  const avatarMarkup = avatar
+    ? `<img src="${escapeAttribute(avatar)}" alt="${escapeHTML(displayName)}" />`
+    : `<div class="avatar-fallback">${escapeHTML(displayName.charAt(0) || "P")}</div>`;
+
   return `
     <li class="applicant-card">
+      <div class="applicant-avatar">
+        ${avatarMarkup}
+      </div>
       <div class="applicant-card-main">
         <div class="applicant-name">${escapeHTML(displayName)}</div>
         <div class="applicant-status">${escapeHTML(status)}${appliedAt ? ` · Applied ${escapeHTML(appliedAt)}` : ""}</div>
+        ${summaryHtml}
+        ${coverLetterHtml}
+        <div class="applicant-links">
+          ${
+            resumeURL
+              ? `<a class="chip" href="${escapeAttribute(resumeURL)}" target="_blank" rel="noopener">Résumé</a>`
+              : `<span class="chip muted" aria-disabled="true">No résumé</span>`
+          }
+          ${
+            linkedInURL
+              ? `<a class="chip" href="${escapeAttribute(linkedInURL)}" target="_blank" rel="noopener">LinkedIn</a>`
+              : `<span class="chip muted" aria-disabled="true">LinkedIn unavailable</span>`
+          }
+        </div>
       </div>
       ${
         showInvite
-          ? `<button class="btn primary" data-invite-paralegal data-paralegal-id="${escapeHTML(
-              paralegalId
-            )}">Invite</button>`
+          ? `<div class="applicant-actions">
+              <button class="btn primary" data-invite-paralegal data-paralegal-id="${escapeHTML(paralegalId)}">Invite</button>
+            </div>`
           : ""
       }
     </li>
@@ -355,7 +420,7 @@ function bindHireButtons(root, caseId) {
     btn.addEventListener("click", () => {
       const paralegalId = btn.dataset.paralegalId || prompt("Enter the paralegal ID to invite:") || "";
       if (!paralegalId) {
-        notify("Paralegal reference is required.", "error");
+        notify("Paralegal ID is required.", "error");
         return;
       }
       inviteParalegal(caseId, paralegalId, btn);
