@@ -118,6 +118,7 @@
       letter-spacing: .12em;
       color: #1a2230;
       text-decoration: none;
+      transition: background .2s ease, color .2s ease, border-color .2s ease;
     }
 
     .site-header.over-image .brand,
@@ -216,7 +217,7 @@
 
     .caption {
       position: absolute;
-      inset: auto 0 15vh 0;
+      inset: auto 0 24vh 0;
       display: grid;
       place-items: center;
       text-align: center;
@@ -595,6 +596,7 @@
         Let’s-ParaConnect
       </a>
       <div class="header-actions">
+        <a class="pill signup-pill" href="signup.html" id="signupAction">Sign Up</a>
         <a class="pill" href="login.html" id="authAction">Sign In</a>
         <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
       </div>
@@ -864,6 +866,9 @@
       </div>
     </div>
   </div>
+  <p class="pricing-note">
+    A standard 15% platform fee applies to attorney payments. Paralegals always see their take-home earnings upfront.
+  </p>
 </section>
 
 <!-- CTA Section (Final Call to Action) -->
@@ -1351,6 +1356,17 @@ updateHeaderAppearance();
   margin-top: auto;
 }
 
+.pricing-note {
+  text-align: center;
+  color: #979da7;
+  font-size: 0.9rem;
+  max-width: 700px;
+  margin: 32px auto 0;
+  line-height: 1.4;
+  position: relative;
+  z-index: 1000;
+}
+
 @media (min-width: 960px) {
   .how-it-works-bg .cards {
     grid-template-columns: repeat(2, minmax(300px, 360px));
@@ -1627,6 +1643,7 @@ updateHeaderAppearance();
     function updateAuthLink() {
       const link = document.getElementById("authAction");
       const logoutBtn = document.getElementById("logoutAction");
+      const signupLink = document.getElementById("signupAction");
       if (!link) return;
       const token = readStoredToken();
       const user = readStoredUser();
@@ -1637,11 +1654,13 @@ updateHeaderAppearance();
         link.href = dashboard;
         link.setAttribute("data-authenticated", "true");
         if (logoutBtn) logoutBtn.style.display = "inline-flex";
+        if (signupLink) signupLink.style.display = "none";
       } else {
         link.textContent = "Sign In";
         link.href = "login.html";
         link.removeAttribute("data-authenticated");
         if (logoutBtn) logoutBtn.style.display = "none";
+        if (signupLink) signupLink.style.display = "inline-flex";
       }
     }
 
