@@ -62,7 +62,15 @@ app.use("/api/auth/login", rateLimit({ windowMs: 60 * 1000, max: 10 }));
 app.use("/api/auth/signup", rateLimit({ windowMs: 60 * 1000, max: 10 }));
 app.use("/api/messages", rateLimit({ windowMs: 10 * 1000, max: 5 }));
 app.use("/api/uploads", rateLimit({ windowMs: 10 * 1000, max: 2 }));
-app.use("/api/cases", rateLimit({ windowMs: 60 * 1000, max: 5 }));
+const casesRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: PROD ? 120 : 10000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: "Too many case requests, please try again shortly.",
+});
+
+app.use("/api/cases", casesRateLimiter);
 app.use("/api/", rateLimit({ windowMs: 60 * 1000, max: 300 }));
 
 // 4) Routers
@@ -97,8 +105,8 @@ app.use(express.json({ limit: "1mb" }));
 app.use("/api/waitlist", waitlistRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/admin", adminRouter);
-app.use("/api/cases", casesRouter);
 app.use("/api/cases/:caseId/tasks", caseTasksRouter);
+app.use("/api/cases", casesRouter);
 app.use("/api/messages", messagesRouter);
 app.use("/api/uploads", uploadsRouter);
 app.use("/api/payments", paymentsRouter);

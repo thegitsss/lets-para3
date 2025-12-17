@@ -692,6 +692,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const { attorneyId } = req.params;
     const jobId = (req.query?.job || "").trim();
+    const caseId = (req.query?.caseId || "").trim();
     const requester = req.user;
 
     if (!requester) {
@@ -713,19 +714,6 @@ router.get(
     }
 
     if (requester.role === "paralegal") {
-      if (!jobId) {
-        return res.status(403).json({ error: "Job context required" });
-      }
-      if (!isObjId(jobId)) {
-        return res.status(400).json({ error: "Invalid job id" });
-      }
-      const job = await Job.findById(jobId).select("attorneyId").lean();
-      if (!job) {
-        return res.status(404).json({ error: "Job not found" });
-      }
-      if (String(job.attorneyId) !== String(attorneyId)) {
-        return res.status(403).json({ error: "Not authorized to view this attorney." });
-      }
       return sendAttorney(attorneyId, res);
     }
 

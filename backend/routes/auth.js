@@ -131,6 +131,11 @@ router.post(
   "/register",
   resumeUpload.single("resume"),
   asyncHandler(async (req, res) => {
+    const bypassList = (process.env.DEV_BYPASS_EMAILS || "")
+      .split(",")
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean);
+    const captchaEnabled = String(process.env.CAPTCHA_ENABLED || "false").toLowerCase() === "true";
     const {
       firstName,
       lastName,
@@ -142,15 +147,46 @@ router.post(
       lawFirm,
       resumeURL,
       certificateURL,
-      recaptchaToken,
+      captchaToken,
       termsAccepted,
       phoneNumber,
       barState,
     } = req.body || {};
 
-    const captchaOk = await verifyRecaptcha(recaptchaToken, "signup");
-    if (!captchaOk) {
-      return res.status(400).json({ msg: "reCAPTCHA failed. Please try again." });
+    const normalizedEmail = String(email || "").toLowerCase().trim();
+    const bypassCaptcha = normalizedEmail && bypassList.includes(normalizedEmail);
+
+    if (!bypassCaptcha && captchaEnabled && process.env.NODE_ENV === "production") {
+      const recaptchaSecret = process.env.RECAPTCHA_SECRET || "";
+      if (!captchaToken || !recaptchaSecret) {
+        return res.status(400).json({ error: "Captcha verification failed" });
+      }
+      try {
+        const params = new URLSearchParams();
+        params.append("secret", recaptchaSecret);
+        params.append("response", captchaToken);
+        const { data } = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);
+        console.log("[signup] recaptcha verify", { success: !!data?.success, score: data?.score, email: normalizedEmail });
+        if (!data?.success) {
+          return res.status(400).json({ error: "Captcha verification failed" });
+        }
+      } catch (err) {
+        console.warn("[signup] recaptcha verification error", err?.message || err);
+        return res.status(400).json({ error: "Captcha verification failed" });
+      }
+    } else if (captchaToken) {
+      const recaptchaSecret = process.env.RECAPTCHA_SECRET || "";
+      if (recaptchaSecret) {
+        try {
+          const params = new URLSearchParams();
+          params.append("secret", recaptchaSecret);
+          params.append("response", captchaToken);
+          const { data } = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);
+          console.log("[signup] recaptcha verify (bypass)", { success: !!data?.success, score: data?.score, email: normalizedEmail });
+        } catch (err) {
+          console.warn("[signup] recaptcha soft-check failed (bypass)", err?.message || err);
+        }
+      }
     }
 
     const safeFirst = String(firstName || "").trim();

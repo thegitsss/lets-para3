@@ -8,6 +8,7 @@ const requireRole = require("../middleware/requireRole");
 const { requireCaseAccess } = require("../utils/authz");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const Case = require("../models/Case");
+const Job = require("../models/Job");
 const User = require("../models/User");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
@@ -557,7 +558,14 @@ router.post(
   })
 );
 
-router.use("/:caseId", ensureCaseParticipant());
+const ensureCaseParticipantMiddleware = ensureCaseParticipant();
+router.use((req, res, next) => {
+  const caseId = req.params?.caseId;
+  if (!caseId || !isObjId(caseId)) {
+    return next();
+  }
+  return ensureCaseParticipantMiddleware(req, res, next);
+});
 
 /**
  * POST /api/cases
@@ -586,8 +594,9 @@ router.post(
       .map((entry) => cleanText(entry, { max: 100_000 }))
       .join("\n\n");
     const narrative = cleanText(buildDetails(combinedDetails, questionList), { max: 100_000 });
-    if (!safeTitle || safeTitle.length < 5 || !narrative || narrative.length < 50) {
-      return res.status(400).json({ error: "Title and description are required." });
+    const MIN_DESCRIPTION_LENGTH = 20;
+    if (!safeTitle || safeTitle.length < 5 || !narrative || narrative.length < MIN_DESCRIPTION_LENGTH) {
+      return res.status(400).json({ error: "Title and a short description are required." });
     }
     const normalizedPractice = normalizePracticeArea(practiceArea);
     if (!normalizedPractice) {
@@ -636,6 +645,23 @@ router.post(
       { path: "paralegal", select: "firstName lastName email role avatarURL" },
       { path: "attorney", select: "firstName lastName email role avatarURL" },
     ]);
+
+    try {
+      const budgetDollars = Math.max(50, Math.round((amountCents || 0) / 100) || 0);
+      const job = await Job.create({
+        caseId: created._id,
+        attorneyId: req.user.id,
+        title: created.title,
+        practiceArea: created.practiceArea,
+        description: created.details,
+        budget: budgetDollars,
+        status: "open",
+      });
+      created.jobId = job._id;
+      await created.save();
+    } catch (jobErr) {
+      console.warn("[cases] Unable to mirror job posting", jobErr?.message || jobErr);
+    }
 
     try {
       await logAction(req, "case.create", { targetType: "case", targetId: created._id });
@@ -732,17 +758,49 @@ router.get(
  */
 router.get(
   "/my",
+  verifyToken.optional,
   asyncHandler(async (req, res) => {
+    const user = req.user;
     const limit = clamp(parseInt(req.query.limit, 10) || 12, 1, 50);
-    const role = req.user.role;
-    const userId = req.user.id;
+    if (!user || !user.role) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const role = user.role;
+    const userId = user.id;
 
     const includeFiles = String(req.query.withFiles || "").toLowerCase() === "true";
+    const userObjectId = mongoose.Types.ObjectId.isValid(userId)
+      ? new mongoose.Types.ObjectId(userId)
+      : null;
     const filter = {};
+    const ownershipFilters = [];
+    const allVariants = userObjectId ? [userObjectId, userId] : [userId];
+    const includeAttorneyFilters = () => {
+      allVariants.forEach((value) => {
+        ownershipFilters.push({ attorney: value }, { attorneyId: value });
+      });
+    };
+    includeAttorneyFilters();
+    const includeParalegalFilters = () => {
+      allVariants.forEach((value) => {
+        ownershipFilters.push(
+          { paralegal: value },
+          { paralegalId: value },
+          { "applicants.paralegalId": value }
+        );
+      });
+    };
+    includeParalegalFilters();
+
     if (role === "attorney") {
-      filter.attorney = userId;
+      filter.$or = ownershipFilters.filter((entry) => entry.attorney !== undefined || entry.attorneyId !== undefined);
     } else if (role === "paralegal") {
-      filter.$or = [{ paralegal: userId }, { "applicants.paralegalId": userId }];
+      filter.$or = ownershipFilters.filter(
+        (entry) =>
+          entry.paralegal !== undefined ||
+          entry.paralegalId !== undefined ||
+          entry["applicants.paralegalId"] !== undefined
+      );
     } else {
       // admin: optional filter by attorney/paralegal query params
       if (req.query.attorney && isObjId(req.query.attorney)) filter.attorney = req.query.attorney;
@@ -750,7 +808,8 @@ router.get(
     }
 
     if (typeof req.query.archived !== "undefined") {
-      filter.archived = String(req.query.archived).toLowerCase() === "true";
+      const wantArchived = String(req.query.archived).toLowerCase() === "true";
+      filter.archived = wantArchived ? true : { $ne: true };
     }
 
     const docs = await Case.find(filter)
@@ -974,6 +1033,16 @@ router.delete(
     }
 
     await Case.deleteOne({ _id: doc._id });
+    const relatedJobIds = [doc.jobId, doc.job].filter(Boolean);
+    try {
+      if (relatedJobIds.length) {
+        await Job.deleteMany({ _id: { $in: relatedJobIds } });
+      } else {
+        await Job.deleteMany({ caseId: doc._id });
+      }
+    } catch (jobErr) {
+      console.warn("[cases] Unable to clean up related jobs for deleted case", doc._id, jobErr);
+    }
     try {
       await logAction(req, "case.delete", { targetType: "case", targetId: doc._id });
     } catch {}
@@ -1739,7 +1808,6 @@ router.get(
 router.put(
   "/:caseId/notes",
   verifyToken,
-  csrfProtection,
   requireCaseAccess("caseId", { project: "internalNotes" }),
   asyncHandler(async (req, res) => {
     if (!req.acl?.isAttorney && req.user.role !== "admin") {

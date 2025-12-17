@@ -74,37 +74,107 @@ router.post("/", auth, requireRole(["attorney"]), async (req, res) => {
   }
 });
 
+function buildAttorneyPreview(doc) {
+  if (!doc || typeof doc !== "object") return null;
+  const normalizedId = normalizeId(doc);
+  return {
+    _id: normalizedId,
+    firstName: doc.firstName || "",
+    lastName: doc.lastName || "",
+    lawFirm: doc.lawFirm || doc.firmName || "",
+    profileImage: doc.profileImage || doc.avatarURL || "",
+  };
+}
+
+function normalizeId(source) {
+  if (!source) return null;
+  if (typeof source === "string") return source;
+  if (typeof source === "object") {
+    if (source._id) return source._id;
+    if (typeof source.toString === "function") return source.toString();
+    return null;
+  }
+  return source;
+}
+
+function shapeListing({ job = null, caseDoc = null }) {
+  const totalAmount = typeof caseDoc?.totalAmount === "number" ? caseDoc.totalAmount : null;
+  const budgetFromCase = totalAmount != null ? Math.round(totalAmount / 100) : null;
+  const attorneySource = job?.attorneyId || caseDoc?.attorney || null;
+  const normalizedAttorneyId =
+    normalizeId(job?.attorneyId) || normalizeId(caseDoc?.attorneyId) || normalizeId(caseDoc?.attorney);
+
+  return {
+    id: caseDoc?._id || job?.caseId || job?._id,
+    _id: caseDoc?._id || job?._id,
+    caseId: caseDoc?._id || job?.caseId || null,
+    jobId: job?._id || caseDoc?.jobId || null,
+    title: job?.title || caseDoc?.title || "Untitled Case",
+    practiceArea: job?.practiceArea || caseDoc?.practiceArea || "",
+    briefSummary: caseDoc?.briefSummary || "",
+    shortDescription: job?.shortDescription || caseDoc?.briefSummary || "",
+    description: job?.description || caseDoc?.details || "",
+    totalAmount,
+    budget: typeof job?.budget === "number" ? job.budget : budgetFromCase,
+    currency: caseDoc?.currency || "usd",
+    state: caseDoc?.state || caseDoc?.locationState || "",
+    locationState: caseDoc?.locationState || caseDoc?.state || "",
+    createdAt: job?.createdAt || caseDoc?.createdAt || new Date(),
+    attorneyId: normalizedAttorneyId,
+    attorney: buildAttorneyPreview(attorneySource),
+    applicantsCount: Array.isArray(caseDoc?.applicants) ? caseDoc.applicants.length : job?.applicantsCount || 0,
+    status: caseDoc?.status || job?.status || "open",
+    contextCaseId: caseDoc?._id || job?.caseId || null,
+  };
+}
+
 // GET /jobs/open — paralegals view available jobs
 router.get("/open", auth, requireRole(["paralegal"]), async (req, res) => {
   try {
-    const jobs = await Job.find({ status: "open" })
-      .populate({
-        path: "attorneyId",
-        select: "firstName lastName lawFirm firmName profileImage avatarURL"
+    const [jobs, cases] = await Promise.all([
+      Job.find({ status: "open" })
+        .populate({
+          path: "attorneyId",
+          select: "firstName lastName lawFirm firmName profileImage avatarURL",
+        })
+        .lean(),
+      Case.find({
+        archived: { $ne: true },
+        status: { $nin: ["assigned", "in_progress", "completed", "cancelled", "closed"] },
       })
-      .lean();
+        .select("title practiceArea details briefSummary totalAmount currency state locationState status applicants attorney attorneyId jobId createdAt")
+        .populate({
+          path: "attorney",
+          select: "firstName lastName lawFirm firmName profileImage avatarURL",
+        })
+        .lean(),
+    ]);
 
-    const shapedJobs = jobs.map((job) => {
-      const attorneyDoc = job.attorneyId && typeof job.attorneyId === "object" ? job.attorneyId : null;
-      const normalizedAttorneyId = attorneyDoc?._id || job.attorneyId || null;
-      const attorneyPreview = attorneyDoc
-        ? {
-            _id: attorneyDoc._id,
-            firstName: attorneyDoc.firstName || "",
-            lastName: attorneyDoc.lastName || "",
-            lawFirm: attorneyDoc.lawFirm || attorneyDoc.firmName || "",
-            profileImage: attorneyDoc.profileImage || attorneyDoc.avatarURL || ""
+    const activeCaseIds = new Set(cases.map((doc) => String(doc._id)));
+    const jobByCaseId = new Map();
+    const orphanJobs = [];
+    jobs.forEach((job) => {
+      const caseKey = job.caseId ? String(job.caseId) : null;
+      if (caseKey) {
+        if (activeCaseIds.has(caseKey)) {
+          if (!jobByCaseId.has(caseKey)) {
+            jobByCaseId.set(caseKey, job);
           }
-        : null;
-
-      return {
-        ...job,
-        attorneyId: normalizedAttorneyId,
-        attorney: attorneyPreview
-      };
+        }
+        return;
+      }
+      orphanJobs.push(shapeListing({ job, caseDoc: null }));
     });
 
-    res.json(shapedJobs);
+    const shapedCases = [];
+    cases.forEach((caseDoc) => {
+      const key = String(caseDoc._id);
+      const job = jobByCaseId.get(key) || null;
+      if (job) jobByCaseId.delete(key);
+      shapedCases.push(shapeListing({ job, caseDoc }));
+    });
+
+    res.json([...shapedCases, ...orphanJobs]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

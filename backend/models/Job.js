@@ -1,6 +1,12 @@
 const mongoose = require("mongoose");
 
 const JobSchema = new mongoose.Schema({
+  caseId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Case",
+    default: null,
+    index: true,
+  },
   attorneyId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",

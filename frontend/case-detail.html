@@ -23,6 +23,9 @@
   <style>
     .gold{color:#b4975a;}
     :root {
+      --bg: #ffffff;
+      --sidebar-bg: #f5f5f5e6;
+      --sidebar-text: #1a1a1a;
       --accent: #b6a47a;
       --line: rgba(0,0,0,0.08);
       --muted: #8a8a8a;
@@ -31,6 +34,107 @@
       --font-serif: 'Cormorant Garamond', serif;
       --font-sans: 'Sarabun', sans-serif;
       --radius: 12px;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+    }
+    .sidebar {
+      width: 240px;
+      background: var(--sidebar-bg);
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+      padding: 24px 16px;
+      color: var(--sidebar-text);
+      position: relative;
+    }
+    .sidebar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: transparent;
+      pointer-events: none;
+      transition: background 0.3s ease;
+    }
+    body.theme-mountain .sidebar {
+      background: url('hero-mountain.jpg') center/cover no-repeat;
+    }
+    body.theme-mountain .sidebar::before {
+      background: rgba(0,0,0,0.45);
+    }
+    body.theme-mountain .sidebar > * {
+      position: relative;
+      z-index: 1;
+    }
+    .logo {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 300;
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    nav {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    nav a {
+      text-decoration: none;
+      color: var(--sidebar-text);
+      font-size: 0.95rem;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      transition: background 0.3s;
+    }
+    nav a.active,
+    nav a:hover {
+      background: rgba(0,0,0,0.04);
+    }
+    body.theme-dark nav a.active,
+    body.theme-dark nav a:hover {
+      background: rgba(255,255,255,0.12);
+    }
+    body.theme-mountain nav a {
+      color: #fff;
+    }
+    body.theme-mountain nav a.active,
+    body.theme-mountain nav a:hover {
+      background: rgba(255,255,255,0.18);
+    }
+    .sidebar-bottom {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .sidebar-footer {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-align: center;
+    }
+    .main {
+      flex: 1;
+      padding: 40px;
+      overflow-y: auto;
+    }
+    body.theme-dark {
+      --bg: #0f172a;
+      --sidebar-bg: #1c2333;
+      --panel: #151b29;
+      --ink: #f5f6fb;
+      --muted: #9aa7c4;
+      --line: rgba(255,255,255,0.08);
+      --sidebar-text: #f8fbff;
+    }
+    body.theme-mountain {
+      --bg: #f8f6f1;
+      --panel: #ffffff;
+      --muted: #7a736a;
+      --sidebar-text: #ffffff;
     }
 
     .toast {
@@ -154,6 +258,69 @@
     .btn.primary:hover { background: #a38e5f; }
     .btn.secondary { background: #fff; border: 1px solid var(--line); color: var(--ink); }
     .btn.secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .case-options {
+      position: relative;
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .case-options summary {
+      list-style: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.45rem 1rem;
+      border-radius: 10px;
+      border: none;
+    }
+    .case-options summary::-webkit-details-marker {
+      display: none;
+    }
+    .case-options[open] .case-options-menu {
+      display: block;
+    }
+    .case-options-menu {
+      position: absolute;
+      left: 50%;
+      top: calc(100% + 8px);
+      transform: translateX(-50%);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: 0 15px 45px rgba(15, 23, 42, 0.15);
+      min-width: 200px;
+      width: max(200px, 115%);
+      padding: 6px 0;
+      display: none;
+      z-index: 60;
+    }
+    .case-options-menu::before {
+      content: "";
+      position: absolute;
+      top: -8px;
+      left: 50%;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-left: 1px solid var(--line);
+      border-top: 1px solid var(--line);
+      transform: translate(-50%, 0) rotate(45deg);
+    }
+    .case-options-menu button {
+      width: 100%;
+      background: none;
+      border: none;
+      padding: 0.65rem 1rem;
+      text-align: left;
+      font-size: 0.9rem;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      color: var(--ink);
+    }
+    .case-options-menu button:hover {
+      background: rgba(0,0,0,0.04);
+    }
     .payment-panel {
       background: #fff;
       border: 1px solid var(--line);
@@ -166,7 +333,7 @@
       width: 100%;
       border: none;
       background: none;
-      color: var(--ink);
+      color: var(--sidebar-text);
       font-size: 0.95rem;
       font-family: var(--font-sans);
       font-weight: 300;
@@ -181,6 +348,15 @@
     .sidebar-link:focus {
       background: rgba(0, 0, 0, 0.04);
       outline: none;
+    }
+    body.theme-dark .sidebar-link:hover,
+    body.theme-dark .sidebar-link:focus,
+    body.theme-mountain .sidebar-link:hover,
+    body.theme-mountain .sidebar-link:focus {
+      color: #fff;
+    }
+    body.theme-mountain .sidebar-link {
+      color: #fff;
     }
     #card-element {
       padding: 12px;
@@ -212,6 +388,46 @@
       font-weight: 300;
       font-size: 1.4rem;
       margin-bottom: 0.75rem;
+    }
+    .applicant-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .applicant-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem;
+      background: #fff;
+    }
+    .applicant-card h4 {
+      margin: 0 0 0.35rem;
+      font-family: var(--font-serif);
+      font-weight: 300;
+    }
+    .applicant-card p {
+      margin: 0.15rem 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .applicant-card .chip {
+      display: inline-flex;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.2rem 0.75rem;
+      font-size: 0.8rem;
+      margin-right: 0.35rem;
+      margin-top: 0.35rem;
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .applicant-card .chip.muted {
+      color: var(--muted);
+      border-style: dashed;
     }
     .task-list {
       display: flex;
@@ -489,6 +705,16 @@
       background: #fff;
       margin-bottom: 0.5rem;
       font-family: var(--font-sans);
+    }
+    .note-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+    .notes-hint {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 0.35rem;
     }
     .upload-video {
       display: flex;
@@ -818,8 +1044,10 @@
       <a href="profile-settings.html">Profile Settings</a>
       <a href="help.html">Help</a>
     </nav>
-        <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
+    <div class="sidebar-bottom">
+      <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
+      <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
+    </div>
   </aside>
 
   <main class="main">
@@ -829,92 +1057,53 @@
 
     <div class="case-header">
       <div>
-        <h1>Motion for Summary Judgment</h1>
-        <small>Client: Smith & Co. · Field: Litigation</small>
-        <span class="case-status">OPEN</span>
+        <h1 id="caseTitle">Case Title</h1>
+        <span class="case-status" id="caseStatusBadge">OPEN</span>
       </div>
       <button class="btn primary" id="openTaskModalBtn" data-paralegal-only>
         + Create Task
       </button>
     </div>
 
-    <!-- === Case Tabs (Activity | Details | Parties | Injuries) === -->
-    <div class="case-tabs">
-      <button class="tab active" data-tab="agenda">Case Agenda</button>
-      <button class="tab" data-tab="details">Details</button>
-      <button class="tab" data-tab="parties">Parties</button>
-    </div>
-
-    <div class="tab-panels">
-      <!-- Case Agenda -->
-      <div id="tab-agenda" class="tab-panel visible">
-        <div class="agenda-panel">
-          <h3>Case Agenda <span class="subtext">Events & Tasks</span></h3>
-          <p class="muted">No items found.</p>
+    <section class="case-section">
+      <div class="details-grid" id="caseDetailsPanel">
+        <div class="party-card">
+          <h4>Paralegal</h4>
+          <p id="caseParalegalName">Not yet hired</p>
+          <p id="caseParalegalEmail" class="muted"></p>
         </div>
       </div>
-
-      <!-- Case Details -->
-      <div id="tab-details" class="tab-panel">
-        <div class="details-grid">
-          <div class="party-card">
-            <h4>Drew Adams – Applicant</h4>
-            <p><strong>Address:</strong> 13200 Roxbury Rd, Oakland CA 94612 (Alameda County)</p>
-            <p><strong>Phone:</strong> 323-595-6500<br>
-               <strong>Email:</strong> eng+452676@fuery.com</p>
-            <p><a href="#">Print Envelope</a> · <a href="#">Map</a></p>
-            <div class="card-actions">
-              <button
-                class="btn primary"
-                data-hire-button
-                data-attorney-only
-                data-paralegal-id="demo-paralegal-452676"
-                aria-label="Hire Drew Adams"
-              >
-                Hire
-              </button>
-              <button class="btn secondary">Message</button>
-            </div>
-          </div>
-
-          <div class="party-card">
-            <h4>Gilmore Banks – Employer</h4>
-            <p><strong>Address:</strong> 1300 Fair Fax Ave, San Francisco CA 94104 (San Francisco County)</p>
-            <p><strong>Phone:</strong> 323-555-5687<br>
-               <strong>Email:</strong> eng+452682@fuery.com</p>
-            <p><a href="#">Print Envelope</a> · <a href="#">Map</a></p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Parties -->
-      <div id="tab-parties" class="tab-panel">
-        <p>List all involved parties with roles, contact info, and communication logs here.</p>
-      </div>
-
-    </div>
+    </section>
 
     <div class="case-actions">
-      <button class="btn secondary" id="saveBtn">Save</button>
-      <button class="btn primary" onclick="window.location.href='create-case.html?ref=existing'">Add Additional Job</button>
       <button class="btn primary hidden" id="fundEscrowBtn" data-attorney-only>Fund Escrow</button>
       <div class="payment-panel hidden" id="escrowPayment" data-attorney-only>
         <p style="margin-bottom:.6rem;font-weight:300;">Payment Method</p>
         <div id="card-element"></div>
         <div id="card-errors" role="alert"></div>
       </div>
-      <button class="btn primary" id="releaseEscrowBtn" data-attorney-only>Mark Complete &amp; Release Funds</button>
-      <button class="btn primary" onclick="openExportModal()" data-attorney-only>Complete Case</button>
+      <details class="case-options" data-attorney-only id="caseOptionsRoot">
+        <summary class="btn primary" id="caseOptionsToggle">Case Options ▾</summary>
+        <div class="case-options-menu" id="caseOptionsMenu">
+          <button type="button" data-case-option="edit">Edit</button>
+          <button type="button" data-case-option="share">Share</button>
+          <button type="button" data-case-option="pause">Pause</button>
+          <button type="button" data-case-option="delete">Delete</button>
+        </div>
+      </details>
     </div>
 
-    <div class="case-overview">
-      <p>This case involves reviewing discovery responses and drafting a Motion for Summary Judgment for Smith & Co. The paralegal assists in organizing discovery, citing prior rulings, and preparing exhibit indexes.</p>
-      <p>
-        <strong>Deadline:</strong> November 30, 2025 ·
-        <span data-attorney-only><strong>Assigned Paralegal:</strong> J. Stone</span>
-        <span data-paralegal-only><strong>Attorney:</strong> Samantha Sider</span>
-      </p>
+    <div class="case-overview" id="caseOverview">
+      <p>No description provided yet.</p>
+      <p id="caseTimelineMeta"></p>
     </div>
+
+    <section class="case-section" data-attorney-only>
+      <h2>Applicants</h2>
+      <div id="applicantsList" class="applicant-list">
+        <p style="color:var(--muted);">No applicants yet.</p>
+      </div>
+    </section>
 
     <section class="case-section" id="caseTasksSection">
       <h2>Case Tasks</h2>
@@ -925,11 +1114,9 @@
 
     <section class="case-section" data-paralegal-only>
       <h2>Uploaded Documents</h2>
-      <ul class="doc-list" id="docList">
-        <li class="doc-item">Exhibit_A.pdf</li>
-        <li class="doc-item">Deposition_Summary.docx</li>
-        <li class="doc-item">Draft_Motion.docx</li>
-      </ul>
+      <div class="doc-list" id="docList">
+        <p style="color:var(--muted);">No documents uploaded.</p>
+      </div>
       <form class="upload-form" id="uploadForm">
         <label for="fileInput">Upload Document</label>
         <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt" required />
@@ -938,59 +1125,26 @@
 
     <section class="case-section deadlines">
       <h2>Deadlines</h2>
-      <ul>
-        <li><strong>Initial Motion Due:</strong> Nov 10, 2025</li>
-        <li><strong>Client Review:</strong> Nov 15, 2025</li>
-        <li><strong>Filing Deadline:</strong> Nov 20, 2025</li>
+      <ul id="deadlinesList">
+        <li style="color:var(--muted);">No deadlines recorded.</li>
       </ul>
     </section>
 
-    <!-- === REFINED REVIEW & MESSAGING SECTION === -->
+    <section class="case-section notes-section" data-attorney-only>
+      <h2>Case Notes</h2>
+      <p class="notes-hint">Private notes only you can see. Clear the field and save to delete.</p>
+      <textarea placeholder="Add internal notes for this case." data-case-note></textarea>
+      <div class="note-actions">
+        <button type="button" class="btn secondary" data-save-note>Save Notes</button>
+      </div>
+    </section>
+
     <section class="review-container">
       <div class="review-header">
-        <h2>Review Submitted Work</h2>
-        <button class="btn primary" data-attorney-only>Review & Approve</button>
+        <h2 style="font-weight:300;">Review & Messaging</h2>
       </div>
-
       <div class="review-body">
-        <div class="review-left">
-          <div class="review-item">
-            <p><strong>Revised Motion Draft</strong> – Uploaded Nov 5, 2025</p>
-          </div>
-
-          <div class="notes-section">
-            <h3>Notes</h3>
-            <textarea placeholder="Add internal notes..."></textarea>
-            <button class="btn secondary">Save Notes</button>
-          </div>
-
-          <div class="upload-video">
-            <div class="upload-box">
-              <h3>Upload to Case</h3>
-              <div class="dropzone">
-                <span>📂 Drag & Drop or click to upload</span>
-              </div>
-              <input type="file" id="caseDocumentInput" hidden accept=".pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip" />
-            </div>
-            <div class="video-box">
-              <h3>Video Meeting</h3>
-              <button class="btn primary dropdown">Start Meeting ▾</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="review-right">
-          <h3>Messages</h3>
-          <div class="chat-window">
-            <div class="chat-msg them">J. Stone: Uploaded revised exhibit set for your review.</div>
-            <div class="chat-msg you">Samantha: Reviewing now, should have comments shortly.</div>
-            <div class="chat-msg them">J. Stone: Perfect, thank you!</div>
-          </div>
-          <div class="chat-input">
-            <input type="text" placeholder="Type a message..." />
-            <button class="btn primary">Send</button>
-          </div>
-        </div>
+        <p style="color:var(--muted);">Review workflows and messaging will appear here once activity begins on this case.</p>
       </div>
     </section>
   </main>
@@ -1043,6 +1197,58 @@
   </div>
 
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script>
+    (function preloadCaseTitle() {
+      const titleNode = document.getElementById('caseTitle');
+      if (!titleNode) return;
+      const params = new URLSearchParams(window.location.search || '');
+      const caseId = params.get('caseId') || document.body?.dataset?.caseId || '';
+      const stores = [sessionStorage, localStorage];
+      const CASE_TITLE_PREFIX = 'case_title_';
+      const PREFILL_KEY = 'lpc_last_case_prefill';
+
+      function readRaw(key) {
+        for (const store of stores) {
+          if (!store) continue;
+          try {
+            const value = store.getItem(key);
+            if (value) return value;
+          } catch {
+            /* ignore */
+          }
+        }
+        return '';
+      }
+
+      function readPrefillObject() {
+        for (const store of stores) {
+          if (!store) continue;
+          try {
+            const raw = store.getItem(PREFILL_KEY);
+            if (!raw) continue;
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.caseId === caseId && parsed.title) {
+              return parsed.title;
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+        return '';
+      }
+
+      let title = params.get('prefillTitle') || '';
+      if (!title && caseId) {
+        title = readRaw(`${CASE_TITLE_PREFIX}${caseId}`) || '';
+      }
+      if (!title && caseId) {
+        title = readPrefillObject();
+      }
+      if (title) {
+        titleNode.textContent = title;
+      }
+    })();
+  </script>
   <script src="assets/scripts/utils/toast.js"></script>
   <script type="module">
     import { secureFetch } from "./assets/scripts/auth.js";
@@ -1182,6 +1388,7 @@
       try {
         await persistCaseNote(caseId, content || '');
         showToastBanner('Notes saved.', 'success');
+        if (notesTextarea) notesTextarea.value = content || '';
         window.dispatchEvent(new CustomEvent('lpc-case-notes-updated', { detail: { caseId } }));
       } catch (err) {
         console.error('Save note error', err);
@@ -1314,7 +1521,18 @@
     const exportStatusText = exportProgress.querySelector('p');
     const caseStatus = document.querySelector('.case-status');
     const caseMain = document.querySelector('.main');
-    const CASE_ID = document.body.dataset.caseId || 'demo-case-0001';
+    const caseParams = new URLSearchParams(window.location.search);
+    const resolvedCaseId = caseParams.get('caseId') || document.body.dataset.caseId || 'demo-case-0001';
+    document.body.dataset.caseId = resolvedCaseId;
+    const CASE_ID = resolvedCaseId;
+    const CASE_CACHE_KEY = 'lpc_case_cache';
+    const LAST_CASE_PREFILL_KEY = 'lpc_last_case_prefill';
+    const CASE_CACHE_TTL = 5 * 60 * 1000;
+    const PREFILL_TITLE_PARAM = caseParams.get('prefillTitle');
+    const PREFILL_TITLE =
+      PREFILL_TITLE_PARAM ||
+      readCachedTitle(CASE_ID) ||
+      readLastPrefill(CASE_ID);
     const AUTH_TOKEN_STORAGE_KEY = 'lpc_token';
     const USER_STORAGE_KEY = 'lpc_user';
     const paymentPanel = document.getElementById('escrowPayment');
@@ -1327,9 +1545,25 @@
     let caseDetails = null;
     let progressInterval;
     let exportTimeout;
-    const hireButtons = document.querySelectorAll('[data-hire-button]');
     const fundEscrowBtn = document.getElementById('fundEscrowBtn');
     const releaseEscrowBtn = document.getElementById('releaseEscrowBtn');
+    const backLink = document.querySelector('.back-arrow');
+    if (backLink && CASE_ID) {
+      backLink.href = `active-cases.html?prefillCaseId=${encodeURIComponent(CASE_ID)}`;
+    }
+    const caseOptionsRoot = document.getElementById('caseOptionsRoot');
+    const caseOptionsToggle = caseOptionsRoot?.querySelector('summary');
+    const caseOptionsMenu = document.getElementById('caseOptionsMenu');
+    if (PREFILL_TITLE) {
+      const titleEl = document.getElementById('caseTitle');
+      if (titleEl) titleEl.textContent = PREFILL_TITLE;
+    }
+
+    const cachedCaseDetails = readPrefilledCaseSummary(CASE_ID);
+    if (cachedCaseDetails) {
+      caseDetails = cachedCaseDetails;
+      updateCaseContent();
+    }
 
     function showFieldError(target, message) {
       if (!target) return;
@@ -1362,17 +1596,211 @@
       if (next?.classList.contains('field-error')) next.remove();
     }
 
-    hireButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const paralegalId = btn.dataset.paralegalId || prompt('Enter the paralegal ID to hire:');
-        if (!paralegalId) {
-          alert('Paralegal ID is required.');
-          return;
+    function readCaseCacheStore() {
+      const merged = {};
+      [localStorage, sessionStorage].forEach((store) => {
+        if (!store) return;
+        try {
+          const raw = store.getItem(CASE_CACHE_KEY);
+          if (!raw) return;
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            Object.assign(merged, parsed);
+          }
+        } catch {
+          /* noop */
         }
-        const targetCase = btn.dataset.caseId || CASE_ID;
-        hireParalegal(targetCase, paralegalId, btn);
       });
+      return merged;
+    }
+
+    function readCachedTitle(caseId) {
+      if (!caseId) return '';
+      const key = `case_title_${caseId}`;
+      const stores = [sessionStorage, localStorage];
+      for (const store of stores) {
+        if (!store) continue;
+        try {
+          const value = store.getItem(key);
+          if (value) return value;
+        } catch {/* noop */}
+      }
+      return '';
+    }
+
+    function readLastPrefill(caseId) {
+      if (!caseId) return '';
+      const stores = [sessionStorage, localStorage];
+      for (const store of stores) {
+        if (!store) continue;
+        try {
+          const raw = store.getItem(LAST_CASE_PREFILL_KEY);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.caseId === caseId && parsed.title) {
+            return parsed.title;
+          }
+        } catch {
+          /* noop */
+        }
+      }
+      return '';
+    }
+
+    function clearCachedTitle(caseId) {
+      if (!caseId) return;
+      const key = `case_title_${caseId}`;
+      [sessionStorage, localStorage].forEach((store) => {
+        if (!store) return;
+        try {
+          store.removeItem(key);
+        } catch {/* noop */}
+      });
+    }
+
+    function persistCaseCacheStore(cache) {
+      let payload = "";
+      try {
+        payload = JSON.stringify(cache || {});
+      } catch (err) {
+        console.warn('Unable to serialize case cache.', err);
+        return;
+      }
+      [sessionStorage, localStorage].forEach((store) => {
+        if (!store) return;
+        try {
+          store.setItem(CASE_CACHE_KEY, payload);
+        } catch (err) {
+          console.warn('Unable to persist case cache.', err);
+        }
+      });
+    }
+
+    function readPrefilledCaseSummary(targetCaseId) {
+      if (!targetCaseId) return null;
+      const store = readCaseCacheStore();
+      const entry = store[targetCaseId];
+      if (!entry) return null;
+      const expired = entry.storedAt && Date.now() - entry.storedAt > CASE_CACHE_TTL;
+      if (expired) {
+        delete store[targetCaseId];
+        persistCaseCacheStore(store);
+        return null;
+      }
+      return entry.data || entry.case || null;
+    }
+
+    function cacheCaseSummary(targetCaseId, payload) {
+      if (!targetCaseId || !payload) return;
+      const store = readCaseCacheStore();
+      store[targetCaseId] = {
+        data: payload,
+        storedAt: Date.now(),
+      };
+      persistCaseCacheStore(store);
+    }
+
+    function closeCaseOptionsMenu() {
+      caseOptionsRoot?.removeAttribute('open');
+    }
+
+    caseOptionsMenu?.addEventListener('click', (event) => {
+      const actionBtn = event.target.closest('[data-case-option]');
+      if (!actionBtn) return;
+      const action = actionBtn.getAttribute('data-case-option');
+      closeCaseOptionsMenu();
+      handleCaseOption(action);
     });
+
+    function handleCaseOption(action) {
+      switch (action) {
+        case 'edit':
+          window.location.href = `create-case.html?ref=existing&caseId=${encodeURIComponent(CASE_ID)}`;
+          break;
+        case 'share':
+          shareCaseLink();
+          break;
+        case 'pause':
+          pauseCurrentCase();
+          break;
+        case 'delete':
+          deleteCurrentCase();
+          break;
+        case 'download':
+          window.open(`case-detail.html?caseId=${encodeURIComponent(CASE_ID)}#caseFilesSection`, '_blank');
+          break;
+        case 'tasks':
+          document.getElementById('caseTasksSection')?.scrollIntoView({ behavior: 'smooth' });
+          break;
+        default:
+          break;
+      }
+    }
+
+    async function pauseCurrentCase() {
+      if (!CASE_ID) return;
+      const confirmed = confirm('Pause this case? It will move to Archived until you resume it.');
+      if (!confirmed) return;
+      try {
+        const res = await secureFetch(`/api/cases/${encodeURIComponent(CASE_ID)}/archive`, {
+          method: 'PATCH',
+          headers: { Accept: 'application/json' },
+          body: { archived: true },
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(payload?.error || 'Unable to pause this case.');
+        showToastBanner('Case paused. You can restore it from the Archived tab.', 'success');
+        setTimeout(() => {
+          window.location.href = 'active-cases.html';
+        }, 800);
+      } catch (err) {
+        showToastBanner(err?.message || 'Unable to pause this case.', 'error');
+      }
+    }
+
+    async function deleteCurrentCase() {
+      if (!CASE_ID) return;
+      const confirmed = confirm('Delete this case permanently? This cannot be undone.');
+      if (!confirmed) return;
+      try {
+        const res = await secureFetch(`/api/cases/${encodeURIComponent(CASE_ID)}`, {
+          method: 'DELETE',
+          headers: { Accept: 'application/json' },
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(payload?.error || 'Unable to delete this case.');
+        showToastBanner('Case deleted.', 'success');
+        setTimeout(() => {
+          window.location.href = 'active-cases.html';
+        }, 800);
+      } catch (err) {
+        showToastBanner(err?.message || 'Unable to delete this case.', 'error');
+      }
+    }
+
+    async function shareCaseLink() {
+      const shareUrl = `${window.location.origin}/case-detail.html?caseId=${encodeURIComponent(CASE_ID)}`;
+      const sharePayload = {
+        title: caseDetails?.title || 'Case',
+        text: 'Please review this case on Let’s-ParaConnect.',
+        url: shareUrl,
+      };
+      if (navigator.share) {
+        try {
+          await navigator.share(sharePayload);
+          return;
+        } catch (err) {
+          if (err?.name === 'AbortError') return;
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        showToastBanner('Case link copied to clipboard.', 'success');
+      } catch {
+        prompt('Copy this link to share:', shareUrl);
+      }
+    }
+
     fundEscrowBtn?.addEventListener('click', () => startEscrow(CASE_ID, fundEscrowBtn));
     releaseEscrowBtn?.addEventListener('click', () => releaseEscrow(CASE_ID, releaseEscrowBtn));
     loadCaseDetails();
@@ -1441,6 +1869,19 @@
       return cachedCsrfToken;
     }
 
+    function formatPerson(person, fallbackLabel = '—') {
+      if (!person) return fallbackLabel;
+      const parts = [person.firstName, person.lastName].filter(Boolean).join(' ').trim();
+      return parts || person.name || fallbackLabel;
+    }
+
+    function formatDisplayDate(value) {
+      if (!value) return 'No deadline set';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return 'No deadline set';
+      return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
     async function loadCaseDetails() {
       const headers = new Headers();
       const token = readStoredToken();
@@ -1449,6 +1890,22 @@
         const res = await fetch(`/api/cases/${encodeURIComponent(CASE_ID)}`, { headers, credentials: 'include' });
         if (!res.ok) throw new Error('Unable to fetch case');
         caseDetails = await res.json();
+        updateCaseContent();
+        cacheCaseSummary(CASE_ID, caseDetails);
+        clearCachedTitle(CASE_ID);
+        if (caseDetails?.title) {
+          [sessionStorage, localStorage].forEach((store) => {
+            if (!store) return;
+            try {
+              const raw = store.getItem(LAST_CASE_PREFILL_KEY);
+              if (!raw) return;
+              const payload = JSON.parse(raw);
+              if (payload?.caseId === CASE_ID) {
+                store.removeItem(LAST_CASE_PREFILL_KEY);
+              }
+            } catch {/* noop */}
+          });
+        }
       } catch (err) {
         console.warn('Unable to load case details.', err);
         caseDetails = null;
@@ -1471,6 +1928,119 @@
       if (show) {
         ensureCardElement().catch((err) => console.warn('Unable to initialize payment field.', err));
       }
+    }
+
+    function updateCaseContent() {
+      if (!caseDetails) return;
+      const titleEl = document.getElementById('caseTitle');
+      const statusBadge = document.getElementById('caseStatusBadge');
+      const overviewEl = document.getElementById('caseOverview');
+      const timelineMeta = document.getElementById('caseTimelineMeta');
+      const paralegalNameEl = document.getElementById('caseParalegalName');
+      const paralegalEmailEl = document.getElementById('caseParalegalEmail');
+
+      if (titleEl) titleEl.textContent = caseDetails.title || 'Untitled Case';
+
+      if (statusBadge) {
+        const status = (caseDetails.status || 'open').toUpperCase();
+        statusBadge.textContent = status;
+      }
+
+      if (overviewEl) {
+        const summary = caseDetails.details || caseDetails.description || 'This case has no additional description yet.';
+        overviewEl.querySelectorAll('p').forEach((node, index) => {
+          if (index === 0) node.textContent = summary;
+        });
+      }
+
+      if (timelineMeta) {
+        const deadline = caseDetails.deadline ? formatDisplayDate(caseDetails.deadline) : 'No deadline set';
+        const assigned = caseDetails.paralegal ? formatPerson(caseDetails.paralegal, 'Assigned paralegal') : 'No paralegal yet';
+        timelineMeta.innerHTML = `<strong>Deadline:</strong> ${deadline} · <strong>Paralegal:</strong> ${assigned}`;
+      }
+
+      if (caseDetails.paralegal) {
+        if (paralegalNameEl) paralegalNameEl.textContent = formatPerson(caseDetails.paralegal, 'Paralegal');
+        if (paralegalEmailEl) paralegalEmailEl.textContent = caseDetails.paralegal.email || '';
+      } else {
+        if (paralegalNameEl) paralegalNameEl.textContent = 'No paralegal hired yet';
+        if (paralegalEmailEl) paralegalEmailEl.textContent = '';
+      }
+
+      const detailsGrid = document.getElementById('caseDetailsPanel');
+      if (detailsGrid) {
+        detailsGrid.innerHTML = `
+          <div class="party-card">
+            <h4>Paralegal</h4>
+            <p>${caseDetails.paralegal ? formatPerson(caseDetails.paralegal, 'Paralegal') : 'No paralegal hired yet'}</p>
+            <p class="muted">${caseDetails?.paralegal?.email || ''}</p>
+          </div>
+        `;
+      }
+
+      const applicantsList = document.getElementById('applicantsList');
+      const applicants = Array.isArray(caseDetails.applicants) ? caseDetails.applicants : [];
+      if (applicantsList) {
+        if (!applicants.length) {
+          applicantsList.innerHTML = '<p style="color:var(--muted);">No applicants yet.</p>';
+        } else {
+          const canHire = readStoredRole().toLowerCase() === 'attorney' && !caseDetails.paralegal;
+          applicantsList.innerHTML = applicants.map((app) => renderApplicantCard(app, canHire)).join("");
+          bindHireButtons();
+        }
+      }
+    }
+
+    function renderApplicantCard(applicant, canHire) {
+      const paralegal = applicant?.paralegalId || applicant?.paralegal || {};
+      const name = formatPerson(paralegal, 'Paralegal');
+      const status = (applicant?.status || 'pending').replace(/_/g, ' ');
+      const appliedAt = applicant?.appliedAt ? new Date(applicant.appliedAt).toLocaleDateString() : '';
+      const letter = applicant?.coverLetter || applicant?.note || '';
+      const resumeURL = applicant?.resumeURL || '';
+      const linkedInURL = applicant?.linkedInURL || '';
+      const paralegalId = paralegal?._id || paralegal?.id || applicant?.paralegalId || '';
+      const hireButton = canHire && paralegalId
+        ? `<button class="btn primary" data-hire-button data-case-id="${CASE_ID}" data-paralegal-id="${paralegalId}">Hire</button>`
+        : '';
+      return `
+        <div class="applicant-card">
+          <h4>${name}</h4>
+          <p>${status}${appliedAt ? ` · Applied ${appliedAt}` : ''}</p>
+          ${
+            letter
+              ? `<p>${letter.replace(/\n/g, '<br>')}</p>`
+              : ''
+          }
+          <div>
+            ${
+              resumeURL
+                ? `<a class="chip" href="${resumeURL}" target="_blank" rel="noopener">Résumé</a>`
+                : `<span class="chip muted">No résumé</span>`
+            }
+            ${
+              linkedInURL
+                ? `<a class="chip" href="${linkedInURL}" target="_blank" rel="noopener">LinkedIn</a>`
+                : `<span class="chip muted">LinkedIn unavailable</span>`
+            }
+          </div>
+          ${hireButton}
+        </div>
+      `;
+    }
+
+    function bindHireButtons() {
+      document.querySelectorAll('[data-hire-button]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const paralegalId = btn.dataset.paralegalId || '';
+          if (!paralegalId) {
+            alert('Paralegal ID is required.');
+            return;
+          }
+          const targetCase = btn.dataset.caseId || CASE_ID;
+          hireParalegal(targetCase, paralegalId, btn);
+        });
+      });
     }
 
     async function ensureCardElement() {
@@ -1803,24 +2373,6 @@
       }
     }
 
-    // --- Case Tabs toggle ---
-    const tabs = document.querySelectorAll('.case-tabs .tab');
-    const panels = document.querySelectorAll('.tab-panel');
-    tabs.forEach(tab=>{
-      tab.addEventListener('click',()=>{
-        tabs.forEach(t=>t.classList.remove('active'));
-        tab.classList.add('active');
-        panels.forEach(p=>p.classList.remove('visible'));
-        document.getElementById(`tab-${tab.dataset.tab}`).classList.add('visible');
-      });
-    });
-
-    // Save Button
-    document.getElementById('saveBtn').addEventListener('click', () => {
-      alert('All progress saved successfully.');
-    });
-    }
-
     function applyRoleVisibility(user) {
       const role = String(user?.role || '').toLowerCase();
       if (role === 'paralegal') {
@@ -1834,7 +2386,8 @@
         });
       }
     }
-        const logoutBtn = document.getElementById('logoutBtn');
+
+    const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', () => {
         localStorage.clear();
@@ -1844,8 +2397,5 @@
     }
   </script>
   <script type="module" src="assets/scripts/case-detail.js"></script>
-</div>
-</div>
-<script type="module" src="assets/scripts/attorney-tabs.js"></script>
 </body>
 </html>
