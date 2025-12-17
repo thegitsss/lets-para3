@@ -485,6 +485,18 @@ router.patch(
     if (typeof lawFirm === "string") {
       me.lawFirm = normStr(lawFirm, { len: 300 }).trim();
     }
+    if (typeof body.state === "string") {
+      me.state = normStr(body.state, { len: 120 }).trim();
+    }
+    if (typeof body.primaryPracticeArea === "string") {
+      me.primaryPracticeArea = normStr(body.primaryPracticeArea, { len: 200 }).trim();
+    }
+    if (body.preferredPracticeAreas !== undefined) {
+      me.preferredPracticeAreas = cleanList(body.preferredPracticeAreas);
+    }
+    if (typeof body.collaborationStyle === "string") {
+      me.collaborationStyle = normStr(body.collaborationStyle, { len: 500 }).trim();
+    }
 
     if (typeof bio === "string") {
       const sanitized = normStr(maskProfanity(bio), { len: 4000 });
@@ -533,9 +545,6 @@ router.patch(
           ["school", 200]
         ]);
       }
-      if (body.languages !== undefined) {
-        me.languages = cleanLanguages(body.languages);
-      }
       if (body.yearsExperience !== undefined) {
         const years = Math.max(0, Math.min(80, parseInt(body.yearsExperience, 10) || 0));
         me.yearsExperience = years;
@@ -544,6 +553,9 @@ router.patch(
         const trimmed = body.linkedInURL.trim();
         me.linkedInURL = trimmed ? normStr(trimmed, { len: 500 }) : null;
       }
+    }
+    if (body.languages !== undefined) {
+      me.languages = cleanLanguages(body.languages);
     }
     if (me.role === "attorney" && typeof barNumber === "string") {
       me.barNumber = normStr(barNumber, { len: 100 }).trim();

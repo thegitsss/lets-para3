@@ -170,9 +170,13 @@ const userSchema = new Schema(
     avatarURL: { type: String, default: "", trim: true },
     profileImage: { type: String, default: null },
     lawFirm: { type: String, default: "", trim: true, maxlength: 300 },
+    state: { type: String, default: "", trim: true, maxlength: 120 },
     timezone: { type: String, default: "America/New_York", trim: true },
     location: { type: String, default: "", trim: true }, // City, State
     practiceAreas: { type: [String], default: [], set: uniqueStrings },
+    primaryPracticeArea: { type: String, default: "", trim: true, maxlength: 200 },
+    preferredPracticeAreas: { type: [String], default: [], set: uniqueStrings },
+    collaborationStyle: { type: String, default: "", trim: true, maxlength: 500 },
 
     // Expertise (improves browse/search)
     specialties: { type: [String], default: [], set: uniqueStrings },
