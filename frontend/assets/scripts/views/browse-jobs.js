@@ -1,3 +1,5 @@
+import { secureFetch } from "../auth.js";
+
 const jobsGrid = document.getElementById("jobs-grid");
 const pagination = document.getElementById("pagination");
 const jobModal = document.getElementById("jobModal");
@@ -13,6 +15,7 @@ const jobAttorneyAvatar = document.getElementById("jobAttorneyAvatar");
 const jobAttorneyName = document.getElementById("jobAttorneyName");
 const jobAttorneyFirm = document.getElementById("jobAttorneyFirm");
 const FALLBACK_AVATAR = "https://via.placeholder.com/64x64.png?text=A";
+const attorneyPreviewCache = new Map();
 
 let allJobs = [];
 let filteredJobs = [];
@@ -75,6 +78,32 @@ if (filterToggle && filterMenu) {
   });
 }
 
+function quantizePayValue(raw) {
+  const value = Math.max(0, Math.min(500, Number(raw) || 0));
+  if (value <= 100) {
+    return Math.max(0, Math.min(100, Math.round(value / 20) * 20));
+  }
+  const remainder = value - 100;
+  const increments = Math.ceil(remainder / 50);
+  return Math.min(500, 100 + increments * 50);
+}
+
+function updatePayLabel(value) {
+  if (!minPayValue) return;
+  const display = value >= 500 ? "$500+" : `$${value.toLocaleString()}`;
+  minPayValue.textContent = display;
+}
+
+function clampExperienceValue(raw) {
+  return Math.max(0, Math.min(10, Number(raw) || 0));
+}
+
+function updateExperienceLabel(value) {
+  if (!minExpValue) return;
+  const label = value >= 10 ? "10+ years" : `${value} year${value === 1 ? "" : "s"}`;
+  minExpValue.textContent = label;
+}
+
 // Dynamic filter population
 function populateFilters() {
   if (!practiceAreaSelect || !stateSelect || !minPaySlider || !minExpSlider) return;
@@ -90,35 +119,40 @@ function populateFilters() {
     `<option value="">Any</option>` + states.map((s) => `<option value="${s}">${s}</option>`).join("");
 
   // Pay slider
-  const payValues = allJobs.map((job) => getJobPayUSD(job)).filter((value) => Number.isFinite(value));
-  const maxPay = payValues.length ? Math.max(...payValues) : 0;
-  minPaySlider.max = Math.max(1000, Math.ceil(maxPay));
+  minPaySlider.min = 0;
+  minPaySlider.max = 500;
+  minPaySlider.step = 10;
   minPaySlider.value = 0;
-  minPayValue.textContent = "$0";
+  updatePayLabel(0);
 
   // Experience slider
-  const expValues = allJobs.map((job) => getJobExperience(job)).filter((value) => Number.isFinite(value));
-  const maxExp = expValues.length ? Math.max(...expValues) : 0;
-  minExpSlider.max = Math.max(20, Math.ceil(maxExp));
+  minExpSlider.min = 0;
+  minExpSlider.max = 10;
+  minExpSlider.step = 1;
   minExpSlider.value = 0;
-  minExpValue.textContent = "0 years";
+  updateExperienceLabel(0);
 }
 
 // Slider displays
 minPaySlider?.addEventListener("input", () => {
-  minPayValue.textContent = `$${Number(minPaySlider.value).toLocaleString()}`;
+  const value = quantizePayValue(minPaySlider.value);
+  minPaySlider.value = value;
+  updatePayLabel(value);
 });
 
 minExpSlider?.addEventListener("input", () => {
-  minExpValue.textContent = `${minExpSlider.value} years`;
+  const value = clampExperienceValue(minExpSlider.value);
+  minExpSlider.value = value;
+  updateExperienceLabel(value);
 });
 
 // Apply filters
 function applyFilters() {
   const area = practiceAreaSelect?.value || "";
   const state = stateSelect?.value || "";
-  const minPay = Number(minPaySlider?.value || 0);
-  const maxExp = Number(minExpSlider?.value || 0);
+  const minPay = quantizePayValue(minPaySlider?.value || 0);
+  const maxExpValue = clampExperienceValue(minExpSlider?.value || 0);
+  const expLimit = maxExpValue >= 10 ? Infinity : maxExpValue;
 
   filteredJobs = allJobs.filter((job) => {
     const payUSD = getJobPayUSD(job);
@@ -128,7 +162,7 @@ function applyFilters() {
     if (area && job.practiceArea !== area) return false;
     if (state && jobState !== state) return false;
     if (payUSD < minPay) return false;
-    if (exp > maxExp) return false;
+    if (expLimit !== Infinity && exp > expLimit) return false;
 
     return true;
   });
@@ -144,10 +178,14 @@ applyFiltersBtn?.addEventListener("click", applyFilters);
 function clearFilters() {
   if (practiceAreaSelect) practiceAreaSelect.value = "";
   if (stateSelect) stateSelect.value = "";
-  if (minPaySlider) minPaySlider.value = 0;
-  if (minExpSlider) minExpSlider.value = 0;
-  if (minPayValue) minPayValue.textContent = "$0";
-  if (minExpValue) minExpValue.textContent = "0 years";
+  if (minPaySlider) {
+    minPaySlider.value = 0;
+    updatePayLabel(0);
+  }
+  if (minExpSlider) {
+    minExpSlider.value = 10;
+    updateExperienceLabel(10);
+  }
   if (sortSelect) sortSelect.value = "";
 
   filteredJobs = [...allJobs];
@@ -515,9 +553,55 @@ async function ensureCsrfToken() {
   return csrfToken;
 }
 
-function openJobModal(job) {
+async function ensureAttorneyPreview(job) {
+  if (!job) return null;
+  const existing = job.attorney || {};
+  if (existing && (existing.firstName || existing.lastName || existing.lawFirm || existing.profileImage)) {
+    if (!existing._id && job.attorneyId) {
+      existing._id = job.attorneyId;
+    }
+    return existing;
+  }
+
+  const id = job.attorneyId || existing._id;
+  if (!id) return null;
+  if (!attorneyPreviewCache.has(id)) {
+    try {
+      const res = await secureFetch(`/api/users/attorneys/${encodeURIComponent(id)}`, {
+        headers: { Accept: "application/json" },
+        noRedirect: true,
+      });
+      if (!res.ok) throw new Error(`Attorney preview failed (${res.status})`);
+      const data = await res.json().catch(() => ({}));
+      attorneyPreviewCache.set(id, data);
+    } catch (err) {
+      console.warn("Unable to fetch attorney preview", err);
+      attorneyPreviewCache.set(id, null);
+    }
+  }
+  const preview = attorneyPreviewCache.get(id);
+  if (preview) {
+    job.attorney = {
+      _id: preview._id || id,
+      firstName: preview.firstName || preview.givenName || "",
+      lastName: preview.lastName || preview.familyName || "",
+      lawFirm: preview.lawFirm || preview.firmName || "",
+      profileImage: preview.profileImage || preview.avatarURL || "",
+    };
+    return job.attorney;
+  }
+  return null;
+}
+
+async function openJobModal(job) {
   if (!jobModal || !job) return;
   modalJob = job;
+  try {
+    await ensureAttorneyPreview(job);
+  } catch (err) {
+    console.warn("Attorney preview load failed", err);
+  }
+
   const title = job.title || "Untitled job";
   const summary = job.shortDescription || job.practiceArea || job.briefSummary || "";
   const description = job.description || job.details || "No additional description provided.";
@@ -567,10 +651,25 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-jobAttorneyButton?.addEventListener("click", () => {
-  const attorneyId = jobAttorneyButton.dataset.attorneyId;
-  const jobId = jobAttorneyButton.dataset.jobId;
-  if (!attorneyId) return;
+jobAttorneyButton?.addEventListener("click", async () => {
+  if (!jobAttorneyButton) return;
+  let attorneyId = jobAttorneyButton.dataset.attorneyId || "";
+  let jobId = jobAttorneyButton.dataset.jobId || "";
+  if (!attorneyId && modalJob) {
+    try {
+      await ensureAttorneyPreview(modalJob);
+    } catch {}
+    attorneyId = modalJob?.attorney?._id || modalJob?.attorneyId || "";
+    jobId = jobId || modalJob?.id || modalJob?._id || "";
+  }
+  if (!attorneyId) {
+    if (toast?.show) {
+      toast.show("Unable to open this attorney profile right now.");
+    } else {
+      alert("Unable to open this attorney profile right now.");
+    }
+    return;
+  }
   const url = new URL("profile-attorney.html", window.location.href);
   url.searchParams.set("id", attorneyId);
   if (jobId) url.searchParams.set("job", jobId);

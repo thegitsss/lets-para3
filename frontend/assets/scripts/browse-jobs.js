@@ -13,6 +13,7 @@ const attorneyAvatar = document.getElementById("jobAttorneyAvatar");
 const attorneyNameEl = document.getElementById("jobAttorneyName");
 const attorneyFirmEl = document.getElementById("jobAttorneyFirm");
 const FALLBACK_AVATAR = "https://via.placeholder.com/64x64.png?text=A";
+const attorneyPreviewCache = new Map();
 
 let jobsCache = [];
 let modalJob = null;
@@ -103,9 +104,55 @@ async function submitQuickApplication(jobId) {
   }
 }
 
-function openJobModal(job) {
+async function ensureAttorneyPreview(job) {
+  if (!job) return null;
+  const existing = job.attorney || {};
+  if (existing && (existing.firstName || existing.lastName || existing.lawFirm || existing.profileImage)) {
+    if (!existing._id && job.attorneyId) {
+      existing._id = job.attorneyId;
+    }
+    return existing;
+  }
+
+  const id = job.attorneyId || existing._id;
+  if (!id) return null;
+  if (!attorneyPreviewCache.has(id)) {
+    try {
+      const res = await secureFetch(`/api/users/attorneys/${encodeURIComponent(id)}`, {
+        headers: { Accept: "application/json" },
+        noRedirect: true,
+      });
+      if (!res.ok) throw new Error(`Attorney preview failed (${res.status})`);
+      const data = await res.json().catch(() => ({}));
+      attorneyPreviewCache.set(id, data);
+    } catch (err) {
+      console.warn("Unable to fetch attorney preview", err);
+      attorneyPreviewCache.set(id, null);
+    }
+  }
+  const preview = attorneyPreviewCache.get(id);
+  if (preview) {
+    job.attorney = {
+      _id: preview._id || id,
+      firstName: preview.firstName || preview.givenName || "",
+      lastName: preview.lastName || preview.familyName || "",
+      lawFirm: preview.lawFirm || preview.firmName || "",
+      profileImage: preview.profileImage || preview.avatarURL || "",
+    };
+    return job.attorney;
+  }
+  return null;
+}
+
+async function openJobModal(job) {
   if (!jobModal) return;
   modalJob = job;
+  try {
+    await ensureAttorneyPreview(job);
+  } catch (err) {
+    console.warn("Attorney preview load failed", err);
+  }
+
   const title = job.title || "Untitled job";
   const summary = job.shortDescription || job.practiceArea || "";
   const description = job.description || job.details || "No additional description provided.";
@@ -121,11 +168,7 @@ function openJobModal(job) {
   if (attorneyNameEl) attorneyNameEl.textContent = attorneyName;
   if (attorneyFirmEl) attorneyFirmEl.textContent = atty.lawFirm || "";
   if (attorneyAvatar) {
-    if (atty.profileImage) {
-      attorneyAvatar.src = atty.profileImage;
-    } else {
-      attorneyAvatar.src = FALLBACK_AVATAR;
-    }
+    attorneyAvatar.src = atty.profileImage || FALLBACK_AVATAR;
     attorneyAvatar.alt = `Profile photo of ${attorneyName}`;
   }
   if (attorneyBtn) {
@@ -154,10 +197,21 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-attorneyBtn?.addEventListener("click", () => {
-  const attorneyId = attorneyBtn.dataset.attorneyId;
-  const jobId = attorneyBtn.dataset.jobId;
-  if (!attorneyId) return;
+attorneyBtn?.addEventListener("click", async () => {
+  if (!attorneyBtn) return;
+  let attorneyId = attorneyBtn.dataset.attorneyId || "";
+  let jobId = attorneyBtn.dataset.jobId || "";
+  if (!attorneyId && modalJob) {
+    try {
+      await ensureAttorneyPreview(modalJob);
+    } catch {}
+    attorneyId = modalJob?.attorney?._id || modalJob?.attorneyId || "";
+    jobId = jobId || modalJob?._id || modalJob?.id || "";
+  }
+  if (!attorneyId) {
+    alert("Unable to open this attorney profile right now.");
+    return;
+  }
   const url = new URL("profile-attorney.html", window.location.href);
   url.searchParams.set("id", attorneyId);
   if (jobId) url.searchParams.set("job", jobId);

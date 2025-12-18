@@ -40,6 +40,10 @@ const elements = {
   cancelInquire: document.getElementById("cancelInquire"),
   confirmInquire: document.getElementById("confirmInquire"),
   selectedParalegalText: document.getElementById("selectedParalegalText"),
+  filterMenu: document.getElementById("filterMenu"),
+  filterToggle: document.getElementById("filterToggle"),
+  applyFilters: document.getElementById("applyFilters"),
+  clearFilters: document.getElementById("clearFilters"),
 };
 
 const viewer = getCachedUser();
@@ -73,6 +77,8 @@ async function init() {
   initStateDropdown();
   initSpecialtyDropdown();
   bindFilterEvents();
+  bindFilterMenuToggle();
+  bindFilterButtons();
   bindModalEvents();
 
   if (state.canInvite) {
@@ -105,19 +111,15 @@ function syncAuthButtons() {
 function bindFilterEvents() {
   elements.experience?.addEventListener("change", () => {
     state.filters.experience = elements.experience.value;
-    resetPageAndFetch();
   });
   elements.availability?.addEventListener("change", () => {
     state.filters.availability = elements.availability.value;
-    resetPageAndFetch();
   });
   elements.stateInput?.addEventListener("change", () => {
     state.filters.location = (elements.stateInput.value || "").trim();
-    resetPageAndFetch();
   });
   elements.stateInput?.addEventListener("blur", () => {
     state.filters.location = (elements.stateInput.value || "").trim();
-    resetPageAndFetch();
   });
 
   elements.prevPage?.addEventListener("click", () => {
@@ -132,6 +134,54 @@ function bindFilterEvents() {
       loadParalegals();
     }
   });
+}
+
+function bindFilterMenuToggle() {
+  const menu = elements.filterMenu;
+  const toggle = elements.filterToggle;
+  if (!menu || !toggle) return;
+  toggle.addEventListener("click", () => {
+    menu.classList.toggle("active");
+  });
+  document.addEventListener("click", (event) => {
+    if (!menu.contains(event.target) && !toggle.contains(event.target)) {
+      menu.classList.remove("active");
+    }
+  });
+}
+
+function bindFilterButtons() {
+  elements.applyFilters?.addEventListener("click", () => {
+    syncFiltersFromInputs();
+    elements.filterMenu?.classList.remove("active");
+    resetPageAndFetch();
+  });
+  elements.clearFilters?.addEventListener("click", () => {
+    if (elements.experience) elements.experience.value = "";
+    if (elements.availability) elements.availability.value = "";
+    if (elements.stateInput) elements.stateInput.value = "";
+    state.filters.experience = "";
+    state.filters.availability = "";
+    state.filters.location = "";
+    selectedSpecialties.clear();
+    updateSpecialtyInput();
+    if (elements.specialtyList) {
+      elements.specialtyList.querySelectorAll("input[type='checkbox']").forEach((cb) => {
+        cb.checked = false;
+      });
+      elements.specialtyList.classList.remove("show");
+    }
+    elements.stateList?.classList.remove("show");
+    elements.filterMenu?.classList.remove("active");
+    syncFiltersFromInputs();
+    resetPageAndFetch();
+  });
+}
+
+function syncFiltersFromInputs() {
+  state.filters.experience = elements.experience?.value || "";
+  state.filters.availability = elements.availability?.value || "";
+  state.filters.location = elements.stateInput?.value?.trim() || "";
 }
 
 function bindModalEvents() {
@@ -167,7 +217,6 @@ function initStateDropdown() {
       elements.stateInput.value = event.target.textContent;
       elements.stateList.classList.remove("show");
       state.filters.location = event.target.textContent;
-      resetPageAndFetch();
     }
   });
   document.addEventListener("click", (event) => {

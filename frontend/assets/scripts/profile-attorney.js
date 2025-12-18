@@ -11,6 +11,7 @@ const elements = {
   content: document.getElementById("profileContent"),
   error: document.getElementById("profileError"),
   editBtn: document.getElementById("editProfileBtn"),
+  backLink: document.getElementById("profileBackLink"),
   name: document.getElementById("profileName"),
   subtitle: document.getElementById("profileSubtitle"),
   firm: document.getElementById("profileFirm"),
@@ -65,6 +66,7 @@ async function init() {
   state.targetId = attorneyId || viewerId;
   state.viewingSelf = !attorneyId || attorneyId === viewerId;
   state.jobContextId = jobId;
+  updateBackLink();
 
   bindEditButton();
 
@@ -176,6 +178,23 @@ function bindEditButton() {
   elements.editBtn.addEventListener("click", () => {
     window.location.href = "profile-settings.html";
   });
+}
+
+function updateBackLink() {
+  if (!elements.backLink) return;
+  const role = String(state.viewer?.role || "").toLowerCase();
+  if (role === "paralegal" && state.jobContextId) {
+    elements.backLink.textContent = "← Back to browse";
+    elements.backLink.href = "browse-jobs.html";
+    return;
+  }
+  if (role === "paralegal") {
+    elements.backLink.textContent = "← Back to dashboard";
+    elements.backLink.href = "dashboard-paralegal.html";
+    return;
+  }
+  elements.backLink.textContent = "← Back to dashboard";
+  elements.backLink.href = "dashboard-attorney.html";
 }
 
 function renderAvatar(name, src) {

@@ -116,6 +116,26 @@
       overflow-y: auto;
     }
 
+    .dashboard-view {
+      display: none;
+      animation: fadeIn 0.25s ease;
+    }
+
+    .dashboard-view.is-active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
     .topbar {
       display: flex;
       justify-content: flex-end;
@@ -669,14 +689,128 @@
       color: var(--ink);
     }
 
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 2rem;
+    }
+
+    .page-header h1 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 2rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .page-header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .filters {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .filters button {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s ease;
+      color: var(--ink);
+    }
+
+    .filters button.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .filters button:hover {
+      border-color: var(--accent);
+    }
+
+    .case-files {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .file-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .file-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .file-name {
+      font-family: var(--font-serif);
+      font-size: 1.05rem;
+      word-break: break-word;
+    }
+
+    .file-status {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: capitalize;
+    }
+
+    .case-files-empty {
+      padding: 16px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .file-meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      flex-wrap: wrap;
+    }
+
+    .file-actions {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .btn-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .btn-link:hover {
+      text-decoration: underline;
+    }
+
   </style>
 </head>
 <body>
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
     <nav>
-      <a href="dashboard-paralegal.html" class="active">Home</a>
-      <a href="case-files.html">Active Cases</a>
+      <a href="#home" class="active" data-view-link="home">Home</a>
+      <a href="#cases" data-view-link="cases">Active Cases</a>
       <a href="profile-settings.html">Profile Settings</a>
       <a href="help.html">Help</a>
     </nav>
@@ -686,89 +820,109 @@
   <main class="main">
     <div class="topbar" data-attorney-header></div>
 
-    <header>
-      <h1>Welcome back, <span id="user-name-heading" data-field="name">Taylor</span></h1>
-      <p><span data-field="welcomeSubheading">You have 0 active assignments</span></p>
-    </header>
+    <div id="paralegalHomeView" class="dashboard-view is-active">
+      <header>
+        <h1>Welcome back, <span id="user-name-heading" data-field="name">Taylor</span></h1>
+        <p><span data-field="welcomeSubheading">You have 0 active assignments</span></p>
+      </header>
 
-    <section class="summary">
-      <div class="info-box"><span data-field="activeCases">0</span> active cases</div>
-      <div class="info-box message-box" id="messageBox">
-        <span id="messageCount" data-field="unreadMessages">0</span> message<span id="plural">s waiting</span>
-      </div>
-      <div class="info-box">Next deadline: <span data-field="nextDeadline">--</span></div>
-      <div class="info-box">$<span data-field="monthEarnings">0</span> earned this month</div>
-    </section>
+      <section class="summary">
+        <div class="info-box"><span data-field="activeCases">0</span> active cases</div>
+        <div class="info-box message-box" id="messageBox">
+          <span id="messageCount" data-field="unreadMessages">0</span> message<span id="plural">s waiting</span>
+        </div>
+        <div class="info-box">Next deadline: <span data-field="nextDeadline">--</span></div>
+        <div class="info-box">$<span data-field="monthEarnings">0</span> earned this month</div>
+      </section>
 
-    <section class="deadlines">
-      <div class="section-title">Upcoming Deadlines</div>
-      <div id="deadlineList">
-        <div class="info-line" data-deadline-empty>No assigned deadlines.</div>
-      </div>
-    </section>
-
-    <div class="side-by-side-panels">
-      <section>
-        <div class="section-title">Latest Messages</div>
-        <div class="info-line" id="latestMessage">
-          <strong data-field="latestMessageName">—</strong>: <span data-field="latestMessageExcerpt">No new messages.</span>
+      <section class="deadlines">
+        <div class="section-title">Upcoming Deadlines</div>
+        <div id="deadlineList">
+          <div class="info-line" data-deadline-empty>No assigned deadlines.</div>
         </div>
       </section>
-      <section>
-        <div class="section-title">Availability</div>
-        <div class="info-line">Status: <span id="availabilityStatus">Available now</span></div>
-        <div class="info-line">Next available date: <span id="availabilityNext">This week</span></div>
-        <div class="info-line"><a href="#" id="updateAvailabilityLink" class="card-link">Update availability →</a></div>
+
+      <div class="side-by-side-panels">
+        <section>
+          <div class="section-title">Latest Messages</div>
+          <div class="info-line" id="latestMessage">
+            <strong data-field="latestMessageName">—</strong>: <span data-field="latestMessageExcerpt">No new messages.</span>
+          </div>
+        </section>
+        <section>
+          <div class="section-title">Availability</div>
+          <div class="info-line">Status: <span id="availabilityStatus">Available now</span></div>
+          <div class="info-line">Next available date: <span id="availabilityNext">This week</span></div>
+          <div class="info-line"><a href="#" id="updateAvailabilityLink" class="card-link">Update availability →</a></div>
+        </section>
+      </div>
+
+      <section class="quick-actions">
+        <div class="section-title">Quick Actions</div>
+        <button type="button" data-action="browse">Browse new postings</button>
+        <button data-action="availability">Update availability</button>
       </section>
-    </div>
 
-    <section class="quick-actions">
-      <div class="section-title">Quick Actions</div>
-      <button type="button" data-action="browse">Browse new postings</button>
-      <button data-action="availability">Update availability</button>
-    </section>
+      <div class="side-by-side-panels">
+        <section class="case-list" id="inviteList">
+          <div class="case-card empty-state">
+            <div class="case-header">
+              <div>
+                <h2>No invitations yet</h2>
+                <div class="case-subinfo">Case invites will appear here.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="case-list" id="assignedCasesList">
+          <div class="case-card empty-state">
+            <div class="case-header">
+              <div>
+                <h2>No assigned cases</h2>
+                <div class="case-subinfo">Accepted cases will be listed here.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
 
-    <div class="side-by-side-panels">
-      <section class="case-list" id="inviteList">
+      <div class="side-by-side-panels">
+        <section class="dashboard-card full-width" id="recommendedPostingsCard">
+          <h3 class="card-title">Recommended for You</h3>
+          <ul class="recommendations-list"></ul>
+          <a href="browse-jobs.html" class="card-link">Browse all postings →</a>
+        </section>
+      </div>
+
+      <section class="case-list" id="assignmentList">
         <div class="case-card empty-state">
           <div class="case-header">
             <div>
-              <h2>No invitations yet</h2>
-              <div class="case-subinfo">Case invites will appear here.</div>
+              <h2>No active assignments</h2>
+              <div class="case-subinfo">New invitations will appear here.</div>
             </div>
           </div>
         </div>
       </section>
-      <section class="case-list" id="assignedCasesList">
-        <div class="case-card empty-state">
-          <div class="case-header">
-            <div>
-              <h2>No assigned cases</h2>
-              <div class="case-subinfo">Accepted cases will be listed here.</div>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
 
-    <div class="side-by-side-panels">
-      <section class="dashboard-card full-width" id="recommendedPostingsCard">
-        <h3 class="card-title">Recommended for You</h3>
-        <ul class="recommendations-list"></ul>
-        <a href="browse-jobs.html" class="card-link">Browse all postings →</a>
-      </section>
-    </div>
-
-    <section class="case-list" id="assignmentList">
-      <div class="case-card empty-state">
-        <div class="case-header">
-          <div>
-            <h2>No active assignments</h2>
-            <div class="case-subinfo">New invitations will appear here.</div>
-          </div>
+    <div id="paralegalCasesView" class="dashboard-view" hidden>
+      <header class="page-header">
+        <div>
+          <h1>Active Cases</h1>
+          <p>View and manage every file associated with your current assignments.</p>
         </div>
+      </header>
+      <div class="filters">
+        <button type="button" id="filterAll" class="active">All</button>
+        <button type="button" id="filterApproved">Approved</button>
+        <button type="button" id="filterPending">Pending Review</button>
+        <button type="button" id="filterRevisions">Requested Revisions</button>
       </div>
-    </section>
+      <div class="case-files" id="filesContainer">
+        <p class="case-files-empty">Loading files…</p>
+      </div>
+    </div>
   </main>
   <template id="assignmentCardTemplate">
     <div class="case-card">
@@ -844,12 +998,79 @@
     })();
   </script>
   <script type="module" src="assets/scripts/paralegal-dashboard.js"></script>
+  <script type="module">
+    import { initCaseFilesView } from "./assets/scripts/case-files-view.js";
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const homeView = document.getElementById("paralegalHomeView");
+      const casesView = document.getElementById("paralegalCasesView");
+      const viewLinks = document.querySelectorAll("[data-view-link]");
+      const basePath = window.location.pathname + window.location.search;
+      const views = { home: homeView, cases: casesView };
+      let casesReady = false;
+
+      function setActiveView(target = "home") {
+        const key = target === "cases" ? "cases" : "home";
+        Object.entries(views).forEach(([name, node]) => {
+          if (!node) return;
+          const isActive = name === key;
+          node.classList.toggle("is-active", isActive);
+          if (isActive) {
+            node.removeAttribute("hidden");
+          } else {
+            node.setAttribute("hidden", "hidden");
+          }
+        });
+        viewLinks.forEach((link) => {
+          const isActive = (link.dataset.viewLink || "home") === key;
+          link.classList.toggle("active", isActive);
+          link.setAttribute("aria-current", isActive ? "page" : "false");
+        });
+        if (key === "cases" && !casesReady) {
+          casesReady = true;
+          initCaseFilesView({
+            containerId: "filesContainer",
+            filters: [
+              { id: "filterAll", fn: (files) => files },
+              { id: "filterApproved", fn: (files) => files.filter((f) => f.status === "approved") },
+              { id: "filterPending", fn: (files) => files.filter((f) => f.status === "pending_review") },
+              { id: "filterRevisions", fn: (files) => files.filter((f) => f.status === "attorney_revision") },
+            ],
+            emptyCopy: "No files found.",
+            unauthorizedCopy: "You need a paralegal account to view these files.",
+          }).catch((error) => console.warn("Case files view failed", error));
+        }
+        if (key === "cases") {
+          history.replaceState(null, "", `${basePath}#cases`);
+        } else {
+          history.replaceState(null, "", basePath);
+        }
+      }
+
+      viewLinks.forEach((link) => {
+        link.addEventListener("click", (event) => {
+          const target = link.dataset.viewLink;
+          if (target === "home" || target === "cases") {
+            event.preventDefault();
+            setActiveView(target);
+          }
+        });
+      });
+
+      window.addEventListener("hashchange", () => {
+        setActiveView(window.location.hash === "#cases" ? "cases" : "home");
+      });
+
+      setActiveView(window.location.hash === "#cases" ? "cases" : "home");
+    });
+  </script>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const modal = document.getElementById("availabilityModal");
       const link = document.getElementById("updateAvailabilityLink");
       const cancel = document.getElementById("cancelAvailabilityBtn");
       const quickAction = document.querySelector('.quick-actions button[data-action="availability"]');
+      const browseAction = document.querySelector('.quick-actions button[data-action="browse"]');
 
       if (!modal) return;
 
@@ -864,6 +1085,9 @@
 
       link?.addEventListener("click", showModal);
       quickAction?.addEventListener("click", showModal);
+      browseAction?.addEventListener("click", () => {
+        window.location.href = "browse-jobs.html";
+      });
       cancel?.addEventListener("click", hideModal);
       modal.addEventListener("click", (event) => {
         if (event.target === modal) hideModal();
