@@ -3,195 +3,449 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Browse Jobs | Let’s-ParaConnect</title>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <title>Browse Jobs – Let’s-ParaConnect</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300&family=Sarabun:wght@200;400&display=swap" rel="stylesheet" />
+  <link href="assets/styles/styles.css" rel="stylesheet" />
+  <link href="assets/styles/hero-pages.css" rel="stylesheet" />
   <script src="assets/scripts/utils/session.js"></script>
-  <script type="module" src="assets/scripts/auth.js"></script>
   <style>
-    .gold{color:#b4975a;}
-    :root{
-      --accent:#d19c3a;
-      --bg:#ffffff;
-      --panel:#ffffff;
-      --line:rgba(12,18,37,0.08);
-      --muted:#5c6475;
-      --ink:#0b1225;
-      --font-serif:'Cormorant Garamond',serif;
-      --font-sans:'Sarabun',sans-serif;
+    body.browse-jobs-page {
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      color: #1a2230;
+      background: #ffffff !important;
+      margin: 0;
     }
-    body.theme-dark{
-      --bg:#0f172a;
-      --panel:#151b29;
-      --line:rgba(255,255,255,0.12);
-      --muted:#a5b3d8;
-      --ink:#f8fbff;
+
+    .site-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 50;
+      background: rgba(255, 255, 255, 0.18) !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.35) !important;
+      box-shadow: none !important;
+      backdrop-filter: saturate(140%) blur(16px) !important;
+      transition: background 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+      color: #fff !important;
     }
-    body.theme-mountain{
-      --bg:#f8f6f1;
-      --panel:#ffffff;
-      --line:rgba(0,0,0,0.08);
-      --muted:#7a736a;
-      --ink:#1d1a16;
+
+    .site-header .header-inner {
+      width: min(1200px, 92vw);
+      margin: 0 auto;
+      padding: 22px 0;
+      display: grid;
+      gap: 32px;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      position: relative;
+      z-index: 5;
     }
-    *{box-sizing:border-box;margin:0;padding:0;}
-    body{font-family:var(--font-sans);font-weight:200;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;flex-direction:column;}
-    header{display:flex;justify-content:space-between;align-items:center;padding:20px 28px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:10;}
-    .logo{font-family:'Cormorant Garamond',serif;font-size:1.25rem;font-weight:300;letter-spacing:0.05em;color:#1a2230;text-transform:none;}
-    .logo a{color:inherit;text-decoration:none;}
-    nav{display:flex;gap:14px;align-items:center;}
-    nav a{text-decoration:none;color:var(--ink);font-weight:200;padding:8px 12px;border-radius:10px;transition:background .2s ease;}
-    nav a:hover,nav a.active{background:rgba(0,0,0,0.05);}
-    .header-cluster{display:flex;align-items:center;gap:12px;position:relative;}
-    .notification-icon{position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:#fff;transition:border-color .2s ease,transform .2s ease;}
-    .notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
-    .notification-icon svg{width:20px;height:20px;color:var(--ink);}
-    .notification-badge{position:absolute;top:-6px;right:-6px;background:#e63946;color:#fff;border-radius:50%;font-size:.7rem;width:18px;height:18px;display:none;align-items:center;justify-content:center;font-weight:300;}
-    .notification-badge.show{display:flex;}
-    .header-cluster [data-notification-toggle][data-count]:after,
-    #notificationToggle[data-count]:after{
-      content:attr(data-count);
-      position:absolute;
-      top:-4px;
-      right:-4px;
-      background:var(--accent);
-      color:#fff;
-      font-family:'Sarabun',sans-serif;
-      font-weight:200;
-      font-size:0.7rem;
-      padding:2px 6px;
-      border-radius:999px;
+
+    .site-header nav ul {
+      list-style: none;
+      display: flex;
+      gap: 28px;
+      margin: 0;
+      padding: 0;
     }
-    .user-profile{display:flex;align-items:center;gap:.6rem;padding:6px 10px;border:1px solid var(--line);border-radius:12px;background:#fff;}
-    .user-profile img{width:42px;height:42px;border-radius:50%;object-fit:cover;box-shadow:0 6px 16px rgba(0,0,0,0.08);}
-    .user-profile strong{display:block;font-weight:300;color:var(--ink);}
-    .user-profile span{display:block;font-size:.85rem;color:var(--muted);font-weight:200;}
-    body.theme-dark .user-profile{background:rgba(0,0,0,0.25);border-color:rgba(255,255,255,0.2);}
-    body.theme-dark .user-profile strong{color:#fff;}
-    body.theme-dark .user-profile span{color:rgba(255,255,255,0.78);}
-    body.theme-dark #clusterName{color:#fff;}
-    body.theme-dark #clusterRole{color:rgba(255,255,255,0.78);}
-    body.theme-mountain .user-profile strong,
-    body.theme-mountain #clusterName{color:#1b1b1b;}
-    body.theme-mountain .user-profile span,
-    body.theme-mountain #clusterRole{color:#7b7b7b;}
-    .notif-panel{position:absolute;right:0;top:48px;width:340px;background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:12px;padding:0;z-index:2000;display:none;flex-direction:column;box-shadow:0 24px 48px rgba(0,0,0,0.12);}
-    .notif-panel.show{display:flex;}
-    .notif-panel.hidden{display:none;}
-    .notif-header{font-family:'Cormorant Garamond',serif;font-weight:300;font-size:1.3rem;padding:14px 18px;border-bottom:1px solid rgba(0,0,0,0.08);background:#fafafa;}
-    #notifList{max-height:360px;overflow-y:auto;}
-    .notif-item{padding:14px 18px;border-bottom:1px solid rgba(0,0,0,0.06);cursor:pointer;transition:background .15s ease;}
-    .notif-item:last-child{border-bottom:none;}
-    .notif-item:hover{background:#f6f6f6;}
-    .notif-item.unread{background:#fff;border-left:3px solid var(--accent);}
-    .notif-item.read{opacity:.75;}
-    .notif-title{font-family:'Cormorant Garamond',serif;font-weight:300;font-size:1.15rem;margin-bottom:2px;color:#1a1a1a;}
-    .notif-body{font-family:'Sarabun',sans-serif;font-weight:200;font-size:.92rem;color:#444;line-height:1.45;}
-    .notif-time{margin-top:4px;font-family:'Sarabun',sans-serif;font-weight:200;font-size:.8rem;color:#888;}
-    .notif-empty{padding:18px;text-align:center;font-size:.9rem;color:#8a8a8a;}
-    .notif-markall{border:none;border-top:1px solid rgba(0,0,0,0.08);background:#fafafa;padding:12px;font-family:'Sarabun',sans-serif;font-weight:200;font-size:.9rem;cursor:pointer;text-align:left;}
-    .notif-markall:hover{background:#f0f0f0;}
-    main{max-width:1100px;margin:32px auto;padding:0 24px 64px;flex:1;}
-    .lpc-card{border:1px solid var(--line);border-radius:12px;padding:18px;background:#fff;box-shadow:0 14px 40px rgba(0,0,0,0.08);}
-    .lpc-card h3{font-family:var(--font-serif);font-weight:300;margin-bottom:12px;}
-    .job-card{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px;background:#fcfcfc;}
-    .job-card button{margin-top:8px;border:none;background:var(--accent);color:#fff;padding:8px 12px;border-radius:8px;cursor:pointer;}
-    .job-card button:hover{background:#a38e5f;}
-    body.modal-open{overflow:hidden;}
-    .job-modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:1500;padding:24px;transition:opacity .2s ease;}
-    .job-modal.hidden{opacity:0;pointer-events:none;}
-    .job-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);}
-    .job-modal-card{position:relative;max-width:720px;width:100%;background:#fff;border-radius:24px;padding:28px 28px 32px;box-shadow:0 24px 70px rgba(0,0,0,0.18);display:flex;flex-direction:column;gap:18px;z-index:1;}
-    .job-modal-close{position:absolute;top:16px;right:16px;border:none;background:transparent;font-size:1.6rem;cursor:pointer;color:var(--muted);}
-    .job-modal-header{display:flex;gap:18px;align-items:flex-start;}
-    .job-attorney-btn{display:flex;align-items:center;gap:12px;padding:0;border:none;background:transparent;text-align:left;cursor:pointer;}
-    .job-attorney-avatar{width:58px;height:58px;border-radius:16px;object-fit:cover;border:1px solid var(--line);background:#f4f4f4;}
-    .job-attorney-name{font-weight:400;font-size:1.05rem;}
-    .job-attorney-firm{font-size:.9rem;color:var(--muted);}
-    .job-header-text h2{font-family:var(--font-serif);font-size:2rem;font-weight:300;margin:0;}
-    .job-header-text p{margin:6px 0 0;color:var(--muted);}
-    .job-modal-body{white-space:pre-line;line-height:1.6;color:var(--ink);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:18px 0;}
-    .job-modal-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
-    .job-compensation{font-weight:400;font-size:1.1rem;}
-    .job-modal .btn{border:none;border-radius:999px;padding:10px 20px;font-weight:400;cursor:pointer;background:var(--accent);color:#fff;}
-    .job-modal .btn:hover{background:#a38e5f;}
-    @media (max-width:640px){
-      .job-modal-card{padding:20px;}
-      .job-modal-header{flex-direction:column;}
-      .job-attorney-btn{width:100%;}
+
+    .site-header nav a {
+      text-decoration: none;
+      color: #1a2230;
+      font-size: 0.95rem;
+      font-weight: 300;
+      opacity: 0.9;
     }
-    .footer{border-top:1px solid var(--line);background:#ffffff;padding:24px 0;font-size:14px;color:#9ca3af;margin-top:auto;}
-    .footer-inner{width:min(1200px,92vw);margin:0 auto;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;text-align:center;gap:10px;}
-    .footer p{justify-self:start;margin:0;color:#9ca3af;font-family:'Sarabun',sans-serif;font-weight:200;}
-    .footer nav{justify-self:center;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;font-family:'Sarabun',sans-serif;font-weight:200;}
-    .footer nav a{color:#9ca3af;text-decoration:none;transition:color 0.25s ease;}
-    .footer nav a:hover{color:#ffffff;}
-    .footer nav span{color:#5f6771;}
-    .footer .region{justify-self:end;font-size:0.85rem;color:#868ea3;font-family:'Sarabun',sans-serif;font-weight:200;}
+
+    .site-header nav a:hover {
+      opacity: 1;
+    }
+
+    .site-header .brand {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.35rem;
+      letter-spacing: 0.05em;
+      color: #1a2230 !important;
+      text-decoration: none;
+      justify-self: center;
+    }
+
+    .site-header .brand .accent-apostrophe {
+      color: #b4975a;
+    }
+
+    .site-header .header-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      z-index: 6;
+    }
+
+    .site-header .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(26, 34, 48, 0.2) !important;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.08em;
+      color: #1a2230 !important;
+      text-decoration: none;
+      background: transparent !important;
+    }
+
+    .site-header .signup-pill {
+      border-color: #1a2230 !important;
+    }
+
+    .site-header.over-image {
+      background: rgba(255, 255, 255, 0.95) !important;
+      border-color: rgba(15, 23, 42, 0.08) !important;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+      color: #1a2230 !important;
+    }
+
+    .site-header.over-image nav a,
+    .site-header.over-image .brand,
+    .site-header.over-image .pill {
+      color: #1a2230;
+      border-color: rgba(26, 34, 48, 0.2);
+    }
+
+    .site-header.over-image .signup-pill {
+      border-color: rgba(26, 34, 48, 0.35) !important;
+    }
+
+    .jobs-shell {
+      width: min(1100px, 94vw);
+      margin: 60px auto 90px;
+      padding: 0 24px;
+    }
+
+    .layout {
+      display: flex;
+      gap: 2rem;
+      align-items: flex-start;
+    }
+
+    aside.filter {
+      width: 240px;
+      flex-shrink: 0;
+      background: #fff;
+      border: 1px solid rgba(26, 34, 48, 0.08);
+      border-radius: 20px;
+      padding: 1.2rem;
+      position: sticky;
+      top: 120px;
+    }
+
+    .filter h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.1rem;
+      font-weight: 300;
+      text-align: center;
+      margin-bottom: 0.8rem;
+    }
+
+    .filter-group { margin-bottom: 1.25rem; }
+
+    .filter-group label {
+      display: block;
+      font-size: 0.95rem;
+      color: #64748b;
+      margin-bottom: 0.4rem;
+    }
+
+    .filter-group select,
+    .filter-group input {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border: 1px solid rgba(26, 34, 48, 0.12);
+      border-radius: 10px;
+      background: #fff;
+      font-size: 0.95rem;
+      color: #475569;
+    }
+
+    .slider-field {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .slider-field span { font-size: 0.9rem; color: #475569; }
+    input[type="range"] { flex: 1; }
+
+    .filter-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .filter-actions button {
+      padding: 0.5rem 1rem;
+      font-size: 0.95rem;
+      border-radius: 999px;
+      border: 1px solid #b4975a;
+      background: transparent;
+      color: #b4975a;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+    }
+
+    .filter-actions button.primary { background: #b4975a; color: #fff; }
+
+    .results {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .results-header {
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(26, 34, 48, 0.05);
+      border-radius: 22px;
+      padding: 1.5rem;
+      box-shadow: 0 24px 70px rgba(10, 15, 25, 0.08);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .results-header h2 {
+      margin: 0;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem;
+      font-weight: 300;
+    }
+
+    .results-header p { color: #64748b; margin: 0.2rem 0 0; }
+
+    .results-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .results-controls select {
+      border: 1px solid rgba(26, 34, 48, 0.12);
+      border-radius: 999px;
+      padding: 0.35rem 0.9rem;
+      font-size: 0.95rem;
+      background: #fff;
+    }
+
+    .filter-toggle {
+      display: none;
+    }
+
+    .jobs-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .job-card {
+      border: 1px solid rgba(26, 34, 48, 0.08);
+      border-left: 4px solid #b4975a;
+      background: #fff;
+      padding: 1.4rem 1.6rem;
+      border-radius: 18px;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+    }
+
+    .job-card h3 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.45rem;
+      font-weight: 300;
+      margin: 0 0 0.2rem;
+    }
+
+    .job-card .area {
+      color: #6b7280;
+      font-size: 0.95rem;
+      margin-bottom: 0.4rem;
+    }
+
+    .job-card .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      color: #94a3b8;
+      font-size: 0.9rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .job-card .job-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+
+    .clear-button,
+    .apply-button {
+      border: 1px solid #b4975a;
+      border-radius: 999px;
+      padding: 0.45rem 1.3rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      background: transparent;
+      color: #b4975a;
+      letter-spacing: 0.02em;
+    }
+
+    .apply-button { background: #b4975a; color: #fff; }
+
+    .clear-button:hover { background: rgba(180, 151, 90, 0.1); }
+    .apply-button:hover { background: #a2864d; border-color: #a2864d; }
+
+    .results-status {
+      border: 1px dashed rgba(26, 34, 48, 0.15);
+      border-radius: 18px;
+      padding: 1.5rem;
+      text-align: center;
+      color: #64748b;
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    #pagination {
+      text-align: center;
+      color: #94a3b8;
+      font-size: 0.95rem;
+    }
+
+    footer {
+      border-top: 1px solid rgba(26, 34, 48, 0.08);
+      padding: 32px 0;
+      background: #ffffff;
+      text-align: center;
+      color: #9ca3af;
+      font-size: 0.95rem;
+    }
+
+    footer nav {
+      display: inline-flex;
+      gap: 12px;
+      margin: 0 0 8px;
+    }
+
+    footer a { color: #94a3b8; text-decoration: none; }
+
+    @media (max-width: 960px) {
+      .layout { flex-direction: column; }
+      aside.filter {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: min(320px, 85vw);
+        max-width: 90vw;
+        height: 100vh;
+        overflow-y: auto;
+        transform: translateX(-110%);
+        transition: transform 0.3s ease;
+        z-index: 20;
+        border-radius: 0;
+        box-shadow: 12px 0 40px rgba(0, 0, 0, 0.28);
+      }
+      aside.filter.active { transform: translateX(0); }
+      .filter-toggle {
+        display: inline-flex;
+        padding: 0.4rem 1rem;
+        border: 1px solid rgba(26, 34, 48, 0.2);
+        border-radius: 999px;
+        background: transparent;
+        color: #1a2230;
+        cursor: pointer;
+        font-size: 0.9rem;
+      }
+    }
   </style>
 </head>
-<body>
-  <header>
-    <div class="logo"><a href="index.html" style="text-decoration:none;color:inherit;">Let’s-ParaConnect</a></div>
-    <nav>
-      <a href="dashboard-paralegal.html">Dashboard</a>
-      <a href="browse-jobs.html" class="active">Browse Jobs</a>
-    </nav>
-    <div class="header-cluster" data-notification-center>
-      <button class="notification-icon" aria-label="View notifications" data-notification-toggle id="notificationToggle">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 01-3.46 0" />
-        </svg>
-        <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
-      </button>
-      <div class="user-profile">
-        <img id="clusterAvatar" class="nav-profile-photo" src="https://via.placeholder.com/64x64.png?text=PL" alt="Paralegal avatar">
-        <div>
-          <strong id="clusterName">Paralegal</strong>
-          <span id="clusterRole">Logged in</span>
-        </div>
-      </div>
-      <div id="notificationPanel" class="notif-panel hidden" data-notification-panel>
-        <div class="notif-header">Notifications</div>
-        <div id="notifList" data-notification-list></div>
-        <div class="notif-empty" data-notification-empty>Loading…</div>
-        <button id="markAllReadBtn" class="notif-markall" type="button" data-notification-mark>Mark All Read</button>
+<body class="browse-jobs-page">
+  <header class="site-header">
+    <div class="header-inner">
+      <nav aria-label="Primary"></nav>
+      <a class="brand" href="index.html">Let<span class="accent-apostrophe">’</span>s-ParaConnect</a>
+      <div class="header-actions">
+        <a class="pill signup-pill" href="dashboard-paralegal.html" id="returnDashboard">Return to Dashboard</a>
       </div>
     </div>
   </header>
 
-  <main>
-    <section id="jobList" class="lpc-card">
-      <h3>Available Jobs</h3>
-    </section>
-  </main>
+  <div class="hero-banner" role="presentation" aria-hidden="true" data-hero-banner></div>
 
-  <div id="jobModal" class="job-modal hidden" aria-hidden="true">
-    <div class="job-modal-backdrop"></div>
-    <div class="job-modal-card" role="dialog" aria-modal="true" aria-labelledby="jobTitle">
-      <button id="jobModalClose" class="job-modal-close" type="button" aria-label="Close">&times;</button>
-      <header class="job-modal-header">
-        <div class="job-attorney">
-          <button id="jobAttorneyButton" class="job-attorney-btn" type="button">
-            <img id="jobAttorneyAvatar" class="job-attorney-avatar" alt="Attorney photo" />
-            <div class="job-attorney-meta">
-              <div id="jobAttorneyName" class="job-attorney-name">Attorney</div>
-              <div id="jobAttorneyFirm" class="job-attorney-firm"></div>
-            </div>
-          </button>
+  <main class="jobs-shell">
+    <div class="layout">
+      <aside class="filter" id="filterMenu">
+        <h2>Filter</h2>
+        <div class="filter-group">
+          <label for="filterPracticeArea">Practice Area</label>
+          <select id="filterPracticeArea">
+            <option value="">Any</option>
+          </select>
         </div>
-        <div class="job-header-text">
-          <h2 id="jobTitle">Job Title</h2>
-          <p id="jobSummary"></p>
+        <div class="filter-group">
+          <label for="filterState">State</label>
+          <select id="filterState">
+            <option value="">Any</option>
+          </select>
         </div>
-      </header>
-      <section id="jobBody" class="job-modal-body"></section>
-      <footer class="job-modal-footer">
-        <div id="jobCompensation" class="job-compensation"></div>
-        <button id="jobApplyBtn" class="btn" type="button">Apply</button>
-      </footer>
+        <div class="filter-group">
+          <label for="filterMinPay">Minimum Pay</label>
+          <div class="slider-field">
+            <input type="range" id="filterMinPay" min="0" max="500" step="10" value="0" />
+            <span id="minPayValue">$0</span>
+          </div>
+        </div>
+        <div class="filter-group">
+          <label for="filterMinExp">Max Experience Required</label>
+          <div class="slider-field">
+            <input type="range" id="filterMinExp" min="0" max="10" step="1" value="0" />
+            <span id="minExpValue">0 years</span>
+          </div>
+        </div>
+        <div class="filter-actions">
+          <button type="button" class="primary" id="applyFilters">Apply Filters</button>
+          <button type="button" id="clearFilters">Reset Filters</button>
+        </div>
+      </aside>
+
+      <section class="results">
+        <div class="results-header">
+          <div class="title-block">
+            <h2>Active matters posted by vetted attorneys.</h2>
+            <p>Use the filters to focus on jurisdictions, practice areas, and compensation that align with your workflow.</p>
+          </div>
+          <div class="results-controls">
+            <label for="sortBy">Sort by</label>
+            <select id="sortBy">
+              <option value="">Recommended</option>
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="payHigh">Highest pay</option>
+              <option value="payLow">Lowest pay</option>
+            </select>
+            <button type="button" class="filter-toggle" id="filterToggle">Filters</button>
+          </div>
+        </div>
+        <div id="jobs-grid" class="jobs-grid">
+          <p class="results-status">Loading available jobs…</p>
+        </div>
+        <div id="pagination"></div>
+      </section>
     </div>
-  </div>
+  </main>
 
   <footer class="footer">
     <div class="footer-inner">
@@ -210,8 +464,62 @@
   </footer>
 
   <script src="assets/scripts/utils/toast.js"></script>
-  <script type="module" src="assets/scripts/utils/notifications.js"></script>
-  <script src="assets/scripts/paralegal-cluster.js"></script>
-  <script type="module" src="assets/scripts/browse-jobs.js"></script>
+  <script type="module" src="assets/scripts/views/browse-jobs.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const header = document.querySelector(".site-header");
+      const hero = document.querySelector("[data-hero-banner]");
+      const body = document.body;
+
+      function lockShellStyles() {
+        if (body && !body.classList.contains("shell-locked")) {
+          body.style.backgroundColor = "#ffffff";
+          body.classList.add("shell-locked");
+        }
+        if (header) {
+          header.style.background = "rgba(255, 255, 255, 0.18)";
+          header.style.borderBottom = "1px solid rgba(255, 255, 255, 0.35)";
+          header.style.backdropFilter = "saturate(140%) blur(16px)";
+          header.style.boxShadow = "none";
+        }
+        if (hero && !hero.dataset.heroReady) {
+          hero.style.backgroundImage = "url('hero-mountain.jpg')";
+          hero.style.backgroundSize = "cover";
+          hero.style.backgroundPosition = "center";
+          hero.dataset.heroReady = "true";
+        }
+      }
+
+      function updateHeader() {
+        if (!header || !hero) return;
+        const heroBottom = hero.offsetTop + hero.offsetHeight;
+        const headerBottom = window.scrollY + header.offsetHeight;
+        const offHero = headerBottom >= heroBottom;
+        header.classList.toggle("over-image", offHero);
+      }
+
+      lockShellStyles();
+      let lockTicks = 0;
+      const lockInterval = setInterval(() => {
+        lockShellStyles();
+        lockTicks += 1;
+        if (lockTicks > 20) clearInterval(lockInterval);
+      }, 250);
+      window.addEventListener("scroll", updateHeader, { passive: true });
+      window.addEventListener("resize", updateHeader);
+      if (window.ResizeObserver) {
+        const observer = new ResizeObserver(() => {
+          lockShellStyles();
+          updateHeader();
+        });
+        observer.observe(hero);
+      } else {
+        setTimeout(updateHeader, 150);
+        setTimeout(lockShellStyles, 150);
+      }
+      updateHeader();
+    });
+  </script>
+  <script type="module" src="assets/scripts/hero-parallax.js"></script>
 </body>
 </html>

@@ -4,8 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Browse Paralegals – Let’s-ParaConnect</title>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;200&family=Sarabun:wght@200&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300&family=Sarabun:wght@200;400&display=swap" rel="stylesheet" />
   <link href="assets/styles/styles.css" rel="stylesheet" />
+  <link href="assets/styles/hero-pages.css" rel="stylesheet" />
   <script type="module" src="assets/scripts/auth.js"></script>
   <script src="assets/scripts/utils/session.js"></script>
   <style>
@@ -19,9 +20,9 @@
     }
 
 
-    body {
+    body.browse-paralegals-page {
       margin: 0;
-      background-color: var(--bg);
+      background-color: var(--bg) !important;
       color: var(--navy);
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
@@ -40,90 +41,103 @@
       margin-top:6px;
     }
 
-/* Global Header from homepage */
 .site-header {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
-  height: 68px;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border-bottom: none;
-  backdrop-filter: saturate(160%) blur(10px);
-  transition: background-color 0.45s ease, box-shadow 0.45s ease, border-color 0.45s ease;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35) !important;
+  box-shadow: none !important;
+  backdrop-filter: saturate(140%) blur(16px) !important;
+  transition: background 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  color: #fff !important;
 }
 
-.site-header,
-.site-header nav a {
-  font-family: 'Sarabun', sans-serif;
-  font-weight: 200;
-  letter-spacing: 0.03em;
-}
-
-.brand {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: 'Cormorant Garamond', serif;
-  font-weight: 300;
-  font-size: 20px;
-  letter-spacing: 0.05em;
-  color: #1a2230;
-  text-decoration: none;
-}
-
-.header-inner {
+.site-header .header-inner {
   width: min(1200px, 92vw);
-  display: flex;
+  margin: 0 auto;
+  padding: 22px 0;
+  display: grid;
+  gap: 32px;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
 }
 
-nav ul {
+.site-header nav ul {
   list-style: none;
   display: flex;
   gap: 28px;
-  padding: 0;
   margin: 0;
+  padding: 0;
 }
 
-nav a {
-  color: #1a2230;
+.site-header nav a {
   text-decoration: none;
-  opacity: .88;
+  color: #1a2230 !important;
+  font-size: 0.95rem;
   font-weight: 300;
+  opacity: 0.9;
 }
 
-nav a:hover {
+.site-header nav a:hover {
   opacity: 1;
 }
 
-.header-actions .pill {
+.site-header .brand {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.35rem;
+  letter-spacing: 0.05em;
+  color: #1a2230 !important;
+  text-decoration: none;
+  justify-self: center;
+}
+
+.site-header .brand .accent-apostrophe {
+  color: #b4975a;
+}
+
+.site-header .header-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.site-header .pill {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
   padding: 8px 14px;
-  border: 1px solid rgba(26,34,48,0.2);
   border-radius: 999px;
-  font-size: 12px;
+  border: 1px solid rgba(26, 34, 48, 0.2) !important;
   text-transform: uppercase;
-  letter-spacing: .12em;
-  color: #1a2230;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: #1a2230 !important;
   text-decoration: none;
+  background: transparent !important;
 }
 
-.site-header.over-image .brand,
+.site-header .signup-pill {
+  border-color: #1a2230 !important;
+}
+
+.site-header.over-image {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  color: #1a2230 !important;
+}
+
 .site-header.over-image nav a,
-.site-header.over-image .header-actions .pill {
-  color: #f8f9fa;
+.site-header.over-image .brand,
+.site-header.over-image .pill {
+  color: #1a2230 !important;
+  border-color: rgba(26, 34, 48, 0.2) !important;
 }
 
-.site-header.over-image .header-actions .pill {
-  border-color: rgba(255,255,255,0.6);
+.site-header.over-image .signup-pill {
+  border-color: rgba(26, 34, 48, 0.35) !important;
 }
 
     .page-intro {
@@ -146,13 +160,14 @@ nav a:hover {
 
     .unified-header .title-block {
       max-width: 640px;
+      color: #fff;
     }
 
     .unified-header .eyebrow {
       letter-spacing: 3px;
       font-size: 0.95rem;
       text-transform: uppercase;
-      color: var(--muted);
+      color: rgba(255,255,255,0.75);
       margin-bottom: 8px;
     }
 
@@ -161,10 +176,11 @@ nav a:hover {
       font-size: 2.3rem;
       margin-bottom: 8px;
       font-weight: 200;
+      color: #fff;
     }
 
     .unified-header p {
-      color: var(--muted);
+      color: rgba(255,255,255,0.85);
       font-size: 0.95rem;
       margin: 0 auto;
     }
@@ -274,22 +290,15 @@ nav a:hover {
     }
 
 
-    main {
-      display: flex;
-      padding: 40px 5vw;
-      gap: 2rem;
-      align-items: flex-start;
-    }
-
-
     aside.filter {
-      width: 180px;
+      width: 240px;
       flex-shrink: 0;
       background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 0;
-      padding: 1rem;
-      align-self: flex-start;
+      border: 1px solid rgba(26,34,48,0.08);
+      border-radius: 20px;
+      padding: 1.2rem;
+      position: sticky;
+      top: 120px;
     }
 
 
@@ -297,13 +306,13 @@ nav a:hover {
       font-family: 'Cormorant Garamond', serif;
       font-size: 1.1rem;
       font-weight: 300;
-      margin-bottom: 0.6rem;
       text-align: center;
+      margin-bottom: 0.8rem;
     }
 
 
     .filter-group {
-      margin-bottom: 1rem;
+      margin-bottom: 1.25rem;
     }
 
 
@@ -317,18 +326,18 @@ nav a:hover {
 
     select, input[type="text"], #stateInput {
       width: 100%;
-      padding: 6px 8px;
+      padding: 0.55rem 0.75rem;
       font-size: 0.95rem;
-      color: var(--muted);
-      border: 1px solid var(--line);
-      border-radius: 0;
+      color: #475569;
+      border: 1px solid rgba(26,34,48,0.12);
+      border-radius: 10px;
       background: #fff;
       outline: none;
       transition: border-color 0.2s;
       appearance: none;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='%2364748b' d='M0 0l5 6 5-6H0z'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
-      background-position: right 6px center;
+      background-position: right 10px center;
       background-size: 8px 5px;
       cursor: pointer;
     }
@@ -346,7 +355,7 @@ nav a:hover {
 
     .dropdown-wrapper {
       position: relative;
-      width: 90%;
+      width: 100%;
     }
 
 
@@ -356,9 +365,9 @@ nav a:hover {
       left: 0;
       right: 0;
       background: #fff;
-      border: 1px solid var(--line);
+      border: 1px solid rgba(26,34,48,0.12);
       border-top: none;
-      border-radius: 0;
+      border-radius: 10px;
       max-height: 200px;
       overflow-y: auto;
       list-style: none;
@@ -375,7 +384,7 @@ nav a:hover {
 
 
     #stateList li, #specialtyList li {
-      padding: 8px 10px;
+      padding: 10px 14px;
       cursor: pointer;
       color: var(--navy);
       display: flex;
@@ -396,21 +405,112 @@ nav a:hover {
       transform: scale(1.1);
     }
 
+    .filter-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      margin-top: 1.5rem;
+    }
+
+    .filter-actions button {
+      padding: 0.5rem 1rem;
+      font-size: 0.95rem;
+      border-radius: 999px;
+      border: 1px solid #b4975a;
+      background: transparent;
+      color: #b4975a;
+      cursor: pointer;
+      letter-spacing: 0.04em;
+    }
+
+    .filter-actions button.primary {
+      background: #b4975a;
+      color: #fff;
+    }
 
     .results {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 2rem;
+      gap: 1.5rem;
+    }
+
+    .results-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
     }
 
     .results-status {
-      padding: 2rem;
-      border: 1px dashed var(--line);
-      border-radius: 8px;
+      padding: 1.5rem;
+      border: 1px dashed rgba(26, 34, 48, 0.15);
+      border-radius: 18px;
       text-align: center;
-      color: var(--muted);
+      color: #64748b;
       font-size: 0.95rem;
+      background: rgba(255,255,255,0.8);
+    }
+
+    .results-header {
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(26, 34, 48, 0.05);
+      border-radius: 22px;
+      padding: 1.5rem;
+      box-shadow: 0 24px 70px rgba(10, 15, 25, 0.08);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .results-header h2 {
+      margin: 0;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2rem;
+      font-weight: 300;
+    }
+
+    .results-header p {
+      margin: 0.2rem 0 0;
+      color: #64748b;
+    }
+
+    .results-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .filter-toggle {
+      display: none;
+      padding: 0.4rem 1rem;
+      border: 1px solid rgba(26, 34, 48, 0.2);
+      border-radius: 999px;
+      background: transparent;
+      color: #1a2230;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 960px) {
+      .layout { flex-direction: column; }
+      aside.filter {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: min(320px, 85vw);
+        max-width: 90vw;
+        height: 100vh;
+        overflow-y: auto;
+        transform: translateX(-110%);
+        transition: transform 0.3s ease;
+        z-index: 20;
+        border-radius: 0;
+        box-shadow: 12px 0 40px rgba(0, 0, 0, 0.28);
+      }
+      aside.filter.active { transform: translateX(0); }
+      .filter-toggle { display: inline-flex; }
     }
 
     .results-status.error {
@@ -819,17 +919,18 @@ nav a:hover {
     justify-self: center;
   }
 }
-html, body {
+html,
+body {
   height: 100%;
 }
 
-body {
+body.browse-paralegals-page {
   display: flex;
   flex-direction: column;
   padding-top: 80px;
 }
 
-main {
+body.browse-paralegals-page main {
   flex: 1; /* pushes footer to bottom when page content is short */
 }
 
@@ -838,7 +939,7 @@ footer {
 }
 
 @media (max-width: 600px) {
-  body {
+  body.browse-paralegals-page {
     padding-top: 0;
   }
 
@@ -887,44 +988,33 @@ footer {
     border-color: rgba(26, 34, 48, 0.2);
   }
 
-  .page-intro {
-    padding-top: 64px;
-  }
 }
 
 
   </style>
 </head>
-<body>
+<body class="browse-paralegals-page">
   <header class="site-header">
-  <div class="header-inner">
-    <nav aria-label="Primary">
-      <ul>
-        <li><a href="index.html#who-we-are">About</a></li>
-        <li><a href="index.html#how">How It Works</a></li>
-        <li><a href="paralegal-faq.html">Paralegal FAQ</a></li>
-      </ul>
-    </nav>
-    <a class="brand" href="index.html">
-      Let’s-ParaConnect
-    </a>
-    <div class="header-actions">
-      <a class="pill" href="login.html" id="authAction">Sign In</a>
-      <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
+    <div class="header-inner">
+      <nav aria-label="Primary"></nav>
+      <a class="brand" href="index.html">Let<span class="accent-apostrophe">’</span>s-ParaConnect</a>
+      <div class="header-actions">
+        <a class="pill signup-pill" href="dashboard-attorney.html" id="returnDashboard">Return to Dashboard</a>
+      </div>
     </div>
-  </div>
   </header>
 
-  <div class="page-intro">
+  <div class="hero-banner" role="presentation" aria-hidden="true" data-hero-banner></div>
+
+  <main class="talent-shell">
     <section class="unified-header" aria-label="Attorney header">
       <div class="title-block">
         <p class="eyebrow">Browse Paralegals</p>
         <p>Explore vetted talent available to collaborate on your next matter.</p>
       </div>
     </section>
-  </div>
-  <main>
-    <aside class="filter">
+    <div class="layout">
+    <aside class="filter" id="filterMenu">
       <h2>Filter</h2>
 
 
@@ -966,12 +1056,28 @@ footer {
           <option value="Weekends">Weekends</option>
         </select>
       </div>
+      <div class="filter-actions">
+        <button type="button" class="primary" id="applyFilters">Apply Filters</button>
+        <button type="button" id="clearFilters">Reset Filters</button>
+      </div>
     </aside>
 
 
-        <section class="results" id="paralegalResults">
-      <div class="results-status" id="resultsStatus">Loading paralegals…</div>
+        <section class="results">
+        <div class="results-header">
+          <div class="title-block">
+            <h2>Available Paralegals</h2>
+            <p>Use the filters to focus on specialties, locations, and availability.</p>
+          </div>
+          <div class="results-controls">
+            <button type="button" class="filter-toggle" id="filterToggle">Filters</button>
+          </div>
+        </div>
+      <div class="results-list" id="paralegalResults">
+        <div class="results-status" id="resultsStatus">Loading paralegals…</div>
+      </div>
     </section>
+    </div>
   </main>
 
 
@@ -1019,5 +1125,61 @@ footer {
 
   <script src="assets/scripts/utils/toast.js"></script>
   <script type="module" src="assets/scripts/browse-paralegals.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const header = document.querySelector(".site-header");
+      const hero = document.querySelector("[data-hero-banner]");
+      const body = document.body;
+
+      function lockShellStyles() {
+        if (body && !body.classList.contains("shell-locked")) {
+          body.style.backgroundColor = "#ffffff";
+          body.classList.add("shell-locked");
+        }
+        if (header) {
+          header.style.background = "rgba(255, 255, 255, 0.18)";
+          header.style.borderBottom = "1px solid rgba(255, 255, 255, 0.35)";
+          header.style.backdropFilter = "saturate(140%) blur(16px)";
+          header.style.boxShadow = "none";
+        }
+        if (hero && !hero.dataset.heroReady) {
+          hero.style.backgroundImage = "url('hero-mountain.jpg')";
+          hero.style.backgroundSize = "cover";
+          hero.style.backgroundPosition = "center";
+          hero.dataset.heroReady = "true";
+        }
+      }
+
+      function updateHeader() {
+        if (!header || !hero) return;
+        const heroBottom = hero.offsetTop + hero.offsetHeight;
+        const headerBottom = window.scrollY + header.offsetHeight;
+        const offHero = headerBottom >= heroBottom;
+        header.classList.toggle("over-image", offHero);
+      }
+
+      lockShellStyles();
+      let lockTicks = 0;
+      const lockInterval = setInterval(() => {
+        lockShellStyles();
+        lockTicks += 1;
+        if (lockTicks > 20) clearInterval(lockInterval);
+      }, 250);
+      window.addEventListener("scroll", updateHeader, { passive: true });
+      window.addEventListener("resize", updateHeader);
+      if (window.ResizeObserver) {
+        const observer = new ResizeObserver(() => {
+          lockShellStyles();
+          updateHeader();
+        });
+        observer.observe(hero);
+      } else {
+        setTimeout(updateHeader, 150);
+        setTimeout(lockShellStyles, 150);
+      }
+      updateHeader();
+    });
+  </script>
+  <script type="module" src="assets/scripts/hero-parallax.js"></script>
 </body>
 </html>
