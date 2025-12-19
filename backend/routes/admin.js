@@ -212,20 +212,27 @@ return user;
 // All admin routes are protected & admin-only
 router.use(verifyToken, requireApproved, requireRole("admin"));
 
+const ACTIVE_USER_MATCH = {
+  status: "approved",
+  disabled: { $ne: true },
+  role: { $ne: "admin" },
+};
+
 router.get("/metrics", asyncHandler(async (_req, res) => {
 const ACTIVE_CASE_STATUSES = ["open", "assigned", "active", "awaiting_documents", "reviewing", "in_progress"];
 
 const [roleAggregation, pendingApprovals, suspendedUsers, recentUsersRaw, monthlyRegistrationsRaw, caseAggregation, escrowAggregation, revenueAggregation] =
 await Promise.all([
-User.aggregate([{ $group: { _id: "$role", count: { $sum: 1 } } }]),
+User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
 User.countDocuments({ status: "pending" }),
 User.countDocuments({ status: { $in: ["denied", "rejected"] } }),
-User.find()
+User.find(ACTIVE_USER_MATCH)
 .sort({ createdAt: -1 })
 .limit(10)
 .select("firstName lastName email role status createdAt")
 .lean(),
 User.aggregate([
+  { $match: ACTIVE_USER_MATCH },
 { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } },
 { $sort: { "_id.year": 1, "_id.month": 1 } },
 ]),
@@ -380,7 +387,7 @@ router.get(
 asyncHandler(async (_req, res) => {
 const ACTIVE_CASE_STATUSES = ["open", "assigned", "active", "awaiting_documents", "reviewing", "in_progress"];
 const [roleAggregation, pendingUsers, caseAggregation, escrowHeldAgg, escrowReleasedAgg] = await Promise.all([
-User.aggregate([{ $group: { _id: "$role", count: { $sum: 1 } } }]),
+User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
 User.countDocuments({ status: "pending" }),
 Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
 Case.aggregate(
@@ -455,11 +462,11 @@ feeLedgerDocs,
 upcomingPayoutCases,
 recentUsersRaw,
 ] = await Promise.all([
-User.aggregate([{ $group: { _id: "$role", count: { $sum: 1 } } }]),
+User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
 User.countDocuments({ status: "pending" }),
 User.countDocuments({ status: { $in: ["denied", "rejected"] } }),
 User.aggregate([
-{ $match: { createdAt: { $gte: startWindow } } },
+{ $match: { ...ACTIVE_USER_MATCH, createdAt: { $gte: startWindow } } },
 { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } },
 { $sort: { "_id.year": 1, "_id.month": 1 } },
 ]),

@@ -69,6 +69,9 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
 const TWO_HOURS = "2h";
 const FIFTEEN_MIN = 15 * 60 * 1000;
 const DISABLED_ACCOUNT_MSG = "This account has been disabled.";
+const BOT_NAME_GIBBERISH = /^[bcdfghjklmnpqrstvwxyz]{6,}$/;
+const BOT_REPEATED = /(.)\1{3,}/;
+const BOT_FORBIDDEN_CHARS = /[{}[\]|\\^<>]/;
 
 function signAccess(user) {
   const approved =
@@ -97,6 +100,20 @@ function isEmail(v = "") {
 
 function isObjId(id) {
   return mongoose.isValidObjectId(id);
+}
+
+function looksLikeBot({ first = "", last = "", email = "" }) {
+  const cleanFirst = String(first).trim().toLowerCase();
+  const cleanLast = String(last).trim().toLowerCase();
+  const cleanEmail = String(email).trim().toLowerCase();
+  const combo = `${cleanFirst} ${cleanLast}`;
+  if (cleanFirst.length < 2 || cleanLast.length < 2) return true;
+  if (BOT_REPEATED.test(combo)) return true;
+  if (BOT_NAME_GIBBERISH.test(cleanFirst) || BOT_NAME_GIBBERISH.test(cleanLast)) return true;
+  if (BOT_FORBIDDEN_CHARS.test(combo)) return true;
+  if (combo.includes("http://") || combo.includes("https://")) return true;
+  if (cleanEmail.startsWith("test@") || cleanEmail.includes("+bot@")) return true;
+  return false;
 }
 
 async function verifyRecaptcha(token, expectedAction) {
@@ -201,6 +218,9 @@ router.post(
     const safeLast = String(lastName || "").trim();
     if (!safeFirst || !safeLast) {
       return res.status(400).json({ msg: "First and last name are required." });
+    }
+    if (looksLikeBot({ first: safeFirst, last: safeLast, email: normalizedEmail })) {
+      return res.status(400).json({ msg: "Registration failed validation. Please provide accurate information." });
     }
 
     if (!termsAccepted) {

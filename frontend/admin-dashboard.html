@@ -1781,7 +1781,10 @@ headers: { Accept: 'application/json' },
 });
 const data = res.ok ? await res.json() : { users: [] };
 if (requestId !== pendingRequestId) return;
-pendingUsers = Array.isArray(data.users) ? data.users.filter((u)=>!window.removedUserIds?.has(String(u.id||u._id||''))) : [];
+const removalSet = window.removedUserIds instanceof Set ? window.removedUserIds : null;
+pendingUsers = Array.isArray(data.users)
+  ? data.users.filter((u)=>!removalSet?.has(String(u.id||u._id||'')))
+  : [];
 renderPendingUsers();
 updatePendingCount(
 typeof data.total === 'number' ? data.total : pendingUsers.length
