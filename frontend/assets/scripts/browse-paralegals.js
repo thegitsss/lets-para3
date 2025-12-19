@@ -249,6 +249,7 @@ function bindModalEvents() {
 function bindPublicGuards() {
   if (state.isLoggedIn) return;
   const blocker = (event) => {
+    if (event.target?.closest(".auth-blocker")) return;
     const actionable = event.target?.closest("a, button, [role='button'], input, textarea, select, label");
     if (!actionable) return;
     event.preventDefault();
