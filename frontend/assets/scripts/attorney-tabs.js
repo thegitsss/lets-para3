@@ -3915,8 +3915,10 @@ function updateMessagePreviewUI({ threads = [], messageSnippet, messagePreviewSe
   if (messageSnippet) messageSnippet.textContent = snippet;
   if (messagePreviewSender) messagePreviewSender.textContent = nextThread.title || "Case thread";
   if (messagePreviewText) messagePreviewText.textContent = ` – ${snippet}`;
-  state.latestThreadId = nextThread.id || null;
-  state.latestThreadCaseId = nextThread.caseId || nextThread.case?.id || null;
+  const threadId = nextThread.id || null;
+  const threadCaseId = nextThread.caseId || nextThread.case?.id || threadId || null;
+  state.latestThreadId = threadId;
+  state.latestThreadCaseId = threadCaseId;
 }
 
 function renderEscrowPanel(container, metrics = {}) {
