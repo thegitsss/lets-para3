@@ -1,5 +1,6 @@
 import { secureFetch, logout, loadUserHeaderInfo } from "./auth.js";
 import { scanNotificationCenters } from "./utils/notifications.js";
+import { initCaseFilesView } from "./case-files-view.js";
 
 const PAGE_ID = window.__ATTORNEY_PAGE__ || "overview";
 const ROLE_SPEC = window.__TAB_ROLE__;
@@ -73,6 +74,7 @@ const state = {
     loading: false,
     error: "",
   },
+  archivedSelection: new Set(),
   simpleMessages: {
     cases: [],
     unread: new Map(),
@@ -85,6 +87,23 @@ const state = {
 
 let openCaseMenu = null;
 let chatMenuWrapper = null;
+
+function repositionOpenCaseMenu() {
+  if (!openCaseMenu) return;
+  positionCaseMenu(openCaseMenu);
+}
+
+const dashboardViewState = {
+  routerAttached: false,
+  viewMap: new Map(),
+  navLinks: [],
+  currentView: "",
+  casesInitialized: false,
+  casesInitPromise: null,
+  caseTabsBound: false,
+  caseFilesPromise: null,
+  caseFilesReady: false,
+};
 
 document.addEventListener("DOMContentLoaded", () => {
   void bootAttorneyExperience();
@@ -584,6 +603,143 @@ async function initOverviewPage() {
       if (deadlineList) deadlineList.innerHTML = `<div class="info-line" style="color:var(--muted);">Unable to load deadlines.</div>`;
     }
   }
+
+  setupDashboardViewRouter();
+}
+
+function setupDashboardViewRouter() {
+  if (dashboardViewState.routerAttached) return;
+  const panels = Array.from(document.querySelectorAll(".view-panel[data-view]"));
+  if (!panels.length) return;
+  dashboardViewState.routerAttached = true;
+  dashboardViewState.viewMap = new Map(panels.map((panel) => [panel.dataset.view, panel]));
+  dashboardViewState.navLinks = Array.from(document.querySelectorAll("[data-view-target]"));
+
+  dashboardViewState.navLinks.forEach((link) => {
+    const href = link.getAttribute("href") || "";
+    if (!href.startsWith("#")) return;
+    link.addEventListener("click", (event) => {
+      const targetView = link.dataset.viewTarget;
+      if (!targetView) return;
+      event.preventDefault();
+      const currentHash = String(window.location.hash || "").replace("#", "");
+      if (currentHash === targetView) {
+        showDashboardView(targetView, { skipHash: true });
+      } else {
+        window.location.hash = targetView;
+      }
+    });
+  });
+
+  const syncFromHash = () => {
+    const hashed = String(window.location.hash || "").replace("#", "").trim().toLowerCase();
+    const target = dashboardViewState.viewMap.has(hashed) ? hashed : "home";
+    showDashboardView(target, { skipHash: true });
+  };
+
+  window.addEventListener("hashchange", syncFromHash);
+  syncFromHash();
+}
+
+function showDashboardView(target, { skipHash = false } = {}) {
+  if (!dashboardViewState.viewMap.has(target)) target = "home";
+  if (dashboardViewState.currentView === target) return;
+
+  dashboardViewState.viewMap.forEach((panel, key) => {
+    if (!panel) return;
+    panel.hidden = key !== target;
+  });
+  dashboardViewState.navLinks.forEach((link) => {
+    const view = link.dataset.viewTarget;
+    if (!view) return;
+    link.classList.toggle("active", view === target);
+  });
+  dashboardViewState.currentView = target;
+
+  if (!skipHash && target) {
+    const normalized = `#${target}`;
+    if (window.location.hash !== normalized) {
+      window.location.hash = target;
+      return;
+    }
+  }
+
+  if (target === "cases") {
+    void ensureCasesViewReady();
+  }
+}
+
+function ensureCasesViewReady() {
+  if (dashboardViewState.casesInitialized) return Promise.resolve();
+  if (dashboardViewState.casesInitPromise) return dashboardViewState.casesInitPromise;
+  dashboardViewState.casesInitPromise = (async () => {
+    await initCasesPage();
+    bindCaseViewTabs();
+    dashboardViewState.casesInitialized = true;
+  })()
+    .catch((err) => {
+      console.warn("Cases view init failed", err);
+    })
+    .finally(() => {
+      dashboardViewState.casesInitPromise = null;
+    });
+  return dashboardViewState.casesInitPromise;
+}
+
+function bindCaseViewTabs() {
+  if (dashboardViewState.caseTabsBound) return;
+  const viewButtons = document.querySelectorAll("[data-case-view]");
+  if (!viewButtons.length) return;
+  const sections = {
+    cases: document.getElementById("casesViewSection"),
+    files: document.getElementById("caseFilesSection"),
+  };
+  viewButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const targetView = btn.dataset.caseView;
+      if (!targetView || btn.classList.contains("active")) return;
+      viewButtons.forEach((node) => {
+        const active = node === btn;
+        node.classList.toggle("active", active);
+        node.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      Object.entries(sections).forEach(([key, node]) => {
+        if (!node) return;
+        node.classList.toggle("hidden", key !== targetView);
+      });
+      if (targetView === "files") {
+        void ensureCaseFilesEmbedReady();
+      }
+    });
+  });
+  dashboardViewState.caseTabsBound = true;
+}
+
+function ensureCaseFilesEmbedReady() {
+  if (dashboardViewState.caseFilesReady) return Promise.resolve();
+  if (dashboardViewState.caseFilesPromise) return dashboardViewState.caseFilesPromise;
+  dashboardViewState.caseFilesPromise = initCaseFilesView({
+    containerId: "caseFilesEmbedContainer",
+    filters: [
+      { id: "caseFilesEmbedFilterAll", fn: (files) => files },
+      { id: "caseFilesEmbedFilterApproved", fn: (files) => files.filter((f) => f.status === "approved") },
+      { id: "caseFilesEmbedFilterPending", fn: (files) => files.filter((f) => f.status === "pending_review") },
+      { id: "caseFilesEmbedFilterRevisions", fn: (files) => files.filter((f) => f.status === "attorney_revision") },
+    ],
+    emptyCopy: "Awaiting paralegal submissions.",
+    emptySubtext: "Once files arrive, they’ll show up here automatically.",
+    unauthorizedCopy: "You need an attorney account to view these files.",
+  })
+    .then(() => {
+      dashboardViewState.caseFilesReady = true;
+    })
+    .catch((err) => {
+      console.warn("Case files embed failed", err);
+    })
+    .finally(() => {
+      dashboardViewState.caseFilesPromise = null;
+    });
+  return dashboardViewState.caseFilesPromise;
 }
 
 async function loadCompletedJobs(container) {
@@ -2067,11 +2223,14 @@ async function initCasesPage() {
   });
 
   wrapper.addEventListener("click", onCasesTableClick);
+  wrapper.addEventListener("change", onArchivedSelectionChange);
   document.addEventListener("click", (evt) => {
     if (openCaseMenu && !openCaseMenu.contains(evt.target)) {
       toggleCaseMenu(openCaseMenu, false);
     }
   });
+  window.addEventListener("resize", repositionOpenCaseMenu);
+  window.addEventListener("scroll", repositionOpenCaseMenu, true);
 
   document.querySelectorAll("[data-case-quick]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -2080,6 +2239,9 @@ async function initCasesPage() {
         window.location.href = "create-case.html";
       }
     });
+  });
+  document.querySelectorAll("[data-archived-bulk]").forEach((btn) => {
+    btn.addEventListener("click", onArchivedBulkAction);
   });
   setupCaseNoteModal();
   window.addEventListener("lpc-case-notes-updated", async (event) => {
@@ -2120,6 +2282,10 @@ async function loadArchivedCases(force = false) {
 }
 
 function renderCasesView() {
+  if (state.casesViewFilter !== "archived" && state.archivedSelection.size) {
+    state.archivedSelection.clear();
+  }
+  pruneArchivedSelection();
   const totals = computeCaseCounts();
   Object.entries(totals).forEach(([key, count]) => {
     const target = document.querySelector(`[data-case-count="${key}"]`);
@@ -2133,11 +2299,13 @@ function renderCasesView() {
     if (!records.length) {
       const searchActive = state.casesSearchTerm && key === state.casesViewFilter;
       const message = searchActive ? "No cases match your search." : "No cases in this category.";
-      body.innerHTML = `<tr><td colspan="7" class="empty-row">${message}</td></tr>`;
+      const span = key === "archived" ? 8 : 7;
+      body.innerHTML = `<tr><td colspan="${span}" class="empty-row">${message}</td></tr>`;
       return;
     }
     body.innerHTML = records.map((item) => renderCaseRow(item, key)).join("");
   });
+  syncArchivedBulkUI();
 }
 
 function computeCaseCounts() {
@@ -2222,8 +2390,15 @@ function renderCaseRow(item, filterKey = "active") {
           rawNote ? "Edit Note" : "Add Note"
         }</button>`
       : "";
+  const selectionCell =
+    filterKey === "archived"
+      ? `<td class="case-select"><input type="checkbox" data-archived-select value="${item.id}" ${
+          state.archivedSelection.has(String(item.id)) ? "checked" : ""
+        } aria-label="Select case ${sanitize(item.title || "Untitled Case")}" /></td>`
+      : "";
   return `
     <tr data-case-id="${item.id}">
+      ${selectionCell}
       <td><a href="case-detail.html?caseId=${encodeURIComponent(item.id)}">${sanitize(item.title || "Untitled Case")}</a></td>
       <td>${sanitize(client)}</td>
       <td>${sanitize(practice)}</td>
@@ -2247,21 +2422,66 @@ function renderCaseMenu(item) {
   }
   if (item.archived) {
     parts.push(
-      `<button type="button" class="menu-item danger" data-case-action="restore" data-case-id="${item.id}">Restore Case</button>`
+      `<button type="button" class="menu-item" data-case-action="restore" data-case-id="${item.id}">Restore Case</button>`
     );
   } else {
     parts.push(
       `<button type="button" class="menu-item danger" data-case-action="archive" data-case-id="${item.id}">Archive Case</button>`
     );
   }
+  parts.push(
+    `<button type="button" class="menu-item danger" data-case-action="delete-case" data-case-id="${item.id}">Delete Case</button>`
+  );
   return `
     <div class="case-actions" data-case-id="${item.id}">
       <button class="menu-trigger" type="button" aria-haspopup="true" aria-expanded="false" data-case-menu-trigger>⋯</button>
-      <div class="case-menu" role="menu">
+      <div class="case-menu" role="menu" style="width: 180px; min-width: 180px;">
         ${parts.join("")}
       </div>
     </div>
   `;
+}
+
+function pruneArchivedSelection() {
+  if (!state.archivedSelection) state.archivedSelection = new Set();
+  if (!state.archivedSelection.size) return;
+  const valid = new Set((state.casesArchived || []).map((c) => String(c.id)));
+  state.archivedSelection.forEach((id) => {
+    if (!valid.has(id)) state.archivedSelection.delete(id);
+  });
+}
+
+function syncArchivedBulkUI() {
+  const bar = document.querySelector("[data-archived-bulk-bar]");
+  if (!bar) return;
+  const isArchivedView = state.casesViewFilter === "archived";
+  bar.hidden = !isArchivedView;
+  const selectAll = bar.querySelector("[data-archived-select-all]");
+  const bulkButtons = bar.querySelectorAll("[data-archived-bulk]");
+  const checkboxes = Array.from(document.querySelectorAll('[data-table-body="archived"] [data-archived-select]'));
+
+  if (!isArchivedView) {
+    if (selectAll) {
+      selectAll.checked = false;
+      selectAll.indeterminate = false;
+    }
+    bulkButtons.forEach((btn) => (btn.disabled = true));
+    return;
+  }
+
+  checkboxes.forEach((cb) => {
+    cb.checked = state.archivedSelection.has(cb.value);
+  });
+
+  const selectedCount = state.archivedSelection.size;
+  bulkButtons.forEach((btn) => (btn.disabled = selectedCount === 0));
+
+  if (selectAll) {
+    const totalVisible = checkboxes.length;
+    const selectedVisible = checkboxes.filter((cb) => cb.checked).length;
+    selectAll.checked = totalVisible > 0 && selectedVisible === totalVisible;
+    selectAll.indeterminate = selectedVisible > 0 && selectedVisible < totalVisible;
+  }
 }
 
 function hasDeliverables(item) {
@@ -2389,6 +2609,9 @@ function applyNoteToState(caseId, payload) {
 }
 
 function onCasesTableClick(event) {
+  if (event.target.closest("[data-archived-select]") || event.target.closest("[data-archived-select-all]")) {
+    return;
+  }
   const trigger = event.target.closest("[data-case-menu-trigger]");
   if (trigger) {
     const parent = trigger.closest(".case-actions");
@@ -2406,21 +2629,123 @@ function onCasesTableClick(event) {
   }
 }
 
+function onArchivedSelectionChange(event) {
+  const toggleAll = event.target.closest("[data-archived-select-all]");
+  if (toggleAll) {
+    const checked = toggleAll.checked;
+    document.querySelectorAll('[data-table-body="archived"] [data-archived-select]').forEach((box) => {
+      box.checked = checked;
+      const id = box.value;
+      if (!id) return;
+      if (checked) state.archivedSelection.add(String(id));
+      else state.archivedSelection.delete(String(id));
+    });
+    syncArchivedBulkUI();
+    return;
+  }
+
+  const checkbox = event.target.closest("[data-archived-select]");
+  if (!checkbox) return;
+  const caseId = checkbox.value;
+  if (!caseId) return;
+  if (checkbox.checked) state.archivedSelection.add(String(caseId));
+  else state.archivedSelection.delete(String(caseId));
+  syncArchivedBulkUI();
+}
+
+async function onArchivedBulkAction(event) {
+  const btn = event.target.closest("[data-archived-bulk]");
+  if (!btn) return;
+  const action = btn.dataset.archivedBulk;
+  const ids = Array.from(state.archivedSelection);
+  if (!ids.length) return;
+  try {
+    if (action === "restore") {
+      for (const id of ids) {
+        await toggleCaseArchive(id, false);
+      }
+      notifyCases("Cases restored.", "success");
+    } else if (action === "delete") {
+      const confirmed = window.confirm(`Delete ${ids.length} case${ids.length === 1 ? "" : "s"}? This cannot be undone.`);
+      if (!confirmed) return;
+      for (const id of ids) {
+        await deleteArchivedCase(id, { skipConfirm: true, silent: true });
+      }
+      notifyCases("Cases deleted.", "success");
+    }
+    state.archivedSelection.clear();
+    await loadArchivedCases(true);
+    renderCasesView();
+  } catch (err) {
+    console.error(err);
+    notifyCases(err.message || "Bulk action failed.", "error");
+  }
+}
+
+function positionCaseMenu(wrapper) {
+  const trigger = wrapper?.querySelector("[data-case-menu-trigger]");
+  const menu = wrapper?.querySelector(".case-menu");
+  if (!trigger || !menu) return;
+
+  const rect = trigger.getBoundingClientRect();
+  menu.style.minWidth = "180px";
+  menu.style.width = "180px";
+  menu.style.visibility = "hidden";
+  menu.style.display = "block";
+  menu.style.position = "fixed";
+  menu.style.zIndex = "10000";
+
+  const menuRect = menu.getBoundingClientRect();
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const gutter = 8;
+  const gap = 6;
+
+  let left = rect.right - menuRect.width;
+  left = Math.max(gutter, Math.min(left, viewportWidth - menuRect.width - gutter));
+
+  let top = rect.bottom + gap;
+  if (top + menuRect.height > viewportHeight - gutter) {
+    top = rect.top - menuRect.height - gap;
+    if (top < gutter) {
+      top = Math.max(gutter, viewportHeight - menuRect.height - gutter);
+    }
+  }
+
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+  menu.style.visibility = "visible";
+}
+
 function toggleCaseMenu(wrapper, show) {
   if (!wrapper) return;
   if (show) {
     if (openCaseMenu && openCaseMenu !== wrapper) {
       openCaseMenu.classList.remove("open");
       openCaseMenu.querySelector(".menu-trigger")?.setAttribute("aria-expanded", "false");
+      resetCaseMenuStyles(openCaseMenu);
     }
     wrapper.classList.add("open");
     wrapper.querySelector(".menu-trigger")?.setAttribute("aria-expanded", "true");
+    positionCaseMenu(wrapper);
     openCaseMenu = wrapper;
   } else {
     wrapper.classList.remove("open");
     wrapper.querySelector(".menu-trigger")?.setAttribute("aria-expanded", "false");
+    resetCaseMenuStyles(wrapper);
     if (openCaseMenu === wrapper) openCaseMenu = null;
   }
+}
+
+function resetCaseMenuStyles(wrapper) {
+  const menu = wrapper?.querySelector(".case-menu");
+  if (!menu) return;
+  menu.style.top = "";
+  menu.style.left = "";
+  menu.style.position = "";
+  menu.style.zIndex = "";
+  menu.style.display = "";
+  menu.style.visibility = "";
 }
 
 async function handleCaseAction(action, caseId) {
@@ -2443,6 +2768,9 @@ async function handleCaseAction(action, caseId) {
       await toggleCaseArchive(caseId, false);
       renderCasesView();
       notifyCases("Case restored.");
+    } else if (action === "delete-case") {
+      await deleteArchivedCase(caseId);
+      renderCasesView();
     }
   } catch (err) {
     console.error(err);
@@ -2469,9 +2797,11 @@ async function downloadCaseDeliverables(caseId) {
 }
 
 async function toggleCaseArchive(caseId, archived) {
+  const body = { archived };
+  if (!archived) body.status = "open";
   const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/archive`, {
     method: "PATCH",
-    body: { archived },
+    body,
     headers: { Accept: "application/json" },
   });
   const payload = await res.json().catch(() => ({}));
@@ -2479,6 +2809,76 @@ async function toggleCaseArchive(caseId, archived) {
     throw new Error(payload.error || "Unable to update case.");
   }
   syncCaseCollections(payload);
+}
+
+async function deleteArchivedCase(caseId, { skipConfirm = false, silent = false } = {}) {
+  if (!caseId) return;
+  if (!skipConfirm) {
+    const confirmed = window.confirm("Permanently delete this case? This cannot be undone.");
+    if (!confirmed) return;
+  }
+  await ensureCaseOpenForDelete(caseId);
+  const attemptDelete = async () => {
+    const response = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, {
+      method: "DELETE",
+      headers: { Accept: "application/json" },
+    });
+    const payload =
+      response.status === 204
+        ? {}
+        : await response.json().catch(() => ({}));
+    return { response, payload };
+  };
+
+  let { response: res, payload } = await attemptDelete();
+  if (!res.ok) {
+    await loadArchivedCases(true);
+    await ensureCaseOpenForDelete(caseId, true);
+    ({ response: res, payload } = await attemptDelete());
+  }
+  if (!res.ok) {
+    throw new Error(payload.error || "Unable to delete case.");
+  }
+  removeCaseFromState(caseId);
+  if (!silent) notifyCases("Case deleted.", "success");
+}
+
+function removeCaseFromState(caseId) {
+  const id = String(caseId);
+  const prune = (list) => {
+    const idx = list.findIndex((item) => String(item.id) === id);
+    if (idx >= 0) list.splice(idx, 1);
+  };
+  prune(state.cases);
+  prune(state.casesArchived);
+  state.caseLookup.delete(id);
+  state.archivedSelection?.delete(id);
+  buildCaseLookup();
+}
+
+async function ensureCaseOpenForDelete(caseId, suppressErrors = false) {
+  const entry = state.caseLookup.get(String(caseId));
+  try {
+    if (entry?.archived) {
+      await toggleCaseArchive(caseId, false);
+    }
+    const statusKey = String(entry?.status || "").toLowerCase();
+    if (statusKey && statusKey !== "open") {
+      const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, {
+        method: "PATCH",
+        headers: { Accept: "application/json" },
+        body: { status: "open" },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Unable to prepare case for deletion.");
+      }
+      syncCaseCollections(data);
+    }
+  } catch (err) {
+    if (!suppressErrors) throw err;
+    console.warn("ensureCaseOpenForDelete failed", err);
+  }
 }
 
 function syncCaseCollections(updatedCase) {

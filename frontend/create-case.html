@@ -316,6 +316,15 @@
       gap:10px;
       margin-top:1.5rem;
     }
+    .step-panel form .actions{
+      max-width:800px;
+      margin-left:auto;
+      margin-right:auto;
+    }
+    #create-step-review .actions{
+      max-width:900px;
+      margin:2rem auto 0;
+    }
     .btn{
       border:none;
       border-radius:6px;
@@ -458,6 +467,174 @@
   color: var(--accent);
 }
 
+    .step-panel[hidden] {
+      display: none !important;
+    }
+
+    .form-wrapper{
+      display:grid;
+      grid-template-columns:1fr 260px;
+      gap:2rem;
+      max-width:1000px;
+      margin:0 auto;
+    }
+
+    .tips{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:1.5rem;
+      background:var(--panel);
+      font-size:0.9rem;
+      color:var(--muted);
+    }
+    .tips h3{
+      font-family:var(--font-serif);
+      font-size:1.15rem;
+      font-weight:300;
+      margin-bottom:0.75rem;
+      color:var(--ink);
+    }
+    .tips ul{
+      margin:0 0 0.75rem 1.1rem;
+      padding:0;
+      display:flex;
+      flex-direction:column;
+      gap:0.35rem;
+    }
+
+    .case-title-preview{
+      border:1px solid rgba(182,164,122,0.4);
+      border-radius:var(--radius);
+      background:#fffbe8;
+      padding:1rem 1.2rem;
+      margin-bottom:1rem;
+      font-size:0.95rem;
+    }
+
+    .char-count{
+      text-align:right;
+      font-size:0.8rem;
+      color:var(--muted);
+      margin-top:6px;
+    }
+
+    .summary{
+      max-width:900px;
+      margin:0 auto;
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:2rem;
+      box-shadow:0 2px 6px rgba(0,0,0,0.03);
+    }
+    .summary h2{
+      font-family:'Sarabun',sans-serif;
+      font-weight:300;
+      font-size:1.5rem;
+      margin-bottom:1rem;
+    }
+    .summary p{margin:0.25rem 0;color:var(--ink);}
+    .summary small{color:var(--muted);}
+    .auto-note{margin-top:1rem;font-size:0.9rem;color:var(--muted);}
+    .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:2rem;}
+    .btn{border:none;border-radius:6px;padding:0.6rem 1.1rem;font-size:0.9rem;cursor:pointer;transition:all .2s;}
+    .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
+    .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
+    .btn.primary{background:var(--accent);color:#fff;}
+    .btn.primary:hover{background:#a0854d;}
+
+    .modal{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.35);
+      backdrop-filter:blur(6px);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:80;
+    }
+    .modal.active{display:flex;}
+    .modal-content{
+      background:#fff;
+      width:min(700px,90vw);
+      border-radius:18px;
+      padding:2.5rem 2.75rem;
+      box-shadow:0 15px 50px rgba(0,0,0,0.15);
+      border:1px solid #e9e6df;
+      font-family:'Sarabun',sans-serif;
+      color:var(--ink);
+      line-height:1.6;
+    }
+    .modal-content h3{
+      font-family:'Cormorant Garamond',serif;
+      font-weight:300;
+      font-size:1.9rem;
+      color:#1a1a1a;
+      margin-bottom:2rem;
+      text-align:center;
+      letter-spacing:0.3px;
+    }
+    .modal-content hr{
+      border:none;
+      border-top:1px solid #e0ded8;
+      margin:1.5rem 0;
+    }
+    .modal-content p{
+      margin:0.35rem 0;
+      color:#2a2a2a;
+      font-size:0.95rem;
+      display:flex;
+      align-items:baseline;
+      gap:6px;
+    }
+    .modal-content strong{
+      font-family:'Cormorant Garamond',serif;
+      font-weight:300;
+      font-size:1rem;
+      color:#111;
+      min-width:130px;
+      display:inline-block;
+    }
+    .close-btn{
+      display:block;
+      margin:2rem auto 0;
+      background:#faf9f6;
+      border:1px solid #d8d3c9;
+      padding:0.55rem 1.2rem;
+      border-radius:8px;
+      font-size:0.9rem;
+      cursor:pointer;
+      color:#333;
+      transition:all 0.2s ease;
+      font-family:'Cormorant Garamond',serif;
+    }
+    .close-btn:hover{
+      background:var(--accent);
+      border-color:var(--accent);
+      color:#fff;
+    }
+    body.modal-open{overflow:hidden;}
+    .toast.inline-toast{
+      position:fixed;
+      bottom:-120px;
+      right:32px;
+      max-width:320px;
+      background:rgba(182,164,122,0.95);
+      color:#fff;
+      padding:0.85rem 1.1rem;
+      border-radius:10px;
+      font-size:0.9rem;
+      box-shadow:0 4px 18px rgba(0,0,0,0.18);
+      gap:0.65rem;
+      display:flex;
+      align-items:center;
+      transition:bottom .35s ease;
+      z-index:85;
+    }
+    .toast.inline-toast.show{bottom:34px;}
+    .toast.inline-toast.error{background:#c0392b;}
+    .toast.inline-toast a{color:#fff;text-decoration:underline;margin-left:10px;}
+
   </style>
 </head>
 <body>
@@ -478,26 +655,29 @@
   <main class="main">
     <div class="topbar" data-attorney-header></div>
 
-    <header>
-      <h1>Create a New Case</h1>
-      <p>Provide details to post your case and invite paralegals to apply.</p>
-    </header>
+    <section class="step-panel" data-step="details" id="create-step-details">
+      <header>
+        <h1>Create a New Case</h1>
+        <p>Provide details to post your case and invite paralegals to apply.</p>
+      </header>
 
-    <!-- Step Progress -->
-    <div class="steps">
-      <a href="create-case.html" class="step active">
-        <div class="circle">1</div><span>Case details</span>
-      </a>
-      <a href="create-case-step2.html" class="step">
-        <div class="circle">2</div><span>Description</span>
-      </a>
-      <a href="create-case-step5.html" class="step">
-        <div class="circle">3</div><span>Review &amp; Post</span>
-      </a>
-    </div>
+      <div class="steps">
+        <a href="#details" class="step active" data-step-link="details">
+          <div class="circle">1</div><span>Case details</span>
+        </a>
+        <a href="#description" class="step" data-step-link="description">
+          <div class="circle">2</div><span>Description</span>
+        </a>
+        <a href="#review" class="step" data-step-link="review">
+          <div class="circle">3</div><span>Review &amp; Post</span>
+        </a>
+      </div>
 
-    <!-- Form -->
-    <form>
+      <form>
+        <div class="field">
+          <label for="caseTitleInput">Case Title</label>
+          <input id="caseTitleInput" type="text" placeholder="e.g., Draft asset purchase agreement" />
+        </div>
       <div class="field">
         <label for="specialty">Field of Law</label>
         <select id="specialty">
@@ -636,13 +816,108 @@
         </div>
       </div>
 
+        <div class="actions">
+          <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html">Cancel</button>
+          <button type="button" class="btn primary" data-step-switch="description" id="detailsNextBtn">Next Step</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="step-panel" data-step="description" id="create-step-description" hidden>
+      <header>
+        <h1>Create a New Case</h1>
+        <p>Step 2: Add a detailed description for your case posting.</p>
+      </header>
+
+      <div class="steps">
+        <a href="#details" class="step" data-step-link="details">
+          <div class="circle">1</div><span>Case details</span>
+        </a>
+        <a href="#description" class="step active" data-step-link="description">
+          <div class="circle">2</div><span>Description</span>
+        </a>
+        <a href="#review" class="step" data-step-link="review">
+          <div class="circle">3</div><span>Review &amp; Post</span>
+        </a>
+      </div>
+
+      <div class="form-wrapper">
+        <form>
+          <div class="case-title-preview" id="caseTitlePreview">
+            <strong>Case Title:</strong> <span id="caseTitlePreviewText">Untitled Case</span>
+          </div>
+          <div class="field">
+            <label for="caseDescription">Case Description</label>
+            <textarea id="caseDescription" placeholder="Describe your case, goals, and expectations for the paralegal..."></textarea>
+            <div class="char-count" id="descriptionCharCount">0 / 4000</div>
+          </div>
+
+          <div class="actions">
+            <button type="button" class="btn secondary" data-step-switch="details">Back</button>
+            <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html">Save and Exit</button>
+            <button type="button" class="btn primary" data-step-switch="review">Next Step</button>
+          </div>
+        </form>
+
+        <div class="tips">
+          <h3>Tips for a Great Description</h3>
+          <ul>
+            <li>Be clear, well-written, and detailed about your case needs.</li>
+            <li>Include the scope of work, deliverables, and deadlines.</li>
+            <li>Avoid sensitive or identifying details in the posting.</li>
+          </ul>
+          <p>For examples of effective job descriptions, <a href="help.html">read our help article</a>.</p>
+        </div>
+      </div>
+    </section>
+    <section class="step-panel" data-step="review" id="create-step-review" hidden>
+      <header>
+        <h1>Review &amp; Post Your Case</h1>
+        <p>Step 3: Confirm details before posting your case publicly.</p>
+      </header>
+
+      <div class="steps">
+        <a href="#details" class="step" data-step-link="details">
+          <div class="circle">1</div><span>Case details</span>
+        </a>
+        <a href="#description" class="step" data-step-link="description">
+          <div class="circle">2</div><span>Description</span>
+        </a>
+        <a href="#review" class="step active" data-step-link="review">
+          <div class="circle">3</div><span>Review &amp; Post</span>
+        </a>
+      </div>
+
+      <section class="summary" id="reviewSummary">
+        <p>Gathering your case details…</p>
+      </section>
+
       <div class="actions">
-  <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html">Cancel</button>
-  <button type="button" class="btn primary" data-nav="next" id="nextStepBtn" data-target="create-case-step2.html">Next Step</button>
-</div>
-    </form>
+        <button type="button" class="btn secondary" data-step-switch="description">Back</button>
+        <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html">Save &amp; Exit</button>
+        <button type="button" class="btn secondary" id="previewBtn">Preview Listing</button>
+        <button type="button" class="btn primary" id="postBtn">Post Case</button>
+      </div>
+    </section>
   </main>
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <div class="modal" id="previewModal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+      <h3 id="previewTitle"></h3>
+      <p><strong>Field of Law:</strong> <span id="previewField">—</span></p>
+      <p><strong>Location:</strong> <span id="previewState">—</span></p>
+      <p><strong>Compensation:</strong> <span id="previewComp">—</span></p>
+      <p><strong>Experience:</strong> <span id="previewExperience">—</span></p>
+      <hr>
+      <p id="previewDescription"></p>
+      <p class="auto-note" id="previewAutoNote"></p>
+      <button type="button" class="close-btn" id="closePreview">Close Preview</button>
+    </div>
+  </div>
+  <div class="toast inline-toast" id="toast">
+    ✅ Your case has been successfully posted.
+    <a href="active-cases.html">View Posted Case</a>
+  </div>
   <script src="assets/scripts/utils/toast.js"></script>
   <script>
     window.__ATTORNEY_PAGE__ = "create-case";
@@ -652,15 +927,42 @@
 
   <script>
   (function () {
-    const nextStepBtn = document.getElementById("nextStepBtn");
+    const stepPanels = new Map();
+    document.querySelectorAll(".step-panel").forEach((panel) => {
+      const key = panel.dataset.step;
+      if (key) stepPanels.set(key, panel);
+    });
+    let currentStep = null;
+
     const fields = {
-      title: document.getElementById("title"),
+      title: document.getElementById("caseTitleInput"),
       specialty: document.getElementById("specialty"),
       state: document.getElementById("state"),
       comp: document.getElementById("comp"),
       experience: document.getElementById("experience"),
     };
+    const titlePreview = document.getElementById("caseTitlePreviewText");
+    const descriptionInput = document.getElementById("caseDescription");
+    const descriptionCount = document.getElementById("descriptionCharCount");
     const toastHelper = window.toastUtils;
+    const reviewSummary = document.getElementById("reviewSummary");
+    const previewBtn = document.getElementById("previewBtn");
+    const postBtn = document.getElementById("postBtn");
+    const previewModal = document.getElementById("previewModal");
+    const closePreviewBtn = document.getElementById("closePreview");
+    const toastEl = document.getElementById("toast");
+    const previewFields = {
+      title: document.getElementById("previewTitle"),
+      field: document.getElementById("previewField"),
+      state: document.getElementById("previewState"),
+      comp: document.getElementById("previewComp"),
+      experience: document.getElementById("previewExperience"),
+      description: document.getElementById("previewDescription"),
+    };
+    const previewAutoNote = document.getElementById("previewAutoNote");
+    const autoNoteCopy = "Applicants automatically include their résumé, cover letter (if available), and LinkedIn profile.";
+    let latestCaseData = null;
+    let csrfToken = "";
 
     const validators = [
       {
@@ -685,7 +987,122 @@
       },
     ];
 
-    nextStepBtn?.addEventListener("click", (event) => {
+    function updateTitlePreview(value = "") {
+      if (!titlePreview) return;
+      const safe = value.trim();
+      titlePreview.textContent = safe || "Untitled Case";
+    }
+
+    function updateDescriptionCount() {
+      if (!descriptionInput || !descriptionCount) return;
+      descriptionCount.textContent = `${descriptionInput.value.length} / 4000`;
+    }
+
+    function showStep(step, { updateHash = true } = {}) {
+      if (!stepPanels.has(step)) return;
+      stepPanels.forEach((panel, key) => {
+        if (!panel) return;
+        panel.hidden = key !== step;
+      });
+      currentStep = step;
+      if (updateHash) {
+        history.replaceState(null, "", `#${step}`);
+      }
+    }
+
+    function attemptStepChange(targetStep) {
+      if (!targetStep || targetStep === currentStep) return;
+      if (targetStep === "description" && currentStep !== "description") {
+        if (!validateDetails()) return;
+        persistDraft();
+      }
+      if (targetStep === "review") {
+        if (!ensureReviewReady()) return;
+        persistDraft();
+        hydrateReviewSummary();
+      }
+      showStep(targetStep);
+    }
+
+    document.querySelectorAll("[data-step-link]").forEach((link) => {
+      link.addEventListener("click", (event) => {
+        const target = link.dataset.stepLink;
+        if (!target) return;
+        event.preventDefault();
+        attemptStepChange(target);
+      });
+    });
+    document.querySelectorAll("[data-step-switch]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.stepSwitch;
+        if (!target) return;
+        attemptStepChange(target);
+      });
+    });
+
+    const initialHash = (window.location.hash || "").replace("#", "");
+    if (initialHash && stepPanels.has(initialHash)) {
+      if (initialHash === "description") {
+        showStep("details", { updateHash: false });
+        attemptStepChange("description");
+      } else if (initialHash === "review") {
+        showStep("details", { updateHash: false });
+        attemptStepChange("description");
+        attemptStepChange("review");
+      } else {
+        showStep(initialHash, { updateHash: false });
+      }
+    } else {
+      showStep("details", { updateHash: false });
+    }
+
+    window.addEventListener("hashchange", () => {
+      const hashed = (window.location.hash || "").replace("#", "");
+      if (!hashed || hashed === currentStep) return;
+      if (!stepPanels.has(hashed)) return;
+      if (hashed === "description" || hashed === "review") {
+        attemptStepChange(hashed);
+      } else {
+        showStep(hashed, { updateHash: false });
+      }
+    });
+
+    Object.entries(fields).forEach(([key, field]) => {
+      if (!field) return;
+      const eventName = field.tagName === "SELECT" ? "change" : "input";
+      field.addEventListener(eventName, () => clearFieldError(field));
+      const storageKeyCamel = `case${key.charAt(0).toUpperCase() + key.slice(1)}`;
+      const storedValue = localStorage.getItem(storageKeyCamel) || localStorage.getItem(`case_${key}`) || "";
+      if (storedValue && field.value !== storedValue) {
+        field.value = storedValue;
+      }
+      if (key === "title") {
+        updateTitlePreview(field.value || storedValue || "");
+      }
+      field.addEventListener(eventName, () => {
+        const value = field.value || "";
+        localStorage.setItem(storageKeyCamel, value);
+        localStorage.setItem(`case_${key}`, value);
+        if (key === "title") {
+          updateTitlePreview(value);
+        }
+      });
+    });
+
+    if (descriptionInput) {
+      const storedDescription = localStorage.getItem("caseDescription") || localStorage.getItem("case_description") || "";
+      if (storedDescription) {
+        descriptionInput.value = storedDescription;
+      }
+      updateDescriptionCount();
+      descriptionInput.addEventListener("input", () => {
+        localStorage.setItem("caseDescription", descriptionInput.value);
+        localStorage.setItem("case_description", descriptionInput.value);
+        updateDescriptionCount();
+      });
+    }
+
+    function validateDetails() {
       let hasErrors = false;
       validators.forEach(({ field, check, message }) => {
         clearFieldError(field);
@@ -695,32 +1112,12 @@
           hasErrors = true;
         }
       });
-
       if (hasErrors) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        showToastBanner("Fill in the highlighted fields before continuing.", "error");
-        return;
+        return false;
       }
+      return true;
+    }
 
-      persistDraft();
-    });
-
-    Object.entries(fields).forEach(([key, field]) => {
-      if (!field) return;
-      const eventName = field.tagName === "SELECT" ? "change" : "input";
-      field.addEventListener(eventName, () => clearFieldError(field));
-      const storageKeyCamel = `case${key.charAt(0).toUpperCase() + key.slice(1)}`;
-      const storedValue = localStorage.getItem(storageKeyCamel) || localStorage.getItem(`case_${key}`) || "";
-      if (storedValue) {
-        field.value = storedValue;
-      }
-      field.addEventListener(eventName, () => {
-        const value = field.value || "";
-        localStorage.setItem(storageKeyCamel, value);
-        localStorage.setItem(`case_${key}`, value);
-      });
-    });
     function persistDraft() {
       localStorage.setItem("caseTitle", fields.title?.value?.trim() || "");
       localStorage.setItem("caseSpecialty", fields.specialty?.value || "");
@@ -759,6 +1156,181 @@
       }
     }
 
+    function getStoredValue(primaryKey, legacyKey) {
+      return localStorage.getItem(primaryKey) || localStorage.getItem(legacyKey) || "";
+    }
+
+    function formatComp(amount) {
+      if (!amount) return "—";
+      const numeric = Number(amount);
+      if (!Number.isFinite(numeric)) return `$${amount}`;
+      return numeric.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+    }
+
+    function collectCaseData() {
+      const title = (fields.title?.value || "").trim() || getStoredValue("caseTitle", "case_title");
+      const field = fields.specialty?.value || getStoredValue("caseSpecialty", "case_specialty");
+      const state = fields.state?.value || getStoredValue("caseState", "case_state");
+      const compRaw = fields.comp?.value || getStoredValue("caseCompAmount", "case_comp_amount");
+      const experience = fields.experience?.value || getStoredValue("caseExperience", "case_experience");
+      const description = (descriptionInput?.value || "").trim() || getStoredValue("caseDescription", "case_description").trim();
+      return {
+        title: title || "",
+        field: field || "",
+        state: state || "",
+        compAmount: compRaw || "",
+        comp: formatComp(compRaw),
+        experience: experience || "",
+        description: description || "",
+      };
+    }
+
+    function hasDescription() {
+      if ((descriptionInput?.value || "").trim()) return true;
+      return Boolean(getStoredValue("caseDescription", "case_description").trim());
+    }
+
+    function ensureReviewReady() {
+      if (!validateDetails()) return false;
+      if (!hasDescription()) {
+        return false;
+      }
+      return true;
+    }
+
+    function hydrateReviewSummary() {
+      if (!reviewSummary) return;
+      const data = collectCaseData();
+      latestCaseData = data;
+      reviewSummary.innerHTML = `
+        <h2>${data.title || "(Untitled Case)"}</h2>
+        <p><small>${data.field || "Practice area pending"} • ${data.state || "Location pending"}</small></p>
+        <p><strong>Compensation:</strong> ${data.comp}</p>
+        <p><strong>Experience:</strong> ${data.experience || "Not specified"}</p>
+        <hr>
+        <p>${data.description || "No description provided yet."}</p>
+        <p class="auto-note">${autoNoteCopy}</p>
+      `;
+    }
+
+    function openPreviewModal() {
+      if (!previewModal) return;
+      const data = latestCaseData || collectCaseData();
+      if (!data.title || !data.description) {
+        showToastBanner("Add a case title and description before previewing.", "error");
+        return;
+      }
+      previewFields.title && (previewFields.title.textContent = data.title);
+      previewFields.field && (previewFields.field.textContent = data.field || "—");
+      previewFields.state && (previewFields.state.textContent = data.state || "—");
+      previewFields.comp && (previewFields.comp.textContent = data.comp || "—");
+      previewFields.experience && (previewFields.experience.textContent = data.experience || "—");
+      previewFields.description && (previewFields.description.textContent = data.description || "No description provided yet.");
+      if (previewAutoNote) previewAutoNote.textContent = autoNoteCopy;
+      previewModal.classList.add("active");
+      document.body.classList.add("modal-open");
+    }
+
+    function closePreviewModal() {
+      if (!previewModal) return;
+      previewModal.classList.remove("active");
+      document.body.classList.remove("modal-open");
+    }
+
+    function clearDraft() {
+      [
+        "caseTitle",
+        "caseSpecialty",
+        "caseState",
+        "caseComp",
+        "caseCompAmount",
+        "caseExperience",
+        "caseDescription",
+      ].forEach((key) => localStorage.removeItem(key));
+    }
+
+    function showToast(message, href, isError = false) {
+      if (!toastEl) return;
+      const linkHtml = href ? ` <a href="${href}">View Case</a>` : "";
+      toastEl.innerHTML = `${isError ? "⚠️" : "✅"} ${message}${linkHtml}`;
+      toastEl.classList.toggle("error", Boolean(isError));
+      toastEl.classList.add("show");
+      setTimeout(() => toastEl.classList.remove("show"), 5000);
+    }
+
+    async function fetchCsrfToken() {
+      if (csrfToken) return csrfToken;
+      try {
+        const res = await fetch("/api/csrf", { credentials: "include" });
+        const json = await res.json().catch(() => ({}));
+        csrfToken = json?.csrfToken || "";
+      } catch (err) {
+        console.warn("Unable to fetch CSRF token", err);
+      }
+      return csrfToken;
+    }
+
+    async function submitCase(payload) {
+      const token = (window.getSessionToken && window.getSessionToken()) || "";
+      if (!token) {
+        window.checkSession?.("attorney");
+        throw new Error("Please log in again before posting.");
+      }
+      await fetchCsrfToken();
+      const res = await fetch("/api/cases", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          "X-CSRF-Token": csrfToken || "",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || data?.msg || "Unable to post this case right now.");
+      }
+      return data;
+    }
+
+    function buildPayload(data) {
+      const description = data.description || "Additional details will be provided once the case is accepted.";
+      return {
+        title: data.title,
+        practiceArea: data.field,
+        state: data.state,
+        compensationAmount: data.compAmount,
+        experience: data.experience,
+        details: description,
+      };
+    }
+
+    async function handlePost() {
+      if (!ensureReviewReady()) {
+        showToastBanner("Finish the required fields before posting.", "error");
+        return;
+      }
+      const data = latestCaseData || collectCaseData();
+      if (!data.title || !data.description) {
+        showToastBanner("Add a case title and description before posting.", "error");
+        return;
+      }
+      if (postBtn) postBtn.disabled = true;
+      try {
+        const created = await submitCase(buildPayload(data));
+        clearDraft();
+        const caseId = created?.id || created?._id;
+        const href = caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "dashboard-attorney.html#cases";
+        showToast("Your case has been successfully posted.", href);
+      } catch (err) {
+        console.error(err);
+        showToast(err?.message || "Unable to post this case right now.", null, true);
+        if (postBtn) postBtn.disabled = false;
+      }
+    }
+
     function showToastBanner(message, type = "info") {
       if (toastHelper?.show) {
         toastHelper.show(message, { targetId: "toastBanner", type });
@@ -766,13 +1338,22 @@
         alert(message);
       }
     }
+
+    previewBtn?.addEventListener("click", openPreviewModal);
+    closePreviewBtn?.addEventListener("click", closePreviewModal);
+    previewModal?.addEventListener("click", (event) => {
+      if (event.target === previewModal) closePreviewModal();
+    });
+    postBtn?.addEventListener("click", handlePost);
   })();
   </script>
 <script>
 const compInput = document.getElementById('comp');
-compInput.addEventListener('input', () => {
-  localStorage.setItem('caseCompAmount', compInput.value);
-});
+if (compInput) {
+  compInput.addEventListener('input', () => {
+    localStorage.setItem('caseCompAmount', compInput.value);
+  });
+}
 </script>
 <script src="assets/scripts/create-case-nav.js"></script>
 </body>

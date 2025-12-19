@@ -1,7 +1,7 @@
 // backend/routes/stripe.js
 const router = require("express").Router();
 const verifyToken = require("../utils/verifyToken");
-const requireRole = require("../middleware/requireRole");
+const { requireApproved, requireRole } = require("../utils/authz");
 const User = require("../models/User");
 const stripe = require("../utils/stripe");
 
@@ -27,10 +27,11 @@ if (process.env.ENABLE_CSRF === "true") {
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 router.use(verifyToken);
+router.use(requireApproved);
 
 router.post(
   "/connect",
-  requireRole(["paralegal"]),
+  requireRole("paralegal"),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const user = await User.findById(req.user.id).select("email stripeAccountId stripeOnboarded");

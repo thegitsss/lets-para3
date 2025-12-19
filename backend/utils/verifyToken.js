@@ -108,6 +108,11 @@ function shapeUser(payload) {
     String(payload.sub ?? payload.id ?? payload.userId ?? payload.uid ?? "") || "";
   const role = payload.role || payload["https://paraconnect.app/role"] || undefined;
   const email = payload.email || payload["https://paraconnect.app/email"] || undefined;
+  const status = payload.status || undefined;
+  const approved =
+    payload.approved === true ||
+    String(status || "").toLowerCase() === "approved" ||
+    payload["https://paraconnect.app/approved"] === true;
 
   // Optional extras (non-breaking)
   const scopes =
@@ -119,7 +124,7 @@ function shapeUser(payload) {
 
   const orgId = payload.orgId || payload["https://paraconnect.app/orgId"] || undefined;
 
-  return { id, role, email, scopes, orgId };
+  return { id, role, email, scopes, orgId, status, approved };
 }
 
 // -------------------------------

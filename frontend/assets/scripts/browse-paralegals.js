@@ -48,6 +48,7 @@ const elements = {
 
 const viewer = getCachedUser();
 const viewerRole = String(viewer?.role || "").toLowerCase();
+let authBlockerTimer = null;
 
 const state = {
   page: 1,
@@ -80,11 +81,15 @@ async function init() {
   bindFilterMenuToggle();
   bindFilterButtons();
   bindModalEvents();
+  bindPublicGuards();
 
   if (state.canInvite) {
     await loadCases();
   } else {
     renderCaseOptions();
+    if (!authBlockerTimer) {
+      authBlockerTimer = window.setTimeout(() => gatePublicAccess(), 10_000);
+    }
   }
 
   await loadParalegals();
@@ -116,7 +121,7 @@ function bindFilterEvents() {
     state.filters.availability = elements.availability.value;
   });
   elements.stateInput?.addEventListener("change", () => {
-    state.filters.location = (elements.stateInput.value || "").trim();
+  state.filters.location = (elements.stateInput.value || "").trim();
   });
   elements.stateInput?.addEventListener("blur", () => {
     state.filters.location = (elements.stateInput.value || "").trim();
@@ -184,6 +189,44 @@ function syncFiltersFromInputs() {
   state.filters.location = elements.stateInput?.value?.trim() || "";
 }
 
+function gatePublicAccess() {
+  if (state.isLoggedIn) return;
+  if (document.querySelector(".auth-blocker")) return;
+  const blocker = document.createElement("div");
+  blocker.className = "auth-blocker";
+  blocker.innerHTML = `
+    <div class="auth-blocker__card">
+      <h2>Members only</h2>
+      <p>Please log in to view paralegal profiles.</p>
+      <div class="auth-blocker__actions">
+        <a class="btn primary" href="login.html">Log In</a>
+        <a class="btn secondary" href="signup.html">Create Account</a>
+      </div>
+    </div>
+  `;
+  const root = document.body;
+  root.appendChild(blocker);
+  const previousOverflow = root.style.overflow;
+  root.style.overflow = "hidden";
+  const disableClicks = (e) => {
+    if (!blocker.contains(e.target)) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+    return true;
+  };
+  document.addEventListener("click", disableClicks, true);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") window.location.href = "login.html";
+  });
+  blocker.addEventListener("transitionend", () => {
+    // no-op placeholder for future animations
+  });
+  blocker.dataset.cleanup = "true";
+  blocker.dataset.prevOverflow = previousOverflow;
+}
+
 function bindModalEvents() {
   elements.cancelInquire?.addEventListener("click", closeInquireModal);
   elements.inquireModal?.addEventListener("click", (event) => {
@@ -201,6 +244,18 @@ function bindModalEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeInquireModal();
   });
+}
+
+function bindPublicGuards() {
+  if (state.isLoggedIn) return;
+  const blocker = (event) => {
+    const actionable = event.target?.closest("a, button, [role='button'], input, textarea, select, label");
+    if (!actionable) return;
+    event.preventDefault();
+    event.stopPropagation();
+    return false;
+  };
+  document.addEventListener("click", blocker, true);
 }
 
 function initStateDropdown() {

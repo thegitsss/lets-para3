@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const auth = require("../utils/verifyToken");
-const requireRole = require("../middleware/requireRole");
+const { requireApproved, requireRole } = require("../utils/authz");
 const Message = require("../models/Message");
 const Case = require("../models/Case");
 
@@ -34,7 +34,7 @@ async function ensureCaseAccess(caseId, userId) {
 }
 
 // All chat routes require authenticated platform roles
-router.use(auth, requireRole(["admin", "attorney", "paralegal"]));
+router.use(auth, requireApproved, requireRole("admin", "attorney", "paralegal"));
 
 /**
  * GET /api/chat/:caseId

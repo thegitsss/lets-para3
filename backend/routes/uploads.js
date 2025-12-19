@@ -7,9 +7,8 @@ const multer = require("multer");
 const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const verifyToken = require("../utils/verifyToken");
-const requireRole = require("../middleware/requireRole");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
-const { requireCaseAccess, sameId } = require("../utils/authz");
+const { requireApproved, requireRole, requireCaseAccess, sameId } = require("../utils/authz");
 const Case = require("../models/Case");
 const CaseFile = require("../models/CaseFile");
 const User = require("../models/User");
@@ -158,10 +157,11 @@ const profilePhotoUpload = multer({
 });
 
 // ----------------------------------------
-// All routes require auth
+// All routes require auth + approval
 // ----------------------------------------
 router.use(verifyToken);
-router.use(requireRole(["admin", "attorney", "paralegal"]));
+router.use(requireApproved);
+router.use(requireRole("admin", "attorney", "paralegal"));
 
 /**
  * POST /api/uploads/presign
@@ -310,7 +310,7 @@ function caseFileMiddleware(req, res, next) {
 
 router.post(
   "/paralegal-certificate",
-  requireRole(["paralegal"]),
+  requireRole("paralegal"),
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
@@ -354,7 +354,7 @@ router.post(
 
 router.post(
   "/paralegal-writing-sample",
-  requireRole(["paralegal"]),
+  requireRole("paralegal"),
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
@@ -398,7 +398,7 @@ router.post(
 
 router.post(
   "/paralegal-resume",
-  requireRole(["paralegal"]),
+  requireRole("paralegal"),
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
@@ -450,7 +450,7 @@ router.post(
 
 router.post(
   "/profile-photo",
-  requireRole(["paralegal", "attorney"]),
+  requireRole("paralegal", "attorney"),
   profilePhotoUpload.single("file"),
   asyncHandler(async (req, res) => {
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });

@@ -2,7 +2,7 @@
 const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
-const requireRole = require("../middleware/requireRole");
+const { requireApproved, requireRole } = require("../utils/authz");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const stripe = require("../utils/stripe");
 const Case = require("../models/Case");
@@ -328,8 +328,9 @@ router.get('/connect', (_req, res) => {
   res.json({ ok: true });
 });
 
-// All routes below require auth
+// All routes below require auth + approval
 router.use(verifyToken);
+router.use(requireApproved);
 router.param("caseId", ensureCaseParticipant("caseId"));
 
 /**
@@ -338,7 +339,7 @@ router.param("caseId", ensureCaseParticipant("caseId"));
  */
 router.post(
   "/portal",
-  requireRole(["attorney"]),
+  requireRole("attorney"),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const user = await User.findById(req.user.id).select("stripeCustomerId firstName lastName email");
@@ -365,7 +366,7 @@ router.post(
  */
 router.post(
   "/start-escrow",
-  requireRole(["attorney"]),
+  requireRole("attorney"),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const { caseId } = req.body || {};
@@ -449,7 +450,7 @@ router.post(
  */
 router.post(
   "/release",
-  requireRole(["attorney"]),
+  requireRole("attorney"),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const { caseId } = req.body || {};
@@ -601,7 +602,7 @@ router.post(
 
 router.post(
   "/connect/create-account",
-  requireRole(["paralegal"]),
+  requireRole("paralegal"),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const user = await User.findById(req.user.id).select("email stripeAccountId stripeOnboarded");
@@ -632,7 +633,7 @@ router.post(
 
 router.post(
   "/connect/onboard-link",
-  requireRole(["paralegal"]),
+  requireRole("paralegal"),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const { accountId } = req.body || {};
@@ -659,7 +660,7 @@ router.post(
 
 router.get(
   "/connect/status",
-  requireRole(["paralegal"]),
+  requireRole("paralegal"),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const user = await User.findById(req.user.id).select("stripeAccountId stripeOnboarded");
@@ -949,7 +950,7 @@ router.post(
 
 router.get(
   "/summary",
-  requireRole(["attorney"]),
+  requireRole("attorney"),
   asyncHandler(async (req, res) => {
     const attorneyMatch = buildAttorneyMatch(req.user.id);
     const [activeCases, pendingCases, completedDocs] = await Promise.all([
@@ -1002,7 +1003,7 @@ router.get(
 
 router.get(
   "/escrow/active",
-  requireRole(["attorney"]),
+  requireRole("attorney"),
   asyncHandler(async (req, res) => {
     const attorneyMatch = buildAttorneyMatch(req.user.id);
     const limit = pickLimit(req.query.limit, 200, 500);
@@ -1033,7 +1034,7 @@ router.get(
 
 router.get(
   "/escrow/pending",
-  requireRole(["attorney"]),
+  requireRole("attorney"),
   asyncHandler(async (req, res) => {
     const attorneyMatch = buildAttorneyMatch(req.user.id);
     const limit = pickLimit(req.query.limit, 200, 500);
@@ -1070,7 +1071,7 @@ router.get(
 
 router.get(
   "/history",
-  requireRole(["attorney"]),
+  requireRole("attorney"),
   asyncHandler(async (req, res) => {
     const attorneyMatch = buildAttorneyMatch(req.user.id);
     const limit = pickLimit(req.query.limit, MAX_HISTORY_ROWS, MAX_HISTORY_ROWS);
@@ -1088,7 +1089,7 @@ router.get(
 
 router.get(
   "/export/csv",
-  requireRole(["attorney"]),
+  requireRole("attorney"),
   asyncHandler(async (req, res) => {
     const attorneyMatch = buildAttorneyMatch(req.user.id);
     const limit = pickLimit(req.query.limit, MAX_EXPORT_ROWS, MAX_EXPORT_ROWS);

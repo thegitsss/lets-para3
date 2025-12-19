@@ -160,10 +160,31 @@ function requireCaseAccess(paramKey = "caseId", opts = {}) {
   };
 }
 
+// Additional approval/active guards
+function requireApproved(req, res, next) {
+  const approved =
+    req.user &&
+    (req.user.approved === true ||
+      String(req.user.status || "").toLowerCase() === "approved");
+  if (!approved) {
+    return res.status(403).json({ error: "Account pending approval" });
+  }
+  return next();
+}
+
+function requireActive(req, res, next) {
+  if (req.user?.blocked === true || req.user?.status === "blocked") {
+    return res.status(403).json({ error: "Account blocked" });
+  }
+  return next();
+}
+
 module.exports = {
   requireRole,
   requireSelfOrAdmin,
   requireCaseAccess,
+  requireApproved,
+  requireActive,
 
   // Optional helpers if you want them elsewhere
   isObjId,

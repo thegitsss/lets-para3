@@ -5,7 +5,7 @@ const Application = require("../models/Application");
 const Job = require("../models/Job");
 const User = require("../models/User");
 const auth = require("../utils/verifyToken");
-const requireRole = require("../middleware/requireRole");
+const { requireApproved, requireRole } = require("../utils/authz");
 const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
 
 function sanitizeMessage(value, { min = 0, max = 2000 } = {}) {
@@ -19,6 +19,11 @@ async function createApplicationForJob(jobId, user, coverLetter) {
   if (!mongoose.isValidObjectId(jobId)) {
     const err = new Error("Invalid job id");
     err.status = 400;
+    throw err;
+  }
+  if (!user || user.approved !== true) {
+    const err = new Error("Account pending approval");
+    err.status = 403;
     throw err;
   }
   if (!user || String(user.role).toLowerCase() !== "paralegal") {
@@ -75,7 +80,7 @@ async function createApplicationForJob(jobId, user, coverLetter) {
 }
 
 // GET /applications/my — paralegal views jobs they've applied to
-router.get("/my", auth, requireRole(["paralegal"]), async (req, res) => {
+router.get("/my", auth, requireApproved, requireRole("paralegal"), async (req, res) => {
   try {
     const apps = await Application.find({ paralegalId: req.user._id })
       .populate("jobId");
@@ -87,7 +92,7 @@ router.get("/my", auth, requireRole(["paralegal"]), async (req, res) => {
 });
 
 // GET /applications/for-job/:jobId — attorney views applicants
-router.get("/for-job/:jobId", auth, requireRole(["admin", "attorney"]), async (req, res) => {
+router.get("/for-job/:jobId", auth, requireApproved, requireRole("admin", "attorney"), async (req, res) => {
   try {
     const job = await Job.findById(req.params.jobId);
     if (!job) return res.status(404).json({ error: "Job not found" });

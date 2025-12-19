@@ -71,7 +71,15 @@ const FIFTEEN_MIN = 15 * 60 * 1000;
 const DISABLED_ACCOUNT_MSG = "This account has been disabled.";
 
 function signAccess(user) {
-  const payload = { id: user._id.toString(), role: user.role, email: user.email };
+  const approved =
+    user.approved === true || String(user.status || "").toLowerCase() === "approved";
+  const payload = {
+    id: user._id.toString(),
+    role: user.role,
+    email: user.email,
+    status: user.status,
+    approved,
+  };
   const opts = { expiresIn: TWO_HOURS };
   if (process.env.JWT_ISSUER) opts.issuer = process.env.JWT_ISSUER;
   if (process.env.JWT_AUDIENCE) opts.audience = process.env.JWT_AUDIENCE;
@@ -348,7 +356,8 @@ router.post(
     }
 
     const status = user.status || "pending";
-    if (status !== "approved") {
+    const approvedFlag = user.approved === true || status === "approved";
+    if (!approvedFlag) {
       const msg =
         status === "pending"
           ? "Your application is still pending admin approval."
@@ -407,6 +416,11 @@ router.post(
     user.twoFactorTempCode = null;
     user.twoFactorExpiresAt = null;
     await user.save();
+
+    const approvedFlag = user.approved === true || String(user.status || "").toLowerCase() === "approved";
+    if (!approvedFlag) {
+      return res.status(403).json({ error: "Account pending approval" });
+    }
 
     const token = signAccess(user);
     res.cookie("token", token, AUTH_COOKIE_OPTIONS);

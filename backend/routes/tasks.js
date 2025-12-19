@@ -1,12 +1,15 @@
 const router = require("express").Router({ mergeParams: true });
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
+const { requireApproved, requireRole } = require("../utils/authz");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const Task = require("../models/Task");
 
 const VALID_STATUSES = ["todo", "in_progress", "review"];
 
 router.use(verifyToken);
+router.use(requireApproved);
+router.use(requireRole("admin", "attorney", "paralegal"));
 router.param("caseId", ensureCaseParticipant("caseId"));
 
 router.post(

@@ -4,8 +4,7 @@ const mongoose = require("mongoose");
 const { S3Client, GetObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const verifyToken = require("../utils/verifyToken");
-const requireRole = require("../middleware/requireRole");
-const { requireCaseAccess } = require("../utils/authz");
+const { requireApproved, requireRole, requireCaseAccess } = require("../utils/authz");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const Case = require("../models/Case");
 const Job = require("../models/Job");
@@ -421,7 +420,7 @@ async function ensureFundsReleased(req, caseDoc) {
   return { payout, transferId: transfer.id };
 }
 
-router.get("/open", verifyToken, requireRole(["paralegal"]), async (req, res) => {
+router.get("/open", verifyToken, requireApproved, requireRole("paralegal"), async (req, res) => {
   try {
     const cases = await Case.find({ status: "open" })
       .populate("attorney", "firstName lastName")
@@ -437,7 +436,8 @@ router.get("/open", verifyToken, requireRole(["paralegal"]), async (req, res) =>
 // All case routes require auth + platform roles
 // ----------------------------------------
 router.use(verifyToken);
-router.use(requireRole(["admin", "attorney", "paralegal"]));
+router.use(requireApproved);
+router.use(requireRole("admin", "attorney", "paralegal"));
 
 // Invitations (must run before ensureCaseParticipant to allow pending paralegals)
 router.post(
@@ -573,7 +573,7 @@ router.use((req, res, next) => {
  */
 router.post(
   "/",
-  requireRole(["admin", "attorney"]),
+  requireRole("admin", "attorney"),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const {
@@ -677,7 +677,7 @@ router.post(
  */
 router.get(
   "/posted",
-  requireRole(["admin", "attorney"]),
+  requireRole("admin", "attorney"),
   asyncHandler(async (req, res) => {
     const filter = {
       archived: { $ne: true },
@@ -716,7 +716,7 @@ router.get(
  */
 router.get(
   "/admin",
-  requireRole(["admin"]),
+  requireRole("admin"),
   asyncHandler(async (req, res) => {
     const limit = clamp(parseInt(req.query.limit, 10) || 250, 1, 1000);
     const statusFilter = String(req.query.status || "")
@@ -831,7 +831,7 @@ router.get(
 
 router.get(
   "/my-active",
-  requireRole(["attorney"]),
+  requireRole("attorney"),
   asyncHandler(async (req, res) => {
     const limit = clamp(parseInt(req.query.limit, 10) || 50, 1, 200);
     const filter = {
@@ -858,7 +858,7 @@ router.get(
 
 router.get(
   "/invited-to",
-  requireRole(["paralegal"]),
+  requireRole("paralegal"),
   asyncHandler(async (req, res) => {
     const limit = clamp(parseInt(req.query.limit, 10) || 50, 1, 200);
     const docs = await Case.find({
@@ -881,7 +881,7 @@ router.get(
 
 router.get(
   "/open",
-  requireRole(["paralegal"]),
+  requireRole("paralegal"),
   asyncHandler(async (req, res) => {
     const docs = await Case.find({
       status: "open",
@@ -898,7 +898,7 @@ router.get(
 
 router.get(
   "/my-assigned",
-  requireRole(["paralegal"]),
+  requireRole("paralegal"),
   asyncHandler(async (req, res) => {
     const limit = clamp(parseInt(req.query.limit, 10) || 100, 1, 500);
     const docs = await Case.find({
@@ -1403,7 +1403,7 @@ router.post(
 
 router.post(
   "/:caseId/apply",
-  requireRole(["paralegal"]),
+  requireRole("paralegal"),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
@@ -1503,7 +1503,7 @@ router.post(
 router.post(
   "/:caseId/invite/accept",
   csrfProtection,
-  requireRole(["paralegal"]),
+  requireRole("paralegal"),
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
     if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid case id" });
@@ -1565,7 +1565,7 @@ router.post(
 router.post(
   "/:caseId/invite/decline",
   csrfProtection,
-  requireRole(["paralegal"]),
+  requireRole("paralegal"),
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
     if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid case id" });

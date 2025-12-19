@@ -341,6 +341,7 @@ router.get(
 router.post(
   "/me/notifications/read",
   csrfProtection,
+  requireApprovedUser,
   asyncHandler(async (req, res) => {
     const { caseId, type } = req.body || {};
     const me = await User.findById(req.user.id).select("notificationsLastViewedAt");
@@ -388,6 +389,7 @@ router.get(
 router.post(
   "/block",
   csrfProtection,
+  requireApprovedUser,
   asyncHandler(async (req, res) => {
     const { userId } = req.body || {};
     if (!isObjId(userId)) return res.status(400).json({ error: "Invalid userId" });
@@ -418,6 +420,7 @@ router.post(
 router.post(
   "/unblock",
   csrfProtection,
+  requireApprovedUser,
   asyncHandler(async (req, res) => {
     const { userId } = req.body || {};
     if (!isObjId(userId)) return res.status(400).json({ error: "Invalid userId" });

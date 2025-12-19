@@ -2,9 +2,8 @@
 const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
-const requireRole = require("../middleware/requireRole");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
-const { requireCaseAccess } = require("../utils/authz");
+const { requireApproved, requireRole, requireCaseAccess } = require("../utils/authz");
 const Message = require("../models/Message");
 const Case = require("../models/Case");
 const User = require("../models/User");
@@ -104,7 +103,8 @@ function isCaseReadOnly(req) {
 
 // All message routes require auth
 router.use(verifyToken);
-router.use(requireRole(["admin", "attorney", "paralegal"]));
+router.use(requireApproved);
+router.use(requireRole("admin", "attorney", "paralegal"));
 
 router.get(
   "/unread-count",

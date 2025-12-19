@@ -122,6 +122,8 @@
       flex: 1;
       padding: 40px;
       overflow-y: auto;
+      overflow-x: hidden;
+      min-height: 100vh;
     }
 
     .topbar {
@@ -891,15 +893,887 @@
     .switch input:checked + .slider:before {
       transform: translateX(18px);
     }
+
+    .view-panel {
+      width: 100%;
+    }
+
+    .view-panel[hidden] {
+      display: none !important;
+    }
+
+    .view-cases {
+      padding-bottom: 3rem;
+    }
+
+    .view-cases .cases-shell {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--panel);
+      padding: 2rem;
+      box-shadow: 0 30px 80px rgba(15, 23, 42, 0.08);
+    }
+
+    .view-cases .case-switcher {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin: 1.5rem 0 1rem;
+    }
+
+    .view-cases .case-switcher button {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.45rem 1.2rem;
+      font-size: 0.9rem;
+      color: var(--ink);
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .view-cases .case-switcher button.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .view-cases .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .view-cases .page-header h2 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 1.6rem;
+    }
+
+    .view-cases .page-header .actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .view-cases .page-header input[type="search"] {
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      width: 220px;
+      transition: border-color 0.2s;
+      background: var(--panel);
+      color: var(--ink);
+    }
+
+    .view-cases .page-header input[type="search"]:focus {
+      border-color: var(--accent);
+      outline: none;
+    }
+
+    .view-cases .add-btn {
+      background: var(--accent);
+      color: #fff;
+      font-family: Sarabun, sans-serif;
+      font-weight: 300;
+      border: none;
+      border-radius: 6px;
+      padding: 9px 14px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background 0.2s;
+    }
+
+    .view-cases .add-btn:hover {
+      background: #a0854d;
+    }
+
+    .view-cases .filter-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .view-cases .filter-tab {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .view-cases .filter-tab.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .view-cases table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border-radius: 12px;
+      overflow: visible;
+      position: relative;
+    }
+
+    .view-cases .case-table {
+      overflow-x: auto;
+      overflow-y: visible;
+    }
+
+    .view-cases .case-table table {
+      min-width: 760px;
+    }
+
+    .view-cases th,
+    .view-cases td {
+      padding: 0.85rem 0.65rem;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      font-size: 0.9rem;
+    }
+
+    .view-cases .case-select {
+      text-align:center;
+      width:42px;
+    }
+
+    .view-cases .archived-bulk-bar {
+      display:flex;
+      align-items:center;
+      gap:0.75rem;
+      margin-bottom:0.65rem;
+      flex-wrap:wrap;
+    }
+
+    .view-cases .archived-select-all {
+      display:inline-flex;
+      align-items:center;
+      gap:0.35rem;
+      font-size:0.9rem;
+      color:var(--ink);
+    }
+
+    .view-cases .archived-bulk-actions {
+      display:flex;
+      gap:0.5rem;
+      flex-wrap:wrap;
+    }
+
+    .archived-bulk-actions .pill-btn {
+      border-radius:999px;
+      border:1px solid var(--line);
+      padding:0.45rem 1.1rem;
+      background:var(--panel);
+      color:var(--ink);
+      cursor:pointer;
+      font-size:0.9rem;
+      font-weight:300;
+      letter-spacing:0.02em;
+      transition:background 0.2s ease,border-color 0.2s ease,transform 0.15s ease,opacity 0.2s ease;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width:140px;
+    }
+
+    .archived-bulk-actions .pill-btn:hover:not([disabled]) {
+      transform:translateY(-1px);
+      border-color:var(--accent);
+      background:rgba(182,164,122,0.08);
+    }
+
+    .archived-bulk-actions .pill-btn.primary {
+      background:var(--accent);
+      color:#fff;
+      border-color:var(--accent);
+    }
+
+    .archived-bulk-actions .pill-btn.danger {
+      color:#b04747;
+      border-color:rgba(176,71,71,0.3);
+    }
+
+    .archived-bulk-actions .pill-btn:disabled {
+      opacity:0.55;
+      cursor:not-allowed;
+      transform:none;
+    }
+
+    .view-cases th {
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.02em;
+      color: var(--muted);
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    .view-cases tbody tr:hover {
+      background: rgba(182, 164, 122, 0.05);
+    }
+
+    .view-cases td a {
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 200;
+    }
+
+    .view-cases td a:hover {
+      color: var(--accent);
+    }
+
+    .view-cases .status {
+      font-size: 0.8rem;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 300;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .view-cases .status.public {background: rgba(31,122,74,.1);color:#1f7a4a;}
+    .view-cases .status.private{background:rgba(176,71,71,.1);color:#b04747;}
+    .view-cases .status.pending{background:rgba(182,164,122,0.15);color:#7a5a1f;}
+    .view-cases .status.accepted{background:rgba(32,131,87,0.12);color:#1e6d45;}
+    .view-cases .status.declined{background:rgba(176,71,71,.12);color:#a93232;}
+
+    .view-cases .case-actions {position:relative; display:inline-block;}
+    .view-cases .case-actions.open .case-menu {display:block;}
+    .view-cases .menu-trigger {
+      background:none;
+      border:none;
+      color:var(--muted);
+      font-size:1.1rem;
+      padding:4px 6px;
+      cursor:pointer;
+      border-radius:6px;
+      transition:color .2s, background .2s;
+    }
+
+    .view-cases .menu-trigger:hover {color:var(--accent); background:rgba(0,0,0,0.03);}
+
+    .view-cases .case-menu {
+      position:fixed;
+      top:0;
+      left:0;
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:10px;
+      box-shadow:0 12px 24px rgba(0,0,0,0.12);
+      display:none;
+      width:180px;
+      min-width:180px;
+      z-index:10000;
+    }
+
+    .view-cases .case-menu button {
+      width:100%;
+      border:none;
+      background:none;
+      text-align:left;
+      padding:0.6rem 0.85rem;
+      font-size:0.9rem;
+      cursor:pointer;
+      color:var(--ink);
+      border-bottom:1px solid var(--line);
+      transition:background .2s,color .2s;
+    }
+
+    .view-cases .case-menu button:last-child {border-bottom:none;}
+    .view-cases .case-menu button:hover {background:rgba(182,164,122,0.1); color:var(--accent);}
+    .view-cases .case-menu .danger {color:#b04747;}
+    .view-cases .case-menu .danger:hover {color:#b04747;}
+
+    .view-cases .case-table.hidden {display:none;}
+    .view-cases .empty-row {
+      text-align:center;
+      color:var(--muted);
+      font-style:italic;
+    }
+
+    .view-cases .case-files-pane{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background:var(--panel);
+      padding:1.5rem;
+      margin-top:1.5rem;
+    }
+
+    .view-cases .case-files-filters{
+      display:flex;
+      gap:.75rem;
+      flex-wrap:wrap;
+      margin-bottom:1.25rem;
+    }
+
+    .view-cases .case-files-filters button{
+      border:1px solid var(--line);
+      border-radius:8px;
+      padding:0.5rem 1rem;
+      cursor:pointer;
+      background:var(--panel);
+      font-size:0.9rem;
+      transition:all .2s ease;
+    }
+
+    .view-cases .case-files-filters button.active{
+      background:var(--accent);
+      color:#fff;
+      border-color:var(--accent);
+    }
+
+    .view-cases .case-files-grid{
+      display:flex;
+      flex-direction:column;
+      gap:1rem;
+    }
+
+    .view-cases .case-files-grid .file-card{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background:var(--panel);
+      padding:1rem 1.25rem;
+      display:flex;
+      flex-direction:column;
+      gap:.6rem;
+    }
+
+    .view-cases .case-files-grid .file-line{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:1rem;
+    }
+
+    .view-cases .case-files-grid .file-name{
+      font-family:var(--font-serif);
+      font-size:1.05rem;
+      word-break:break-word;
+    }
+
+    .view-cases .case-files-grid .file-status{
+      font-size:.85rem;
+      font-weight:600;
+      color:var(--accent);
+      text-transform:capitalize;
+    }
+
+    .view-cases .case-files-grid .file-meta{
+      display:flex;
+      gap:1rem;
+      font-size:.85rem;
+      color:var(--muted);
+      flex-wrap:wrap;
+    }
+
+    .view-cases .case-files-grid .file-actions{
+      display:flex;
+      gap:.75rem;
+      flex-wrap:wrap;
+    }
+
+    .view-cases .case-files-empty{
+      padding:1rem;
+      color:var(--muted);
+      font-size:0.95rem;
+    }
+
+    .view-cases .note-cell{
+      max-width:260px;
+      font-size:0.85rem;
+      color:var(--muted);
+    }
+
+    .view-cases .note-cell .note-preview{margin-bottom:0.25rem;}
+
+    .view-cases .note-cell .note-edit-btn{
+      border:none;
+      background:none;
+      color:var(--accent);
+      font-size:0.8rem;
+      cursor:pointer;
+      padding:0;
+    }
+
+    .view-cases .note-cell .note-edit-btn:hover{text-decoration:underline;}
+
+    .hidden {
+      display: none !important;
+    }
+
+    .note-modal{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.35);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:3000;
+    }
+
+    .note-modal.hidden{display:none;}
+
+    .note-modal-card{
+      background:var(--panel);
+      border-radius:12px;
+      padding:1.25rem;
+      width:min(90vw,440px);
+      box-shadow:0 30px 80px rgba(15,23,42,0.25);
+      display:flex;
+      flex-direction:column;
+      gap:0.85rem;
+    }
+
+    .note-modal-card textarea{
+      min-height:140px;
+      border:1px solid var(--line);
+      border-radius:10px;
+      padding:0.75rem;
+      resize:vertical;
+      font-family:inherit;
+      font-size:0.95rem;
+      background:var(--panel);
+      color:var(--ink);
+    }
+
+    .note-modal-actions{
+      display:flex;
+      justify-content:flex-end;
+      gap:0.75rem;
+      flex-wrap:wrap;
+    }
+
+    .btn{
+      border-radius:999px;
+      padding:0.55rem 1.4rem;
+      border:1px solid transparent;
+      font-family:inherit;
+      font-size:0.9rem;
+      cursor:pointer;
+      transition:background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .btn.primary{background:var(--accent);color:#fff;}
+    .btn.primary:hover{background:#9a8459;}
+
+    .btn.secondary{
+      background:var(--panel);
+      border:1px solid var(--line);
+      color:var(--ink);
+    }
+
+    .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
+
+    body.theme-dark .view-cases th{
+      background:rgba(26,32,48,0.85);
+      color:#f8fbff;
+    }
+
+    body.theme-dark .view-cases td{
+      color:#f8fbff;
+      border-color:rgba(255,255,255,0.08);
+    }
+
+    body.theme-dark .view-cases .case-menu button{
+      color:#f8fbff;
+      border-color:rgba(255,255,255,0.08);
+    }
+
+    body.theme-dark .view-cases .case-menu button:hover{background:rgba(255,255,255,0.1);}
+
+    body.theme-dark .btn.secondary{
+      background:transparent;
+      color:#f8fbff;
+      border-color:rgba(255,255,255,0.25);
+    }
+
+    .view-billing {
+      padding-bottom: 3rem;
+    }
+
+    .view-billing header.page-header {
+      display:flex;
+      flex-wrap:wrap;
+      gap:1.5rem;
+      justify-content:space-between;
+      align-items:flex-end;
+      margin-bottom:2rem;
+    }
+
+    .view-billing header.page-header h1 {
+      font-family:var(--font-serif);
+      font-weight:300;
+      font-size:2.3rem;
+      margin-bottom:0.35rem;
+    }
+
+    .view-billing header.page-header p {
+      color:var(--muted);
+      max-width:540px;
+      font-size:0.95rem;
+    }
+
+    .view-billing header.page-header .actions {
+      display:flex;
+      align-items:center;
+      gap:0.75rem;
+      flex-wrap:wrap;
+    }
+
+    .view-billing .primary-btn {
+      border:none;
+      border-radius:999px;
+      padding:0.75rem 1.5rem;
+      background:var(--accent);
+      color:#fff;
+      font-weight:300;
+      cursor:pointer;
+      transition:transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      box-shadow:0 12px 24px rgba(0,0,0,0.12);
+    }
+
+    .view-billing .primary-btn:hover:not(:disabled) {
+      transform:translateY(-1px);
+      box-shadow:0 16px 28px rgba(0,0,0,0.15);
+      background:#9c8a63;
+    }
+
+    .view-billing .primary-btn:disabled {
+      opacity:0.6;
+      cursor:not-allowed;
+      box-shadow:none;
+    }
+
+    .view-billing .panel {
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background:var(--panel);
+      padding:1.5rem;
+      margin-bottom:2rem;
+    }
+
+    .view-billing .panel-header {
+      display:flex;
+      justify-content:space-between;
+      gap:1rem;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-bottom:1.25rem;
+    }
+
+    .view-billing .panel-header h2 {
+      font-family:var(--font-serif);
+      font-size:1.6rem;
+      font-weight:300;
+      margin-bottom:0.35rem;
+    }
+
+    .view-billing .panel-header p {
+      color:var(--muted);
+      font-size:0.95rem;
+    }
+
+    .view-billing .ghost-btn {
+      border:1px solid var(--line);
+      background:var(--panel);
+      border-radius:999px;
+      padding:0.4rem 1.1rem;
+      cursor:pointer;
+      font-size:0.85rem;
+      letter-spacing:0.05em;
+      text-transform:uppercase;
+      color:var(--muted);
+      transition:border-color 0.2s ease,color 0.2s ease;
+    }
+
+    .view-billing .ghost-btn:hover {
+      border-color:var(--accent);
+      color:var(--ink);
+    }
+
+    .view-billing .finance-alerts {
+      display:flex;
+      flex-direction:column;
+      gap:0.85rem;
+      margin-bottom:2rem;
+    }
+
+    .view-billing .finance-alert {
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background:var(--panel);
+      padding:1.1rem 1.25rem;
+      display:flex;
+      flex-wrap:wrap;
+      justify-content:space-between;
+      gap:0.85rem;
+    }
+
+    .view-billing .finance-alert .alert-title {
+      font-family:var(--font-serif);
+      font-size:1.15rem;
+      font-weight:300;
+      margin-bottom:0.15rem;
+    }
+
+    .view-billing .finance-alert p {
+      margin:0;
+      font-size:0.95rem;
+      color:var(--muted);
+    }
+
+    .view-billing .alert-actions {
+      display:flex;
+      flex-wrap:wrap;
+      gap:0.5rem;
+      align-items:center;
+    }
+
+    .view-billing .pill-btn {
+      border-radius:999px;
+      border:1px solid var(--line);
+      padding:0.45rem 1.25rem;
+      background:var(--panel);
+      color:var(--ink);
+      cursor:pointer;
+      font-size:0.9rem;
+      font-weight:300;
+      letter-spacing:0.02em;
+      transition:background 0.2s ease,border-color 0.2s ease,transform 0.15s ease;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-width:120px;
+    }
+
+    .view-billing .pill-btn:hover {
+      transform:translateY(-1px);
+      border-color:var(--accent);
+      background:rgba(182,164,122,0.08);
+    }
+
+    .view-billing .pill-btn.primary {
+      background:var(--accent);
+      color:#fff;
+      border-color:var(--accent);
+    }
+
+    .view-billing .pill-btn.primary:hover {
+      background:#9c8a63;
+      border-color:#9c8a63;
+    }
+
+    .view-billing .table-wrapper {
+      overflow-x:auto;
+    }
+
+    .view-billing .escrow-table {
+      width:100%;
+      border-collapse:collapse;
+      min-width:640px;
+    }
+
+    .view-billing .escrow-table th,
+    .view-billing .escrow-table td {
+      padding:0.75rem 0.5rem;
+      text-align:left;
+      border-bottom:1px solid var(--line);
+      background:var(--panel);
+    }
+
+    .view-billing .escrow-table th {
+      text-transform:uppercase;
+      font-size:0.75rem;
+      letter-spacing:0.08em;
+      color:var(--muted);
+    }
+
+    .view-billing .escrow-table td .pill {
+      display:inline-flex;
+      align-items:center;
+      padding:0.15rem 0.65rem;
+      border-radius:999px;
+      background:rgba(182,164,122,0.15);
+      color:var(--ink);
+      font-size:0.8rem;
+    }
+
+    .view-billing .finance-alerts .finance-alert.calm {
+      border-style:dashed;
+      border-color:var(--line);
+    }
+
+    .view-billing .history-list {
+      display:flex;
+      flex-direction:column;
+      gap:1.25rem;
+    }
+
+    .view-billing .history-card {
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background:var(--panel);
+      padding:1.25rem;
+      display:flex;
+      flex-direction:column;
+      gap:1rem;
+    }
+
+    .view-billing .history-primary .case-name {
+      font-family:var(--font-serif);
+      font-size:1.45rem;
+      font-weight:300;
+    }
+
+    .view-billing .history-primary .job-title {
+      color:var(--muted);
+      font-size:1rem;
+    }
+
+    .view-billing .history-primary .paralegal-name {
+      font-size:0.95rem;
+      color:var(--ink);
+    }
+
+    .view-billing .history-meta {
+      display:flex;
+      flex-wrap:wrap;
+      gap:1.5rem;
+    }
+
+    .view-billing .meta-item span {
+      display:block;
+      text-transform:uppercase;
+      font-size:0.7rem;
+      color:var(--muted);
+      letter-spacing:0.08em;
+      margin-bottom:0.3rem;
+    }
+
+    .view-billing .meta-item strong {
+      font-size:1.2rem;
+      font-weight:300;
+    }
+
+    .view-billing .history-actions {
+      display:flex;
+      flex-wrap:wrap;
+      gap:0.75rem;
+      align-items:center;
+    }
+
+    .view-billing .history-actions button {
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:0.45rem 1.25rem;
+      background:var(--panel);
+      cursor:pointer;
+      transition:transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .view-billing .history-actions button:hover {
+      transform:translateY(-1px);
+      box-shadow:0 8px 20px rgba(0,0,0,0.09);
+    }
+
+    .view-billing .history-empty {
+      text-align:center;
+      color:var(--muted);
+      padding:2rem 1rem;
+      border:1px dashed var(--line);
+      border-radius:var(--radius);
+      background:var(--panel);
+    }
+
+    .view-billing .history-empty.error {
+      color:#c0392b;
+      border-color:rgba(192,57,43,0.4);
+    }
+
+    .view-billing .action-drawer {
+      position:relative;
+      display:inline-flex;
+    }
+
+    .view-billing .action-toggle {
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:0.4rem 1.2rem;
+      display:inline-flex;
+      align-items:center;
+      gap:0.35rem;
+      background:var(--panel);
+      cursor:pointer;
+      font-size:0.85rem;
+      letter-spacing:0.05em;
+      text-transform:uppercase;
+    }
+
+    .view-billing .action-drawer.open .action-toggle {
+      border-color:var(--accent);
+      color:var(--accent);
+    }
+
+    .view-billing .action-menu {
+      position:absolute;
+      top:calc(100% + 6px);
+      right:0;
+      background:var(--panel);
+      border:1px solid var(--line);
+      border-radius:12px;
+      box-shadow:0 15px 40px rgba(15,23,42,0.15);
+      padding:0.65rem;
+      display:none;
+      flex-direction:column;
+      min-width:180px;
+      z-index:40;
+    }
+
+    .view-billing .action-drawer.open .action-menu {
+      display:flex;
+    }
+
+    .view-billing .action-menu button {
+      border:none;
+      background:transparent;
+      padding:0.5rem 0.35rem;
+      border-radius:8px;
+      font-size:0.9rem;
+      text-align:left;
+      cursor:pointer;
+      transition:background 0.2s ease;
+    }
+
+    .view-billing .action-menu button:hover {
+      background:rgba(182,164,122,0.12);
+    }
+
+    @media (max-width: 960px) {
+      .view-billing .history-meta {
+        gap:1rem;
+      }
+    }
   </style>
 </head>
 <body>
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
     <nav>
-      <a href="dashboard-attorney.html" class="active">Home</a>
-      <a href="active-cases.html">Cases &amp; Files</a>
-      <a href="billing-attorney.html">Escrow</a>
+      <a href="#home" class="active" data-view-target="home">Home</a>
+      <a href="#cases" data-view-target="cases">Cases &amp; Files</a>
+      <a href="#billing" data-view-target="billing">Billing &amp; Escrow</a>
       <a href="help.html">Help</a>
     </nav>
     <div class="sidebar-bottom">
@@ -910,70 +1784,273 @@
   <main class="main">
     <div class="topbar" data-attorney-header></div>
 
-    <header>
-      <h1>Welcome back, <span id="user-name-heading"></span></h1>
-      <p id="activeCasesHeading"></p>
-    </header>
+    <section class="view-panel view-home" data-view="home">
+      <header>
+        <h1>Welcome back, <span id="user-name-heading"></span></h1>
+        <p id="activeCasesHeading"></p>
+      </header>
 
-    <section class="summary">
-      <div class="info-box" id="attorneyActiveCases" data-metric="activeCases"></div>
-      <div class="info-box message-box" id="messageBox">
-        <div>
-          <span id="messageCount"></span> message<span id="plural"></span>
+      <section class="summary">
+        <div class="info-box" id="attorneyActiveCases" data-metric="activeCases"></div>
+        <div class="info-box message-box" id="messageBox">
+          <div>
+            <span id="messageCount"></span> message<span id="plural"></span>
+          </div>
+          <div id="messageSnippet" style="margin-top:.3rem;color:var(--muted);font-size:.85rem;"></div>
         </div>
-        <div id="messageSnippet" style="margin-top:.3rem;color:var(--muted);font-size:.85rem;"></div>
-      </div>
-      <div class="info-box" id="attorneyOverdueTasks" data-metric="overdueTasks"></div>
-      <div class="info-box" id="attorneyEscrowTotal" data-metric="escrowTotal"></div>
-    </section>
+        <div class="info-box" id="attorneyOverdueTasks" data-metric="overdueTasks"></div>
+        <div class="info-box" id="attorneyEscrowTotal" data-metric="escrowTotal"></div>
+      </section>
 
-    <section class="deadlines">
-      <div class="section-title">Upcoming Deadlines</div>
-      <div id="deadlineList">
-        <div class="info-line" id="attorneyDeadlinesEmpty" style="color:var(--muted);" hidden>No upcoming deadlines.</div>
-      </div>
-    </section>
+      <section class="deadlines">
+        <div class="section-title">Upcoming Deadlines</div>
+        <div id="deadlineList">
+          <div class="info-line" id="attorneyDeadlinesEmpty" style="color:var(--muted);" hidden>No upcoming deadlines.</div>
+        </div>
+      </section>
 
-    <div class="side-by-side-panels">
-      <section id="latestMessagePreview">
-        <div class="section-title">Unread Messages</div>
+      <div class="side-by-side-panels">
+        <section id="latestMessagePreview">
+          <div class="section-title">Unread Messages</div>
           <div class="info-line">
             <strong id="messagePreviewSender"></strong>
             <span id="messagePreviewText"></span>
             <a id="messagePreviewLink" href="#" style="color:var(--accent);font-weight:500;">View</a>
           </div>
+        </section>
+        <section>
+          <div class="section-title">Escrow Status</div>
+          <div id="escrowDetails">
+            <div class="info-line" id="attorneyEscrowEmpty" hidden>&bull; Escrow metrics unavailable.</div>
+          </div>
+        </section>
+      </div>
+
+      <section class="quick-actions">
+        <div class="section-title">Quick Actions</div>
+        <button type="button" data-quick-link="create-case">Create New Request</button>
+        <button type="button" data-quick-link="browse-paralegals">Browse Paralegals</button>
+        <button type="button" data-quick-link="upload-doc">Upload Document</button>
       </section>
-      <section>
-        <div class="section-title">Escrow Status</div>
-        <div id="escrowDetails">
-          <div class="info-line" id="attorneyEscrowEmpty" hidden>&bull; Escrow metrics unavailable.</div>
+
+      <section class="case-list" id="caseCards">
+        <div class="case-card" id="attorneyCasesEmpty" hidden>
+          <div class="case-header">
+            <div>
+              <h2>No active cases</h2>
+              <div class="case-subinfo">Your upcoming assignments will appear here.</div>
+            </div>
+          </div>
         </div>
       </section>
-    </div>
 
-    <section class="quick-actions">
-      <div class="section-title">Quick Actions</div>
-      <button type="button" data-quick-link="create-case">Create New Request</button>
-      <button type="button" data-quick-link="browse-paralegals">Browse Paralegals</button>
-      <button type="button" data-quick-link="upload-doc">Upload Document</button>
+      <section class="completed-section">
+        <h2 class="section-title">Completed Jobs</h2>
+        <div id="completedJobsList" class="completed-jobs-list">
+          <p class="info-line" id="attorneyCompletedEmpty" style="color:var(--muted);" hidden>No completed jobs yet.</p>
+        </div>
+      </section>
     </section>
 
-    <section class="case-list" id="caseCards">
-      <div class="case-card" id="attorneyCasesEmpty" hidden>
-        <div class="case-header">
-          <div>
-            <h2>No active cases</h2>
-            <div class="case-subinfo">Your upcoming assignments will appear here.</div>
+    <section class="view-panel view-cases" data-view="cases" hidden>
+      <div class="cases-shell">
+        <header>
+          <h1>Active Cases</h1>
+          <p>Manage and monitor your open matters below.</p>
+        </header>
+        <div class="case-switcher" role="tablist" aria-label="Case views">
+          <button type="button" class="active" data-case-view="cases" role="tab" aria-selected="true">Cases</button>
+          <button type="button" data-case-view="files" role="tab" aria-selected="false">Case Files</button>
+        </div>
+
+        <section id="casesViewSection">
+          <div class="page-header">
+            <h2>All Active Cases</h2>
+            <div class="actions">
+              <input type="search" placeholder="Search cases..." data-cases-search />
+              <button class="add-btn" type="button" data-case-quick="create">＋ New Case</button>
+            </div>
+          </div>
+
+          <div class="filter-tabs">
+            <button class="filter-tab active" data-case-filter="active">Active (<span data-case-count="active">0</span>)</button>
+            <button class="filter-tab" data-case-filter="draft">Draft (<span data-case-count="draft">0</span>)</button>
+            <button class="filter-tab" data-case-filter="archived">Archived (<span data-case-count="archived">0</span>)</button>
+            <button class="filter-tab" data-case-filter="inquiries">Inquiries (<span data-case-count="inquiries">0</span>)</button>
+          </div>
+
+          <div data-cases-wrapper>
+            <div class="case-table" data-case-table="active">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Client</th>
+                    <th>Specialty</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                    <th>Posted</th>
+                    <th class="actions"></th>
+                  </tr>
+                </thead>
+                <tbody data-table-body="active">
+                  <tr><td colspan="7" class="empty-row">Loading cases…</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="case-table hidden" data-case-table="draft">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Client</th>
+                    <th>Specialty</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                    <th>Last Edited</th>
+                    <th class="actions"></th>
+                  </tr>
+                </thead>
+                <tbody data-table-body="draft">
+                  <tr><td colspan="7" class="empty-row">Loading draft cases…</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="case-table hidden" data-case-table="archived">
+              <div class="archived-bulk-bar" data-archived-bulk-bar hidden>
+                <label class="archived-select-all">
+                  <input type="checkbox" data-archived-select-all />
+                  <span>Select all</span>
+                </label>
+                <div class="archived-bulk-actions">
+                  <button type="button" class="pill-btn primary" data-archived-bulk="restore" disabled>Restore selected</button>
+                  <button type="button" class="pill-btn danger" data-archived-bulk="delete" disabled>Delete selected</button>
+                </div>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width:42px;">Select</th>
+                    <th>Title</th>
+                    <th>Client</th>
+                    <th>Specialty</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                    <th>Archived</th>
+                    <th class="actions"></th>
+                  </tr>
+                </thead>
+                <tbody data-table-body="archived">
+                  <tr><td colspan="8" class="empty-row">Loading archived cases…</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="case-table hidden" data-case-table="inquiries">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Client</th>
+                    <th>Specialty</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                    <th>Posted</th>
+                    <th class="actions"></th>
+                  </tr>
+                </thead>
+                <tbody data-table-body="inquiries">
+                  <tr><td colspan="7" class="empty-row">Loading inquiries…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="caseFilesSection" class="case-files-pane hidden" aria-labelledby="caseFilesHeading">
+          <div class="page-header">
+            <div>
+              <h2 id="caseFilesHeading">Case Files</h2>
+              <p>Review uploaded work, download approved files, or request revisions.</p>
+            </div>
+          </div>
+          <div class="case-files-filters">
+            <button type="button" id="caseFilesEmbedFilterAll" class="active">All Files</button>
+            <button type="button" id="caseFilesEmbedFilterApproved">Approved</button>
+            <button type="button" id="caseFilesEmbedFilterPending">Awaiting Review</button>
+            <button type="button" id="caseFilesEmbedFilterRevisions">Revisions Requested</button>
+          </div>
+          <div class="case-files-grid" id="caseFilesEmbedContainer">
+            <p class="case-files-empty">Loading files…</p>
+          </div>
+        </section>
+      </div>
+
+      <div id="caseNoteModal" class="note-modal hidden" role="dialog" aria-modal="true">
+        <div class="note-modal-card">
+          <h3 style="font-family:var(--font-serif);font-weight:300;">Edit Case Note</h3>
+          <textarea id="caseNoteTextarea" placeholder="Add internal notes for this case."></textarea>
+          <div class="note-modal-actions">
+            <button type="button" class="btn secondary" data-note-cancel>Cancel</button>
+            <button type="button" class="btn primary" data-note-save>Save Note</button>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="completed-section">
-      <h2 class="section-title">Completed Jobs</h2>
-      <div id="completedJobsList" class="completed-jobs-list">
-        <p class="info-line" id="attorneyCompletedEmpty" style="color:var(--muted);" hidden>No completed jobs yet.</p>
-      </div>
+    <section class="view-panel view-billing" data-view="billing" hidden data-billing-surface>
+      <header class="page-header">
+        <div>
+          <h1>Billing &amp; Escrow</h1>
+          <p>Manage invoices, receipts, and escrow releases without leaving your dashboard.</p>
+        </div>
+        <div class="actions">
+          <button type="button" class="primary-btn" id="openPortalBtn">Open Stripe Billing Portal</button>
+        </div>
+      </header>
+
+      <section id="financeAlerts" class="finance-alerts" aria-live="polite"></section>
+
+      <section class="panel" aria-labelledby="escrow-heading">
+        <div class="panel-header">
+          <div>
+            <h2 id="escrow-heading">Active Escrow</h2>
+            <p>Funds currently held in trust for ongoing cases.</p>
+          </div>
+          <button type="button" class="ghost-btn" id="refreshEscrowsBtn">Refresh</button>
+        </div>
+        <div class="table-wrapper">
+          <table class="escrow-table" aria-describedby="escrow-heading">
+            <thead>
+              <tr>
+                <th>Case</th>
+                <th>Paralegal</th>
+                <th>Held Amount</th>
+                <th>Funded</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="escrowTableBody">
+              <tr><td colspan="6" class="history-empty">Loading active escrows…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="history-heading">
+        <div class="panel-header">
+          <div>
+            <h2 id="history-heading">Completed Assignments</h2>
+            <p>Receipts for every completed job. Click any record to jump back into its case file.</p>
+          </div>
+        </div>
+        <div id="historyList" class="history-list">
+          <div class="history-empty">Loading payment history…</div>
+        </div>
+      </section>
     </section>
   </main>
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
@@ -984,5 +2061,6 @@
 <script src="assets/libs/cropper/cropper.main.js"></script>
 <script type="module" src="assets/scripts/attorney-tabs.js"></script>
 <script type="module" src="assets/scripts/attorney-settings.js"></script>
+<script type="module" src="assets/scripts/billing-lite.js"></script>
 </body>
 </html>

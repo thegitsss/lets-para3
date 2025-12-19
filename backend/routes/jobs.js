@@ -4,7 +4,7 @@ const Job = require("../models/Job");
 const Application = require("../models/Application");
 const Case = require("../models/Case");
 const auth = require("../utils/verifyToken");
-const requireRole = require("../middleware/requireRole");
+const { requireApproved, requireRole } = require("../utils/authz");
 const applicationsRouter = require("./applications");
 const { cleanTitle, cleanText, cleanBudget } = require("../utils/sanitize");
 const createApplicationForJob = applicationsRouter?.createApplicationForJob;
@@ -35,7 +35,7 @@ const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
 }, {});
 
 // POST /jobs — Attorney posts a job
-router.post("/", auth, requireRole(["attorney"]), async (req, res) => {
+router.post("/", auth, requireApproved, requireRole("attorney"), async (req, res) => {
   try {
     const title = cleanTitle(req.body.title, 150);
     if (!title || title.length < 5) {
@@ -129,7 +129,7 @@ function shapeListing({ job = null, caseDoc = null }) {
 }
 
 // GET /jobs/open — paralegals view available jobs
-router.get("/open", auth, requireRole(["paralegal"]), async (req, res) => {
+router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req, res) => {
   try {
     const [jobs, cases] = await Promise.all([
       Job.find({ status: "open" })
@@ -181,7 +181,7 @@ router.get("/open", auth, requireRole(["paralegal"]), async (req, res) => {
 });
 
 // GET /jobs/my — attorney views their posted jobs
-router.get("/my", auth, requireRole(["attorney"]), async (req, res) => {
+router.get("/my", auth, requireApproved, requireRole("attorney"), async (req, res) => {
   try {
     const jobs = await Job.find({ attorneyId: req.user._id });
     res.json(jobs);
@@ -191,7 +191,7 @@ router.get("/my", auth, requireRole(["attorney"]), async (req, res) => {
 });
 
 // POST /jobs/:jobId/apply — paralegal applies
-router.post("/:jobId/apply", auth, requireRole(["paralegal"]), async (req, res) => {
+router.post("/:jobId/apply", auth, requireApproved, requireRole("paralegal"), async (req, res) => {
   try {
     if (!createApplicationForJob) {
       return res.status(500).json({ error: "Applications service unavailable" });

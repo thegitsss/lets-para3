@@ -2,7 +2,7 @@
 const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
-const requireRole = require("../middleware/requireRole");
+const { requireApproved, requireRole } = require("../utils/authz");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const Case = require("../models/Case");
 const AuditLog = require("../models/AuditLog");
@@ -21,9 +21,10 @@ function parsePagination(req, { maxLimit = 100, defaultLimit = 25 } = {}) {
 }
 
 // ----------------------------------------
-// All dispute routes require auth
+// All dispute routes require auth + approval
 // ----------------------------------------
 router.use(verifyToken);
+router.use(requireApproved);
 router.param("caseId", ensureCaseParticipant("caseId"));
 
 /**

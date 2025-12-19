@@ -215,6 +215,69 @@
       gap: 1.5rem;
     }
 
+    .auth-blocker {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      display: grid;
+      place-items: center;
+      z-index: 2000;
+      padding: 1rem;
+    }
+
+    .auth-blocker__card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 2rem;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(15, 23, 42, 0.35);
+    }
+
+    .auth-blocker__card h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.7rem;
+      font-weight: 300;
+      margin-bottom: 0.5rem;
+    }
+
+    .auth-blocker__card p {
+      color: #556070;
+      margin-bottom: 1.25rem;
+    }
+
+    .auth-blocker__actions {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .auth-blocker__actions .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 0.55rem 1.4rem;
+      border: 1px solid rgba(26, 34, 48, 0.18);
+      cursor: pointer;
+      text-decoration: none;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 400;
+    }
+
+    .auth-blocker__actions .btn.primary {
+      background: #b4975a;
+      color: #fff;
+      border-color: #b4975a;
+    }
+
+    .auth-blocker__actions .btn.secondary {
+      background: #fff;
+      color: #1a2230;
+    }
+
     .results-header {
       background: rgba(255, 255, 255, 0.95);
       border: 1px solid rgba(26, 34, 48, 0.05);

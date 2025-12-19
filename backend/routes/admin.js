@@ -2,7 +2,7 @@
 const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
-const requireRole = require("../middleware/requireRole");
+const { requireApproved, requireRole } = require("../utils/authz");
 const User = require("../models/User");
 const Case = require("../models/Case");
 const AuditLog = require("../models/AuditLog"); // NOTE: file name fix
@@ -73,6 +73,17 @@ return deadline.toLocaleDateString("en-US", { month: "long", day: "numeric", yea
 
 function isObjId(id) {
 return mongoose.isValidObjectId(id);
+}
+
+function buildApprovedCasePipeline(match = {}) {
+const baseMatch = Object.assign({}, match);
+return [
+{ $match: baseMatch },
+{ $addFields: { attorneyRef: { $ifNull: ["$attorney", "$attorneyId"] } } },
+{ $lookup: { from: "users", localField: "attorneyRef", foreignField: "_id", as: "attorneyDoc" } },
+{ $unwind: "$attorneyDoc" },
+{ $match: { "attorneyDoc.status": "approved" } },
+];
 }
 
 function pickUserSafe(u) {
@@ -199,7 +210,7 @@ return user;
 }
 
 // All admin routes are protected & admin-only
-router.use(verifyToken, requireRole("admin"));
+router.use(verifyToken, requireApproved, requireRole("admin"));
 
 router.get("/metrics", asyncHandler(async (_req, res) => {
 const ACTIVE_CASE_STATUSES = ["open", "assigned", "active", "awaiting_documents", "reviewing", "in_progress"];
@@ -218,11 +229,10 @@ User.aggregate([
 { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } },
 { $sort: { "_id.year": 1, "_id.month": 1 } },
 ]),
-Case.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
-Case.aggregate([
-{ $match: { paymentReleased: { $ne: true } } },
-{ $group: { _id: null, total: { $sum: "$totalAmount" } } },
-]),
+Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
+Case.aggregate(
+  buildApprovedCasePipeline({ paymentReleased: { $ne: true } }).concat([{ $group: { _id: null, total: { $sum: "$totalAmount" } } }])
+),
 PlatformIncome.aggregate([{ $group: { _id: null, total: { $sum: "$feeAmount" }, count: { $sum: 1 } } }]),
 ]);
 
@@ -372,15 +382,13 @@ const ACTIVE_CASE_STATUSES = ["open", "assigned", "active", "awaiting_documents"
 const [roleAggregation, pendingUsers, caseAggregation, escrowHeldAgg, escrowReleasedAgg] = await Promise.all([
 User.aggregate([{ $group: { _id: "$role", count: { $sum: 1 } } }]),
 User.countDocuments({ status: "pending" }),
-Case.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
-Case.aggregate([
-{ $match: { paymentReleased: { $ne: true } } },
-{ $group: { _id: null, total: { $sum: "$totalAmount" } } },
-]),
-Case.aggregate([
-{ $match: { paymentReleased: true } },
-{ $group: { _id: null, total: { $sum: "$totalAmount" } } },
-]),
+Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
+Case.aggregate(
+  buildApprovedCasePipeline({ paymentReleased: { $ne: true } }).concat([{ $group: { _id: null, total: { $sum: "$totalAmount" } } }])
+),
+Case.aggregate(
+  buildApprovedCasePipeline({ paymentReleased: true }).concat([{ $group: { _id: null, total: { $sum: "$totalAmount" } } }])
+),
 ]);
 
 const roleMap = roleAggregation.reduce((acc, item) => {
@@ -455,24 +463,23 @@ User.aggregate([
 { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } },
 { $sort: { "_id.year": 1, "_id.month": 1 } },
 ]),
-Case.aggregate([
-{ $match: { paymentReleased: { $ne: true } } },
-{ $group: { _id: null, total: { $sum: "$totalAmount" } } },
-]),
-Case.aggregate([
-{ $match: { paymentReleased: true } },
-{ $group: { _id: null, total: { $sum: "$totalAmount" } } },
-]),
-      Case.aggregate([
-        { $match: { createdAt: { $gte: startWindow }, totalAmount: { $gt: 0 }, paymentReleased: { $ne: true } } },
-        {
-          $group: {
-            _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
-            total: { $sum: "$totalAmount" },
+Case.aggregate(
+  buildApprovedCasePipeline({ paymentReleased: { $ne: true } }).concat([{ $group: { _id: null, total: { $sum: "$totalAmount" } } }])
+),
+Case.aggregate(
+  buildApprovedCasePipeline({ paymentReleased: true }).concat([{ $group: { _id: null, total: { $sum: "$totalAmount" } } }])
+),
+      Case.aggregate(
+        buildApprovedCasePipeline({ createdAt: { $gte: startWindow }, totalAmount: { $gt: 0 }, paymentReleased: { $ne: true } }).concat([
+          {
+            $group: {
+              _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+              total: { $sum: "$totalAmount" },
+            },
           },
-        },
-        { $sort: { "_id.year": 1, "_id.month": 1 } },
-      ]),
+          { $sort: { "_id.year": 1, "_id.month": 1 } },
+        ])
+      ),
       Payout.aggregate([
         { $match: { createdAt: { $gte: startWindow } } },
         {
@@ -483,39 +490,47 @@ Case.aggregate([
         },
         { $sort: { "_id.year": 1, "_id.month": 1 } },
       ]),
-Case.aggregate([{ $group: { _id: null, total: { $sum: "$totalAmount" }, count: { $sum: 1 } } }]),
-Case.aggregate([
-{ $match: { createdAt: { $gte: startWindow } } },
-{ $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, total: { $sum: "$totalAmount" } } },
-{ $sort: { "_id.year": 1, "_id.month": 1 } },
-]),
+Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: null, total: { $sum: "$totalAmount" }, count: { $sum: 1 } } }])),
+Case.aggregate(
+  buildApprovedCasePipeline({ createdAt: { $gte: startWindow } }).concat([
+    { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, total: { $sum: "$totalAmount" } } },
+    { $sort: { "_id.year": 1, "_id.month": 1 } },
+  ])
+),
 PlatformIncome.aggregate([{ $group: { _id: null, total: { $sum: "$feeAmount" } } }]),
 PlatformIncome.aggregate([
 { $match: { createdAt: { $gte: startWindow } } },
 { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, revenue: { $sum: "$feeAmount" } } },
 { $sort: { "_id.year": 1, "_id.month": 1 } },
 ]),
-Case.aggregate([
-{ $match: { createdAt: { $gte: startWindow } } },
-{ $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } },
-{ $sort: { "_id.year": 1, "_id.month": 1 } },
-]),
-Case.aggregate([
-{ $match: { completedAt: { $ne: null, $gte: startWindow } } },
-{ $group: { _id: { year: { $year: "$completedAt" }, month: { $month: "$completedAt" } }, count: { $sum: 1 } } },
-{ $sort: { "_id.year": 1, "_id.month": 1 } },
-]),
-Case.aggregate([
-{ $group: { _id: "$practiceArea", count: { $sum: 1 } } },
-{ $sort: { count: -1 } },
-]),
-Case.countDocuments({ paymentReleased: { $ne: true }, status: { $in: ACTIVE_CASE_STATUSES } }),
-Case.aggregate([
-{ $match: { paymentReleased: { $ne: true }, status: { $in: COMPLETED_CASE_STATUSES } } },
-{ $group: { _id: null, total: { $sum: "$totalAmount" }, count: { $sum: 1 } } },
-]),
+Case.aggregate(
+  buildApprovedCasePipeline({ createdAt: { $gte: startWindow } }).concat([
+    { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } },
+    { $sort: { "_id.year": 1, "_id.month": 1 } },
+  ])
+),
+Case.aggregate(
+  buildApprovedCasePipeline({ completedAt: { $ne: null, $gte: startWindow } }).concat([
+    { $group: { _id: { year: { $year: "$completedAt" }, month: { $month: "$completedAt" } }, count: { $sum: 1 } } },
+    { $sort: { "_id.year": 1, "_id.month": 1 } },
+  ])
+),
+Case.aggregate(
+  buildApprovedCasePipeline({}).concat([
+    { $group: { _id: "$practiceArea", count: { $sum: 1 } } },
+    { $sort: { count: -1 } },
+  ])
+),
+Case.aggregate(
+  buildApprovedCasePipeline({ paymentReleased: { $ne: true }, status: { $in: ACTIVE_CASE_STATUSES } }).concat([{ $count: "count" }])
+),
+Case.aggregate(
+  buildApprovedCasePipeline({ paymentReleased: { $ne: true }, status: { $in: COMPLETED_CASE_STATUSES } }).concat([
+    { $group: { _id: null, total: { $sum: "$totalAmount" }, count: { $sum: 1 } } },
+  ])
+),
 Payout.aggregate([{ $group: { _id: null, total: { $sum: "$amountPaid" }, count: { $sum: 1 } } }]),
-Case.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
 Case.find({ totalAmount: { $gt: 0 } })
 .sort({ createdAt: -1 })
 .limit(LEDGER_LIMIT)
@@ -603,12 +618,13 @@ activeCases += item.count;
 }
 });
 
+const escrowInProgress = Array.isArray(escrowInProgressCount) ? escrowInProgressCount[0]?.count || 0 : escrowInProgressCount || 0;
 const escrowMetrics = {
-totalEscrowHeld: escrowHeldAgg[0]?.total || 0,
-totalEscrowReleased: escrowReleasedAgg[0]?.total || 0,
-escrowInProgress: escrowInProgressCount,
-pendingPayouts: pendingPayoutAgg[0]?.total || 0,
-pendingPayoutCount: pendingPayoutAgg[0]?.count || 0,
+  totalEscrowHeld: escrowHeldAgg[0]?.total || 0,
+  totalEscrowReleased: escrowReleasedAgg[0]?.total || 0,
+  escrowInProgress,
+  pendingPayouts: pendingPayoutAgg[0]?.total || 0,
+  pendingPayoutCount: pendingPayoutAgg[0]?.count || 0,
 };
 
 const grossVolume = grossVolumeAgg[0]?.total || 0;
@@ -962,9 +978,7 @@ const [users, cases] = await Promise.all([
 User.aggregate([
 { $group: { _id: { role: "$role", status: "$status" }, count: { $sum: 1 } } },
 ]),
-Case.aggregate([
-{ $group: { _id: "$status", count: { $sum: 1 } } },
-]),
+Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
 ]);
 
 res.json({ users, cases });

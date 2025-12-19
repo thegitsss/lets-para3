@@ -13,6 +13,8 @@ expense: null,
 
 let analyticsTimer;
 let latestAnalytics = null;
+const removedUserIds = new Set();
+let recentUsersCache = [];
 
 async function loadAnalytics() {
 try {
@@ -313,11 +315,12 @@ function populateEscrowReportChart(data) {
 function populateNewUsers(data) {
 const list = document.getElementById("newUsersList");
 if (!list) return;
-const users = data?.recentUsers || [];
+const users = filterActiveUsers(data?.recentUsers || recentUsersCache);
 if (!users.length) {
 list.innerHTML = '<li style="color:var(--muted)">No recent users found.</li>';
 return;
 }
+recentUsersCache = users;
 list.innerHTML = "";
   users.forEach((user) => {
     const li = document.createElement("li");
@@ -335,9 +338,23 @@ list.innerHTML = "";
     time.style.display = "block";
     time.style.color = "var(--muted)";
     time.textContent = created;
+    const actions = document.createElement("div");
+    actions.className = "user-actions";
+    const deactivateBtn = document.createElement("button");
+    deactivateBtn.type = "button";
+    deactivateBtn.textContent = "Remove";
+    deactivateBtn.className = "btn danger";
+    deactivateBtn.dataset.userId = user.id || user._id || "";
+    deactivateBtn.addEventListener("click", () => {
+      const userId = deactivateBtn.dataset.userId;
+      if (!userId) return;
+      deactivateUser(userId, { source: "recent" });
+    });
+    actions.appendChild(deactivateBtn);
     li.appendChild(link);
     li.appendChild(roleSpan);
     li.appendChild(time);
+    li.appendChild(actions);
     list.appendChild(li);
   });
 }
@@ -361,6 +378,53 @@ const data = await loadAnalytics();
 if (!data) return null;
 applyAnalyticsPayload(data);
 return data;
+}
+
+window.deactivateUser = deactivateUser;
+window.filterActiveUsers = filterActiveUsers;
+window.removedUserIds = removedUserIds;
+function filterActiveUsers(users = []) {
+  return (users || []).filter((user) => {
+    const id = String(user.id || user._id || "").trim();
+    if (removedUserIds.has(id)) return false;
+    const status = String(user.status || "").toLowerCase();
+    if (status === "denied" || status === "suspended") return false;
+    return true;
+  });
+}
+
+async function deactivateUser(userId, { source } = {}) {
+  if (!userId) return;
+  const confirmed = window.confirm("Remove/deactivate this user?");
+  if (!confirmed) return;
+  try {
+    await fetchCSRF?.();
+  } catch (_) {}
+  try {
+    const res = await secureFetch(`/api/admin/users/${encodeURIComponent(userId)}/deny`, {
+      method: "POST",
+      body: {},
+      headers: { Accept: "application/json" },
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload?.msg || payload?.error || "Unable to remove user.");
+    }
+    showToast("User removed/deactivated.", "info");
+    removedUserIds.add(String(userId));
+    recentUsersCache = recentUsersCache.filter((u) => String(u.id || u._id) !== String(userId));
+    if (source === "recent") {
+      populateNewUsers({ recentUsers: recentUsersCache });
+    }
+    if (Array.isArray(window.pendingUsers)) {
+      window.pendingUsers = window.pendingUsers.filter((u) => String(u.id || u._id) !== String(userId));
+      window.renderPendingUsers?.();
+      window.updatePendingCount?.(window.pendingUsers.length);
+    }
+    await hydrateAnalytics();
+  } catch (err) {
+    showToast(err?.message || "Unable to remove user.", "err");
+  }
 }
 
 async function loadPendingParalegals() {

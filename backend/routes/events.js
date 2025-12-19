@@ -2,7 +2,7 @@
 const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
-const requireRole = require("../middleware/requireRole");
+const { requireApproved, requireRole } = require("../utils/authz");
 const Event = require("../models/Event");
 const { logAction } = require("../utils/audit");
 const { assertCaseParticipant } = require("../middleware/ensureCaseParticipant");
@@ -47,10 +47,11 @@ async function ensureEventCaseAccess(req, res, caseId) {
 }
 
 // ----------------------------------------
-// All routes require auth
+// All routes require auth + approval
 // ----------------------------------------
 router.use(verifyToken);
-router.use(requireRole(["admin", "attorney", "paralegal"]));
+router.use(requireApproved);
+router.use(requireRole("admin", "attorney", "paralegal"));
 
 /**
  * GET /api/events

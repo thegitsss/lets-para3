@@ -2,15 +2,16 @@
 const router = require("express").Router({ mergeParams: true });
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const verifyToken = require("../utils/verifyToken");
-const requireRole = require("../middleware/requireRole");
+const { requireApproved, requireRole } = require("../utils/authz");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const csrfProtection = (_req, _res, next) => next();
 
 const Task = require("../models/Task");
 
-// All task routes require auth + being a participant on the case
+// All task routes require auth + approval + being a participant on the case
 router.use(verifyToken);
-router.use(requireRole(["attorney", "paralegal"]));
+router.use(requireApproved);
+router.use(requireRole("attorney", "paralegal"));
 router.use(ensureCaseParticipant());
 
 // GET /api/cases/:caseId/tasks

@@ -2,6 +2,7 @@
 const router = require("express").Router();
 const crypto = require("crypto");
 const verifyToken = require("../utils/verifyToken");
+const { requireApproved } = require("../utils/authz");
 const User = require("../models/User");
 
 // ----------------------------------------
@@ -35,6 +36,7 @@ function hashCode(code) {
 }
 
 router.use(verifyToken);
+router.use(requireApproved);
 
 router.get(
   "/preferences",

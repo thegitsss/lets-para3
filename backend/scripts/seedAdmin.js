@@ -23,6 +23,7 @@ async function seedAdmin() {
     admin.lastName = "User";
     admin.role = "admin";
     admin.status = "approved";
+    admin.approved = true;
     if (!admin.approvedAt) {
       admin.approvedAt = new Date();
     }
