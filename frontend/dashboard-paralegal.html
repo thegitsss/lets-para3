@@ -142,6 +142,95 @@
       align-items: center;
       margin-bottom: 2rem;
       gap: 1.5rem;
+      position: relative;
+      z-index: 3;
+      pointer-events: auto;
+    }
+
+    .profile-header-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: relative;
+      z-index: 4;
+      pointer-events: auto;
+    }
+
+    .notification-wrapper {
+      position: relative;
+    }
+
+    .notification-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+      position: relative;
+    }
+
+    .notification-icon:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #e63946;
+      color: #fff;
+      font-size: 0.7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      display: none;
+    }
+
+    .notification-badge.show {
+      display: flex;
+    }
+
+    .user-chip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.06);
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .user-chip img {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    }
+
+    .user-chip strong {
+      font-weight: 400;
+      display: block;
+    }
+
+    .user-chip span {
+      font-size: 0.85rem;
+      color: var(--muted);
+      display: block;
     }
 
     header h1 {
@@ -818,7 +907,51 @@
     <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
   </aside>
   <main class="main">
-    <div class="topbar" data-attorney-header></div>
+    <div class="topbar" data-attorney-header>
+      <div class="profile-header-controls" data-notification-center>
+        <div class="notification-wrapper">
+          <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle id="notificationToggle">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 01-3.46 0"></path>
+            </svg>
+            <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
+          </button>
+          <div
+            class="notification-dropdown"
+            id="notificationDropdown"
+            style="
+              display: none;
+              width: 320px;
+              background: #fff;
+              border-radius: 12px;
+              box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+              padding: 16px;
+            "
+          >
+            <div style="font-weight: 600; margin-bottom: 8px;">
+              Notifications
+            </div>
+
+            <div id="notificationList" style="font-size: 14px; color: #555;">
+              No new notifications.
+            </div>
+          </div>
+          <div id="notificationPanel" class="notif-panel hidden" data-notification-panel>
+            <div class="notif-header">Notifications</div>
+            <div class="notif-body" id="notifList" data-notification-list></div>
+            <div class="notif-empty" data-notification-empty>No new notifications.</div>
+          </div>
+        </div>
+        <a class="user-chip" href="/dashboard-paralegal.html" aria-label="Go to dashboard">
+          <img id="clusterAvatar" class="nav-profile-photo" src="https://via.placeholder.com/64x64.png?text=PL" alt="Profile" />
+          <div>
+            <strong id="clusterName">Paralegal</strong>
+            <span id="clusterRole">Member</span>
+          </div>
+        </a>
+      </div>
+    </div>
 
     <div id="paralegalHomeView" class="dashboard-view is-active">
       <header>
@@ -967,7 +1100,25 @@
     </div>
   </div>
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="assets/scripts/utils/notifications.js"></script>
   <script src="assets/scripts/utils/toast.js"></script>
+  <script>
+    // Ensure notification dropdown binds even if modules load after DOM ready
+    (function ensureNotificationsInit() {
+      const init = () => {
+        if (typeof window.scanNotificationCenters === 'function') {
+          window.scanNotificationCenters();
+        } else if (typeof window.initNotificationCenters === 'function') {
+          window.initNotificationCenters();
+        }
+      };
+      if (document.readyState === "complete" || document.readyState === "interactive") {
+        init();
+      } else {
+        window.addEventListener('DOMContentLoaded', init, { once: true });
+      }
+    })();
+  </script>
   <script>
     window.__ATTORNEY_PAGE__ = "overview";
     window.__TAB_ROLE__ = "attorney,paralegal";

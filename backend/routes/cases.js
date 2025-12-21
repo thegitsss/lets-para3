@@ -273,9 +273,10 @@ function normalizeFile(file) {
   };
 }
 
-async function sendCaseNotification(userId, type, caseDoc, payload = {}) {
+async function sendCaseNotification(userId, type, caseDoc, payload = {}, options = {}) {
   if (!userId) return;
   try {
+    const actorUserId = options.actorUserId || payload.actorUserId || null;
     await notifyUser(
       userId,
       type,
@@ -285,7 +286,8 @@ async function sendCaseNotification(userId, type, caseDoc, payload = {}) {
           caseTitle: caseDoc?.title || "Case",
         },
         payload || {}
-      )
+      ),
+      { actorUserId }
     );
   } catch (err) {
     console.warn("[cases] notifyUser failed", err);
@@ -478,9 +480,15 @@ router.post(
     await caseDoc.save();
 
     const inviterName = formatPersonName(req.user) || "An attorney";
-    await sendCaseNotification(paralegal._id, "case_invite", caseDoc, {
-      inviterName,
-    });
+    await sendCaseNotification(
+      paralegal._id,
+      "case_invite",
+      caseDoc,
+      {
+        inviterName,
+      },
+      { actorUserId: req.user.id }
+    );
 
     return res.json(caseSummary(caseDoc));
   })
@@ -533,11 +541,17 @@ router.post(
       else caseDoc.applicants.push({ paralegalId, status: "accepted" });
 
       await caseDoc.save();
-      await sendCaseNotification(attorneyId, "case_invite_response", caseDoc, {
-        response: "accepted",
-        paralegalId,
-        paralegalName,
-      });
+      await sendCaseNotification(
+        attorneyId,
+        "case_invite_response",
+        caseDoc,
+        {
+          response: "accepted",
+          paralegalId,
+          paralegalName,
+        },
+        { actorUserId: paralegalId }
+      );
     } else {
       caseDoc.pendingParalegalId = null;
       caseDoc.pendingParalegalInvitedAt = null;
@@ -547,11 +561,17 @@ router.post(
         if (existing) existing.status = "rejected";
       }
       await caseDoc.save();
-      await sendCaseNotification(attorneyId, "case_invite_response", caseDoc, {
-        response: "declined",
-        paralegalId: pendingId,
-        paralegalName,
-      });
+      await sendCaseNotification(
+        attorneyId,
+        "case_invite_response",
+        caseDoc,
+        {
+          response: "declined",
+          paralegalId: pendingId,
+          paralegalName,
+        },
+        { actorUserId: paralegalId }
+      );
     }
 
     return res.json(caseSummary(caseDoc));
@@ -1492,9 +1512,15 @@ router.post(
     } catch {}
 
     const attorneyName = formatPersonName(caseDoc.attorney || caseDoc.attorneyId) || "An attorney";
-    await sendCaseNotification(invitee._id, "case_invite", caseDoc, {
-      inviterName: attorneyName,
-    });
+    await sendCaseNotification(
+      invitee._id,
+      "case_invite",
+      caseDoc,
+      {
+        inviterName: attorneyName,
+      },
+      { actorUserId: req.user.id }
+    );
 
     res.json({ success: true });
   })
@@ -1551,11 +1577,17 @@ router.post(
 
     const attorneyId = caseDoc.attorney?._id || caseDoc.attorneyId || null;
     if (attorneyId) {
-      await sendCaseNotification(attorneyId, "case_invite_response", caseDoc, {
-        response: "accepted",
-        paralegalId: req.user.id,
-        paralegalName: formatPersonName(paralegal),
-      });
+      await sendCaseNotification(
+        attorneyId,
+        "case_invite_response",
+        caseDoc,
+        {
+          response: "accepted",
+          paralegalId: req.user.id,
+          paralegalName: formatPersonName(paralegal),
+        },
+        { actorUserId: req.user.id }
+      );
     }
 
     res.json({ success: true });
@@ -1593,11 +1625,17 @@ router.post(
 
     const attorneyId = caseDoc.attorney?._id || caseDoc.attorneyId || null;
     if (attorneyId) {
-      await sendCaseNotification(attorneyId, "case_invite_response", caseDoc, {
-        response: "declined",
-        paralegalId: req.user.id,
-        paralegalName: formatPersonName(paralegal),
-      });
+      await sendCaseNotification(
+        attorneyId,
+        "case_invite_response",
+        caseDoc,
+        {
+          response: "declined",
+          paralegalId: req.user.id,
+          paralegalName: formatPersonName(paralegal),
+        },
+        { actorUserId: req.user.id }
+      );
     }
 
     res.json({ success: true });
@@ -1684,6 +1722,13 @@ router.patch(
       .populate("attorneyId", "firstName lastName email role avatarURL");
     if (!doc) return res.status(404).json({ error: "Case not found" });
 
+    // Normalize status when unarchiving to avoid enum errors on legacy "draft" values.
+    if (!shouldArchive) {
+      const statusKey = String(doc.status || "").toLowerCase();
+      if (!statusKey || statusKey === "draft") {
+        doc.status = "open";
+      }
+    }
     doc.archived = shouldArchive;
     await doc.save();
     try {

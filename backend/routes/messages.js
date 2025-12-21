@@ -82,7 +82,7 @@ async function createMessageNotification({ caseDoc, senderDoc, previewText }) {
       caseTitle: caseDoc.title || "Case",
       fromName: senderName,
       messageSnippet: buildShortPreview(previewText, 40),
-    });
+    }, { actorUserId: senderId });
   } catch (err) {
     console.warn("[messages] notifyUser failed", err);
   }

@@ -438,7 +438,7 @@ router.post(
     }
 
     try {
-      await notifyUser(user._id, "resume_uploaded", {});
+      await notifyUser(user._id, "resume_uploaded", {}, { actorUserId: user._id });
     } catch (err) {
       console.warn("[uploads] notifyUser resume_uploaded failed", err);
     }

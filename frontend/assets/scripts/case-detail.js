@@ -89,7 +89,17 @@ function escapeHtml(str = "") {
 async function loadTasks() {
   if (!CASE_ID) return;
   try {
-    const res = await secureFetch(`/api/cases/${encodeURIComponent(CASE_ID)}/tasks`);
+    const res = await secureFetch(`/api/cases/${encodeURIComponent(CASE_ID)}/tasks`, {
+      noRedirect: true,
+    });
+    if (res.status === 401 || res.status === 403) {
+      currentTasks = [];
+      if (tasksContainer) {
+        tasksContainer.innerHTML = `<p style="color:var(--muted);">Tasks will appear here once you are on this case.</p>`;
+      }
+      return;
+    }
+    if (!res.ok) throw new Error("Could not load tasks.");
     const payload = await res.json();
     currentTasks = payload?.tasks || [];
     renderTasks(currentTasks);
@@ -117,8 +127,14 @@ async function saveTask() {
   try {
     const res = await secureFetch(`/api/cases/${encodeURIComponent(CASE_ID)}/tasks`, {
       method: "POST",
-      body: { title, description, dueDate, status: "todo" }
+      body: { title, description, dueDate, status: "todo" },
+      noRedirect: true,
     });
+
+    if (res.status === 401 || res.status === 403) {
+      notify("You need to be on this case to create tasks.", "err");
+      return;
+    }
 
     if (!res.ok) throw new Error("Could not create task.");
 

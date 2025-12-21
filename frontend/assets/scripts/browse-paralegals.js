@@ -389,6 +389,7 @@ function renderParalegals(items) {
 }
 
 function buildParalegalCard(paralegal) {
+  const paralegalId = String(paralegal._id || paralegal.id || paralegal.paralegalId || "");
   const name = formatName(paralegal);
   const summary = (paralegal.bio || paralegal.about || "This professional hasn’t added a summary yet.").trim();
   const location = paralegal.location || "Location not specified";
@@ -399,10 +400,13 @@ function buildParalegalCard(paralegal) {
 
   const card = document.createElement("article");
   card.className = "paralegal-card";
+  if (paralegalId) {
+    card.dataset.paralegalId = paralegalId;
+  }
 
   const photoLink = document.createElement("a");
   photoLink.className = "profile-photo-link profile-link";
-  photoLink.href = `profile-paralegal.html?id=${paralegal.id || paralegal._id}`;
+  photoLink.href = buildParalegalProfileUrl(paralegalId);
   const img = document.createElement("img");
   img.src = avatar;
   img.alt = `Portrait of ${name}`;
@@ -413,7 +417,7 @@ function buildParalegalCard(paralegal) {
   content.className = "card-content";
   const heading = document.createElement("h3");
   const headingLink = document.createElement("a");
-  headingLink.href = `profile-paralegal.html?id=${paralegal.id || paralegal._id}`;
+  headingLink.href = buildParalegalProfileUrl(paralegalId);
   headingLink.textContent = name;
   headingLink.className = "profile-name-link profile-link";
   heading.appendChild(headingLink);
@@ -442,19 +446,26 @@ function buildParalegalCard(paralegal) {
   const contactBtn = document.createElement("button");
   contactBtn.type = "button";
   contactBtn.className = "action-btn contact-btn";
-  contactBtn.dataset.id = paralegal.id || paralegal._id;
+  contactBtn.dataset.id = paralegalId;
   contactBtn.textContent = state.isLoggedIn ? "Message" : "Sign in to message";
-  contactBtn.addEventListener("click", () => handleContactClick(paralegal.id || paralegal._id));
+  contactBtn.addEventListener("click", () => handleContactClick(paralegalId));
   actions.appendChild(contactBtn);
   if (state.canInvite) {
     const inquireBtn = document.createElement("button");
     inquireBtn.type = "button";
     inquireBtn.className = "action-btn invite-btn";
     inquireBtn.textContent = "Invite to Job";
-    inquireBtn.addEventListener("click", () => openInquireModal({ id: paralegal.id || paralegal._id, name }));
+    inquireBtn.addEventListener("click", () => openInquireModal({ id: paralegalId, name }));
     actions.appendChild(inquireBtn);
   }
   card.appendChild(actions);
+
+  card.addEventListener("click", (event) => {
+    const isAction = event.target.closest(".action-btn");
+    const isProfileLink = event.target.closest(".profile-link");
+    if (isAction || isProfileLink || !paralegalId) return;
+    window.location.href = buildParalegalProfileUrl(paralegalId);
+  });
 
   return card;
 }
@@ -559,7 +570,7 @@ async function sendInquiry() {
 }
 
 function parseExperience(value = "") {
-  const match = value.match(/\\d+/);
+  const match = value.match(/\d+/);
   return match ? parseInt(match[0], 10) : null;
 }
 
@@ -569,7 +580,7 @@ function handleContactClick(paralegalId) {
     window.location.href = "login.html";
     return;
   }
-  window.location.href = `profile-paralegal.html?id=${encodeURIComponent(paralegalId)}`;
+  window.location.href = buildParalegalProfileUrl(paralegalId);
 }
 
 function getCachedUser() {
@@ -613,6 +624,12 @@ function buildInitialAvatar(initials) {
 function truncate(text, max = 200) {
   if (!text) return "";
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+function buildParalegalProfileUrl(paralegalId = "") {
+  const safeId = String(paralegalId || "").trim();
+  if (!safeId) return "profile-paralegal.html";
+  return `profile-paralegal.html?paralegalId=${encodeURIComponent(safeId)}`;
 }
 
 function escapeHtml(value = "") {

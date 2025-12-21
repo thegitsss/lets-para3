@@ -11,8 +11,26 @@ router.use(verifyToken, requireApproved);
 // Get all notifications for logged-in user
 router.get("/", async (req, res) => {
   try {
-    const items = await Notification.find({ userId: req.user.id }).sort({ createdAt: -1 });
-    res.json(items);
+    const items = await Notification.find({ userId: req.user.id })
+      .sort({ createdAt: -1, _id: -1 })
+      .lean();
+    const normalized = items.map((item) => ({
+      id: String(item._id),
+      _id: item._id,
+      userId: item.userId,
+      userRole: item.userRole || "",
+      type: item.type,
+      message: item.message || item.payload?.message || "You have a new notification.",
+      link: item.link || item.payload?.link || "",
+      payload: item.payload || {},
+      isRead: item.isRead ?? item.read ?? false,
+      read: item.isRead ?? item.read ?? false,
+      actorUserId: item.actorUserId || null,
+      actorFirstName: item.actorFirstName || "",
+      actorProfileImage: item.actorProfileImage || "",
+      createdAt: item.createdAt,
+    }));
+    res.json(normalized);
   } catch (err) {
     console.error("Failed to fetch notifications:", err);
     res.status(500).json({ message: "Unable to load notifications" });
@@ -24,7 +42,7 @@ router.post("/:id/read", async (req, res) => {
   try {
     await Notification.findOneAndUpdate(
       { _id: req.params.id, userId: req.user.id },
-      { read: true }
+      { read: true, isRead: true }
     );
     res.json({ success: true });
   } catch (err) {
@@ -36,11 +54,23 @@ router.post("/:id/read", async (req, res) => {
 // Mark ALL as read
 router.post("/read-all", async (req, res) => {
   try {
-    await Notification.updateMany({ userId: req.user.id }, { read: true });
+    await Notification.updateMany({ userId: req.user.id }, { read: true, isRead: true });
     res.json({ success: true });
   } catch (err) {
     console.error("Failed to mark notifications read:", err);
     res.status(500).json({ message: "Unable to update notifications" });
+  }
+});
+
+// Dismiss a notification
+router.delete("/:id", async (req, res) => {
+  try {
+    const result = await Notification.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+    if (!result) return res.status(404).json({ message: "Notification not found" });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Failed to delete notification:", err);
+    res.status(500).json({ message: "Unable to delete notification" });
   }
 });
 

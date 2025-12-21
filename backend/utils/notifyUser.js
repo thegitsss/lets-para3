@@ -2,6 +2,67 @@ const Notification = require("../models/Notification");
 const User = require("../models/User");
 const sendEmail = require("./email");
 
+function buildDisplayMessage(type, payload = {}) {
+  if (payload.message && typeof payload.message === "string") {
+    return payload.message;
+  }
+  const actorName =
+    payload.actorFirstName ||
+    payload.actorName ||
+    payload.fromName ||
+    payload.inviterName ||
+    payload.paralegalName ||
+    payload.userName ||
+    "";
+  const caseTitle = payload.caseTitle || payload.caseName || "";
+  const caseFragment = caseTitle ? ` to ${caseTitle}` : "";
+
+  switch (type) {
+    case "message": {
+      const snippet = payload.messageSnippet || payload.preview || "";
+      const base = `${actorName || "Someone"} sent you a message${caseTitle ? ` about ${caseTitle}` : ""}`;
+      return snippet ? `${base}: "${snippet}"` : base;
+    }
+    case "case_invite":
+      return `${actorName || "An attorney"} invited you${caseFragment || " to a case"}`;
+    case "case_invite_response": {
+      const response = String(payload.response || "").toLowerCase();
+      const verb = response === "declined" ? "declined" : "accepted";
+      return `${actorName || "The paralegal"} ${verb} your invitation${caseFragment || ""}`.trim();
+    }
+    case "case_update":
+      return payload.summary || `${actorName || "Someone"} updated${caseFragment || " your case"}`;
+    case "resume_uploaded":
+      return "Your resume was uploaded successfully.";
+    case "profile_approved":
+      return "Your profile was approved.";
+    case "payout_released":
+      return `Your payout was released${payload.amount ? ` (${payload.amount})` : ""}.`;
+    default:
+      return "You have a new notification.";
+  }
+}
+
+async function resolveActorSnapshot(actorUserId) {
+  if (!actorUserId) {
+    return { actorUserId: null, actorFirstName: "", actorProfileImage: "" };
+  }
+  try {
+    const actor = await User.findById(actorUserId).select("firstName profileImage avatarURL");
+    if (!actor) {
+      return { actorUserId, actorFirstName: "", actorProfileImage: "" };
+    }
+    return {
+      actorUserId: actor._id,
+      actorFirstName: actor.firstName || "",
+      actorProfileImage: actor.profileImage || actor.avatarURL || "",
+    };
+  } catch (err) {
+    console.warn("[notifyUser] actor lookup failed", err?.message || err);
+    return { actorUserId, actorFirstName: "", actorProfileImage: "" };
+  }
+}
+
 function emailTemplate(type, payload) {
   switch (type) {
     case "message":
@@ -58,14 +119,26 @@ async function safeSendEmail(to, subject, html) {
   }
 }
 
-async function notifyUser(userId, type, payload = {}) {
+async function notifyUser(userId, type, payload = {}, options = {}) {
   const user = await User.findById(userId);
   if (!user) return;
 
+  const actorUserId = payload?.actorUserId || options.actorUserId || null;
+  const actor = await resolveActorSnapshot(actorUserId);
+  const message = buildDisplayMessage(type, { ...payload, actorFirstName: actor.actorFirstName });
+
   const notif = await Notification.create({
     userId,
+    userRole: user.role || "",
     type,
+    message,
+    link: payload.link || "",
     payload,
+    actorUserId: actor.actorUserId,
+    actorFirstName: actor.actorFirstName,
+    actorProfileImage: actor.actorProfileImage,
+    read: false,
+    isRead: false,
     createdAt: new Date(),
   });
 
@@ -81,7 +154,37 @@ async function notifyUser(userId, type, payload = {}) {
   return notif;
 }
 
+async function createNotification({
+  userId,
+  userRole = "",
+  type,
+  message = "",
+  link = "",
+  actorUserId = null,
+  payload = {},
+}) {
+  if (!userId || !type) return null;
+  const actor = await resolveActorSnapshot(actorUserId);
+  const finalMessage = message || buildDisplayMessage(type, { ...payload, actorFirstName: actor.actorFirstName });
+  const notif = await Notification.create({
+    userId,
+    userRole,
+    type,
+    message: finalMessage,
+    link,
+    payload: payload || {},
+    actorUserId: actor.actorUserId,
+    actorFirstName: actor.actorFirstName,
+    actorProfileImage: actor.actorProfileImage,
+    read: false,
+    isRead: false,
+    createdAt: new Date(),
+  });
+  return notif;
+}
+
 module.exports = {
   notifyUser,
   emailTemplate,
+  createNotification,
 };

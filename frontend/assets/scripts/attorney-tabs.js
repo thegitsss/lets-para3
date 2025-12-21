@@ -20,7 +20,9 @@ const STATUS_LABELS = {
   approved: "Approved",
   attorney_revision: "Attorney Revisions",
 };
+const CASE_VIEW_FILTERS = ["active", "draft", "archived", "inquiries"];
 const CASE_FILE_MAX_BYTES = 20 * 1024 * 1024;
+const LOCAL_DRAFTS_KEY = "attorneyLocalDraftCases";
 function getProfileImageUrl(user = {}) {
   return user.profileImage || user.avatarURL || "assets/images/default-avatar.png";
 }
@@ -83,6 +85,7 @@ const state = {
     lastIds: new Map(),
     pollTimer: null,
   },
+  localDrafts: [],
 };
 
 let openCaseMenu = null;
@@ -631,17 +634,28 @@ function setupDashboardViewRouter() {
     });
   });
 
+  const parseDashboardHash = () => {
+    const raw = String(window.location.hash || "").replace("#", "").trim();
+    if (!raw) return { view: "home", caseFilter: null };
+    const [viewPart, filterPart] = raw.split(":");
+    const view = (viewPart || "").toLowerCase();
+    const caseFilter = view === "cases" && CASE_VIEW_FILTERS.includes((filterPart || "").toLowerCase())
+      ? (filterPart || "").toLowerCase()
+      : null;
+    return { view, caseFilter };
+  };
+
   const syncFromHash = () => {
-    const hashed = String(window.location.hash || "").replace("#", "").trim().toLowerCase();
-    const target = dashboardViewState.viewMap.has(hashed) ? hashed : "home";
-    showDashboardView(target, { skipHash: true });
+    const { view, caseFilter } = parseDashboardHash();
+    const target = dashboardViewState.viewMap.has(view) ? view : "home";
+    showDashboardView(target, { skipHash: true, caseFilter });
   };
 
   window.addEventListener("hashchange", syncFromHash);
   syncFromHash();
 }
 
-function showDashboardView(target, { skipHash = false } = {}) {
+function showDashboardView(target, { skipHash = false, caseFilter = null } = {}) {
   if (!dashboardViewState.viewMap.has(target)) target = "home";
   if (dashboardViewState.currentView === target) return;
 
@@ -665,7 +679,11 @@ function showDashboardView(target, { skipHash = false } = {}) {
   }
 
   if (target === "cases") {
-    void ensureCasesViewReady();
+    void ensureCasesViewReady().then(() => {
+      if (caseFilter && CASE_VIEW_FILTERS.includes(caseFilter)) {
+        setCaseFilter(caseFilter);
+      }
+    });
   }
 }
 
@@ -713,6 +731,24 @@ function bindCaseViewTabs() {
     });
   });
   dashboardViewState.caseTabsBound = true;
+}
+
+function setCaseFilter(filterKey) {
+  const key = (filterKey || "").toLowerCase();
+  if (!CASE_VIEW_FILTERS.includes(key)) return;
+  const tabs = document.querySelectorAll("[data-case-filter]");
+  const tables = document.querySelectorAll("[data-case-table]");
+  if (!tabs.length || !tables.length) return;
+  state.casesViewFilter = key;
+  tabs.forEach((btn) => {
+    const active = btn.dataset.caseFilter === key;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  tables.forEach((table) => {
+    table.classList.toggle("hidden", table.dataset.caseTable !== key);
+  });
+  renderCasesView();
 }
 
 function ensureCaseFilesEmbedReady() {
@@ -2162,7 +2198,6 @@ function enableButtonOnFormInput(form, button, defaultText) {
 // -------------------------
 // Cases Page
 // -------------------------
-const CASE_VIEW_FILTERS = ["active", "draft", "archived", "inquiries"];
 const CASE_STATUS_LABELS = {
   open: "Open",
   assigned: "Assigned",
@@ -2197,6 +2232,7 @@ async function initCasesPage() {
 
   try {
     await Promise.all([loadCasesWithFiles(), loadArchivedCases()]);
+    state.localDrafts = readLocalDrafts();
   } catch (err) {
     console.warn("Unable to load cases", err);
   }
@@ -2211,14 +2247,7 @@ async function initCasesPage() {
     tab.addEventListener("click", () => {
       const target = tab.dataset.caseFilter;
       if (!target || target === state.casesViewFilter) return;
-      state.casesViewFilter = target;
-      document.querySelectorAll("[data-case-filter]").forEach((btn) => {
-        btn.classList.toggle("active", btn === tab);
-      });
-      document.querySelectorAll("[data-case-table]").forEach((table) => {
-        table.classList.toggle("hidden", table.dataset.caseTable !== target);
-      });
-      renderCasesView();
+      setCaseFilter(target);
     });
   });
 
@@ -2286,6 +2315,7 @@ function renderCasesView() {
     state.archivedSelection.clear();
   }
   pruneArchivedSelection();
+  state.localDrafts = readLocalDrafts();
   const totals = computeCaseCounts();
   Object.entries(totals).forEach(([key, count]) => {
     const target = document.querySelector(`[data-case-count="${key}"]`);
@@ -2311,7 +2341,7 @@ function renderCasesView() {
 function computeCaseCounts() {
   const counts = {
     active: 0,
-    draft: 0,
+    draft: Array.isArray(state.localDrafts) ? state.localDrafts.length : 0,
     archived: state.casesArchived.length,
     inquiries: 0,
   };
@@ -2327,6 +2357,9 @@ function getCasesByFilter(filterKey, { applySearch = false } = {}) {
   if (filterKey !== "archived") {
     source = source.filter((item) => categorizeCase(item) === filterKey);
   }
+  if (filterKey === "draft" && Array.isArray(state.localDrafts) && state.localDrafts.length) {
+    source = [...state.localDrafts, ...source];
+  }
   let records = [...source];
   records.sort((a, b) => {
     const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
@@ -2341,9 +2374,11 @@ function getCasesByFilter(filterKey, { applySearch = false } = {}) {
 
 function categorizeCase(item) {
   if (item.archived) return "archived";
+  if (item.localDraft) return "draft";
+  const status = String(item.status || "").toLowerCase();
   const applicantCount = Number(item.applicants || 0);
   if (!item.paralegal && applicantCount > 0) return "inquiries";
-  if (!item.paralegal && (!item.status || item.status === "open")) return "draft";
+  if (status === "draft") return "draft";
   return "active";
 }
 
@@ -2374,18 +2409,18 @@ function renderCaseRow(item, filterKey = "active") {
   } else if (!item.paralegal && item.pendingParalegalId) {
     client = "Invitation Sent";
   }
-  const practice = item.practiceArea || "General";
+  const practice = item.practiceArea || item.field || "General";
   const created = formatCaseDate(item.createdAt || item.updatedAt);
   const updated = formatCaseDate(item.updatedAt || item.completedAt || item.createdAt);
   const displayedDate =
     filterKey === "draft" ? updated : filterKey === "archived" ? updated : created;
-  const statusText = formatCaseStatus(item.status);
-  const statusClass = getStatusClass(item.status);
+  const statusText = item.localDraft ? "Draft" : formatCaseStatus(item.status);
+  const statusClass = item.localDraft ? "pending" : getStatusClass(item.status);
   const rawNote = (item.internalNotes?.note || "").trim();
   const notePreview = rawNote.length > 140 ? `${rawNote.slice(0, 137)}…` : rawNote;
   const noteDisplay = notePreview ? `<div class="note-preview">${sanitize(notePreview)}</div>` : '<span class="muted">—</span>';
   const noteAction =
-    canEditCaseNotes() && item.id
+    !item.localDraft && canEditCaseNotes() && item.id
       ? `<button type="button" class="note-edit-btn" data-case-action="edit-note" data-case-id="${item.id}">${
           rawNote ? "Edit Note" : "Add Note"
         }</button>`
@@ -2399,7 +2434,11 @@ function renderCaseRow(item, filterKey = "active") {
   return `
     <tr data-case-id="${item.id}">
       ${selectionCell}
-      <td><a href="case-detail.html?caseId=${encodeURIComponent(item.id)}">${sanitize(item.title || "Untitled Case")}</a></td>
+      <td>${
+        item.localDraft
+          ? `<a href="create-case.html#description">${sanitize(item.title || "Untitled Case")}</a>`
+          : `<a href="case-detail.html?caseId=${encodeURIComponent(item.id)}">${sanitize(item.title || "Untitled Case")}</a>`
+      }</td>
       <td>${sanitize(client)}</td>
       <td>${sanitize(practice)}</td>
       <td><span class="status ${statusClass}">${statusText}</span></td>
@@ -2411,6 +2450,17 @@ function renderCaseRow(item, filterKey = "active") {
 }
 
 function renderCaseMenu(item) {
+  if (item.localDraft) {
+    return `
+    <div class="case-actions" data-case-id="${item.id}">
+      <button class="menu-trigger" type="button" aria-haspopup="true" aria-expanded="false" data-case-menu-trigger>⋯</button>
+      <div class="case-menu" role="menu" style="width: 180px; min-width: 180px;">
+        <button type="button" class="menu-item" data-case-action="resume-draft" data-case-id="${item.id}">Resume Draft</button>
+        <button type="button" class="menu-item danger" data-case-action="discard-draft" data-case-id="${item.id}">Discard Draft</button>
+      </div>
+    </div>
+    `;
+  }
   const parts = [
     `<button type="button" class="menu-item" data-case-action="view" data-case-id="${item.id}">View Case</button>`,
     `<button type="button" class="menu-item" data-case-action="messages" data-case-id="${item.id}">Open Messages</button>`,
@@ -2449,6 +2499,41 @@ function pruneArchivedSelection() {
   state.archivedSelection.forEach((id) => {
     if (!valid.has(id)) state.archivedSelection.delete(id);
   });
+}
+
+function readLocalDrafts() {
+  try {
+    const raw = localStorage.getItem(LOCAL_DRAFTS_KEY);
+    const parsed = JSON.parse(raw || "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((item) => item && item.id)
+      .map((item) => ({
+        ...item,
+        localDraft: true,
+        createdAt: item.createdAt || item.updatedAt || new Date().toISOString(),
+        updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function removeLocalDraft(draftId) {
+  if (!draftId) return;
+  try {
+    const raw = localStorage.getItem(LOCAL_DRAFTS_KEY);
+    const parsed = JSON.parse(raw || "[]");
+    if (!Array.isArray(parsed)) return;
+    const next = parsed.filter((item) => item && item.id !== draftId);
+    localStorage.setItem(LOCAL_DRAFTS_KEY, JSON.stringify(next));
+    const currentId = localStorage.getItem("currentDraftId");
+    if (currentId && currentId === draftId) {
+      localStorage.removeItem("currentDraftId");
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 function syncArchivedBulkUI() {
@@ -2751,7 +2836,15 @@ function resetCaseMenuStyles(wrapper) {
 async function handleCaseAction(action, caseId) {
   if (!caseId) return;
   try {
-    if (action === "view") {
+    if (action === "resume-draft") {
+      window.location.href = "create-case.html#description";
+      return;
+    } else if (action === "discard-draft") {
+      removeLocalDraft(caseId);
+      state.localDrafts = readLocalDrafts();
+      renderCasesView();
+      return;
+    } else if (action === "view") {
       window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
     } else if (action === "messages") {
       goToMessages(caseId);
@@ -2797,18 +2890,63 @@ async function downloadCaseDeliverables(caseId) {
 }
 
 async function toggleCaseArchive(caseId, archived) {
-  const body = { archived };
-  if (!archived) body.status = "open";
-  const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/archive`, {
-    method: "PATCH",
-    body,
-    headers: { Accept: "application/json" },
-  });
-  const payload = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(payload.error || "Unable to update case.");
+  const archiveUrl = `/api/cases/${encodeURIComponent(caseId)}/archive`;
+  const caseUrl = `/api/cases/${encodeURIComponent(caseId)}`;
+
+  // Ensure a valid status before unarchiving to avoid enum errors.
+  if (!archived) {
+    try {
+      await secureFetch(caseUrl, {
+        method: "PATCH",
+        headers: { Accept: "application/json" },
+        body: { status: "open" },
+      });
+    } catch (err) {
+      console.warn("Pre-unarchive status normalization failed", err);
+    }
   }
-  syncCaseCollections(payload);
+
+  const attemptArchiveToggle = async (body) => {
+    const res = await secureFetch(archiveUrl, {
+      method: "PATCH",
+      body,
+      headers: { Accept: "application/json" },
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload.error || "Unable to update case.");
+    }
+    return payload;
+  };
+
+  try {
+    const payload = await attemptArchiveToggle(archived ? { archived } : { archived, status: "open" });
+    if (!archived && payload && !payload.status) payload.status = "open";
+    syncCaseCollections(payload);
+    return;
+  } catch (err) {
+    const message = String(err?.message || "").toLowerCase();
+    const draftError = message.includes("draft");
+    if (!archived && draftError) {
+      // Final fallback: direct case PATCH to clear archived flag with a safe status.
+      try {
+        const res = await secureFetch(caseUrl, {
+          method: "PATCH",
+          headers: { Accept: "application/json" },
+          body: { archived: false, status: "open" },
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (res.ok) {
+          payload.status = payload.status || "open";
+          syncCaseCollections(payload);
+          return;
+        }
+      } catch (innerErr) {
+        console.warn("Direct unarchive fallback failed", innerErr);
+      }
+    }
+    throw err;
+  }
 }
 
 async function deleteArchivedCase(caseId, { skipConfirm = false, silent = false } = {}) {

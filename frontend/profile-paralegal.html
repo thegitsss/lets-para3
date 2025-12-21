@@ -49,6 +49,16 @@
       line-height: 1.7;
       letter-spacing: 0.25px;
     }
+    .bg-hero-mountain {
+      position: fixed;
+      inset: 0;
+      background: url('hero-mountain.jpg') center/cover no-repeat;
+      filter: blur(5px);
+      opacity: 0.3;
+      transform: scale(1.05);
+      z-index: 0;
+      pointer-events: none;
+    }
 
     .input-error{
       border-color:#c0392b !important;
@@ -65,6 +75,8 @@
       max-width: 1350px;
       margin: 0 auto;
       padding: 24px 32px 48px;
+      position: relative;
+      z-index: 2;
     }
 
     .topbar {
@@ -73,12 +85,18 @@
       align-items: center;
       margin-bottom: 24px;
       gap: 16px;
+      position: relative;
+      z-index: 3;
+      pointer-events: auto;
     }
 
     .profile-header-controls {
       display: flex;
       align-items: center;
       gap: 16px;
+      position: relative;
+      z-index: 4;
+      pointer-events: auto;
     }
 
     .notification-wrapper {
@@ -149,6 +167,9 @@
       border: 1px solid var(--line);
       background: #fff;
       box-shadow: 0 14px 40px rgba(0, 0, 0, 0.06);
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
     }
 
     .user-chip img {
@@ -231,28 +252,47 @@
       opacity: 0.75;
     }
 
-    .notif-title {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      font-size: 1.15rem;
-      margin-bottom: 2px;
-      color: #1a1a1a;
+    .notif-meta {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
     }
 
-    .notif-body {
+    .notif-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.6;
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+
+    .notif-item:not(.unread) .notif-dot {
+      opacity: 0;
+    }
+
+    .notif-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      width: 100%;
+    }
+
+    .notif-title {
       font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      font-size: 0.92rem;
-      color: #444;
-      line-height: 1.45;
+      font-weight: 400;
+      font-size: 0.98rem;
+      margin: 0;
+      color: #1a1a1a;
+      line-height: 1.35;
     }
 
     .notif-time {
-      margin-top: 4px;
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
-      font-size: 0.8rem;
-      color: #888;
+      font-size: 0.82rem;
+      color: #777;
     }
 
     .notif-empty {
@@ -281,12 +321,15 @@
     /* HERO CARD (matches UX layout) */
 
     .hero-card {
-      background: #ffffff;
+      background: linear-gradient(135deg, #ffffff, #f7f1e6);
       border-radius: var(--radius-lg);
-      padding: 24px 32px 28px;
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.06);
+      padding: 32px 36px 34px;
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.07);
       margin-bottom: 32px;
       position: relative;
+      overflow: hidden;
+      animation: fadeUp 0.4s ease both;
+      z-index: 2;
     }
 
     .hero-eyebrow {
@@ -300,7 +343,7 @@
     .hero-content {
       display: grid;
       grid-template-columns: 220px minmax(0, 1fr);
-      column-gap: 28px;
+      column-gap: 32px;
       align-items: center;
     }
 
@@ -311,8 +354,8 @@
     }
 
     .hero-photo {
-      width: 130px;
-      height: 130px;
+      width: 200px;
+      height: 200px;
       border-radius: 50%;
       overflow: hidden;
       background: var(--panel);
@@ -329,12 +372,12 @@
     .hero-main {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 8px;
     }
 
     #profileName {
       font-family: var(--font-serif);
-      font-size: 2.8rem;
+      font-size: 3rem;
       font-weight: 300;
       letter-spacing: 0.6px;
     }
@@ -419,19 +462,22 @@
       transform: none;
     }
 
-    /* MAIN GRID (skills / degrees / experience) */
-
-    .profile-main-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-      gap: 20px;
-      margin-bottom: 20px;
+    .hero-doc-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
     }
 
-    .column {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
+    /* MAIN GRID (compact fold) */
+
+    .fold-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 18px;
+      margin-bottom: 16px;
+      align-items: start;
+      animation: fadeUp 0.5s ease both;
+      animation-delay: 0.05s;
     }
 
     .card {
@@ -439,6 +485,13 @@
       border-radius: var(--radius-md);
       padding: 18px 22px;
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.04);
+      position: relative;
+      z-index: 2;
+    }
+    .card.compact {
+      padding: 18px 18px;
+      box-shadow: 0 22px 58px rgba(0, 0, 0, 0.06);
+      background: linear-gradient(145deg, #ffffff, #fbf8f2);
     }
 
     .card-header-label {
@@ -456,62 +509,114 @@
       margin-bottom: 2px;
     }
 
-    /* Skills lines */
-
-    #skillsList {
-      margin-top: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    #skillsList .pill {
-      position: relative;
-      padding-bottom: 6px;
-      font-size: 0.98rem;
-      color: var(--ink);
-    }
-
-    #skillsList .pill::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      height: 4px;
-      border-radius: 999px;
-      background: linear-gradient(90deg, var(--accent) 60%, #e0e0e0 60%);
-      opacity: 0.7;
-    }
-
-    .pill-group {
+    .chip-cloud,
+    .chip-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 16px;
+      gap: 8px;
+      margin-top: 10px;
     }
 
-    .pill-group .pill {
-      padding: 6px 14px;
+    .chip-section {
+      margin-top: 10px;
+    }
+
+    .chip-section:first-of-type {
+      margin-top: 6px;
+    }
+
+    .chip-section .card-header-label {
+      display: block;
+      width: 100%;
+      text-align: center;
+    }
+
+    .chip {
+      padding: 7px 12px;
       border-radius: 999px;
       background: var(--accent-soft);
-      color: var(--ink);
-      font-size: 0.9rem;
       border: 1px solid var(--line);
+      font-size: 0.92rem;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
     }
 
-    .document-links {
+    .chip:hover,
+    .timeline-item:hover,
+    .edu-pill:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+      background: #fff;
+    }
+
+    .timeline-list {
       display: flex;
+      flex-direction: column;
       gap: 10px;
+      margin: 10px 0 6px;
+    }
+
+    .timeline-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .timeline-role {
+      font-weight: 400;
+    }
+
+    .timeline-dates {
+      color: var(--muted);
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+
+    .edu-inline {
+      display: flex;
       flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .edu-pill {
+      padding: 6px 10px;
+      border-radius: 10px;
+      border: 1px dashed var(--line);
+      background: #fff;
+      font-size: 0.9rem;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .inline-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
       margin-top: 12px;
+    }
+
+    .credentials-row {
+      border-top: 1px dashed var(--line);
+      padding-top: 10px;
+    }
+
+    .doc-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
     }
 
     .doc-chip {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 6px 12px;
+      padding: 7px 12px;
       border-radius: 999px;
       border: 1px solid var(--line);
       background: var(--panel);
@@ -520,102 +625,8 @@
       font-size: 0.9rem;
     }
 
-    /* Degrees & Experience cards */
-
-    .list-stack {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      margin-top: 4px;
-    }
-
-    .list-stack article h3 {
-      font-size: 1rem;
-      font-weight: 300;
-    }
-
-    .list-stack article span {
-      display: block;
-      font-size: 0.9rem;
-      color: var(--muted);
-      margin-top: 2px;
-    }
-
-    .list-stack article p {
-      font-size: 0.95rem;
-      margin-top: 6px;
-      color: var(--ink);
-    }
-
-    /* SECOND ROW CARDS (Practice / Credentials / Fun facts) */
-
-    .secondary-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 20px;
-      margin-top: 8px;
-      margin-bottom: 20px;
-    }
-
-    /* Languages row */
-
-    .languages-section {
-      margin-top: 12px;
-    }
-
-    .languages-header {
-      margin-bottom: 18px;
-    }
-
-    .languages-header .card-header-label {
-      margin-bottom: 4px;
-    }
-
-    .languages-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 14px;
-    }
-
     .languages-empty {
-      margin-top: 12px;
-      color: var(--muted);
-      font-size: 0.9rem;
-    }
-
-    .language-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      min-width: 90px;
-    }
-
-    .language-ring {
-      width: 65px;
-      height: 65px;
-      border-radius: 50%;
-      background: conic-gradient(var(--accent) var(--val), #eaeaea 0);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.95rem;
-      color: var(--ink);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
-    }
-
-    .language-label {
-      font-size: 0.9rem;
-      color: var(--ink);
-    }
-
-    .language-level {
-      font-size: 0.78rem;
-      color: var(--muted);
-    }
-
-    .documents-card {
-      margin-top: 24px;
+      margin: 0;
     }
 
     /* Toast, modal, error */
@@ -734,17 +745,14 @@
         justify-content: center;
       }
 
-      .profile-main-grid {
+      .fold-grid {
         grid-template-columns: 1fr;
-      }
-
-      .languages-row {
-        justify-content: flex-start;
       }
     }
   </style>
 </head>
 <body>
+  <div class="bg-hero-mountain" aria-hidden="true"></div>
   <div class="page-shell">
     <div class="topbar">
       <div class="profile-header-controls" data-notification-center>
@@ -756,20 +764,39 @@
             </svg>
             <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
           </button>
+        <div
+          class="notification-dropdown"
+          id="notificationDropdown"
+          style="
+            display: none;
+            width: 320px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            padding: 16px;
+          "
+        >
+            <div style="font-weight: 600; margin-bottom: 8px;">
+              Notifications
+            </div>
+
+            <div id="notificationList" style="font-size: 14px; color: #555;">
+              No new notifications.
+            </div>
+          </div>
           <div id="notificationPanel" class="notif-panel hidden" data-notification-panel>
             <div class="notif-header">Notifications</div>
-            <div id="notifList" data-notification-list></div>
-            <div class="notif-empty" data-notification-empty>Loading…</div>
-            <button id="markAllReadBtn" class="notif-markall" type="button" data-notification-mark>Mark All Read</button>
+            <div class="notif-body" id="notifList" data-notification-list></div>
+            <div class="notif-empty" data-notification-empty>No new notifications.</div>
           </div>
         </div>
-        <div class="user-chip">
+        <a class="user-chip" href="/dashboard-paralegal.html" aria-label="Go to dashboard">
           <img id="clusterAvatar" class="nav-profile-photo" src="https://via.placeholder.com/64x64.png?text=PL" alt="Profile" />
           <div>
             <strong id="clusterName">Paralegal</strong>
             <span id="clusterRole">Member</span>
           </div>
-        </div>
+        </a>
       </div>
     </div>
     <div id="profileError" class="error-card hidden"></div>
@@ -792,7 +819,11 @@
 
           <div class="hero-meta-row">
             <span id="credentialMeta" class="hero-meta-pill">Credentials available upon request</span>
-            <span id="joinedMeta" class="hero-meta-pill">Joined date unavailable</span>
+            <div class="hero-doc-buttons doc-buttons">
+              <a href="#" target="_blank" rel="noopener" id="certificateLink" class="doc-chip hidden">Certificate</a>
+              <a href="#" target="_blank" rel="noopener" id="resumeLink" class="doc-chip hidden">Résumé</a>
+              <a href="#" target="_blank" rel="noopener" id="writingSampleLink" class="doc-chip hidden">Writing Sample</a>
+            </div>
             <span id="locationMeta" class="hero-meta-pill">Location</span>
           </div>
 
@@ -805,83 +836,48 @@
       </div>
     </section>
 
-    <!-- MAIN GRID: SKILLS / DEGREES / EXPERIENCE -->
-    <section class="profile-main-grid">
-      <div class="column">
-        <article class="card" id="skillsCard">
-          <div class="card-header-label">My skills</div>
-          <div class="card-title">Skills & Specialties</div>
-          <div id="skillsList">
-            <!-- JS will populate .pill elements; styled as lines -->
-          </div>
-        </article>
-      </div>
-
-      <div class="column">
-        <article class="card" id="educationCard">
-          <div class="card-header-label">Degrees</div>
-          <div class="card-title">Education</div>
-          <div id="educationList" class="list-stack">
-            <!-- education entries -->
-          </div>
-        </article>
-
-        <article class="card" id="experienceCard">
-          <div class="card-header-label">Experience</div>
-          <div class="card-title">Experience &amp; Background</div>
-          <div id="experienceList" class="list-stack">
-            <!-- experience entries -->
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <!-- SECOND ROW CARDS -->
-    <section class="secondary-grid">
-      <article class="card" id="practiceCard">
-        <div class="card-header-label">Practice areas</div>
-        <div class="card-title">Practice Areas</div>
-        <div id="practiceList" class="pill-group">
-          <!-- practice pills -->
+    <section class="fold-grid">
+      <article class="card compact" id="skillsCard">
+        <div class="chip-section">
+          <span class="card-header-label" style="text-align:center; width:100%;">Skills</span>
+          <div id="skillsList" class="chip-cloud"></div>
+          <p class="muted hidden" id="skillsEmpty">No skills added yet.</p>
+        </div>
+        <div class="chip-section">
+          <span class="card-header-label" style="text-align:center; width:100%;">Focus Areas</span>
+          <div id="practiceList" class="chip-cloud"></div>
+          <p class="muted hidden" id="practiceEmpty">No focus areas added yet.</p>
         </div>
       </article>
 
-      <article class="card" id="attorneyInsightsCard" data-attorney-only>
-        <div class="card-header-label">Credentials</div>
-        <div class="card-title">Professional Credentials</div>
-        <div id="attorneyHighlights" class="list-stack">
-          <!-- attorney-only highlights -->
+      <article class="card compact" id="experienceCard">
+        <div class="card-header-label" style="text-align:center;">Experience</div>
+        <div id="experienceList" class="timeline-list">
+          <!-- condensed experience timeline -->
+        </div>
+        <div id="educationList" class="edu-inline">
+          <!-- folded education inline -->
+        </div>
+        <div class="inline-row">
+          <span class="card-header-label" style="text-align:center;width:100%;">Languages</span>
+          <div class="chip-row" id="languagesList"></div>
+          <p class="muted hidden" id="languagesEmpty">No languages added yet.</p>
+        </div>
+        <div class="inline-row credentials-row" id="documentsCard">
+          <span id="joinedMeta" class="hero-meta-pill" style="margin:0 auto;">Joined date unavailable</span>
+        </div>
+        <div class="inline-row hidden" id="attorneyHighlightsCard" data-attorney-only>
+          <span class="card-header-label">Highlights</span>
+          <div id="attorneyHighlights" class="chip-row"></div>
         </div>
       </article>
-
-      <article class="card hidden" id="funFactsCard">
-        <div class="card-header-label">Fun facts</div>
-        <div class="card-title">Fun Facts &amp; Extras</div>
-        <p id="funFactsCopy"></p>
-      </article>
     </section>
 
-    <!-- LANGUAGES ROW -->
-    <section class="card languages-section">
-      <div class="languages-header">
-        <div class="card-header-label">Languages I speak</div>
-        <div class="card-title">Languages</div>
-      </div>
-      <div class="languages-row" id="languagesList"></div>
-      <p class="languages-empty hidden" id="languagesEmpty">No languages added yet.</p>
-    </section>
-
-    <section class="card documents-card hidden" id="documentsCard">
-      <div class="card-header-label">Documents</div>
-      <div class="card-title">Professional Credentials</div>
-      <p class="muted">Download verified files shared by this paralegal.</p>
-      <div class="document-links">
-        <a href="#" target="_blank" rel="noopener" id="certificateLink" class="doc-chip hidden">Certificate</a>
-        <a href="#" target="_blank" rel="noopener" id="resumeLink" class="doc-chip hidden">Résumé</a>
-        <a href="#" target="_blank" rel="noopener" id="writingSampleLink" class="doc-chip hidden">Writing Sample</a>
-      </div>
-      <p class="muted hidden" id="documentsEmpty">No documents available yet.</p>
-    </section>
+    <article class="card hidden" id="funFactsCard">
+      <div class="card-header-label">Fun facts</div>
+      <div class="card-title">Fun Facts &amp; Extras</div>
+      <p id="funFactsCopy"></p>
+    </article>
   </div>
 
   <!-- Modal + toast + scripts stay intact -->
@@ -909,6 +905,23 @@
   <script src="assets/scripts/paralegal-cluster.js"></script>
   <script type="module" src="assets/scripts/profile-paralegal.js"></script>
   <script>
+    // Ensure notification dropdown binds even if modules load after DOM ready
+    (function ensureNotificationsInit() {
+      const init = () => {
+        if (typeof window.scanNotificationCenters === 'function') {
+          window.scanNotificationCenters();
+        } else if (typeof window.initNotificationCenters === 'function') {
+          window.initNotificationCenters();
+        }
+      };
+      if (document.readyState === "complete" || document.readyState === "interactive") {
+        init();
+      } else {
+        window.addEventListener('DOMContentLoaded', init, { once: true });
+      }
+    })();
+
+    // Direct bell toggle for notification dropdown
     async function uploadProfilePhoto(file) {
       const form = new FormData();
       form.append("file", file);

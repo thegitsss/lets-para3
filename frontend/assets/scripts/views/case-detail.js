@@ -29,12 +29,16 @@ export async function render(el, { escapeHTML, params: routeParams } = {}) {
   ensureStyles();
   let session = null;
   try {
-    if (typeof window.requireRole === "function") {
-      session = normalizeSessionPayload(await window.requireRole());
-    } else if (typeof window.checkSession === "function") {
-      session = normalizeSessionPayload(await window.checkSession());
-    } else {
-      session = normalizeSessionPayload(requireAuth());
+    const rawSession =
+      typeof window.checkSession === "function"
+        ? await window.checkSession(undefined, { redirectOnFail: false })
+        : typeof window.requireRole === "function"
+        ? await window.requireRole()
+        : requireAuth();
+    session = normalizeSessionPayload(rawSession);
+    const viewerRole = String(session?.role || session?.user?.role || "").toLowerCase();
+    if (!["attorney", "paralegal", "admin", ""].includes(viewerRole)) {
+      return;
     }
   } catch {
     return;

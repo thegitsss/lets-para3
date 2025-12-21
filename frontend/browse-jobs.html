@@ -272,6 +272,10 @@
       font-weight: 300;
       margin: 0 0 0.2rem;
     }
+    .job-card.expanded h3 {
+      font-size: 1.6rem;
+      line-height: 1.2;
+    }
 
     .job-card .area {
       color: #6b7280;
@@ -310,6 +314,220 @@
 
     .clear-button:hover { background: rgba(180, 151, 90, 0.1); }
     .apply-button:hover { background: #a2864d; border-color: #a2864d; }
+
+    .job-card.expanded {
+      border-left-width: 6px;
+      box-shadow: 0 28px 70px rgba(10, 15, 25, 0.12);
+      max-width: 980px;
+      margin: 0 auto;
+      animation: jobExpandIn 420ms cubic-bezier(.2,.7,.2,1);
+      transform-origin: center top;
+      position: relative;
+      padding-bottom: 1.6rem;
+    }
+    .job-card .pill-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(180, 151, 90, 0.12);
+      color: #8b6a2f;
+      font-size: 0.85rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .expanded-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .expanded-header h3 { margin-bottom: 0.35rem; }
+    .expanded-header .meta { margin-bottom: 0; }
+    .expanded-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .expanded-card-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.8fr) minmax(220px, 0.9fr);
+      grid-template-rows: auto 1fr auto auto;
+      grid-template-areas:
+        "header sidebar"
+        "body sidebar"
+        "experience sidebar"
+        "footer footer";
+      gap: 0.9rem 1.1rem;
+      align-items: stretch;
+      margin-top: 1rem;
+      min-height: 360px;
+    }
+    .expanded-header { grid-area: header; }
+    .expanded-sidebar {
+      grid-area: sidebar;
+      border: 1px solid rgba(26, 34, 48, 0.08);
+      border-radius: 14px;
+      padding: 1rem 0.9rem;
+      background: #fbfcff;
+      display: grid;
+      gap: 0.9rem;
+      max-width: 320px;
+      width: 85%;
+      min-height: auto;
+      height: auto;
+      justify-self: end;
+      align-self: start;
+    }
+    .expanded-body {
+      grid-area: body;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      align-items: flex-start;
+      justify-content: flex-start;
+      min-height: 0;
+    }
+    .expanded-body .lede { color: #475569; margin: 0 0 0.65rem; line-height: 1.6; }
+    .description-label {
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin: 1rem 0 0;
+    }
+    .expanded-body .rich-text { color: #0f172a; line-height: 1.8; white-space: pre-line; }
+    .expanded-body .main-description { margin: 0; }
+    .experience-line {
+      color: #475569;
+      margin: 0.1rem 0 0;
+    }
+    .experience-line-row {
+      grid-area: experience;
+      align-self: start;
+    }
+    .experience-line-row .experience-line { margin: 0; }
+    .expanded-footer {
+      grid-area: footer;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 0.75rem;
+      border-top: 1px solid rgba(26, 34, 48, 0.08);
+      padding-top: 8px;
+    }
+    .expanded-sidebar .stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.95rem;
+      color: #475569;
+    }
+    .expanded-sidebar .stat strong { color: #0f172a; font-size: 1.1rem; }
+    .ghost-button {
+      border: 1px solid rgba(26, 34, 48, 0.15);
+      background: #fff;
+      color: #0f172a;
+    }
+    .apply-info {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 0.95rem;
+      color: #0f172a;
+      text-align: center;
+    }
+    .apply-info-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 0.95rem;
+      margin-bottom: 6px;
+    }
+    .apply-info-list {
+      list-style: disc;
+      padding-left: 1.2rem;
+      text-align: left;
+      margin: 0;
+      display: grid;
+      gap: 6px;
+    }
+    .apply-info-list li {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 0.95rem;
+      color: #0f172a;
+      line-height: 1.5;
+    }
+    .posted-by {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+    }
+    .posted-label {
+      grid-column: 1 / -1;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.78rem;
+      color: #94a3b8;
+    }
+    .posted-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      object-fit: cover;
+      background: #e2e8f0;
+    }
+    .posted-name { color: #0f172a; font-weight: 400; }
+    .posted-firm { color: #6b7280; font-size: 0.92rem; }
+    .posted-trust { color: #475569; font-size: 0.9rem; }
+    .posted-link {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      align-items: center;
+      text-decoration: none;
+      color: inherit;
+    }
+    .expanded-footer-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-end;
+      align-self: end;
+      justify-self: end;
+    }
+    @keyframes jobExpandIn {
+      0% { opacity: 0; transform: translateY(18px) scale(.96); box-shadow: 0 12px 32px rgba(10,15,25,0.08); }
+      60% { opacity: 1; transform: translateY(0) scale(1.012); box-shadow: 0 24px 70px rgba(10,15,25,0.14); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    body.job-expanded .layout {
+      justify-content: center;
+    }
+    body.job-expanded aside.filter,
+    body.job-expanded .results-header {
+      display: none;
+    }
+    body.job-expanded .results {
+      width: min(980px, 100%);
+      margin: 0 auto;
+    }
+    body.job-expanded .jobs-grid {
+      align-items: center;
+    }
+    @media (max-width: 900px) {
+      .expanded-card-grid {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "header"
+          "sidebar"
+          "body"
+          "experience"
+          "footer";
+      }
+      .expanded-sidebar { justify-self: stretch; width: 100%; }
+    }
 
     .results-status {
       border: 1px dashed rgba(26, 34, 48, 0.15);

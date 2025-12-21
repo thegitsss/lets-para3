@@ -218,6 +218,17 @@
       font-weight: 300;
       font-size: 0.95rem;
     }
+    .case-header-meta{
+      display:flex;
+      flex-direction:column;
+      gap:.35rem;
+    }
+    .case-submeta{
+      display:flex;
+      align-items:center;
+      gap:.5rem;
+      flex-wrap:wrap;
+    }
     .case-status {
       background: rgba(31,122,74,.1);
       color: #1f7a4a;
@@ -227,6 +238,22 @@
       font-weight: 300;
       margin-top: 6px;
       display: inline-block;
+    }
+    .case-live-copy{
+      margin:0;
+      color:#1f7a4a;
+      font-weight:400;
+      font-size:0.95rem;
+    }
+    .case-header-actions{
+      display:flex;
+      align-items:center;
+      gap:.5rem;
+      flex-wrap:wrap;
+    }
+    .case-header-actions .btn{
+      min-width:160px;
+      justify-content:center;
     }
     .case-header .btn {
       align-self: center;
@@ -337,7 +364,7 @@
       font-size: 0.95rem;
       font-family: var(--font-sans);
       font-weight: 300;
-      text-align: left;
+      text-align: center;
       padding: 10px 14px;
       border-radius: var(--radius);
       cursor: pointer;
@@ -357,6 +384,18 @@
     }
     body.theme-mountain .sidebar-link {
       color: #fff;
+    }
+    .sidebar-bottom{
+      margin-top:auto;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      align-items:center;
+    }
+    .sidebar-bottom .sidebar-link{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
     }
     #card-element {
       padding: 12px;
@@ -382,6 +421,13 @@
 
     .case-section {
       margin-bottom: 2rem;
+    }
+    .case-section.is-muted {
+      opacity: 0.7;
+      filter: grayscale(0.05);
+    }
+    .case-section.is-muted h2 {
+      font-weight: 200;
     }
     .case-section h2 {
       font-family: var(--font-serif);
@@ -1056,13 +1102,30 @@
     <a href="active-cases.html" class="back-arrow">← Back to Cases</a>
 
     <div class="case-header">
-      <div>
+      <div class="case-header-meta">
         <h1 id="caseTitle">Case Title</h1>
-        <span class="case-status" id="caseStatusBadge">OPEN</span>
+        <div class="case-submeta">
+          <span class="case-status" id="caseStatusBadge">OPEN</span>
+        </div>
+        <p class="case-live-copy hidden" id="caseLiveCopy">This case is live and visible to vetted paralegals.</p>
       </div>
-      <button class="btn primary" id="openTaskModalBtn" data-paralegal-only>
-        + Create Task
-      </button>
+      <div class="case-header-actions">
+        <button type="button" class="btn primary hidden" id="primaryInviteBtn" data-attorney-only>
+          Invite Paralegal
+        </button>
+        <details class="case-options hidden" data-attorney-only id="caseOptionsRoot">
+          <summary class="btn secondary" id="caseOptionsToggle">Case Options ▾</summary>
+          <div class="case-options-menu" id="caseOptionsMenu">
+            <button type="button" data-case-option="edit">Edit</button>
+            <button type="button" data-case-option="share">Share</button>
+            <button type="button" data-case-option="pause">Pause</button>
+            <button type="button" data-case-option="delete">Delete</button>
+          </div>
+        </details>
+        <button class="btn primary hidden" id="openTaskModalBtn" data-paralegal-only data-requires-paralegal>
+          + Create Task
+        </button>
+      </div>
     </div>
 
     <section class="case-section">
@@ -1082,15 +1145,6 @@
         <div id="card-element"></div>
         <div id="card-errors" role="alert"></div>
       </div>
-      <details class="case-options" data-attorney-only id="caseOptionsRoot">
-        <summary class="btn primary" id="caseOptionsToggle">Case Options ▾</summary>
-        <div class="case-options-menu" id="caseOptionsMenu">
-          <button type="button" data-case-option="edit">Edit</button>
-          <button type="button" data-case-option="share">Share</button>
-          <button type="button" data-case-option="pause">Pause</button>
-          <button type="button" data-case-option="delete">Delete</button>
-        </div>
-      </details>
     </div>
 
     <div class="case-overview" id="caseOverview">
@@ -1101,14 +1155,14 @@
     <section class="case-section" data-attorney-only>
       <h2>Applicants</h2>
       <div id="applicantsList" class="applicant-list">
-        <p style="color:var(--muted);">No applicants yet.</p>
+        <p style="color:var(--muted);">No applications yet. Paralegals will appear here as soon as they apply.</p>
       </div>
     </section>
 
     <section class="case-section" id="caseTasksSection">
       <h2>Case Tasks</h2>
       <div id="caseTasksContainer" class="task-list">
-        <p style="color:var(--muted);">No tasks yet.</p>
+        <p style="color:var(--muted);">Tasks will show here after you hire a paralegal and assign work.</p>
       </div>
     </section>
 
@@ -1126,7 +1180,7 @@
     <section class="case-section deadlines">
       <h2>Deadlines</h2>
       <ul id="deadlinesList">
-        <li style="color:var(--muted);">No deadlines recorded.</li>
+        <li style="color:var(--muted);">Deadlines will appear here once work begins on this case.</li>
       </ul>
     </section>
 
@@ -1328,7 +1382,11 @@
       showToastBanner(stagedToast.message, stagedToast.type || 'info');
     }
 
-    const currentUser = typeof window.requireRole === "function" ? await window.requireRole() : null;
+    let currentUser = null;
+    if (typeof window.checkSession === "function") {
+      const session = await window.checkSession(undefined, { redirectOnFail: false }).catch(() => null);
+      currentUser = session?.user || session || null;
+    }
     if (!currentUser) {
       // Guard will redirect unauthorized visitors.
     } else {
@@ -1536,6 +1594,9 @@
     const AUTH_TOKEN_STORAGE_KEY = 'lpc_token';
     const USER_STORAGE_KEY = 'lpc_user';
     const paymentPanel = document.getElementById('escrowPayment');
+    const primaryInviteBtn = document.getElementById('primaryInviteBtn');
+    const liveCopy = document.getElementById('caseLiveCopy');
+    const createTaskBtn = document.getElementById('openTaskModalBtn');
     const cardElementHost = document.getElementById('card-element');
     const cardErrorsEl = document.getElementById('card-errors');
     let cachedCsrfToken = window.__CSRF__ || '';
@@ -1552,7 +1613,6 @@
       backLink.href = `active-cases.html?prefillCaseId=${encodeURIComponent(CASE_ID)}`;
     }
     const caseOptionsRoot = document.getElementById('caseOptionsRoot');
-    const caseOptionsToggle = caseOptionsRoot?.querySelector('summary');
     const caseOptionsMenu = document.getElementById('caseOptionsMenu');
     if (PREFILL_TITLE) {
       const titleEl = document.getElementById('caseTitle');
@@ -1711,6 +1771,13 @@
       closeCaseOptionsMenu();
       handleCaseOption(action);
     });
+
+    function goToParalegalInvite() {
+      const target = CASE_ID ? `browse-paralegals.html?caseId=${encodeURIComponent(CASE_ID)}` : 'browse-paralegals.html';
+      window.location.href = target;
+    }
+
+    primaryInviteBtn?.addEventListener('click', goToParalegalInvite);
 
     function handleCaseOption(action) {
       switch (action) {
@@ -1938,6 +2005,14 @@
       const timelineMeta = document.getElementById('caseTimelineMeta');
       const paralegalNameEl = document.getElementById('caseParalegalName');
       const paralegalEmailEl = document.getElementById('caseParalegalEmail');
+      const applicants = Array.isArray(caseDetails.applicants) ? caseDetails.applicants : [];
+      const isOpen = String(caseDetails.status || 'open').toLowerCase() === 'open';
+      const hasParalegal = !!caseDetails.paralegal;
+      const shouldShowActivation = isOpen && !hasParalegal;
+      const tasksSection = document.getElementById('caseTasksSection');
+      const deadlinesSection = document.querySelector('.case-section.deadlines');
+      const notesSection = document.querySelector('.notes-section');
+      const noHireYet = !hasParalegal;
 
       if (titleEl) titleEl.textContent = caseDetails.title || 'Untitled Case';
 
@@ -1955,11 +2030,11 @@
 
       if (timelineMeta) {
         const deadline = caseDetails.deadline ? formatDisplayDate(caseDetails.deadline) : 'No deadline set';
-        const assigned = caseDetails.paralegal ? formatPerson(caseDetails.paralegal, 'Assigned paralegal') : 'No paralegal yet';
+        const assigned = hasParalegal ? formatPerson(caseDetails.paralegal, 'Assigned paralegal') : 'No paralegal yet';
         timelineMeta.innerHTML = `<strong>Deadline:</strong> ${deadline} · <strong>Paralegal:</strong> ${assigned}`;
       }
 
-      if (caseDetails.paralegal) {
+      if (hasParalegal) {
         if (paralegalNameEl) paralegalNameEl.textContent = formatPerson(caseDetails.paralegal, 'Paralegal');
         if (paralegalEmailEl) paralegalEmailEl.textContent = caseDetails.paralegal.email || '';
       } else {
@@ -1967,22 +2042,39 @@
         if (paralegalEmailEl) paralegalEmailEl.textContent = '';
       }
 
+      if (liveCopy) {
+        liveCopy.classList.toggle('hidden', !shouldShowActivation);
+      }
+      if (primaryInviteBtn) {
+        primaryInviteBtn.classList.toggle('hidden', !shouldShowActivation);
+      }
+      if (caseOptionsRoot) {
+        caseOptionsRoot.classList.remove('hidden');
+      }
+      if (createTaskBtn) {
+        createTaskBtn.classList.toggle('hidden', !hasParalegal);
+      }
+
+      [tasksSection, deadlinesSection, notesSection].forEach((section) => {
+        if (!section) return;
+        section.classList.toggle('is-muted', noHireYet);
+      });
+
       const detailsGrid = document.getElementById('caseDetailsPanel');
       if (detailsGrid) {
         detailsGrid.innerHTML = `
           <div class="party-card">
             <h4>Paralegal</h4>
-            <p>${caseDetails.paralegal ? formatPerson(caseDetails.paralegal, 'Paralegal') : 'No paralegal hired yet'}</p>
+            <p>${hasParalegal ? formatPerson(caseDetails.paralegal, 'Paralegal') : 'No paralegal hired yet'}</p>
             <p class="muted">${caseDetails?.paralegal?.email || ''}</p>
           </div>
         `;
       }
 
       const applicantsList = document.getElementById('applicantsList');
-      const applicants = Array.isArray(caseDetails.applicants) ? caseDetails.applicants : [];
       if (applicantsList) {
         if (!applicants.length) {
-          applicantsList.innerHTML = '<p style="color:var(--muted);">No applicants yet.</p>';
+          applicantsList.innerHTML = '<p style="color:var(--muted);">No applications yet. Paralegals will appear here as soon as they apply.</p>';
         } else {
           const canHire = readStoredRole().toLowerCase() === 'attorney' && !caseDetails.paralegal;
           applicantsList.innerHTML = applicants.map((app) => renderApplicantCard(app, canHire)).join("");

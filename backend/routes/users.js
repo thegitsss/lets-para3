@@ -353,7 +353,7 @@ router.post(
     if (type && typeof type === "string") {
       filter.type = type;
     }
-    await Notification.updateMany(filter, { $set: { read: true } });
+    await Notification.updateMany(filter, { $set: { read: true, isRead: true } });
     me.notificationsLastViewedAt = new Date();
     await me.save();
     return res.json({ ok: true, seenAt: me.notificationsLastViewedAt });
@@ -939,7 +939,7 @@ router.patch(
 
     if (String(user.role).toLowerCase() === "paralegal") {
       try {
-        await notifyUser(user._id, "profile_approved", {});
+        await notifyUser(user._id, "profile_approved", {}, { actorUserId: req.user.id });
       } catch (err) {
         console.warn("[users] notifyUser profile_approved failed", err);
       }

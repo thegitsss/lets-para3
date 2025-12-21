@@ -31,6 +31,7 @@ let applyCounter = null;
 let currentApplyJob = null;
 let csrfToken = "";
 const toast = window.toastUtils;
+let expandedJobId = "";
 
 // Elements
 const filterToggle = document.getElementById("filterToggle");
@@ -224,6 +225,57 @@ function formatPay(value) {
   return rounded.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+function normalizeContentLines(raw) {
+  const normalized = String(raw || "")
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/div>/gi, "\n");
+  return normalized
+    .split(/[\r\n]+|<[^>]+>/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function isStateLine(line, jobState) {
+  const state = String(jobState || "").trim().toLowerCase();
+  const cleaned = String(line || "")
+    .replace(/^[\s>*•\-–—]+/, "")
+    .trim();
+  const normalized = cleaned.toLowerCase();
+  if (/^state\b/i.test(cleaned)) return true;
+  if (state && normalized === state) return true;
+  if (state && normalized === `state: ${state}`) return true;
+  return false;
+}
+
+function scrubStateLines(raw, jobState) {
+  const lines = normalizeContentLines(raw);
+  return lines.filter((line) => !isStateLine(line, jobState)).join("\n");
+}
+
+function prepareExpandedContent(raw, jobState) {
+  const cleaned = stripDuplicateStateLine(raw, jobState);
+  const lines = normalizeContentLines(cleaned);
+  let experienceLine = "";
+  const filtered = lines.filter((line) => {
+    if (!line) return false;
+    if (!experienceLine && /^Experience\s*:/i.test(line)) {
+      experienceLine = line;
+      return false;
+    }
+    return true;
+  });
+  const description = filtered.join("\n").trim() || "No additional description provided for this case.";
+  return { description, experienceLine: experienceLine.trim() };
+}
+
+function stripDuplicateStateLine(text, jobState) {
+  const lines = normalizeContentLines(text);
+  return lines
+    .filter((line) => !isStateLine(line, jobState))
+    .join("\n");
+}
+
 function applySort() {
   if (!sortSelect || !sortSelect.value) return;
   const mode = sortSelect.value;
@@ -249,6 +301,18 @@ function applySort() {
 function renderJobs() {
   if (!jobsGrid) return;
   jobsGrid.innerHTML = "";
+  syncExpansionLayout();
+
+  if (expandedJobId) {
+    const expanded = filteredJobs.find((job) => getJobUniqueId(job) === expandedJobId);
+    if (expanded) {
+      jobsGrid.appendChild(renderExpandedJob(expanded));
+      if (pagination) pagination.textContent = "";
+      return;
+    }
+    expandedJobId = "";
+    syncExpansionLayout();
+  }
 
   if (!filteredJobs.length) {
     const empty = document.createElement("p");
@@ -270,6 +334,7 @@ function renderJobs() {
     const practice = escapeHtml(job.practiceArea || "General Practice");
     const when = job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Recently posted";
     const jobId = String(job.id || job._id || "");
+    const caseId = getJobUniqueId(job) || jobId;
 
     card.innerHTML = `
       <h3>${title}</h3>
@@ -284,41 +349,21 @@ function renderJobs() {
     const actions = document.createElement("div");
     actions.className = "job-actions";
 
-    const detailBtn = document.createElement("button");
-    detailBtn.type = "button";
-    detailBtn.className = "clear-button";
-    detailBtn.textContent = "Preview";
-    detailBtn.addEventListener("click", (event) => {
-      event.stopPropagation();
-      openJobModal(job);
-    });
-    actions.appendChild(detailBtn);
-
     const caseBtn = document.createElement("button");
     caseBtn.type = "button";
     caseBtn.className = "clear-button";
     caseBtn.textContent = "View Case";
     caseBtn.addEventListener("click", (event) => {
       event.stopPropagation();
-      if (jobId) window.location.href = `case-detail.html?caseId=${encodeURIComponent(jobId)}`;
+      if (caseId) {
+        expandJob(job);
+        return;
+      }
+      openJobModal(job);
     });
     actions.appendChild(caseBtn);
 
-    const applyBtn = document.createElement("button");
-    applyBtn.type = "button";
-    applyBtn.className = "apply-button";
-    applyBtn.dataset.jobId = jobId;
-    if (appliedJobs.has(jobId)) {
-      applyBtn.disabled = true;
-      applyBtn.textContent = "Application sent";
-    } else {
-      applyBtn.textContent = "Apply";
-      applyBtn.addEventListener("click", (event) => {
-        event.stopPropagation();
-        openApplyModal(job);
-      });
-    }
-    actions.appendChild(applyBtn);
+    actions.appendChild(buildApplyButton(job, jobId || caseId));
 
     card.appendChild(actions);
 
@@ -609,7 +654,7 @@ async function openJobModal(job) {
   const budget = typeof job.budget === "number" ? job.budget : null;
   const compensation =
     job.compensationDisplay ||
-    (budget ? `$${formatPay(budget)} budget` : payUSD ? `$${formatPay(payUSD)} total` : "Rate negotiable");
+    (budget ? `$${formatPay(budget)} compensation` : payUSD ? `$${formatPay(payUSD)} total` : "Rate negotiable");
 
   if (jobTitleEl) jobTitleEl.textContent = title;
   if (jobSummaryEl) jobSummaryEl.textContent = summary;
@@ -691,10 +736,11 @@ function injectApplyStyles() {
     .job-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
     .job-apply-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s ease}
     .job-apply-overlay.show{opacity:1;pointer-events:auto}
-    .job-apply-dialog{background:#fff;border-radius:18px;padding:20px;max-width:480px;width:92%;box-shadow:0 30px 60px rgba(0,0,0,.15);display:grid;gap:12px}
+    .job-apply-dialog{background:#fff;border-radius:18px;padding:24px;max-width:520px;width:92%;box-shadow:0 30px 60px rgba(0,0,0,.15);display:grid;gap:14px}
     .job-apply-dialog header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .job-apply-dialog [data-apply-title]{flex:1;text-align:center;font-family:'Cormorant Garamond',serif;font-weight:300;font-size:1.6rem;margin:0;}
     .job-apply-dialog .close-btn{border:none;background:none;font-size:1.5rem;line-height:1;cursor:pointer}
-    .job-apply-dialog textarea{width:100%;border:1px solid #d1d5db;border-radius:12px;padding:10px;font:inherit;resize:vertical;min-height:120px}
+    .job-apply-dialog textarea{width:100%;max-width:100%;border:1px solid #d1d5db;border-radius:14px;padding:12px 14px;font:inherit;resize:vertical;min-height:120px;box-sizing:border-box;margin-top:4px;}
     .job-apply-dialog .apply-meta{display:flex;align-items:center;justify-content:space-between;font-size:.85rem;color:#6b7280}
     .job-apply-dialog .apply-meta .error{color:#b91c1c}
     .job-apply-dialog .modal-actions{display:flex;justify-content:flex-end;gap:10px}
@@ -726,4 +772,243 @@ function escapeAttr(value) {
     return window.CSS.escape(value);
   }
   return String(value || "").replace(/"/g, '\\"');
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getJobUniqueId(job) {
+  return String(
+    job?.caseId || job?.case_id || job?.case || job?.id || job?._id || job?.jobId || job?.job_id || ""
+  );
+}
+
+function expandJob(job) {
+  const id = getJobUniqueId(job);
+  if (!id) {
+    openJobModal(job);
+    return;
+  }
+  expandedJobId = id;
+  renderJobs();
+  if (jobsGrid?.scrollIntoView) {
+    setTimeout(() => jobsGrid.scrollIntoView({ behavior: "smooth", block: "start" }), 10);
+  }
+}
+
+function collapseExpanded() {
+  expandedJobId = "";
+  renderJobs();
+  if (jobsGrid?.scrollIntoView) {
+    setTimeout(() => jobsGrid.scrollIntoView({ behavior: "smooth", block: "start" }), 10);
+  }
+}
+
+function buildApplyButton(job, jobId) {
+  const applyBtn = document.createElement("button");
+  applyBtn.type = "button";
+  applyBtn.className = "apply-button";
+  applyBtn.dataset.jobId = jobId;
+  if (appliedJobs.has(jobId)) {
+    applyBtn.disabled = true;
+    applyBtn.textContent = "Application sent";
+  } else {
+    applyBtn.textContent = "Apply for this case";
+    applyBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openApplyModal(job);
+    });
+  }
+  return applyBtn;
+}
+
+function renderExpandedJob(job) {
+  const card = document.createElement("div");
+  card.className = "job-card expanded";
+  const caseId = getJobUniqueId(job);
+  const jobId = String(job.id || job._id || "") || caseId;
+  const payUSD = getJobPayUSD(job);
+  const budget = typeof job.budget === "number" ? job.budget : null;
+  const compensation =
+    job.compensationDisplay ||
+    (budget ? `$${formatPay(budget)} compensation` : payUSD ? `$${formatPay(payUSD)} total` : "Rate negotiable");
+  const jobState = getJobState(job) || "—";
+  const when = job.createdAt
+    ? new Date(job.createdAt).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })
+    : "Recently posted";
+  const rawSummary = job.briefSummary || job.shortDescription || job.practiceArea || "";
+  const summary = scrubStateLines(rawSummary, jobState);
+  const rawDescription = job.description || job.details || job.briefSummary || "";
+  const { description, experienceLine } = prepareExpandedContent(rawDescription, jobState);
+
+  const title = escapeHtml(job.title || "Case");
+  card.innerHTML = `
+    <div class="expanded-card-grid">
+      <div class="expanded-header">
+        <div>
+          <div class="pill-label">${escapeHtml(job.practiceArea || "General practice")}</div>
+          <h3>${title}</h3>
+          <div class="meta">
+            <span>${escapeHtml(jobState)}</span>
+            <span>${escapeHtml(compensation)}</span>
+            <span>Posted ${escapeHtml(when)}</span>
+          </div>
+        </div>
+        <div class="expanded-actions"></div>
+      </div>
+      <aside class="expanded-sidebar">
+        <div class="apply-info">
+          <div class="apply-info-title">What Happens After You Apply</div>
+          <ul class="apply-info-list">
+            <li>The attorney reviews applications</li>
+            <li>Selected paralegals receive full case details</li>
+            <li>Work is completed through Let’s ParaConnect</li>
+            <li>Payment is released upon approval</li>
+          </ul>
+        </div>
+        <div class="expanded-actions" data-expanded-buttons></div>
+      </aside>
+      <div class="expanded-body">
+        ${summary ? `<p class="lede">${escapeHtml(summary)}</p>` : ""}
+        <div class="description-label">DESCRIPTION</div>
+        <div class="rich-text main-description">${escapeHtml(description)}</div>
+      </div>
+      ${experienceLine ? `<div class="experience-line-row"><div class="experience-line">${escapeHtml(experienceLine)}</div></div>` : ""}
+      <div class="expanded-footer">
+        <div class="posted-by" data-posted-by>
+          <div class="posted-label">Posted by</div>
+          <a class="posted-link" href="#" data-attorney-link>
+            <img class="posted-avatar" alt="Attorney photo">
+            <div>
+              <div class="posted-name" data-posted-name></div>
+              <div class="posted-firm" data-posted-firm></div>
+              <div class="posted-trust" data-posted-trust></div>
+            </div>
+          </a>
+        </div>
+        <div class="expanded-footer-actions" data-footer-actions></div>
+      </div>
+    </div>
+  `;
+
+  // Ensure no legacy attorney card markup lingers in this view.
+  card.querySelectorAll(".attorney-block, .attorney-card, .job-sidebar-card").forEach((node) => node.remove());
+
+  const buttonsHost = card.querySelector("[data-expanded-buttons]");
+  const footerActions = card.querySelector("[data-footer-actions]");
+  if (buttonsHost) {
+    buttonsHost.innerHTML = "";
+  }
+  if (footerActions) {
+    footerActions.innerHTML = "";
+    const backBtn = document.createElement("button");
+    backBtn.type = "button";
+    backBtn.className = "clear-button ghost-button";
+    backBtn.textContent = "Back to all jobs";
+    backBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      collapseExpanded();
+    });
+
+    const applyBtn = buildApplyButton(job, jobId);
+    footerActions.appendChild(backBtn);
+    footerActions.appendChild(applyBtn);
+  }
+
+  updatePostedBy(card, job);
+
+  ensureAttorneyPreview(job)
+    .then((preview) => {
+      if (!preview) return;
+      job.attorney = {
+        ...(job.attorney || {}),
+        ...preview,
+        lawFirm: preview.lawFirm || preview.firmName || job.attorney?.lawFirm,
+      };
+      updatePostedBy(card, job);
+    })
+    .catch(() => {});
+
+  return card;
+}
+
+function syncExpansionLayout() {
+  const isExpanded = !!expandedJobId;
+  document.body.classList.toggle("job-expanded", isExpanded);
+}
+
+function formatDeadline(raw) {
+  if (!raw) return "";
+  const date = new Date(raw);
+  if (!Number.isNaN(date.getTime())) {
+    return date.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  }
+  if (typeof raw === "string" && raw.trim()) return raw.trim();
+  return "";
+}
+
+function getCompletedJobsCount(job) {
+  const attorney = job?.attorney || {};
+  const candidates = [
+    attorney.completedJobs,
+    attorney.completedCases,
+    attorney.completedCasesCount,
+    attorney.casesCompleted,
+    attorney.metrics?.completedCases,
+    attorney.stats?.completedCases,
+  ];
+  for (const value of candidates) {
+    const num = Number(value);
+    if (Number.isFinite(num) && num >= 0) return num;
+  }
+  return 0;
+}
+
+function buildAttorneyProfileUrl(attorney, job) {
+  const attorneyId = attorney?._id || attorney?.id || job?.attorneyId || "";
+  if (!attorneyId) return "";
+  const jobId = job?.id || job?._id || getJobUniqueId(job) || "";
+  const url = new URL("profile-attorney.html", window.location.href);
+  url.searchParams.set("id", attorneyId);
+  if (jobId) url.searchParams.set("job", jobId);
+  return url.toString();
+}
+
+function updatePostedBy(card, job) {
+  const root = card.querySelector("[data-posted-by]");
+  if (!root) return;
+  const avatar = root.querySelector(".posted-avatar");
+  const nameEl = root.querySelector("[data-posted-name]");
+  const firmEl = root.querySelector("[data-posted-firm]");
+  const trustEl = root.querySelector("[data-posted-trust]");
+  const linkEl = root.querySelector("[data-attorney-link]");
+  const attorney = job?.attorney || {};
+  const displayName = [attorney.firstName, attorney.lastName].filter(Boolean).join(" ") || "Attorney";
+  const profileUrl = buildAttorneyProfileUrl(attorney, job);
+  if (avatar) {
+    avatar.src = attorney.profileImage || FALLBACK_AVATAR;
+    avatar.alt = `Profile photo of ${displayName}`;
+  }
+  if (nameEl) nameEl.textContent = displayName;
+  if (firmEl) firmEl.textContent = attorney.lawFirm || "Firm undisclosed";
+  if (trustEl) {
+    const count = getCompletedJobsCount(job);
+    if (count >= 2) {
+      trustEl.textContent = `${count} completed jobs`;
+      trustEl.style.display = "";
+    } else {
+      trustEl.textContent = "";
+      trustEl.style.display = "none";
+    }
+  }
+  if (linkEl) {
+    if (profileUrl) {
+      linkEl.href = profileUrl;
+      linkEl.dataset.attorneyLinkReady = "true";
+    } else {
+      linkEl.href = "#";
+      delete linkEl.dataset.attorneyLinkReady;
+    }
+  }
 }

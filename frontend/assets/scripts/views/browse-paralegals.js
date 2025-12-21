@@ -24,11 +24,9 @@ function init() {
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => {
-    void hydrate(1);
-  }, { once: true });
+  document.addEventListener("DOMContentLoaded", init, { once: true });
 } else {
-  void hydrate(1);
+  init();
 }
 
 async function hydrate(page = 1) {
@@ -87,12 +85,16 @@ function renderGrid(items = []) {
     return;
   }
   items.forEach((paralegal) => {
+    const paralegalId = String(paralegal._id || paralegal.id || paralegal.paralegalId || "");
     const card = document.createElement("div");
     card.className = "pl-card";
+    if (paralegalId) {
+      card.dataset.paralegalId = paralegalId;
+    }
 
-  const avatar = document.createElement("img");
-  avatar.className = "pl-avatar";
-  avatar.setAttribute("data-avatar", "");
+    const avatar = document.createElement("img");
+    avatar.className = "pl-avatar";
+    avatar.setAttribute("data-avatar", "");
     avatar.alt = `${formatName(paralegal)} avatar`;
     avatar.src = getProfileImageUrl(paralegal) || PLACEHOLDER_AVATAR;
 
@@ -119,7 +121,8 @@ function renderGrid(items = []) {
     const viewBtn = document.createElement("button");
     viewBtn.type = "button";
     viewBtn.className = "pl-view-btn";
-    viewBtn.dataset.id = String(paralegal._id || paralegal.id || "");
+    viewBtn.dataset.paralegalId = paralegalId;
+    viewBtn.dataset.id = paralegalId;
     viewBtn.textContent = "View Profile";
 
     card.appendChild(avatar);
@@ -150,10 +153,13 @@ function renderPagination(meta = {}) {
 }
 
 function onGridClick(event) {
+  const nestedLink = event.target.closest("a");
+  if (nestedLink && nestedLink.closest(".pl-card")) return;
   const button = event.target.closest(".pl-view-btn");
-  if (!button || !button.dataset.id) return;
-  const targetId = button.dataset.id;
-  window.location.href = `profile-paralegal.html?id=${encodeURIComponent(targetId)}`;
+  const card = event.target.closest(".pl-card");
+  const targetId = button?.dataset.paralegalId || button?.dataset.id || card?.dataset.paralegalId;
+  if (!targetId) return;
+  window.location.href = buildParalegalProfileUrl(targetId);
 }
 
 function setStatus(message, isError = false) {
@@ -211,6 +217,12 @@ function buildCertificateSnippet(paralegal = {}) {
   if (!paralegal.certificateURL) return "";
   const safe = escapeAttribute(paralegal.certificateURL);
   return `<p>Certificate: <a href="${safe}" target="_blank" rel="noopener">View</a></p>`;
+}
+
+function buildParalegalProfileUrl(paralegalId = "") {
+  const safeId = String(paralegalId || "").trim();
+  if (!safeId) return "profile-paralegal.html";
+  return `profile-paralegal.html?paralegalId=${encodeURIComponent(safeId)}`;
 }
 
 function escapeHtml(value = "") {

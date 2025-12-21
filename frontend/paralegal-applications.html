@@ -414,27 +414,48 @@ nav a.active {background:rgba(255,255,255,0.25);}
       <h1>Welcome, Paralegal</h1>
       <p>Review and track your job applications.</p>
     </div>
-    <div class="header-cluster" data-paralegal-cluster data-notification-center>
-      <button type="button" class="notification-icon" aria-label="View notifications" data-notification-toggle id="notificationToggle">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 01-3.46 0" />
-        </svg>
-        <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
-      </button>
-      <div id="profileHeaderBlock" class="user-profile">
-        <img id="clusterAvatar" class="globalProfileImage nav-profile-photo profile-img-small" src="https://via.placeholder.com/64x64.png?text=PL" alt="Paralegal avatar">
-        <div>
-          <strong id="clusterName" class="globalProfileName"></strong>
-          <span id="clusterRole" class="globalProfileRole"></span>
+    <div class="header-cluster profile-header-controls" data-notification-center>
+      <div class="notification-wrapper">
+        <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle id="notificationToggle">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 01-3.46 0"></path>
+          </svg>
+          <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
+        </button>
+        <div
+          class="notification-dropdown"
+          id="notificationDropdown"
+          style="
+            display: none;
+            width: 320px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            padding: 16px;
+          "
+        >
+          <div style="font-weight: 600; margin-bottom: 8px;">
+            Notifications
+          </div>
+
+          <div id="notificationList" style="font-size: 14px; color: #555;">
+            No new notifications.
+          </div>
+        </div>
+        <div id="notificationPanel" class="notif-panel hidden" data-notification-panel>
+          <div class="notif-header">Notifications</div>
+          <div class="notif-body" id="notifList" data-notification-list></div>
+          <div class="notif-empty" data-notification-empty>No new notifications.</div>
         </div>
       </div>
-      <div id="notificationPanel" class="notif-panel hidden" data-notification-panel>
-        <div class="notif-header">Notifications</div>
-        <div id="notifList" data-notification-list></div>
-        <div class="notif-empty" data-notification-empty>Loading…</div>
-        <button id="markAllReadBtn" class="notif-markall" type="button" data-notification-mark>Mark All Read</button>
-      </div>
+      <a class="user-chip" href="/dashboard-paralegal.html" aria-label="Go to dashboard">
+        <img id="clusterAvatar" class="nav-profile-photo" src="https://via.placeholder.com/64x64.png?text=PL" alt="Profile" />
+        <div>
+          <strong id="clusterName">Paralegal</strong>
+          <span id="clusterRole">Member</span>
+        </div>
+      </a>
     </div>
   </header>
 

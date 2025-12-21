@@ -313,7 +313,7 @@ let attorneyPrefsBound = false;
 let attorneySaveBound = false;
 
 const LANGUAGE_PROFICIENCY_OPTIONS = [
-  { value: "Native", label: "Native / Bilingual" },
+  { value: "Native", label: "Native" },
   { value: "Fluent", label: "Fluent" },
   { value: "Professional", label: "Professional" },
   { value: "Conversational", label: "Conversational" },
@@ -1746,7 +1746,7 @@ function handleProfilePreviewNavigation() {
   if (role === "attorney") {
     window.location.href = `profile-attorney.html?id=${id}`;
   } else {
-    window.location.href = `profile-paralegal.html?id=${id}`;
+    window.location.href = `profile-paralegal.html?paralegalId=${id}`;
   }
 }
 

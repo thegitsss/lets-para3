@@ -1,11 +1,63 @@
 // Shared notification center for headers
 import { secureFetch, getStoredSession } from "../auth.js";
 
+const NOTIFICATION_STYLE_ID = "lpc-notification-styles";
+let lastKnownUnread = 0;
+
+function ensureNotificationStyles() {
+  if (typeof document === "undefined") return;
+  if (document.getElementById(NOTIFICATION_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = NOTIFICATION_STYLE_ID;
+  style.textContent = `
+    .notification-wrapper{position:relative;}
+    .notification-dropdown{position:absolute;top:calc(100% + 8px);right:0;z-index:100000;}
+    .notif-item{display:flex;align-items:flex-start;gap:12px;}
+    .notif-main{display:flex;align-items:flex-start;gap:12px;flex:1;}
+    .notif-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#f2f4f8;flex-shrink:0;}
+    .notif-copy{display:flex;flex-direction:column;gap:4px;flex:1;}
+    .notif-dot{width:10px;height:10px;border-radius:50%;background:var(--accent,#b6a47a);margin-top:6px;opacity:0;flex-shrink:0;}
+    .notif-item.unread .notif-dot{opacity:0.9;}
+    .notif-dismiss{background:transparent;border:none;color:var(--muted,#7a7a7a);font-size:0.9rem;cursor:pointer;padding:6px;border-radius:8px;align-self:flex-start;flex-shrink:0;}
+    .notif-dismiss:hover{background:rgba(0,0,0,0.06);color:var(--ink,#1a1a1a);}
+    .notif-time{color:var(--muted,#6b7280);}
+  `;
+  document.head.appendChild(style);
+}
+
+function normalizeNotification(item = {}) {
+  const isRead = item.isRead ?? item.read ?? false;
+  return { ...item, isRead, read: isRead };
+}
+
+function isNotificationRead(item = {}) {
+  return item?.isRead ?? item?.read ?? false;
+}
+
+function getUnreadCount(list = []) {
+  return list.filter((item) => !isNotificationRead(item)).length;
+}
+
+function getAvatarFallback(name = "") {
+  const letter = (name || "?").trim().charAt(0).toUpperCase() || "?";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="32" fill="#eef1f7"/><text x="50%" y="56%" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#5c6477">${letter}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function formatNotificationMessage(item = {}) {
+  if (item.message) return item.message;
+  if (item.type === "message" && item.actorFirstName) {
+    return `${item.actorFirstName} sent you a message.`;
+  }
+  return "You have a new notification.";
+}
+
 export async function loadNotifications() {
   try {
     const res = await fetch("/api/notifications", { credentials: "include" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const items = await res.json();
+    const payload = await res.json();
+    const items = (Array.isArray(payload) ? payload : []).map(normalizeNotification);
 
     const lists = document.querySelectorAll("[data-notification-list]");
     lists.forEach((listEl) => {
@@ -13,7 +65,9 @@ export async function loadNotifications() {
       renderNotificationList(listEl, emptyEl, items);
     });
 
-    syncNotificationBadges(items.filter((i) => !i.read).length);
+    const unreadCount = getUnreadCount(items);
+    lastKnownUnread = unreadCount;
+    syncNotificationBadges(unreadCount);
   } catch (err) {
     console.warn("[notifications] loadNotifications failed", err);
   }
@@ -54,7 +108,7 @@ function formatNotificationBody(item = {}) {
     case "case_update":
       return payload.summary || `Case "${payload.caseTitle || "update"}" has changed.`;
     case "resume_uploaded":
-      return "Your résumé has been successfully uploaded.";
+      return "Your resume has been successfully uploaded.";
     case "profile_approved":
       return "Your profile was approved.";
     case "payout_released":
@@ -71,20 +125,31 @@ function formatTimeAgo(dateString) {
 }
 
 async function markNotificationRead(id) {
-  if (!id) return;
+  if (!id) return false;
   try {
-    await fetch(`/api/notifications/${id}/read`, {
+    await secureFetch(`/api/notifications/${id}/read`, {
       method: "POST",
       credentials: "include",
     });
+    return true;
   } catch (err) {
     console.warn("[notifications] mark single read failed", err);
+    return false;
   }
 }
 
 const centers = [];
 let dismissBound = false;
 let initBound = false;
+
+function totalUnread() {
+  const centerTotal = centers.reduce((sum, center) => {
+    return sum + getUnreadCount(center.notifications || []);
+  }, 0);
+  return centerTotal || lastKnownUnread || 0;
+}
+
+ensureNotificationStyles();
 
 export function scanNotificationCenters() {
   document.querySelectorAll("[data-notification-center]").forEach((root) => {
@@ -101,7 +166,11 @@ export function scanNotificationCenters() {
 export function initNotificationCenters() {
   if (initBound) return;
   initBound = true;
-  document.addEventListener("DOMContentLoaded", scanNotificationCenters);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", scanNotificationCenters, { once: true });
+  } else {
+    scanNotificationCenters();
+  }
 }
 
 // Auto-init on import
@@ -171,22 +240,24 @@ function togglePanel(center) {
   center.panel.classList.toggle("hidden", !willShow);
   if (willShow) {
     if (!center.loaded) {
-      fetchNotifications(center);
-    } else if (center.unread > 0) {
+      fetchNotifications(center, { markReadOnLoad: true });
+    } else {
       markNotificationsRead(center);
     }
   }
 }
 
 function preload(center) {
-  renderEmpty(center, "Loading…");
+  renderEmpty(center, "Loading...");
   fetchNotifications(center);
 }
 
-async function fetchNotifications(center) {
+async function fetchNotifications(center, options = {}) {
   if (center.loading) return;
   const session = getStoredSession();
   if (!session?.token) {
+    lastKnownUnread = 0;
+    syncNotificationBadges(0);
     renderEmpty(center, "Sign in to view notifications.");
     center.loaded = true;
     return;
@@ -201,11 +272,16 @@ async function fetchNotifications(center) {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
-    center.notifications = Array.isArray(payload) ? payload : [];
-    center.unread = center.notifications.filter((n) => !n.read).length;
+    center.notifications = Array.isArray(payload) ? payload.map(normalizeNotification) : [];
+    center.unread = getUnreadCount(center.notifications);
     center.loaded = true;
     renderNotifications(center);
-    syncNotificationBadges(center.unread);
+    const total = totalUnread();
+    lastKnownUnread = total;
+    syncNotificationBadges(total);
+    if (options.markReadOnLoad && center.unread > 0 && center.panel.classList.contains("show")) {
+      await markNotificationsRead(center);
+    }
   } catch (err) {
     console.warn("[notifications] load failed", err);
     renderEmpty(center, "Notifications unavailable.");
@@ -216,27 +292,40 @@ async function fetchNotifications(center) {
 
 function renderNotifications(center) {
   updateBadge(center, center.unread);
-  if (!center.list || !center.empty) return;
+  if (!center.list || !center.empty) {
+    const totalIfMissing = totalUnread();
+    lastKnownUnread = totalIfMissing;
+    syncNotificationBadges(totalIfMissing);
+    return;
+  }
   center.list.innerHTML = "";
   if (!center.notifications.length) {
-    renderEmpty(center, "You’re all caught up.");
+    renderEmpty(center, "You're all caught up.");
     return;
   }
   center.empty.style.display = "none";
   center.notifications.forEach((item) => {
-    const node = buildNotificationNode(item);
+    const node = buildNotificationNode(item, center);
     center.list.appendChild(node);
   });
-  syncNotificationBadges(center.unread);
+  const total = totalUnread();
+  lastKnownUnread = total;
+  syncNotificationBadges(total);
 }
 
 function renderEmpty(center, text) {
+  if (center) {
+    center.unread = 0;
+  }
   if (center.empty) {
     center.empty.style.display = "block";
     center.empty.textContent = text;
   }
   if (center.list) center.list.innerHTML = "";
   updateBadge(center, 0);
+  const total = totalUnread();
+  lastKnownUnread = total;
+  syncNotificationBadges(total);
 }
 
 function updateBadge(center, count) {
@@ -247,20 +336,57 @@ function updateBadge(center, count) {
 }
 
 async function markNotificationsRead(center) {
-  if (!center.unread) return;
+  const hasUnread = (center.notifications || []).some((item) => !isNotificationRead(item));
+  if (!hasUnread) return;
   try {
     await secureFetch("/api/notifications/read-all", {
       method: "POST",
       credentials: "include",
     });
-    center.unread = 0;
-    center.notifications = center.notifications.map((item) => ({ ...item, read: true }));
-    updateBadge(center, 0);
+    centers.forEach((c) => {
+      c.notifications = (c.notifications || []).map((item) => ({ ...item, read: true, isRead: true }));
+      c.unread = 0;
+      updateBadge(c, 0);
+      if (c !== center) {
+        renderNotifications(c);
+      }
+    });
     renderNotifications(center);
-    syncNotificationBadges(0);
   } catch (err) {
     console.warn("[notifications] mark read failed", err);
   }
+}
+
+async function dismissNotification(center, id) {
+  if (!id) return false;
+  try {
+    await secureFetch(`/api/notifications/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+  } catch (err) {
+    console.warn("[notifications] dismiss failed", err);
+  }
+  const targetId = String(id);
+  centers.forEach((c) => {
+    const before = (c.notifications || []).length;
+    c.notifications = (c.notifications || []).filter(
+      (item) => String(item._id || item.id) !== targetId
+    );
+    if (before !== c.notifications.length) {
+      c.unread = getUnreadCount(c.notifications);
+      updateBadge(c, c.unread);
+      renderNotifications(c);
+    }
+  });
+  if (!centers.length) {
+    const remaining = document.querySelectorAll("[data-notification-list] .notif-item.unread").length;
+    syncNotificationBadges(remaining);
+    return true;
+  }
+  const total = totalUnread();
+  syncNotificationBadges(total);
+  return true;
 }
 
 function bindGlobalDismiss() {
@@ -280,6 +406,27 @@ function bindGlobalDismiss() {
   });
 }
 
+function bindMinimalToggleHandler() {
+  document.addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-notification-toggle]");
+    if (!toggle) return;
+    const root = toggle.closest("[data-notification-center]") || document;
+    const panel =
+      root.querySelector("[data-notification-panel]") ||
+      toggle.parentElement?.querySelector("[data-notification-panel]");
+    if (!panel) return;
+    const willShow = !panel.classList.contains("show");
+    document.querySelectorAll("[data-notification-panel]").forEach((node) => {
+      if (node !== panel) {
+        node.classList.remove("show");
+        node.classList.add("hidden");
+      }
+    });
+    panel.classList.toggle("show", willShow);
+    panel.classList.toggle("hidden", !willShow);
+  });
+}
+
 function formatRelativeTime(value) {
   if (!value) return "";
   const date = value instanceof Date ? value : new Date(value);
@@ -295,10 +442,14 @@ function formatRelativeTime(value) {
   return date.toLocaleDateString();
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  loadNotifications();
-  initPushNotifications();
-});
+if (!notificationsOptOut) {
+  document.addEventListener("DOMContentLoaded", () => {
+    ensureNotificationStyles();
+    loadNotifications();
+    initPushNotifications();
+    bindMinimalToggleHandler();
+  });
+}
 
 async function initPushNotifications() {
   if (typeof window === "undefined") return;
@@ -360,49 +511,130 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
-function buildNotificationNode(item = {}) {
+function buildNotificationNode(item = {}, center = null, options = {}) {
+  const normalized = normalizeNotification(item);
+  const onDismiss = typeof options.onDismiss === "function" ? options.onDismiss : null;
   const wrapper = document.createElement("div");
-  wrapper.className = `notif-item ${item.read ? "read" : "unread"}`;
-  const title = document.createElement("div");
-  title.className = "notif-title";
-  title.textContent = formatNotificationTitle(item);
-  const body = document.createElement("div");
-  body.className = "notif-body";
-  body.textContent = formatNotificationBody(item);
+  wrapper.className = `notif-item ${normalized.isRead ? "read" : "unread"}`;
+  wrapper.dataset.id = normalized.id || normalized._id || "";
+  const actorName = normalized.actorFirstName || "";
+
+  const avatar = document.createElement("img");
+  avatar.className = "notif-avatar";
+  avatar.src = normalized.actorProfileImage || getAvatarFallback(actorName);
+  avatar.alt = actorName ? `${actorName}'s profile photo` : "Notification";
+  avatar.loading = "lazy";
+
+  const dot = document.createElement("span");
+  dot.className = "notif-dot";
+  dot.setAttribute("aria-hidden", "true");
+
+  const message = document.createElement("div");
+  message.className = "notif-title";
+  message.textContent = formatNotificationMessage(normalized);
+
   const time = document.createElement("div");
   time.className = "notif-time";
-  time.textContent = formatTimeAgo(item.createdAt);
-  wrapper.appendChild(title);
-  wrapper.appendChild(body);
-  wrapper.appendChild(time);
-  if (item._id) {
-    wrapper.addEventListener("click", async () => {
-      if (!wrapper.classList.contains("read")) {
-        await markNotificationRead(item._id);
+  time.textContent = formatRelativeTime(normalized.createdAt);
+
+  const copy = document.createElement("div");
+  copy.className = "notif-copy";
+  copy.appendChild(message);
+  copy.appendChild(time);
+
+  const main = document.createElement("div");
+  main.className = "notif-main";
+  main.appendChild(dot);
+  main.appendChild(copy);
+
+  const dismiss = document.createElement("button");
+  dismiss.className = "notif-dismiss";
+  dismiss.type = "button";
+  dismiss.title = "Dismiss";
+  dismiss.setAttribute("aria-label", "Dismiss notification");
+  dismiss.textContent = "x";
+  dismiss.addEventListener("click", async (event) => {
+    event.stopPropagation();
+    const ok = await dismissNotification(center, normalized._id || normalized.id);
+    if (!center && ok) {
+      wrapper.remove();
+      if (onDismiss) onDismiss();
+    }
+  });
+
+  wrapper.appendChild(avatar);
+  wrapper.appendChild(main);
+  wrapper.appendChild(dismiss);
+
+  const link = typeof normalized.link === "string" ? normalized.link.trim() : "";
+  wrapper.addEventListener("click", async () => {
+    const id = normalized._id || normalized.id;
+    if (!isNotificationRead(normalized) && id) {
+      const success = await markNotificationRead(id);
+      if (success) {
+        normalized.isRead = true;
+        normalized.read = true;
         wrapper.classList.remove("unread");
         wrapper.classList.add("read");
-        const remaining = document.querySelectorAll("[data-notification-list] .notif-item.unread").length;
-        syncNotificationBadges(remaining);
+        if (centers.length) {
+          const targetId = String(id);
+          centers.forEach((c) => {
+            let touched = false;
+            c.notifications = (c.notifications || []).map((n) => {
+              if (String(n._id || n.id) !== targetId) return n;
+              touched = true;
+              return { ...n, isRead: true, read: true };
+            });
+            if (touched) {
+              c.unread = getUnreadCount(c.notifications);
+              updateBadge(c, c.unread);
+              renderNotifications(c);
+            }
+          });
+          const total = totalUnread();
+          syncNotificationBadges(total);
+        } else {
+          const remaining = document.querySelectorAll("[data-notification-list] .notif-item.unread").length;
+          syncNotificationBadges(remaining);
+        }
       }
-    });
-  }
+    }
+    if (link) {
+      window.location.href = link;
+    }
+  });
+
   return wrapper;
 }
 
 function renderNotificationList(listEl, emptyEl, items = []) {
+  if (!listEl) return;
   listEl.innerHTML = "";
-  if (!items.length) {
+  const normalized = (Array.isArray(items) ? items : []).map(normalizeNotification);
+  if (!normalized.length) {
     if (emptyEl) {
       emptyEl.style.display = "block";
-      emptyEl.textContent = "You’re all caught up.";
+      emptyEl.textContent = "You're all caught up.";
     }
     return;
   }
   if (emptyEl) emptyEl.style.display = "none";
-  items.forEach((item) => listEl.appendChild(buildNotificationNode(item)));
+  normalized.forEach((item) =>
+    listEl.appendChild(
+      buildNotificationNode(item, null, {
+        onDismiss: () => {
+          if (!listEl.children.length && emptyEl) {
+            emptyEl.style.display = "block";
+            emptyEl.textContent = "You're all caught up.";
+          }
+        },
+      })
+    )
+  );
 }
 
 function syncNotificationBadges(unreadCount) {
+  lastKnownUnread = unreadCount;
   const label = unreadCount > 9 ? "9+" : unreadCount > 0 ? String(unreadCount) : "";
   document.querySelectorAll("[data-notification-toggle]").forEach((toggle) => {
     if (label) {

@@ -134,8 +134,13 @@
       color:#fff;
     }
     body.theme-mountain .sidebar-link{color:#fff;}
-    .sidebar-footer{
+    .sidebar-bottom{
       margin-top:auto;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .sidebar-footer{
       font-size:0.7rem;
       color:var(--muted);
       text-align:center;
@@ -156,7 +161,7 @@
   top: 14px;
   left: 0;
   right: 0;
-  height: 2px;
+  height: 3px;
   background: var(--line);
 }
 
@@ -233,16 +238,6 @@
       flex:1;
       position:relative;
     }
-    .step:not(:first-child)::before{
-      content:"";
-      position:absolute;
-      top:14px;
-      left:0;
-      width:100%;
-      height:2px;
-      background:var(--line);
-      z-index:0;
-    }
     .circle{
       position:relative;
       z-index:1;
@@ -310,21 +305,6 @@
       outline:none;
     }
 
-    .actions{
-      display:flex;
-      justify-content:flex-end;
-      gap:10px;
-      margin-top:1.5rem;
-    }
-    .step-panel form .actions{
-      max-width:800px;
-      margin-left:auto;
-      margin-right:auto;
-    }
-    #create-step-review .actions{
-      max-width:900px;
-      margin:2rem auto 0;
-    }
     .btn{
       border:none;
       border-radius:6px;
@@ -471,12 +451,26 @@
       display: none !important;
     }
 
-    .form-wrapper{
-      display:grid;
-      grid-template-columns:1fr 260px;
-      gap:2rem;
+    .step-panel form{
       max-width:1000px;
       margin:0 auto;
+      width:100%;
+    }
+
+    .form-wrapper{
+      max-width:1000px;
+      margin:0 auto;
+      display:flex;
+      flex-direction:column;
+      gap:1.5rem;
+    }
+
+    #create-step-description .form-wrapper form{
+      width:100%;
+    }
+
+    #create-step-description .form-wrapper .tips{
+      width:100%;
     }
 
     .tips{
@@ -519,24 +513,36 @@
     }
 
     .summary{
-      max-width:900px;
+      max-width:1000px;
       margin:0 auto;
       background:var(--panel);
       border:1px solid var(--line);
       border-radius:var(--radius);
-      padding:2rem;
+      padding:2.6rem 3rem;
       box-shadow:0 2px 6px rgba(0,0,0,0.03);
+      display:flex;
+      flex-direction:column;
+      gap:1.1rem;
+      line-height:1.6;
     }
     .summary h2{
-      font-family:'Sarabun',sans-serif;
+      font-family:'Cormorant Garamond',serif;
       font-weight:300;
       font-size:1.5rem;
-      margin-bottom:1rem;
+      margin-bottom:1.25rem;
     }
-    .summary p{margin:0.25rem 0;color:var(--ink);}
+    .summary p{margin:0;color:var(--ink);}
     .summary small{color:var(--muted);}
+
     .auto-note{margin-top:1rem;font-size:0.9rem;color:var(--muted);}
     .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:2rem;}
+    .step-panel .actions{
+      max-width:1000px;
+      margin:2rem auto 0;
+      width:100%;
+      padding:0 2rem;
+      justify-content:flex-end;
+    }
     .btn{border:none;border-radius:6px;padding:0.6rem 1.1rem;font-size:0.9rem;cursor:pointer;transition:all .2s;}
     .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
     .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
@@ -647,8 +653,10 @@
       <a href="billing-attorney.html">Escrow</a>
       <a href="help.html">Help</a>
     </nav>
-    <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
+    <div class="sidebar-bottom">
+      <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
+      <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
+    </div>
   </aside>
 
   <!-- Main -->
@@ -816,11 +824,12 @@
         </div>
       </div>
 
-        <div class="actions">
-          <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html">Cancel</button>
-          <button type="button" class="btn primary" data-step-switch="description" id="detailsNextBtn">Next Step</button>
-        </div>
       </form>
+
+      <div class="actions">
+        <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html">Cancel</button>
+        <button type="button" class="btn primary" data-step-switch="description" id="detailsNextBtn">Next Step</button>
+      </div>
     </section>
 
     <section class="step-panel" data-step="description" id="create-step-description" hidden>
@@ -851,11 +860,10 @@
             <textarea id="caseDescription" placeholder="Describe your case, goals, and expectations for the paralegal..."></textarea>
             <div class="char-count" id="descriptionCharCount">0 / 4000</div>
           </div>
-
-          <div class="actions">
-            <button type="button" class="btn secondary" data-step-switch="details">Back</button>
-            <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html">Save and Exit</button>
-            <button type="button" class="btn primary" data-step-switch="review">Next Step</button>
+          <div class="field">
+            <label for="caseDeadline">Deadline (optional)</label>
+            <input id="caseDeadline" type="date" placeholder="YYYY-MM-DD" />
+            <small style="color:var(--muted);">You can type a date or use the picker.</small>
           </div>
         </form>
 
@@ -867,6 +875,12 @@
             <li>Avoid sensitive or identifying details in the posting.</li>
           </ul>
           <p>For examples of effective job descriptions, <a href="help.html">read our help article</a>.</p>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn secondary" data-step-switch="details">Back</button>
+          <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html#cases:draft" data-save-draft="true">Save and Exit</button>
+          <button type="button" class="btn primary" data-step-switch="review">Next Step</button>
         </div>
       </div>
     </section>
@@ -894,7 +908,7 @@
 
       <div class="actions">
         <button type="button" class="btn secondary" data-step-switch="description">Back</button>
-        <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html">Save &amp; Exit</button>
+        <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html#cases:draft" data-save-draft="true">Save &amp; Exit</button>
         <button type="button" class="btn secondary" id="previewBtn">Preview Listing</button>
         <button type="button" class="btn primary" id="postBtn">Post Case</button>
       </div>
@@ -940,6 +954,7 @@
       state: document.getElementById("state"),
       comp: document.getElementById("comp"),
       experience: document.getElementById("experience"),
+      deadline: document.getElementById("caseDeadline"),
     };
     const titlePreview = document.getElementById("caseTitlePreviewText");
     const descriptionInput = document.getElementById("caseDescription");
@@ -996,6 +1011,12 @@
     function updateDescriptionCount() {
       if (!descriptionInput || !descriptionCount) return;
       descriptionCount.textContent = `${descriptionInput.value.length} / 4000`;
+    }
+
+    function hydrateDeadline() {
+      if (!fields.deadline) return;
+      const stored = getStoredValue("caseDeadline", "case_deadline");
+      if (stored) fields.deadline.value = stored;
     }
 
     function showStep(step, { updateHash = true } = {}) {
@@ -1094,7 +1115,8 @@
       if (storedDescription) {
         descriptionInput.value = storedDescription;
       }
-      updateDescriptionCount();
+    updateDescriptionCount();
+    hydrateDeadline();
       descriptionInput.addEventListener("input", () => {
         localStorage.setItem("caseDescription", descriptionInput.value);
         localStorage.setItem("case_description", descriptionInput.value);
@@ -1125,6 +1147,7 @@
       localStorage.setItem("caseComp", fields.comp?.value || "");
       localStorage.setItem("caseCompAmount", fields.comp?.value || "");
       localStorage.setItem("caseExperience", fields.experience?.value || "");
+      localStorage.setItem("caseDeadline", fields.deadline?.value || "");
     }
 
     function showFieldError(field, message) {
@@ -1173,6 +1196,7 @@
       const state = fields.state?.value || getStoredValue("caseState", "case_state");
       const compRaw = fields.comp?.value || getStoredValue("caseCompAmount", "case_comp_amount");
       const experience = fields.experience?.value || getStoredValue("caseExperience", "case_experience");
+      const deadline = fields.deadline?.value || getStoredValue("caseDeadline", "case_deadline");
       const description = (descriptionInput?.value || "").trim() || getStoredValue("caseDescription", "case_description").trim();
       return {
         title: title || "",
@@ -1181,6 +1205,7 @@
         compAmount: compRaw || "",
         comp: formatComp(compRaw),
         experience: experience || "",
+        deadline: deadline || "",
         description: description || "",
       };
     }
@@ -1195,6 +1220,13 @@
       if (!hasDescription()) {
         return false;
       }
+      if (fields.deadline && fields.deadline.value) {
+        const parsed = new Date(fields.deadline.value);
+        if (Number.isNaN(parsed.getTime())) {
+          showToastBanner("Enter a valid deadline date (YYYY-MM-DD).", "error");
+          return false;
+        }
+      }
       return true;
     }
 
@@ -1202,11 +1234,15 @@
       if (!reviewSummary) return;
       const data = collectCaseData();
       latestCaseData = data;
+      const deadlineText = data.deadline
+        ? new Date(data.deadline).toLocaleDateString() || data.deadline
+        : "No deadline set";
       reviewSummary.innerHTML = `
         <h2>${data.title || "(Untitled Case)"}</h2>
         <p><small>${data.field || "Practice area pending"} • ${data.state || "Location pending"}</small></p>
         <p><strong>Compensation:</strong> ${data.comp}</p>
         <p><strong>Experience:</strong> ${data.experience || "Not specified"}</p>
+        <p><strong>Deadline:</strong> ${deadlineText}</p>
         <hr>
         <p>${data.description || "No description provided yet."}</p>
         <p class="auto-note">${autoNoteCopy}</p>
@@ -1226,6 +1262,10 @@
       previewFields.comp && (previewFields.comp.textContent = data.comp || "—");
       previewFields.experience && (previewFields.experience.textContent = data.experience || "—");
       previewFields.description && (previewFields.description.textContent = data.description || "No description provided yet.");
+      if (data.deadline) {
+        const deadlineText = new Date(data.deadline).toLocaleDateString() || data.deadline;
+        previewFields.description.insertAdjacentHTML("beforebegin", `<p><strong>Deadline:</strong> ${deadlineText}</p>`);
+      }
       if (previewAutoNote) previewAutoNote.textContent = autoNoteCopy;
       previewModal.classList.add("active");
       document.body.classList.add("modal-open");
@@ -1295,17 +1335,231 @@
       return data;
     }
 
+    function mapPracticeArea(area = "") {
+      // Must align exactly with backend PRACTICE_AREAS (lowercase)
+      const allowed = [
+        "administrative law",
+        "bankruptcy",
+        "business law",
+        "civil litigation",
+        "commercial litigation",
+        "contract law",
+        "corporate law",
+        "criminal defense",
+        "employment law",
+        "estate planning",
+        "family law",
+        "immigration",
+        "intellectual property",
+        "labor law",
+        "personal injury",
+        "real estate",
+        "tax law",
+        "technology",
+        "trusts & estates",
+      ];
+      const aliases = {
+        "admiralty & maritime law": "civil litigation",
+        "antitrust law": "commercial litigation",
+        "appellate law": "civil litigation",
+        "banking law": "business law",
+        "bankruptcy law": "bankruptcy",
+        "business / corporate law": "business law",
+        "civil rights law": "civil litigation",
+        "class action law": "civil litigation",
+        "commercial law": "commercial litigation",
+        "communications law": "technology",
+        "construction law": "civil litigation",
+        "consumer protection law": "civil litigation",
+        "corporate law": "corporate law",
+        "criminal defense law": "criminal defense",
+        "education law": "administrative law",
+        "elder law": "estate planning",
+        "election law": "administrative law",
+        "employment & labor law": "employment law",
+        "energy law": "technology",
+        "entertainment law": "technology",
+        "environmental law": "civil litigation",
+        "estate planning & probate": "estate planning",
+        "franchise law": "business law",
+        "government contracts law": "contract law",
+        "health care law": "employment law",
+        "immigration law": "immigration",
+        "insurance law": "business law",
+        "intellectual property (ip) law": "intellectual property",
+        "international law": "business law",
+        "land use & zoning law": "real estate",
+        "litigation": "civil litigation",
+        "media law": "technology",
+        "medical malpractice": "personal injury",
+        "military law": "administrative law",
+        "municipal law": "administrative law",
+        "personal injury law": "personal injury",
+        "product liability law": "personal injury",
+        "real estate law": "real estate",
+        "securities law": "business law",
+        "social security / disability law": "administrative law",
+        "sports law": "business law",
+        "technology law": "technology",
+        "telecommunications law": "technology",
+        "torts": "civil litigation",
+        "transportation law": "business law",
+        "trusts & estates": "trusts & estates",
+        "white collar crime": "criminal defense",
+        "workers’ compensation": "employment law",
+      };
+
+      const cleaned = area.trim().replace(/[’']/g, "'").toLowerCase();
+      if (allowed.includes(cleaned)) return cleaned;
+      if (aliases[cleaned]) return aliases[cleaned];
+      const ampCandidate = cleaned.replace(/\band\b/g, "&").replace(/\s*&\s*/g, " & ");
+      if (allowed.includes(ampCandidate)) return ampCandidate;
+      if (aliases[ampCandidate]) return aliases[ampCandidate];
+
+      // Broad keyword fallbacks
+      if (cleaned.includes("contract")) return "contract law";
+      if (cleaned.includes("family")) return "family law";
+      if (cleaned.includes("immigration")) return "immigration";
+      if (cleaned.includes("real estate") || cleaned.includes("zoning") || cleaned.includes("land use"))
+        return "real estate";
+      if (cleaned.includes("employment") || cleaned.includes("labor")) return "employment law";
+      if (cleaned.includes("corporate") || cleaned.includes("business")) return "business law";
+      if (cleaned.includes("tax")) return "tax law";
+      if (cleaned.includes("technology") || cleaned.includes("telecom") || cleaned.includes("media"))
+        return "technology";
+      if (cleaned.includes("ip") || cleaned.includes("intellectual")) return "intellectual property";
+      if (cleaned.includes("injury") || cleaned.includes("liability") || cleaned.includes("malpractice"))
+        return "personal injury";
+      if (cleaned.includes("estate")) return "estate planning";
+      if (cleaned.includes("trust")) return "trusts & estates";
+      if (cleaned.includes("criminal") || cleaned.includes("white collar")) return "criminal defense";
+      if (cleaned.includes("bankruptcy")) return "bankruptcy";
+      // Default to a safe allowed value
+      return "civil litigation";
+    }
+
+    function padDescription(text = "") {
+      if (text.length >= 50) return text;
+      const filler = " Additional details will be provided to qualified applicants.";
+      let result = text.trim();
+      while (result.length < 50) {
+        result += filler;
+      }
+      return result;
+    }
+
+    async function createJobListing(casePayload, caseId) {
+      const practiceArea = mapPracticeArea(casePayload.field || "");
+      const description = padDescription(casePayload.description || "");
+      const budget = Math.max(50, Math.round(Number(casePayload.compAmount || casePayload.comp || 0)) || 50);
+      try {
+        await fetchCsrfToken();
+        const res = await fetch("/api/jobs", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${(window.getSessionToken && window.getSessionToken()) || ""}`,
+            "X-CSRF-Token": csrfToken || "",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({
+            caseId,
+            title: casePayload.title,
+            practiceArea,
+            description,
+            budget,
+          }),
+        });
+        if (!res.ok) {
+          // Soft-fail: log but don't block the case post UX.
+          console.warn("Job listing failed", await res.text().catch(() => ""));
+        }
+      } catch (err) {
+        console.warn("Job listing request failed", err);
+      }
+    }
+
     function buildPayload(data) {
       const description = data.description || "Additional details will be provided once the case is accepted.";
+      const practiceArea = mapPracticeArea(data.field);
+      const deadline = data.deadline || "";
       return {
         title: data.title,
-        practiceArea: data.field,
+        practiceArea,
         state: data.state,
         compensationAmount: data.compAmount,
         experience: data.experience,
         details: description,
+        deadline,
       };
     }
+
+    const LOCAL_DRAFTS_KEY = "attorneyLocalDraftCases";
+    let currentDraftId = localStorage.getItem("currentDraftId") || "";
+
+    function readLocalDrafts() {
+      try {
+        const raw = localStorage.getItem(LOCAL_DRAFTS_KEY);
+        const parsed = JSON.parse(raw || "[]");
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function writeLocalDrafts(list) {
+      localStorage.setItem(LOCAL_DRAFTS_KEY, JSON.stringify(list || []));
+    }
+
+    function upsertLocalDraft(draft) {
+      if (!draft?.id) return;
+      const list = readLocalDrafts().filter((d) => d && d.id !== draft.id);
+      list.unshift(draft);
+      writeLocalDrafts(list);
+    }
+
+    function removeLocalDraft(draftId) {
+      if (!draftId) return;
+      const list = readLocalDrafts().filter((d) => d && d.id !== draftId);
+      writeLocalDrafts(list);
+    }
+
+    function saveDraftToLocalList() {
+      const data = latestCaseData || collectCaseData();
+      if (!currentDraftId) {
+        currentDraftId = `draft-${Date.now()}`;
+        localStorage.setItem("currentDraftId", currentDraftId);
+      }
+      persistDraft();
+      const now = new Date().toISOString();
+      upsertLocalDraft({
+        id: currentDraftId,
+        title: data.title || "Untitled Case",
+        practiceArea: data.field || "",
+        details: data.description || "",
+        state: data.state || "",
+        status: "draft",
+        createdAt: now,
+        updatedAt: now,
+        localDraft: true,
+      });
+    }
+
+    function clearCurrentDraftId() {
+      if (currentDraftId) {
+        removeLocalDraft(currentDraftId);
+      }
+      currentDraftId = "";
+      localStorage.removeItem("currentDraftId");
+    }
+
+    window.saveDraftAndExit = function (targetHref) {
+      saveDraftToLocalList();
+      if (targetHref) {
+        window.location.href = targetHref;
+      }
+    };
 
     async function handlePost() {
       if (!ensureReviewReady()) {
@@ -1321,7 +1575,11 @@
       try {
         const created = await submitCase(buildPayload(data));
         clearDraft();
+        clearCurrentDraftId();
         const caseId = created?.id || created?._id;
+        if (caseId) {
+          void createJobListing(data, caseId);
+        }
         const href = caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "dashboard-attorney.html#cases";
         showToast("Your case has been successfully posted.", href);
       } catch (err) {

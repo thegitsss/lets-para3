@@ -66,11 +66,13 @@ const elements = {
   bioCopy: document.getElementById("bioCopy"),
   skillsList: document.getElementById("skillsList"),
   practiceList: document.getElementById("practiceList"),
+  skillsEmpty: document.getElementById("skillsEmpty"),
+  practiceEmpty: document.getElementById("practiceEmpty"),
   experienceList: document.getElementById("experienceList"),
   educationList: document.getElementById("educationList"),
   funFactsCard: document.getElementById("funFactsCard"),
   funFactsCopy: document.getElementById("funFactsCopy"),
-  attorneyCard: document.getElementById("attorneyInsightsCard"),
+  attorneyCard: document.getElementById("attorneyHighlightsCard"),
   attorneyHighlights: document.getElementById("attorneyHighlights"),
   languagesList: document.getElementById("languagesList"),
   languagesEmpty: document.getElementById("languagesEmpty"),
@@ -178,9 +180,15 @@ async function fetchSelfProfileSnapshot() {
 
 async function fetchPublicProfileSnapshot() {
   try {
-    const res = await secureFetch(`/api/paralegals/${encodeURIComponent(state.paralegalId || "")}`, {
+    const isSelf = state.paralegalId && state.viewerId && state.paralegalId === state.viewerId && state.viewerRole === "paralegal";
+    if (isSelf) {
+      const meRes = await secureFetch("/api/users/me", { headers: { Accept: "application/json" }, noRedirect: true });
+      const meData = await meRes.json().catch(() => null);
+      return meRes.ok ? meData : null;
+    }
+    const res = await fetch(`/api/public/paralegals/${encodeURIComponent(state.paralegalId || "")}`, {
       headers: { Accept: "application/json" },
-      noRedirect: true,
+      credentials: "include",
     });
     const data = await res.json().catch(() => null);
     return res.ok ? data : null;
@@ -270,7 +278,7 @@ async function init() {
 
   const params = new URLSearchParams(window.location.search);
   state.caseContextId = params.get("caseId") || null;
-  const explicitId = params.get("id") || params.get("paralegalId");
+  const explicitId = params.get("paralegalId") || params.get("id");
   state.viewingSelf = params.get("me") === "1";
 
   if (explicitId && explicitId.trim()) {
@@ -288,6 +296,9 @@ async function init() {
 
   if (!state.paralegalId && state.viewerRole === "paralegal") {
     state.paralegalId = state.viewerId;
+  }
+  if (state.paralegalId && state.viewerId && state.paralegalId === state.viewerId) {
+    state.viewingSelf = true;
   }
 
   if (!state.paralegalId) {
@@ -684,13 +695,24 @@ async function loadProfile() {
       }
     } else {
       if (!state.paralegalId) throw new Error("Paralegal not found");
-      const res = await secureFetch(`/api/paralegals/${encodeURIComponent(state.paralegalId)}`, {
-        headers: { Accept: "application/json" },
-        noRedirect: true,
-      });
-      data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "Unable to load profile");
-      state.profile = { ...data, id: data.id || data._id || state.paralegalId };
+      const viewingSelf = state.paralegalId === state.viewerId && state.viewerRole === "paralegal";
+      if (viewingSelf) {
+        const res = await secureFetch("/api/users/me", {
+          headers: { Accept: "application/json" },
+          noRedirect: true,
+        });
+        data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || "Unable to load profile");
+        state.profile = { ...data, id: data.id || data._id || state.paralegalId };
+      } else {
+        const res = await fetch(`/api/public/paralegals/${encodeURIComponent(state.paralegalId)}`, {
+          headers: { Accept: "application/json" },
+          credentials: "include",
+        });
+        data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || "Unable to load profile");
+        state.profile = { ...data, id: data.id || data._id || state.paralegalId };
+      }
     }
     applyGlobalAvatars(state.profile);
     applyAvatar(state.profile);
@@ -712,7 +734,7 @@ function renderProfile(profile) {
   setFieldText(elements.nameField, fullName);
 
   const experienceLabel = describeExperience(profile.yearsExperience);
-  const roleCopy = `${experienceLabel ? `${experienceLabel} • ` : ""}elite paralegal professional`;
+  const roleCopy = `${experienceLabel ? `${experienceLabel} • ` : ""}Paralegal`;
   setFieldText(elements.roleLine, roleCopy);
 
   const summary = profile.bio || profile.about || "This professional hasn’t added a summary yet.";
@@ -725,11 +747,10 @@ function renderProfile(profile) {
   const skillValues =
     (Array.isArray(profile.skills) && profile.skills.length ? profile.skills : null) ||
     (Array.isArray(profile.highlightedSkills) && profile.highlightedSkills.length ? profile.highlightedSkills : null);
-  renderSkills(elements.skillsList, skillValues, "This paralegal hasn’t shared skills yet.");
   const practiceValues =
     (Array.isArray(profile.practiceAreas) && profile.practiceAreas.length ? profile.practiceAreas : null) ||
     (Array.isArray(profile.specialties) && profile.specialties.length ? profile.specialties : null);
-  renderPills(elements.practiceList, practiceValues, "This paralegal hasn’t listed practice areas yet.");
+  renderSkillsAndPractice(skillValues, practiceValues);
   renderExperience(profile.experience);
   renderEducation(profile.education);
   renderFunFacts(profile.about, profile.writingSamples);
@@ -792,9 +813,7 @@ function renderMetadata(profile) {
     clearMetaLine(elements.locationMeta);
   }
 
-  if (profile.certificateURL) {
-    renderMetaLine(elements.credentialMeta, "C", "Credentials on file", profile.certificateURL);
-  } else if (profile.barNumber) {
+  if (profile.barNumber) {
     renderMetaLine(elements.credentialMeta, "C", `Bar #${profile.barNumber}`);
   } else {
     const linkedIn = profile.linkedInURL || profile.linkedin || "";
@@ -808,7 +827,7 @@ function renderMetadata(profile) {
   const joinedSource = profile.approvedAt || profile.createdAt || null;
   const joined =
     joinedSource && !Number.isNaN(new Date(joinedSource).getTime())
-      ? new Date(joinedSource).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })
+      ? new Date(joinedSource).toLocaleDateString(undefined, { month: "long", year: "numeric" })
       : null;
   renderMetaLine(elements.joinedMeta, "J", joined ? `Joined ${joined}` : "Joined date unavailable");
 }
@@ -894,7 +913,7 @@ function renderDocumentLinks(profile) {
     elements.documentsEmpty.classList.toggle("hidden", hasDoc);
   }
   if (elements.documentsCard) {
-    elements.documentsCard.classList.toggle("hidden", !hasDoc);
+    elements.documentsCard.classList.remove("hidden");
   }
 }
 
@@ -927,18 +946,10 @@ function renderLanguages(languages = []) {
   }
   if (emptyState) emptyState.classList.add("hidden");
   normalized.forEach((lang) => {
-    const key = String(lang.proficiency || "").toLowerCase();
-    const rawValue = LANGUAGE_RING_MAP[key] ?? 0.5;
-    const ratio = Math.max(0.1, Math.min(1, rawValue));
-    const pct = Math.round(ratio * 100);
-    const item = document.createElement("div");
-    item.className = "language-item";
-    item.innerHTML = `
-      <div class="language-ring" style="--val:${ratio}turn;">${pct}%</div>
-      <div class="language-label">${escapeHtml(lang.name)}</div>
-      <div class="language-level">${lang.proficiency || "—"}</div>
-    `;
-    container.appendChild(item);
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.textContent = lang.proficiency ? `${lang.name} — ${lang.proficiency}` : lang.name;
+    container.appendChild(chip);
   });
 }
 
@@ -1027,55 +1038,87 @@ function renderPills(container, values, emptyCopy) {
   });
 }
 
+function renderSkillsAndPractice(skills = [], practices = []) {
+  const renderList = (target, emptyEl, values, emptyCopy) => {
+    if (!target) return;
+    target.innerHTML = "";
+    const seen = new Set();
+    const cleaned = (Array.isArray(values) ? values : [])
+      .map((val) => (val ? String(val).trim() : ""))
+      .filter(Boolean)
+      .filter((val) => {
+        const key = val.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    if (!cleaned.length) {
+      if (emptyEl) emptyEl.classList.remove("hidden");
+      return;
+    }
+    if (emptyEl) emptyEl.classList.add("hidden");
+    cleaned.slice(0, 24).forEach((label) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = label;
+      target.appendChild(chip);
+    });
+  };
+
+  renderList(elements.skillsList, elements.skillsEmpty, skills, "No skills added yet.");
+  renderList(elements.practiceList, elements.practiceEmpty, practices, "No focus areas added yet.");
+}
+
 function renderExperience(entries) {
   if (!elements.experienceList) return;
   elements.experienceList.innerHTML = "";
-  const list = Array.isArray(entries) ? entries.filter((item) => item && (item.title || item.description)) : [];
+  const list = Array.isArray(entries) ? entries.filter((item) => item && (item.title || item.years)) : [];
   if (!list.length) {
     elements.experienceList.innerHTML = `<p class="muted">No experience timeline yet.</p>`;
     return;
   }
-  list.forEach((item) => {
-    const block = document.createElement("article");
-    const title = document.createElement("h3");
+  list.slice(0, 5).forEach((item) => {
+    const block = document.createElement("div");
+    block.className = "timeline-item";
+    const title = document.createElement("div");
+    title.className = "timeline-role";
     title.textContent = item.title || "Role";
+    const dates = document.createElement("div");
+    dates.className = "timeline-dates";
+    dates.textContent = item.years || item.timeline || formatExperienceRange(item) || "Dates not provided";
     block.appendChild(title);
-
-    if (item.years) {
-      const yearsEl = document.createElement("span");
-      yearsEl.textContent = item.years;
-      block.appendChild(yearsEl);
-    }
-
-    if (item.description) {
-      const desc = document.createElement("p");
-      desc.textContent = item.description;
-      block.appendChild(desc);
-    }
+    block.appendChild(dates);
     elements.experienceList.appendChild(block);
   });
+}
+
+function formatExperienceRange(item = {}) {
+  const start = item.startDate || item.start || item.from || "";
+  const end = item.endDate || item.end || item.to || "";
+  const formatDate = (value) => {
+    if (!value) return "";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+  };
+  const startLabel = formatDate(start);
+  const endLabel = formatDate(end);
+  if (startLabel && endLabel) return `${startLabel} – ${endLabel}`;
+  if (startLabel) return `${startLabel} – Present`;
+  return endLabel ? `Through ${endLabel}` : "";
 }
 
 function renderEducation(entries) {
   if (!elements.educationList) return;
   elements.educationList.innerHTML = "";
   const list = Array.isArray(entries) ? entries.filter((item) => item && (item.degree || item.school)) : [];
-  if (!list.length) {
-    elements.educationList.innerHTML = `<p class="muted">Education history coming soon.</p>`;
-    return;
-  }
-  list.forEach((item) => {
-    const block = document.createElement("article");
-    const degree = document.createElement("h3");
-    degree.textContent = item.degree || "Degree";
-    block.appendChild(degree);
-
-    if (item.school) {
-      const school = document.createElement("span");
-      school.textContent = item.school;
-      block.appendChild(school);
-    }
-    elements.educationList.appendChild(block);
+  if (!list.length) return;
+  list.slice(0, 5).forEach((item) => {
+    const pill = document.createElement("span");
+    pill.className = "edu-pill";
+    const parts = [item.degree, item.school].filter(Boolean).join(" • ");
+    pill.textContent = parts || "Education detail";
+    elements.educationList.appendChild(pill);
   });
 }
 
@@ -1135,32 +1178,18 @@ function renderAttorneyHighlights(profile) {
       content: `<a href="${resumeHref}" target="_blank" rel="noopener">View Résumé</a>`,
     });
   }
-  if (profile.resumeURL) {
-    const resumeUrl = escapeAttribute(profile.resumeURL);
-    entries.push({
-      title: "Résumé",
-      content: `<a href="${resumeUrl}" target="_blank" rel="noopener">View Résumé</a>`,
-    });
-  }
 
   container.innerHTML = "";
   if (!entries.length) {
-    const empty = document.createElement("p");
-    empty.className = "muted";
-    empty.textContent = "Credentials forthcoming.";
-    container.appendChild(empty);
+    card.classList.add("hidden");
     return;
   }
 
   entries.forEach((entry) => {
-    const block = document.createElement("article");
-    const title = document.createElement("h3");
-    title.textContent = entry.title;
-    block.appendChild(title);
-    const body = document.createElement("p");
-    body.innerHTML = entry.content;
-    block.appendChild(body);
-    container.appendChild(block);
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.innerHTML = `${escapeHtml(entry.title)}: ${entry.content}`;
+    container.appendChild(chip);
   });
 }
 
