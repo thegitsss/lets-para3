@@ -121,7 +121,7 @@ const parseParalegalFilters = (query = {}) => {
 };
 
 const SAFE_PUBLIC_SELECT =
-  "_id firstName lastName avatarURL profileImage location specialties practiceAreas skills experience yearsExperience linkedInURL certificateURL writingSampleURL education resumeURL notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt languages writingSamples status";
+  "_id firstName lastName avatarURL profileImage location specialties practiceAreas skills experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt languages writingSamples status";
 const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email phoneNumber`;
 const FILE_PUBLIC_BASE =
   (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
@@ -152,6 +152,8 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
     location: src.location || "",
     state: src.state || src.location || "",
     lawFirm: src.lawFirm || "",
+    firmWebsite: src.firmWebsite || "",
+    publications: Array.isArray(src.publications) ? src.publications : [],
     specialties: Array.isArray(src.specialties) ? src.specialties : [],
     practiceAreas: Array.isArray(src.practiceAreas) ? src.practiceAreas : [],
     skills: Array.isArray(src.skills) ? src.skills : [],
@@ -276,7 +278,7 @@ async function buildNotifications(userDoc) {
 
 // all routes require auth
 router.use(verifyToken);
-paralegalRouter.use(verifyToken, requireRole(["paralegal"]));
+paralegalRouter.use(verifyToken);
 
 /**
  * GET /api/users?status=&role=
@@ -497,6 +499,12 @@ router.patch(
     if (body.preferredPracticeAreas !== undefined) {
       me.preferredPracticeAreas = cleanList(body.preferredPracticeAreas);
     }
+    if (body.practiceAreas !== undefined) {
+      me.practiceAreas = cleanList(body.practiceAreas);
+    }
+    if (body.publications !== undefined) {
+      me.publications = cleanList(body.publications);
+    }
     if (typeof body.collaborationStyle === "string") {
       me.collaborationStyle = normStr(body.collaborationStyle, { len: 500 }).trim();
     }
@@ -516,6 +524,16 @@ router.patch(
     }
     if (typeof timezone === "string" && timezone.length <= 64) {
       me.timezone = timezone;
+    }
+
+    if (typeof body.linkedInURL === "string") {
+      const trimmed = body.linkedInURL.trim();
+      me.linkedInURL = trimmed ? normStr(trimmed, { len: 500 }) : null;
+    }
+
+    if (typeof body.firmWebsite === "string") {
+      const trimmed = body.firmWebsite.trim();
+      me.firmWebsite = trimmed ? normStr(trimmed, { len: 500 }) : "";
     }
 
     if (me.role === "paralegal") {
@@ -551,10 +569,6 @@ router.patch(
       if (body.yearsExperience !== undefined) {
         const years = Math.max(0, Math.min(80, parseInt(body.yearsExperience, 10) || 0));
         me.yearsExperience = years;
-      }
-      if (typeof body.linkedInURL === "string") {
-        const trimmed = body.linkedInURL.trim();
-        me.linkedInURL = trimmed ? normStr(trimmed, { len: 500 }) : null;
       }
     }
     if (body.languages !== undefined) {
@@ -768,6 +782,7 @@ const PARALEGAL_SELECT = `${SAFE_PUBLIC_SELECT} role status email`;
 
 paralegalRouter.get(
   "/",
+  requireRole("paralegal", "attorney", "admin"),
   asyncHandler(async (req, res) => {
     const { filter, sortOpt, page, limit } = parseParalegalFilters(req.query);
     const [docs, total] = await Promise.all([
@@ -788,6 +803,7 @@ paralegalRouter.get(
 
 paralegalRouter.get(
   "/:paralegalId",
+  requireRole("paralegal", "attorney", "admin"),
   asyncHandler(async (req, res) => {
     const targetId = resolveParalegalId(req.params.paralegalId, req.user.id);
     if (!isObjId(targetId)) return res.status(400).json({ error: "Invalid paralegal id" });
@@ -974,7 +990,35 @@ router.patch(
 
 async function sendAttorney(attorneyId, res) {
   const attorney = await User.findById(attorneyId).select(
-    "firstName lastName lawFirm firmName email linkedInURL firmWebsite practiceDescription bio languages availability profileImage avatarURL experience practiceAreas specialties yearsExperience location"
+    [
+      "firstName",
+      "lastName",
+      "lawFirm",
+      "firmName",
+      "company",
+      "organization",
+      "email",
+      "linkedInURL",
+      "firmWebsite",
+      "practiceDescription",
+      "practiceOverview",
+      "bio",
+      "about",
+      "languages",
+      "availability",
+      "profileImage",
+      "avatarURL",
+      "experience",
+      "practiceAreas",
+      "specialties",
+      "publications",
+      "yearsExperience",
+      "location",
+      "locationState",
+      "state",
+      "timezone",
+      "title",
+    ].join(" ")
   );
   if (!attorney) {
     return res.status(404).json({ error: "Attorney not found" });
@@ -984,11 +1028,20 @@ async function sendAttorney(attorneyId, res) {
     id: attorney._id,
     firstName: attorney.firstName || "",
     lastName: attorney.lastName || "",
-    lawFirm: attorney.lawFirm || attorney.firmName || "",
+    lawFirm: attorney.lawFirm || attorney.firmName || attorney.company || attorney.organization || "",
+    name:
+      `${attorney.firstName || ""} ${attorney.lastName || ""}`.trim() ||
+      attorney.email ||
+      "Attorney",
     email: attorney.email || "",
     linkedInURL: attorney.linkedInURL || "",
     firmWebsite: attorney.firmWebsite || "",
-    practiceDescription: attorney.practiceDescription || attorney.bio || "",
+    practiceDescription:
+      attorney.practiceDescription ||
+      attorney.practiceOverview ||
+      attorney.bio ||
+      attorney.about ||
+      "",
     languages: attorney.languages || [],
     availability: attorney.availability || "Available now",
     profileImage: attorney.profileImage || attorney.avatarURL || "",
@@ -996,7 +1049,13 @@ async function sendAttorney(attorneyId, res) {
     practiceAreas: attorney.practiceAreas || [],
     specialties: attorney.specialties || [],
     yearsExperience: attorney.yearsExperience || 0,
-    location: attorney.location || ""
+    location:
+      attorney.location ||
+      attorney.locationState ||
+      attorney.state ||
+      attorney.timezone ||
+      "",
+    title: attorney.title || "Attorney",
   });
 }
 

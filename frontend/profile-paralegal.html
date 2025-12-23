@@ -14,7 +14,10 @@
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600;700&family=Cormorant+Garamond:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
   <script src="assets/scripts/utils/session.js"></script>
 
   <style>
@@ -52,9 +55,11 @@
     .bg-hero-mountain {
       position: fixed;
       inset: 0;
-      background: url('hero-mountain.jpg') center/cover no-repeat;
-      filter: blur(5px);
-      opacity: 0.3;
+      background:
+        linear-gradient(to bottom, rgba(0,0,0,0.32), rgba(0,0,0,0.14), rgba(0,0,0,0.48)),
+        url('hero-mountain.jpg') center/cover no-repeat;
+      filter: blur(4px) brightness(0.38) saturate(0.95);
+      opacity: 0.62;
       transform: scale(1.05);
       z-index: 0;
       pointer-events: none;
@@ -81,7 +86,7 @@
 
     .topbar {
       display: flex;
-      justify-content: flex-end;
+      justify-content: space-between;
       align-items: center;
       margin-bottom: 24px;
       gap: 16px;
@@ -97,6 +102,12 @@
       position: relative;
       z-index: 4;
       pointer-events: auto;
+    }
+
+    .back-row {
+      display: flex;
+      justify-content: flex-start;
+      margin-bottom: 12px;
     }
 
     .notification-wrapper {
@@ -321,15 +332,17 @@
     /* HERO CARD (matches UX layout) */
 
     .hero-card {
-      background: linear-gradient(135deg, #ffffff, #f7f1e6);
+      background: linear-gradient(135deg, #fdfbf7, #f6f0e6);
       border-radius: var(--radius-lg);
       padding: 32px 36px 34px;
-      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.07);
+      box-shadow:
+        0 30px 80px rgba(0, 0, 0, 0.12),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
       margin-bottom: 32px;
       position: relative;
       overflow: hidden;
       animation: fadeUp 0.4s ease both;
-      z-index: 2;
+      z-index: 50;
     }
 
     .hero-eyebrow {
@@ -345,6 +358,33 @@
       grid-template-columns: 220px minmax(0, 1fr);
       column-gap: 32px;
       align-items: center;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      background: transparent;
+      color: #1b1f2a;
+      text-decoration: none;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 14px;
+      font-weight: 300;
+      box-shadow: none;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, translate 0.15s ease;
+    }
+
+    .back-link:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+    }
+
+    .back-link svg {
+      width: 14px;
+      height: 14px;
     }
 
     .hero-photo-shell {
@@ -481,17 +521,21 @@
     }
 
     .card {
-      background: #ffffff;
+      background: linear-gradient(145deg, #fdfbf8, #f6f2ea);
       border-radius: var(--radius-md);
       padding: 18px 22px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.04);
+      box-shadow:
+        0 18px 55px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
       position: relative;
-      z-index: 2;
+      z-index: 40;
     }
     .card.compact {
       padding: 18px 18px;
-      box-shadow: 0 22px 58px rgba(0, 0, 0, 0.06);
-      background: linear-gradient(145deg, #ffffff, #fbf8f2);
+      box-shadow:
+        0 18px 58px rgba(0, 0, 0, 0.07),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
+      background: linear-gradient(145deg, #fdfbf8, #f5efe6);
     }
 
     .card-header-label {
@@ -648,6 +692,8 @@
       position: fixed;
       inset: 0;
       background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       display: none;
       align-items: center;
       justify-content: center;
@@ -660,20 +706,81 @@
     }
 
     .invite-modal {
-      width: min(520px, 100%);
-      background: #fff;
-      border-radius: 20px;
-      padding: 24px;
-      border: 1px solid var(--line);
-      box-shadow: 0 40px 80px rgba(0, 0, 0, 0.18);
+      width: min(360px, 90%);
+      max-height: 82vh;
+      background: linear-gradient(145deg, rgba(253, 251, 247, 0.7), rgba(244, 237, 225, 0.65));
+      border-radius: 30px;
+      padding: 30px 22px;
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      box-shadow:
+        0 22px 55px rgba(0, 0, 0, 0.14),
+        0 38px 120px rgba(0, 0, 0, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.8);
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 18px;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(24px) saturate(130%);
+      -webkit-backdrop-filter: blur(24px) saturate(130%);
+    }
+
+    .invite-modal::before {
+      content: "";
+      position: absolute;
+      inset: -40% auto auto -20%;
+      width: 220px;
+      height: 220px;
+      background: radial-gradient(closest-side, rgba(255, 255, 255, 0.55), transparent 60%);
+      transform: rotate(8deg);
+      pointer-events: none;
+      filter: blur(2px);
+    }
+
+    .invite-modal::after {
+      content: "";
+      position: absolute;
+      inset: auto -25% -35% auto;
+      width: 260px;
+      height: 260px;
+      background: radial-gradient(closest-side, rgba(255, 247, 230, 0.7), transparent 60%);
+      transform: rotate(-6deg);
+      pointer-events: none;
+      filter: blur(4px);
     }
 
     .invite-modal h3 {
-      font-size: 1.4rem;
-      font-weight: 300;
+      font-family: "Cormorant Garamond", "Times New Roman", serif;
+      font-size: 1.8rem;
+      font-weight: 400;
+      margin: 0 0 10px 0;
+      color: #1b1f2a;
+      letter-spacing: 0.02em;
+      text-align: center;
+    }
+
+    .invite-modal .modal-subtitle {
+      margin: 0;
+      color: #62687a;
+      font-size: 0.95rem;
+    }
+
+    .invite-modal label {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-weight: 500;
+      color: #2f3645;
+    }
+
+    .invite-modal select {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      padding: 12px 14px;
+      font-size: 1rem;
+      background: #fff;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
     }
 
     .modal-actions {
@@ -685,16 +792,32 @@
 
     .modal-actions button {
       border-radius: 999px;
-      padding: 0.6rem 1.2rem;
-      border: 1px solid var(--line);
+      padding: 0.65rem 1.4rem;
+      border: 1px solid rgba(0, 0, 0, 0.12);
       background: #fff;
       cursor: pointer;
+      font-weight: 600;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    }
+
+    .modal-actions button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
     }
 
     .modal-actions .confirm {
-      background: var(--ink);
+      background: #1f2937;
       color: #fff;
-      border-color: var(--ink);
+      border-color: #1f2937;
+    }
+
+    .modal-actions .confirm:disabled {
+      background: #d5d7dc;
+      border-color: #d5d7dc;
+      color: #8c9099;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
     }
 
     .toast {
@@ -752,9 +875,15 @@
   </style>
 </head>
 <body>
-  <div class="bg-hero-mountain" aria-hidden="true"></div>
-  <div class="page-shell">
+    <div class="bg-hero-mountain" aria-hidden="true"></div>
+    <div class="page-shell">
     <div class="topbar">
+      <a id="backBtn" class="back-link" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M15 6l-6 6 6 6"></path>
+        </svg>
+        <span>Back</span>
+      </a>
       <div class="profile-header-controls" data-notification-center>
         <div class="notification-wrapper">
           <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle id="notificationToggle">
@@ -789,12 +918,12 @@
             <div class="notif-body" id="notifList" data-notification-list></div>
             <div class="notif-empty" data-notification-empty>No new notifications.</div>
           </div>
-        </div>
+          </div>
         <a class="user-chip" href="/dashboard-paralegal.html" aria-label="Go to dashboard">
           <img id="clusterAvatar" class="nav-profile-photo" src="https://via.placeholder.com/64x64.png?text=PL" alt="Profile" />
           <div>
-            <strong id="clusterName">Paralegal</strong>
-            <span id="clusterRole">Member</span>
+            <strong id="clusterName">Profile</strong>
+            <span id="clusterRole"></span>
           </div>
         </a>
       </div>
@@ -866,10 +995,6 @@
         <div class="inline-row credentials-row" id="documentsCard">
           <span id="joinedMeta" class="hero-meta-pill" style="margin:0 auto;">Joined date unavailable</span>
         </div>
-        <div class="inline-row hidden" id="attorneyHighlightsCard" data-attorney-only>
-          <span class="card-header-label">Highlights</span>
-          <div id="attorneyHighlights" class="chip-row"></div>
-        </div>
       </article>
     </section>
 
@@ -884,6 +1009,7 @@
   <div class="modal-overlay" id="inviteModal" role="dialog" aria-modal="true">
     <div class="invite-modal">
       <h3>Invite to Case</h3>
+      <p class="modal-subtitle">Choose the case to connect with this paralegal.</p>
       <label>
         <span style="display:block;font-size:0.9rem;color:var(--muted);margin-bottom:6px;">Select a case</span>
         <select id="inviteCaseSelect"></select>

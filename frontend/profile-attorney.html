@@ -4,25 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Attorney Profile – Let’s-ParaConnect</title>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600;700&display=swap" rel="stylesheet" />
   <script src="assets/scripts/utils/session.js"></script>
   <style>
     :root {
-      --bg: #f6f4ef;
-      --panel: #ffffff;
-      --ink: #1a1f2b;
-      --muted: #6b6f7c;
-      --line: rgba(26, 31, 43, 0.08);
-      --accent: #b6a47a;
-      --accent-dark: #9c8a63;
-      --pill: rgba(182, 164, 122, 0.15);
-      --radius-lg: 28px;
-      --radius: 18px;
-      --font-serif: 'Cormorant Garamond', serif;
+      --bg: #ffffff;
+      --ink: #0f172a;
+      --muted: #5c6575;
+      --line: #dfe3ea;
+      --accent: #0b4bb3;
+      --subtle: #f5f7fb;
       --font-sans: 'Sarabun', sans-serif;
     }
-
-    .gold { color: var(--accent); }
 
     * {
       box-sizing: border-box;
@@ -32,48 +25,49 @@
 
     body {
       font-family: var(--font-sans);
-      font-weight: 200;
       background: var(--bg);
       color: var(--ink);
+      line-height: 1.6;
       min-height: 100vh;
     }
 
     .page-shell {
-      max-width: 1100px;
+      max-width: 1220px;
       margin: 0 auto;
-      padding: 32px 24px 80px;
+      padding: 32px 28px 96px;
     }
 
-    .topbar {
+    .page-header {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
       gap: 16px;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
+    }
+
+    .back-link {
+      color: var(--muted);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .back-link:hover {
+      color: var(--ink);
+      text-decoration: underline;
     }
 
     .btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      border-radius: 999px;
-      padding: 10px 20px;
+      border-radius: 4px;
+      padding: 10px 16px;
       font-size: 0.95rem;
+      font-weight: 700;
       border: 1px solid transparent;
       cursor: pointer;
       text-decoration: none;
-      transition: background 0.2s ease, color 0.2s ease, border 0.2s ease;
-    }
-
-    .btn-outline {
-      border-color: var(--line);
-      color: var(--ink);
-      background: transparent;
-    }
-
-    .btn-outline:hover {
-      border-color: var(--accent);
-      color: var(--accent-dark);
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
     }
 
     .btn-primary {
@@ -83,38 +77,122 @@
     }
 
     .btn-primary:hover {
-      background: var(--accent-dark);
-      border-color: var(--accent-dark);
+      background: #093d91;
+      border-color: #093d91;
     }
 
-    .hero-card {
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) 460px;
+      gap: 40px;
+      align-items: start;
+    }
+
+    .hero-text {
+      width: 100%;
+    }
+
+    .eyebrow {
+      font-size: 0.9rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+
+    #profileName {
+      font-size: 3rem;
+      line-height: 1.1;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--ink);
+    }
+
+    #profileSubtitle {
+      font-size: 1.1rem;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .link-strip {
       display: flex;
-      gap: 28px;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      padding: 32px;
-      margin-bottom: 28px;
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.06);
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 14px 0 20px;
+    }
+
+    .inline-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .inline-link:hover {
+      text-decoration: underline;
+    }
+
+    .hairline {
+      border: 0;
+      border-top: 1px solid var(--line);
+      margin: 14px 0 22px;
+    }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 24px;
+    }
+
+    .contact-card h4 {
+      font-size: 0.9rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    .contact-line {
+      font-size: 1rem;
+      color: var(--ink);
+    }
+
+    .contact-link {
+      font-size: 1rem;
+    }
+
+    .contact-link a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .contact-link a:hover {
+      text-decoration: underline;
+    }
+
+    .hero-photo {
+      width: 100%;
     }
 
     .avatar-shell {
-      width: 136px;
-      height: 136px;
-      border-radius: 32px;
-      background: linear-gradient(145deg, rgba(182, 164, 122, 0.15), rgba(0, 0, 0, 0.05));
+      width: 100%;
+      height: 430px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: linear-gradient(135deg, #e7edf5, #cfd8e7);
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
-      overflow: hidden;
     }
 
     #profileAvatar {
+      display: none;
       width: 100%;
       height: 100%;
       object-fit: cover;
-      display: none;
     }
 
     .avatar-shell.has-photo #profileAvatar {
@@ -122,119 +200,149 @@
     }
 
     .avatar-fallback {
-      font-size: 2.8rem;
-      font-weight: 600;
-      letter-spacing: 1px;
-      color: var(--accent-dark);
+      font-size: 2.6rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: #3f4e66;
     }
 
     .avatar-shell.has-photo .avatar-fallback {
       display: none;
     }
 
-    .hero-copy {
-      flex: 1;
+    .practice-card {
+      border-top: 1px solid var(--line);
+      padding-top: 18px;
+      margin-top: 24px;
     }
 
-    .hero-copy h1 {
-      font-family: var(--font-serif);
-      font-size: 2.6rem;
-      font-weight: 300;
-      margin-bottom: 8px;
-    }
-
-    .hero-copy p {
+    .practice-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       margin-bottom: 12px;
     }
 
-    .eyebrow {
-      font-size: 0.85rem;
-      letter-spacing: 3px;
+    .practice-header h3 {
+      font-size: 1.05rem;
+      letter-spacing: 0.08em;
+      color: var(--muted);
       text-transform: uppercase;
+    }
+
+    .practice-close {
       color: var(--muted);
-      margin-bottom: 8px;
+      font-weight: 700;
+      font-size: 1.1rem;
     }
 
-    .muted {
-      color: var(--muted);
-    }
-
-    .hero-meta {
+    .practice-list {
       display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      color: var(--muted);
-      font-size: 0.95rem;
-    }
-
-    .hero-meta span {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .hero-actions {
-      margin-top: 18px;
-      display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       gap: 10px;
     }
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 24px;
-      margin-bottom: 28px;
+    .practice-list .pill {
+      background: none;
+      padding: 0;
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 1.05rem;
+      border-radius: 0;
     }
 
-    .panel {
-      background: var(--panel);
+    .profile-body {
+      margin-top: 44px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .tab {
       border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 24px;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.04);
+      background: var(--subtle);
+      padding: 10px 16px;
+      border-radius: 4px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--muted);
     }
 
-    .panel-header {
-      margin-bottom: 14px;
+    .tab.active {
+      background: #fff;
+      border-color: var(--accent);
+      color: var(--accent);
     }
 
-    .panel-header h2 {
-      font-family: var(--font-serif);
-      font-weight: 400;
-      font-size: 1.6rem;
+    .tab[aria-disabled="true"] {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .bio {
+      font-size: 1.2rem;
+      color: var(--ink);
+      line-height: 1.7;
     }
 
     .copy {
-      font-size: 1.02rem;
-      line-height: 1.7;
-      color: var(--ink);
       white-space: pre-line;
     }
 
-    .meta-list {
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+      margin-top: 38px;
+    }
+
+    .meta-card {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 18px 20px;
+      background: #f9fbff;
+    }
+
+    .meta-card h4 {
+      font-size: 0.95rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    .timeline {
+      list-style: none;
+      padding-left: 0;
       display: flex;
       flex-direction: column;
       gap: 12px;
     }
 
-    .meta-list div {
-      display: grid;
-      grid-template-columns: 120px 1fr;
-      gap: 12px;
-      align-items: baseline;
+    .timeline li {
+      padding-left: 0;
     }
 
-    dt {
-      font-weight: 400;
+    .timeline strong {
+      display: block;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .timeline span {
+      font-size: 0.95rem;
       color: var(--muted);
-      font-size: 0.9rem;
     }
 
-    dd {
-      margin: 0;
-      font-size: 1rem;
-      color: var(--ink);
+    .timeline p {
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.5;
     }
 
     .pill-list {
@@ -245,11 +353,12 @@
     }
 
     .pill {
-      padding: 6px 14px;
+      padding: 8px 12px;
       border-radius: 999px;
-      background: var(--pill);
-      color: var(--ink);
-      font-size: 0.9rem;
+      background: #eef2f8;
+      color: var(--accent);
+      font-weight: 600;
+      font-size: 0.95rem;
     }
 
     .placeholder {
@@ -257,43 +366,9 @@
       font-size: 0.95rem;
     }
 
-    .timeline {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      padding-left: 0;
-    }
-
-    .timeline li {
-      position: relative;
-      padding-left: 20px;
-    }
-
-    .timeline li::before {
-      content: "";
-      position: absolute;
-      left: 4px;
-      top: 6px;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--accent);
-    }
-
-    .timeline strong {
-      font-weight: 400;
-      display: block;
-    }
-
-    .timeline span {
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-
     .alert {
       padding: 16px 20px;
-      border-radius: 14px;
+      border-radius: 8px;
       background: #fff0f0;
       border: 1px solid #f4c7c7;
       color: #8c1c1c;
@@ -304,105 +379,109 @@
       display: none !important;
     }
 
-    a.inline-link {
-      color: var(--accent-dark);
-      text-decoration: none;
+    .muted {
+      color: var(--muted);
     }
 
-    a.inline-link:hover {
-      text-decoration: underline;
-    }
-
-    @media (max-width: 720px) {
-      .hero-card {
-        flex-direction: column;
-      }
-
-      .meta-list div {
+    @media (max-width: 980px) {
+      .hero-grid {
         grid-template-columns: 1fr;
       }
 
-      .topbar {
+      .avatar-shell {
+        height: 340px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page-header {
         flex-direction: column;
         align-items: flex-start;
+      }
+
+      #profileName {
+        font-size: 2.4rem;
       }
     }
   </style>
 </head>
 <body>
   <div class="page-shell">
-    <header class="topbar">
-      <a class="btn btn-outline" id="profileBackLink" href="dashboard-attorney.html">&larr; Back to dashboard</a>
+    <header class="page-header">
+      <a class="back-link" id="profileBackLink" href="dashboard-attorney.html">&larr; Back to dashboard</a>
       <button id="editProfileBtn" class="btn btn-primary">Edit profile</button>
     </header>
 
     <div id="profileError" class="alert hidden" role="alert"></div>
 
     <div id="profileContent">
-      <section class="hero-card" id="profileHero">
-        <div class="avatar-shell" id="avatarShell">
-          <img id="profileAvatar" alt="Profile photo" />
-          <div id="avatarFallback" class="avatar-fallback">A</div>
-        </div>
-        <div class="hero-copy">
+      <section class="hero-grid" id="profileHero">
+        <div class="hero-text">
           <p class="eyebrow">Attorney Profile</p>
           <h1 id="profileName">Loading…</h1>
-          <p id="profileSubtitle" class="muted">This page highlights how you collaborate with paralegals on LPC.</p>
-          <div class="hero-meta">
-            <span id="profileFirm"></span>
-            <span id="profileLocation"></span>
+          <p id="profileSubtitle" class="subhead hidden"></p>
+          <div class="link-strip">
+            <a id="heroLinkedIn" class="inline-link hidden" target="_blank" rel="noopener">LinkedIn</a>
+            <a id="heroWebsite" class="inline-link hidden" target="_blank" rel="noopener">Firm Website</a>
           </div>
-          <div class="hero-actions">
-            <a id="heroLinkedIn" class="btn btn-outline hidden" target="_blank" rel="noopener">LinkedIn</a>
-            <a id="heroWebsite" class="btn btn-outline hidden" target="_blank" rel="noopener">Firm Website</a>
+          <hr class="hairline" />
+          <div class="contact-grid">
+            <div class="contact-card">
+              <h4>Firm</h4>
+              <p id="profileFirm" class="contact-line muted">Independent attorney</p>
+            </div>
+            <div class="contact-card">
+              <h4>Office</h4>
+              <p id="profileLocation" class="contact-line muted">Location not provided</p>
+            </div>
+            <div class="contact-card">
+              <h4>Connect</h4>
+              <div id="contactLinkedIn" class="contact-link muted">—</div>
+              <div id="contactWebsite" class="contact-link muted">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="hero-photo">
+          <div class="avatar-shell" id="avatarShell">
+            <img id="profileAvatar" alt="Profile photo" />
+            <div id="avatarFallback" class="avatar-fallback">A</div>
+          </div>
+          <div class="practice-card">
+            <div class="practice-header">
+              <h3>PRACTICES</h3>
+              <span class="practice-close" aria-hidden="true">×</span>
+            </div>
+            <div id="practiceAreasList" class="practice-list pill-list"></div>
           </div>
         </div>
       </section>
 
-      <section class="grid">
-        <article class="panel">
-          <div class="panel-header">
-            <h2>Practice Overview</h2>
-          </div>
+      <section class="profile-body">
+        <div class="tabs" role="tablist" aria-label="Profile sections">
+          <button class="tab active" type="button" aria-selected="true">Profile</button>
+          <button class="tab" type="button" aria-disabled="true" aria-selected="false">Publications &amp; Presentations</button>
+        </div>
+        <div class="bio">
           <p id="practiceBio" class="copy">Loading profile…</p>
-        </article>
-        <article class="panel">
-          <div class="panel-header">
-            <h2>Contact &amp; Credentials</h2>
-          </div>
-          <dl class="meta-list">
-            <div>
-              <dt>LinkedIn</dt>
-              <dd id="contactLinkedIn" class="muted">—</dd>
-            </div>
-            <div>
-              <dt>Firm website</dt>
-              <dd id="contactWebsite" class="muted">—</dd>
-            </div>
-          </dl>
-        </article>
-      </section>
-
-      <section class="grid">
-        <article class="panel">
-          <div class="panel-header">
-            <h2>Preferred Practice Areas</h2>
-          </div>
-          <div id="practiceAreasList" class="pill-list"></div>
-        </article>
-        <article class="panel">
-          <div class="panel-header">
-            <h2>Experience Highlights</h2>
-          </div>
-          <ul id="experienceList" class="timeline"></ul>
-        </article>
-      </section>
-
-      <section class="panel">
-        <div class="panel-header">
-          <h2>Languages</h2>
         </div>
-        <div id="languagesList" class="pill-list"></div>
+      </section>
+
+      <section class="meta-grid">
+        <div class="meta-card">
+          <h4>Experience Highlights</h4>
+          <ul id="experienceList" class="timeline"></ul>
+        </div>
+        <div class="meta-card">
+          <h4>Languages</h4>
+          <div id="languagesList" class="pill-list"></div>
+        </div>
+      </section>
+
+      <section class="meta-grid">
+        <div class="meta-card">
+          <h4>Publications &amp; Presentations</h4>
+          <ul id="publicationsList" class="timeline"></ul>
+        </div>
       </section>
     </div>
   </div>

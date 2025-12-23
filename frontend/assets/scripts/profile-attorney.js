@@ -24,6 +24,7 @@ const elements = {
   practiceAreas: document.getElementById("practiceAreasList"),
   experience: document.getElementById("experienceList"),
   languages: document.getElementById("languagesList"),
+  publications: document.getElementById("publicationsList"),
   avatar: document.getElementById("profileAvatar"),
   avatarShell: document.getElementById("avatarShell"),
   avatarFallback: document.getElementById("avatarFallback")
@@ -39,46 +40,93 @@ function hasProfileAccess(user = {}) {
   return status === "approved";
 }
 
-document.addEventListener("DOMContentLoaded", init);
+function getProfileAttorneyParams() {
+  const searchParams = new URLSearchParams(window.location.search);
+  let id = (searchParams.get("id") || "").trim();
+  let job = (searchParams.get("job") || "").trim();
 
-function getQueryParams() {
-  const params = new URLSearchParams(window.location.search);
-  return {
-    attorneyId: (params.get("id") || "").trim(),
-    jobId: (params.get("job") || "").trim()
-  };
+  // Handle cases where params are placed in the hash (e.g., after client-side routing)
+  if (!id && window.location.hash) {
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    id = (hashParams.get("id") || "").trim();
+    if (!job) job = (hashParams.get("job") || "").trim();
+  }
+
+  // Basic path fallback: allow /profile-attorney.html/<id> style URLs.
+  if (!id) {
+    const parts = window.location.pathname.split("/").filter(Boolean);
+    const maybeId = parts[parts.length - 1];
+    if (maybeId && !maybeId.toLowerCase().endsWith("profile-attorney.html")) {
+      id = maybeId;
+    }
+  }
+
+  return { id, job };
 }
 
+document.addEventListener("DOMContentLoaded", init);
+
 async function init() {
-  try {
-    state.viewer = await loadViewer();
-  } catch (err) {
-    console.warn("[profile-attorney] viewer load failed", err);
-    return showError("Please sign in to view attorney profiles.");
-  }
+  const { id: profileAttorneyId, job: profileJobId } = getProfileAttorneyParams();
+  const viewer = typeof window.getStoredUser === "function" ? window.getStoredUser() : null;
 
-  if (!hasProfileAccess(state.viewer)) {
-    return showError(PENDING_ACCESS_MESSAGE);
-  }
-
-  const viewerId = normalizeId(state.viewer);
-  const { attorneyId, jobId } = getQueryParams();
-  state.targetId = attorneyId || viewerId;
-  state.viewingSelf = !attorneyId || attorneyId === viewerId;
-  state.jobContextId = jobId;
-  updateBackLink();
+  state.viewer = viewer;
+  state.jobContextId = profileJobId;
 
   bindEditButton();
 
+  if (profileAttorneyId) {
+    state.targetId = profileAttorneyId;
+    state.viewingSelf = false;
+
+    try {
+      if (!state.viewer) {
+        try {
+          state.viewer = await loadViewer();
+        } catch (_) {
+          /* session hydration best-effort */
+        }
+      }
+      const profileUser = await fetchProfileById(profileAttorneyId, profileJobId);
+      const normalizedProfile = { ...(profileUser || {}) };
+      normalizedProfile._id = normalizedProfile._id || profileAttorneyId;
+      const viewerId = normalizeId(state.viewer);
+      const isOwner = viewerId && viewerId === profileAttorneyId;
+      if (!isRenderableProfile(normalizedProfile) && !isOwner) {
+        console.warn("[profile-attorney] loaded profile lacks required fields", normalizedProfile);
+        return showError("Unable to load this attorney right now.");
+      }
+      state.profile = normalizedProfile;
+      updateBackLink();
+      updateEditButtonVisibility(state.viewer, normalizedProfile);
+      renderProfile(normalizedProfile);
+      return; // Early return so no session-based logic runs
+    } catch (err) {
+      console.warn("[profile-attorney] profile load failed", err);
+      const fallback = err?.message || "Unable to load this attorney right now.";
+      return showError(fallback);
+    }
+  }
+
+  // If no id is present, do not attempt to render a generic/self profile.
+  showError("Unable to load this attorney right now.");
+}
+
+async function fetchProfileById(id, jobId = "") {
   try {
-    state.profile = state.viewingSelf
-      ? await loadSelfProfile()
-      : await loadAttorneyById(state.targetId, jobId);
-    renderProfile(state.profile);
+    const attorneyProfile = await loadAttorneyById(id, jobId);
+    if (isRenderableProfile(attorneyProfile)) return attorneyProfile;
+    const fallback = await loadAttorneyFallback(id);
+    return { ...(fallback || {}), ...(attorneyProfile || {}) };
   } catch (err) {
-    console.warn("[profile-attorney] profile load failed", err);
-    const fallback = err?.message || "Unable to load this attorney right now.";
-    showError(fallback);
+    // Try fallback when primary fails (e.g., empty body or 404)
+    try {
+      const fallback = await loadAttorneyFallback(id);
+      if (fallback) return fallback;
+    } catch (_) {
+      /* ignore secondary failure */
+    }
+    throw err;
   }
 }
 
@@ -112,9 +160,83 @@ async function loadSelfProfile() {
   return data;
 }
 
+async function loadPublicAttorney(id) {
+  let primary = {};
+  try {
+    const res = await secureFetch(`/api/users/attorneys/${encodeURIComponent(id)}`, {
+      headers: { Accept: "application/json" },
+      noRedirect: true
+    });
+    primary = await res.json().catch(() => ({}));
+    if (res.ok && primary && !needsEnrichment(primary)) {
+      return primary;
+    }
+  } catch (_) {
+    /* ignore primary failure */
+  }
+
+  // Secondary try: plain fetch with cookies (in case secureFetch headers/session differ)
+  try {
+    const res = await fetch(`/api/users/attorneys/${encodeURIComponent(id)}`, {
+      headers: { Accept: "application/json" },
+      credentials: "include"
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data) {
+      primary = Object.keys(primary || {}).length ? primary : data;
+      if (!needsEnrichment(data)) return data;
+    }
+  } catch (_) {
+    /* ignore */
+  }
+
+  // Secondary attempt: use /api/users/:id to capture any stored profile fields (works for paralegal IDs too).
+  try {
+    const resUser = await secureFetch(`/api/users/${encodeURIComponent(id)}`, {
+      headers: { Accept: "application/json" },
+      noRedirect: true
+    });
+    const userData = await resUser.json().catch(() => ({}));
+    if (resUser.ok && userData) {
+      const merged = { ...(userData || {}), ...(primary || {}) };
+      if (Object.keys(merged).length) return merged;
+    }
+  } catch (_) {
+    /* ignore user fallback failure */
+  }
+
+  // Final fallback: if the current session matches this id, use the self profile.
+  try {
+    const meRes = await secureFetch("/api/users/me", {
+      headers: { Accept: "application/json" },
+      noRedirect: true
+    });
+    const me = await meRes.json().catch(() => ({}));
+    if (meRes.ok && normalizeId(me) === String(id)) {
+      const mergedSelf = { ...(primary || {}), ...(me || {}) };
+      if (Object.keys(mergedSelf || {}).length) return mergedSelf;
+    }
+  } catch (_) {
+    /* ignore */
+  }
+
+  if (Object.keys(primary || {}).length) return primary;
+  throw new Error("Unable to load this attorney profile.");
+}
+
 async function loadAttorneyById(id, jobId = "") {
   const safeId = encodeURIComponent(id);
   const jobParam = jobId ? `?job=${encodeURIComponent(jobId)}` : "";
+
+  // Primary: use the endpoint known to work for paralegal browse flows.
+  const primaryRes = await secureFetch(`/api/users/attorneys/${safeId}${jobParam}`, {
+    headers: { Accept: "application/json" },
+    noRedirect: true
+  });
+  const primaryData = await primaryRes.json().catch(() => ({}));
+  if (primaryRes.ok) return primaryData || {};
+
+  // Fallback: legacy /api/attorneys/:id
   const res = await secureFetch(`/api/attorneys/${safeId}${jobParam}`, {
     headers: { Accept: "application/json" },
     noRedirect: true
@@ -126,7 +248,43 @@ async function loadAttorneyById(id, jobId = "") {
     }
     throw new Error(data?.error || "Unable to load this attorney profile.");
   }
-  return data;
+  return data || {};
+}
+
+async function loadAttorneyFallback(id) {
+  try {
+    const res = await secureFetch(`/api/users/${encodeURIComponent(id)}`, {
+      headers: { Accept: "application/json" },
+      noRedirect: true
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) return data;
+  } catch (_) {}
+  return null;
+}
+
+function needsEnrichment(profile = {}) {
+  const hasName = Boolean((profile.firstName || profile.lastName || profile.name || "").trim());
+  const hasFirm = Boolean(
+    (profile.lawFirm || profile.firmName || profile.company || profile.organization || "").trim()
+  );
+  const hasSummary = Boolean(
+    (profile.practiceDescription || profile.practiceOverview || profile.bio || profile.about || "").trim()
+  );
+  const hasAvatar = Boolean(profile.profileImage || profile.avatarURL);
+  return !(hasName && hasFirm && hasSummary && hasAvatar);
+}
+
+function isRenderableProfile(profile = {}) {
+  const hasName = Boolean((profile.firstName || profile.lastName || profile.name || "").trim());
+  const hasFirm = Boolean(
+    (profile.lawFirm || profile.firmName || profile.company || profile.organization || "").trim()
+  );
+  const hasSummary = Boolean(
+    (profile.practiceDescription || profile.practiceOverview || profile.bio || profile.about || "").trim()
+  );
+  const hasAvatar = Boolean(profile.profileImage || profile.avatarURL);
+  return hasName || hasFirm || hasSummary || hasAvatar;
 }
 
 function renderProfile(profile) {
@@ -145,7 +303,11 @@ function renderProfile(profile) {
     .slice(0, 2)
     .join(" • ");
   if (practicePreview) summaryParts.push(practicePreview);
-  setText(elements.subtitle, summaryParts.join(" • "), "Share how you collaborate with paralegals.");
+  const subtitle = summaryParts.join(" • ");
+  setText(elements.subtitle, subtitle, "");
+  if (elements.subtitle) {
+    elements.subtitle.classList.toggle("hidden", !subtitle);
+  }
 
   setText(elements.firm, profile.lawFirm || profile.firmName || "Independent attorney", "Independent attorney");
   setText(elements.location, profile.location || formatTimezone(profile.timezone), "Location not provided");
@@ -166,18 +328,16 @@ function renderProfile(profile) {
   renderPracticeAreas(profile);
   renderExperience(profile.experience);
   renderLanguages(profile.languages);
+  renderPublications(profile.publications);
 }
 
 function bindEditButton() {
-  if (!elements.editBtn) return;
-  if (!state.viewingSelf) {
-    elements.editBtn.classList.add("hidden");
-    return;
-  }
-  elements.editBtn.classList.remove("hidden");
-  elements.editBtn.addEventListener("click", () => {
+  const btn = elements.editBtn;
+  if (!btn || btn.dataset.bound === "true") return;
+  btn.addEventListener("click", () => {
     window.location.href = "profile-settings.html";
   });
+  btn.dataset.bound = "true";
 }
 
 function updateBackLink() {
@@ -285,6 +445,27 @@ function renderLanguages(entries = []) {
   });
 }
 
+function renderPublications(items = []) {
+  const list = elements.publications;
+  if (!list) return;
+  list.textContent = "";
+  if (!Array.isArray(items) || !items.length) {
+    const item = document.createElement("li");
+    item.className = "muted";
+    item.textContent = "Add publications or presentations to showcase your work.";
+    list.appendChild(item);
+    return;
+  }
+  items.forEach((entry) => {
+    if (!entry) return;
+    const item = document.createElement("li");
+    const title = document.createElement("strong");
+    title.textContent = entry;
+    item.appendChild(title);
+    list.appendChild(item);
+  });
+}
+
 function setText(el, value, fallback = "") {
   if (!el) return;
   const text = value && String(value).trim() ? value : fallback;
@@ -329,6 +510,17 @@ function showError(message) {
   elements.content?.classList.add("hidden");
 }
 
+function updateEditButtonVisibility(viewer, profile) {
+  const btn = elements.editBtn;
+  if (!btn) return;
+  const viewerRole = String(viewer?.role || "").toLowerCase();
+  const viewerId = normalizeId(viewer);
+  const profileId = normalizeId(profile);
+  const canEdit = viewerRole === "attorney" && viewerId && profileId && viewerId === profileId;
+  btn.classList.toggle("hidden", !canEdit);
+  btn.disabled = !canEdit;
+}
+
 function buildPlaceholder(copy) {
   const span = document.createElement("span");
   span.className = "placeholder";
@@ -340,7 +532,7 @@ function formatName(user = {}) {
   const first = user.firstName || "";
   const last = user.lastName || "";
   const name = `${first} ${last}`.trim();
-  return name || user.email || "Attorney";
+  return name || user.name || user.email || "Attorney";
 }
 
 function describeExperience(value) {

@@ -12,6 +12,7 @@
       --bg: #ffffff;
       --sidebar-bg: #f5f5f5e6;
       --accent: #b6a47a;
+      --navy: #102c50;
       --ink: #1a1a1a;
       --muted: #8a8a8a;
       --line: rgba(0, 0, 0, 0.08);
@@ -544,6 +545,270 @@
     .toast.show {
       opacity: 1;
       transform: translate(-50%, 0);
+    }
+
+    /* Invite detail modal (mirrors job popup styling) */
+    .invite-overlay {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.05), transparent 32%),
+        rgba(0, 0, 0, 0.62);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 4000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      padding: 18px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    .invite-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .invite-dialog {
+      background: linear-gradient(135deg, #fdfbf8 0%, #f7f2e7 100%);
+      border-radius: 20px;
+      padding: 26px 26px 22px;
+      width: min(860px, 95vw);
+      box-shadow:
+        0 24px 70px rgba(0, 0, 0, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.78);
+      display: grid;
+      gap: 16px;
+      position: relative;
+      border-left: 6px solid #b4975a;
+    }
+
+    .invite-dialog::after {
+      content: "";
+      position: absolute;
+      inset: 10px 10px auto auto;
+      width: 140px;
+      height: 140px;
+      background: radial-gradient(closest-side, rgba(255, 255, 255, 0.35), transparent 60%);
+      pointer-events: none;
+      opacity: 0.6;
+    }
+
+    .invite-dialog .invite-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: space-between;
+    }
+
+    .invite-dialog .invite-title {
+      font-family: var(--font-serif);
+      font-size: 1.85rem;
+      font-weight: 500;
+      margin: 0;
+      letter-spacing: 0.01em;
+      color: #1f2937;
+    }
+
+    .invite-dialog .invite-subtitle {
+      font-family: var(--font-serif);
+      font-size: 1.4rem;
+      color: #0f172a;
+      margin: -4px 0 2px;
+      letter-spacing: 0.005em;
+    }
+
+    .invite-dialog .invite-lead {
+      margin: 0 0 2px;
+      color: #4b5563;
+      font-size: 1rem;
+    }
+
+    .invite-dialog .close-btn {
+      border: none;
+      background: none;
+      font-size: 1.6rem;
+      line-height: 1;
+      cursor: pointer;
+      color: #4b5563;
+    }
+
+    .invite-dialog .invite-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .invite-dialog .pill {
+      padding: 7px 12px;
+      border-radius: 999px;
+      border: 1px solid #e4e7eb;
+      background: #f8fafc;
+      color: #374151;
+      font-size: 0.92rem;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+    }
+
+    .invite-dialog .body-text {
+      font-size: 1.05rem;
+      color: #1f2937;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .invite-dialog .invited-by {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+      margin-top: 2px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .invite-dialog .invited-by img {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    .invite-dialog .invited-by .muted {
+      color: #6b7280;
+      font-size: 0.95rem;
+    }
+
+    .invite-dialog .invite-reassure {
+      display: grid;
+      gap: 4px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #f3f4f6;
+      color: #374151;
+      font-size: 0.95rem;
+      border: 1px solid #e5e7eb;
+    }
+
+    .invite-dialog .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .invite-dialog .actions button {
+      padding: 0.6rem 1.25rem;
+      border: 1px solid var(--navy);
+      background: transparent;
+      color: var(--navy);
+      cursor: pointer;
+      border-radius: 999px;
+      font-family: var(--font-sans);
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .invite-dialog .actions button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+      background: rgba(16, 44, 80, 0.04);
+    }
+
+    .invite-dialog .actions .primary {
+      background: var(--navy);
+      color: #fff;
+      box-shadow: 0 12px 30px rgba(16, 44, 80, 0.2);
+    }
+
+    .invite-dialog .actions .primary:hover {
+      background: #0c203d;
+    }
+
+    .invite-dialog .invite-microcopy {
+      color: #4b5563;
+      font-size: 0.92rem;
+      text-align: right;
+      margin-top: -6px;
+    }
+
+    /* Invite detail modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 4000;
+      padding: 20px;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-overlay.show { display: flex; }
+
+    .case-modal {
+      background: #fff;
+      width: min(540px, 95vw);
+      border-radius: 16px;
+      padding: 20px 22px;
+      box-shadow: 0 26px 70px rgba(0,0,0,0.16);
+      position: relative;
+      display: grid;
+      gap: 10px;
+    }
+
+    .case-modal h3 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 1.4rem;
+      font-weight: 400;
+    }
+
+    .case-modal .meta {
+      font-size: 0.95rem;
+      color: var(--muted);
+      display: grid;
+      gap: 4px;
+    }
+
+    .case-modal .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .case-modal .actions button {
+      padding: 0.5rem 1.1rem;
+      border: 1px solid var(--navy);
+      background: transparent;
+      color: var(--navy);
+      cursor: pointer;
+      border-radius: 8px;
+      font-family: var(--font-sans);
+    }
+
+    .case-modal .actions .primary {
+      background: var(--navy);
+      color: #fff;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      border: none;
+      background: transparent;
+      font-size: 1.2rem;
+      cursor: pointer;
+      line-height: 1;
     }
 
     .header-cluster [data-notification-toggle][data-count]:after,
@@ -1245,6 +1510,35 @@
       });
     });
   </script>
+  <div class="invite-overlay" id="inviteOverlay">
+    <div class="invite-dialog">
+      <div class="invite-header">
+        <h3 class="invite-title" id="inviteCaseTitle">You've been invited to a case</h3>
+        <button type="button" class="close-btn" id="inviteCloseBtn" aria-label="Close invite">&times;</button>
+      </div>
+      <div class="invite-subtitle" id="inviteJobTitle">Case title</div>
+      <p class="invite-lead" id="inviteLead"></p>
+      <div class="invite-meta" id="inviteMeta"></div>
+      <p class="body-text" id="inviteDetails"></p>
+      <a class="invited-by" id="inviteAttorneyLink" href="#">
+        <img id="inviteAttorneyAvatar" alt="Attorney avatar" />
+        <div>
+          <div id="inviteAttorneyName"></div>
+          <div id="inviteAttorneyFirm" class="muted"></div>
+        </div>
+      </a>
+      <div class="invite-reassure">
+        <div>Payment secured in escrow</div>
+        <div>Scope confirmed before work begins</div>
+        <div>You may decline with no obligation</div>
+      </div>
+      <div class="actions">
+        <button type="button" id="inviteDeclineBtn">Decline</button>
+        <button type="button" class="primary" id="inviteAcceptBtn">Accept Invitation</button>
+      </div>
+      <div class="invite-microcopy">You can ask questions after accepting.</div>
+    </div>
+  </div>
   <script>
     window.checkSession('paralegal');
     const logoutBtn = document.getElementById('logoutBtn');

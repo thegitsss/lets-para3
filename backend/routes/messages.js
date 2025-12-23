@@ -101,6 +101,22 @@ function isCaseReadOnly(req) {
   return !!(req.case?.readOnly && !req.acl?.isAdmin);
 }
 
+function assertMessagingOpen(req, res) {
+  const caseDoc = req.case;
+  if (!caseDoc) {
+    return res.status(400).json({ error: "Case not loaded" });
+  }
+  const status = String(caseDoc.status || "").toLowerCase();
+  const hasParalegal = caseDoc.paralegal || caseDoc.paralegalId;
+  if (!hasParalegal) {
+    return res.status(403).json({ error: "Messaging is available after hire" });
+  }
+  if (["completed", "closed", "cancelled"].includes(status)) {
+    return res.status(403).json({ error: "Messaging is closed for completed cases" });
+  }
+  return null;
+}
+
 // All message routes require auth
 router.use(verifyToken);
 router.use(requireApproved);
@@ -268,6 +284,8 @@ router.post(
   "/:caseId",
   csrfProtection,
   asyncHandler(async (req, res) => {
+    const closed = assertMessagingOpen(req, res);
+    if (closed) return;
     const { caseId } = req.params;
     const caseDoc = req.case;
     if (caseDoc?.readOnly && !req.acl?.isAdmin) {
@@ -319,6 +337,8 @@ router.post(
   requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    const closed = assertMessagingOpen(req, res);
+    if (closed) return;
     if (isCaseReadOnly(req)) {
       return res.status(403).json({ error: "Case is read-only" });
     }
@@ -360,6 +380,8 @@ router.post(
   requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    const closed = assertMessagingOpen(req, res);
+    if (closed) return;
     if (isCaseReadOnly(req)) {
       return res.status(403).json({ error: "Case is read-only" });
     }
@@ -455,6 +477,8 @@ router.patch(
   requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    const closed = assertMessagingOpen(req, res);
+    if (closed) return;
     if (isCaseReadOnly(req)) {
       return res.status(403).json({ error: "Case is read-only" });
     }
@@ -508,6 +532,8 @@ router.post(
   requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    const closed = assertMessagingOpen(req, res);
+    if (closed) return;
     if (isCaseReadOnly(req)) {
       return res.status(403).json({ error: "Case is read-only" });
     }
@@ -538,6 +564,8 @@ router.delete(
   requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    const closed = assertMessagingOpen(req, res);
+    if (closed) return;
     if (isCaseReadOnly(req)) {
       return res.status(403).json({ error: "Case is read-only" });
     }
@@ -571,6 +599,8 @@ router.delete(
   requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    const closed = assertMessagingOpen(req, res);
+    if (closed) return;
     if (isCaseReadOnly(req)) {
       return res.status(403).json({ error: "Case is read-only" });
     }

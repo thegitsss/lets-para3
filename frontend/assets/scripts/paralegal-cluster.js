@@ -209,7 +209,7 @@
   function formatRole(user={}){
     if (user.title) return user.title;
     if (user.role) return String(user.role).charAt(0).toUpperCase() + String(user.role).slice(1);
-    return "Paralegal";
+    return "";
   }
 
   function applyGlobalAvatars(user = {}) {
@@ -224,7 +224,11 @@
     const els = targetEls();
     if (!hasTargets()) return;
     if (els.name) els.name.textContent = formatName(user);
-    if (els.role) els.role.textContent = formatRole(user);
+    if (els.role) {
+      const roleText = formatRole(user);
+      els.role.textContent = roleText;
+      els.role.style.display = roleText ? "" : "none";
+    }
     const avatar = user.profileImage || user.avatarURL || FALLBACK_AVATAR;
     if (els.avatar && avatar) {
       els.avatar.src = avatar;

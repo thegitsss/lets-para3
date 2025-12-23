@@ -19,14 +19,31 @@ async function persistDocumentField(field, value) {
   return data;
 }
 
+const PLACEHOLDER_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+  `<svg xmlns='http://www.w3.org/2000/svg' width='280' height='280' viewBox='0 0 280 280'>
+    <defs>
+      <linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'>
+        <stop offset='0%' stop-color='#f4f6fa'/>
+        <stop offset='100%' stop-color='#e6e9ef'/>
+      </linearGradient>
+    </defs>
+    <rect width='280' height='280' rx='36' fill='url(#grad)'/>
+    <path d='M70 200c10-38 42-66 70-66s60 28 70 66' fill='none' stroke='#c9cfda' stroke-width='12' stroke-linecap='round'/>
+    <circle cx='140' cy='120' r='54' fill='#d4dae6'/>
+    <circle cx='140' cy='112' r='48' fill='url(#grad)'/>
+    <text x='50%' y='55%' font-family='Sarabun, Arial, sans-serif' font-size='52' font-weight='600' fill='#3a4553' text-anchor='middle' dominant-baseline='middle'>LPC</text>
+  </svg>`
+)}`;
+
 function getProfileImageUrl(user = {}) {
-  return user.profileImage || user.avatarURL || "assets/images/default-avatar.png";
+  return user.profileImage || user.avatarURL || PLACEHOLDER_AVATAR;
 }
-function applyGlobalAvatars(user = {}) {
-  if (!user.profileImage) return;
-  const els = document.querySelectorAll("#user-avatar, #headerAvatar, #avatarPreview");
+function applyGlobalAvatars(user = state.profileUser || {}) {
+  const src = getProfileImageUrl(user);
+  if (!src) return;
+  const els = document.querySelectorAll("#user-avatar, #avatarPreview");
   els.forEach((el) => {
-    if (el) el.src = user.profileImage;
+    if (el) el.src = src;
   });
   const frame = document.getElementById("avatarFrame");
   const initials = document.getElementById("avatarInitials");
@@ -34,13 +51,14 @@ function applyGlobalAvatars(user = {}) {
   if (initials) initials.style.display = "none";
 }
 
-function applyAvatar(user) {
-  if (!user?.profileImage) return;
+function applyAvatar(user = state.profileUser || {}) {
+  const src = getProfileImageUrl(user);
+  if (!src) return;
   const avatar = document.getElementById("user-avatar");
   const preview = document.getElementById("profilePhotoPreview");
 
-  if (avatar) avatar.src = user.profileImage;
-  if (preview) preview.src = user.profileImage;
+  if (avatar) avatar.src = src;
+  if (preview) preview.src = src;
 }
 function friendlyAvailabilityDate(value) {
   if (!value) return "";
@@ -54,6 +72,7 @@ const elements = {
   inviteBtn: document.getElementById("inviteToCaseBtn"),
   messageBtn: document.getElementById("messageBtn"),
   editBtn: document.getElementById("editProfileBtn"),
+  backBtn: document.getElementById("backBtn"),
   avatarWrapper: document.querySelector("[data-avatar-wrapper]"),
   avatarImg: document.querySelector("[data-profile-avatar]"),
   avatarFallback: document.querySelector("[data-avatar-fallback]"),
@@ -117,12 +136,12 @@ if (elements.inviteCaseSelect) {
 }
 
 const state = {
-  viewer: null,
+  viewerUser: null, // logged-in user (session/local cache)
   viewerRole: "",
   viewerId: "",
   paralegalId: "",
   viewingSelf: false,
-  profile: null,
+  profileUser: null, // the paralegal being displayed
   caseContextId: null,
   openCases: [],
   inviteTarget: null,
@@ -131,13 +150,13 @@ const state = {
 const PREFILL_CACHE_KEY = "lpc_edit_profile_prefill";
 
 async function cacheProfileForEditing() {
-  if (!state.profile) return;
-  const profileId = String(state.profile.id || state.profile._id || "");
+  if (!state.profileUser) return;
+  const profileId = String(state.profileUser.id || state.profileUser._id || "");
   const isSelf =
     state.viewerRole === "paralegal" && state.viewerId && profileId && state.viewerId === profileId;
 
   const target = isSelf ? await fetchSelfProfileSnapshot() : await fetchPublicProfileSnapshot();
-  const payload = target || state.profile;
+  const payload = target || state.profileUser;
   persistPrefill(payload);
   persistCachedUser(payload);
 }
@@ -229,12 +248,12 @@ document.addEventListener("DOMContentLoaded", init);
 
 window.addEventListener("lpc:user-updated", (event) => {
   const updated = event?.detail;
-  if (!updated || !state.profile) return;
+  if (!updated || !state.profileUser) return;
   const updatedId = String(updated._id || updated.id || "");
-  const currentId = String(state.profile.id || state.paralegalId || "");
+  const currentId = String(state.profileUser.id || state.paralegalId || "");
   if (!updatedId || updatedId !== currentId) return;
-  state.profile = { ...state.profile, ...updated };
-  renderProfile(state.profile);
+  state.profileUser = { ...state.profileUser, ...updated };
+  renderProfile(state.profileUser);
 });
 
 async function init() {
@@ -255,7 +274,7 @@ async function init() {
   if (!sessionUser) return;
 
   if (!hasViewerAccess(sessionUser)) {
-    showError(PENDING_PROFILE_MESSAGE);
+    showToast(PENDING_PROFILE_MESSAGE, "info");
     toggleSkeleton(false);
     disableCtas();
     return;
@@ -264,17 +283,20 @@ async function init() {
   applyRoleVisibility(sessionUser);
 
   const storedUser = window.getStoredUser ? window.getStoredUser() : null;
-  state.viewer = storedUser || sessionUser || null;
-  if (sessionUser?.status && state.viewer && !state.viewer.status) {
-    state.viewer = { ...state.viewer, status: sessionUser.status };
+  state.viewerUser = storedUser || sessionUser || null;
+  if (sessionUser?.status && state.viewerUser && !state.viewerUser.status) {
+    state.viewerUser = { ...state.viewerUser, status: sessionUser.status };
   }
-  state.viewerRole = String(state.viewer?.role || "").toLowerCase();
-  state.viewerId = String(state.viewer?.id || state.viewer?._id || "");
+  state.viewerRole = String(state.viewerUser?.role || "").toLowerCase();
+  state.viewerId = String(state.viewerUser?.id || state.viewerUser?._id || "");
 
   hydrateHeader();
   bindHeaderEvents();
   bindCtaEvents();
   bindProfileForm();
+  bindBackButton();
+  elements.messageBtn?.classList.add("hidden");
+  elements.messageBtn?.setAttribute("aria-hidden", "true");
 
   const params = new URLSearchParams(window.location.search);
   state.caseContextId = params.get("caseId") || null;
@@ -301,13 +323,6 @@ async function init() {
     state.viewingSelf = true;
   }
 
-  if (!state.paralegalId) {
-    showError("Paralegal profile not found. Please use a valid profile link.");
-    toggleSkeleton(false);
-    disableCtas();
-    return;
-  }
-
   toggleSkeleton(true);
   await loadProfile();
   toggleSkeleton(false);
@@ -321,14 +336,6 @@ async function init() {
 function bindCtaEvents() {
   elements.inviteBtn?.addEventListener("click", () => {
     openInviteModal();
-  });
-  elements.messageBtn?.addEventListener("click", () => {
-    if (!state.profile) return;
-    if (!state.caseContextId) {
-      showError("Messaging is only available for active cases.");
-      return;
-    }
-    window.location.href = `case-detail.html?caseId=${encodeURIComponent(state.caseContextId)}#messages`;
   });
   elements.editBtn?.addEventListener("click", async (event) => {
     event.preventDefault();
@@ -345,6 +352,18 @@ function bindCtaEvents() {
   elements.sendInviteBtn?.addEventListener("click", sendInviteToCase);
 
   bindDocumentLinks();
+}
+
+function bindBackButton() {
+  if (!elements.backBtn) return;
+  elements.backBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      window.location.href = "browse-paralegals.html";
+    }
+  });
 }
 
 function bindDocumentLinks() {
@@ -385,7 +404,7 @@ function bindProfileForm() {
 
 function handleProfileFormSubmit(event) {
   event.preventDefault();
-  if (!canEditProfile() || !state.profile) {
+  if (!canEditProfile() || !state.profileUser) {
     showToast("Only the profile owner can update these details.", "error");
     return;
   }
@@ -423,11 +442,11 @@ async function saveProfileDetails(payload) {
   if (!res.ok) {
     throw new Error(data?.error || "Unable to update profile");
   }
-  const snapshot = state.profile || { id: state.paralegalId };
-  state.profile = { ...snapshot, ...payload };
-  populateProfileForm(state.profile);
-  renderProfile(state.profile);
-  renderMetadata(state.profile);
+  const snapshot = state.profileUser || { id: state.paralegalId };
+  state.profileUser = { ...snapshot, ...payload };
+  populateProfileForm(state.profileUser);
+  renderProfile(state.profileUser);
+  renderMetadata(state.profileUser);
   return data;
 }
 
@@ -493,11 +512,11 @@ async function uploadCertificate(file) {
     if (url) {
       const updated = await persistDocumentField("certificateURL", url);
       const certificateKey = updated?.certificateKey || updated?.certificateURL || url;
-      const snapshot = state.profile || { id: state.paralegalId };
-      state.profile = { ...snapshot, certificateURL: certificateKey, certificateKey };
-      renderMetadata(state.profile);
-      renderAttorneyHighlights(state.profile);
-      renderDocumentLinks(state.profile);
+      const snapshot = state.profileUser || { id: state.paralegalId };
+      state.profileUser = { ...snapshot, certificateURL: certificateKey, certificateKey };
+      renderMetadata(state.profileUser);
+      renderAttorneyHighlights(state.profileUser);
+      renderDocumentLinks(state.profileUser);
     }
     showToast("Certificate uploaded.", "success");
   } catch (err) {
@@ -550,11 +569,11 @@ async function uploadResume(file) {
       throw new Error("Could not save résumé to profile.");
     }
     const resumeValue = key;
-    const snapshot = state.profile || { id: state.paralegalId };
-    state.profile = { ...snapshot, resumeURL: resumeValue };
-    renderMetadata(state.profile);
-    renderAttorneyHighlights(state.profile);
-    renderDocumentLinks(state.profile);
+    const snapshot = state.profileUser || { id: state.paralegalId };
+    state.profileUser = { ...snapshot, resumeURL: resumeValue };
+    renderMetadata(state.profileUser);
+    renderAttorneyHighlights(state.profileUser);
+    renderDocumentLinks(state.profileUser);
     showToast("Résumé uploaded.", "success");
   } catch (err) {
     console.error(err);
@@ -596,13 +615,13 @@ async function uploadProfilePhoto(file) {
     }
     const url = data?.url || data?.profileImage || data?.location || null;
     if (url) {
-      const snapshot = state.profile || { id: state.paralegalId };
-      state.profile = { ...snapshot, profileImage: url };
+      const snapshot = state.profileUser || { id: state.paralegalId };
+      state.profileUser = { ...snapshot, profileImage: url };
       if (state.viewerRole === "paralegal" && state.viewerId === state.paralegalId) {
-        state.viewer = { ...(state.viewer || {}), profileImage: url };
+        state.viewerUser = { ...(state.viewerUser || {}), profileImage: url };
         hydrateHeader();
       }
-      renderProfile(state.profile);
+      renderProfile(state.profileUser);
     }
     showToast("Profile photo updated.", "success");
   } catch (err) {
@@ -635,13 +654,14 @@ function updateProfileFormVisibility() {
   }
 }
 function hydrateHeader() {
-  if (!state.viewer) return;
-  if (elements.chipName) elements.chipName.textContent = formatName(state.viewer);
-  if (elements.chipRole) elements.chipRole.textContent = prettyRole(state.viewer.role);
-  const avatarSrc = getProfileImageUrl(state.viewer) || buildInitialAvatar(getInitials(formatName(state.viewer)));
+  if (!state.viewerUser) return;
+  if (elements.chipName) elements.chipName.textContent = formatName(state.viewerUser);
+  if (elements.chipRole) elements.chipRole.textContent = prettyRole(state.viewerUser.role);
+  const avatarSrc =
+    getProfileImageUrl(state.viewerUser) || buildInitialAvatar(getInitials(formatName(state.viewerUser)));
   if (elements.chipAvatar && avatarSrc) {
     elements.chipAvatar.src = avatarSrc;
-    elements.chipAvatar.alt = `${formatName(state.viewer)} avatar`;
+    elements.chipAvatar.alt = `${formatName(state.viewerUser)} avatar`;
   }
 }
 
@@ -680,6 +700,7 @@ function bindHeaderEvents() {
 }
 
 async function loadProfile() {
+  let publicProfileFailed = false;
   try {
     let data;
     if (state.viewingSelf) {
@@ -689,12 +710,12 @@ async function loadProfile() {
       });
       data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Unable to load profile");
-      state.profile = { ...data, id: data.id || data._id || state.viewerId || "" };
-      if (!state.paralegalId && state.profile.id) {
-        state.paralegalId = state.profile.id;
+      state.profileUser = { ...data, id: data.id || data._id || state.viewerId || "" };
+      if (!state.paralegalId && state.profileUser.id) {
+        state.paralegalId = state.profileUser.id;
       }
     } else {
-      if (!state.paralegalId) throw new Error("Paralegal not found");
+      if (!state.paralegalId) throw new Error("Unable to load this paralegal right now.");
       const viewingSelf = state.paralegalId === state.viewerId && state.viewerRole === "paralegal";
       if (viewingSelf) {
         const res = await secureFetch("/api/users/me", {
@@ -703,28 +724,72 @@ async function loadProfile() {
         });
         data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data?.error || "Unable to load profile");
-        state.profile = { ...data, id: data.id || data._id || state.paralegalId };
+        state.profileUser = { ...data, id: data.id || data._id || state.paralegalId };
       } else {
-        const res = await fetch(`/api/public/paralegals/${encodeURIComponent(state.paralegalId)}`, {
-          headers: { Accept: "application/json" },
-          credentials: "include",
-        });
-        data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data?.error || "Unable to load profile");
-        state.profile = { ...data, id: data.id || data._id || state.paralegalId };
+        // Logged-in members should view private profiles via authenticated endpoint first.
+        const usePrivate = Boolean(state.viewerRole);
+        let resolved = false;
+        let res;
+        if (usePrivate) {
+          res = await secureFetch(`/api/paralegals/${encodeURIComponent(state.paralegalId)}`, {
+            headers: { Accept: "application/json" },
+            noRedirect: true,
+          });
+          data = await res.json().catch(() => ({}));
+          if (res.ok) {
+            state.profileUser = { ...data, id: data.id || data._id || state.paralegalId };
+            resolved = true;
+          } else if (res.status !== 404) {
+            const err = new Error(data?.error || "Unable to load this paralegal right now.");
+            err.status = res.status;
+            throw err;
+          }
+          // fall through on 404 to public fetch
+        }
+
+        if (!resolved) {
+          try {
+            res = await fetch(`/api/public/paralegals/${encodeURIComponent(state.paralegalId)}`, {
+              headers: { Accept: "application/json" },
+              credentials: "include",
+            });
+          } catch (fetchErr) {
+            publicProfileFailed = true;
+            throw fetchErr;
+          }
+          data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            publicProfileFailed = true;
+            const message =
+              res.status === 404
+                ? "Paralegal profile not found. Please use a valid profile link."
+                : data?.error || "Unable to load this paralegal right now.";
+            const err = new Error(message);
+            err.status = res.status;
+            throw err;
+          }
+          state.profileUser = { ...data, id: data.id || data._id || state.paralegalId };
+        }
       }
     }
-    applyGlobalAvatars(state.profile);
-    applyAvatar(state.profile);
-    renderProfile(state.profile);
-    populateProfileForm(state.profile);
+    applyGlobalAvatars(state.profileUser);
+    applyAvatar(state.profileUser);
+    renderProfile(state.profileUser);
+    populateProfileForm(state.profileUser);
     updateProfileFormVisibility();
     updateButtonVisibility();
     elements.error?.classList.add("hidden");
     elements.error.textContent = "";
   } catch (err) {
     console.error(err);
-    showError(err.message || "Unable to load this paralegal right now.");
+    const notFound = publicProfileFailed || err?.status === 404;
+    if (notFound) {
+      showError("Paralegal profile not found. Please use a valid profile link.");
+    } else {
+      elements.error?.classList.add("hidden");
+      elements.error.textContent = "";
+      showToast(err.message || "Unable to load this paralegal right now.", "error");
+    }
     disableCtas();
   }
 }
@@ -734,8 +799,9 @@ function renderProfile(profile) {
   setFieldText(elements.nameField, fullName);
 
   const experienceLabel = describeExperience(profile.yearsExperience);
-  const roleCopy = `${experienceLabel ? `${experienceLabel} • ` : ""}Paralegal`;
-  setFieldText(elements.roleLine, roleCopy);
+  const roleCopy = profile.role || profile.title || "Paralegal";
+  const roleLine = [experienceLabel, roleCopy].filter(Boolean).join(" • ") || "Paralegal";
+  setFieldText(elements.roleLine, roleLine);
 
   const summary = profile.bio || profile.about || "This professional hasn’t added a summary yet.";
   setFieldText(elements.bioCopy, summary);
@@ -754,7 +820,6 @@ function renderProfile(profile) {
   renderExperience(profile.experience);
   renderEducation(profile.education);
   renderFunFacts(profile.about, profile.writingSamples);
-  renderAttorneyHighlights(profile);
   renderDocumentLinks(profile);
 }
 
@@ -774,8 +839,7 @@ function setInputValue(input, value) {
 }
 
 function renderAvatar(name, avatarUrl) {
-  const fallback = buildInitialAvatar(getInitials(name));
-  const source = avatarUrl || fallback;
+  const source = avatarUrl || PLACEHOLDER_AVATAR;
   if (elements.avatarImg) {
     elements.avatarImg.src = source;
     elements.avatarImg.alt = `${name} portrait`;
@@ -1198,7 +1262,6 @@ function updateButtonVisibility() {
   const isAttorney = state.viewerRole === "attorney";
 
   toggleElement(elements.editBtn, isOwner);
-  toggleElement(elements.messageBtn, isAttorney);
   updateInviteButtonState();
   if (!isAttorney) closeInviteModal();
 }
@@ -1293,7 +1356,7 @@ function renderCaseOptions() {
 }
 
 function openInviteModal() {
-  if (!elements.inviteModal || !state.profile) return;
+  if (!elements.inviteModal || !state.profileUser) return;
   if (!state.openCases.length) {
     showToast("You need an active case before inviting a paralegal.", "info");
     return;
@@ -1309,7 +1372,7 @@ function closeInviteModal() {
 }
 
 async function sendInviteToCase() {
-  if (!state.profile || !elements.inviteCaseSelect) return;
+  if (!state.profileUser || !elements.inviteCaseSelect) return;
   const caseId = elements.inviteCaseSelect.value;
   clearFieldError(elements.inviteCaseSelect);
   if (!caseId) {
@@ -1318,7 +1381,7 @@ async function sendInviteToCase() {
     return;
   }
   const payload = {
-    paralegalId: state.profile.id || state.paralegalId,
+    paralegalId: state.profileUser.id || state.paralegalId,
   };
   const button = elements.sendInviteBtn;
   const previousLabel = button?.textContent || "Send Invite";

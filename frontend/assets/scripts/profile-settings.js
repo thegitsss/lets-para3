@@ -312,6 +312,60 @@ let statePreferenceSelect = null;
 let attorneyPrefsBound = false;
 let attorneySaveBound = false;
 
+const FIELD_OF_LAW_OPTIONS = [
+  "Administrative Law",
+  "Admiralty & Maritime Law",
+  "Antitrust Law",
+  "Appellate Law",
+  "Banking Law",
+  "Bankruptcy Law",
+  "Business / Corporate Law",
+  "Civil Rights Law",
+  "Class Action Law",
+  "Commercial Law",
+  "Communications Law",
+  "Construction Law",
+  "Consumer Protection Law",
+  "Contract Law",
+  "Criminal Defense Law",
+  "Education Law",
+  "Elder Law",
+  "Election Law",
+  "Employment & Labor Law",
+  "Energy Law",
+  "Entertainment Law",
+  "Environmental Law",
+  "Estate Planning & Probate",
+  "Family Law",
+  "Franchise Law",
+  "Government Contracts Law",
+  "Health Care Law",
+  "Immigration Law",
+  "Insurance Law",
+  "Intellectual Property (IP) Law",
+  "International Law",
+  "Land Use & Zoning Law",
+  "Litigation",
+  "Media Law",
+  "Medical Malpractice",
+  "Military Law",
+  "Municipal Law",
+  "Personal Injury Law",
+  "Product Liability Law",
+  "Real Estate Law",
+  "Securities Law",
+  "Social Security / Disability Law",
+  "Sports Law",
+  "Tax Law",
+  "Technology Law",
+  "Telecommunications Law",
+  "Torts",
+  "Transportation Law",
+  "Trusts & Estates",
+  "White Collar Crime",
+  "Workers’ Compensation"
+];
+
 const LANGUAGE_PROFICIENCY_OPTIONS = [
   { value: "Native", label: "Native" },
   { value: "Fluent", label: "Fluent" },
@@ -458,6 +512,9 @@ function hydrateAttorneyProfileForm(user = {}) {
   const practiceValue = user.practiceDescription || user.bio || "";
   if (practiceInput) practiceInput.value = practiceValue;
   settingsState.practiceDescription = practiceValue;
+  renderAttorneyPracticeAreas(user.practiceAreas || []);
+  const publicationsInput = document.getElementById("attorneyPublications");
+  if (publicationsInput) publicationsInput.value = Array.isArray(user.publications) ? user.publications.join("\n") : "";
   updateAttorneyPracticeCount();
   hydrateAttorneyNotificationPrefs(user);
   updateAttorneyAvatarPreview(user);
@@ -503,6 +560,195 @@ function bindAttorneyPracticeEditor() {
     updateAttorneyPracticeCount();
   });
   updateAttorneyPracticeCount();
+}
+
+function renderAttorneyPracticeAreas(selected = []) {
+  const panel = document.getElementById("attorneyPracticeDropdown");
+  const toggle = document.getElementById("attorneyPracticeDropdownToggle");
+  const summary = document.getElementById("attorneyPracticeSummary");
+  if (!panel || !toggle || !summary) return;
+  panel.innerHTML = "";
+
+  const searchWrap = document.createElement("div");
+  searchWrap.className = "dropdown-search";
+  const searchInput = document.createElement("input");
+  searchInput.type = "search";
+  searchInput.placeholder = "Search…";
+  searchWrap.appendChild(searchInput);
+  panel.appendChild(searchWrap);
+
+  const selectedSet = new Set(
+    (Array.isArray(selected) ? selected : [selected])
+      .filter(Boolean)
+      .map((v) => String(v).trim())
+  );
+
+  const optionNodes = [];
+  const syncAllOptionClasses = () => {
+    optionNodes.forEach((opt) => {
+      const cb = opt.querySelector("input[type=\"checkbox\"]");
+      if (cb) opt.classList.toggle("selected", cb.checked);
+    });
+  };
+
+  const buildOption = (label, isSelectAll = false) => {
+    const option = document.createElement("div");
+    option.className = `dropdown-option${isSelectAll ? " dropdown-option--select-all" : ""}`;
+    option.role = "option";
+    option.tabIndex = 0;
+    option.dataset.label = label.toLowerCase();
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = label;
+    checkbox.checked = isSelectAll ? selectedSet.size === FIELD_OF_LAW_OPTIONS.length : selectedSet.has(label);
+
+    const text = document.createElement("span");
+    text.textContent = label;
+
+    option.appendChild(checkbox);
+    option.appendChild(text);
+    panel.appendChild(option);
+    if (!isSelectAll) optionNodes.push(option);
+
+    const findAllCheckboxes = () =>
+      optionNodes.map((opt) => opt.querySelector("input[type=\"checkbox\"]")).filter(Boolean);
+
+    const setAll = (checked) => {
+      findAllCheckboxes().forEach((cb) => {
+        cb.checked = checked;
+        const opt = cb.closest(".dropdown-option");
+        if (opt) opt.classList.toggle("selected", checked);
+      });
+      updatePracticeDropdownLabel();
+    };
+
+    const toggleCheckbox = () => {
+      checkbox.checked = !checkbox.checked;
+      if (isSelectAll) {
+        setAll(checkbox.checked);
+      } else {
+        syncSelectedClass();
+        updatePracticeDropdownLabel();
+        syncAllOptionClasses();
+      }
+    };
+
+    const syncSelectedClass = () => {
+      if (!isSelectAll) {
+        option.classList.toggle("selected", checkbox.checked);
+      }
+    };
+
+    checkbox.addEventListener("change", () => {
+      if (isSelectAll) {
+        setAll(checkbox.checked);
+      } else {
+        syncSelectedClass();
+        updatePracticeDropdownLabel();
+        syncAllOptionClasses();
+      }
+    });
+
+    option.addEventListener("click", (e) => {
+      if (e.target === checkbox) return;
+      toggleCheckbox();
+    });
+    option.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleCheckbox();
+      }
+    });
+    syncSelectedClass();
+    syncAllOptionClasses();
+    return option;
+  };
+
+  buildOption("Select all", true);
+
+  FIELD_OF_LAW_OPTIONS.forEach((label) => {
+    buildOption(label, false);
+  });
+
+  const findOptionCheckbox = (value) => {
+    return panel.querySelector(`.dropdown-option input[type="checkbox"][value="${CSS.escape(value)}"]`);
+  };
+
+  const updatePracticeDropdownLabel = () => {
+    const selected = collectAttorneyPracticeAreas();
+    summary.innerHTML = "";
+    if (!selected.length) {
+      const span = document.createElement("span");
+      span.className = "placeholder";
+      span.textContent = "Select fields";
+      summary.appendChild(span);
+      return;
+    }
+    const chips = selected.slice(0, 3);
+    chips.forEach((value) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.textContent = value;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "chip-remove";
+      remove.setAttribute("aria-label", `Remove ${value}`);
+      remove.textContent = "×";
+      remove.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const cb = findOptionCheckbox(value);
+        if (cb) {
+          cb.checked = false;
+          const opt = cb.closest(".dropdown-option");
+          if (opt) opt.classList.remove("selected");
+          updatePracticeDropdownLabel();
+          syncAllOptionClasses();
+        }
+      });
+      chip.appendChild(remove);
+      summary.appendChild(chip);
+    });
+    if (selected.length > chips.length) {
+      const more = document.createElement("span");
+      more.className = "chip";
+      more.textContent = `+${selected.length - chips.length} more`;
+      summary.appendChild(more);
+    }
+  };
+
+  const filterOptions = () => {
+    const q = (searchInput.value || "").toLowerCase().trim();
+    optionNodes.forEach((opt) => {
+      const match = !q || opt.dataset.label.includes(q);
+      opt.style.display = match ? "flex" : "none";
+    });
+  };
+
+  searchInput.addEventListener("input", filterOptions);
+  filterOptions();
+  updatePracticeDropdownLabel();
+
+  if (!toggle.dataset.bound) {
+    toggle.addEventListener("click", () => {
+      panel.classList.toggle("open");
+    });
+    document.addEventListener("click", (e) => {
+      if (!panel.contains(e.target) && !toggle.contains(e.target)) {
+        panel.classList.remove("open");
+      }
+    });
+    toggle.dataset.bound = "true";
+  }
+}
+
+function collectAttorneyPracticeAreas() {
+  const panel = document.getElementById("attorneyPracticeDropdown");
+  if (!panel) return [];
+  return Array.from(panel.querySelectorAll(".dropdown-option input[type=\"checkbox\"]"))
+    .filter((input) => input.value !== "Select all" && input.checked)
+    .map((input) => input.value)
+    .filter(Boolean);
 }
 
 function bindAttorneyNotificationToggles() {
@@ -555,12 +801,20 @@ function collectAttorneyPayload() {
   const firmWebsite = document.getElementById("attorneyFirmWebsite")?.value.trim() || "";
   const practiceDescription = document.getElementById("attorneyPracticeDescription")?.value.trim() || "";
   const emailToggle = document.getElementById("attorneyEmailNotifications");
+  const practiceAreas = collectAttorneyPracticeAreas();
+  const publicationsRaw = document.getElementById("attorneyPublications")?.value || "";
+  const publications = publicationsRaw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
   const payload = {
     firstName: first,
     lastName: last,
     email,
     linkedInURL: linkedIn || null,
     lawFirm,
+    practiceAreas,
+    publications,
     practiceDescription,
     bio: practiceDescription,
     notificationPrefs: {
@@ -607,6 +861,7 @@ async function handleAttorneyProfileSave() {
     window.updateSessionUser?.(updatedUser);
     settingsState.profileImage = updatedUser.profileImage || settingsState.profileImage;
     settingsState.practiceDescription = updatedUser.practiceDescription || updatedUser.bio || "";
+    renderAttorneyPracticeAreas(updatedUser.practiceAreas || []);
     settingsState.notificationPrefs = {
       ...settingsState.notificationPrefs,
       email: updatedUser.notificationPrefs?.email !== false,
@@ -1730,20 +1985,19 @@ if (profileForm) {
 }
 
 function handleProfilePreviewNavigation() {
-  if (!currentUser) {
-    alert("Unable to load your profile.");
-    return;
-  }
+  const cached = currentUser || getCachedUser() || {};
 
-  const role = (currentUser.role || "").toLowerCase();
-  const id = currentUser._id || currentUser.id;
+  const role = (cached.role || "").toLowerCase();
+  const id = cached._id || cached.id;
 
   if (!id) {
     alert("Missing user id.");
     return;
   }
 
-  if (role === "attorney") {
+  // Favor the attorney view when the attorney settings panel is visible or when the role is missing.
+  const isAttorneyPanelVisible = !document.getElementById("attorneySettings")?.classList.contains("hidden");
+  if (role === "attorney" || (!role && isAttorneyPanelVisible)) {
     window.location.href = `profile-attorney.html?id=${id}`;
   } else {
     window.location.href = `profile-paralegal.html?paralegalId=${id}`;

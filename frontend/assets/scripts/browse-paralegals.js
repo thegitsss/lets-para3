@@ -71,6 +71,13 @@ let availableCases = [];
 let activeParalegal = null;
 const toast = window.toastUtils;
 
+function normalizeId(val) {
+  if (!val) return "";
+  if (typeof val === "string") return val;
+  if (typeof val === "object") return String(val.id || val._id || val.paralegalId || "");
+  return "";
+}
+
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
@@ -443,13 +450,6 @@ function buildParalegalCard(paralegal) {
 
   const actions = document.createElement("div");
   actions.className = "card-actions";
-  const contactBtn = document.createElement("button");
-  contactBtn.type = "button";
-  contactBtn.className = "action-btn contact-btn";
-  contactBtn.dataset.id = paralegalId;
-  contactBtn.textContent = state.isLoggedIn ? "Message" : "Sign in to message";
-  contactBtn.addEventListener("click", () => handleContactClick(paralegalId));
-  actions.appendChild(contactBtn);
   if (state.canInvite) {
     const inquireBtn = document.createElement("button");
     inquireBtn.type = "button";
@@ -458,7 +458,9 @@ function buildParalegalCard(paralegal) {
     inquireBtn.addEventListener("click", () => openInquireModal({ id: paralegalId, name }));
     actions.appendChild(inquireBtn);
   }
-  card.appendChild(actions);
+  if (actions.children.length) {
+    card.appendChild(actions);
+  }
 
   card.addEventListener("click", (event) => {
     const isAction = event.target.closest(".action-btn");
@@ -504,7 +506,7 @@ function openInquireModal(paralegal) {
   if (!elements.inquireModal) return;
   clearFieldError(elements.jobList);
   clearFieldError(elements.inquireMessage);
-  elements.selectedParalegalText.textContent = `Select the open case for ${paralegal.name}.`;
+  elements.selectedParalegalText.textContent = `Select an open case for ${paralegal.name}.`;
   elements.inquireMessage.value = "";
   const firstOption = elements.jobList.querySelector("input[name='jobOption']");
   if (firstOption) firstOption.checked = false;
@@ -529,16 +531,33 @@ function renderCaseOptions() {
     elements.confirmInquire.disabled = true;
     return;
   }
-  elements.jobList.innerHTML = availableCases
+  const targetId = String(
+    normalizeId(activeParalegal) ||
+      normalizeId(activeParalegal?.paralegal) ||
+      normalizeId(activeParalegal?.user) ||
+      normalizeId(activeParalegal?.person)
+  );
+  const options = availableCases.map((c) => {
+    const caseId = c.id || c._id;
+    const pendingId = normalizeId(c.pendingParalegalId) || normalizeId(c.pendingParalegal);
+    const assignedId = normalizeId(c.paralegalId) || normalizeId(c.paralegal);
+    const invited = targetId && String(pendingId || "") === targetId;
+    const assigned = targetId && String(assignedId || "") === targetId;
+    const disabled = invited || assigned;
+    const statusLabel = invited ? "Invitation already sent to this paralegal" : assigned ? "Paralegal already assigned" : "";
+    return { caseId, title: c.title || "Untitled matter", disabled, statusLabel };
+  });
+  const hasSelectable = options.some((opt) => !opt.disabled);
+  elements.jobList.innerHTML = options
     .map(
-      (c) => `
-      <label class="job-option">
-        <input type="radio" name="jobOption" value="${c.id || c._id}">
-        <span>${escapeHtml(c.title || "Untitled matter")}</span>
+      (opt) => `
+      <label class="job-option${opt.disabled ? " disabled" : ""}">
+        <input type="radio" name="jobOption" value="${opt.caseId}" ${opt.disabled ? "disabled" : ""} aria-disabled="${opt.disabled ? "true" : "false"}">
+        <span>${escapeHtml(opt.title)}${opt.statusLabel ? ` — ${escapeHtml(opt.statusLabel)}` : ""}</span>
       </label>`
     )
     .join("");
-  elements.confirmInquire.disabled = false;
+  elements.confirmInquire.disabled = !hasSelectable;
 }
 
 async function sendInquiry() {
@@ -551,12 +570,29 @@ async function sendInquiry() {
     return;
   }
   const message = (elements.inquireMessage.value || "").trim();
+  const targetId = normalizeId(activeParalegal) || normalizeId(activeParalegal?.paralegal) || normalizeId(activeParalegal?.user) || normalizeId(activeParalegal?.person);
+  const caseMeta = availableCases.find((c) => String(c.id || c._id) === String(selected.value));
+  if (caseMeta && targetId) {
+    const pendingId = normalizeId(caseMeta.pendingParalegalId) || normalizeId(caseMeta.pendingParalegal);
+    const assignedId = normalizeId(caseMeta.paralegalId) || normalizeId(caseMeta.paralegal);
+    if (String(pendingId) === targetId) {
+      showToast("Invitation already sent to this paralegal for this case.", "err");
+      return;
+    }
+    if (String(assignedId) === targetId) {
+      showToast("This paralegal is already assigned to this case.", "err");
+      return;
+    }
+  }
   try {
-    const res = await secureFetch(`/api/users/${activeParalegal.id}/invite`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ caseId: selected.value, message }),
-    });
+    const res = await secureFetch(
+      `/api/cases/${encodeURIComponent(selected.value)}/invite/${encodeURIComponent(activeParalegal.id)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caseId: selected.value, message }),
+      }
+    );
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(data?.error || "Unable to send invite");

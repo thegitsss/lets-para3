@@ -32,6 +32,10 @@ let currentApplyJob = null;
 let csrfToken = "";
 const toast = window.toastUtils;
 let expandedJobId = "";
+const initialJobParam = (() => {
+  const params = new URLSearchParams(window.location.search);
+  return (params.get("id") || params.get("caseId") || "").trim();
+})();
 
 // Elements
 const filterToggle = document.getElementById("filterToggle");
@@ -404,6 +408,12 @@ async function fetchJobs() {
 
     populateFilters();
     applySort();
+    if (initialJobParam) {
+      const match = filteredJobs.find((job) => getJobUniqueId(job) === initialJobParam);
+      if (match) {
+        expandedJobId = getJobUniqueId(match);
+      }
+    }
     renderJobs();
   } catch (err) {
     console.error("Failed to load jobs", err);

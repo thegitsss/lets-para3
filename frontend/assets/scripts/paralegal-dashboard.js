@@ -1,5 +1,47 @@
 import { secureFetch } from "./auth.js";
-import { getAvatarUrl } from "./helpers.js";
+
+const PLACEHOLDER_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+  `<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'>
+    <defs>
+      <linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'>
+        <stop offset='0%' stop-color='#f4f6fa'/>
+        <stop offset='100%' stop-color='#e6e9ef'/>
+      </linearGradient>
+    </defs>
+    <rect width='80' height='80' rx='16' fill='url(#grad)'/>
+    <circle cx='40' cy='34' r='18' fill='#d4dae6'/>
+    <path d='M18 70c4-15 17-26 22-26s18 11 22 26' fill='none' stroke='#c9cfda' stroke-width='4' stroke-linecap='round'/>
+    <text x='50%' y='52%' font-family='Sarabun, Arial, sans-serif' font-size='18' font-weight='600' fill='#3a4553' text-anchor='middle' dominant-baseline='middle'>LPC</text>
+  </svg>`
+)}`;
+
+function getAvatarUrl(user = {}) {
+  return user.profileImage || user.avatarURL || PLACEHOLDER_AVATAR;
+}
+
+function normalizeIdCandidate(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object") return value._id || value.id || value.userId || "";
+  return "";
+}
+
+function deriveAttorneyId(invite = {}) {
+  const candidates = [invite.attorney, invite.attorneyId, invite.attorney_id];
+  for (const candidate of candidates) {
+    const id = normalizeIdCandidate(candidate);
+    if (id) return id;
+  }
+  const createdBy = invite.createdByUser || invite.createdBy;
+  const createdByRole = String(
+    (createdBy && (createdBy.role || createdBy.type)) || invite.createdByRole || invite.createdByType || ""
+  ).toLowerCase();
+  if (createdByRole === "attorney") {
+    const createdById = normalizeIdCandidate(createdBy);
+    if (createdById) return createdById;
+  }
+  return "";
+}
 
 const selectors = {
   messageBox: document.getElementById('messageBox'),
@@ -12,6 +54,19 @@ const selectors = {
   assignmentTemplate: document.getElementById('assignmentCardTemplate'),
   toastBanner: document.getElementById('toastBanner'),
   nameHeading: document.getElementById('user-name-heading'),
+  inviteOverlay: document.getElementById('inviteOverlay'),
+  inviteCaseTitle: document.getElementById('inviteCaseTitle'),
+  inviteJobTitle: document.getElementById('inviteJobTitle'),
+  inviteLead: document.getElementById('inviteLead'),
+  inviteMeta: document.getElementById('inviteMeta'),
+  inviteDetails: document.getElementById('inviteDetails'),
+  inviteAttorneyAvatar: document.getElementById('inviteAttorneyAvatar'),
+  inviteAttorneyName: document.getElementById('inviteAttorneyName'),
+  inviteAttorneyFirm: document.getElementById('inviteAttorneyFirm'),
+  inviteAttorneyLink: document.getElementById('inviteAttorneyLink'),
+  inviteCloseBtn: document.getElementById('inviteCloseBtn'),
+  inviteAcceptBtn: document.getElementById('inviteAcceptBtn'),
+  inviteDeclineBtn: document.getElementById('inviteDeclineBtn'),
 };
 
 const JSON_HEADERS = { Accept: 'application/json' };
@@ -245,6 +300,13 @@ function renderInvites(invites = []) {
     body.appendChild(actions);
     card.appendChild(body);
     container.appendChild(card);
+
+    const openDetail = () => openInviteOverlay(invite);
+    header.addEventListener('click', openDetail);
+    card.addEventListener('click', (e) => {
+      if (e.target?.closest('button')) return;
+      openDetail();
+    });
   });
 
   container.querySelectorAll('[data-invite-action]').forEach((button) => {
@@ -275,6 +337,7 @@ async function respondToInvite(caseId, action, button) {
     }
     const invites = await loadInvites();
     renderInvites(invites);
+    closeInviteOverlay();
   } catch (error) {
     toastHelper?.show?.(error.message || 'Unable to update invitation.', {
       targetId: selectors.toastBanner?.id,
@@ -340,6 +403,133 @@ function attachUIHandlers() {
   if (stagedToast?.message && selectors.toastBanner) {
     toastHelper.show(stagedToast.message, { targetId: selectors.toastBanner.id, type: stagedToast.type });
   }
+
+  if (selectors.inviteCloseBtn) {
+    selectors.inviteCloseBtn.addEventListener('click', closeInviteOverlay);
+  }
+  if (selectors.inviteOverlay) {
+    selectors.inviteOverlay.addEventListener('click', (event) => {
+      if (event.target === selectors.inviteOverlay) closeInviteOverlay();
+    });
+  }
+  if (selectors.inviteAcceptBtn) {
+    selectors.inviteAcceptBtn.addEventListener('click', () => {
+      const caseId = selectors.inviteAcceptBtn.dataset.caseId;
+      respondToInvite(caseId, 'accept', selectors.inviteAcceptBtn);
+    });
+  }
+  if (selectors.inviteDeclineBtn) {
+    selectors.inviteDeclineBtn.addEventListener('click', () => {
+      const caseId = selectors.inviteDeclineBtn.dataset.caseId;
+      respondToInvite(caseId, 'decline', selectors.inviteDeclineBtn);
+    });
+  }
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && selectors.inviteOverlay?.classList.contains('show')) {
+      closeInviteOverlay();
+    }
+  });
+}
+
+let activeInvite = null;
+function openInviteOverlay(invite) {
+  activeInvite = invite || null;
+  const {
+    inviteOverlay,
+    inviteCaseTitle,
+    inviteJobTitle,
+    inviteLead,
+    inviteMeta,
+    inviteDetails,
+    inviteAttorneyAvatar,
+    inviteAttorneyName,
+    inviteAttorneyFirm,
+    inviteAttorneyLink,
+    inviteAcceptBtn,
+    inviteDeclineBtn,
+  } = selectors;
+  if (!inviteOverlay) return;
+  const title = invite?.title || 'Case Invitation';
+  const attorneyName =
+    invite?.attorney?.name ||
+    [invite?.attorney?.firstName, invite?.attorney?.lastName].filter(Boolean).join(' ').trim() ||
+    'Attorney';
+  const practice = invite?.practiceArea || 'General matter';
+  const status = invite?.status ? invite.status.replace(/_/g, ' ') : '';
+  const numericBudget = typeof invite?.budget === 'number' ? invite.budget : Number.NaN;
+  const pay =
+    (Number.isFinite(numericBudget) && `$${numericBudget.toLocaleString()} compensation`) ||
+    invite?.compensationDisplay ||
+    invite?.payDisplay ||
+    invite?.compensation ||
+    invite?.rate ||
+    '';
+  const postedOn = invite?.createdAt ? new Date(invite.createdAt).toLocaleDateString() : '';
+  const invitedAt = invite?.pendingParalegalInvitedAt
+    ? `Invited ${new Date(invite.pendingParalegalInvitedAt).toLocaleDateString()}`
+    : '';
+  const brief =
+    invite?.briefSummary ||
+    invite?.description ||
+    invite?.details ||
+    invite?.summary ||
+    invite?.caseDescription ||
+    '';
+
+  if (inviteCaseTitle) inviteCaseTitle.textContent = "You've been invited to a case";
+  if (inviteJobTitle) inviteJobTitle.textContent = title;
+  if (inviteLead) inviteLead.textContent = `${attorneyName} has invited you to collaborate on this case.`;
+  if (inviteMeta) {
+    const metaPieces = [
+      practice ? `<span class="pill">${escapeHtml(practice)}</span>` : '',
+      invite?.state || invite?.locationState || invite?.location
+        ? `<span class="pill">${escapeHtml(invite.state || invite.locationState || invite.location)}</span>`
+        : '',
+      pay ? `<span class="pill">${escapeHtml(pay)}</span>` : '',
+      invitedAt
+        ? `<span class="pill">${escapeHtml(invitedAt)}</span>`
+        : postedOn
+          ? `<span class="pill">${escapeHtml(postedOn)}</span>`
+          : '',
+    ].filter(Boolean);
+    inviteMeta.innerHTML = metaPieces.join('');
+  }
+  if (inviteDetails) {
+    inviteDetails.textContent = brief || 'Full case details will be shared after you accept.';
+  }
+  if (inviteAttorneyName) inviteAttorneyName.textContent = attorneyName;
+  if (inviteAttorneyFirm) inviteAttorneyFirm.textContent = invite?.attorney?.firm || invite?.attorney?.lawFirm || '';
+  const attorneyId = deriveAttorneyId(invite);
+  if (inviteAttorneyLink) {
+    if (attorneyId) {
+      inviteAttorneyLink.href = `profile-attorney.html?id=${encodeURIComponent(attorneyId)}`;
+      inviteAttorneyLink.removeAttribute('aria-disabled');
+    } else {
+      inviteAttorneyLink.removeAttribute('href');
+      inviteAttorneyLink.setAttribute('aria-disabled', 'true');
+    }
+  }
+  if (inviteAttorneyAvatar) {
+    inviteAttorneyAvatar.src = getAvatarUrl(invite?.attorney || {});
+    inviteAttorneyAvatar.alt = `${attorneyName} avatar`;
+    inviteAttorneyAvatar.style.display = "block";
+  }
+  const caseId = invite?.id || invite?._id || '';
+  if (inviteAcceptBtn) {
+    inviteAcceptBtn.dataset.caseId = caseId;
+    inviteAcceptBtn.disabled = !caseId;
+  }
+  if (inviteDeclineBtn) {
+    inviteDeclineBtn.dataset.caseId = caseId;
+    inviteDeclineBtn.disabled = !caseId;
+  }
+
+  inviteOverlay.classList.add('show');
+}
+
+function closeInviteOverlay() {
+  selectors.inviteOverlay?.classList.remove('show');
+  activeInvite = null;
 }
 
 function updateProfile(profile = {}) {

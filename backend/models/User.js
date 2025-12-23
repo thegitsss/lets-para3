@@ -170,6 +170,7 @@ const userSchema = new Schema(
     avatarURL: { type: String, default: "", trim: true },
     profileImage: { type: String, default: null },
     lawFirm: { type: String, default: "", trim: true, maxlength: 300 },
+    firmWebsite: { type: String, default: "", trim: true, maxlength: 500 },
     state: { type: String, default: "", trim: true, maxlength: 120 },
     timezone: { type: String, default: "America/New_York", trim: true },
     location: { type: String, default: "", trim: true }, // City, State
@@ -187,6 +188,7 @@ const userSchema = new Schema(
     writingSamples: { type: [writingSampleSchema], default: [] },
     experience: { type: [experienceEntrySchema], default: [] },
     education: { type: [educationEntrySchema], default: [] },
+    publications: { type: [String], default: [], set: uniqueStrings },
 
     // Security / housekeeping
     termsAccepted: { type: Boolean, default: false },

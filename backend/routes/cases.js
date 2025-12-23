@@ -170,6 +170,7 @@ function summarizeUser(person) {
     name,
     email: person.email || null,
     role: person.role || null,
+    profileImage: person.profileImage || person.avatarURL || null,
   };
 }
 

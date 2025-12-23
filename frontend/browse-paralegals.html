@@ -721,6 +721,15 @@
 
     .job-option input { accent-color: var(--gold); }
 
+    .job-option.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .job-option.disabled input {
+      pointer-events: none;
+    }
+
     .modal-actions {
       display: flex;
       justify-content: flex-end;
@@ -818,6 +827,28 @@
         margin-left: 0;
         order: 3;
       }
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translate(-50%, 20px);
+      background: rgba(17, 17, 17, 0.9);
+      color: #fff;
+      padding: 0.85rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 300;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
     }
   </style>
 </head>
@@ -943,6 +974,8 @@
       <div class="region">United States</div>
     </div>
   </footer>
+
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
 
   <script src="assets/scripts/utils/toast.js"></script>
   <script type="module" src="assets/scripts/browse-paralegals.js"></script>
