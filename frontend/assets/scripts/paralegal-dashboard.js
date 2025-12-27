@@ -258,6 +258,7 @@ function renderInvites(invites = []) {
   invites.forEach((invite) => {
     const card = document.createElement('div');
     card.className = 'case-card';
+    card.dataset.caseId = invite.id || invite._id || '';
 
     const header = document.createElement('div');
     header.className = 'case-header';
@@ -335,9 +336,17 @@ async function respondToInvite(caseId, action, button) {
       window.location.reload();
       return;
     }
+    // Optimistically remove the invite card and close the overlay
+    if (action === 'decline' && selectors.inviteList) {
+      selectors.inviteList.querySelector(`[data-case-id="${caseId}"]`)?.remove();
+    }
+    closeInviteOverlay();
     const invites = await loadInvites();
     renderInvites(invites);
-    closeInviteOverlay();
+    // Refresh notification bell to reflect the decline notice
+    if (typeof window.refreshNotificationCenters === 'function') {
+      window.refreshNotificationCenters();
+    }
   } catch (error) {
     toastHelper?.show?.(error.message || 'Unable to update invitation.', {
       targetId: selectors.toastBanner?.id,
@@ -371,7 +380,11 @@ function renderAssignedCases(items = []) {
   }
   list.innerHTML = items
     .map(
-      (c) => `
+      (c) => {
+        const funded = String(c.escrowStatus || '').toLowerCase() === 'funded';
+        const buttonLabel = funded ? 'Open Case' : 'Awaiting Attorney Funding';
+        const disabledAttr = funded ? '' : ' disabled aria-disabled="true"';
+        return `
       <div class="case-item" data-id="${c._id}">
         <div class="case-title">${c.title || 'Untitled Case'}</div>
         <div class="case-meta">
@@ -379,8 +392,9 @@ function renderAssignedCases(items = []) {
           <span>Attorney: ${c.attorneyName || ''}</span>
           <span>Status: ${c.status || 'Active'}</span>
         </div>
-        <button class="open-case-btn" data-id="${c._id}">Open Case</button>
-      </div>`
+        <button class="open-case-btn" data-id="${c._id}"${disabledAttr}>${buttonLabel}</button>
+      </div>`;
+      }
     )
     .join('');
 }
@@ -749,6 +763,70 @@ async function loadRecommendedJobs(profile = {}) {
   }
 }
 
+async function loadAppliedJobs() {
+  const container = document.getElementById('appliedJobsList');
+  if (!container) return;
+  container.innerHTML = '';
+  const loading = document.createElement('div');
+  loading.className = 'case-card';
+  loading.innerHTML = '<div class="case-header"><div><h2>Loading applications…</h2></div></div>';
+  container.appendChild(loading);
+
+  try {
+    const res = await secureFetch('/api/applications/my', { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const apps = await res.json();
+    if (!Array.isArray(apps) || !apps.length) {
+      container.innerHTML = `
+        <div class="case-card empty-state">
+          <div class="case-header">
+            <div>
+              <h2>No applications yet</h2>
+              <div class="case-subinfo">Jobs you apply to will appear here.</div>
+            </div>
+          </div>
+        </div>`;
+      return;
+    }
+    container.innerHTML = apps
+      .map((app) => {
+        const job = app.jobId || {};
+        const title = escapeHtml(job.title || 'Untitled job');
+        const practice = escapeHtml(job.practiceArea || 'General practice');
+        const when = app.createdAt
+          ? new Date(app.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+          : 'Recently';
+        const href = job._id || job.id ? `browse-jobs.html?id=${encodeURIComponent(job._id || job.id)}` : 'browse-jobs.html';
+        return `
+          <div class="case-card applied-card">
+            <div class="case-header">
+              <div>
+                <h2>${title}</h2>
+                <div class="case-subinfo">${practice}</div>
+                <div class="case-subinfo">Applied on ${when}</div>
+              </div>
+              <div class="case-actions">
+                <a class="card-link" href="${href}">View →</a>
+              </div>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
+  } catch (err) {
+    console.error('Failed to load applied jobs', err);
+    container.innerHTML = `
+      <div class="case-card empty-state">
+        <div class="case-header">
+          <div>
+            <h2>Unable to load applications</h2>
+            <div class="case-subinfo">Please refresh to try again.</div>
+          </div>
+        </div>
+      </div>`;
+  }
+}
+
 async function initDashboard() {
   attachUIHandlers();
   initQuickActions();
@@ -772,6 +850,7 @@ async function initDashboard() {
       nextPayout: dashboard?.metrics?.nextPayoutDate,
     });
     loadRecommendedJobs(viewer);
+    loadAppliedJobs();
     renderDeadlines(deadlines);
     initLatestMessage(threads);
     renderAssignments(mapActiveCasesToAssignments(dashboard?.activeCases || []));
@@ -783,6 +862,7 @@ async function initDashboard() {
     renderDeadlines([]);
     initLatestMessage([]);
     loadRecommendedJobs({});
+    loadAppliedJobs();
   }
   await loadAssignedCases();
 }
@@ -805,6 +885,10 @@ async function bootParalegalDashboard() {
   selectors.assignedCasesList?.addEventListener('click', (event) => {
     const btn = event.target.closest('.open-case-btn');
     if (!btn) return;
+    if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') {
+      event.preventDefault();
+      return;
+    }
     const caseId = btn.dataset.id;
     if (!caseId) return;
     window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;

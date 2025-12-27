@@ -74,7 +74,12 @@ function draw(root, data, escapeHTML, caseId, session) {
   const title = data?.title || "Case";
   const statusRaw = String(data?.status || "open");
   const status = statusRaw.replace(/_/g, " ");
+  const budgetCents = Number.isFinite(data?.lockedTotalAmount)
+    ? data.lockedTotalAmount
+    : Number(data?.totalAmount) || 0;
+  const budgetDisplay = formatCurrency(budgetCents / 100);
   const zoomLink = data?.zoomLink;
+  const escrowFunded = !!data?.escrowIntentId;
   const applicants = Array.isArray(data?.applicants) ? data.applicants : [];
   const viewer = session?.user || {};
   const viewerRole = String(session?.role || viewer.role || "").toLowerCase();
@@ -101,7 +106,7 @@ function draw(root, data, escapeHTML, caseId, session) {
   const termination = normalizeTermination(data?.termination);
   const caseLocked = statusRaw === "disputed" || termination.status === "disputed";
   const showPayment =
-    !caseLocked && (isOwner || isAdmin) && paralegalOnCase && !data?.paymentReleased && !readOnly;
+    !caseLocked && (isOwner || isAdmin) && paralegalOnCase && !escrowFunded && !data?.paymentReleased && !readOnly;
   const showCompleteButton =
     !caseLocked && (isOwner || isAdmin) && paralegalOnCase && !data?.paymentReleased && !readOnly;
   const canInvite = (isOwner || isAdmin) && !paralegalOnCase && !pendingParalegalId;
@@ -186,7 +191,7 @@ function draw(root, data, escapeHTML, caseId, session) {
         <div class="case-actions">
           ${
             showPayment
-              ? `<button class="btn primary" data-start-escrow>Fund Escrow</button>
+              ? `<button class="btn primary" data-start-escrow>Hire &amp; Start Work</button>
                  <div class="payment-panel" data-payment-panel>
                    <div data-card-element></div>
                    <div class="card-errors" data-card-errors></div>
@@ -195,7 +200,7 @@ function draw(root, data, escapeHTML, caseId, session) {
           }
           ${
             showCompleteButton
-              ? `<button class="btn secondary" data-complete-case>Mark Case Complete &amp; Archive</button>`
+              ? `<button class="btn secondary" data-complete-case>Approve &amp; Release Funds</button>`
               : ""
           }
           ${
@@ -224,6 +229,7 @@ function draw(root, data, escapeHTML, caseId, session) {
     <section class="dash">
       <div class="section-title">${escapeHTML(title)}</div>
       <div class="case-meta">Practice area: ${escapeHTML(practiceArea)}</div>
+      <div class="case-meta">Posted amount: ${escapeHTML(budgetDisplay)}</div>
       <div class="case-status-pill">${escapeHTML(status)}</div>
       ${
         pendingParalegalId
@@ -339,6 +345,7 @@ function skeleton() {
     <section class="dash">
       <div class="section-title shimmer" style="width:220px"></div>
       <div class="case-meta shimmer" style="width:180px"></div>
+      <div class="case-meta shimmer" style="width:200px"></div>
       <div class="case-status-pill shimmer" style="width:120px;height:32px"></div>
       <div class="case-section">
         <div class="case-section-title shimmer" style="width:140px"></div>
@@ -358,6 +365,12 @@ function getRouteParams(explicit) {
     return new URLSearchParams(window.location.search.slice(1));
   }
   return new URLSearchParams();
+}
+
+function formatCurrency(amount) {
+  const value = Number(amount);
+  if (!Number.isFinite(value)) return "$0.00";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
 function escapeAttribute(value = "") {
@@ -667,14 +680,17 @@ function ensureStripeJs() {
       const existing = document.querySelector('script[src="https://js.stripe.com/v3/"]');
       if (existing) {
         existing.addEventListener("load", () => resolve());
-        existing.addEventListener("error", () => reject(new Error("Stripe.js failed to load")));
+        existing.addEventListener("error", () =>
+          reject(new Error("We couldn't load the secure payment form. Please allow js.stripe.com or disable ad blockers and try again."))
+        );
         return;
       }
       const script = document.createElement("script");
       script.src = "https://js.stripe.com/v3/";
       script.async = true;
       script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Stripe.js failed to load"));
+      script.onerror = () =>
+        reject(new Error("We couldn't load the secure payment form. Please allow js.stripe.com or disable ad blockers and try again."));
       document.head.appendChild(script);
     });
   }

@@ -1549,28 +1549,24 @@ Legal Assistant at..."></textarea>
   <script type="module" src="assets/scripts/attorney-tabs.js"></script>
   <script type="module" src="assets/scripts/profile-settings.js"></script>
   <script>
-    // Single, simple logout binding for any dropdown logout control
-    const forceLogout = async (event) => {
-      event?.preventDefault?.();
-      event?.stopPropagation?.();
-      try {
-        await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-      } catch (_) {}
-      try {
-        localStorage.clear();
-        sessionStorage.clear();
-      } catch (_) {}
-      window.location.href = "login.html";
-    };
-    document.addEventListener(
-      "click",
-      (event) => {
-        const target = event.target.closest("[data-logout]");
-        if (!target) return;
-        forceLogout(event);
-      },
-      true
-    );
+    // Safe, bubble-phase logout handler as a fallback for any [data-logout] trigger
+    document.addEventListener("click", (evt) => {
+      const target = evt.target.closest("[data-logout]");
+      if (!target) return;
+      evt.preventDefault();
+      if (typeof window.logoutUser === "function") {
+        window.logoutUser(evt);
+        return;
+      }
+      // Fallback if helper is unavailable
+      fetch("/api/auth/logout", { method: "POST", credentials: "include" }).finally(() => {
+        try {
+          localStorage.clear();
+          sessionStorage.clear();
+        } catch (_) {}
+        window.location.href = "login.html";
+      });
+    });
   </script>
 </body>
 </html>

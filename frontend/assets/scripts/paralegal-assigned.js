@@ -20,11 +20,15 @@ async function loadAssignedCasesList() {
   }
 
   items.forEach(c => {
+    const funded = String(c.escrowStatus || "").toLowerCase() === "funded";
+    const action = funded
+      ? `<a class="btn primary" href="case-detail.html?caseId=${c._id}">Open Case</a>`
+      : '<button class="btn secondary" type="button" disabled aria-disabled="true">Awaiting Attorney Funding</button>';
     section.innerHTML += `
       <div class="assigned-case-card">
         <strong>${c.title}</strong><br>
         <span>Attorney: ${c.attorneyName || "Unknown"}</span><br>
-        <a href="case-detail.html?caseId=${c._id}">Open Case</a>
+        ${action}
       </div>
     `;
   });

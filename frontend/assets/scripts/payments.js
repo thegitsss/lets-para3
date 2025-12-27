@@ -15,7 +15,9 @@ export async function getStripe() {
   if (!cfg.publishableKey) throw new Error('Missing Stripe publishable key (check /api/payments/config).');
   __pk = cfg.publishableKey;
 
-  if (!window.Stripe) throw new Error('Stripe.js not loaded. Add <script src="https://js.stripe.com/v3"></script>');
+  if (!window.Stripe) {
+    throw new Error("We couldn't load the secure payment form. Please allow js.stripe.com or disable ad blockers and try again.");
+  }
 
   __stripe = window.Stripe(__pk);
   return __stripe;
@@ -62,4 +64,12 @@ export function mountPaymentElement(elements, container) {
 export async function confirmPayment(elements) {
   const stripe = await getStripe();
   return stripe.confirmPayment({ elements, redirect: 'if_required' });
+}
+
+/**
+ * Confirm a SetupIntent for saving a payment method.
+ */
+export async function confirmSetup(elements) {
+  const stripe = await getStripe();
+  return stripe.confirmSetup({ elements, redirect: 'if_required' });
 }

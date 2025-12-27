@@ -1,4 +1,5 @@
 import { secureFetch } from "./auth.js";
+import { createElements, mountPaymentElement, confirmSetup } from "./payments.js";
 
 const surface = document.querySelector("[data-billing-surface]");
 if (!surface) {
@@ -11,14 +12,28 @@ const financeAlertsEl = document.getElementById("financeAlerts");
 const escrowTableBody = document.getElementById("escrowTableBody");
 const refreshEscrowsBtn = document.getElementById("refreshEscrowsBtn");
 const currencyFormatter = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" });
+const paymentSummaryEl = document.getElementById("paymentMethodSummary");
+const paymentFormEl = document.getElementById("paymentMethodForm");
+const paymentElementHost = document.getElementById("paymentMethodElement");
+const paymentErrorsEl = document.getElementById("paymentMethodErrors");
+const addCardBtn = document.getElementById("addPaymentMethodBtn");
+const replaceCardBtn = document.getElementById("replacePaymentMethodBtn");
+const saveCardBtn = document.getElementById("savePaymentMethodBtn");
+const cancelCardBtn = document.getElementById("cancelPaymentMethodBtn");
 
 let cachedEscrows = [];
 let openDrawerEl = null;
+let setupElements = null;
+let setupPaymentElement = null;
+
+const STRIPE_JS_SRC = "https://js.stripe.com/v3/";
+let stripeJsPromise = null;
 
 initBillingSurface();
 
 async function initBillingSurface() {
   bindEvents();
+  await loadPaymentMethodStatus();
   const activeItems = await loadActiveEscrows(true);
   await Promise.all([loadFinanceAlerts(activeItems), loadHistory()]);
 }
@@ -38,6 +53,10 @@ function bindEvents() {
   escrowTableBody?.addEventListener("click", handleEscrowClick);
   financeAlertsEl?.addEventListener("click", handleAlertAction);
   document.addEventListener("click", handleGlobalClick);
+  addCardBtn?.addEventListener("click", () => startPaymentMethodFlow());
+  replaceCardBtn?.addEventListener("click", () => startPaymentMethodFlow());
+  saveCardBtn?.addEventListener("click", () => savePaymentMethod());
+  cancelCardBtn?.addEventListener("click", () => cancelPaymentFlow());
 }
 
 async function loadActiveEscrows(showLoading = false, { syncAlerts = false } = {}) {
@@ -88,7 +107,7 @@ function renderEscrowRow(entry = {}) {
           </button>
           <div class="action-menu" role="menu">
             <button type="button" data-escrow-action="view" data-case-id="${caseId}">View Case</button>
-            <button type="button" data-escrow-action="release" data-case-id="${caseId}">Release Funds</button>
+            <button type="button" data-escrow-action="release" data-case-id="${caseId}">Approve &amp; Release Funds</button>
             <button type="button" data-escrow-action="messages" data-case-id="${caseId}">Message Paralegal</button>
           </div>
         </div>
@@ -144,10 +163,10 @@ function buildFinanceAlerts({ active = [], pending = [] } = {}) {
     alerts.push({
       id: `release-${item.caseId}`,
       type: "release",
-      title: `Release funds for ${item.caseName || "a case"}`,
-      body: "The paralegal has wrapped. Release escrow to pay them.",
+      title: `Approve & release funds for ${item.caseName || "a case"}`,
+      body: "The paralegal has wrapped. Approve & release funds to pay them.",
       actions: [
-        { type: "release", label: "Release Funds", caseId: item.caseId, primary: true },
+        { type: "release", label: "Approve & Release Funds", caseId: item.caseId, primary: true },
         { type: "view", label: "View Case", caseId: item.caseId },
         { type: "messages", label: "Message Paralegal", caseId: item.caseId },
       ],
@@ -307,6 +326,162 @@ async function openBillingPortal() {
     portalBtn.disabled = false;
     portalBtn.textContent = originalText;
   }
+}
+
+function ensureStripeJs() {
+  if (window.Stripe) return Promise.resolve();
+  if (!stripeJsPromise) {
+    stripeJsPromise = new Promise((resolve, reject) => {
+      const existing = document.querySelector(`script[src="${STRIPE_JS_SRC}"]`);
+      if (existing) {
+        existing.addEventListener("load", () => resolve());
+        existing.addEventListener("error", () =>
+          reject(new Error("We couldn't load the secure payment form. Please allow js.stripe.com or disable ad blockers and try again."))
+        );
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = STRIPE_JS_SRC;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () =>
+        reject(new Error("We couldn't load the secure payment form. Please allow js.stripe.com or disable ad blockers and try again."));
+      document.head.appendChild(script);
+    });
+  }
+  return stripeJsPromise;
+}
+
+async function loadPaymentMethodStatus() {
+  if (!paymentSummaryEl) return null;
+  paymentSummaryEl.innerHTML = `<p class="muted">Checking saved payment method…</p>`;
+  try {
+    const res = await secureFetch("/api/payments/payment-method/default", { headers: { Accept: "application/json" } });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload?.error || `HTTP ${res.status}`);
+    renderPaymentMethodSummary(payload);
+    return payload;
+  } catch (err) {
+    console.warn("Unable to load default payment method", err);
+    paymentSummaryEl.innerHTML = `<p class="muted">Unable to load saved payment method right now.</p>`;
+    return null;
+  }
+}
+
+function renderPaymentMethodSummary(payload = {}) {
+  if (!paymentSummaryEl) return;
+  const pm = payload.paymentMethod;
+  if (pm) {
+    const brand = (pm.brand || pm.type || "Card").toString().toUpperCase();
+    const last4 = pm.last4 || "••••";
+    const exp =
+      pm.exp_month && pm.exp_year
+        ? ` · Expires ${String(pm.exp_month).padStart(2, "0")}/${pm.exp_year}`
+        : "";
+    paymentSummaryEl.innerHTML = `
+      <div class="pm-row">
+        <div class="pm-icon" aria-hidden="true">💳</div>
+        <div>
+          <div class="pm-label">Default card on file</div>
+          <div class="pm-meta">${escapeHtml(brand)} •••• ${escapeHtml(last4)}${escapeHtml(exp)}</div>
+        </div>
+      </div>
+    `;
+    addCardBtn?.setAttribute("hidden", "hidden");
+    replaceCardBtn?.removeAttribute("hidden");
+  } else {
+    paymentSummaryEl.innerHTML = `<p class="muted">No default payment method yet. Add a card to speed up escrow funding.</p>`;
+    addCardBtn?.removeAttribute("hidden");
+    replaceCardBtn?.setAttribute("hidden", "hidden");
+  }
+}
+
+function resetPaymentElement() {
+  if (setupPaymentElement?.destroy) {
+    setupPaymentElement.destroy();
+  }
+  setupPaymentElement = null;
+  setupElements = null;
+  if (paymentElementHost) paymentElementHost.innerHTML = "";
+}
+
+async function startPaymentMethodFlow() {
+  if (!paymentFormEl || !paymentElementHost) return;
+  if (paymentErrorsEl) paymentErrorsEl.textContent = "";
+  addCardBtn?.setAttribute("aria-busy", "true");
+  replaceCardBtn?.setAttribute("aria-busy", "true");
+  try {
+    await ensureStripeJs();
+    const session = await createSetupIntentSession();
+    resetPaymentElement();
+    setupElements = await createElements(session.clientSecret, { appearance: { theme: "flat" } });
+    setupPaymentElement = mountPaymentElement(setupElements, paymentElementHost);
+    paymentFormEl.hidden = false;
+    paymentElementHost.scrollIntoView({ behavior: "smooth", block: "center" });
+  } catch (err) {
+    console.warn("Unable to start payment method flow", err);
+    showToast(err?.message || "Unable to start card setup.", "error");
+  } finally {
+    addCardBtn?.removeAttribute("aria-busy");
+    replaceCardBtn?.removeAttribute("aria-busy");
+  }
+}
+
+async function createSetupIntentSession() {
+  const res = await secureFetch("/api/payments/payment-method/setup-intent", {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok || !payload?.clientSecret) {
+    throw new Error(payload?.error || "Unable to start card setup.");
+  }
+  return payload;
+}
+
+async function savePaymentMethod() {
+  if (!setupElements) {
+    showToast("Start by adding a card.", "info");
+    return;
+  }
+  if (paymentErrorsEl) paymentErrorsEl.textContent = "";
+  saveCardBtn?.setAttribute("disabled", "disabled");
+  saveCardBtn?.setAttribute("aria-busy", "true");
+  try {
+    await ensureStripeJs();
+    const { error, setupIntent } = await confirmSetup(setupElements);
+    if (error) throw new Error(error.message || "Unable to save card.");
+    const pmId = setupIntent?.payment_method;
+    if (!pmId) throw new Error("No payment method returned from Stripe.");
+    await setDefaultPaymentMethod(pmId);
+    showToast("Card saved and set as default.", "success");
+    await loadPaymentMethodStatus();
+    cancelPaymentFlow();
+  } catch (err) {
+    if (paymentErrorsEl) paymentErrorsEl.textContent = err?.message || "Unable to save card.";
+  } finally {
+    saveCardBtn?.removeAttribute("disabled");
+    saveCardBtn?.removeAttribute("aria-busy");
+  }
+}
+
+async function setDefaultPaymentMethod(paymentMethodId) {
+  const res = await secureFetch("/api/payments/payment-method/default", {
+    method: "POST",
+    headers: { Accept: "application/json" },
+    body: { paymentMethodId },
+  });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload?.error || "Unable to save payment method.");
+  }
+  return payload;
+}
+
+function cancelPaymentFlow() {
+  resetPaymentElement();
+  if (paymentFormEl) paymentFormEl.hidden = true;
+  if (paymentErrorsEl) paymentErrorsEl.textContent = "";
 }
 
 function renderHistoryCard(entry = {}) {

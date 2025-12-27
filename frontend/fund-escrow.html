@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hire &amp; Start Work</title>
+  <link rel="stylesheet" href="assets/styles/main.css">
+  <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body class="dash">
+  <main class="container" style="max-width:640px;margin:2rem auto;padding:1.5rem;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+    <h1 style="margin-top:0;">Hire &amp; Start Work</h1>
+    <p id="caseTitle" style="color:#444;margin-bottom:0.5rem;"></p>
+    <p id="caseStatus" style="color:#888;margin-top:0;"></p>
+
+    <div id="amountBox" style="margin:1rem 0;padding:1rem;border:1px solid #eee;border-radius:10px;background:#fafafa;">
+      <div style="font-size:0.9rem;color:#666;">Locked Amount</div>
+      <div id="lockedAmount" style="font-size:1.4rem;font-weight:600;">—</div>
+    </div>
+
+    <div id="paymentPane" style="display:none;">
+      <p style="margin-bottom:0.5rem;">Payment Method</p>
+      <div id="card-element" style="padding:0.75rem;border:1px solid #ddd;border-radius:8px;"></div>
+      <div id="card-errors" role="alert" style="color:#b00020;margin-top:0.5rem;min-height:1.25rem;"></div>
+      <button id="fundBtn" class="btn primary" style="margin-top:1rem;">Hire &amp; Start Work</button>
+    </div>
+
+    <div id="statusMsg" style="margin-top:1rem;color:#b00020;"></div>
+  </main>
+
+  <script type="module" src="assets/scripts/fund-escrow.js"></script>
+</body>
+</html>

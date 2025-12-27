@@ -21,7 +21,7 @@ let allJobs = [];
 let filteredJobs = [];
 const APPLY_MAX_CHARS = 2000;
 const APPLIED_STORAGE_KEY = "lpc_applied_jobs";
-const appliedJobs = new Set(loadAppliedJobs());
+const appliedJobs = new Map(loadAppliedJobs()); // jobId -> appliedAt ISO
 let applyModal = null;
 let applyTextarea = null;
 let applyStatus = null;
@@ -337,8 +337,12 @@ function renderJobs() {
     const title = escapeHtml(job.title || "Untitled Matter");
     const practice = escapeHtml(job.practiceArea || "General Practice");
     const when = job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Recently posted";
-    const jobId = String(job.id || job._id || "");
+    const jobId = getJobIdForApply(job);
     const caseId = getJobUniqueId(job) || jobId;
+    const appliedAt = appliedJobs.get(jobId) || appliedJobs.get(caseId);
+    if (appliedAt) {
+      card.classList.add("job-card--applied");
+    }
 
     card.innerHTML = `
       <h3>${title}</h3>
@@ -346,7 +350,7 @@ function renderJobs() {
       <div class="meta">
         <span>${escapeHtml(jobState || "—")}</span>
         <span>$${formatPay(payUSD)}</span>
-        <span>${escapeHtml(when)}</span>
+        <span>${appliedAt ? `Applied on ${new Date(appliedAt).toLocaleDateString()}` : escapeHtml(when)}</span>
       </div>
     `;
 
@@ -443,7 +447,7 @@ function openApplyModal(job) {
   if (!job) return;
   ensureApplyModal();
   currentApplyJob = job;
-  const jobId = String(job.id || job._id || "");
+  const jobId = getJobIdForApply(job);
   if (!jobId) return;
   applyModal.dataset.jobId = jobId;
   applyTitle.textContent = `Apply to ${escapeHtml(job.title || "this job")}`;
@@ -520,7 +524,7 @@ function updateApplyCounter() {
 
 async function submitApplication() {
   if (!currentApplyJob || !applyTextarea || !applyStatus || !applySubmitBtn) return;
-  const jobId = String(currentApplyJob.id || currentApplyJob._id || "");
+  const jobId = getJobIdForApply(currentApplyJob);
   const note = applyTextarea.value.trim();
   if (!note) {
     applyStatus.textContent = "Add a short cover letter before submitting.";
@@ -555,6 +559,12 @@ async function submitApplication() {
     applyStatus.textContent = "Application submitted!";
     markJobAsApplied(jobId);
     showToast("Application submitted successfully.", "ok");
+    if (applyModal) {
+      const conf = document.createElement("div");
+      conf.className = "apply-confirm";
+      conf.textContent = "Your application was sent to the attorney.";
+      applyModal.querySelector(".modal-actions")?.appendChild(conf);
+    }
     setTimeout(() => {
       closeApplyModal();
       fetchJobs();
@@ -568,20 +578,26 @@ async function submitApplication() {
 }
 
 function markJobAsApplied(jobId) {
-  appliedJobs.add(jobId);
+  const now = new Date().toISOString();
+  appliedJobs.set(jobId, now);
   persistAppliedJobs();
   const selector = `[data-job-id="${escapeAttr(jobId)}"]`;
   document.querySelectorAll(selector).forEach((btn) => {
     btn.disabled = true;
     btn.textContent = "Application sent";
   });
+  renderJobs(); // refresh cards to show applied state/date
 }
 
 function loadAppliedJobs() {
   try {
     const raw = sessionStorage.getItem(APPLIED_STORAGE_KEY);
     if (!raw) return [];
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((id) => [id, new Date().toISOString()]); // legacy list, mark now
+    }
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -589,7 +605,8 @@ function loadAppliedJobs() {
 
 function persistAppliedJobs() {
   try {
-    sessionStorage.setItem(APPLIED_STORAGE_KEY, JSON.stringify([...appliedJobs]));
+    const entries = [...appliedJobs.entries()];
+    sessionStorage.setItem(APPLIED_STORAGE_KEY, JSON.stringify(entries));
   } catch {
     /* ignore */
   }
@@ -794,6 +811,10 @@ function getJobUniqueId(job) {
   );
 }
 
+function getJobIdForApply(job) {
+  return String(job?.jobId || job?.job_id || job?._id || job?.id || "");
+}
+
 function expandJob(job) {
   const id = getJobUniqueId(job);
   if (!id) {
@@ -837,7 +858,8 @@ function renderExpandedJob(job) {
   const card = document.createElement("div");
   card.className = "job-card expanded";
   const caseId = getJobUniqueId(job);
-  const jobId = String(job.id || job._id || "") || caseId;
+  const jobId = getJobIdForApply(job) || caseId;
+  const appliedAt = appliedJobs.get(jobId);
   const payUSD = getJobPayUSD(job);
   const budget = typeof job.budget === "number" ? job.budget : null;
   const compensation =
@@ -863,6 +885,11 @@ function renderExpandedJob(job) {
             <span>${escapeHtml(jobState)}</span>
             <span>${escapeHtml(compensation)}</span>
             <span>Posted ${escapeHtml(when)}</span>
+            ${
+              appliedAt
+                ? `<span class="applied-pill">Applied on ${new Date(appliedAt).toLocaleDateString()}</span>`
+                : ""
+            }
           </div>
         </div>
         <div class="expanded-actions"></div>

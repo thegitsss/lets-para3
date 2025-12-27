@@ -317,12 +317,14 @@
     .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
     .btn.primary{background:var(--accent);color:#fff;}
     .btn.primary:hover{background:#a0854d;}
-    .comp-wrapper {
+.comp-wrapper {
   display: flex;
   align-items: center;
   gap: 8px;
   position: relative;
 }
+
+.lock-note{font-size:0.9rem;margin-top:6px;color:var(--muted);}
 
 .dollar-sign {
   position: absolute;
@@ -802,12 +804,13 @@
   </select>
 </div>
 
-      <div class="field">
+  <div class="field">
   <label for="comp">Compensation</label>
   <div class="comp-wrapper">
     <span class="dollar-sign">$</span>
     <input id="comp" type="number" min="0" placeholder="Amount" />
   </div>
+  <p class="muted lock-note" id="compLockNotice" hidden>Compensation is locked after a paralegal is invited or hired.</p>
 </div>
 
       <div class="field select-field">
@@ -941,6 +944,10 @@
 
   <script>
   (function () {
+    const params = new URLSearchParams(window.location.search);
+    const editingCaseId = params.get("caseId");
+    const isEditing = Boolean(editingCaseId);
+
     const stepPanels = new Map();
     document.querySelectorAll(".step-panel").forEach((panel) => {
       const key = panel.dataset.step;
@@ -956,6 +963,7 @@
       experience: document.getElementById("experience"),
       deadline: document.getElementById("caseDeadline"),
     };
+    const compLockNotice = document.getElementById("compLockNotice");
     const titlePreview = document.getElementById("caseTitlePreviewText");
     const descriptionInput = document.getElementById("caseDescription");
     const descriptionCount = document.getElementById("descriptionCharCount");
@@ -1093,7 +1101,7 @@
       const eventName = field.tagName === "SELECT" ? "change" : "input";
       field.addEventListener(eventName, () => clearFieldError(field));
       const storageKeyCamel = `case${key.charAt(0).toUpperCase() + key.slice(1)}`;
-      const storedValue = localStorage.getItem(storageKeyCamel) || localStorage.getItem(`case_${key}`) || "";
+      const storedValue = isEditing ? "" : localStorage.getItem(storageKeyCamel) || localStorage.getItem(`case_${key}`) || "";
       if (storedValue && field.value !== storedValue) {
         field.value = storedValue;
       }
@@ -1111,7 +1119,9 @@
     });
 
     if (descriptionInput) {
-      const storedDescription = localStorage.getItem("caseDescription") || localStorage.getItem("case_description") || "";
+      const storedDescription = isEditing
+        ? ""
+        : localStorage.getItem("caseDescription") || localStorage.getItem("case_description") || "";
       if (storedDescription) {
         descriptionInput.value = storedDescription;
       }
@@ -1208,6 +1218,13 @@
         deadline: deadline || "",
         description: description || "",
       };
+    }
+
+    function setCompLocked(locked) {
+      if (!fields.comp) return;
+      fields.comp.disabled = !!locked;
+      fields.comp.setAttribute("aria-disabled", locked ? "true" : "false");
+      if (compLockNotice) compLockNotice.hidden = !locked;
     }
 
     function hasDescription() {
@@ -1497,6 +1514,9 @@
 
     const LOCAL_DRAFTS_KEY = "attorneyLocalDraftCases";
     let currentDraftId = localStorage.getItem("currentDraftId") || "";
+    if (isEditing) {
+      currentDraftId = editingCaseId;
+    }
 
     function readLocalDrafts() {
       try {
@@ -1573,15 +1593,18 @@
       }
       if (postBtn) postBtn.disabled = true;
       try {
-        const created = await submitCase(buildPayload(data));
+        const payload = buildPayload(data);
+        const created = isEditing && editingCaseId
+          ? await updateCase(editingCaseId, payload)
+          : await submitCase(payload);
         clearDraft();
         clearCurrentDraftId();
-        const caseId = created?.id || created?._id;
-        if (caseId) {
+        const caseId = created?.id || created?._id || editingCaseId;
+        if (caseId && !isEditing) {
           void createJobListing(data, caseId);
         }
         const href = caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "dashboard-attorney.html#cases";
-        showToast("Your case has been successfully posted.", href);
+        showToast(isEditing ? "Your changes have been saved." : "Your case has been successfully posted.", href);
       } catch (err) {
         console.error(err);
         showToast(err?.message || "Unable to post this case right now.", null, true);
@@ -1603,6 +1626,119 @@
       if (event.target === previewModal) closePreviewModal();
     });
     postBtn?.addEventListener("click", handlePost);
+
+    function applyEditingCopy() {
+      document.title = "Edit Case – Let’s-ParaConnect";
+      const detailsHeader = document.querySelector('#create-step-details header h1');
+      const detailsSub = document.querySelector('#create-step-details header p');
+      const descHeader = document.querySelector('#create-step-description header h1');
+      const descSub = document.querySelector('#create-step-description header p');
+      const reviewHeader = document.querySelector('#create-step-review header h1');
+      const reviewSub = document.querySelector('#create-step-review header p');
+      const labelDetails = document.querySelectorAll('[data-step-link="details"] span');
+      const labelDesc = document.querySelectorAll('[data-step-link="description"] span');
+      const labelReview = document.querySelectorAll('[data-step-link="review"] span');
+      detailsHeader && (detailsHeader.textContent = "Edit Case");
+      detailsSub && (detailsSub.textContent = "Step 1: Update your case basics.");
+      descHeader && (descHeader.textContent = "Edit Case");
+      descSub && (descSub.textContent = "Step 2: Update the case description.");
+      reviewHeader && (reviewHeader.textContent = "Review & Save Changes");
+      reviewSub && (reviewSub.textContent = "Step 3: Confirm updates before saving.");
+      labelDetails.forEach((el) => (el.textContent = "Case details"));
+      labelDesc.forEach((el) => (el.textContent = "Description"));
+      labelReview.forEach((el) => (el.textContent = "Review & Save"));
+      if (postBtn) postBtn.textContent = "Save Changes";
+      if (previewBtn) previewBtn.textContent = "Preview Updates";
+    }
+
+    function setSelectValue(select, value) {
+      if (!select || !value) return;
+      const target = value.toString().toLowerCase();
+      const match = Array.from(select.options).find(
+        (opt) => opt.value.toLowerCase() === target || opt.textContent.toLowerCase() === target
+      );
+      if (match) select.value = match.value;
+    }
+
+    function applyCaseDataToForm(caseData = {}) {
+      if (fields.title) {
+        fields.title.value = caseData.title || "";
+        updateTitlePreview(fields.title.value);
+      }
+      setSelectValue(fields.specialty, caseData.practiceArea || caseData.field);
+      setSelectValue(fields.state, caseData.locationState || caseData.state);
+      const amountCents = Number.isFinite(caseData.lockedTotalAmount)
+        ? caseData.lockedTotalAmount
+        : Number(caseData.totalAmount) || 0;
+      if (fields.comp) {
+        fields.comp.value = amountCents ? Math.round(amountCents / 100) : "";
+      }
+      const hasParalegal = !!(caseData.paralegal || caseData.paralegalId);
+      const hasPendingParalegal = !!(caseData.pendingParalegal || caseData.pendingParalegalId);
+      setCompLocked(hasParalegal || hasPendingParalegal);
+      if (fields.experience && caseData.experience) {
+        setSelectValue(fields.experience, caseData.experience);
+      }
+      const details = caseData.details || caseData.description || "";
+      if (descriptionInput) {
+        descriptionInput.value = details;
+        updateDescriptionCount();
+      }
+      if (fields.deadline && caseData.deadline) {
+        const iso = new Date(caseData.deadline).toISOString().slice(0, 10);
+        fields.deadline.value = iso;
+      }
+      latestCaseData = collectCaseData();
+      hydrateReviewSummary();
+    }
+
+    async function loadExistingCase() {
+      if (!editingCaseId) return;
+      try {
+        const token = (window.getSessionToken && window.getSessionToken()) || "";
+        const res = await fetch(`/api/cases/${encodeURIComponent(editingCaseId)}`, {
+          headers: Object.assign({ Accept: "application/json" }, token ? { Authorization: `Bearer ${token}` } : {}),
+          credentials: "include",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || "Unable to load this case for editing.");
+        applyCaseDataToForm(data);
+      } catch (err) {
+        console.warn("Edit case load failed", err);
+        showToastBanner(err?.message || "Unable to load this case for editing.", "error");
+      }
+    }
+
+    async function updateCase(caseId, payload) {
+      const token = (window.getSessionToken && window.getSessionToken()) || "";
+      if (!token) {
+        window.checkSession?.("attorney");
+        throw new Error("Please log in again before saving changes.");
+      }
+      await fetchCsrfToken();
+      const res = await fetch(`/api/cases/${encodeURIComponent(caseId)}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          "X-CSRF-Token": csrfToken || "",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || data?.msg || "Unable to save changes to this case.");
+      }
+      return data;
+    }
+
+    if (isEditing) {
+      clearDraft();
+      applyEditingCopy();
+      void loadExistingCase();
+    }
   })();
   </script>
 <script>

@@ -1502,6 +1502,65 @@
       color:var(--ink);
     }
 
+    .view-billing .payment-method-summary {
+      display:flex;
+      align-items:center;
+      gap:12px;
+      color:var(--ink);
+    }
+
+    .view-billing .pm-row {
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+
+    .view-billing .pm-icon {
+      font-size:1.2rem;
+    }
+
+    .view-billing .pm-label {
+      font-weight:600;
+      letter-spacing:0.02em;
+      margin-bottom:2px;
+    }
+
+    .view-billing .pm-meta {
+      color:var(--muted);
+    }
+
+    .view-billing .payment-method-form {
+      border:1px dashed var(--line);
+      border-radius:12px;
+      padding:12px;
+      background:rgba(0,0,0,0.02);
+    }
+
+    body.theme-dark .view-billing .payment-method-form {
+      background:rgba(255,255,255,0.03);
+    }
+
+    .view-billing .payment-element-host {
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:12px;
+      background:var(--panel);
+    }
+
+    .view-billing .payment-errors {
+      color:#b00020;
+      margin-top:8px;
+      min-height:20px;
+      font-size:0.9rem;
+    }
+
+    .view-billing .payment-actions {
+      display:flex;
+      gap:0.75rem;
+      margin-top:0.75rem;
+      flex-wrap:wrap;
+    }
+
     .view-billing .finance-alerts {
       display:flex;
       flex-direction:column;
@@ -1844,6 +1903,17 @@
         </div>
       </section>
 
+      <section class="case-list" id="applicationsSection">
+        <div class="case-card empty-state">
+          <div class="case-header">
+            <div>
+              <h2>No applications yet</h2>
+              <div class="case-subinfo">Paralegal applications to your postings will appear here.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="completed-section">
         <h2 class="section-title">Completed Jobs</h2>
         <div id="completedJobsList" class="completed-jobs-list">
@@ -1888,6 +1958,7 @@
                     <th>Client</th>
                     <th>Specialty</th>
                     <th>Status</th>
+                    <th>Amount</th>
                     <th>Notes</th>
                     <th>Posted</th>
                     <th class="actions"></th>
@@ -1907,6 +1978,7 @@
                     <th>Client</th>
                     <th>Specialty</th>
                     <th>Status</th>
+                    <th>Amount</th>
                     <th>Notes</th>
                     <th>Last Edited</th>
                     <th class="actions"></th>
@@ -1937,13 +2009,14 @@
                     <th>Client</th>
                     <th>Specialty</th>
                     <th>Status</th>
+                    <th>Amount</th>
                     <th>Notes</th>
                     <th>Archived</th>
                     <th class="actions"></th>
                   </tr>
                 </thead>
                 <tbody data-table-body="archived">
-                  <tr><td colspan="8" class="empty-row">Loading archived cases…</td></tr>
+                  <tr><td colspan="9" class="empty-row">Loading archived cases…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1956,6 +2029,7 @@
                     <th>Client</th>
                     <th>Specialty</th>
                     <th>Status</th>
+                    <th>Amount</th>
                     <th>Notes</th>
                     <th>Posted</th>
                     <th class="actions"></th>
@@ -2010,6 +2084,30 @@
           <button type="button" class="primary-btn" id="openPortalBtn">Open Stripe Billing Portal</button>
         </div>
       </header>
+
+      <section class="panel" aria-labelledby="payment-method-heading">
+        <div class="panel-header">
+          <div>
+            <h2 id="payment-method-heading">Payment Method</h2>
+            <p>Save a card on file for faster escrow funding.</p>
+          </div>
+          <div class="panel-actions">
+            <button type="button" class="ghost-btn" id="addPaymentMethodBtn">Add Card</button>
+            <button type="button" class="ghost-btn" id="replacePaymentMethodBtn" hidden>Update Card</button>
+          </div>
+        </div>
+        <div id="paymentMethodSummary" class="payment-method-summary">
+          <p class="muted">Checking saved payment method…</p>
+        </div>
+        <div id="paymentMethodForm" class="payment-method-form" hidden>
+          <div id="paymentMethodElement" class="payment-element-host"></div>
+          <div class="payment-errors" id="paymentMethodErrors" role="alert"></div>
+          <div class="payment-actions">
+            <button type="button" class="primary-btn" id="savePaymentMethodBtn">Save Card</button>
+            <button type="button" class="ghost-btn" id="cancelPaymentMethodBtn">Cancel</button>
+          </div>
+        </div>
+      </section>
 
       <section id="financeAlerts" class="finance-alerts" aria-live="polite"></section>
 

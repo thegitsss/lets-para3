@@ -109,6 +109,7 @@ function buildCaseRow(c, escapeHTML) {
     c.practiceArea ? `Practice: ${escapeHTML(c.practiceArea)}` : "",
     c.paralegalName ? `Paralegal: ${escapeHTML(c.paralegalName)}` : "",
     c.status ? `Status: ${escapeHTML(c.status)}` : "",
+    Number.isFinite(c.amountCents) ? `Amount: ${formatCurrency(c.amountCents / 100)}` : "",
   ]
     .filter(Boolean)
     .join(" · ");

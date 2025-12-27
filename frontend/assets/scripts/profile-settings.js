@@ -2007,3 +2007,16 @@ function handleProfilePreviewNavigation() {
 [document.getElementById("previewProfileBtn"), document.getElementById("attorneyPreviewProfileBtn")]
   .filter(Boolean)
   .forEach((btn) => btn.addEventListener("click", handleProfilePreviewNavigation));
+window.logoutUser = function (e) {
+  if (e) e.preventDefault();
+
+  // Clear client auth
+  localStorage.clear();
+  sessionStorage.clear();
+
+  // Backend logout (if applicable)
+  fetch("/api/auth/logout", { credentials: "include" })
+    .finally(() => {
+      window.location.href = "/login.html";
+    });
+};

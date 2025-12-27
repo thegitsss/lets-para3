@@ -215,8 +215,8 @@ function ensureHeaderStyles() {
   const style = document.createElement("style");
   style.id = "attorney-shared-header";
   style.textContent = `
-  .lpc-shared-header{display:flex;justify-content:flex-end;align-items:flex-start;position:relative;margin-bottom:32px;font-family:'Sarabun',sans-serif}
-  .lpc-shared-header .header-controls{display:flex;align-items:center;gap:20px}
+  .lpc-shared-header{display:flex;justify-content:flex-end;align-items:flex-start;position:relative;z-index:2000;margin-bottom:32px;font-family:'Sarabun',sans-serif;overflow:visible}
+  .lpc-shared-header .header-controls{display:flex;align-items:center;gap:20px;position:relative;z-index:2001;overflow:visible}
   .lpc-shared-header .btn{border-radius:999px;padding:10px 18px;font-weight:600;border:1px solid transparent;background:#b6a47a;color:#fff;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;transition:background .2s ease,transform .2s ease}
   .lpc-shared-header .btn:hover{transform:translateY(-1px);background:#9c8a63}
   .lpc-shared-header .btn.btn-outline{background:transparent;border-color:rgba(0,0,0,0.08);color:#1a1a1a}
@@ -250,8 +250,8 @@ function ensureHeaderStyles() {
   body.theme-mountain .lpc-shared-header .user-chip{background:rgba(255,255,255,0.65);border-color:rgba(255,255,255,0.42);box-shadow:0 18px 34px rgba(17,22,26,0.2)}
   body.theme-mountain .lpc-shared-header .user-chip strong{color:#1b1b1b}
   body.theme-mountain .lpc-shared-header .user-chip span{color:#6b6b6b}
-  .lpc-shared-header .profile-dropdown{position:absolute;right:0;top:calc(100% + 10px);background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:16px;box-shadow:0 18px 30px rgba(0,0,0,0.12);display:none;flex-direction:column;min-width:200px;z-index:40}
-  .lpc-shared-header .profile-dropdown.show{display:flex}
+  .lpc-shared-header .profile-dropdown{position:absolute;right:0;top:calc(100% + 10px);background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:16px;box-shadow:0 18px 30px rgba(0,0,0,0.12);display:none;flex-direction:column;min-width:200px;z-index:9999;pointer-events:auto;overflow:visible}
+  .lpc-shared-header .profile-dropdown.show{display:flex;pointer-events:auto;overflow:visible}
   .lpc-shared-header .profile-dropdown button{background:none;border:none;padding:.85rem 1.1rem;text-align:left;font-size:.92rem;cursor:pointer}
   .lpc-shared-header .profile-dropdown button:hover{background:rgba(0,0,0,0.04)}
   .lpc-shared-header .notifications-panel{position:absolute;top:72px;right:0;width:340px;background:var(--panel,#fff);border-radius:14px;border:1px solid var(--line,rgba(0,0,0,0.08));box-shadow:0 24px 48px rgba(0,0,0,0.15);padding:0;opacity:0;pointer-events:none;transform:translateY(-10px);transition:opacity .2s ease,transform .2s ease;z-index:30;display:flex;flex-direction:column}
@@ -383,7 +383,7 @@ async function initHeader(options = {}) {
           </div>
           <div class="profile-dropdown" id="profileDropdown">
             <button type="button" data-account-settings>Account Settings</button>
-            <button type="button" data-logout>Log Out</button>
+            <button type="button" data-logout onclick="window.logoutUser?.(event)">Log Out</button>
           </div>
         </div>
       </div>
@@ -402,6 +402,20 @@ function bindHeaderEvents() {
   const profileMenu = document.getElementById("profileDropdown");
   const settingsBtn = profileMenu?.querySelector("[data-account-settings]");
   const logoutBtn = profileMenu?.querySelector("[data-logout]");
+  const notifToggle = document.querySelector("[data-notification-toggle]");
+  const notifPanel = document.querySelector("[data-notification-panel]");
+  const triggerLogout = async (evt) => {
+    evt?.preventDefault?.();
+    if (typeof window.logoutUser === "function") {
+      await window.logoutUser(evt);
+      return;
+    }
+    try {
+      await logout("login.html");
+    } catch {
+      window.location.href = "login.html";
+    }
+  };
 
   if (profileTrigger && profileMenu) {
     profileTrigger.addEventListener("click", (evt) => {
@@ -415,8 +429,31 @@ function bindHeaderEvents() {
   settingsBtn?.addEventListener("click", () => {
     window.location.href = "profile-settings.html";
   });
-  logoutBtn?.addEventListener("click", async () => {
-    await logout("login.html");
+  if (logoutBtn && !logoutBtn.dataset.boundLogout) {
+    logoutBtn.dataset.boundLogout = "true";
+    logoutBtn.addEventListener("click", triggerLogout);
+  }
+
+  // Fallback notification toggle if notifications.js didn't bind yet
+  if (notifToggle && notifPanel && !notifToggle.dataset.boundNotifFallback) {
+    notifToggle.dataset.boundNotifFallback = "true";
+    notifToggle.addEventListener("click", () => {
+      const willShow = !notifPanel.classList.contains("show");
+      document.querySelectorAll("[data-notification-panel].show").forEach((panel) => {
+        if (panel !== notifPanel) panel.classList.remove("show");
+      });
+      notifPanel.classList.toggle("show", willShow);
+      notifPanel.classList.toggle("hidden", !willShow);
+      if (willShow && typeof window.refreshNotificationCenters === "function") {
+        window.refreshNotificationCenters();
+      }
+    });
+  }
+
+  document.addEventListener("click", (evt) => {
+    const target = evt.target.closest("[data-logout]");
+    if (!target) return;
+    triggerLogout(evt);
   });
 
   document.addEventListener("click", (evt) => {
@@ -585,11 +622,12 @@ async function initOverviewPage() {
 
   async function hydrateOverview() {
     try {
-      const [dashboard, overdueCount, events, threads] = await Promise.all([
+      const [dashboard, overdueCount, events, threads, apps] = await Promise.all([
         fetchDashboardData(),
         fetchOverdueCount(),
         fetchUpcomingEvents(),
         fetchThreadsOverview(),
+        fetchApplicationsForMyJobs(),
       ]);
       updateMetrics(dashboard?.metrics, overdueCount);
       renderCaseCards(caseCards, dashboard?.activeCases || []);
@@ -601,6 +639,7 @@ async function initOverviewPage() {
         messagePreviewSender,
         messagePreviewText,
       });
+      renderApplications(apps || []);
     } catch (err) {
       console.warn("Overview hydration failed", err);
       if (deadlineList) deadlineList.innerHTML = `<div class="info-line" style="color:var(--muted);">Unable to load deadlines.</div>`;
@@ -2204,6 +2243,7 @@ const CASE_STATUS_LABELS = {
   active: "Active",
   awaiting_documents: "Awaiting Docs",
   reviewing: "Reviewing",
+  "in progress": "In Progress",
   in_progress: "In Progress",
   completed: "Completed",
   disputed: "Disputed",
@@ -2216,6 +2256,7 @@ const CASE_STATUS_CLASSES = {
   assigned: "pending",
   awaiting_documents: "pending",
   reviewing: "pending",
+  "in progress": "private",
   in_progress: "private",
   completed: "accepted",
   disputed: "declined",
@@ -2329,7 +2370,7 @@ function renderCasesView() {
     if (!records.length) {
       const searchActive = state.casesSearchTerm && key === state.casesViewFilter;
       const message = searchActive ? "No cases match your search." : "No cases in this category.";
-      const span = key === "archived" ? 8 : 7;
+      const span = key === "archived" ? 9 : 8;
       body.innerHTML = `<tr><td colspan="${span}" class="empty-row">${message}</td></tr>`;
       return;
     }
@@ -2416,6 +2457,7 @@ function renderCaseRow(item, filterKey = "active") {
     filterKey === "draft" ? updated : filterKey === "archived" ? updated : created;
   const statusText = item.localDraft ? "Draft" : formatCaseStatus(item.status);
   const statusClass = item.localDraft ? "pending" : getStatusClass(item.status);
+  const amountDisplay = formatCaseAmount(item);
   const rawNote = (item.internalNotes?.note || "").trim();
   const notePreview = rawNote.length > 140 ? `${rawNote.slice(0, 137)}…` : rawNote;
   const noteDisplay = notePreview ? `<div class="note-preview">${sanitize(notePreview)}</div>` : '<span class="muted">—</span>';
@@ -2442,6 +2484,7 @@ function renderCaseRow(item, filterKey = "active") {
       <td>${sanitize(client)}</td>
       <td>${sanitize(practice)}</td>
       <td><span class="status ${statusClass}">${statusText}</span></td>
+      <td>${sanitize(amountDisplay)}</td>
       <td class="note-cell">${noteDisplay}${noteAction ? `<div>${noteAction}</div>` : ""}</td>
       <td>${displayedDate}</td>
       <td class="actions">${renderCaseMenu(item)}</td>
@@ -3051,6 +3094,14 @@ function formatCaseDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatCaseAmount(item) {
+  const cents = Number(
+    item?.lockedTotalAmount ?? item?.totalAmount ?? item?.paymentAmount ?? item?.budget ?? 0
+  );
+  if (!Number.isFinite(cents) || cents <= 0) return "—";
+  return formatCurrency(cents);
 }
 
 function notifyCases(message, type = "info") {
@@ -4404,6 +4455,19 @@ async function fetchThreadsOverview(limit = 10) {
   }
 }
 
+async function fetchApplicationsForMyJobs() {
+  try {
+    const res = await secureFetch("/api/applications/my-postings", {
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) throw new Error("Unable to load applications");
+    return res.json();
+  } catch (err) {
+    console.warn("Failed to load applications", err);
+    return [];
+  }
+}
+
 function updateMetrics(metrics = {}, overdueCount = 0) {
   document.querySelectorAll("[data-metric]").forEach((el) => {
     const key = el.dataset.metric;
@@ -4467,6 +4531,59 @@ function renderEscrowPanel(container, metrics = {}) {
     <div class="info-line">&bull; ${total} currently protected.</div>
     <div class="info-line">&bull; ${openJobs} open job${openJobs === 1 ? "" : "s"} awaiting funding.</div>
   `;
+}
+
+function renderApplications(apps = []) {
+  const container = document.getElementById("applicationsSection");
+  if (!container) return;
+  if (!apps.length) {
+    container.innerHTML = `
+      <div class="case-card empty-state">
+        <div class="case-header">
+          <div>
+            <h2>No applications yet</h2>
+            <div class="case-subinfo">Paralegal applications to your postings will appear here.</div>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+  container.innerHTML = apps
+    .map((app) => {
+      const name = sanitize(
+        `${app?.paralegal?.firstName || ""} ${app?.paralegal?.lastName || ""}`.trim() || "Paralegal"
+      );
+      const jobTitle = sanitize(app.jobTitle || "Job");
+      const practice = sanitize(app.practiceArea || "General practice");
+      const when = app.createdAt
+        ? new Date(app.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+        : "Recently";
+      const budget =
+        typeof app.budget === "number"
+          ? `$${app.budget.toLocaleString()}`
+          : app.budget && Number.isFinite(+app.budget)
+          ? `$${Number(app.budget).toLocaleString()}`
+          : "";
+      const href =
+        app.caseId ? `case-detail.html?caseId=${encodeURIComponent(app.caseId)}` : "active-cases.html";
+      const cover = app.coverLetter ? sanitize(app.coverLetter.slice(0, 200)) : "";
+      return `
+        <div class="case-card">
+          <div class="case-header">
+            <div>
+              <h2>${jobTitle}</h2>
+              <div class="case-subinfo">${practice}${budget ? ` • ${budget}` : ""}</div>
+              <div class="case-subinfo">Applied on ${when} by ${name}</div>
+            </div>
+            <div class="case-actions">
+              <a class="chip" href="${href}">Open</a>
+            </div>
+          </div>
+          ${cover ? `<p class="case-subinfo" style="margin:0.5rem 0 0;">${cover}</p>` : ""}
+        </div>
+      `;
+    })
+    .join("");
 }
 
 function renderCaseCards(container, cases = []) {

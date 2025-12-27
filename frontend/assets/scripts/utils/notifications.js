@@ -83,12 +83,16 @@ function formatNotificationTitle(item = {}) {
       return "Case Update";
     case "case_invite_response":
       return "Invitation Update";
+    case "application_submitted":
+      return "New Application";
     case "profile_approved":
       return "Profile Approved";
     case "resume_uploaded":
       return "Resume Updated";
     case "payout_released":
       return "Payout Released";
+    case "case_awaiting_funding":
+      return "Funding Needed";
     default:
       return "Notification";
   }
@@ -107,12 +111,16 @@ function formatNotificationBody(item = {}) {
         : `${payload.paralegalName || "Paralegal"} declined your invitation`;
     case "case_update":
       return payload.summary || `Case "${payload.caseTitle || "update"}" has changed.`;
+    case "application_submitted":
+      return `${payload.paralegalName || "A paralegal"} applied to "${payload.title || "your job"}"`;
     case "resume_uploaded":
       return "Your resume has been successfully uploaded.";
     case "profile_approved":
       return "Your profile was approved.";
     case "payout_released":
       return `Your payout is on the way${payload.amount ? ` (${payload.amount})` : ""}.`;
+    case "case_awaiting_funding":
+      return `${payload.caseTitle || "A case"} is awaiting funding.`;
     default:
       return "You have a new notification.";
   }
@@ -255,7 +263,7 @@ function preload(center) {
 async function fetchNotifications(center, options = {}) {
   if (center.loading) return;
   const session = getStoredSession();
-  if (!session?.token) {
+  if (!session?.user) {
     lastKnownUnread = 0;
     syncNotificationBadges(0);
     renderEmpty(center, "Sign in to view notifications.");
@@ -619,6 +627,8 @@ function renderNotificationList(listEl, emptyEl, items = []) {
     return;
   }
   if (emptyEl) emptyEl.style.display = "none";
+  const panel = listEl.closest("[data-notification-panel]");
+  if (panel) panel.style.display = "block";
   normalized.forEach((item) =>
     listEl.appendChild(
       buildNotificationNode(item, null, {

@@ -245,6 +245,47 @@
       font-weight:400;
       font-size:0.95rem;
     }
+    .case-amount{
+      margin-top:0.35rem;
+      font-weight:600;
+      color:var(--ink);
+    }
+    .case-amount .muted{color:var(--muted);font-weight:400;}
+    .case-funding-alert{
+      margin-top:0.5rem;
+      padding:10px 12px;
+      border:1px solid #f2c94c;
+      background:#fff8e5;
+      color:#8a6d1f;
+      border-radius:8px;
+      font-weight:600;
+      width:fit-content;
+    }
+    .case-funding-alert.hidden{display:none;}
+    .work-locked-banner{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:12px 14px;
+      border:1px solid var(--line);
+      background:#fff5ec;
+      color:#9a4b00;
+      border-radius:10px;
+      margin:0 0 12px 0;
+      font-weight:600;
+    }
+    body.theme-dark .work-locked-banner{
+      background:rgba(154,75,0,0.12);
+      color:#ffb469;
+    }
+    .work-locked-banner.hidden{display:none;}
+    .case-header-actions.locked{
+      opacity:0.6;
+      pointer-events:none;
+    }
+    .case-header-actions.locked .btn{
+      cursor:not-allowed;
+    }
     .case-header-actions{
       display:flex;
       align-items:center;
@@ -1107,6 +1148,10 @@
         <div class="case-submeta">
           <span class="case-status" id="caseStatusBadge">OPEN</span>
         </div>
+        <div class="case-amount" id="caseAmount">Posted amount: —</div>
+        <div class="case-funding-alert hidden" id="fundingPrompt" data-attorney-only>
+          Hire & start work to charge your saved card and unlock tasks.
+        </div>
         <p class="case-live-copy hidden" id="caseLiveCopy">This case is live and visible to vetted paralegals.</p>
       </div>
       <div class="case-header-actions">
@@ -1122,10 +1167,14 @@
             <button type="button" data-case-option="delete">Delete</button>
           </div>
         </details>
-        <button class="btn primary hidden" id="openTaskModalBtn" data-paralegal-only data-requires-paralegal>
+        <button class="btn primary hidden" id="openTaskModalBtn" data-attorney-only data-requires-paralegal>
           + Create Task
         </button>
       </div>
+    </div>
+    <div class="work-locked-banner hidden" id="workLockedBanner">
+      <span aria-hidden="true">⏳</span>
+      <span>Work begins once payment is secured.</span>
     </div>
 
     <section class="case-section">
@@ -1139,7 +1188,7 @@
     </section>
 
     <div class="case-actions">
-      <button class="btn primary hidden" id="fundEscrowBtn" data-attorney-only>Fund Escrow</button>
+      <button class="btn primary hidden" id="fundEscrowBtn" data-attorney-only>Hire &amp; Start Work</button>
       <div class="payment-panel hidden" id="escrowPayment" data-attorney-only>
         <p style="margin-bottom:.6rem;font-weight:300;">Payment Method</p>
         <div id="card-element"></div>
@@ -1152,7 +1201,7 @@
       <p id="caseTimelineMeta"></p>
     </div>
 
-    <section class="case-section" data-attorney-only>
+    <section class="case-section" data-attorney-only id="applicantsSection">
       <h2>Applicants</h2>
       <div id="applicantsList" class="applicant-list">
         <p style="color:var(--muted);">No applications yet. Paralegals will appear here as soon as they apply.</p>
@@ -1161,6 +1210,7 @@
 
     <section class="case-section" id="caseTasksSection">
       <h2>Case Tasks</h2>
+      <div id="caseTasksGate" class="hidden" style="margin:0 0 0.5rem;color:var(--muted);"></div>
       <div id="caseTasksContainer" class="task-list">
         <p style="color:var(--muted);">Tasks will show here after you hire a paralegal and assign work.</p>
       </div>
@@ -1601,6 +1651,7 @@
     const cardErrorsEl = document.getElementById('card-errors');
     let cachedCsrfToken = window.__CSRF__ || '';
     let stripeClientPromise;
+    let stripeLoaderPromise;
     let stripeElementsInstance;
     let cardElementInstance;
     let caseDetails = null;
@@ -1790,6 +1841,9 @@
         case 'pause':
           pauseCurrentCase();
           break;
+        case 'end-engagement':
+          endEngagementCase();
+          break;
         case 'delete':
           deleteCurrentCase();
           break;
@@ -1822,6 +1876,27 @@
         }, 800);
       } catch (err) {
         showToastBanner(err?.message || 'Unable to pause this case.', 'error');
+      }
+    }
+
+    async function endEngagementCase() {
+      if (!CASE_ID) return;
+      const confirmed = confirm('Are you sure you want to end the engagement? This will move the case to Archived.');
+      if (!confirmed) return;
+      try {
+        const res = await secureFetch(`/api/cases/${encodeURIComponent(CASE_ID)}/archive`, {
+          method: 'PATCH',
+          headers: { Accept: 'application/json' },
+          body: { archived: true },
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(payload?.error || 'Unable to end this engagement.');
+        showToastBanner('Engagement ended. Case moved to Archived.', 'success');
+        setTimeout(() => {
+          window.location.href = 'dashboard-attorney.html#cases';
+        }, 800);
+      } catch (err) {
+        showToastBanner(err?.message || 'Unable to end this engagement.', 'error');
       }
     }
 
@@ -1868,7 +1943,10 @@
       }
     }
 
-    fundEscrowBtn?.addEventListener('click', () => startEscrow(CASE_ID, fundEscrowBtn));
+    fundEscrowBtn?.addEventListener('click', () => {
+      if (!CASE_ID) return;
+      window.location.href = `/cases/${encodeURIComponent(CASE_ID)}/fund-escrow`;
+    });
     releaseEscrowBtn?.addEventListener('click', () => releaseEscrow(CASE_ID, releaseEscrowBtn));
     loadCaseDetails();
 
@@ -1984,8 +2062,9 @@
     function shouldShowPaymentForm() {
       const role = readStoredRole().toLowerCase();
       const hasParalegal = !!(caseDetails && caseDetails.paralegal);
-      const escrowFunded = !!(caseDetails && caseDetails.paymentReleased);
-      return role === 'attorney' && hasParalegal && !escrowFunded;
+      const escrowFunded = !!(caseDetails && caseDetails.escrowIntentId);
+      const alreadyReleased = !!(caseDetails && caseDetails.paymentReleased);
+      return role === 'attorney' && hasParalegal && !escrowFunded && !alreadyReleased;
     }
 
     function updatePaymentVisibility() {
@@ -1993,7 +2072,14 @@
       fundEscrowBtn?.classList.toggle('hidden', !show);
       paymentPanel?.classList.toggle('hidden', !show);
       if (show) {
-        ensureCardElement().catch((err) => console.warn('Unable to initialize payment field.', err));
+        loadStripeScript()
+          .then(() => ensureCardElement())
+          .catch((err) => {
+            console.warn('Unable to initialize payment field.', err);
+            if (cardErrorsEl) {
+              cardErrorsEl.textContent = err?.message || 'Stripe is blocked. Allow js.stripe.com and try again.';
+            }
+          });
       }
     }
 
@@ -2008,11 +2094,14 @@
       const applicants = Array.isArray(caseDetails.applicants) ? caseDetails.applicants : [];
       const isOpen = String(caseDetails.status || 'open').toLowerCase() === 'open';
       const hasParalegal = !!caseDetails.paralegal;
+      const escrowFunded = !!caseDetails.escrowIntentId;
       const shouldShowActivation = isOpen && !hasParalegal;
       const tasksSection = document.getElementById('caseTasksSection');
       const deadlinesSection = document.querySelector('.case-section.deadlines');
       const notesSection = document.querySelector('.notes-section');
       const noHireYet = !hasParalegal;
+      const applicantsSection = document.getElementById('applicantsSection');
+      const deleteOption = caseOptionsMenu?.querySelector('[data-case-option="delete"], [data-case-option="end-engagement"]');
 
       if (titleEl) titleEl.textContent = caseDetails.title || 'Untitled Case';
 
@@ -2022,7 +2111,12 @@
       }
 
       if (overviewEl) {
-        const summary = caseDetails.details || caseDetails.description || 'This case has no additional description yet.';
+        const summary =
+          caseDetails.details ||
+          caseDetails.description ||
+          caseDetails.shortDescription ||
+          caseDetails.briefSummary ||
+          'This case has no additional description yet.';
         overviewEl.querySelectorAll('p').forEach((node, index) => {
           if (index === 0) node.textContent = summary;
         });
@@ -2052,13 +2146,45 @@
         caseOptionsRoot.classList.remove('hidden');
       }
       if (createTaskBtn) {
-        createTaskBtn.classList.toggle('hidden', !hasParalegal);
+        const allowTaskCreate = hasParalegal && escrowFunded;
+        createTaskBtn.classList.toggle('hidden', !allowTaskCreate);
+        createTaskBtn.toggleAttribute('disabled', !allowTaskCreate);
+        createTaskBtn.dataset.lockedEscrow = allowTaskCreate ? '' : 'true';
+      }
+      if (deleteOption) {
+        if (hasParalegal) {
+          deleteOption.textContent = 'End Engagement';
+          deleteOption.setAttribute('data-case-option', 'end-engagement');
+        } else {
+          deleteOption.textContent = 'Delete';
+          deleteOption.setAttribute('data-case-option', 'delete');
+        }
       }
 
-      [tasksSection, deadlinesSection, notesSection].forEach((section) => {
+      [deadlinesSection, notesSection].forEach((section) => {
         if (!section) return;
         section.classList.toggle('is-muted', noHireYet);
       });
+
+      if (applicantsSection) {
+        applicantsSection.classList.toggle('hidden', hasParalegal);
+      }
+      if (tasksSection) {
+        tasksSection.classList.toggle('is-muted', !hasParalegal || !escrowFunded);
+      }
+      const taskGateEl = document.getElementById('caseTasksGate');
+      if (taskGateEl) {
+        if (!hasParalegal) {
+          taskGateEl.classList.remove('hidden');
+          taskGateEl.textContent = 'Hire & start work to enable tasks and messaging.';
+        } else if (!escrowFunded) {
+          taskGateEl.classList.remove('hidden');
+          taskGateEl.textContent = 'Payment is still processing. We will unlock tasks once funding clears.';
+        } else {
+          taskGateEl.classList.add('hidden');
+          taskGateEl.textContent = '';
+        }
+      }
 
       const detailsGrid = document.getElementById('caseDetailsPanel');
       if (detailsGrid) {
@@ -2093,7 +2219,7 @@
       const linkedInURL = applicant?.linkedInURL || '';
       const paralegalId = paralegal?._id || paralegal?.id || applicant?.paralegalId || '';
       const hireButton = canHire && paralegalId
-        ? `<button class="btn primary" data-hire-button data-case-id="${CASE_ID}" data-paralegal-id="${paralegalId}">Hire</button>`
+        ? `<button class="btn primary" data-hire-button data-case-id="${CASE_ID}" data-paralegal-id="${paralegalId}">Hire &amp; Start Work</button>`
         : '';
       return `
         <div class="applicant-card">
@@ -2207,15 +2333,77 @@
         caseStatus.style.color = '#1f7a4a';
       }
       if (toastHelper?.stage) {
-        toastHelper.stage('Paralegal hired successfully.', 'success');
+        toastHelper.stage('Paralegal hired and work started.', 'success');
       } else {
-        alert('Paralegal hired successfully.');
+        alert('Paralegal hired and work started.');
       }
 
       loadCaseDetails();
       return payload;
     }
     window.hireParalegal = hireParalegal;
+
+    async function loadStripeScript() {
+      if (typeof Stripe !== 'undefined') return true;
+      let attempt = 0;
+      const maxAttempts = 3;
+      while (attempt < maxAttempts && typeof Stripe === 'undefined') {
+        attempt += 1;
+        if (!stripeLoaderPromise) {
+          stripeLoaderPromise = new Promise((resolve, reject) => {
+            let script = document.querySelector('script[src*="js.stripe.com/v3"]');
+            if (script?.dataset?.failed === 'true') {
+              script.remove();
+              script = null;
+            }
+            if (!script) {
+              script = document.createElement('script');
+              script.src = `https://js.stripe.com/v3/?cacheBust=${Date.now()}`;
+              script.async = true;
+              script.id = 'stripe-js-dynamic';
+              script.crossOrigin = 'anonymous';
+              document.head.appendChild(script);
+            }
+            const timeout = setTimeout(() => {
+              script.dataset.failed = 'true';
+              script.removeEventListener('load', onLoad);
+              script.removeEventListener('error', onError);
+              reject(new Error('Stripe.js timed out loading. Please allow js.stripe.com and retry.'));
+            }, 30000);
+            const onLoad = () => {
+              clearTimeout(timeout);
+              script.removeEventListener('load', onLoad);
+              script.removeEventListener('error', onError);
+              resolve(true);
+            };
+            const onError = () => {
+              clearTimeout(timeout);
+              script.dataset.failed = 'true';
+              script.removeEventListener('load', onLoad);
+              script.removeEventListener('error', onError);
+              reject(new Error('Stripe.js failed to load. Please disable ad blockers or allow js.stripe.com.'));
+            };
+            script.addEventListener('load', onLoad);
+            script.addEventListener('error', onError);
+            if (script.complete && typeof Stripe !== 'undefined') {
+              clearTimeout(timeout);
+              script.removeEventListener('load', onLoad);
+              script.removeEventListener('error', onError);
+              resolve(true);
+            }
+          });
+        }
+        try {
+          await stripeLoaderPromise;
+        } catch (err) {
+          stripeLoaderPromise = null;
+          if (attempt >= maxAttempts) {
+            throw err;
+          }
+        }
+      }
+      return typeof Stripe !== 'undefined';
+    }
 
     async function getStripeClient() {
       if (stripeClientPromise) {
@@ -2225,6 +2413,9 @@
           stripeClientPromise = null;
           throw err;
         }
+      }
+      if (typeof Stripe === 'undefined') {
+        await loadStripeScript();
       }
       if (typeof Stripe === 'undefined') {
         throw new Error('Stripe.js failed to load.');
@@ -2250,7 +2441,8 @@
       try {
         await ensureCardElement();
       } catch (err) {
-        alert(err?.message || 'Unable to initialize payment form.');
+        if (cardErrorsEl) cardErrorsEl.textContent = err?.message || 'Unable to load payment form (Stripe may be blocked).';
+        alert(err?.message || 'Unable to initialize payment form. Please allow js.stripe.com and retry.');
         return;
       }
       if (!cardElementInstance) {

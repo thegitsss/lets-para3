@@ -33,6 +33,19 @@ function normalizeConfig(config) {
 
 async function loadCaseFiles() {
   const container = document.getElementById(currentConfig.containerId);
+  async function fetchActiveCasesFallback() {
+    try {
+      const res = await secureFetch("/api/paralegal/dashboard", {
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) return [];
+      const payload = await res.json().catch(() => ({}));
+      return Array.isArray(payload?.activeCases) ? payload.activeCases : [];
+    } catch {
+      return [];
+    }
+  }
+
   try {
     const res = await secureFetch("/api/cases/my?withFiles=true&limit=100", {
       headers: { Accept: "application/json" },
@@ -46,13 +59,39 @@ async function loadCaseFiles() {
       throw err;
     }
     const cases = Array.isArray(data?.cases) ? data.cases : [];
-    allFiles = cases.flatMap((caseItem = {}) =>
-      (caseItem.files || []).map((file) => ({
+    allFiles = cases.flatMap((caseItem = {}) => {
+      const caseId = caseItem.id || caseItem._id;
+      const caseTitle = caseItem.title || caseItem.name || "Untitled Case";
+      const caseStatus = normalizeStatus(caseItem.status) || "pending";
+      const files = Array.isArray(caseItem.files) ? caseItem.files : [];
+      if (!files.length) {
+        return [
+          {
+            placeholder: true,
+            caseId,
+            caseTitle,
+            status: caseStatus,
+          },
+        ];
+      }
+      return files.map((file) => ({
         ...file,
-        caseId: caseItem.id || caseItem._id,
-        caseTitle: caseItem.title || caseItem.name || "Untitled Case",
-      }))
-    );
+        caseId,
+        caseTitle,
+        status: normalizeStatus(file.status) || caseStatus,
+      }));
+    });
+
+    // Fallback: if no cases/files returned, pull active cases from dashboard data
+    if (!allFiles.length) {
+      const activeCases = await fetchActiveCasesFallback();
+      allFiles = activeCases.map((c) => ({
+        placeholder: true,
+        caseId: c.caseId || c.id || c._id || "",
+        caseTitle: c.jobTitle || c.title || c.practiceArea || "Case",
+        status: normalizeStatus(c.status) || "in progress",
+      }));
+    }
   } catch (err) {
     console.warn("Unable to load case files", err);
     allFiles = [];
@@ -102,20 +141,39 @@ function renderFiles(files) {
   }
   container.innerHTML = files
     .map((file) => {
+      const caseId = file.caseId || file.id || "";
+      const caseLink = caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "#";
       const downloadUrl = file.downloadUrl || file.key || file.url || "#";
       const sizeLabel =
         typeof file.size === "number" ? `${(file.size / 1024).toFixed(1)} KB` : "—";
+      const statusLabel = sanitize(currentConfig.formatStatus(file.status));
+      const caseMeta = `<div class="file-meta"><span>Case: ${sanitize(file.caseTitle || "Case")}</span></div>`;
+      if (file.placeholder) {
+        return `
+          <article class="file-card" data-case-id="${sanitize(caseId)}">
+            <div class="file-line">
+              <span class="file-name">${sanitize(file.caseTitle || "Case")}</span>
+              <span class="file-status">${statusLabel}</span>
+            </div>
+            ${caseMeta}
+            <div class="file-actions">
+              <a href="${caseLink}" class="btn-link">Open Case</a>
+            </div>
+          </article>
+        `;
+      }
       return `
-        <article class="file-card">
+        <article class="file-card" data-case-id="${sanitize(caseId)}">
           <div class="file-line">
             <span class="file-name">${sanitize(file.original || file.filename || "Untitled document")}</span>
-            <span class="file-status">${sanitize(currentConfig.formatStatus(file.status))}</span>
+            <span class="file-status">${statusLabel}</span>
           </div>
           <div class="file-meta">
             <span>Case: ${sanitize(file.caseTitle || "Case")}</span>
             <span>${sanitize(sizeLabel)}</span>
           </div>
           <div class="file-actions">
+            <a href="${caseLink}" class="btn-link">Open Case</a>
             <a href="${downloadUrl}" class="btn-link" download>Download</a>
           </div>
         </article>
@@ -125,10 +183,19 @@ function renderFiles(files) {
 }
 
 function defaultFormatStatus(status) {
-  if (status === "pending_review") return "Pending Review";
-  if (status === "approved") return "Approved";
-  if (status === "attorney_revision") return "Requested Revisions";
+  const normalized = normalizeStatus(status).toLowerCase();
+  if (normalized === "pending_review") return "Pending Review";
+  if (normalized === "approved") return "Approved";
+  if (normalized === "attorney_revision") return "Requested Revisions";
+  if (normalized === "in progress" || normalized === "in_progress") return "In Progress";
   return status || "Unknown";
+}
+
+function normalizeStatus(status) {
+  const value = String(status || "").trim();
+  if (!value) return "";
+  if (value.toLowerCase() === "in_progress") return "in progress";
+  return value;
 }
 
 function sanitize(value = "") {
