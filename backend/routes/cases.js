@@ -407,7 +407,9 @@ async function ensureFundsReleased(req, caseDoc) {
     throw new Error("Case has no funded payment intent.");
   }
 
-  const budgetCents = Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount || 0);
+const budgetCents = Number(
+  caseDoc.lockedTotalAmount ?? (caseDoc.totalAmount || 0)
+  );
   if (!Number.isFinite(budgetCents) || budgetCents <= 0) {
     throw new Error("Case total amount is invalid.");
   }
