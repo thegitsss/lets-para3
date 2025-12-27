@@ -81,7 +81,7 @@ function archiveMetadataFromCase(doc) {
       id: String(doc.paralegalId || ""),
       name: doc.paralegalNameSnapshot || "",
     },
-    totalAmount: doc.totalAmount || 0,
+    totalAmount: doc.lockedTotalAmount || doc.totalAmount || 0,
     currency: doc.currency || "usd",
     paymentReleased: !!doc.paymentReleased,
     payoutTransferId: doc.payoutTransferId || null,

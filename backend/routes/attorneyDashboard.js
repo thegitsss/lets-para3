@@ -72,11 +72,11 @@ router.get("/", auth, requireRole(["attorney"]), async (req, res) => {
     }
 
     // 3. Aggregate metrics
-    const [activeCasesCount, openJobsCount, pendingApplicationsCount, escrowTotal] =
-      await Promise.all([
-        Case.countDocuments({
-          attorneyId,
-          status: { $in: ["active", "awaiting_documents", "reviewing"] },
+  const [activeCasesCount, openJobsCount, pendingApplicationsCount, escrowTotal] =
+    await Promise.all([
+      Case.countDocuments({
+        attorneyId,
+        status: { $in: ["active", "awaiting_documents", "reviewing"] },
         }),
         Job.countDocuments({ attorneyId, status: "open" }),
         Application.countDocuments({
@@ -98,12 +98,14 @@ router.get("/", auth, requireRole(["attorney"]), async (req, res) => {
       caseId: c._id,
       jobTitle: c.jobId ? c.jobId.title : "Untitled Matter",
       practiceArea: c.jobId ? c.jobId.practiceArea : null,
-      paralegalName: c.paralegalId
-        ? `${c.paralegalId.firstName} ${c.paralegalId.lastName}`
-        : "Unassigned",
-      status: c.status,
-      createdAt: c.createdAt,
-    }));
+    paralegalName: c.paralegalId
+      ? `${c.paralegalId.firstName} ${c.paralegalId.lastName}`
+      : "Unassigned",
+    status: c.status,
+    createdAt: c.createdAt,
+    amountCents: typeof c.lockedTotalAmount === "number" ? c.lockedTotalAmount : typeof c.totalAmount === "number" ? c.totalAmount : 0,
+    currency: c.currency || "usd",
+  }));
 
     const openJobsSummary = openJobs.map((j) => ({
       jobId: j._id,

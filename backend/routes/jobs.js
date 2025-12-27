@@ -140,7 +140,7 @@ router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req,
         .lean(),
       Case.find({
         archived: { $ne: true },
-        status: { $nin: ["assigned", "in_progress", "completed", "cancelled", "closed"] },
+        status: { $nin: ["assigned", "in progress", "in_progress", "completed", "cancelled", "closed"] },
       })
         .select("title practiceArea details briefSummary totalAmount currency state locationState status applicants attorney attorneyId jobId createdAt")
         .populate({
@@ -206,33 +206,11 @@ router.post("/:jobId/apply", auth, requireApproved, requireRole("paralegal"), as
   }
 });
 
-// POST /jobs/:jobId/hire/:paralegalId — attorney hires → case created
-router.post("/:jobId/hire/:paralegalId", auth, requireRole(["attorney"]), async (req, res) => {
-  try {
-    const { jobId, paralegalId } = req.params;
-    const job = await Job.findById(jobId);
-    if (!job) {
-      return res.status(404).json({ error: "Job not found" });
-    }
-
-    // create case
-    const newCase = await Case.create({
-      jobId,
-      attorneyId: job.attorneyId,
-      paralegalId,
-      title: job.title,
-      details: job.description,
-      practiceArea: job.practiceArea,
-      status: "open",
-    });
-
-    // close job
-    await Job.findByIdAndUpdate(jobId, { status: "assigned" });
-
-    res.json(newCase);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// POST /jobs/:jobId/hire/:paralegalId — disabled to avoid hiring without funded escrow
+router.post("/:jobId/hire/:paralegalId", auth, requireRole(["attorney"]), async (_req, res) => {
+  return res.status(410).json({
+    error: "Direct job-to-paralegal hire is disabled. Use the case hire + funding flow to ensure escrow is funded.",
+  });
 });
 
 module.exports = router;

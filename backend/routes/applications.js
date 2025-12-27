@@ -76,6 +76,26 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     profileSnapshot: shapeParalegalSnapshot(applicant),
   });
   await Job.findByIdAndUpdate(jobId, { $inc: { applicantsCount: 1 } });
+
+  // Notify the attorney who posted the job
+  try {
+    const attorneyId =
+      job.attorneyId && job.attorneyId._id
+        ? job.attorneyId._id
+        : job.attorneyId || null;
+    if (attorneyId) {
+      await require("../utils/notifyUser").notifyUser(attorneyId, "application_submitted", {
+        jobId: job._id,
+        caseId: job.caseId || null,
+        title: job.title || "Job application",
+        paralegalName: `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Paralegal",
+        paralegalId: user._id,
+      });
+    }
+  } catch (err) {
+    console.warn("[applications] Failed to notify attorney of application", err?.message || err);
+  }
+
   return application;
 }
 
@@ -110,6 +130,38 @@ router.get("/for-job/:jobId", auth, requireApproved, requireRole("admin", "attor
     res.json(apps);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /applications/my-postings — attorney sees applications to their jobs
+router.get("/my-postings", auth, requireApproved, requireRole("attorney"), async (req, res) => {
+  try {
+    const jobs = await Job.find({ attorneyId: req.user._id }).select("_id title practiceArea budget caseId");
+    if (!jobs.length) return res.json([]);
+    const jobIds = jobs.map((j) => j._id);
+    const jobById = new Map(jobs.map((j) => [String(j._id), j]));
+    const apps = await Application.find({ jobId: { $in: jobIds } })
+      .populate("paralegalId", "firstName lastName email role profileImage avatarURL")
+      .sort({ createdAt: -1 })
+      .lean();
+    const shaped = apps.map((app) => {
+      const job = jobById.get(String(app.jobId?._id || app.jobId)) || {};
+      return {
+        id: String(app._id),
+        jobId: app.jobId?._id || app.jobId || null,
+        jobTitle: job.title || "Job",
+        practiceArea: job.practiceArea || "",
+        budget: job.budget || null,
+        caseId: job.caseId || null,
+        paralegal: app.paralegalId || null,
+        coverLetter: app.coverLetter || "",
+        createdAt: app.createdAt,
+      };
+    });
+    res.json(shaped);
+  } catch (err) {
+    console.error("[applications] my-postings error", err);
+    res.status(500).json({ error: "Unable to load applications." });
   }
 });
 

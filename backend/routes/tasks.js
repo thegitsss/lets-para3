@@ -5,7 +5,24 @@ const { requireApproved, requireRole } = require("../utils/authz");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const Task = require("../models/Task");
 
-const VALID_STATUSES = ["todo", "in_progress", "review"];
+const IN_PROGRESS_STATUS = "in progress";
+const VALID_STATUSES = ["todo", IN_PROGRESS_STATUS, "review"];
+const LEGACY_STATUSES = {
+  in_progress: IN_PROGRESS_STATUS,
+};
+
+function normalizeStatus(status = "") {
+  const key = String(status).trim().toLowerCase();
+  return LEGACY_STATUSES[key] || (VALID_STATUSES.includes(key) ? key : "");
+}
+
+function assertEscrowFunded(req, res) {
+  const escrowId = req.case?.escrowIntentId;
+  const escrowStatus = String(req.case?.escrowStatus || "").toLowerCase();
+  if (escrowId && escrowStatus === "funded") return true;
+  res.status(403).json({ error: "Fund escrow to create or update tasks for this case." });
+  return false;
+}
 
 router.use(verifyToken);
 router.use(requireApproved);
@@ -16,12 +33,13 @@ router.post(
   "/:caseId/tasks",
   async (req, res, next) => {
     try {
+      if (!assertEscrowFunded(req, res)) return;
       const { caseId } = req.params;
       const { title, description = "", dueDate, status = "todo" } = req.body || {};
       if (!title || typeof title !== "string") {
         return res.status(400).json({ error: "Title is required" });
       }
-      const normalizedStatus = VALID_STATUSES.includes(status) ? status : "todo";
+      const normalizedStatus = normalizeStatus(status) || "todo";
       const doc = await Task.create({
         caseId,
         paralegalId: req.user.id,
@@ -56,10 +74,12 @@ router.patch(
   "/:caseId/tasks/:taskId",
   async (req, res, next) => {
     try {
+      if (!assertEscrowFunded(req, res)) return;
       const { taskId } = req.params;
       const updates = {};
-      if (typeof req.body?.status === "string" && VALID_STATUSES.includes(req.body.status)) {
-        updates.status = req.body.status;
+      if (typeof req.body?.status === "string") {
+        const normalized = normalizeStatus(req.body.status);
+        if (normalized) updates.status = normalized;
       }
       if (!Object.keys(updates).length) {
         return res.status(400).json({ error: "No valid fields to update" });

@@ -191,6 +191,11 @@ router.post(
       if (!caseId || !isObjId(caseId)) {
         return res.status(400).json({ msg: "caseId is required" });
       }
+      const caseDoc = await Case.findById(caseId).select("escrowStatus escrowIntentId");
+      const escrowStatus = String(caseDoc?.escrowStatus || "").toLowerCase();
+      if (escrowStatus !== "funded") {
+        return res.status(403).json({ msg: "Work begins once payment is secured." });
+      }
 
       if (!contentType || typeof contentType !== "string") {
         return res.status(400).json({ msg: "contentType required" });

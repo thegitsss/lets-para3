@@ -38,6 +38,12 @@ function buildDisplayMessage(type, payload = {}) {
       return "Your profile was approved.";
     case "payout_released":
       return `Your payout was released${payload.amount ? ` (${payload.amount})` : ""}.`;
+    case "application_submitted": {
+      const paralegal = payload.paralegalName || actorName || "A paralegal";
+      return `${paralegal} applied${caseFragment || ""}`.trim();
+    }
+    case "case_awaiting_funding":
+      return `${payload.caseTitle || "A case"} is awaiting funding`;
     default:
       return "You have a new notification.";
   }
@@ -101,6 +107,18 @@ function emailTemplate(type, payload) {
             : `<p>${payload.paralegalName || "The invited paralegal"} declined your invitation${
                 payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>.` : "."
               }</p>`
+      };
+    case "application_submitted":
+      return {
+        subject: "New application received",
+        html: `<p>${payload.paralegalName || "A paralegal"} applied to ${
+          payload.title || "your job"
+        }.</p><p>Log in to review the application.</p>`,
+      };
+    case "case_awaiting_funding":
+      return {
+        subject: `Fund ${payload.caseTitle || "your case"}`,
+        html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is awaiting funding.</p><p>${payload.link ? `<a href="${payload.link}">Open the case to fund now.</a>` : "Please fund the case to continue."}</p>`,
       };
     default:
       return {

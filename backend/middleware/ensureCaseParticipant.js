@@ -17,7 +17,7 @@ async function evaluateCaseParticipant(req, caseId) {
   }
 
   const caseDoc = await Case.findById(caseId).select(
-    "_id title attorney attorneyId paralegal paralegalId readOnly"
+    "_id title status escrowStatus escrowIntentId paymentReleased attorney attorneyId paralegal paralegalId pendingParalegalId readOnly"
   );
   if (!caseDoc) {
     const err = new Error("Case not found");

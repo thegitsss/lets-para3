@@ -66,7 +66,8 @@ function computePlatformFee(doc = {}) {
     typeof doc.feeAttorneyPct === "number" && Number.isFinite(doc.feeAttorneyPct)
       ? doc.feeAttorneyPct
       : PLATFORM_FEE_PERCENT;
-  return Math.max(0, Math.round(cents(doc.totalAmount) * (pct / 100)));
+  const base = doc.lockedTotalAmount ?? doc.totalAmount;
+  return Math.max(0, Math.round(cents(base) * (pct / 100)));
 }
 
 function pickLimit(rawValue, fallback = 200, max = 1000) {
@@ -179,7 +180,8 @@ function extractReceipt(doc = {}) {
 }
 
 async function ensureCheckoutUrl(caseDoc, req) {
-  if (!caseDoc || !cents(caseDoc.totalAmount) || !stripe?.checkout?.sessions) return "";
+  const base = caseDoc.lockedTotalAmount ?? caseDoc.totalAmount;
+  if (!caseDoc || !cents(base) || !stripe?.checkout?.sessions) return "";
   const context = buildPaymentContext(caseDoc);
   const paymentMetadata = {
     ...context.metadata,
@@ -208,7 +210,7 @@ async function ensureCheckoutUrl(caseDoc, req) {
             product_data: {
               name: context.metadata.caseName || caseDoc.title || `Case ${caseDoc._id.toString()}`,
             },
-            unit_amount: cents(caseDoc.totalAmount),
+            unit_amount: cents(base),
           },
           quantity: 1,
         },
@@ -231,7 +233,7 @@ async function ensureCheckoutUrl(caseDoc, req) {
 }
 
 function shapeHistoryRecord(doc) {
-  const jobAmount = cents(doc.totalAmount);
+  const jobAmount = cents(doc.lockedTotalAmount ?? doc.totalAmount);
   const platformFee = computePlatformFee(doc);
   const paralegalDoc = resolveParalegalDoc(doc);
   const paralegal = paralegalDoc
@@ -315,6 +317,49 @@ function formatDollars(centsValue) {
   return (Number(centsValue || 0) / 100).toFixed(2);
 }
 
+async function ensureStripeCustomer(user) {
+  if (!user) throw new Error("User not found");
+  if (user.stripeCustomerId) return user.stripeCustomerId;
+  const customer = await stripe.customers.create({
+    email: user.email || undefined,
+    name: fullName(user) || undefined,
+    metadata: {
+      userId: user._id ? String(user._id) : "",
+      role: user.role || "",
+    },
+  });
+  user.stripeCustomerId = customer.id;
+  await user.save();
+  return customer.id;
+}
+
+function summarizePaymentMethod(pm) {
+  if (!pm) return null;
+  const card = pm.card || (pm.type === "card" ? pm.card : null);
+  return {
+    id: pm.id,
+    type: pm.type,
+    brand: card?.brand || null,
+    last4: card?.last4 || null,
+    exp_month: card?.exp_month || null,
+    exp_year: card?.exp_year || null,
+  };
+}
+
+async function fetchDefaultPaymentMethod(customerId) {
+  if (!customerId) return null;
+  const customer = await stripe.customers.retrieve(customerId);
+  const defaultPmId = customer?.invoice_settings?.default_payment_method;
+  if (!defaultPmId) return null;
+  try {
+    const pm = await stripe.paymentMethods.retrieve(defaultPmId);
+    return summarizePaymentMethod(pm);
+  } catch (err) {
+    console.warn(`[payments] unable to retrieve default payment method ${defaultPmId}:`, err?.message || err);
+    return null;
+  }
+}
+
 // ----------------------------------------
 // PUBLIC: Stripe publishable key for Stripe.js
 // GET /api/payments/config
@@ -332,6 +377,96 @@ router.get('/connect', (_req, res) => {
 router.use(verifyToken);
 router.use(requireApproved);
 router.param("caseId", ensureCaseParticipant("caseId"));
+
+router.get(
+  "/payment-method/default",
+  requireRole("attorney"),
+  asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user.id).select("firstName lastName email role stripeCustomerId");
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    try {
+      const customerId = await ensureStripeCustomer(user);
+      const paymentMethod = await fetchDefaultPaymentMethod(customerId);
+      return res.json({
+        customerId,
+        hasDefault: !!paymentMethod,
+        paymentMethod,
+      });
+    } catch (err) {
+      console.error("[payments] default payment method lookup failed", err?.message || err);
+      return res.status(502).json({ error: "Unable to load payment method" });
+    }
+  })
+);
+
+router.post(
+  "/payment-method/setup-intent",
+  requireRole("attorney"),
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user.id).select("firstName lastName email role stripeCustomerId");
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    try {
+      const customerId = await ensureStripeCustomer(user);
+      const intent = await stripe.setupIntents.create({
+        customer: customerId,
+        payment_method_types: ["card"],
+        usage: "off_session",
+        metadata: {
+          userId: user._id ? String(user._id) : "",
+          role: user.role || "",
+          email: user.email || "",
+        },
+      });
+
+      res.json({ clientSecret: intent.client_secret, intentId: intent.id, customerId });
+    } catch (err) {
+      console.error("[payments] setup_intent creation failed", err?.message || err);
+      res.status(502).json({ error: "Unable to start card setup" });
+    }
+  })
+);
+
+router.post(
+  "/payment-method/default",
+  requireRole("attorney"),
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const { paymentMethodId } = req.body || {};
+    if (!paymentMethodId) {
+      return res.status(400).json({ error: "paymentMethodId is required" });
+    }
+
+    const user = await User.findById(req.user.id).select("firstName lastName email role stripeCustomerId");
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    try {
+      const customerId = await ensureStripeCustomer(user);
+      let pm = await stripe.paymentMethods.retrieve(paymentMethodId);
+      if (!pm || pm.type !== "card") {
+        return res.status(400).json({ error: "Unsupported payment method type" });
+      }
+
+      const pmCustomerId = typeof pm.customer === "string" ? pm.customer : pm.customer?.id;
+      if (!pmCustomerId) {
+        pm = await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
+      } else if (pmCustomerId !== customerId) {
+        return res.status(403).json({ error: "Payment method does not belong to this customer" });
+      }
+
+      await stripe.customers.update(customerId, {
+        invoice_settings: { default_payment_method: paymentMethodId },
+      });
+
+      res.json({ ok: true, customerId, paymentMethod: summarizePaymentMethod(pm) });
+    } catch (err) {
+      console.error("[payments] failed to set default payment method", err?.message || err);
+      res.status(502).json({ error: "Unable to save payment method" });
+    }
+  })
+);
 
 /**
  * POST /api/payments/portal
@@ -395,14 +530,14 @@ router.post(
       return res.status(400).json({ error: "Attorney email is required to send the payment receipt" });
     }
 
-    const budgetCents = Number(
-      typeof selectedCase.budget === "number" ? selectedCase.budget : selectedCase.totalAmount
-    );
-    if (!Number.isFinite(budgetCents) || budgetCents < 50) {
-      return res.status(400).json({ error: "Case budget must be at least $0.50" });
+    const amountToCharge = selectedCase.lockedTotalAmount;
+    if (!amountToCharge || amountToCharge < 50) {
+      return res.status(400).json({
+        error: "Escrow amount is not locked. Invite/accept/hire first.",
+      });
     }
 
-    const applicationFee = Math.max(0, Math.round(budgetCents * 0.15));
+    const applicationFee = Math.max(0, Math.round(amountToCharge * 0.15));
     const context = buildPaymentContext(selectedCase);
     const attorneyMeta =
       selectedCase.attorney && selectedCase.attorney._id
@@ -412,20 +547,34 @@ router.post(
       ...context.metadata,
       attorneyId: attorneyMeta ? String(attorneyMeta) : "",
     };
+
+    if (selectedCase.escrowIntentId) {
+      const existing = await stripe.paymentIntents.retrieve(selectedCase.escrowIntentId);
+      if (existing && !["succeeded", "canceled"].includes(existing.status)) {
+        const amountMatches = existing.amount === amountToCharge;
+        const tgMatches = existing.transfer_group && existing.transfer_group === `case_${selectedCase._id.toString()}`;
+        if (!amountMatches || !tgMatches) {
+          return res.status(400).json({
+            error: "Existing escrow intent does not match locked amount. Please cancel and retry.",
+          });
+        }
+        return res.json({ clientSecret: existing.client_secret, intentId: existing.id });
+      }
+    }
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: budgetCents,
+      amount: amountToCharge,
       currency: selectedCase.currency || "usd",
       automatic_payment_methods: { enabled: true },
       application_fee_amount: applicationFee,
       receipt_email: selectedCase.attorney.email,
+      transfer_group: `case_${selectedCase._id.toString()}`,
       metadata,
       description: context.description,
     });
 
     selectedCase.paymentIntentId = paymentIntent.id;
-    if (!selectedCase.escrowIntentId) {
-      selectedCase.escrowIntentId = paymentIntent.id;
-    }
+    selectedCase.escrowIntentId = paymentIntent.id;
     await selectedCase.save();
 
     await AuditLog.logFromReq(req, "payment.intent.start", {
@@ -433,7 +582,7 @@ router.post(
       targetId: paymentIntent.id,
       caseId: selectedCase._id,
       meta: {
-        amount: budgetCents,
+        amount: amountToCharge,
         applicationFee,
         currency: selectedCase.currency || "usd",
       },
@@ -479,7 +628,7 @@ router.post(
       return res.status(400).json({ error: "Paralegal must complete Stripe Connect onboarding before payouts" });
     }
 
-    const budgetCents = Number(c.totalAmount || 0);
+    const budgetCents = Number((c.lockedTotalAmount ?? c.totalAmount) || 0);
     if (!Number.isFinite(budgetCents) || budgetCents <= 0) {
       return res.status(400).json({ error: "Case budget is missing or invalid" });
     }
@@ -693,6 +842,7 @@ router.patch(
   "/:caseId/budget",
   requireRole("attorney", "admin"),
   asyncHandler(async (req, res) => {
+    const isAdmin = req.user.role === "admin";
     const { caseId } = req.params;
     const { amountUsd, currency } = req.body || {};
     const c = await Case.findById(caseId);
@@ -702,11 +852,20 @@ router.patch(
       return res.status(403).json({ msg: "Only the case attorney or admin can update budget" });
     }
 
+    if (!isAdmin) {
+      if (c.lockedTotalAmount || c.paralegalId || c.pendingParalegalId) {
+        return res.status(403).json({
+          error: "Escrow amount is locked and cannot be modified.",
+        });
+      }
+    }
+
     const cents = Math.round(Number(amountUsd || 0) * 100);
     if (!Number.isFinite(cents) || cents < 50) {
       return res.status(400).json({ msg: "Amount must be at least $0.50" });
     }
 
+    const before = c.totalAmount;
     c.totalAmount = cents;
     if (currency) c.currency = String(currency).toLowerCase();
     c.snapshotFees?.(); // compute fee snapshots if model helper exists
@@ -716,7 +875,11 @@ router.patch(
       targetType: "case",
       targetId: c._id,
       caseId: c._id,
-      meta: { totalAmount: c.totalAmount, currency: c.currency },
+      meta: {
+        totalAmount: c.totalAmount,
+        currency: c.currency,
+        ...(isAdmin && before !== c.totalAmount ? { amountOverride: { from: before, to: c.totalAmount }, adminId: req.user.id } : {}),
+      },
     });
 
     res.json({ ok: true, totalAmount: c.totalAmount, currency: c.currency });
@@ -745,8 +908,9 @@ router.post(
       return res.status(403).json({ error: "Only the attorney can fund escrow" });
     }
 
-    if (!c.totalAmount || c.totalAmount < 50) {
-      return res.status(400).json({ error: "totalAmount (>= $0.50) required on case" });
+    const amountToCharge = c.lockedTotalAmount;
+    if (!amountToCharge || amountToCharge < 50) {
+      return res.status(400).json({ error: "Escrow amount is not locked. Cannot fund escrow." });
     }
 
     const transferGroup = `case_${c._id.toString()}`;
@@ -763,34 +927,29 @@ router.post(
     if (c.escrowIntentId) {
       const existing = await stripe.paymentIntents.retrieve(c.escrowIntentId);
       if (existing && !["succeeded", "canceled"].includes(existing.status)) {
-        let pi = existing;
-        const canUpdate = ["requires_payment_method", "requires_confirmation"].includes(pi.status);
-        const needsTG = !pi.transfer_group || pi.transfer_group !== transferGroup;
-        const needsAmt = pi.amount !== c.totalAmount;
-        if (canUpdate) {
-          pi = await stripe.paymentIntents.update(pi.id, {
-            ...(needsTG ? { transfer_group: transferGroup } : {}),
-            ...(needsAmt ? { amount: c.totalAmount } : {}),
-            metadata: paymentMetadata,
-            description,
+        const amountMatches = existing.amount === amountToCharge;
+        const tgMatches = existing.transfer_group && existing.transfer_group === transferGroup;
+        if (!amountMatches || !tgMatches) {
+          return res.status(400).json({
+            error: "Existing escrow intent does not match locked amount. Please cancel and retry.",
           });
         }
 
         await AuditLog.logFromReq(req, "payment.intent.reuse", {
           targetType: "payment",
-          targetId: pi.id,
+          targetId: existing.id,
           caseId: c._id,
-          meta: { amount: c.totalAmount, currency: c.currency || "usd", status: pi.status },
+          meta: { amount: amountToCharge, currency: c.currency || "usd", status: existing.status },
         });
 
-        return res.json({ clientSecret: pi.client_secret, intentId: pi.id });
+        return res.json({ clientSecret: existing.client_secret, intentId: existing.id });
       }
     }
 
     // Create a fresh PI
     const intent = await stripe.paymentIntents.create(
       {
-        amount: c.totalAmount, // cents
+        amount: amountToCharge, // cents
         currency: c.currency || "usd",
         automatic_payment_methods: { enabled: true },
         transfer_group: transferGroup, // important for later Connect transfer
@@ -807,7 +966,7 @@ router.post(
       targetType: "payment",
       targetId: intent.id,
       caseId: c._id,
-      meta: { amount: c.totalAmount, currency: c.currency || "usd" },
+      meta: { amount: amountToCharge, currency: c.currency || "usd" },
     });
 
     res.json({ clientSecret: intent.client_secret, intentId: intent.id });
@@ -837,11 +996,12 @@ router.post(
 
     // Compute/snapshot fees
     c.snapshotFees?.();
+    const base = c.lockedTotalAmount ?? c.totalAmount;
     if (!c.feeAttorneyAmount || !c.feeParalegalAmount) {
-      c.feeAttorneyAmount = Math.round((c.totalAmount * (c.feeAttorneyPct || 15)) / 100);
-      c.feeParalegalAmount = Math.round((c.totalAmount * (c.feeParalegalPct || 15)) / 100);
+      c.feeAttorneyAmount = Math.round((base * (c.feeAttorneyPct || 15)) / 100);
+      c.feeParalegalAmount = Math.round((base * (c.feeParalegalPct || 15)) / 100);
     }
-    const payout = Math.max(0, c.totalAmount - c.feeAttorneyAmount - c.feeParalegalAmount);
+    const payout = Math.max(0, base - c.feeAttorneyAmount - c.feeParalegalAmount);
 
     c.paymentReleased = true;
     if (typeof c.canTransitionTo === "function" && c.canTransitionTo("closed") && c.status === "completed") {
@@ -888,9 +1048,10 @@ router.post(
 
     // Ensure fees/payout are known
     c.snapshotFees?.();
-    const feeA = c.feeAttorneyAmount ?? Math.round((c.totalAmount * (c.feeAttorneyPct || 15)) / 100);
-    const feeP = c.feeParalegalAmount ?? Math.round((c.totalAmount * (c.feeParalegalPct || 15)) / 100);
-    const payout = Math.max(0, c.totalAmount - feeA - feeP);
+    const base = c.lockedTotalAmount ?? c.totalAmount;
+    const feeA = c.feeAttorneyAmount ?? Math.round((base * (c.feeAttorneyPct || 15)) / 100);
+    const feeP = c.feeParalegalAmount ?? Math.round((base * (c.feeParalegalPct || 15)) / 100);
+    const payout = Math.max(0, base - feeA - feeP);
 
     const transfer = await stripe.transfers.create({
       amount: payout,
@@ -959,7 +1120,7 @@ router.get(
         escrowIntentId: { $nin: [null, ""] },
         paymentReleased: { $ne: true },
       })
-        .select("totalAmount")
+        .select("totalAmount lockedTotalAmount")
         .lean(),
       Case.find({
         ...attorneyMatch,
@@ -969,20 +1130,20 @@ router.get(
           { $or: [{ escrowIntentId: { $exists: false } }, { escrowIntentId: null }, { escrowIntentId: "" }] },
         ],
       })
-        .select("totalAmount")
+        .select("totalAmount lockedTotalAmount")
         .lean(),
       Case.find({
         ...attorneyMatch,
         paymentReleased: true,
       })
-        .select("totalAmount feeAttorneyAmount feeAttorneyPct")
+        .select("totalAmount lockedTotalAmount feeAttorneyAmount feeAttorneyPct")
         .lean(),
     ]);
 
-    const activeEscrow = activeCases.reduce((sum, c) => sum + cents(c.totalAmount), 0);
-    const pendingCharges = pendingCases.reduce((sum, c) => sum + cents(c.totalAmount), 0);
+    const activeEscrow = activeCases.reduce((sum, c) => sum + cents(c.lockedTotalAmount ?? c.totalAmount), 0);
+    const pendingCharges = pendingCases.reduce((sum, c) => sum + cents(c.lockedTotalAmount ?? c.totalAmount), 0);
     const completedRecords = completedDocs.map((doc) => ({
-      jobAmount: cents(doc.totalAmount),
+      jobAmount: cents(doc.lockedTotalAmount ?? doc.totalAmount),
       platformFee: computePlatformFee(doc),
     }));
     const completedJobsCount = completedRecords.length;
@@ -1023,7 +1184,7 @@ router.get(
       caseName: doc.title || doc.caseTitle || "Case",
       paralegalName: doc.paralegal ? fullName(doc.paralegal) : "",
       paralegal: doc.paralegal || null,
-      amountHeld: cents(doc.totalAmount),
+      amountHeld: cents(doc.lockedTotalAmount ?? doc.totalAmount),
       fundedAt: doc.updatedAt || doc.createdAt || doc.hiredAt || null,
       status: doc.paymentStatus || doc.status || "pending",
     }));
@@ -1058,7 +1219,7 @@ router.get(
           id: doc._id,
           caseId: doc._id,
           caseName: doc.title || doc.caseTitle || "Case",
-          amountDue: cents(doc.totalAmount),
+          amountDue: cents(doc.lockedTotalAmount ?? doc.totalAmount),
           checkoutUrl,
           paralegalName: doc.paralegal ? fullName(doc.paralegal) : "",
         };

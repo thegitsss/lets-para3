@@ -106,10 +106,15 @@ function assertMessagingOpen(req, res) {
   if (!caseDoc) {
     return res.status(400).json({ error: "Case not loaded" });
   }
+  const escrowStatus = String(caseDoc.escrowStatus || "").toLowerCase();
+  const escrowFunded = !!caseDoc.escrowIntentId;
   const status = String(caseDoc.status || "").toLowerCase();
   const hasParalegal = caseDoc.paralegal || caseDoc.paralegalId;
   if (!hasParalegal) {
     return res.status(403).json({ error: "Messaging is available after hire" });
+  }
+  if (!escrowFunded || escrowStatus !== "funded") {
+    return res.status(403).json({ error: "Work begins once payment is secured." });
   }
   if (["completed", "closed", "cancelled"].includes(status)) {
     return res.status(403).json({ error: "Messaging is closed for completed cases" });

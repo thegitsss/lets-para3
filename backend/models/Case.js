@@ -5,18 +5,23 @@ const { Schema, Types } = mongoose;
 /** ----------------------------------------
  * Enums & Helpers
  * -----------------------------------------*/
+const STATUS_IN_PROGRESS = "in progress";
+const LEGACY_STATUS_IN_PROGRESS = "in_progress";
+
 const CASE_STATUS = [
   "open",                // posted and visible
   "assigned",            // paralegal chosen, not started
   "active",              // work started (legacy alias)
   "awaiting_documents",  // pending uploads/info
   "reviewing",           // under review
-  "in_progress",         // work underway
+  STATUS_IN_PROGRESS,     // work underway
   "completed",           // work marked complete
   "disputed",            // dispute opened
   "cancelled",           // cancelled matter
   "closed",              // final closed state
 ];
+
+const CASE_STATUS_ENUM = [...CASE_STATUS, LEGACY_STATUS_IN_PROGRESS];
 
 const DISPUTE_STATUS = ["open", "resolved", "rejected"];
 const APPLICANT_STATUS = ["pending", "accepted", "rejected"];
@@ -28,6 +33,15 @@ function cents(n) {
   if (n == null) return 0;
   // Ensure integer cents (avoid floats)
   return Math.max(0, Math.round(Number(n)));
+}
+
+function normalizeCaseStatus(value) {
+  if (!value) return "";
+  const normalized = String(value).trim();
+  if (!normalized) return "";
+  const lower = normalized.toLowerCase();
+  if (lower === LEGACY_STATUS_IN_PROGRESS) return STATUS_IN_PROGRESS;
+  return lower;
 }
 
 /** ----------------------------------------
@@ -124,7 +138,7 @@ const caseSchema = new Schema(
     details: { type: String, required: true, trim: true, maxlength: 100_000 },
     state: { type: String, trim: true, maxlength: 200, default: "" },
     locationState: { type: String, trim: true, maxlength: 200, default: "" },
-    status: { type: String, enum: CASE_STATUS, default: "open", index: true },
+    status: { type: String, enum: CASE_STATUS_ENUM, default: "open", index: true },
 
     // Timeline
     deadline: { type: Date, default: null }, // optional target date
@@ -185,6 +199,7 @@ const caseSchema = new Schema(
     escrowIntentId: { type: String, default: null, index: true },
     escrowSessionId: { type: String, default: null, index: true }, // if using Checkout
     paymentIntentId: { type: String, default: null, index: true },
+    escrowStatus: { type: String, default: null, index: true }, // awaiting_funding, funded
     paymentReleased: { type: Boolean, default: false }, // funds released to paralegal
     paidOutAt: { type: Date, default: null },
     paymentStatus: { type: String, default: "pending", trim: true },
@@ -245,6 +260,7 @@ caseSchema.pre("validate", function (next) {
   if (!this.attorneyId && this.attorney) this.attorneyId = this.attorney;
   if (!this.paralegal && this.paralegalId) this.paralegal = this.paralegalId;
   if (!this.paralegalId && this.paralegal) this.paralegalId = this.paralegal;
+  this.status = normalizeCaseStatus(this.status);
 
   if (Array.isArray(this.applicants) && this.applicants.length > 1) {
     const seen = new Set();
@@ -270,12 +286,12 @@ caseSchema.pre("save", function (next) {
  * -----------------------------------------*/
 // Enforce simple status transitions to avoid accidental jumps
 const ALLOWED_TRANSITIONS = {
-  open: ["assigned", "active", "awaiting_documents", "reviewing", "in_progress", "cancelled", "closed"],
-  assigned: ["active", "awaiting_documents", "reviewing", "in_progress", "cancelled", "closed"],
-  active: ["awaiting_documents", "reviewing", "in_progress", "cancelled", "closed"],
-  awaiting_documents: ["reviewing", "in_progress", "completed", "cancelled", "closed"],
-  reviewing: ["in_progress", "completed", "cancelled", "closed"],
-  in_progress: ["completed", "disputed", "cancelled", "closed"],
+  open: ["assigned", "active", "awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
+  assigned: ["active", "awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
+  active: ["awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
+  awaiting_documents: ["reviewing", STATUS_IN_PROGRESS, "completed", "cancelled", "closed"],
+  reviewing: [STATUS_IN_PROGRESS, "completed", "cancelled", "closed"],
+  [STATUS_IN_PROGRESS]: ["completed", "disputed", "cancelled", "closed"],
   completed: ["disputed", "closed"],
   disputed: ["closed"],
   cancelled: [],
@@ -283,23 +299,26 @@ const ALLOWED_TRANSITIONS = {
 };
 
 caseSchema.methods.canTransitionTo = function (nextStatus) {
-  if (!CASE_STATUS.includes(nextStatus)) return false;
-  const allowed = ALLOWED_TRANSITIONS[this.status] || [];
-  return allowed.includes(nextStatus);
+  const target = normalizeCaseStatus(nextStatus);
+  const current = normalizeCaseStatus(this.status);
+  if (!CASE_STATUS.includes(target)) return false;
+  const allowed = ALLOWED_TRANSITIONS[current] || [];
+  return allowed.includes(target);
 };
 
 caseSchema.methods.transitionTo = function (nextStatus) {
-  if (!this.canTransitionTo(nextStatus)) {
+  const target = normalizeCaseStatus(nextStatus);
+  if (!this.canTransitionTo(target)) {
     const allowed = ALLOWED_TRANSITIONS[this.status] || [];
-    throw new Error(`Invalid status transition from '${this.status}' to '${nextStatus}'. Allowed: ${allowed.join(", ") || "none"}`);
+    throw new Error(`Invalid status transition from '${this.status}' to '${target}'. Allowed: ${allowed.join(", ") || "none"}`);
   }
-  this.status = nextStatus;
+  this.status = target;
   return this;
 };
 
 // Snapshot platform fees based on current totalAmount & pct
 caseSchema.methods.snapshotFees = function () {
-  const total = cents(this.totalAmount);
+  const total = cents(this.lockedTotalAmount ?? this.totalAmount);
   const atty = Math.floor((total * (this.feeAttorneyPct ?? 0)) / 100);
   const para = Math.floor((total * (this.feeParalegalPct ?? 0)) / 100);
   this.feeAttorneyAmount = cents(atty);
@@ -343,7 +362,7 @@ caseSchema.methods.createDispute = function ({ message, raisedBy }) {
 };
 
 // Convenience markers
-caseSchema.methods.markInProgress = function () { return this.transitionTo("in_progress"); };
+caseSchema.methods.markInProgress = function () { return this.transitionTo(STATUS_IN_PROGRESS); };
 caseSchema.methods.markCompleted  = function () { return this.transitionTo("completed"); };
 caseSchema.methods.markClosed     = function () { return this.transitionTo("closed"); };
 

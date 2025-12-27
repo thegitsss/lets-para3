@@ -45,7 +45,7 @@ router.get("/", auth, requireRole(["paralegal"]), async (req, res) => {
     // 1. My active cases
     const activeCases = await Case.find({
       paralegalId,
-      status: { $in: ["active", "awaiting_documents", "reviewing"] },
+      status: { $in: ["active", "awaiting_documents", "reviewing", "in progress", "in_progress"] },
     })
       .populate("attorneyId", "firstName lastName email role")
       .populate("jobId", "title practiceArea")
@@ -99,7 +99,7 @@ router.get("/", auth, requireRole(["paralegal"]), async (req, res) => {
       attorneyName: c.attorneyId
         ? `${c.attorneyId.firstName} ${c.attorneyId.lastName}`
         : null,
-      status: c.status,
+      status: String(c.status || "").toLowerCase() === "in_progress" ? "in progress" : c.status,
       createdAt: c.createdAt,
     }));
 

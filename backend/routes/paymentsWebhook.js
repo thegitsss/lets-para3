@@ -89,6 +89,8 @@ router.post("/", async (req, res) => {
           if (!c.escrowIntentId) c.escrowIntentId = pi.id;
           if (!c.currency) c.currency = pi.currency || c.currency || "usd";
           if (!c.totalAmount || c.totalAmount <= 0) c.totalAmount = pi.amount || c.totalAmount || 0;
+          if (!c.lockedTotalAmount) c.lockedTotalAmount = c.totalAmount;
+          if (!c.escrowStatus || c.escrowStatus !== "funded") c.escrowStatus = "funded";
           await c.save();
 
           await AuditLog.create({

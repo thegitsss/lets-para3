@@ -149,6 +149,9 @@ app.use((req, res, next) => {
 // 6) Static + SPA fallback
 app.use(express.static(PUBLIC_DIR));
 app.use(express.static(FRONTEND_DIR));
+app.get("/cases/:caseId/fund-escrow", (_req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/fund-escrow.html"));
+});
 app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/index.html"));
 });

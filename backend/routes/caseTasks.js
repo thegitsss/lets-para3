@@ -8,6 +8,14 @@ const csrfProtection = (_req, _res, next) => next();
 
 const Task = require("../models/Task");
 
+function assertEscrowFunded(req, res) {
+  const escrowId = req.case?.escrowIntentId;
+  const escrowStatus = String(req.case?.escrowStatus || "").toLowerCase();
+  if (escrowId && escrowStatus === "funded") return true;
+  res.status(403).json({ error: "Work begins once payment is secured." });
+  return false;
+}
+
 // All task routes require auth + approval + being a participant on the case
 router.use(verifyToken);
 router.use(requireApproved);
@@ -29,6 +37,7 @@ router.post(
   "/",
   csrfProtection,
   asyncHandler(async (req, res) => {
+    if (!assertEscrowFunded(req, res)) return;
     const { title, description, dueDate, status } = req.body;
     const caseId = req.params.caseId;
 
@@ -54,6 +63,7 @@ router.patch(
   "/:taskId",
   csrfProtection,
   asyncHandler(async (req, res) => {
+    if (!assertEscrowFunded(req, res)) return;
     const { taskId } = req.params;
     const updates = req.body;
 

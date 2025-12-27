@@ -524,6 +524,27 @@
 
     .case-actions {
       margin-top: 1rem;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .open-case-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-family: var(--font-sans);
+      font-weight: 200;
+      cursor: pointer;
+      margin-right: 0.5rem;
+      transition: transform 0.1s ease;
+    }
+
+    .open-case-btn:hover {
+      transform: translateY(-1px);
     }
 
     .toast {
@@ -1175,7 +1196,7 @@
     <div class="topbar" data-attorney-header>
       <div class="profile-header-controls" data-notification-center>
         <div class="notification-wrapper">
-          <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle id="notificationToggle">
+          <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle id="notificationToggle" aria-expanded="false">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
               <path d="M13.73 21a2 2 0 01-3.46 0"></path>
@@ -1291,6 +1312,17 @@
           <a href="browse-jobs.html" class="card-link">Browse all postings →</a>
         </section>
       </div>
+
+      <section class="case-list" id="appliedJobsList">
+        <div class="case-card empty-state">
+          <div class="case-header">
+            <div>
+              <h2>No applications yet</h2>
+              <div class="case-subinfo">Jobs you apply to will appear here.</div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section class="case-list" id="assignmentList">
         <div class="case-card empty-state">
