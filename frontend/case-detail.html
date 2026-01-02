@@ -1098,6 +1098,59 @@
       position:relative;
       flex-shrink:0;
     }
+
+    .payment-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+    .payment-modal.hidden { display: none; }
+    .payment-modal .modal-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.5rem;
+      max-width: 420px;
+      width: 90%;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+      color: #1a1a1a;
+    }
+    .payment-modal h3 {
+      margin-top: 0;
+      font-weight: 400;
+      margin-bottom: 0.5rem;
+    }
+    .payment-modal p {
+      margin: 0 0 1rem 0;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .payment-modal .actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .payment-modal .actions button,
+    .payment-modal .actions a {
+      border: none;
+      border-radius: 10px;
+      padding: 0.6rem 1rem;
+      cursor: pointer;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .payment-modal .actions .primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .payment-modal .actions .secondary {
+      background: #f3f4f6;
+      color: #111827;
+    }
     .upload-video-wrap {
       display:flex;
       gap:1rem;
@@ -1189,11 +1242,6 @@
 
     <div class="case-actions">
       <button class="btn primary hidden" id="fundEscrowBtn" data-attorney-only>Hire &amp; Start Work</button>
-      <div class="payment-panel hidden" id="escrowPayment" data-attorney-only>
-        <p style="margin-bottom:.6rem;font-weight:300;">Payment Method</p>
-        <div id="card-element"></div>
-        <div id="card-errors" role="alert"></div>
-      </div>
     </div>
 
     <div class="case-overview" id="caseOverview">
@@ -1270,6 +1318,17 @@
       <div class="modal-actions">
         <button id="cancelTaskBtn" class="btn btn-outline" type="button">Cancel</button>
         <button id="saveTaskBtn" class="btn btn-primary" type="button">Save Task</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="paymentMethodModal" class="payment-modal hidden">
+    <div class="modal-card">
+      <h3>Payment method required</h3>
+      <p>To hire and start work, add a card on your account. You’ll be returned here to finish once it’s saved.</p>
+      <div class="actions">
+        <button type="button" class="secondary" id="paymentModalDismiss">Cancel</button>
+        <button type="button" class="primary" id="paymentModalAddCard">Add Card</button>
       </div>
     </div>
   </div>
@@ -1943,10 +2002,6 @@
       }
     }
 
-    fundEscrowBtn?.addEventListener('click', () => {
-      if (!CASE_ID) return;
-      window.location.href = `/cases/${encodeURIComponent(CASE_ID)}/fund-escrow`;
-    });
     releaseEscrowBtn?.addEventListener('click', () => releaseEscrow(CASE_ID, releaseEscrowBtn));
     loadCaseDetails();
 
@@ -2106,8 +2161,12 @@
       if (titleEl) titleEl.textContent = caseDetails.title || 'Untitled Case';
 
       if (statusBadge) {
-        const status = (caseDetails.status || 'open').toUpperCase();
-        statusBadge.textContent = status;
+        const statusRaw = String(caseDetails.status || 'open')
+          .replace(/_/g, ' ')
+          .trim()
+          .toLowerCase();
+        const status = statusRaw.replace(/\b\w/g, (c) => c.toUpperCase());
+        statusBadge.textContent = status || 'Status';
       }
 
       if (overviewEl) {
@@ -2328,7 +2387,7 @@
 
       button?.removeAttribute('disabled');
       if (caseStatus) {
-        caseStatus.textContent = 'IN PROGRESS';
+        caseStatus.textContent = 'In Progress';
         caseStatus.style.background = 'rgba(31,122,74,.1)';
         caseStatus.style.color = '#1f7a4a';
       }

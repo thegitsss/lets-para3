@@ -19,6 +19,10 @@ const fundPromptNode = document.getElementById("fundingPrompt");
 const fundEscrowBtn = document.getElementById("fundEscrowBtn");
 const workLockedBanner = document.getElementById("workLockedBanner");
 const caseActionsRoot = document.querySelector(".case-header-actions");
+const paymentModal = document.getElementById("paymentMethodModal");
+const paymentModalDismiss = document.getElementById("paymentModalDismiss");
+const paymentModalAddCard = document.getElementById("paymentModalAddCard");
+const RETURN_TO_CASE_KEY = "lpc_return_to_case_after_billing";
 
 const titleInput = document.getElementById("taskTitleInput");
 const descInput = document.getElementById("taskDescInput");
@@ -98,8 +102,11 @@ async function loadCaseMeta() {
       caseTitleNode.textContent = payload.title;
     }
     if (caseStatusBadge && payload?.status) {
-      const cleanStatus = String(payload.status).replace(/_/g, " ").toUpperCase();
-      caseStatusBadge.textContent = cleanStatus;
+      const cleanStatus = String(payload.status || "")
+        .replace(/_/g, " ")
+        .trim()
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+      caseStatusBadge.textContent = cleanStatus || "Status";
     }
   } catch {
     /* ignore meta failures to avoid blocking tasks */
@@ -262,6 +269,25 @@ modal?.addEventListener("click", (e) => {
 });
 saveBtn?.addEventListener("click", saveTask);
 
+fundEscrowBtn?.addEventListener("click", async () => {
+  if (!CASE_ID) return;
+  const hasDefault = await hasDefaultPaymentMethod();
+  if (!hasDefault) {
+    showPaymentModal();
+    return;
+  }
+  window.location.href = `/cases/${encodeURIComponent(CASE_ID)}/fund-escrow`;
+});
+
+paymentModalDismiss?.addEventListener("click", hidePaymentModal);
+paymentModalAddCard?.addEventListener("click", () => {
+  try {
+    localStorage.setItem(RETURN_TO_CASE_KEY, window.location.href);
+  } catch {}
+  const targetUrl = `${window.location.origin}/dashboard-attorney.html#billing`;
+  window.location.assign(targetUrl);
+});
+
 //
 // --- INITIALIZE PAGE ---
 //
@@ -285,7 +311,7 @@ saveBtn?.addEventListener("click", saveTask);
 function applyWorkLock() {
   document.body.classList.toggle("work-locked", !!workLocked);
   workLockedBanner?.classList.toggle("hidden", !workLocked);
-  const lockTargets = [openModalBtn, fundEscrowBtn, primaryInviteBtn, caseOptionsRoot];
+  const lockTargets = [openModalBtn, primaryInviteBtn, caseOptionsRoot];
   lockTargets.forEach((el) => {
     if (!el) return;
     const isControl =
@@ -310,4 +336,26 @@ function formatCurrency(amount) {
   const value = Number(amount);
   if (!Number.isFinite(value)) return "$0.00";
   return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
+}
+
+async function hasDefaultPaymentMethod() {
+  try {
+    const res = await secureFetch("/api/payments/payment-method/default", {
+      headers: { Accept: "application/json" },
+      noRedirect: true,
+    });
+    if (!res.ok) return false;
+    const payload = await res.json().catch(() => ({}));
+    return !!payload?.hasDefault || !!payload?.paymentMethod;
+  } catch {
+    return false;
+  }
+}
+
+function showPaymentModal() {
+  paymentModal?.classList.remove("hidden");
+}
+
+function hidePaymentModal() {
+  paymentModal?.classList.add("hidden");
 }
