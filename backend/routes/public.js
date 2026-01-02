@@ -4,6 +4,7 @@ const router = express.Router();
 const rateLimit = require("express-rate-limit");
 const axios = require("axios");
 const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
 
 const User = require("../models/User");
 const sendEmail = require("../utils/email");
@@ -44,6 +45,45 @@ router.use(
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many weather requests. Please slow down." },
+  })
+);
+
+// ----------------------------------------
+// GET /public/unsubscribe?token=...
+// ----------------------------------------
+router.get(
+  "/unsubscribe",
+  asyncHandler(async (req, res) => {
+    const redirect = (status, reason) => {
+      const params = new URLSearchParams({ status });
+      if (reason) params.set("reason", reason);
+      return res.redirect(303, `/unsubscribe.html?${params.toString()}`);
+    };
+    const token = String(req.query?.token || "").trim();
+    if (!token) {
+      return redirect("error", "missing");
+    }
+    let payload = null;
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET || "");
+    } catch {
+      return redirect("error", "invalid");
+    }
+    if (!payload || payload.purpose !== "unsubscribe" || !payload.uid || !isObjId(payload.uid)) {
+      return redirect("error", "invalid");
+    }
+
+    const user = await User.findById(payload.uid);
+    if (!user) return redirect("error", "not_found");
+
+    if (!user.notificationPrefs) user.notificationPrefs = {};
+    user.notificationPrefs.email = false;
+    if (!user.emailPref) user.emailPref = {};
+    user.emailPref.product = false;
+    user.emailPref.marketing = false;
+    await user.save();
+
+    return redirect("success");
   })
 );
 

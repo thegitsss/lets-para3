@@ -8,6 +8,7 @@ const { requireApproved, requireRole, requireCaseAccess } = require("../utils/au
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const Case = require("../models/Case");
 const Job = require("../models/Job");
+const Application = require("../models/Application");
 const User = require("../models/User");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
@@ -62,7 +63,7 @@ const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
   return acc;
 }, {});
 const IN_PROGRESS_STATUS = "in progress";
-const LEGACY_IN_PROGRESS_STATUS = "in_progress";
+const LEGACY_IN_PROGRESS_STATUS = "in progress";
 const PLATFORM_FEE_PERCENT = Number(process.env.PLATFORM_FEE_PERCENT || 15);
 const WORK_STARTED_STATUSES = new Set([
   "active",
@@ -352,6 +353,23 @@ function buildCaseLink(caseDoc) {
   return id ? `case-detail.html?caseId=${encodeURIComponent(id)}` : "";
 }
 
+async function ensureStripeOnboardedUser(paralegal) {
+  if (!paralegal?.stripeAccountId) return false;
+  if (paralegal.stripeOnboarded) return true;
+  try {
+    const account = await stripe.accounts.retrieve(paralegal.stripeAccountId);
+    const submitted = !!account?.details_submitted;
+    if (submitted) {
+      paralegal.stripeOnboarded = true;
+      await paralegal.save();
+      return true;
+    }
+  } catch (err) {
+    console.warn("[cases] stripe onboarding status check failed", err?.message || err);
+  }
+  return false;
+}
+
 async function notifyAttorneyAwaitingFunding(caseDoc, actorUserId = null) {
   const attorneyId = caseDoc?.attorney?._id || caseDoc?.attorneyId || caseDoc?.attorney || null;
   if (!attorneyId) return;
@@ -401,19 +419,23 @@ async function ensureFundsReleased(req, caseDoc) {
     throw new Error("Paralegal cannot be paid until onboarding completes.");
   }
   if (!paralegal.stripeOnboarded) {
+    const refreshed = await ensureStripeOnboardedUser(paralegal);
+    if (!refreshed) {
+      throw new Error("Paralegal must finish Stripe onboarding before payouts.");
+    }
+  }
+  if (!paralegal.stripeOnboarded) {
     throw new Error("Paralegal must finish Stripe onboarding before payouts.");
   }
   if (!caseDoc.paymentIntentId) {
     throw new Error("Case has no funded payment intent.");
   }
 
-const budgetCents = Number(
-  caseDoc.lockedTotalAmount ?? (caseDoc.totalAmount || 0)
-  );
+  const budgetCents = Number(caseDoc.lockedTotalAmount ?? (caseDoc.totalAmount || 0));
   if (!Number.isFinite(budgetCents) || budgetCents <= 0) {
     throw new Error("Case total amount is invalid.");
   }
-  const feeAmount = Math.max(0, Math.round(budgetCents * 0.15));
+  const feeAmount = Math.max(0, Math.round(budgetCents * (PLATFORM_FEE_PERCENT / 100)));
   const payout = Math.max(0, budgetCents - feeAmount);
   if (payout <= 0) {
     throw new Error("Calculated payout must be positive.");
@@ -439,6 +461,11 @@ const budgetCents = Number(
   caseDoc.paidOutAt = completedAt;
   caseDoc.completedAt = caseDoc.completedAt || completedAt;
   caseDoc.briefSummary = `${caseDoc.title} – ${paralegalName} – completed ${completedAt.toISOString().split("T")[0]}`;
+  const attorneyFee = Number.isFinite(caseDoc.feeAttorneyAmount) ? caseDoc.feeAttorneyAmount : feeAmount;
+  if (!Number.isFinite(caseDoc.feeAttorneyPct)) caseDoc.feeAttorneyPct = PLATFORM_FEE_PERCENT;
+  if (!Number.isFinite(caseDoc.feeAttorneyAmount)) caseDoc.feeAttorneyAmount = attorneyFee;
+  caseDoc.feeParalegalPct = PLATFORM_FEE_PERCENT;
+  caseDoc.feeParalegalAmount = feeAmount;
 
   const attorneyObjectId = caseDoc.attorney?._id || caseDoc.attorneyId || caseDoc.attorney;
   const paralegalObjectId = paralegal._id || caseDoc.paralegalId || caseDoc.paralegal;
@@ -454,13 +481,24 @@ const budgetCents = Number(
       caseId: caseDoc._id,
       attorneyId: attorneyObjectId,
       paralegalId: paralegalObjectId,
-      feeAmount,
+      feeAmount: Math.max(0, (caseDoc.feeAttorneyAmount || 0) + feeAmount),
     }),
   ]);
 
+  const payoutDisplay = `$${(payout / 100).toFixed(2)}`;
+  try {
+    const link = buildCaseLink(caseDoc);
+    await sendCaseNotification(
+      paralegalObjectId,
+      "payout_released",
+      caseDoc,
+      { amount: payoutDisplay, link },
+      { actorUserId: req.user?.id }
+    );
+  } catch {}
+
   try {
     const completedDateStr = completedAt.toLocaleDateString("en-US");
-    const payoutDisplay = `$${(payout / 100).toFixed(2)}`;
     const feeDisplay = `$${(feeAmount / 100).toFixed(2)}`;
     const totalDisplay = `$${(budgetCents / 100).toFixed(2)}`;
     if (caseDoc.attorney?.email) {
@@ -480,7 +518,7 @@ const budgetCents = Number(
         "Your payout is complete",
         `<p>Hi ${paraName},</p>
          <p>Your payout for "<strong>${caseDoc.title}</strong>" is complete.</p>
-         <p>Job amount: ${totalDisplay}<br/>Service fee (15%): ${feeDisplay}<br/>Final payout: <strong>${payoutDisplay}</strong></p>`
+         <p>Job amount (escrow): ${totalDisplay}<br/>Platform fee (15%) deducted: ${feeDisplay}<br/>Payout: <strong>${payoutDisplay}</strong></p>`
       );
     }
   } catch (err) {
@@ -607,19 +645,34 @@ router.post(
     const paralegalId = role === "admin" && req.body?.paralegalId && isObjId(req.body.paralegalId)
       ? req.body.paralegalId
       : req.user.id;
-    const paralegalProfile = await User.findById(paralegalId).select("firstName lastName");
+    const paralegalProfile = await User.findById(paralegalId).select("firstName lastName stripeAccountId stripeOnboarded");
     const paralegalName = formatPersonName(paralegalProfile) || "Paralegal";
 
     if (decision === "accept") {
+      if (!paralegalProfile?.stripeAccountId) {
+        return res.status(403).json({ error: "Connect Stripe before accepting invitations." });
+      }
+      if (!paralegalProfile?.stripeOnboarded) {
+        const refreshed = await ensureStripeOnboardedUser(paralegalProfile);
+        if (!refreshed) {
+          return res.status(403).json({ error: "Complete Stripe onboarding before accepting invitations." });
+        }
+      }
+      if (!caseDoc.lockedTotalAmount) {
+        caseDoc.lockedTotalAmount = caseDoc.totalAmount;
+        caseDoc.amountLockedAt = new Date();
+      }
       caseDoc.paralegal = paralegalId;
       caseDoc.paralegalId = paralegalId;
       caseDoc.pendingParalegalId = null;
       caseDoc.pendingParalegalInvitedAt = null;
       caseDoc.hiredAt = new Date();
-      if (typeof caseDoc.canTransitionTo === "function" && caseDoc.canTransitionTo(IN_PROGRESS_STATUS)) {
-        caseDoc.transitionTo(IN_PROGRESS_STATUS);
+      caseDoc.escrowStatus = "awaiting_funding";
+      caseDoc.paralegalNameSnapshot = formatPersonName(paralegalProfile);
+      if (typeof caseDoc.canTransitionTo === "function" && caseDoc.canTransitionTo("awaiting_funding")) {
+        caseDoc.transitionTo("awaiting_funding");
       } else {
-        caseDoc.status = IN_PROGRESS_STATUS;
+        caseDoc.status = "awaiting_funding";
       }
       if (!Array.isArray(caseDoc.applicants)) caseDoc.applicants = [];
       const existing = caseDoc.applicants.find((app) => String(app.paralegalId) === String(paralegalId));
@@ -627,8 +680,20 @@ router.post(
       else caseDoc.applicants.push({ paralegalId, status: "accepted" });
 
       await caseDoc.save();
+      await notifyAttorneyAwaitingFunding(caseDoc, paralegalId);
       await sendCaseNotification(
         attorneyId,
+        "case_invite_response",
+        caseDoc,
+        {
+          response: "accepted",
+          paralegalId,
+          paralegalName,
+        },
+        { actorUserId: paralegalId }
+      );
+      await sendCaseNotification(
+        paralegalId,
         "case_invite_response",
         caseDoc,
         {
@@ -641,6 +706,7 @@ router.post(
     } else {
       caseDoc.pendingParalegalId = null;
       caseDoc.pendingParalegalInvitedAt = null;
+      caseDoc.escrowStatus = null;
       caseDoc.status = "open";
       if (Array.isArray(caseDoc.applicants)) {
         const existing = caseDoc.applicants.find((app) => String(app.paralegalId) === pendingId);
@@ -649,6 +715,17 @@ router.post(
       await caseDoc.save();
       await sendCaseNotification(
         attorneyId,
+        "case_invite_response",
+        caseDoc,
+        {
+          response: "declined",
+          paralegalId: pendingId,
+          paralegalName,
+        },
+        { actorUserId: paralegalId }
+      );
+      await sendCaseNotification(
+        paralegalId,
         "case_invite_response",
         caseDoc,
         {
@@ -1536,7 +1613,7 @@ router.post(
     const { caseId } = req.params;
     if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid case id" });
 
-    const doc = await Case.findById(caseId).select("status paralegal applicants archived");
+    const doc = await Case.findById(caseId).select("status paralegal applicants archived attorney attorneyId title");
     if (!doc) return res.status(404).json({ error: "Case not found" });
     if (doc.archived) return res.status(400).json({ error: "This case is not accepting applications" });
     if (doc.paralegal) return res.status(400).json({ error: "A paralegal has already been hired" });
@@ -1547,10 +1624,19 @@ router.post(
       return res.status(400).json({ error: "Please provide more detail in your note (20+ characters)." });
     }
     const applicant = await User.findById(req.user.id).select(
-      "role resumeURL linkedInURL availability availabilityDetails location languages specialties yearsExperience bio profileImage avatarURL"
+      "firstName lastName role stripeAccountId stripeOnboarded resumeURL linkedInURL availability availabilityDetails location languages specialties yearsExperience bio profileImage avatarURL"
     );
     if (!applicant) {
       return res.status(404).json({ error: "Unable to load your profile details." });
+    }
+    if (!applicant.stripeAccountId) {
+      return res.status(403).json({ error: "Connect Stripe before applying to jobs." });
+    }
+    if (!applicant.stripeOnboarded) {
+      const refreshed = await ensureStripeOnboardedUser(applicant);
+      if (!refreshed) {
+        return res.status(403).json({ error: "Complete Stripe onboarding before applying to jobs." });
+      }
     }
     try {
       doc.addApplicant(req.user.id, rawNote, {
@@ -1565,6 +1651,25 @@ router.post(
     await doc.save();
     try {
       await logAction(req, "case.apply", { targetType: "case", targetId: doc._id, meta: { note: Boolean(rawNote) } });
+    } catch {}
+    try {
+      const attorneyId = doc.attorney?._id || doc.attorneyId || doc.attorney || null;
+      if (attorneyId) {
+        const paralegalName = formatPersonName(applicant) || "Paralegal";
+        const link = buildCaseLink(doc);
+        await sendCaseNotification(
+          attorneyId,
+          "application_submitted",
+          doc,
+          {
+            paralegalName,
+            paralegalId: req.user.id,
+            title: doc.title || "Case",
+            link,
+          },
+          { actorUserId: req.user.id }
+        );
+      }
     } catch {}
 
     res.status(201).json({ ok: true, applicants: doc.applicants.length });
@@ -1650,7 +1755,16 @@ router.post(
       return res.status(400).json({ error: "This case is already assigned to another paralegal." });
     }
 
-    const paralegal = await User.findById(req.user.id).select("firstName lastName");
+    const paralegal = await User.findById(req.user.id).select("firstName lastName stripeAccountId stripeOnboarded");
+    if (!paralegal?.stripeAccountId) {
+      return res.status(403).json({ error: "Connect Stripe before accepting invitations." });
+    }
+    if (!paralegal?.stripeOnboarded) {
+      const refreshed = await ensureStripeOnboardedUser(paralegal);
+      if (!refreshed) {
+        return res.status(403).json({ error: "Complete Stripe onboarding before accepting invitations." });
+      }
+    }
     // Ensure pending fields align before assignment
     caseDoc.pendingParalegalId = req.user.id;
     if (!caseDoc.pendingParalegalInvitedAt) {
@@ -1808,6 +1922,77 @@ router.post(
 );
 
 /**
+ * POST /api/cases/:caseId/withdraw
+ * Paralegal withdraws from a case before escrow is funded.
+ */
+router.post(
+  "/:caseId/withdraw",
+  csrfProtection,
+  requireRole("paralegal"),
+  asyncHandler(async (req, res) => {
+    const { caseId } = req.params;
+    if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid case id" });
+
+    const caseDoc = await Case.findById(caseId);
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+
+    const paralegalRef = caseDoc.paralegalId || caseDoc.paralegal;
+    if (!paralegalRef || String(paralegalRef) !== String(req.user.id)) {
+      return res.status(403).json({ error: "You are not assigned to this case" });
+    }
+
+    const escrowStatus = String(caseDoc.escrowStatus || "").toLowerCase();
+    if (escrowStatus === "funded" || caseDoc.paymentReleased) {
+      return res.status(400).json({ error: "This case has already been funded" });
+    }
+    if (hasWorkStarted(caseDoc)) {
+      return res.status(400).json({ error: "Work has already started on this case" });
+    }
+
+    caseDoc.paralegal = null;
+    caseDoc.paralegalId = null;
+    caseDoc.paralegalNameSnapshot = "";
+    caseDoc.hiredAt = null;
+    caseDoc.pendingParalegalId = null;
+    caseDoc.pendingParalegalInvitedAt = null;
+    caseDoc.escrowStatus = null;
+    caseDoc.escrowIntentId = null;
+    caseDoc.paymentIntentId = null;
+    caseDoc.paymentReleased = false;
+
+    if (Array.isArray(caseDoc.applicants) && caseDoc.applicants.length) {
+      caseDoc.applicants.forEach((app) => {
+        if (String(app.paralegalId) === String(req.user.id)) {
+          app.status = "rejected";
+        }
+      });
+    }
+
+    caseDoc.status = "open";
+    await caseDoc.save();
+
+    const relatedJobId = caseDoc.jobId || caseDoc.job;
+    if (relatedJobId) {
+      try {
+        await Job.findByIdAndUpdate(relatedJobId, { status: "open" });
+      } catch (jobErr) {
+        console.warn("[cases] Unable to relist job for withdrawn case", caseDoc._id, jobErr);
+      }
+    }
+
+    try {
+      await logAction(req, "paralegal_withdrew", {
+        targetType: "case",
+        targetId: caseDoc._id,
+        caseId: caseDoc._id,
+      });
+    } catch {}
+
+    res.json({ ok: true, case: caseSummary(caseDoc) });
+  })
+);
+
+/**
  * POST /api/cases/:caseId/hire/:paralegalId
  * Assigns a paralegal to an existing case (attorney-only).
  */
@@ -1816,6 +2001,11 @@ router.post(
   requireCaseAccess("caseId"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    console.log("[case-hire] request", {
+      caseId: req.params.caseId,
+      paralegalId: req.params.paralegalId,
+      attorneyId: req.user?.id,
+    });
     if (!req.acl?.isAttorney) {
       return res.status(403).json({ error: "Only the case attorney can hire for this case" });
     }
@@ -1861,7 +2051,8 @@ router.post(
       return res.status(400).json({ error: "Add a default payment method in Billing before hiring." });
     }
 
-    const applicationFee = Math.max(0, Math.round(budgetCents * (PLATFORM_FEE_PERCENT / 100)));
+    const platformFee = Math.max(0, Math.round(budgetCents * (PLATFORM_FEE_PERCENT / 100)));
+    const totalCharge = Math.round(budgetCents + platformFee);
     const metadata = {
       caseId: selectedCase._id.toString(),
       paralegalId: String(paralegalId),
@@ -1870,8 +2061,13 @@ router.post(
     const description = buildCaseChargeDescription(selectedCase, paralegal);
     let intent;
     try {
+      console.log("[case-hire] stripe payment intent attempt", {
+        caseId: selectedCase._id?.toString(),
+        amount: totalCharge,
+        currency: selectedCase.currency || "usd",
+      });
       intent = await stripe.paymentIntents.create({
-        amount: budgetCents,
+        amount: totalCharge,
         currency: selectedCase.currency || "usd",
         customer: customerId,
         payment_method: defaultPmId,
@@ -1879,7 +2075,6 @@ router.post(
         confirm: true,
         payment_method_types: ["card"],
         automatic_payment_methods: { enabled: false },
-        application_fee_amount: applicationFee,
         transfer_group: `case_${selectedCase._id}`,
         metadata,
         description,
@@ -1889,7 +2084,25 @@ router.post(
       const pi = err?.raw?.payment_intent;
       const status = pi?.status || err?.code || null;
       const message = err?.message || "Payment failed. Please update your card and try again.";
+      console.log("[case-hire] stripe payment intent failed", {
+        caseId: selectedCase._id?.toString(),
+        status,
+        message,
+      });
       return res.status(402).json({ error: message, status, paymentIntentId: pi?.id });
+    }
+
+    console.log("[case-hire] stripe payment intent result", {
+      caseId: selectedCase._id?.toString(),
+      paymentIntentId: intent?.id,
+      status: intent?.status,
+    });
+    if (intent?.status !== "succeeded") {
+      return res.status(402).json({
+        error: "Payment did not succeed. Please try again.",
+        status: intent?.status || null,
+        paymentIntentId: intent?.id,
+      });
     }
 
     selectedCase.paralegal = paralegalId;
@@ -1909,13 +2122,38 @@ router.post(
     } else {
       selectedCase.status = IN_PROGRESS_STATUS;
     }
-    if (typeof selectedCase.snapshotFees === "function") {
-      selectedCase.snapshotFees();
-    }
+    selectedCase.feeAttorneyPct = PLATFORM_FEE_PERCENT;
+    selectedCase.feeAttorneyAmount = platformFee;
+    selectedCase.feeParalegalPct = PLATFORM_FEE_PERCENT;
+    selectedCase.feeParalegalAmount = Math.max(0, Math.round(budgetCents * (PLATFORM_FEE_PERCENT / 100)));
+    let hiredWasApplicant = false;
+    const rejectedApplicantIds = new Set();
     if (Array.isArray(selectedCase.applicants) && selectedCase.applicants.length) {
       selectedCase.applicants.forEach((app) => {
-        if (String(app.paralegalId) === String(paralegalId)) {
+        const applicantId = String(app.paralegalId || "");
+        if (!applicantId) return;
+        if (applicantId === String(paralegalId)) {
           app.status = "accepted";
+          hiredWasApplicant = true;
+        } else {
+          app.status = "rejected";
+          rejectedApplicantIds.add(applicantId);
+        }
+      });
+    }
+
+    const rawJobId = selectedCase.jobId || selectedCase.job || null;
+    const jobId =
+      rawJobId && typeof rawJobId === "object" ? rawJobId._id || rawJobId.id || rawJobId : rawJobId;
+    if (jobId) {
+      const jobApps = await Application.find({ jobId }).select("paralegalId").lean();
+      jobApps.forEach((app) => {
+        const applicantId = String(app.paralegalId || "");
+        if (!applicantId) return;
+        if (applicantId === String(paralegalId)) {
+          hiredWasApplicant = true;
+        } else {
+          rejectedApplicantIds.add(applicantId);
         }
       });
     }
@@ -1925,6 +2163,55 @@ router.post(
       { path: "paralegal", select: "firstName lastName email role avatarURL" },
       { path: "attorney", select: "firstName lastName email role avatarURL" },
     ]);
+
+    if (jobId) {
+      try {
+        await Application.updateOne(
+          { jobId, paralegalId },
+          { $set: { status: "accepted" } }
+        );
+        await Application.updateMany(
+          { jobId, paralegalId: { $ne: paralegalId } },
+          { $set: { status: "rejected" } }
+        );
+      } catch (err) {
+        console.warn("[case-hire] Unable to update application statuses", err?.message || err);
+      }
+    }
+
+    try {
+      const link = buildCaseLink(selectedCase);
+      if (hiredWasApplicant) {
+        await sendCaseNotification(
+          paralegalId,
+          "application_accepted",
+          selectedCase,
+          { link },
+          { actorUserId: req.user.id }
+        );
+      }
+      if (rejectedApplicantIds.size) {
+        const rejectLink = "dashboard-paralegal.html";
+        await Promise.all(
+          [...rejectedApplicantIds].map((id) =>
+            sendCaseNotification(
+              id,
+              "application_denied",
+              selectedCase,
+              { link: rejectLink },
+              { actorUserId: req.user.id }
+            )
+          )
+        );
+      }
+      await sendCaseNotification(
+        paralegalId,
+        "case_work_ready",
+        selectedCase,
+        { link },
+        { actorUserId: req.user.id }
+      );
+    } catch {}
 
     res.json(caseSummary(selectedCase));
   })
@@ -2121,7 +2408,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const doc = await Case.findById(req.params.caseId)
       .select(
-        "title status practiceArea deadline zoomLink paymentReleased escrowIntentId escrowStatus totalAmount currency files attorney paralegal applicants hiredAt completedAt briefSummary archived downloadUrl terminationReason terminationStatus terminationRequestedAt terminationRequestedBy terminationDisputeId terminatedAt paralegalAccessRevokedAt archiveReadyAt archiveDownloadedAt purgeScheduledFor readOnly"
+        "title status practiceArea deadline zoomLink paymentReleased escrowIntentId escrowStatus totalAmount lockedTotalAmount currency files attorney paralegal applicants hiredAt completedAt briefSummary archived downloadUrl terminationReason terminationStatus terminationRequestedAt terminationRequestedBy terminationDisputeId terminatedAt paralegalAccessRevokedAt archiveReadyAt archiveDownloadedAt purgeScheduledFor readOnly jobId job"
       )
       .populate("paralegal", "firstName lastName email role")
       .populate("attorney", "firstName lastName email role")
@@ -2130,7 +2417,7 @@ router.get(
       .lean();
     if (!doc) return res.status(404).json({ error: "Case not found" });
 
-    const applicants = Array.isArray(doc.applicants)
+    let applicants = Array.isArray(doc.applicants)
       ? doc.applicants.map((entry) => {
           const paralegalDoc =
             entry.paralegalId && typeof entry.paralegalId === "object" ? entry.paralegalId : null;
@@ -2157,6 +2444,39 @@ router.get(
         })
       : [];
 
+    const jobId = doc.jobId || doc.job || null;
+    if (jobId) {
+      const jobApps = await Application.find({ jobId })
+        .populate("paralegalId", "firstName lastName email role profileImage avatarURL")
+        .lean();
+      if (jobApps.length) {
+        const existing = new Set(applicants.map((entry) => String(entry.paralegalId || "")));
+        const mapped = jobApps
+          .map((app) => {
+            const paralegalDoc = app.paralegalId && typeof app.paralegalId === "object" ? app.paralegalId : null;
+            const paralegalId = paralegalDoc?._id || app.paralegalId || null;
+            return {
+              status: app.status || "submitted",
+              appliedAt: app.createdAt,
+              note: app.coverLetter || "",
+              coverLetter: app.coverLetter || "",
+              resumeURL: app.resumeURL || "",
+              linkedInURL: app.linkedInURL || "",
+              profileSnapshot: app.profileSnapshot || {},
+              paralegalId: paralegalId ? String(paralegalId) : null,
+              paralegal: summarizeUser(paralegalDoc),
+            };
+          })
+          .filter((entry) => {
+            if (!entry.paralegalId) return true;
+            if (existing.has(String(entry.paralegalId))) return false;
+            existing.add(String(entry.paralegalId));
+            return true;
+          });
+        applicants = [...applicants, ...mapped];
+      }
+    }
+
     res.json({
       id: String(doc._id),
       _id: doc._id,
@@ -2165,7 +2485,9 @@ router.get(
       zoomLink: doc.zoomLink || "",
       paymentReleased: doc.paymentReleased || false,
       escrowIntentId: doc.escrowIntentId || null,
+      escrowStatus: doc.escrowStatus || null,
       totalAmount: doc.totalAmount || 0,
+      lockedTotalAmount: typeof doc.lockedTotalAmount === "number" ? doc.lockedTotalAmount : null,
       currency: doc.currency || "usd",
       deadline: doc.deadline || null,
       hiredAt: doc.hiredAt || null,

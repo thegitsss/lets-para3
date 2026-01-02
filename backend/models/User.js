@@ -221,7 +221,7 @@ const userSchema = new Schema(
     preferences: {
       theme: {
         type: String,
-        enum: ["light", "dark", "mountain"],
+        enum: ["light", "dark", "mountain", "mountain-dark"],
         default: "mountain",
       },
     },

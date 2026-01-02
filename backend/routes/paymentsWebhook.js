@@ -13,18 +13,64 @@ const stripe = require("../utils/stripe");
 const mongoose = require("mongoose");
 const Case = require("../models/Case");
 const AuditLog = require("../models/AuditLog"); // match filename
+const WebhookEvent = require("../models/WebhookEvent");
+const { notifyUser } = require("../utils/notifyUser");
 
 // ----------------------------------------
-// Lightweight, per-process dedupe (use Redis/db in prod)
+// Durable dedupe (db-backed) with retry-safe status tracking
 // ----------------------------------------
-const seenEvents = new Set();
-function dedupe(eventId) {
-  if (!eventId) return false;
-  if (seenEvents.has(eventId)) return true;
-  // keep the set from growing forever
-  if (seenEvents.size > 5000) seenEvents.clear();
-  seenEvents.add(eventId);
-  return false;
+async function claimWebhookEvent(event) {
+  if (!event?.id) return { deduped: false };
+  const now = new Date();
+  const staleCutoff = new Date(Date.now() - 10 * 60 * 1000);
+  try {
+    const record = await WebhookEvent.findOneAndUpdate(
+      {
+        eventId: event.id,
+        $or: [
+          { status: { $in: ["received", "failed"] } },
+          { status: "processing", lastAttemptAt: { $lt: staleCutoff } },
+        ],
+      },
+      {
+        $setOnInsert: { provider: "stripe", eventId: event.id, type: event.type, status: "received" },
+        $set: { type: event.type, status: "processing", lastAttemptAt: now },
+        $inc: { attempts: 1 },
+      },
+      { upsert: true, new: true }
+    );
+    return { deduped: false, record };
+  } catch (err) {
+    if (err?.code === 11000) {
+      return { deduped: true };
+    }
+    console.warn("[stripe] webhook dedupe failed", err?.message || err);
+    return { deduped: false, record: null };
+  }
+}
+
+async function markWebhookEventProcessed(eventId) {
+  if (!eventId) return;
+  try {
+    await WebhookEvent.updateOne(
+      { eventId },
+      { $set: { status: "processed", lastError: "" } }
+    );
+  } catch (err) {
+    console.warn("[stripe] webhook processed update failed", err?.message || err);
+  }
+}
+
+async function markWebhookEventFailed(eventId, err) {
+  if (!eventId) return;
+  try {
+    await WebhookEvent.updateOne(
+      { eventId },
+      { $set: { status: "failed", lastError: String(err?.message || err || "Unknown error") } }
+    );
+  } catch (updateErr) {
+    console.warn("[stripe] webhook failed update failed", updateErr?.message || updateErr);
+  }
 }
 
 function pickSecret(req) {
@@ -48,10 +94,17 @@ async function findCaseForPaymentIntent(pi) {
     if (c) return c;
   }
   if (pi?.id) {
-    const c = await Case.findOne({ escrowIntentId: pi.id });
+    const c = await Case.findOne({
+      $or: [{ escrowIntentId: pi.id }, { paymentIntentId: pi.id }],
+    });
     if (c) return c;
   }
   return null;
+}
+
+function buildCaseLink(caseDoc) {
+  const id = caseDoc?._id || caseDoc?.id;
+  return id ? `case-detail.html?caseId=${encodeURIComponent(id)}` : "";
 }
 
 // ----------------------------------------
@@ -70,8 +123,8 @@ router.post("/", async (req, res) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // Basic dedupe for Stripe retries
-  if (dedupe(event.id)) {
+  const { deduped } = await claimWebhookEvent(event);
+  if (deduped) {
     return res.json({ received: true, deduped: true });
   }
 
@@ -86,12 +139,39 @@ router.post("/", async (req, res) => {
 
         if (c) {
           // Snapshot funding info (do NOT auto-release or payout here)
+          const wasFunded = String(c.escrowStatus || "").toLowerCase() === "funded";
           if (!c.escrowIntentId) c.escrowIntentId = pi.id;
+          if (!c.paymentIntentId) c.paymentIntentId = pi.id;
           if (!c.currency) c.currency = pi.currency || c.currency || "usd";
           if (!c.totalAmount || c.totalAmount <= 0) c.totalAmount = pi.amount || c.totalAmount || 0;
           if (!c.lockedTotalAmount) c.lockedTotalAmount = c.totalAmount;
           if (!c.escrowStatus || c.escrowStatus !== "funded") c.escrowStatus = "funded";
+          c.paymentStatus = "succeeded";
+          const hasParalegal = !!(c.paralegal || c.paralegalId);
+          const status = String(c.status || "").toLowerCase();
+          if (hasParalegal && ["awaiting_funding", "assigned", "open"].includes(status)) {
+            if (typeof c.canTransitionTo === "function" && c.canTransitionTo("in_progress")) {
+              c.transitionTo("in_progress");
+            } else {
+              c.status = "in_progress";
+            }
+          }
           await c.save();
+
+          if (!wasFunded && hasParalegal) {
+            const paralegalId = c.paralegal?._id || c.paralegalId || c.paralegal;
+            if (paralegalId) {
+              try {
+                await notifyUser(paralegalId, "case_work_ready", {
+                  caseId: c._id,
+                  caseTitle: c.title || "Case",
+                  link: buildCaseLink(c),
+                });
+              } catch (err) {
+                console.warn("[stripe] notifyUser case_work_ready failed", err?.message || err);
+              }
+            }
+          }
 
           await AuditLog.create({
             actor: null,
@@ -122,6 +202,36 @@ router.post("/", async (req, res) => {
       case "payment_intent.payment_failed": {
         const pi = event.data.object;
         const c = await findCaseForPaymentIntent(pi);
+        if (c) {
+          const wasFunded = String(c.escrowStatus || "").toLowerCase() === "funded";
+          if (!wasFunded) {
+            if (!c.paymentIntentId) c.paymentIntentId = pi.id;
+            if (!c.currency) c.currency = pi.currency || c.currency || "usd";
+            if (!c.escrowStatus) c.escrowStatus = "awaiting_funding";
+            c.paymentStatus = pi.status || c.paymentStatus || "pending";
+            await c.save();
+          }
+          if (["payment_intent.payment_failed", "payment_intent.canceled", "payment_intent.requires_action"].includes(event.type)) {
+            const attorneyId = c.attorney?._id || c.attorneyId || c.attorney || null;
+            if (attorneyId) {
+              const link = buildCaseLink(c);
+              const summary =
+                event.type === "payment_intent.requires_action"
+                  ? "Payment requires action. Open the case to update funding."
+                  : "Funding failed. Please update your payment method and try again.";
+              try {
+                await notifyUser(attorneyId, "case_update", {
+                  caseId: c._id,
+                  caseTitle: c.title || "Case",
+                  summary,
+                  link,
+                });
+              } catch (err) {
+                console.warn("[stripe] notifyUser case_update failed", err?.message || err);
+              }
+            }
+          }
+        }
 
         await AuditLog.create({
           actor: null,
@@ -139,6 +249,7 @@ router.post("/", async (req, res) => {
             last_payment_error: pi.last_payment_error?.message || null,
             amount: pi.amount || null,
             currency: pi.currency || null,
+            status: pi.status || null,
           },
         });
         break;
@@ -297,11 +408,13 @@ router.post("/", async (req, res) => {
     }
   } catch (err) {
     console.error("[stripe] Webhook handling error:", err);
+    await markWebhookEventFailed(event.id, err);
     // Return 2xx so Stripe doesn't retry forever if the error is non-retriable,
     // but in most cases 500 is okay. Keep 500 for now.
     return res.status(500).send("Webhook handler error");
   }
 
+  await markWebhookEventProcessed(event.id);
   res.json({ received: true });
 });
 

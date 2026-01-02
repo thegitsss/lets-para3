@@ -42,8 +42,18 @@ function buildDisplayMessage(type, payload = {}) {
       const paralegal = payload.paralegalName || actorName || "A paralegal";
       return `${paralegal} applied${caseFragment || ""}`.trim();
     }
+    case "application_accepted":
+      return `Your application for ${caseTitle || "the case"} was accepted.`;
+    case "application_denied":
+      return `Your application for ${caseTitle || "the case"} was not selected.`;
     case "case_awaiting_funding":
       return `${payload.caseTitle || "A case"} is awaiting funding`;
+    case "case_work_ready":
+      return `${payload.caseTitle || "A case"} is funded. Work can begin.`;
+    case "case_file_uploaded": {
+      const fileName = payload.fileName || "a document";
+      return `${actorName || "Someone"} uploaded ${fileName}${caseFragment || ""}`.trim();
+    }
     default:
       return "You have a new notification.";
   }
@@ -115,10 +125,35 @@ function emailTemplate(type, payload) {
           payload.title || "your job"
         }.</p><p>Log in to review the application.</p>`,
       };
+    case "application_accepted":
+      return {
+        subject: "Application accepted",
+        html: `<p>Your application${payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>` : ""} was accepted.</p><p>${payload.link ? `<a href="${payload.link}">Open the case</a>` : "Log in to view details."}</p>`,
+      };
+    case "application_denied":
+      return {
+        subject: "Application update",
+        html: `<p>Your application${payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>` : ""} was not selected.</p><p>${payload.link ? `<a href="${payload.link}">Browse jobs</a>` : "Log in to explore other opportunities."}</p>`,
+      };
     case "case_awaiting_funding":
       return {
         subject: `Fund ${payload.caseTitle || "your case"}`,
         html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is awaiting funding.</p><p>${payload.link ? `<a href="${payload.link}">Open the case to fund now.</a>` : "Please fund the case to continue."}</p>`,
+      };
+    case "payout_released":
+      return {
+        subject: "Your payout is on the way",
+        html: `<p>Your payout${payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>` : ""} is on the way${payload.amount ? ` (${payload.amount})` : ""}.</p><p>${payload.link ? `<a href="${payload.link}">Open the case</a>` : "Log in to view details."}</p>`,
+      };
+    case "case_work_ready":
+      return {
+        subject: `Work can begin on ${payload.caseTitle || "your case"}`,
+        html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is funded and ready to begin.</p><p>${payload.link ? `<a href="${payload.link}">Open the case</a>` : "Log in to get started."}</p>`,
+      };
+    case "case_file_uploaded":
+      return {
+        subject: `New document on ${payload.caseTitle || "your case"}`,
+        html: `<p>${payload.fileName || "A document"} was uploaded${payload.caseTitle ? ` to <strong>${payload.caseTitle}</strong>` : ""}.</p><p>${payload.link ? `<a href="${payload.link}">Open the case</a>` : "Log in to view the document."}</p>`,
       };
     default:
       return {
@@ -137,11 +172,40 @@ async function safeSendEmail(to, subject, html) {
   }
 }
 
+const CASE_EMAIL_TYPES = new Set([
+  "case_invite",
+  "case_invite_response",
+  "case_update",
+  "case_awaiting_funding",
+  "case_work_ready",
+  "case_file_uploaded",
+  "application_submitted",
+  "application_accepted",
+  "application_denied",
+  "payout_released",
+]);
+
+function shouldSendEmailForType(user, type) {
+  const prefs = user?.notificationPrefs || {};
+  if (prefs.email === false) return false;
+  if (type === "message") {
+    return prefs.emailMessages !== false;
+  }
+  if (CASE_EMAIL_TYPES.has(type)) {
+    return prefs.emailCase !== false;
+  }
+  return true;
+}
+
 async function notifyUser(userId, type, payload = {}, options = {}) {
   const user = await User.findById(userId);
   if (!user) return;
 
   const actorUserId = payload?.actorUserId || options.actorUserId || null;
+  const senderId = payload?.fromId || payload?.senderId || actorUserId || null;
+  if (type === "message" && senderId && String(senderId) === String(userId)) {
+    return;
+  }
   const actor = await resolveActorSnapshot(actorUserId);
   const message = buildDisplayMessage(type, { ...payload, actorFirstName: actor.actorFirstName });
 
@@ -164,7 +228,7 @@ async function notifyUser(userId, type, payload = {}, options = {}) {
     return notif;
   }
 
-  if (user.notificationPrefs?.email) {
+  if (shouldSendEmailForType(user, type)) {
     const { subject, html } = emailTemplate(type, payload);
     await safeSendEmail(user.email, subject, html);
   }

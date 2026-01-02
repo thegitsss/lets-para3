@@ -14,7 +14,13 @@ router.get("/", async (req, res) => {
     const items = await Notification.find({ userId: req.user.id })
       .sort({ createdAt: -1, _id: -1 })
       .lean();
-    const normalized = items.map((item) => ({
+    const normalized = items
+      .filter((item) => {
+        if (item.type !== "message") return true;
+        if (!item.actorUserId) return true;
+        return String(item.actorUserId) !== String(req.user.id);
+      })
+      .map((item) => ({
       id: String(item._id),
       _id: item._id,
       userId: item.userId,

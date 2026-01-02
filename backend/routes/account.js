@@ -72,7 +72,7 @@ router.post(
     };
 
     const normalizedTheme =
-      typeof theme === "string" && ["light", "dark", "mountain"].includes(theme.toLowerCase())
+      typeof theme === "string" && ["light", "dark", "mountain", "mountain-dark"].includes(theme.toLowerCase())
         ? theme.toLowerCase()
         : null;
     if (normalizedTheme) {

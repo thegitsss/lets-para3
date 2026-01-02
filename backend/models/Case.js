@@ -11,6 +11,7 @@ const LEGACY_STATUS_IN_PROGRESS = "in_progress";
 const CASE_STATUS = [
   "open",                // posted and visible
   "assigned",            // paralegal chosen, not started
+  "awaiting_funding",    // paralegal accepted, funding pending
   "active",              // work started (legacy alias)
   "awaiting_documents",  // pending uploads/info
   "reviewing",           // under review
@@ -286,8 +287,9 @@ caseSchema.pre("save", function (next) {
  * -----------------------------------------*/
 // Enforce simple status transitions to avoid accidental jumps
 const ALLOWED_TRANSITIONS = {
-  open: ["assigned", "active", "awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
-  assigned: ["active", "awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
+  open: ["assigned", "awaiting_funding", "active", "awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
+  assigned: ["awaiting_funding", "active", "awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
+  awaiting_funding: ["active", "awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
   active: ["awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
   awaiting_documents: ["reviewing", STATUS_IN_PROGRESS, "completed", "cancelled", "closed"],
   reviewing: [STATUS_IN_PROGRESS, "completed", "cancelled", "closed"],

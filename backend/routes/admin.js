@@ -1,6 +1,8 @@
 // backend/routes/admin.js
 const router = require("express").Router();
 const mongoose = require("mongoose");
+const path = require("path");
+const jwt = require("jsonwebtoken");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const User = require("../models/User");
@@ -8,6 +10,7 @@ const Case = require("../models/Case");
 const AuditLog = require("../models/AuditLog"); // NOTE: file name fix
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
+const Notification = require("../models/Notification");
 const sendEmail = require("../utils/email");
 const { sendWelcomePacket } = sendEmail;
 
@@ -22,9 +25,11 @@ csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: tr
 }
 
 const APP_BASE_URL = (process.env.APP_BASE_URL || "").replace(/\/$/, "");
-const LOGIN_URL = APP_BASE_URL ? `${APP_BASE_URL}/login.html` : "https://www.lets-paraconnect.com/login.html";
+const EMAIL_BASE_URL = (process.env.EMAIL_BASE_URL || "").replace(/\/$/, "");
+const ASSET_BASE_URL = EMAIL_BASE_URL || "https://www.lets-paraconnect.com";
+const LOGIN_URL = `${ASSET_BASE_URL}/login.html`;
 const APPROVAL_EMAIL_SUBJECT =
-"Welcome to Let's-ParaConnect. Your account has been approved. You may now log in and begin using your dashboard.";
+"Your accout has been approved! Welcome to Let's-ParaConnect.";
 const DENIAL_EMAIL_SUBJECT =
 "Your application to join Let's-ParaConnect has been reviewed and was unfortunately not approved.";
 const VERIFICATION_ACCEPT_SUBJECT = "Let’s-ParaConnect Verification Approval";
@@ -128,6 +133,7 @@ function normalizeUserStatus(value) {
 const safe = String(value || "").trim().toLowerCase();
 if (!safe) return null;
 if (safe === "rejected") return "denied";
+if (safe === "suspended") return "denied";
 if (["pending", "approved", "denied"].includes(safe)) return safe;
 return null;
 }
@@ -138,12 +144,16 @@ const text = String(note).trim();
 return text ? text.slice(0, 1000) : undefined;
 }
 
+function escapeRegex(value = "") {
+return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function buildVerificationAcceptanceBody(user) {
 if (typeof sendEmail.sendAcceptedEmail === "function") {
 return sendEmail.sendAcceptedEmail(user?.lastName || "");
 }
 const last = user?.lastName || "Applicant";
-return `Dear Ms./Mr. ${last},<br/><br/>Congratulations! Your application has been approved. We will send onboarding instructions as we approach the official platform launch.<br/><br/>If you have any questions, contact us at admin@lets-paraconnect.com.<br/><br/>Let’s-ParaConnect Verification Division`;
+return `Dear Ms./Mr. ${last},<br/><br/>Congratulations! Your application has been approved. We will send onboarding instructions as we approach the official platform launch.<br/><br/>If you have any questions, contact us at support@lets-paraconnect.com.<br/><br/>Let’s-ParaConnect Verification Division`;
 }
 
 function buildVerificationRejectionBody(user) {
@@ -151,21 +161,220 @@ if (typeof sendEmail.sendNotAcceptedEmail === "function") {
 return sendEmail.sendNotAcceptedEmail(user?.lastName || "");
 }
 const last = user?.lastName || "Applicant";
-return `Dear Ms./Mr. ${last},<br/><br/>Thank you for your interest in Let’s-ParaConnect. After reviewing your submission, we are unable to extend an invitation at this time. You are welcome to reapply in the future if circumstances change.<br/><br/>If you have any questions, contact us at admin@lets-paraconnect.com.<br/><br/>Let’s-ParaConnect Verification Division`;
+return `Dear Ms./Mr. ${last},<br/><br/>Thank you for your interest in Let’s-ParaConnect. After reviewing your submission, we are unable to extend an invitation at this time. You are welcome to reapply in the future if circumstances change.<br/><br/>If you have any questions, contact us at support@lets-paraconnect.com.<br/><br/>Let’s-ParaConnect Verification Division`;
+}
+
+function buildUnsubscribeToken(user) {
+  if (!user?._id || !process.env.JWT_SECRET) return "";
+  const payload = {
+    purpose: "unsubscribe",
+    uid: String(user._id),
+  };
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "180d" });
+}
+
+function buildApprovalEmailHtml(user, opts = {}) {
+  const loginUrl = LOGIN_URL;
+  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
+  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
+  const token = buildUnsubscribeToken(user);
+  const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
+
+  const unsubscribeLine = unsubscribeUrl
+    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe</a>`
+    : "Unsubscribe";
+
+  return `
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td align="center" style="padding:24px 24px 8px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding-right:12px;">
+                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
+                  </td>
+                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
+                    Let's-ParaConnect
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 24px 20px;">
+              <img src="${heroUrl}" alt="Welcome to Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 32px 0;">
+              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:34px;letter-spacing:0.06em;color:#6e6e6e;">
+                Your account is ready
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:16px 32px 0;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.08em;color:#1f1f1f;line-height:1.6;">
+                You can now sign in to complete your profile and begin using the platform.
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:24px 32px 16px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td bgcolor="#ffbd59" style="border-radius:999px;">
+                    <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
+                      Login
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 32px 16px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td height="1" style="background:#bfc3c8;line-height:1px;font-size:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:0 32px 28px;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
+                Let's-ParaConnect was built to create a more reliable way for attorneys and paralegals to work together.
+                Every interaction on the platform is supported by verification and escrow-secured payments, helping set
+                clear expectations and protect both sides.
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td bgcolor="#070300" style="padding:26px 32px;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;color:#f6f5f1;letter-spacing:-0.01em;">
+                Need help?
+              </div>
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#f6f5f1;line-height:1.4;margin-top:8px;">
+                Email us at <a href="mailto:support@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">support@lets-paraconnect.com</a>
+              </div>
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
+                No longer want to receive these emails? ${unsubscribeLine}
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  `;
+}
+
+function buildDenialEmailHtml(user, opts = {}) {
+  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
+  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
+  const token = buildUnsubscribeToken(user);
+  const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
+  const friendlyName = formatFullName(user) || "there";
+
+  const unsubscribeLine = unsubscribeUrl
+    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe</a>`
+    : "Unsubscribe";
+
+  return `
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td align="center" style="padding:24px 24px 8px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding-right:12px;">
+                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
+                  </td>
+                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
+                    Let's-ParaConnect
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 24px 20px;">
+              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 32px 0;">
+              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:30px;letter-spacing:0.04em;color:#6e6e6e;">
+                Application update
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:16px 40px 28px;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;">
+                Hi ${friendlyName},<br><br>
+                Your application to join Let's-ParaConnect has been reviewed and was unfortunately not approved.
+                Our team reviews every submission carefully, and you can reply to this email if you believe we missed
+                important information.<br><br>
+                Thank you for your interest in the community.
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td bgcolor="#070300" style="padding:26px 32px;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;color:#f6f5f1;letter-spacing:-0.01em;">
+                Need help?
+              </div>
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#f6f5f1;line-height:1.4;margin-top:8px;">
+                Email us at <a href="mailto:support@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">support@lets-paraconnect.com</a>
+              </div>
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
+                No longer want to receive these emails? ${unsubscribeLine}
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  `;
 }
 
 async function dispatchDecisionEmail(user, status) {
 if (!user?.email) return;
 const friendlyName = formatFullName(user) || "there";
-const loginLine = LOGIN_URL ? `<br/><br/>Log in here: <a href="${LOGIN_URL}">${LOGIN_URL}</a>` : "";
 if (status === "approved") {
-const html = `Hi ${friendlyName},<br/><br/>Welcome to Let's-ParaConnect. Your account has been approved. You may now log in and begin using your dashboard.${loginLine}<br/><br/>We're excited to have you onboard.<br/>— Let's-ParaConnect`;
-await sendEmail(user.email, APPROVAL_EMAIL_SUBJECT, html);
+const inlineLogoPath = path.join(__dirname, "../../frontend/Cleanfav.png");
+const html = buildApprovalEmailHtml(user, { logoUrl: "cid:cleanfav-logo" });
+await sendEmail(user.email, APPROVAL_EMAIL_SUBJECT, html, {
+  attachments: [
+    {
+      filename: "Cleanfav.png",
+      path: inlineLogoPath,
+      cid: "cleanfav-logo",
+    },
+  ],
+});
 return;
 }
 if (status === "denied") {
-const html = `Hi ${friendlyName},<br/><br/>Your application to join Let's-ParaConnect has been reviewed and was unfortunately not approved. Our team reviews every submission carefully, and you can reply to this email if you believe we missed important information.<br/><br/>Thank you for your interest in the community.<br/>— Let's-ParaConnect`;
-await sendEmail(user.email, DENIAL_EMAIL_SUBJECT, html);
+const inlineLogoPath = path.join(__dirname, "../../frontend/Cleanfav.png");
+const html = buildDenialEmailHtml(user, { logoUrl: "cid:cleanfav-logo" });
+await sendEmail(user.email, DENIAL_EMAIL_SUBJECT, html, {
+  attachments: [
+    {
+      filename: "Cleanfav.png",
+      path: inlineLogoPath,
+      cid: "cleanfav-logo",
+    },
+  ],
+});
 }
 }
 
@@ -218,6 +427,7 @@ router.use(verifyToken, requireApproved, requireRole("admin"));
 const ACTIVE_USER_MATCH = {
   status: "approved",
   disabled: { $ne: true },
+  deleted: { $ne: true },
   role: { $ne: "admin" },
 };
 
@@ -236,7 +446,7 @@ const [roleAggregation, pendingApprovals, suspendedUsers, recentUsersRaw, monthl
 await Promise.all([
 User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
 User.countDocuments({ status: "pending" }),
-User.countDocuments({ status: { $in: ["denied", "rejected"] } }),
+User.countDocuments({ status: { $in: ["denied", "rejected"] }, deleted: { $ne: true } }),
 User.find(ACTIVE_USER_MATCH)
 .sort({ createdAt: -1 })
 .limit(10)
@@ -824,8 +1034,22 @@ const { status = "pending", role, q } = req.query;
 const { skip, limit, page } = parsePagination(req, { defaultLimit: 25 });
 
 const filter = {};
+const rawStatus = String(status || "").trim().toLowerCase();
+if (rawStatus === "deleted") {
+filter.deleted = true;
+} else {
+if (String(req.query?.includeDeleted || "").toLowerCase() !== "true") {
+filter.deleted = { $ne: true };
+}
 const normalizedStatus = normalizeUserStatus(status);
-if (normalizedStatus) filter.status = normalizedStatus;
+if (normalizedStatus) {
+if (normalizedStatus === "denied") {
+filter.status = { $in: ["denied", "rejected"] };
+} else {
+filter.status = normalizedStatus;
+}
+}
+}
 if (["attorney", "paralegal", "admin"].includes(role)) filter.role = role;
 if (q && q.trim()) {
 const rx = new RegExp(q.trim(), "i");
@@ -857,6 +1081,107 @@ users: items.map(pickUserSafe),
 */
 router.get("/pending-users", listUsersHandler);
 router.get("/users/pending", listUsersHandler);
+
+/**
+* GET /api/admin/audit-logs
+* Optional query: ?q=search&role=admin|attorney|paralegal|system&targetType=user|case|payment|message|dispute|document|other&caseId=&actorId=&from=&to=&page=&limit=
+*/
+router.get("/audit-logs", asyncHandler(async (req, res) => {
+const { skip, limit, page } = parsePagination(req, { defaultLimit: 50, maxLimit: 200 });
+const filter = {};
+const q = String(req.query.q || "").trim();
+const role = String(req.query.role || "").trim().toLowerCase();
+const targetType = String(req.query.targetType || "").trim().toLowerCase();
+const action = String(req.query.action || "").trim();
+const caseId = req.query.caseId;
+const actorId = req.query.actorId;
+const from = req.query.from;
+const to = req.query.to;
+
+if (role && role !== "all") filter.actorRole = role;
+if (targetType && targetType !== "all") filter.targetType = targetType;
+if (action) filter.action = new RegExp(escapeRegex(action), "i");
+if (caseId && isObjId(caseId)) filter.case = caseId;
+if (actorId && isObjId(actorId)) filter.actor = actorId;
+if (from || to) {
+const createdAt = {};
+if (from) {
+const fromDate = new Date(from);
+if (!Number.isNaN(fromDate.getTime())) createdAt.$gte = fromDate;
+}
+if (to) {
+const toDate = new Date(to);
+if (!Number.isNaN(toDate.getTime())) createdAt.$lte = toDate;
+}
+if (Object.keys(createdAt).length) filter.createdAt = createdAt;
+}
+if (q) {
+const rx = new RegExp(escapeRegex(q), "i");
+let actorIds = [];
+try {
+const matches = await User.find({
+$or: [{ firstName: rx }, { lastName: rx }, { email: rx }],
+})
+  .select("_id")
+  .limit(100)
+  .lean();
+actorIds = matches.map((user) => user._id);
+} catch (_) {}
+const orFilters = [
+{ action: rx },
+{ path: rx },
+{ method: rx },
+];
+if (actorIds.length) {
+orFilters.push({ actor: { $in: actorIds } });
+}
+filter.$or = orFilters;
+}
+
+const [items, total] = await Promise.all([
+AuditLog.find(filter)
+  .sort({ createdAt: -1 })
+  .skip(skip)
+  .limit(limit)
+  .populate("actor", "firstName lastName email role")
+  .populate("case", "title")
+  .lean(),
+AuditLog.countDocuments(filter),
+]);
+
+const logs = items.map((entry) => {
+const actor = entry.actor || {};
+const actorName = [actor.firstName, actor.lastName].filter(Boolean).join(" ") || actor.email || null;
+const caseDoc = entry.case || null;
+const caseIdValue = caseDoc?._id || entry.case || null;
+return {
+id: entry._id,
+createdAt: entry.createdAt,
+action: entry.action,
+actorRole: entry.actorRole,
+actorId: actor._id || entry.actor || null,
+actorName,
+actorEmail: actor.email || null,
+targetType: entry.targetType,
+targetId: entry.targetId,
+caseId: caseIdValue,
+caseTitle: caseDoc?.title || null,
+path: entry.path,
+method: entry.method,
+meta: entry.meta || {},
+ip: entry.ip,
+ua: entry.ua,
+};
+});
+
+res.json({
+page,
+limit,
+total,
+pages: Math.ceil(total / limit),
+logs,
+});
+}));
 
 /**
 * PATCH /api/admin/user/:id
@@ -908,6 +1233,94 @@ const user = await User.findById(id);
 if (!user) return res.status(404).json({ msg: "User not found" });
 const updated = await applyUserDecision(req, user, "denied", req.body?.note);
 res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
+}));
+
+// Send approval email without changing status (admin test helper)
+router.post("/email/approval-test", csrfProtection, asyncHandler(async (req, res) => {
+const { userId, email } = req.body || {};
+let user = null;
+if (userId && isObjId(userId)) {
+  user = await User.findById(userId);
+} else if (typeof email === "string" && email.trim()) {
+  user = await User.findOne({ email: String(email).toLowerCase().trim() });
+}
+if (!user) return res.status(404).json({ msg: "User not found" });
+const inlineLogoPath = path.join(__dirname, "../../frontend/Cleanfav.png");
+await sendEmail(
+  user.email,
+  APPROVAL_EMAIL_SUBJECT,
+  buildApprovalEmailHtml(user, { logoUrl: "cid:cleanfav-logo" }),
+  {
+    attachments: [
+      {
+        filename: "Cleanfav.png",
+        path: inlineLogoPath,
+        cid: "cleanfav-logo",
+      },
+    ],
+  }
+);
+res.json({ ok: true });
+}));
+
+// Preview approval email HTML in-browser (admin-only)
+router.get("/email/approval-preview", asyncHandler(async (req, res) => {
+const { userId, email } = req.query || {};
+let user = null;
+if (userId && isObjId(userId)) {
+  user = await User.findById(userId);
+} else if (typeof email === "string" && email.trim()) {
+  user = await User.findOne({ email: String(email).toLowerCase().trim() });
+}
+if (!user) return res.status(404).send("User not found.");
+const html = buildApprovalEmailHtml(user);
+res.set("Content-Type", "text/html").send(html);
+}));
+
+router.post("/users/:id/delete", csrfProtection, asyncHandler(async (req, res) => {
+const { id } = req.params;
+if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
+const user = await User.findById(id);
+if (!user) return res.status(404).json({ msg: "User not found" });
+
+user.deleted = true;
+user.deletedAt = new Date();
+user.disabled = true;
+user.status = "denied";
+await user.save();
+
+try {
+await AuditLog.logFromReq(req, "admin.user.delete", {
+  targetType: "user",
+  targetId: user._id,
+  meta: { email: user.email || "", role: user.role || "" },
+});
+} catch {}
+
+res.json({ ok: true, user: pickUserSafe(user.toObject()) });
+}));
+
+router.post("/users/:id/purge", csrfProtection, asyncHandler(async (req, res) => {
+const { id } = req.params;
+if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
+const user = await User.findById(id);
+if (!user) return res.status(404).json({ msg: "User not found" });
+
+await User.findByIdAndDelete(id);
+
+try {
+await Notification.deleteMany({ userId: id });
+} catch {}
+
+try {
+await AuditLog.logFromReq(req, "admin.user.purge", {
+  targetType: "user",
+  targetId: id,
+  meta: { email: user.email || "", role: user.role || "" },
+});
+} catch {}
+
+res.json({ ok: true, id });
 }));
 
 /**

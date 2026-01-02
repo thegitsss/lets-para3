@@ -122,6 +122,13 @@ function assertMessagingOpen(req, res) {
   return null;
 }
 
+function resolveSenderRole(req) {
+  if (req?.acl?.isAdmin) return "admin";
+  if (req?.acl?.isParalegal) return "paralegal";
+  if (req?.acl?.isAttorney) return "attorney";
+  return String(req?.user?.role || "");
+}
+
 // All message routes require auth
 router.use(verifyToken);
 router.use(requireApproved);
@@ -305,7 +312,7 @@ router.post(
     const msg = await Message.create({
       caseId,
       senderId: req.user.id,
-      senderRole: req.user.role,
+      senderRole: resolveSenderRole(req),
       type: "text",
       text,
       content: text,
@@ -354,7 +361,7 @@ router.post(
     const msg = await Message.create({
       caseId: req.params.caseId,
       senderId: req.user.id,
-      senderRole: req.user.role,
+      senderRole: resolveSenderRole(req),
       type: "file",
       text: fileName,
       fileKey,
@@ -400,7 +407,7 @@ router.post(
     const msg = await Message.create({
       caseId: req.params.caseId,
       senderId: req.user.id,
-      senderRole: req.user.role,
+      senderRole: resolveSenderRole(req),
       type: "audio",
       text: safeTranscript,
       fileKey,

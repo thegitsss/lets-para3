@@ -543,6 +543,32 @@ router.post(
       console.warn("[uploads] file upload audit failed", err?.message || err);
     }
 
+    try {
+      const actorRole = String(req.user?.role || "").toLowerCase();
+      const recipientId =
+        actorRole === "attorney"
+          ? caseDoc.paralegal || caseDoc.paralegalId
+          : actorRole === "paralegal"
+          ? caseDoc.attorney || caseDoc.attorneyId
+          : null;
+      if (recipientId) {
+        const caseId = String(caseDoc._id);
+        await notifyUser(
+          recipientId,
+          "case_file_uploaded",
+          {
+            caseId,
+            caseTitle: caseDoc.title || "Case",
+            fileName: originalName,
+            link: `case-detail.html?caseId=${encodeURIComponent(caseId)}#caseFilesSection`,
+          },
+          { actorUserId: req.user.id }
+        );
+      }
+    } catch (err) {
+      console.warn("[uploads] notifyUser case_file_uploaded failed", err?.message || err);
+    }
+
     res.status(201).json({ file: serializeCaseFile(entry) });
   })
 );

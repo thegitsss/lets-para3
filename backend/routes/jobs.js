@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const router = express.Router();
 const Job = require("../models/Job");
 const Application = require("../models/Application");
@@ -37,6 +38,32 @@ const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
 // POST /jobs — Attorney posts a job
 router.post("/", auth, requireApproved, requireRole("attorney"), async (req, res) => {
   try {
+    const caseId = req.body?.caseId || null;
+    let caseDoc = null;
+    if (caseId) {
+      if (!mongoose.isValidObjectId(caseId)) {
+        return res.status(400).json({ error: "Invalid case id" });
+      }
+      caseDoc = await Case.findById(caseId).select("attorney attorneyId jobId");
+      if (!caseDoc) {
+        return res.status(404).json({ error: "Case not found" });
+      }
+      const ownerId = String(caseDoc.attorneyId || caseDoc.attorney || "");
+      if (!ownerId || ownerId !== String(req.user._id)) {
+        return res.status(403).json({ error: "You are not the attorney for this case" });
+      }
+      if (caseDoc.jobId) {
+        const existingById = await Job.findById(caseDoc.jobId);
+        if (existingById) {
+          return res.json(existingById);
+        }
+      }
+      const existingByCase = await Job.findOne({ caseId });
+      if (existingByCase) {
+        return res.json(existingByCase);
+      }
+    }
+
     const title = cleanTitle(req.body.title, 150);
     if (!title || title.length < 5) {
       return res.status(400).json({ error: "Title must be at least 5 characters." });
@@ -61,12 +88,18 @@ router.post("/", auth, requireApproved, requireRole("attorney"), async (req, res
     }
 
     const job = await Job.create({
+      caseId: caseDoc?._id || null,
       attorneyId: req.user._id,
       title,
       practiceArea: practiceAreaValue,
       description,
       budget: Math.round(budget),
     });
+
+    if (caseDoc && !caseDoc.jobId) {
+      caseDoc.jobId = job._id;
+      await caseDoc.save();
+    }
 
     res.json(job);
   } catch (err) {
@@ -140,7 +173,7 @@ router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req,
         .lean(),
       Case.find({
         archived: { $ne: true },
-        status: { $nin: ["assigned", "in progress", "in_progress", "completed", "cancelled", "closed"] },
+        status: { $nin: ["assigned", "in progress", "in progress", "completed", "cancelled", "closed"] },
       })
         .select("title practiceArea details briefSummary totalAmount currency state locationState status applicants attorney attorneyId jobId createdAt")
         .populate({

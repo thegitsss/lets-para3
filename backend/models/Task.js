@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const { Schema, Types } = mongoose;
 
 const TASK_STATUS_IN_PROGRESS = "in progress";
-const TASK_STATUS_ENUM = ["todo", TASK_STATUS_IN_PROGRESS, "in_progress", "review"];
+const TASK_STATUS_ENUM = ["todo", TASK_STATUS_IN_PROGRESS, "in progress", "review"];
 
 const taskSchema = new Schema(
   {
@@ -23,7 +23,7 @@ const taskSchema = new Schema(
 taskSchema.pre("validate", function (next) {
   if (typeof this.status === "string") {
     const normalized = this.status.trim().toLowerCase();
-    if (normalized === "in_progress") {
+    if (normalized === "in progress") {
       this.status = TASK_STATUS_IN_PROGRESS;
     } else if (normalized === TASK_STATUS_IN_PROGRESS || TASK_STATUS_ENUM.includes(normalized)) {
       this.status = normalized;
