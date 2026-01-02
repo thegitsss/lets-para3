@@ -8,6 +8,23 @@
   <script src="assets/scripts/utils/session.js"></script>
   <script src="assets/scripts/auth.js" type="module"></script>
   <style>
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+
     .gold{color:#b4975a;}
     :root {
       --bg: #ffffff;
@@ -84,15 +101,18 @@
       transition: background 0.3s ease;
     }
 
-    body.theme-mountain .sidebar {
+    body.theme-mountain .sidebar,
+    body.theme-mountain-dark .sidebar {
       background: url('hero-mountain.jpg') center/cover no-repeat;
     }
 
-    body.theme-mountain .sidebar::before {
+    body.theme-mountain .sidebar::before,
+    body.theme-mountain-dark .sidebar::before {
       background: rgba(0, 0, 0, 0.45);
     }
 
-    body.theme-mountain .sidebar > * {
+    body.theme-mountain .sidebar > *,
+    body.theme-mountain-dark .sidebar > * {
       position: relative;
       z-index: 1;
     }
@@ -179,6 +199,7 @@
       position: relative;
     }
 
+
     .unified-header .title-block {
       max-width: 520px;
     }
@@ -205,6 +226,10 @@
 
     .lpc-shared-header .user-chip strong {
       font-weight: 300 !important;
+    }
+
+    .lpc-shared-header .notification-badge {
+      display: none !important;
     }
 
     .settings-panel {
@@ -234,12 +259,16 @@
     }
 
     body.theme-mountain .settings-nav button,
-    body.theme-mountain .sidebar-link {
+    body.theme-mountain .sidebar-link,
+    body.theme-mountain-dark .settings-nav button,
+    body.theme-mountain-dark .sidebar-link {
       color: #fff;
     }
 
     body.theme-mountain .settings-nav button.active,
-    body.theme-mountain .settings-nav button:hover {
+    body.theme-mountain .settings-nav button:hover,
+    body.theme-mountain-dark .settings-nav button.active,
+    body.theme-mountain-dark .settings-nav button:hover {
       background: rgba(255, 255, 255, 0.18);
       color: #fff;
     }
@@ -276,7 +305,9 @@
     }
 
     body.theme-mountain .sidebar-link:hover,
-    body.theme-mountain .sidebar-link:focus {
+    body.theme-mountain .sidebar-link:focus,
+    body.theme-mountain-dark .sidebar-link:hover,
+    body.theme-mountain-dark .sidebar-link:focus {
       background: rgba(255, 255, 255, 0.2);
       color: #fff;
     }
@@ -803,6 +834,50 @@ input[type="number"],
       color: var(--ink);
     }
 
+    .theme-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 16px;
+      margin: 8px 0 20px;
+    }
+
+    .theme-preview {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: var(--panel);
+      text-align: left;
+      cursor: pointer;
+      font-family: var(--font-sans);
+      color: var(--ink);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .theme-preview span {
+      font-size: 0.95rem;
+    }
+
+    .theme-preview-icon {
+      width: 120px;
+      height: 78px;
+      display: block;
+      border-radius: 10px;
+    }
+
+    .theme-preview[aria-checked="true"] {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.2);
+    }
+
+    .theme-preview:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.35);
+    }
+
     .switch {
       position: relative;
       display: inline-block;
@@ -1183,6 +1258,7 @@ input[type="number"],
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
   <aside class="sidebar">
     <div class="logo">Let’s-ParaConnect</div>
     <nav class="settings-nav" aria-label="Settings navigation">
@@ -1194,7 +1270,7 @@ input[type="number"],
     <a class="btn btn-outline btn-light" href="dashboard-attorney.html" style="margin-top:auto;">Return to Dashboard</a>
   </aside>
 
-  <main class="content">
+  <main id="main" tabindex="-1" class="content">
     <div class="topbar" data-attorney-header></div>
     <section class="unified-header" aria-label="Attorney header">
       <div class="title-block">
@@ -1206,8 +1282,6 @@ input[type="number"],
 
     <div id="settingsContent">
       <section class="settings-panel settings-section active" id="profileSection">
-        <h2>Profile</h2>
-        <p>Update your profile information and bio.</p>
 
         <div id="attorneySettings" class="role-settings hidden" data-attorney-settings>
           <div class="settings-section attorney-settings-inner">
@@ -1450,13 +1524,78 @@ Legal Assistant at..."></textarea>
           <span class="slider"></span>
         </label>
       </div>
-      <div class="pref-row">
-        <span>Theme</span>
-        <select id="themePreference">
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-          <option value="mountain">Mountain</option>
-        </select>
+      <div class="pref-row" data-paralegal-only>
+        <span>New message alerts</span>
+        <label class="switch">
+          <input type="checkbox" id="paralegalMessageAlerts">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="pref-row" data-paralegal-only>
+        <span>Case updates</span>
+        <label class="switch">
+          <input type="checkbox" id="paralegalCaseUpdates">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <input type="hidden" id="themePreference" value="mountain" />
+      <div class="theme-preview-grid" role="radiogroup" aria-label="Theme previews">
+        <button type="button" class="theme-preview" data-theme-preview="dark" role="radio" aria-checked="false">
+          <svg class="theme-preview-icon" viewBox="0 0 120 78" aria-hidden="true">
+            <rect x="1" y="1" width="118" height="76" rx="10" fill="#1c2333" stroke="#d1d5db"/>
+            <rect x="8" y="10" width="30" height="58" rx="6" fill="#111827"/>
+            <rect x="46" y="16" width="60" height="8" rx="4" fill="#d9a441"/>
+            <rect x="46" y="30" width="52" height="6" rx="3" fill="#e5e7eb"/>
+            <rect x="46" y="42" width="46" height="6" rx="3" fill="#e5e7eb"/>
+            <rect x="46" y="54" width="38" height="6" rx="3" fill="#e5e7eb"/>
+          </svg>
+          <span>Dark</span>
+        </button>
+        <button type="button" class="theme-preview" data-theme-preview="light" role="radio" aria-checked="false">
+          <svg class="theme-preview-icon" viewBox="0 0 120 78" aria-hidden="true">
+            <rect x="1" y="1" width="118" height="76" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+            <rect x="8" y="10" width="30" height="58" rx="6" fill="#f3f4f6"/>
+            <rect x="46" y="16" width="60" height="8" rx="4" fill="#d9a441"/>
+            <rect x="46" y="30" width="52" height="6" rx="3" fill="#e5e7eb"/>
+            <rect x="46" y="42" width="46" height="6" rx="3" fill="#e5e7eb"/>
+            <rect x="46" y="54" width="38" height="6" rx="3" fill="#e5e7eb"/>
+          </svg>
+          <span>Light</span>
+        </button>
+        <button type="button" class="theme-preview" data-theme-preview="mountain" role="radio" aria-checked="false">
+          <svg class="theme-preview-icon" viewBox="0 0 120 78" aria-hidden="true">
+            <defs>
+              <linearGradient id="mountainGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#0b2a4a"/>
+                <stop offset="100%" stop-color="#2f4b63"/>
+              </linearGradient>
+            </defs>
+            <rect x="1" y="1" width="118" height="76" rx="10" fill="#ffffff" stroke="#d1d5db"/>
+            <rect x="8" y="10" width="30" height="58" rx="6" fill="url(#mountainGradient)"/>
+            <rect x="46" y="16" width="60" height="8" rx="4" fill="#d9a441"/>
+            <rect x="46" y="30" width="52" height="6" rx="3" fill="#e5e7eb"/>
+            <rect x="46" y="42" width="46" height="6" rx="3" fill="#e5e7eb"/>
+            <rect x="46" y="54" width="38" height="6" rx="3" fill="#e5e7eb"/>
+          </svg>
+          <span>Mountain</span>
+        </button>
+        <button type="button" class="theme-preview" data-theme-preview="mountain-dark" role="radio" aria-checked="false">
+          <svg class="theme-preview-icon" viewBox="0 0 120 78" aria-hidden="true">
+            <defs>
+              <linearGradient id="mountainGradientDark" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#0b2a4a"/>
+                <stop offset="100%" stop-color="#2f4b63"/>
+              </linearGradient>
+            </defs>
+            <rect x="1" y="1" width="118" height="76" rx="10" fill="#1c2333" stroke="#d1d5db"/>
+            <rect x="8" y="10" width="30" height="58" rx="6" fill="url(#mountainGradientDark)"/>
+            <rect x="46" y="16" width="60" height="8" rx="4" fill="#d9a441"/>
+            <rect x="46" y="30" width="52" height="6" rx="3" fill="#c7d2fe"/>
+            <rect x="46" y="42" width="46" height="6" rx="3" fill="#c7d2fe"/>
+            <rect x="46" y="54" width="38" height="6" rx="3" fill="#c7d2fe"/>
+          </svg>
+          <span>Mountain Dark</span>
+        </button>
       </div>
       <div class="pref-row">
         <span>Update State</span>

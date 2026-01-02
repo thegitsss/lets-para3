@@ -667,24 +667,27 @@ function hydrateHeader() {
 
 function bindHeaderEvents() {
   if (elements.notificationToggle && elements.notificationPanel) {
-    elements.notificationToggle.addEventListener("click", () => {
+    elements.notificationToggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === "function") {
+        event.stopImmediatePropagation();
+      }
       const isShowing = elements.notificationPanel.classList.toggle("show");
       elements.notificationPanel.classList.toggle("hidden", !isShowing);
-    });
-    document.addEventListener("click", (event) => {
-      if (
-        event.target !== elements.notificationToggle &&
-        !elements.notificationPanel.contains(event.target) &&
-        !elements.notificationToggle.contains(event.target)
-      ) {
-        elements.notificationPanel.classList.remove("show");
-        elements.notificationPanel.classList.add("hidden");
+      if (isShowing) {
+        if (typeof window.refreshNotificationCenters === "function") {
+          window.refreshNotificationCenters();
+        }
+        secureFetch("/api/notifications/read-all", { method: "POST" }).catch(() => {});
       }
     });
   }
 
   if (elements.userChip && elements.profileDropdown) {
-    elements.userChip.addEventListener("click", () => {
+    elements.userChip.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       elements.profileDropdown.classList.toggle("show");
     });
     document.addEventListener("click", (event) => {

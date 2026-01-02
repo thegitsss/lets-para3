@@ -33,10 +33,32 @@ function normalizeConfig(config) {
 
 async function loadCaseFiles() {
   const container = document.getElementById(currentConfig.containerId);
+  function readViewerRole() {
+    if (typeof window.getStoredUser === "function") {
+      const user = window.getStoredUser();
+      if (user?.role) return String(user.role).toLowerCase();
+    }
+    try {
+      const raw = localStorage.getItem("lpc_user");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.role) return String(parsed.role).toLowerCase();
+      }
+    } catch {
+      /* ignore */
+    }
+    return "";
+  }
+
   async function fetchActiveCasesFallback() {
     try {
-      const res = await secureFetch("/api/paralegal/dashboard", {
+      const role = readViewerRole();
+      if (role && role !== "paralegal" && role !== "attorney" && role !== "admin") return [];
+      const endpoint =
+        role === "paralegal" ? "/api/paralegal/dashboard" : "/api/attorney/dashboard";
+      const res = await secureFetch(endpoint, {
         headers: { Accept: "application/json" },
+        noRedirect: true,
       });
       if (!res.ok) return [];
       const payload = await res.json().catch(() => ({}));

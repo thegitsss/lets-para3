@@ -17,6 +17,23 @@
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
   <script src="assets/scripts/utils/session.js"></script>
   <style>
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+
     .gold{color:#b4975a;}
     :root {
       --bg:#ffffff;
@@ -76,13 +93,16 @@
       pointer-events:none;
       transition:background .3s ease;
     }
-    body.theme-mountain .sidebar{
+    body.theme-mountain .sidebar,
+    body.theme-mountain-dark .sidebar{
       background:url('hero-mountain.jpg') center/cover no-repeat;
     }
-    body.theme-mountain .sidebar::before{
+    body.theme-mountain .sidebar::before,
+    body.theme-mountain-dark .sidebar::before{
       background:rgba(0,0,0,0.45);
     }
-    body.theme-mountain .sidebar > *{
+    body.theme-mountain .sidebar > *,
+    body.theme-mountain-dark .sidebar > *{
       position:relative;
       z-index:1;
     }
@@ -106,8 +126,11 @@
     body.theme-dark nav a.active,
     body.theme-dark nav a:hover{background:rgba(255,255,255,0.12);}
     body.theme-mountain nav a.active,
-    body.theme-mountain nav a:hover{background:rgba(255,255,255,0.18);}
-    body.theme-mountain nav a{color:#fff;}
+    body.theme-mountain nav a:hover,
+    body.theme-mountain-dark nav a.active,
+    body.theme-mountain-dark nav a:hover{background:rgba(255,255,255,0.18);}
+    body.theme-mountain nav a,
+    body.theme-mountain-dark nav a{color:#fff;}
     .sidebar-link{
       margin-top:1.5rem;
       width:100%;
@@ -130,10 +153,13 @@
     body.theme-dark .sidebar-link:hover,
     body.theme-dark .sidebar-link:focus,
     body.theme-mountain .sidebar-link:hover,
-    body.theme-mountain .sidebar-link:focus{
+    body.theme-mountain .sidebar-link:focus,
+    body.theme-mountain-dark .sidebar-link:hover,
+    body.theme-mountain-dark .sidebar-link:focus{
       color:#fff;
     }
-    body.theme-mountain .sidebar-link{color:#fff;}
+    body.theme-mountain .sidebar-link,
+    body.theme-mountain-dark .sidebar-link{color:#fff;}
     .sidebar-bottom{
       margin-top:auto;
       display:flex;
@@ -646,6 +672,7 @@
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
   <!-- Sidebar -->
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
@@ -662,7 +689,7 @@
   </aside>
 
   <!-- Main -->
-  <main class="main">
+  <main id="main" tabindex="-1" class="main">
     <div class="topbar" data-attorney-header></div>
 
     <section class="step-panel" data-step="details" id="create-step-details">
@@ -1465,38 +1492,6 @@
       return result;
     }
 
-    async function createJobListing(casePayload, caseId) {
-      const practiceArea = mapPracticeArea(casePayload.field || "");
-      const description = padDescription(casePayload.description || "");
-      const budget = Math.max(50, Math.round(Number(casePayload.compAmount || casePayload.comp || 0)) || 50);
-      try {
-        await fetchCsrfToken();
-        const res = await fetch("/api/jobs", {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${(window.getSessionToken && window.getSessionToken()) || ""}`,
-            "X-CSRF-Token": csrfToken || "",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            caseId,
-            title: casePayload.title,
-            practiceArea,
-            description,
-            budget,
-          }),
-        });
-        if (!res.ok) {
-          // Soft-fail: log but don't block the case post UX.
-          console.warn("Job listing failed", await res.text().catch(() => ""));
-        }
-      } catch (err) {
-        console.warn("Job listing request failed", err);
-      }
-    }
-
     function buildPayload(data) {
       const description = data.description || "Additional details will be provided once the case is accepted.";
       const practiceArea = mapPracticeArea(data.field);
@@ -1600,11 +1595,12 @@
         clearDraft();
         clearCurrentDraftId();
         const caseId = created?.id || created?._id || editingCaseId;
-        if (caseId && !isEditing) {
-          void createJobListing(data, caseId);
-        }
+        // Jobs are now mirrored automatically when a case is created on the backend.
         const href = caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "dashboard-attorney.html#cases";
-        showToast(isEditing ? "Your changes have been saved." : "Your case has been successfully posted.", href);
+        showToast(
+          isEditing ? "Your changes have been saved." : "Your case has been posted and is now open to applications.",
+          href
+        );
       } catch (err) {
         console.error(err);
         showToast(err?.message || "Unable to post this case right now.", null, true);

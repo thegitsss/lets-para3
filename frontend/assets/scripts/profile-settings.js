@@ -17,7 +17,6 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".settings-item").forEach(el => el.classList.remove("active"));
       btn.classList.add("active");
-
       document.querySelectorAll(".settings-section").forEach(sec => sec.classList.remove("active"));
       const section = document.getElementById(sectionId);
       section?.classList.add("active");
@@ -48,8 +47,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const themeSelect = document.getElementById("themePreference");
+  const themePreviewButtons = document.querySelectorAll("[data-theme-preview]");
   const emailToggle = document.getElementById("emailNotificationsToggle");
   statePreferenceSelect = document.getElementById("statePreference");
+
+  const updateThemePreview = (value) => {
+    if (!themePreviewButtons.length) return;
+    themePreviewButtons.forEach((btn) => {
+      const isActive = btn.dataset.themePreview === value;
+      btn.setAttribute("aria-checked", isActive ? "true" : "false");
+      btn.classList.toggle("is-active", isActive);
+    });
+  };
 
   async function persistThemePreference(themeValue) {
     try {
@@ -69,12 +78,33 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  if (themeSelect && typeof window.applyThemePreference === "function") {
+  const applyThemeSelection = (value) => {
+    if (!value) return;
+    if (themeSelect) {
+      themeSelect.value = value;
+    }
+    updateThemePreview(value);
+    if (typeof window.applyThemePreference === "function") {
+      window.applyThemePreference(value);
+    }
+    persistThemePreference(value);
+  };
+
+  if (themeSelect) {
     themeSelect.addEventListener("change", () => {
-      const selectedTheme = themeSelect.value;
-      window.applyThemePreference(selectedTheme);
-      persistThemePreference(selectedTheme);
+      applyThemeSelection(themeSelect.value);
     });
+  }
+
+  themePreviewButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const value = btn.dataset.themePreview;
+      applyThemeSelection(value);
+    });
+  });
+
+  if (themeSelect) {
+    updateThemePreview(themeSelect.value);
   }
 
   async function loadPreferences() {
@@ -92,9 +122,12 @@ document.addEventListener("DOMContentLoaded", () => {
             ? window.getThemePreference()
             : "mountain");
         themeSelect.value = resolvedTheme;
+        updateThemePreview(resolvedTheme);
         if (typeof window.applyThemePreference === "function") {
           window.applyThemePreference(resolvedTheme);
         }
+      } else if (prefs.theme) {
+        applyThemeSelection(prefs.theme);
       }
       const stateValue = prefs.state || currentUser?.location || currentUser?.state || "";
       if (statePreferenceSelect) {
@@ -311,6 +344,7 @@ let currentUser = null;
 let statePreferenceSelect = null;
 let attorneyPrefsBound = false;
 let attorneySaveBound = false;
+let paralegalPrefsBound = false;
 
 const FIELD_OF_LAW_OPTIONS = [
   "Administrative Law",
@@ -472,6 +506,8 @@ function initParalegalSettings(user = {}) {
   showParalegalSettings();
   hydrateProfileForm(user);
   seedSettingsState(user);
+  hydrateParalegalNotificationPrefs(user);
+  bindParalegalNotificationToggles();
   renderLanguageEditor(user.languages || []);
   try { loadCertificate(user); } catch {}
   try { loadResume(user); } catch {}
@@ -763,7 +799,7 @@ function bindAttorneyNotificationToggles() {
     input.addEventListener("change", async () => {
       const checked = input.checked;
       try {
-        await saveAttorneyNotificationPref(key, checked);
+        await saveNotificationPref(key, checked);
         settingsState.notificationPrefs[key] = checked;
         showToast("Notification preference updated", "ok");
       } catch (err) {
@@ -776,6 +812,30 @@ function bindAttorneyNotificationToggles() {
   attorneyPrefsBound = true;
 }
 
+function bindParalegalNotificationToggles() {
+  if (paralegalPrefsBound) return;
+  [
+    { id: "paralegalMessageAlerts", key: "emailMessages" },
+    { id: "paralegalCaseUpdates", key: "emailCase" }
+  ].forEach(({ id, key }) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener("change", async () => {
+      const checked = input.checked;
+      try {
+        await saveNotificationPref(key, checked);
+        settingsState.notificationPrefs[key] = checked;
+        showToast("Notification preference updated", "ok");
+      } catch (err) {
+        console.error("Unable to update notification preference", err);
+        input.checked = !checked;
+        showToast("Unable to update preference right now.", "err");
+      }
+    });
+  });
+  paralegalPrefsBound = true;
+}
+
 function hydrateAttorneyNotificationPrefs(user = {}) {
   const prefs = user.notificationPrefs || {};
   const emailToggle = document.getElementById("attorneyEmailNotifications");
@@ -783,6 +843,20 @@ function hydrateAttorneyNotificationPrefs(user = {}) {
   const messageToggle = document.getElementById("attorneyMessageAlerts");
   if (messageToggle) messageToggle.checked = prefs.emailMessages !== false;
   const caseToggle = document.getElementById("attorneyCaseUpdates");
+  if (caseToggle) caseToggle.checked = prefs.emailCase !== false;
+  settingsState.notificationPrefs = {
+    ...settingsState.notificationPrefs,
+    email: prefs.email !== false,
+    emailMessages: prefs.emailMessages !== false,
+    emailCase: prefs.emailCase !== false
+  };
+}
+
+function hydrateParalegalNotificationPrefs(user = {}) {
+  const prefs = user.notificationPrefs || {};
+  const messageToggle = document.getElementById("paralegalMessageAlerts");
+  if (messageToggle) messageToggle.checked = prefs.emailMessages !== false;
+  const caseToggle = document.getElementById("paralegalCaseUpdates");
   if (caseToggle) caseToggle.checked = prefs.emailCase !== false;
   settingsState.notificationPrefs = {
     ...settingsState.notificationPrefs,
@@ -881,7 +955,7 @@ async function handleAttorneyProfileSave() {
   }
 }
 
-async function saveAttorneyNotificationPref(key, value) {
+async function saveNotificationPref(key, value) {
   const res = await secureFetch("/api/users/me/notification-prefs", {
     method: "PATCH",
     body: { [key]: !!value }

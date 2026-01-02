@@ -89,6 +89,8 @@ const state = {
 };
 
 let openCaseMenu = null;
+let openCaseMenuTrigger = null;
+let caseMenuKeydownBound = false;
 let chatMenuWrapper = null;
 
 function repositionOpenCaseMenu() {
@@ -176,7 +178,8 @@ async function bootstrap() {
   const pageKey = (PAGE_ID || "").toLowerCase();
   const role = String(state.user?.role || "").toLowerCase();
   const headerOnly = HEADER_ONLY_ROUTES[role]?.has(pageKey);
-  await initHeader({ skipNotifications: headerOnly });
+  const skipNotifications = role !== "paralegal" && headerOnly;
+  await initHeader({ skipNotifications });
   if (headerOnly) {
     return;
   }
@@ -258,7 +261,7 @@ function ensureHeaderStyles() {
   .lpc-shared-header .notifications-panel.show{opacity:1;pointer-events:auto;transform:translateY(0)}
   .lpc-shared-header .notifications-panel.hidden{display:none}
   .lpc-shared-header .notifications-panel .notif-header{font-family:'Cormorant Garamond',serif;font-weight:300;font-size:1.2rem;padding:14px 18px;border-bottom:1px solid var(--line,rgba(0,0,0,0.08));background:rgba(0,0,0,0.02);margin:0}
-  .lpc-shared-header .notifications-panel #notifList{max-height:320px;overflow-y:auto}
+  .lpc-shared-header .notifications-panel #notifList{max-height:220px;overflow-y:auto}
   .lpc-shared-header .notifications-panel .notif-item{padding:14px 18px;border-bottom:1px solid var(--line,rgba(0,0,0,0.06));cursor:pointer}
   .lpc-shared-header .notifications-panel .notif-item.unread{border-left:3px solid #b6a47a}
   .lpc-shared-header .notifications-panel .notif-item.read{opacity:.75}
@@ -2299,6 +2302,16 @@ async function initCasesPage() {
       toggleCaseMenu(openCaseMenu, false);
     }
   });
+  if (!caseMenuKeydownBound) {
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && openCaseMenu) {
+        const trigger = openCaseMenuTrigger || openCaseMenu.querySelector(".menu-trigger");
+        toggleCaseMenu(openCaseMenu, false);
+        trigger?.focus();
+      }
+    });
+    caseMenuKeydownBound = true;
+  }
   window.addEventListener("resize", repositionOpenCaseMenu);
   window.addEventListener("scroll", repositionOpenCaseMenu, true);
 
@@ -2493,11 +2506,13 @@ function renderCaseRow(item, filterKey = "active") {
 }
 
 function renderCaseMenu(item) {
+  const safeId = String(item.id || "case").replace(/[^a-z0-9_-]/gi, "");
+  const menuId = `case-menu-${safeId || "case"}`;
   if (item.localDraft) {
     return `
     <div class="case-actions" data-case-id="${item.id}">
-      <button class="menu-trigger" type="button" aria-haspopup="true" aria-expanded="false" data-case-menu-trigger>⋯</button>
-      <div class="case-menu" role="menu" style="width: 180px; min-width: 180px;">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="${menuId}" data-case-menu-trigger>⋯</button>
+      <div class="case-menu" id="${menuId}" role="menu" style="width: 180px; min-width: 180px;">
         <button type="button" class="menu-item" data-case-action="resume-draft" data-case-id="${item.id}">Resume Draft</button>
         <button type="button" class="menu-item danger" data-case-action="discard-draft" data-case-id="${item.id}">Discard Draft</button>
       </div>
@@ -2527,8 +2542,8 @@ function renderCaseMenu(item) {
   );
   return `
     <div class="case-actions" data-case-id="${item.id}">
-      <button class="menu-trigger" type="button" aria-haspopup="true" aria-expanded="false" data-case-menu-trigger>⋯</button>
-      <div class="case-menu" role="menu" style="width: 180px; min-width: 180px;">
+      <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="${menuId}" data-case-menu-trigger>⋯</button>
+      <div class="case-menu" id="${menuId}" role="menu" style="width: 180px; min-width: 180px;">
         ${parts.join("")}
       </div>
     </div>
@@ -2854,7 +2869,9 @@ function toggleCaseMenu(wrapper, show) {
       resetCaseMenuStyles(openCaseMenu);
     }
     wrapper.classList.add("open");
-    wrapper.querySelector(".menu-trigger")?.setAttribute("aria-expanded", "true");
+    const trigger = wrapper.querySelector(".menu-trigger");
+    trigger?.setAttribute("aria-expanded", "true");
+    openCaseMenuTrigger = trigger || null;
     positionCaseMenu(wrapper);
     openCaseMenu = wrapper;
   } else {
@@ -2862,6 +2879,7 @@ function toggleCaseMenu(wrapper, show) {
     wrapper.querySelector(".menu-trigger")?.setAttribute("aria-expanded", "false");
     resetCaseMenuStyles(wrapper);
     if (openCaseMenu === wrapper) openCaseMenu = null;
+    if (!openCaseMenu) openCaseMenuTrigger = null;
   }
 }
 
@@ -4525,11 +4543,14 @@ function updateMessagePreviewUI({ threads = [], messageSnippet, messagePreviewSe
 
 function renderEscrowPanel(container, metrics = {}) {
   if (!container) return;
-  const total = formatCurrency(metrics.escrowTotal || 0);
-  const openJobs = Number(metrics.openJobs || 0);
+  const billingHref = "#billing";
   container.innerHTML = `
-    <div class="info-line">&bull; ${total} currently protected.</div>
-    <div class="info-line">&bull; ${openJobs} open job${openJobs === 1 ? "" : "s"} awaiting funding.</div>
+    <div class="info-line">&bull; View all invoices and receipts in Billing.</div>
+    <div class="info-line">&bull; Export your history anytime.</div>
+    <div class="info-actions" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+      <a class="pill-btn primary" href="${billingHref}" data-view-target="billing">Open Billing &amp; Escrow</a>
+      <a class="pill-btn" href="/api/payments/export/csv">Download Receipts (CSV)</a>
+    </div>
   `;
 }
 

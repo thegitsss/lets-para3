@@ -17,6 +17,23 @@
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
   <script src="assets/scripts/utils/session.js"></script>
   <style>
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+
     .gold{color:#b4975a;}
     :root {
       --bg:#ffffff;
@@ -113,6 +130,7 @@
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
     <nav>
@@ -127,15 +145,15 @@
     </div>
   </aside>
 
-  <main class="main">
+  <main id="main" tabindex="-1" class="main">
     <div class="topbar">
       <div class="breadcrumbs">Clients / Case Dashboard</div>
       <div class="top-actions">
-        <button class="ghost-btn" onclick="downloadSummary()">⭳</button>
+        <button class="ghost-btn" type="button" onclick="downloadSummary()" aria-label="Download summary">⭳</button>
         <button class="btn primary" onclick="createCase()">+ Case (Project)</button>
         <div class="menu-container">
-          <button class="menu-trigger" type="button">⋯</button>
-          <div class="menu-dropdown">
+          <button class="menu-trigger" type="button" aria-label="Open actions menu" aria-haspopup="menu" aria-expanded="false" aria-controls="caseDashboardMenu">⋯</button>
+          <div class="menu-dropdown" id="caseDashboardMenu">
             <button onclick="shareDashboard()">Share</button>
             <button onclick="renameDashboard()">Rename</button>
             <button onclick="moveDashboard()">Move to Case</button>
@@ -155,7 +173,7 @@
     <div class="layout">
       <section class="clients-panel">
         <h2>Clients</h2>
-        <input class="client-search" id="clientSearch" type="search" placeholder="Search clients" />
+        <input class="client-search" id="clientSearch" type="search" placeholder="Search clients" aria-label="Search clients" />
         <div id="clientList"></div>
       </section>
 
@@ -289,11 +307,44 @@
       }
     });
 
-    document.addEventListener('click',e=>{
-      document.querySelectorAll('.menu-container').forEach(c=>{
-        if(c.contains(e.target)) c.classList.toggle('active');
-        else c.classList.remove('active');
+    const menuContainers = document.querySelectorAll('.menu-container');
+    let menuTriggerFocus = null;
+
+    function closeMenus({ returnFocus = false } = {}) {
+      menuContainers.forEach((container) => {
+        container.classList.remove('active');
+        const trigger = container.querySelector('.menu-trigger');
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
       });
+      if (returnFocus && menuTriggerFocus) {
+        menuTriggerFocus.focus();
+      }
+      if (!returnFocus) menuTriggerFocus = null;
+    }
+
+    document.addEventListener('click', (e) => {
+      let handled = false;
+      menuContainers.forEach((container) => {
+        if (!container.contains(e.target)) return;
+        handled = true;
+        const willOpen = !container.classList.contains('active');
+        closeMenus();
+        if (willOpen) {
+          container.classList.add('active');
+          const trigger = container.querySelector('.menu-trigger');
+          if (trigger) {
+            trigger.setAttribute('aria-expanded', 'true');
+            menuTriggerFocus = trigger;
+          }
+        }
+      });
+      if (!handled) closeMenus();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeMenus({ returnFocus: true });
+      }
     });
 
     function shareDashboard(){alert('Share link copied.');}

@@ -89,6 +89,8 @@ async function fetchJson(url, options = {}) {
 }
 
 let viewerProfile = null;
+let latestMessageThread = null;
+let unreadMessageCount = 0;
 
 async function loadViewerProfile() {
   const profile = await fetchJson('/api/users/me');
@@ -105,7 +107,7 @@ async function loadDeadlineEvents(limit = 5) {
   return fetchJson(`/api/events?${params.toString()}`).then((data) => (Array.isArray(data.items) ? data.items : []));
 }
 
-async function loadMessageThreads(limit = 5) {
+async function loadMessageThreads(limit = 50) {
   return fetchJson(`/api/messages/threads?limit=${limit}`).then((data) => (Array.isArray(data.threads) ? data.threads : []));
 }
 
@@ -141,6 +143,7 @@ function updateStats(stats = {}) {
   setField('welcomeSubheading', `You have ${activeCases} active assignment${activeCases === 1 ? '' : 's'}`);
   setField('activeCases', activeCases);
   setField('unreadMessages', unread);
+  unreadMessageCount = unread;
   if (selectors.pluralText) {
     selectors.pluralText.textContent = unread === 1 ? ' waiting' : 's waiting';
   }
@@ -204,7 +207,22 @@ function renderAssignments(assignments = []) {
     metaEl.textContent = metaParts.join(' · ');
     summaryEl.textContent = assignment.summary || '';
 
-    header.addEventListener('click', () => card.classList.toggle('open'));
+    header.setAttribute('role', 'button');
+    header.setAttribute('tabindex', '0');
+    header.setAttribute('aria-expanded', card.classList.contains('open') ? 'true' : 'false');
+
+    const toggleOpen = () => {
+      card.classList.toggle('open');
+      header.setAttribute('aria-expanded', card.classList.contains('open') ? 'true' : 'false');
+    };
+
+    header.addEventListener('click', toggleOpen);
+    header.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        toggleOpen();
+      }
+    });
 
     card.querySelectorAll('[data-action]').forEach((button) => {
       const action = button.dataset.action;
@@ -250,7 +268,19 @@ function renderInvites(invites = []) {
   const container = selectors.inviteList;
   if (!container) return;
   if (!invites.length) {
-    container.innerHTML = '<p class="info-line">No invitations yet.</p>';
+    container.innerHTML = `
+      <div class="case-card empty-state">
+        <div class="case-header">
+          <div>
+            <h2>No invitations yet</h2>
+            <div class="case-subinfo">Case invites will appear here.</div>
+          </div>
+        </div>
+        <div class="case-actions">
+          <a class="open-case-btn" href="browse-jobs.html">Browse new postings and apply</a>
+        </div>
+      </div>
+    `;
     return;
   }
   container.innerHTML = '';
@@ -313,6 +343,11 @@ function renderInvites(invites = []) {
   container.querySelectorAll('[data-invite-action]').forEach((button) => {
     button.addEventListener('click', () => respondToInvite(button.dataset.caseId, button.dataset.inviteAction, button));
   });
+
+  const footer = document.createElement('div');
+  footer.className = 'info-line';
+  footer.innerHTML = '<a href="browse-jobs.html" class="card-link">Browse new postings →</a>';
+  container.appendChild(footer);
 }
 
 async function respondToInvite(caseId, action, button) {
@@ -384,19 +419,59 @@ function renderAssignedCases(items = []) {
         const funded = String(c.escrowStatus || '').toLowerCase() === 'funded';
         const buttonLabel = funded ? 'Open Case' : 'Awaiting Attorney Funding';
         const disabledAttr = funded ? '' : ' disabled aria-disabled="true"';
+        const statusValue = String(c.status || 'Active');
+        const statusLabel = statusValue.replace(/_/g, ' ').replace(/\s+/g, ' ').trim() || 'Active';
+        const statusKey = statusValue.toLowerCase().replace(/\s+/g, '_');
+        const canWithdraw = !funded && statusKey === 'awaiting_funding';
         return `
       <div class="case-item" data-id="${c._id}">
         <div class="case-title">${c.title || 'Untitled Case'}</div>
         <div class="case-meta">
           <span>${c.caseNumber || ''}</span>
           <span>Attorney: ${c.attorneyName || ''}</span>
-          <span>Status: ${c.status || 'Active'}</span>
+          <span>Status: ${statusLabel}</span>
         </div>
-        <button class="open-case-btn" data-id="${c._id}"${disabledAttr}>${buttonLabel}</button>
+        <div class="case-actions">
+          <button class="open-case-btn" data-id="${c._id}"${disabledAttr}>${buttonLabel}</button>
+          ${
+            canWithdraw
+              ? `<button class="withdraw-application-btn" data-id="${c._id}">Withdraw application</button>`
+              : ''
+          }
+        </div>
       </div>`;
       }
     )
     .join('');
+}
+
+async function withdrawFromCase(caseId, button) {
+  if (!caseId) return;
+  const toastHelper = window.toastUtils;
+  const originalLabel = button?.textContent;
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Withdrawing…';
+  }
+  try {
+    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/withdraw`, {
+      method: 'POST',
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload?.error || 'Unable to withdraw from this case.');
+    toastHelper?.show?.('Application withdrawn.', { targetId: selectors.toastBanner?.id, type: 'success' });
+    await loadAssignedCases();
+  } catch (error) {
+    toastHelper?.show?.(error.message || 'Unable to withdraw from this case.', {
+      targetId: selectors.toastBanner?.id,
+      type: 'error',
+    });
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalLabel || 'Withdraw application';
+    }
+  }
 }
 
 function renderAssignedCasesError(message = 'Unable to load assigned cases.') {
@@ -436,6 +511,14 @@ function attachUIHandlers() {
     selectors.inviteDeclineBtn.addEventListener('click', () => {
       const caseId = selectors.inviteDeclineBtn.dataset.caseId;
       respondToInvite(caseId, 'decline', selectors.inviteDeclineBtn);
+    });
+  }
+  if (selectors.messageBox) {
+    selectors.messageBox.addEventListener('click', () => {
+      if (unreadMessageCount < 1) return;
+      const caseId = latestMessageThread?.id || latestMessageThread?._id || '';
+      if (!caseId) return;
+      window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}#messages`;
     });
   }
   document.addEventListener('keydown', (event) => {
@@ -608,15 +691,31 @@ window.addEventListener('lpc:user-updated', (event) => {
   }
 });
 
+function getThreadTimestamp(thread = {}) {
+  const raw = thread.updatedAt || thread.lastMessageAt || thread.createdAt || null;
+  if (!raw) return 0;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+}
+
+function selectLatestThread(threads = []) {
+  return threads.reduce((latest, current) => {
+    if (!latest) return current;
+    return getThreadTimestamp(current) > getThreadTimestamp(latest) ? current : latest;
+  }, null);
+}
+
 function initLatestMessage(threads = []) {
   if (!threads.length) {
+    latestMessageThread = null;
     setField('latestMessageName', 'Inbox');
     setField('latestMessageExcerpt', 'No new messages.');
     return;
   }
-  const latest = threads[0];
-  setField('latestMessageName', latest.title || 'Case thread');
-  setField('latestMessageExcerpt', latest.lastMessageSnippet || 'No new messages.');
+  const latest = selectLatestThread(threads);
+  latestMessageThread = latest || null;
+  setField('latestMessageName', latest?.title || 'Case thread');
+  setField('latestMessageExcerpt', latest?.lastMessageSnippet || 'No new messages.');
 }
 
 function initQuickActions() {
@@ -883,6 +982,12 @@ async function bootParalegalDashboard() {
   }
   await initDashboard();
   selectors.assignedCasesList?.addEventListener('click', (event) => {
+    const withdrawBtn = event.target.closest('.withdraw-application-btn');
+    if (withdrawBtn) {
+      event.preventDefault();
+      withdrawFromCase(withdrawBtn.dataset.id, withdrawBtn);
+      return;
+    }
     const btn = event.target.closest('.open-case-btn');
     if (!btn) return;
     if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') {

@@ -7,6 +7,23 @@
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600;700&display=swap" rel="stylesheet" />
   <script src="assets/scripts/utils/session.js"></script>
   <style>
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+
     :root {
       --bg: #ffffff;
       --ink: #0f172a;
@@ -406,7 +423,8 @@
   </style>
 </head>
 <body>
-  <div class="page-shell">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="page-shell" id="main" role="main" tabindex="-1">
     <header class="page-header">
       <a class="back-link" id="profileBackLink" href="dashboard-attorney.html">&larr; Back to dashboard</a>
       <button id="editProfileBtn" class="btn btn-primary">Edit profile</button>

@@ -24,7 +24,7 @@
   </script>
   <script src="https://www.google.com/recaptcha/api.js?render=6Lfmq1orAAAAAEfFBDqDFpXtHMGld5aesRFjvIEM" defer></script>
   <style>
-    .gold{color:#b4975a;}
+    .gold{color:var(--gold);}
     html, body {
       margin: 0;
       padding: 0;
@@ -37,7 +37,7 @@
     }
 
     :root {
-      --gold: #b4975a;
+      --gold: #887244;
       --navy: #27394d;
       --line: #e8edf3;
       --muted: #64748b;
@@ -177,6 +177,11 @@ button[type="submit"]:hover {
   transform: scale(1.01);
 }
 
+button[type="submit"]:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
     
     .extra-links {
       text-align: center;
@@ -248,7 +253,7 @@ button[type="submit"]:hover {
 }
 
 .forgot {
-  color: #b4975a;
+  color: var(--gold);
   font-weight: 200;
 }
 
@@ -270,7 +275,8 @@ button[type="submit"]:hover {
 </head>
 
 <body>
-  <div class="overlay">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="overlay" id="main" role="main" tabindex="-1">
     <!-- LEFT PANEL -->
     <div class="left-panel">
       <div class="form-container">

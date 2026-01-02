@@ -154,7 +154,7 @@ header {
   background: #ffffff;
   padding: 24px 0;
   font-size: 14px;
-  color: #9ca3af;
+  color: #6b7280;
 }
 
 .footer-inner {
@@ -170,7 +170,7 @@ header {
 .footer p {
   justify-self: start;
   margin: 0;
-  color: #9ca3af;
+  color: #6b7280;
   font-family: 'Sarabun', sans-serif;
   font-weight: 200;
 }
@@ -186,13 +186,13 @@ header {
 }
 
 .footer nav a {
-  color: #9ca3af;
+  color: #6b7280;
   text-decoration: none;
   transition: color 0.25s ease;
 }
 
 .footer nav a:hover {
-  color: #ffffff;
+  color: #1a2230;
 }
 
 .footer nav span {
@@ -201,13 +201,30 @@ header {
 
 .footer .region {
   justify-self: end;
-  color: #9ca3af;
+  color: #6b7280;
   font-family: 'Sarabun', sans-serif;
   font-weight: 200;
 }
 
 html {
   scroll-behavior: smooth;
+}
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -40px;
+  background: #1a2230;
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  text-decoration: none;
+  z-index: 10000;
+  font-size: 14px;
+}
+
+.skip-link:focus {
+  top: 12px;
 }
 
 /* GPU Layer Promotion for Smooth Scrolling */

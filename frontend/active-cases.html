@@ -6,6 +6,23 @@
   <title>Cases &amp; Files Redirect – Let’s‑ParaConnect</title>
   <meta http-equiv="refresh" content="0;url=dashboard-attorney.html#cases" />
   <style>
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+
     body {
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
@@ -26,7 +43,7 @@
       box-shadow: 0 25px 60px rgba(10, 16, 34, 0.08);
     }
     .redirect-card a {
-      color: #b4975a;
+      color: #887244;
       font-weight: 600;
       text-decoration: none;
     }
@@ -46,7 +63,8 @@
   </script>
 </head>
 <body>
-  <div class="redirect-card">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <div class="redirect-card" id="main" role="main" tabindex="-1">
     <h1>Cases moved!</h1>
     <p>The Cases &amp; Files tools now live directly inside your dashboard.</p>
     <p><a href="dashboard-attorney.html#cases">Go to the dashboard</a></p>

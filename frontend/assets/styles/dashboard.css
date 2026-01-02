@@ -531,6 +531,13 @@ td a:hover {
 .status.pending { background: rgba(255, 193, 7, 0.15); color: #b68b00; }
 .status.released { background: rgba(31,122,74,0.1); color: #1f7a4a; }
 .status.held { background: rgba(176,71,71,0.1); color: #b04747; }
+.status.user { background: rgba(37, 99, 235, 0.12); color: #1d4ed8; }
+.status.case { background: rgba(16, 185, 129, 0.12); color: #047857; }
+.status.payment { background: rgba(245, 158, 11, 0.12); color: #b45309; }
+.status.message { background: rgba(99, 102, 241, 0.12); color: #4338ca; }
+.status.dispute { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
+.status.document { background: rgba(148, 163, 184, 0.18); color: #475569; }
+.status.other { background: rgba(120, 113, 108, 0.12); color: #57534e; }
 
 .modal {
   display: none;

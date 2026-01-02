@@ -16,6 +16,23 @@
 
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
   <style>
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+
     .gold{color:#b4975a;}
     :root {
       --bg:#ffffff;
@@ -107,6 +124,7 @@
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
     <nav>
@@ -121,12 +139,12 @@
     </div>
   </aside>
 
-  <main class="main">
+  <main id="main" tabindex="-1" class="main">
     <div class="topbar">
       <h1 style="font-family:var(--font-serif);font-weight:300;font-size:2rem;">Case Invoices</h1>
       <div class="more-actions" id="moreActions">
-        <button class="more-trigger" type="button">More Actions ▾</button>
-        <div class="more-menu">
+        <button class="more-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="caseInvoicesMenu">More Actions ▾</button>
+        <div class="more-menu" id="caseInvoicesMenu">
           <button onclick="downloadAll()">Download All</button>
           <button onclick="exportCsv()">Export CSV</button>
           <button onclick="emailSummary()">Email Summary</button>
@@ -140,7 +158,7 @@
     </div>
 
     <div class="actions-row">
-      <input type="search" id="searchInput" placeholder="Search invoices or cases..." />
+      <input type="search" id="searchInput" placeholder="Search invoices or cases..." aria-label="Search invoices or cases" />
       <select id="itemsPerPage" disabled>
         <option>Items per page: 100</option>
       </select>
@@ -222,7 +240,7 @@
       filtered.forEach(inv=>{
         const tr=document.createElement('tr');
         tr.innerHTML=`
-          <td><a class="invoice-link" onclick="openInvoice('${inv.invoiceNo}')">${inv.invoiceNo}</a></td>
+          <td><a class="invoice-link" href="#" onclick="openInvoice('${inv.invoiceNo}'); return false;">${inv.invoiceNo}</a></td>
           <td>${inv.createdOn}</td>
           <td>${inv.caseName}</td>
           <td>$${inv.invoiceAmt.toLocaleString()}</td>
@@ -270,9 +288,33 @@
     });
 
     const moreActions=document.getElementById('moreActions');
+    const moreTrigger=moreActions?.querySelector('.more-trigger');
+
+    function closeMoreActions({ returnFocus = false } = {}) {
+      if (!moreActions) return;
+      moreActions.classList.remove('open');
+      if (moreTrigger) moreTrigger.setAttribute('aria-expanded', 'false');
+      if (returnFocus && moreTrigger) moreTrigger.focus();
+    }
+
     document.addEventListener('click',e=>{
-      if(moreActions.contains(e.target)) moreActions.classList.toggle('open');
-      else moreActions.classList.remove('open');
+      if (!moreActions) return;
+      if(moreActions.contains(e.target)) {
+        const willOpen = !moreActions.classList.contains('open');
+        closeMoreActions();
+        if (willOpen) {
+          moreActions.classList.add('open');
+          if (moreTrigger) moreTrigger.setAttribute('aria-expanded', 'true');
+        }
+      } else {
+        closeMoreActions();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeMoreActions({ returnFocus: true });
+      }
     });
 
     function downloadAll(){alert('Preparing invoice PDF bundle...');}

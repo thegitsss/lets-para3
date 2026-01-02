@@ -7,6 +7,23 @@
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
   <script src="assets/scripts/utils/session.js"></script>
   <style>
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+
     .gold{color:#b4975a;}
     :root {
       --bg:#fff;
@@ -82,12 +99,17 @@
     nav a{text-decoration:none;color:var(--sidebar-text);font-weight:300;font-size:.95rem;padding:10px 14px;border-radius:8px;transition:background .3s;}
     nav a.active,nav a:hover{background:rgba(0,0,0,0.04);}
     body.theme-dark nav a.active, body.theme-dark nav a:hover{background:rgba(255,255,255,0.12);}
-    body.theme-mountain nav a{color:#fff;}
-    body.theme-mountain nav a.active,body.theme-mountain nav a:hover{background:rgba(255,255,255,0.18);}
+    body.theme-mountain nav a,
+    body.theme-mountain-dark nav a{color:#fff;}
+    body.theme-mountain nav a.active,body.theme-mountain nav a:hover,
+    body.theme-mountain-dark nav a.active,body.theme-mountain-dark nav a:hover{background:rgba(255,255,255,0.18);}
     .sidebar-footer{font-size:.7rem;color:var(--muted);text-align:center;}
-    body.theme-mountain .sidebar{background:url('hero-mountain.jpg') center/cover no-repeat;}
-    body.theme-mountain .sidebar::before{background:rgba(0,0,0,0.45);}
-    body.theme-mountain .sidebar > *{position:relative;z-index:1;}
+    body.theme-mountain .sidebar,
+    body.theme-mountain-dark .sidebar{background:url('hero-mountain.jpg') center/cover no-repeat;}
+    body.theme-mountain .sidebar::before,
+    body.theme-mountain-dark .sidebar::before{background:rgba(0,0,0,0.45);}
+    body.theme-mountain .sidebar > *,
+    body.theme-mountain-dark .sidebar > *{position:relative;z-index:1;}
     .main{flex:1;padding:40px;overflow-y:auto;background:var(--bg);}
     .topbar{display:flex;justify-content:flex-end;margin-bottom:1.5rem;}
     .notification-icon{
@@ -255,11 +277,14 @@
     body.theme-dark .sidebar-link:hover,
     body.theme-dark .sidebar-link:focus,
     body.theme-mountain .sidebar-link:hover,
-    body.theme-mountain .sidebar-link:focus{
+    body.theme-mountain .sidebar-link:focus,
+    body.theme-mountain-dark .sidebar-link:hover,
+    body.theme-mountain-dark .sidebar-link:focus{
       color:#fff;
       background:rgba(255,255,255,0.12);
     }
-    body.theme-mountain .sidebar-link{color:#fff;}
+    body.theme-mountain .sidebar-link,
+    body.theme-mountain-dark .sidebar-link{color:#fff;}
     .sidebar-bottom{
       margin-top:auto;
       display:flex;
@@ -272,6 +297,7 @@
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
   <div id="paralegalCaseFiles" class="role-shell hidden">
     <aside class="sidebar">
       <div class="logo">Dashboard</div>
@@ -287,7 +313,7 @@
       </div>
     </aside>
 
-    <main class="main">
+    <main class="main" tabindex="-1" data-main>
       <div class="topbar" data-attorney-header></div>
       <header class="page-header">
         <div>
@@ -322,7 +348,7 @@
       </div>
     </aside>
 
-    <main class="main">
+    <main class="main" tabindex="-1" data-main>
       <div class="topbar" data-attorney-header></div>
       <div class="info-banner">
         <strong>Looking for Case Files?</strong> Manage uploads, downloads, and approvals from the unified
@@ -380,13 +406,29 @@
 
     const paralegalShell = document.getElementById("paralegalCaseFiles");
     const attorneyShell = document.getElementById("attorneyCaseFiles");
+    const mainTargets = document.querySelectorAll("[data-main]");
+
+    function setActiveMain(shell) {
+      mainTargets.forEach((el) => el.removeAttribute("id"));
+      const mainEl = shell?.querySelector("[data-main]");
+      if (mainEl) {
+        mainEl.id = "main";
+      }
+    }
+
+    function setShellHidden(shell, hidden) {
+      if (!shell) return;
+      shell.classList.toggle("hidden", hidden);
+      shell.setAttribute("aria-hidden", hidden ? "true" : "false");
+    }
 
     document.addEventListener("DOMContentLoaded", async () => {
       const role = await resolveRole();
-      paralegalShell?.classList.add("hidden");
-      attorneyShell?.classList.add("hidden");
+      setShellHidden(paralegalShell, true);
+      setShellHidden(attorneyShell, true);
       if (role === "paralegal") {
-        paralegalShell?.classList.remove("hidden");
+        setShellHidden(paralegalShell, false);
+        setActiveMain(paralegalShell);
         await initCaseFilesView({
           containerId: "filesContainer",
           filters: [
@@ -399,7 +441,8 @@
           unauthorizedCopy: "You need a paralegal account to view these files.",
         });
       } else {
-        attorneyShell?.classList.remove("hidden");
+        setShellHidden(attorneyShell, false);
+        setActiveMain(attorneyShell);
         await initCaseFilesView({
           containerId: "attorneyFilesContainer",
           filters: [

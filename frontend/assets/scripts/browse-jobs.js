@@ -87,21 +87,52 @@ async function loadJobs() {
       event.stopPropagation();
       const jobId = btn.dataset.id;
       if (!jobId) return;
-      await submitQuickApplication(jobId);
+      const coverLetter = promptCoverLetter();
+      if (!coverLetter) return;
+      await submitQuickApplication(jobId, coverLetter);
     });
   });
 }
 
-async function submitQuickApplication(jobId) {
+function promptCoverLetter() {
+  const note = window.prompt(
+    "Add a brief cover letter (20+ characters). This is required to apply."
+  );
+  if (!note) return "";
+  const trimmed = note.trim();
+  if (trimmed.length < 20) {
+    alert("Please include at least 20 characters in your cover letter.");
+    return "";
+  }
+  return trimmed;
+}
+
+async function submitQuickApplication(jobId, coverLetter) {
   try {
-    await secureFetch(`/api/jobs/${jobId}/apply`, {
+    const res = await secureFetch(`/api/jobs/${jobId}/apply`, {
       method: "POST",
-      body: { coverLetter: "" }
+      body: { coverLetter },
+      noRedirect: true,
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const message = data?.error || "Unable to submit application.";
+      if (res.status === 403 && /stripe/i.test(message)) {
+        promptStripeOnboarding(message);
+        return;
+      }
+      throw new Error(message);
+    }
     alert("Application submitted!");
   } catch (err) {
     alert("Unable to submit application.");
   }
+}
+
+function promptStripeOnboarding(message) {
+  const copy = message || "Complete Stripe onboarding before applying.";
+  const go = window.confirm(`${copy} Open Profile Settings to connect Stripe now?`);
+  if (go) window.location.href = "profile-settings.html";
 }
 
 async function ensureAttorneyPreview(job) {
@@ -222,7 +253,9 @@ jobApplyBtn?.addEventListener("click", async () => {
   if (!modalJob) return;
   const jobId = modalJob._id || modalJob.id;
   if (!jobId) return;
-  await submitQuickApplication(jobId);
+  const coverLetter = promptCoverLetter();
+  if (!coverLetter) return;
+  await submitQuickApplication(jobId, coverLetter);
 });
 
 function escapeHtml(value) {

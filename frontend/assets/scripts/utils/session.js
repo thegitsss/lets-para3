@@ -8,7 +8,7 @@
   let cachedSessionToken = null;
   const LEGACY_TOKEN_KEYS = ["lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"];
   const THEME_STORAGE_KEY = "lpc_theme";
-  const VALID_THEMES = ["light", "dark", "mountain"];
+  const VALID_THEMES = ["light", "dark", "mountain", "mountain-dark"];
   let currentTheme = null;
 
   function normalizeTheme(value) {
@@ -16,27 +16,35 @@
     return VALID_THEMES.includes(candidate) ? candidate : "mountain";
   }
 
-  function applyClassToBody(className) {
+  function applyClassToBody(classNames) {
+    const classes = Array.isArray(classNames) ? classNames : [classNames];
     const targets = [];
     if (document.body) targets.push(document.body);
     if (document.documentElement) targets.push(document.documentElement);
     targets.forEach((node) => {
       VALID_THEMES.forEach((theme) => node.classList.remove(`theme-${theme}`));
-      node.classList.add(className);
+      classes.forEach((value) => {
+        if (value) node.classList.add(value);
+      });
     });
+  }
+
+  function getThemeClasses(theme) {
+    if (theme === "mountain-dark") return ["theme-mountain-dark", "theme-dark"];
+    return [`theme-${theme}`];
   }
 
   function setThemeClass(theme) {
     const normalized = normalizeTheme(theme);
     if (currentTheme === normalized) return normalized;
-    const className = `theme-${normalized}`;
+    const classNames = getThemeClasses(normalized);
     if (document.body) {
-      applyClassToBody(className);
+      applyClassToBody(classNames);
     } else {
       document.addEventListener(
         "DOMContentLoaded",
         () => {
-          applyClassToBody(className);
+          applyClassToBody(classNames);
         },
         { once: true }
       );
@@ -45,23 +53,28 @@
     return normalized;
   }
 
-  function readStoredTheme() {
-    try {
-      const stored = localStorage.getItem(THEME_STORAGE_KEY);
-      if (stored) return normalizeTheme(stored);
-    } catch (_) {}
-    return "mountain";
+  function getThemeStorageKey(userId) {
+    return userId ? `${THEME_STORAGE_KEY}_${userId}` : THEME_STORAGE_KEY;
   }
 
-  function persistTheme(theme) {
+  function readStoredTheme(userId) {
     try {
-      localStorage.setItem(THEME_STORAGE_KEY, theme);
+      const stored = localStorage.getItem(getThemeStorageKey(userId));
+      if (stored) return normalizeTheme(stored);
+    } catch (_) {}
+    return userId ? null : "mountain";
+  }
+
+  function persistTheme(theme, userId) {
+    try {
+      localStorage.setItem(getThemeStorageKey(userId), theme);
     } catch (_) {}
   }
 
   function applyThemePreference(theme) {
     const normalized = setThemeClass(theme);
-    persistTheme(normalized);
+    const userId = cachedUser?.id || cachedUser?._id;
+    persistTheme(normalized, userId || null);
     if (cachedUser) {
       cachedUser.preferences = { ...(cachedUser.preferences || {}), theme: normalized };
       try {
@@ -72,9 +85,11 @@
   }
 
   function applyThemeFromUser(user) {
+    const userId = user?.id || user?._id;
     const theme =
       (user && user.preferences && user.preferences.theme) ||
-      readStoredTheme();
+      readStoredTheme(userId) ||
+      "mountain";
     applyThemePreference(theme);
   }
 
@@ -119,6 +134,7 @@
         .catch(() => null)
         .then((user) => {
           cachedUser = user;
+          syncStoredUser(user);
           applyThemeFromUser(user);
           try {
             if (user?.avatarURL) {
@@ -229,6 +245,7 @@
     cachedUser = { ...(cachedUser || {}), ...user };
     applyThemeFromUser(cachedUser);
     sessionPromise = Promise.resolve(cachedUser);
+    persistStoredUser(cachedUser);
     if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
       try {
         window.dispatchEvent(new CustomEvent("lpc:user-updated", { detail: cachedUser }));
@@ -253,6 +270,55 @@
       return raw ? JSON.parse(raw) : null;
     } catch (_) {
       return null;
+    }
+  }
+
+  function readStoredUserRaw() {
+    try {
+      const raw = localStorage.getItem("lpc_user");
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function normalizeUserId(user) {
+    return String(user?.id || user?._id || "");
+  }
+
+  function normalizeRole(user) {
+    return String(user?.role || "").toLowerCase();
+  }
+
+  function persistStoredUser(user) {
+    try {
+      if (user) {
+        localStorage.setItem("lpc_user", JSON.stringify(user));
+      } else {
+        localStorage.removeItem("lpc_user");
+      }
+    } catch (_) {}
+  }
+
+  function syncStoredUser(serverUser) {
+    const stored = readStoredUserRaw();
+    if (!serverUser) {
+      if (stored) persistStoredUser(null);
+      return;
+    }
+    if (!stored) {
+      persistStoredUser(serverUser);
+      return;
+    }
+    const sameId = normalizeUserId(stored) === normalizeUserId(serverUser);
+    const sameRole = normalizeRole(stored) === normalizeRole(serverUser);
+    if (!sameId || !sameRole) {
+      persistStoredUser(serverUser);
+      if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+        try {
+          window.dispatchEvent(new CustomEvent("lpc:user-updated", { detail: serverUser }));
+        } catch (_) {}
+      }
     }
   }
 
@@ -282,7 +348,8 @@
   window.refreshSession = refreshSession;
   window.updateSessionUser = updateSessionUser;
   window.applyThemePreference = applyThemePreference;
-  window.getThemePreference = () => currentTheme || readStoredTheme();
+  window.getThemePreference = () =>
+    currentTheme || readStoredTheme(cachedUser?.id || cachedUser?._id);
 
   function updateHeaderBasedOnAuth(isLoggedIn) {
     document.querySelectorAll("[data-authed-only]").forEach((el) => {

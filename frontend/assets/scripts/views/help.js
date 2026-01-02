@@ -1,7 +1,7 @@
 // frontend/assets/scripts/views/help.js
 // Rich Help page: FAQs, health check, diagnostics copy/email/download, cache reset.
 
-const SUPPORT_EMAIL = "admin@lets-paraconnect.com";
+const SUPPORT_EMAIL = "support@lets-paraconnect.com";
 
 function ensureStylesOnce() {
   if (document.getElementById("pc-help-styles")) return;

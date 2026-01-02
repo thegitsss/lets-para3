@@ -70,6 +70,13 @@ async function ensureSession() {
   }
 }
 
+function promptStripeOnboarding(message) {
+  const copy = message || "Complete Stripe onboarding before applying.";
+  toast?.show?.(copy, { targetId: "toastBanner", type: "error" });
+  const go = window.confirm(`${copy} Open Profile Settings to connect Stripe now?`);
+  if (go) window.location.href = "profile-settings.html";
+}
+
 // Toggle filter menu
 if (filterToggle && filterMenu) {
   filterToggle.addEventListener("click", () => {
@@ -554,7 +561,15 @@ async function submitApplication() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data?.error || "Unable to submit application.");
+      const message = data?.error || "Unable to submit application.";
+      if (res.status === 403 && /stripe/i.test(message)) {
+        applyStatus.textContent = message;
+        applySubmitBtn.disabled = false;
+        applySubmitBtn.textContent = "Submit application";
+        promptStripeOnboarding(message);
+        return;
+      }
+      throw new Error(message);
     }
     applyStatus.textContent = "Application submitted!";
     markJobAsApplied(jobId);

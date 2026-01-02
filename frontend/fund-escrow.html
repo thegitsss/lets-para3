@@ -6,9 +6,29 @@
   <title>Hire &amp; Start Work</title>
   <link rel="stylesheet" href="assets/styles/main.css">
   <script src="https://js.stripe.com/v3/"></script>
+
+  <style>
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+  </style>
 </head>
 <body class="dash">
-  <main class="container" style="max-width:640px;margin:2rem auto;padding:1.5rem;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <main id="main" tabindex="-1" class="container" style="max-width:640px;margin:2rem auto;padding:1.5rem;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
     <h1 style="margin-top:0;">Hire &amp; Start Work</h1>
     <p id="caseTitle" style="color:#444;margin-bottom:0.5rem;"></p>
     <p id="caseStatus" style="color:#888;margin-top:0;"></p>

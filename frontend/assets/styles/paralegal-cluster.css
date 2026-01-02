@@ -162,6 +162,8 @@ body.theme-mountain #clusterRole {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
 }
 
 [data-paralegal-cluster] [data-notification-list] li,

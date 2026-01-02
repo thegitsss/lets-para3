@@ -2,8 +2,10 @@
 // Case detail view wired to /api/cases/:caseId
 
 import { j } from "../helpers.js";
-import { requireAuth } from "../auth.js";
+import { requireAuth, fetchCSRF } from "../auth.js";
 import { render as renderChecklist } from "./checklist.js";
+
+console.log("case-detail.js loaded");
 
 function normalizeSessionPayload(raw) {
   if (!raw) return null;
@@ -79,7 +81,8 @@ function draw(root, data, escapeHTML, caseId, session) {
     : Number(data?.totalAmount) || 0;
   const budgetDisplay = formatCurrency(budgetCents / 100);
   const zoomLink = data?.zoomLink;
-  const escrowFunded = !!data?.escrowIntentId;
+  const escrowFunded =
+    !!data?.escrowIntentId && String(data?.escrowStatus || "").toLowerCase() === "funded";
   const applicants = Array.isArray(data?.applicants) ? data.applicants : [];
   const viewer = session?.user || {};
   const viewerRole = String(session?.role || viewer.role || "").toLowerCase();
@@ -269,6 +272,7 @@ function draw(root, data, escapeHTML, caseId, session) {
   bindApplicationForm(root, caseId);
   bindInviteResponses(root, caseId);
   bindTerminationButton(root, caseId);
+  bindApplicantDocLinks(root);
   const checklistHost = root.querySelector("#caseChecklist");
   if (checklistHost) {
     renderChecklist(checklistHost, { caseId: data?._id || caseId }).catch((err) => {
@@ -315,6 +319,8 @@ function ensureStyles() {
     .applicant-card{display:flex;align-items:flex-start;gap:16px;border:1px solid #e5e7eb;padding:16px;border-radius:14px;background:#fff}
     .applicant-card-main{display:grid;gap:8px;flex:1}
     .applicant-name{font-weight:600;font-size:1rem}
+    .applicant-name a{color:inherit;text-decoration:none;border-bottom:1px solid transparent;transition:color .2s ease,border-color .2s ease}
+    .applicant-name a:hover,.applicant-name a:focus{color:#0f172a;border-color:#0f172a}
     .applicant-status{font-size:.85rem;color:#6b7280;text-transform:capitalize}
     .applicant-summary{display:flex;flex-wrap:wrap;gap:8px}
     .applicant-summary span{font-size:.8rem;color:#374151;background:#f3f4f6;padding:2px 10px;border-radius:999px}
@@ -377,14 +383,33 @@ function escapeAttribute(value = "") {
   return String(value ?? "").replace(/"/g, "&quot;");
 }
 
+function isHttpUrl(value) {
+  return /^https?:\/\//i.test(String(value || ""));
+}
+
+function normalizeDocKey(value) {
+  if (!value) return "";
+  return String(value).replace(/^\/+/, "");
+}
+
 function renderApplicant(applicant, escapeHTML, { canInvite } = {}) {
-  const person = applicant?.paralegal || {};
+  const person =
+    applicant?.paralegal && typeof applicant.paralegal === "object"
+      ? applicant.paralegal
+      : applicant?.paralegalId && typeof applicant.paralegalId === "object"
+      ? applicant.paralegalId
+      : {};
   const displayName =
     person?.name ||
     [person?.firstName, person?.lastName].filter(Boolean).join(" ").trim() ||
     "Paralegal";
   const status = (applicant?.status || "pending").replace(/_/g, " ");
-  const paralegalId = applicant?.paralegal?.id || applicant?.paralegalId || "";
+  const paralegalId =
+    applicant?.paralegal?.id ||
+    applicant?.paralegal?._id ||
+    applicant?.paralegalId?._id ||
+    applicant?.paralegalId ||
+    "";
   const appliedAt = applicant?.appliedAt ? new Date(applicant.appliedAt).toLocaleDateString() : "";
   const showInvite = canInvite && paralegalId;
   const snapshot = applicant?.profileSnapshot && typeof applicant.profileSnapshot === "object" ? applicant.profileSnapshot : {};
@@ -411,7 +436,12 @@ function renderApplicant(applicant, escapeHTML, { canInvite } = {}) {
       </div>`
     : "";
   const resumeURL = applicant?.resumeURL || "";
+  const resumeIsHttp = isHttpUrl(resumeURL);
+  const resumeKey = resumeIsHttp ? "" : normalizeDocKey(resumeURL);
   const linkedInURL = applicant?.linkedInURL || "";
+  const profileHref = paralegalId
+    ? `profile-paralegal.html?paralegalId=${encodeURIComponent(paralegalId)}`
+    : "";
   const avatar = snapshot.profileImage || person?.profileImage || person?.avatarURL || "";
   const avatarMarkup = avatar
     ? `<img src="${escapeAttribute(avatar)}" alt="${escapeHTML(displayName)}" />`
@@ -423,14 +453,22 @@ function renderApplicant(applicant, escapeHTML, { canInvite } = {}) {
         ${avatarMarkup}
       </div>
       <div class="applicant-card-main">
-        <div class="applicant-name">${escapeHTML(displayName)}</div>
+        <div class="applicant-name">
+          ${
+            profileHref
+              ? `<a href="${escapeAttribute(profileHref)}">${escapeHTML(displayName)}</a>`
+              : `${escapeHTML(displayName)}`
+          }
+        </div>
         <div class="applicant-status">${escapeHTML(status)}${appliedAt ? ` · Applied ${escapeHTML(appliedAt)}` : ""}</div>
         ${summaryHtml}
         ${coverLetterHtml}
         <div class="applicant-links">
           ${
             resumeURL
-              ? `<a class="chip" href="${escapeAttribute(resumeURL)}" target="_blank" rel="noopener">Résumé</a>`
+              ? resumeIsHttp
+                ? `<a class="chip" href="${escapeAttribute(resumeURL)}" target="_blank" rel="noopener">Résumé</a>`
+                : `<a class="chip" href="#" data-doc-key="${escapeAttribute(resumeKey)}">Résumé</a>`
               : `<span class="chip muted" aria-disabled="true">No résumé</span>`
           }
           ${
@@ -553,11 +591,15 @@ function bindInviteResponses(root, caseId) {
       await j(`/api/cases/${encodeURIComponent(caseId)}/respond-invite`, {
         method: "POST",
         body: { decision },
+        noRedirect: true,
       });
       setStatus("Updated. Reloading…", true);
       setTimeout(() => window.location.reload(), 500);
     } catch (err) {
       setStatus(err?.message || "Unable to update invitation.", false);
+      if (err?.status === 403 && /stripe/i.test(err?.message || "")) {
+        promptStripeOnboarding(err.message);
+      }
       acceptBtn?.removeAttribute("disabled");
       declineBtn?.removeAttribute("disabled");
     }
@@ -593,6 +635,30 @@ function bindDownloadButton(root, caseId) {
   btn.addEventListener("click", () => downloadArchive(caseId, btn));
 }
 
+function bindApplicantDocLinks(root) {
+  const list = root?.querySelector(".applicant-list");
+  if (!list || list.dataset.docsBound === "true") return;
+  list.dataset.docsBound = "true";
+  list.addEventListener("click", async (event) => {
+    const link = event.target.closest("a[data-doc-key]");
+    if (!link) return;
+    event.preventDefault();
+    const key = link.dataset.docKey || "";
+    if (!key) return;
+    try {
+      const params = new URLSearchParams({ key });
+      const data = await j(`/api/uploads/signed-get?${params.toString()}`);
+      if (data?.url) {
+        window.open(data.url, "_blank", "noopener");
+      } else {
+        notify("Document unavailable.", "error");
+      }
+    } catch (err) {
+      notify(err?.message || "Unable to open document.", "error");
+    }
+  });
+}
+
 function bindApplicationForm(root, caseId) {
   const form = root.querySelector("[data-case-apply-form]");
   if (!form) return;
@@ -614,6 +680,7 @@ function bindApplicationForm(root, caseId) {
       await j(`/api/cases/${encodeURIComponent(caseId)}/apply`, {
         method: "POST",
         body: { note },
+        noRedirect: true,
       });
       if (statusNode) statusNode.textContent = "Application submitted!";
       if (textarea) textarea.value = "";
@@ -621,6 +688,9 @@ function bindApplicationForm(root, caseId) {
       setTimeout(() => window.location.reload(), 800);
     } catch (err) {
       if (statusNode) statusNode.textContent = err?.message || "Unable to apply right now.";
+      if (err?.status === 403 && /stripe/i.test(err?.message || "")) {
+        promptStripeOnboarding(err.message);
+      }
     } finally {
       if (restoreButton && submitBtn) {
         submitBtn.disabled = false;
@@ -628,6 +698,12 @@ function bindApplicationForm(root, caseId) {
       }
     }
   });
+}
+
+function promptStripeOnboarding(message) {
+  const copy = message || "Complete Stripe onboarding before proceeding.";
+  const go = window.confirm(`${copy} Open Profile Settings to connect Stripe now?`);
+  if (go) window.location.href = "profile-settings.html";
 }
 
 function setupPaymentSection(root, caseId, enable) {
@@ -749,14 +825,30 @@ async function startEscrow(caseId, button) {
     notify("Escrow funding is currently unavailable.", "error");
     return;
   }
+  const originalText = button?.textContent || "Hire & Start Work";
+  if (button) {
+    button.dataset.btnText = originalText;
+    button.textContent = "Processing payment...";
+    button.setAttribute("aria-busy", "true");
+  }
   try {
     await ensureStripeCard();
   } catch (err) {
     notify(err?.message || "Unable to load payment form.", "error");
+    if (button) {
+      button.textContent = button.dataset.btnText || originalText;
+      button.removeAttribute("aria-busy");
+      delete button.dataset.btnText;
+    }
     return;
   }
   if (!cardElementInstance) {
     notify("Payment form is not ready.", "error");
+    if (button) {
+      button.textContent = button.dataset.btnText || originalText;
+      button.removeAttribute("aria-busy");
+      delete button.dataset.btnText;
+    }
     return;
   }
   if (cardErrorsNode) cardErrorsNode.textContent = "";
@@ -781,6 +873,11 @@ async function startEscrow(caseId, button) {
     window.location.reload();
   } catch (err) {
     button?.removeAttribute("disabled");
+    if (button) {
+      button.textContent = button.dataset.btnText || originalText;
+      button.removeAttribute("aria-busy");
+      delete button.dataset.btnText;
+    }
     notify(err?.message || "Unable to fund escrow.", "error");
   }
 }
@@ -893,3 +990,48 @@ function notify(message, type = "info") {
     alert(message);
   }
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("hireStartWorkBtn");
+  console.log("hireStartWorkBtn found:", btn);
+
+  if (!btn) return;
+
+  btn.addEventListener("click", async () => {
+    console.log("HIRE CLICKED");
+    const caseId =
+      window.caseId ||
+      window.CASE_ID ||
+      document.body?.dataset?.caseId ||
+      new URLSearchParams(window.location.search).get("caseId") ||
+      "";
+    const paralegalId =
+      window.paralegalId ||
+      window.PARALEGAL_ID ||
+      document.body?.dataset?.paralegalId ||
+      btn.dataset.paralegalId ||
+      "";
+
+    try {
+      const csrfToken = await fetchCSRF().catch(() => "");
+      const response = await fetch(
+        `/api/cases/${encodeURIComponent(caseId)}/hire/${encodeURIComponent(paralegalId)}`,
+        {
+          method: "POST",
+          headers: { "x-csrf-token": csrfToken },
+          credentials: "include",
+        }
+      );
+      const payload = await response.json().catch(() => ({}));
+      console.log("Hire response status:", response.status);
+      console.log("Hire response JSON:", payload);
+      if (!response.ok) {
+        console.error("Hire error:", payload);
+        return;
+      }
+      window.location.reload();
+    } catch (err) {
+      console.error("Hire request failed:", err);
+    }
+  });
+});

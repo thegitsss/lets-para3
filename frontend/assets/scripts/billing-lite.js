@@ -1,42 +1,42 @@
 import { secureFetch } from "./auth.js";
 import { createElements, mountPaymentElement, confirmSetup } from "./payments.js";
 
-const surface = document.querySelector("[data-billing-surface]");
-if (!surface) {
-  return;
-}
+function initBillingLite() {
+  const surface = document.querySelector("[data-billing-surface]");
+  if (!surface) return;
 
-const historyList = document.getElementById("historyList");
-const portalBtn = document.getElementById("openPortalBtn");
-const financeAlertsEl = document.getElementById("financeAlerts");
-const escrowTableBody = document.getElementById("escrowTableBody");
-const refreshEscrowsBtn = document.getElementById("refreshEscrowsBtn");
-const currencyFormatter = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" });
-const paymentSummaryEl = document.getElementById("paymentMethodSummary");
-const paymentFormEl = document.getElementById("paymentMethodForm");
-const paymentElementHost = document.getElementById("paymentMethodElement");
-const paymentErrorsEl = document.getElementById("paymentMethodErrors");
-const addCardBtn = document.getElementById("addPaymentMethodBtn");
-const replaceCardBtn = document.getElementById("replacePaymentMethodBtn");
-const saveCardBtn = document.getElementById("savePaymentMethodBtn");
-const cancelCardBtn = document.getElementById("cancelPaymentMethodBtn");
+  const historyList = document.getElementById("historyList");
+  const portalBtn = document.getElementById("openPortalBtn");
+  const financeAlertsEl = document.getElementById("financeAlerts");
+  const escrowTableBody = document.getElementById("escrowTableBody");
+  const refreshEscrowsBtn = document.getElementById("refreshEscrowsBtn");
+  const currencyFormatter = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" });
+  const paymentSummaryEl = document.getElementById("paymentMethodSummary");
+  const paymentFormEl = document.getElementById("paymentMethodForm");
+  const paymentElementHost = document.getElementById("paymentMethodElement");
+  const paymentErrorsEl = document.getElementById("paymentMethodErrors");
+  const paymentModalEl = document.getElementById("paymentMethodModal");
+  const addCardBtn = document.getElementById("addPaymentMethodBtn");
+  const replaceCardBtn = document.getElementById("replacePaymentMethodBtn");
+  const saveCardBtn = document.getElementById("savePaymentMethodBtn");
+  const cancelCardBtn = document.getElementById("cancelPaymentMethodBtn");
 
-let cachedEscrows = [];
-let openDrawerEl = null;
-let setupElements = null;
-let setupPaymentElement = null;
+  let cachedEscrows = [];
+  let openDrawerEl = null;
+  let openDrawerTrigger = null;
+  let setupElements = null;
+  let setupPaymentElement = null;
 
-const STRIPE_JS_SRC = "https://js.stripe.com/v3/";
-let stripeJsPromise = null;
+  const STRIPE_JS_SRC = "https://js.stripe.com/v3/";
+  let stripeJsPromise = null;
 
-initBillingSurface();
-
-async function initBillingSurface() {
-  bindEvents();
-  await loadPaymentMethodStatus();
-  const activeItems = await loadActiveEscrows(true);
-  await Promise.all([loadFinanceAlerts(activeItems), loadHistory()]);
-}
+  (async function initBillingSurface() {
+    console.log("billing-lite loaded");
+    bindEvents();
+    await loadPaymentMethodStatus();
+    const activeItems = await loadActiveEscrows(true);
+    await Promise.all([loadFinanceAlerts(activeItems), loadHistory()]);
+  })();
 
 function bindEvents() {
   portalBtn?.addEventListener("click", openBillingPortal);
@@ -53,6 +53,13 @@ function bindEvents() {
   escrowTableBody?.addEventListener("click", handleEscrowClick);
   financeAlertsEl?.addEventListener("click", handleAlertAction);
   document.addEventListener("click", handleGlobalClick);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && openDrawerEl) {
+      const trigger = openDrawerTrigger || openDrawerEl.querySelector(".action-toggle");
+      closeActionDrawers();
+      trigger?.focus();
+    }
+  });
   addCardBtn?.addEventListener("click", () => startPaymentMethodFlow());
   replaceCardBtn?.addEventListener("click", () => startPaymentMethodFlow());
   saveCardBtn?.addEventListener("click", () => savePaymentMethod());
@@ -93,6 +100,8 @@ function renderEscrowRow(entry = {}) {
   const funded = formatDate(entry.fundedAt || entry.updatedAt);
   const statusLabel = formatStatusLabel(entry.status || "");
   const caseId = String(entry.caseId || entry.id || "");
+  const safeCaseId = String(caseId || "case").replace(/[^a-z0-9_-]/gi, "");
+  const menuId = `escrow-actions-${safeCaseId || "case"}`;
   return `
     <tr>
       <td>${caseName}</td>
@@ -102,10 +111,10 @@ function renderEscrowRow(entry = {}) {
       <td><span class="pill">${statusLabel}</span></td>
       <td>
         <div class="action-drawer" data-case-id="${caseId}">
-          <button type="button" class="action-toggle" aria-haspopup="true" aria-expanded="false">
+          <button type="button" class="action-toggle" aria-haspopup="menu" aria-expanded="false" aria-controls="${menuId}">
             Actions <span aria-hidden="true">⋯</span>
           </button>
-          <div class="action-menu" role="menu">
+          <div class="action-menu" id="${menuId}" role="menu">
             <button type="button" data-escrow-action="view" data-case-id="${caseId}">View Case</button>
             <button type="button" data-escrow-action="release" data-case-id="${caseId}">Approve &amp; Release Funds</button>
             <button type="button" data-escrow-action="messages" data-case-id="${caseId}">Message Paralegal</button>
@@ -262,6 +271,7 @@ function toggleActionDrawer(drawer) {
     drawer.classList.add("open");
     drawer.querySelector(".action-toggle")?.setAttribute("aria-expanded", "true");
     openDrawerEl = drawer;
+    openDrawerTrigger = drawer.querySelector(".action-toggle");
   }
 }
 
@@ -271,6 +281,7 @@ function closeActionDrawers() {
     drawer.querySelector(".action-toggle")?.setAttribute("aria-expanded", "false");
   });
   openDrawerEl = null;
+  openDrawerTrigger = null;
 }
 
 function handleGlobalClick(event) {
@@ -382,15 +393,16 @@ function renderPaymentMethodSummary(payload = {}) {
       <div class="pm-row">
         <div class="pm-icon" aria-hidden="true">💳</div>
         <div>
-          <div class="pm-label">Default card on file</div>
-          <div class="pm-meta">${escapeHtml(brand)} •••• ${escapeHtml(last4)}${escapeHtml(exp)}</div>
+          <div class="pm-label">Primary payment method</div>
+          <div class="pm-meta">${escapeHtml(brand)} ending in ${escapeHtml(last4)}${escapeHtml(exp)}</div>
+          <div class="pm-helper">Used to fund escrow securely. Funds are released only after approval.</div>
         </div>
       </div>
     `;
     addCardBtn?.setAttribute("hidden", "hidden");
     replaceCardBtn?.removeAttribute("hidden");
   } else {
-    paymentSummaryEl.innerHTML = `<p class="muted">No default payment method yet. Add a card to speed up escrow funding.</p>`;
+    paymentSummaryEl.innerHTML = "";
     addCardBtn?.removeAttribute("hidden");
     replaceCardBtn?.setAttribute("hidden", "hidden");
   }
@@ -408,6 +420,12 @@ function resetPaymentElement() {
 async function startPaymentMethodFlow() {
   if (!paymentFormEl || !paymentElementHost) return;
   if (paymentErrorsEl) paymentErrorsEl.textContent = "";
+  if (paymentModalEl) {
+    paymentModalEl.classList.remove("hidden");
+    paymentModalEl.setAttribute("aria-hidden", "false");
+  }
+  paymentFormEl.hidden = false;
+  paymentElementHost.innerHTML = `<p class="muted">Loading secure card form…</p>`;
   addCardBtn?.setAttribute("aria-busy", "true");
   replaceCardBtn?.setAttribute("aria-busy", "true");
   try {
@@ -416,11 +434,14 @@ async function startPaymentMethodFlow() {
     resetPaymentElement();
     setupElements = await createElements(session.clientSecret, { appearance: { theme: "flat" } });
     setupPaymentElement = mountPaymentElement(setupElements, paymentElementHost);
-    paymentFormEl.hidden = false;
     paymentElementHost.scrollIntoView({ behavior: "smooth", block: "center" });
   } catch (err) {
     console.warn("Unable to start payment method flow", err);
+    if (paymentErrorsEl) paymentErrorsEl.textContent = err?.message || "Unable to start card setup.";
     showToast(err?.message || "Unable to start card setup.", "error");
+    if (paymentElementHost) {
+      paymentElementHost.innerHTML = `<p class="muted">${escapeHtml(err?.message || "Unable to load the secure card form right now.")}</p>`;
+    }
   } finally {
     addCardBtn?.removeAttribute("aria-busy");
     replaceCardBtn?.removeAttribute("aria-busy");
@@ -482,6 +503,10 @@ function cancelPaymentFlow() {
   resetPaymentElement();
   if (paymentFormEl) paymentFormEl.hidden = true;
   if (paymentErrorsEl) paymentErrorsEl.textContent = "";
+  if (paymentModalEl) {
+    paymentModalEl.classList.add("hidden");
+    paymentModalEl.setAttribute("aria-hidden", "true");
+  }
 }
 
 function renderHistoryCard(entry = {}) {
@@ -632,3 +657,7 @@ function showToast(message, type = "info") {
     helper.show(message, { targetId: "toastBanner", type });
   }
 }
+
+}
+
+document.addEventListener("DOMContentLoaded", initBillingLite);

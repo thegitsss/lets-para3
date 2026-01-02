@@ -12,11 +12,14 @@ expense: null,
 };
 
 let analyticsTimer;
+let analyticsInFlight = false;
 let latestAnalytics = null;
 const removedUserIds = new Set();
 let recentUsersCache = [];
 
 async function loadAnalytics() {
+if (analyticsInFlight) return null;
+analyticsInFlight = true;
 try {
 const res = await fetch("/api/admin/analytics", {
 credentials: "include",
@@ -30,6 +33,8 @@ return await res.json();
 } catch (err) {
 console.error("Failed to load analytics", err);
 return null;
+} finally {
+analyticsInFlight = false;
 }
 }
 
@@ -531,7 +536,22 @@ if (!data) return;
 
 applyAnalyticsPayload(data);
 if (analyticsTimer) clearInterval(analyticsTimer);
+const startAnalytics = () => {
+if (analyticsTimer) clearInterval(analyticsTimer);
 analyticsTimer = setInterval(hydrateAnalytics, REFRESH_INTERVAL_MS);
+};
+const stopAnalytics = () => {
+if (analyticsTimer) clearInterval(analyticsTimer);
+analyticsTimer = null;
+};
+document.addEventListener("visibilitychange", () => {
+if (document.hidden) {
+stopAnalytics();
+} else {
+startAnalytics();
+}
+});
+startAnalytics();
 });
 
 document.addEventListener("click", async (evt) => {

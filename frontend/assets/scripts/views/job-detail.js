@@ -82,12 +82,16 @@ function wire(root, jobId) {
       await j(`/api/jobs/${encodeURIComponent(jobId)}/apply`, {
         method: "POST",
         body: { coverLetter: letter },
+        noRedirect: true,
       });
       if (status) status.textContent = "Application submitted!";
       if (textarea) textarea.value = "";
       restoreButton = false;
     } catch (err) {
       if (status) status.textContent = err?.message || "Unable to apply right now.";
+      if (err?.status === 403 && /stripe/i.test(err?.message || "")) {
+        promptStripeOnboarding(err.message);
+      }
     } finally {
       if (restoreButton && submitBtn) {
         submitBtn.disabled = false;
@@ -95,6 +99,12 @@ function wire(root, jobId) {
       }
     }
   });
+}
+
+function promptStripeOnboarding(message) {
+  const copy = message || "Complete Stripe onboarding before applying.";
+  const go = window.confirm(`${copy} Open Profile Settings to connect Stripe now?`);
+  if (go) window.location.href = "profile-settings.html";
 }
 
 function formatCurrency(amount) {

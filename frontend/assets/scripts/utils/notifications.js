@@ -1,5 +1,5 @@
 // Shared notification center for headers
-import { secureFetch, getStoredSession } from "../auth.js";
+import { secureFetch } from "../auth.js";
 
 const NOTIFICATION_STYLE_ID = "lpc-notification-styles";
 let lastKnownUnread = 0;
@@ -12,6 +12,7 @@ function ensureNotificationStyles() {
   style.textContent = `
     .notification-wrapper{position:relative;}
     .notification-dropdown{position:absolute;top:calc(100% + 8px);right:0;z-index:100000;}
+    [data-notification-list]{max-height:220px;overflow-y:auto;}
     .notif-item{display:flex;align-items:flex-start;gap:12px;}
     .notif-main{display:flex;align-items:flex-start;gap:12px;flex:1;}
     .notif-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#f2f4f8;flex-shrink:0;}
@@ -85,6 +86,10 @@ function formatNotificationTitle(item = {}) {
       return "Invitation Update";
     case "application_submitted":
       return "New Application";
+    case "application_accepted":
+      return "Application Accepted";
+    case "application_denied":
+      return "Application Update";
     case "profile_approved":
       return "Profile Approved";
     case "resume_uploaded":
@@ -93,6 +98,10 @@ function formatNotificationTitle(item = {}) {
       return "Payout Released";
     case "case_awaiting_funding":
       return "Funding Needed";
+    case "case_work_ready":
+      return "Work Ready";
+    case "case_file_uploaded":
+      return "Document Uploaded";
     default:
       return "Notification";
   }
@@ -113,6 +122,10 @@ function formatNotificationBody(item = {}) {
       return payload.summary || `Case "${payload.caseTitle || "update"}" has changed.`;
     case "application_submitted":
       return `${payload.paralegalName || "A paralegal"} applied to "${payload.title || "your job"}"`;
+    case "application_accepted":
+      return `Your application for "${payload.caseTitle || "the case"}" was accepted.`;
+    case "application_denied":
+      return `Your application for "${payload.caseTitle || "the case"}" was not selected.`;
     case "resume_uploaded":
       return "Your resume has been successfully uploaded.";
     case "profile_approved":
@@ -121,6 +134,10 @@ function formatNotificationBody(item = {}) {
       return `Your payout is on the way${payload.amount ? ` (${payload.amount})` : ""}.`;
     case "case_awaiting_funding":
       return `${payload.caseTitle || "A case"} is awaiting funding.`;
+    case "case_work_ready":
+      return `${payload.caseTitle || "A case"} is funded. Work can begin.`;
+    case "case_file_uploaded":
+      return `${payload.fileName || "A document"} was uploaded${payload.caseTitle ? ` to "${payload.caseTitle}"` : "."}`;
     default:
       return "You have a new notification.";
   }
@@ -149,6 +166,16 @@ async function markNotificationRead(id) {
 const centers = [];
 let dismissBound = false;
 let initBound = false;
+
+function closeAllNotificationPanels() {
+  document.querySelectorAll("[data-notification-panel].show").forEach((panel) => {
+    panel.classList.remove("show");
+    panel.classList.add("hidden");
+  });
+  document.querySelectorAll(".notification-dropdown").forEach((dropdown) => {
+    dropdown.style.display = "none";
+  });
+}
 
 function totalUnread() {
   const centerTotal = centers.reduce((sum, center) => {
@@ -262,14 +289,6 @@ function preload(center) {
 
 async function fetchNotifications(center, options = {}) {
   if (center.loading) return;
-  const session = getStoredSession();
-  if (!session?.user) {
-    lastKnownUnread = 0;
-    syncNotificationBadges(0);
-    renderEmpty(center, "Sign in to view notifications.");
-    center.loaded = true;
-    return;
-  }
   center.loading = true;
   try {
     const res = await secureFetch("/api/notifications", {
@@ -278,6 +297,13 @@ async function fetchNotifications(center, options = {}) {
       credentials: "include",
       noRedirect: true,
     });
+    if (res.status === 401 || res.status === 403) {
+      lastKnownUnread = 0;
+      syncNotificationBadges(0);
+      renderEmpty(center, "Sign in to view notifications.");
+      center.loaded = true;
+      return;
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
     center.notifications = Array.isArray(payload) ? payload.map(normalizeNotification) : [];
@@ -400,16 +426,30 @@ async function dismissNotification(center, id) {
 function bindGlobalDismiss() {
   if (dismissBound) return;
   dismissBound = true;
-  document.addEventListener("click", (event) => {
-    centers.forEach((center) => {
-      if (!center.root.contains(event.target)) {
-        center.panel.classList.remove("show");
-      }
-    });
-  });
+  const isNotificationTarget = (event) => {
+    const target = event.target;
+    if (target?.closest?.("[data-notification-panel], [data-notification-toggle], .notification-dropdown")) {
+      return true;
+    }
+    const path = typeof event.composedPath === "function" ? event.composedPath() : [];
+    return path.some(
+      (node) =>
+        node?.matches?.("[data-notification-panel]") ||
+        node?.matches?.("[data-notification-toggle]") ||
+        node?.matches?.(".notification-dropdown")
+    );
+  };
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (isNotificationTarget(event)) return;
+      closeAllNotificationPanels();
+    },
+    true
+  );
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
-      centers.forEach((center) => center.panel.classList.remove("show"));
+      closeAllNotificationPanels();
     }
   });
 }
@@ -417,7 +457,12 @@ function bindGlobalDismiss() {
 function bindMinimalToggleHandler() {
   document.addEventListener("click", (event) => {
     const toggle = event.target.closest("[data-notification-toggle]");
-    if (!toggle) return;
+    if (!toggle) {
+      const panel = event.target.closest("[data-notification-panel]");
+      if (panel) return;
+      closeAllNotificationPanels();
+      return;
+    }
     const root = toggle.closest("[data-notification-center]") || document;
     const panel =
       root.querySelector("[data-notification-panel]") ||
@@ -448,6 +493,62 @@ function formatRelativeTime(value) {
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
   return date.toLocaleDateString();
+}
+
+function extractId(value) {
+  if (!value) return "";
+  if (typeof value === "object") {
+    return value._id || value.id || value.caseId || value.jobId || "";
+  }
+  return value;
+}
+
+function resolveNotificationLink(item = {}) {
+  const payload = item.payload || {};
+  const primaryLink = typeof item.link === "string" ? item.link.trim() : "";
+  const payloadLink = typeof payload.link === "string" ? payload.link.trim() : "";
+  const payloadUrl = typeof payload.url === "string" ? payload.url.trim() : "";
+  const explicitLink = primaryLink || payloadLink || payloadUrl;
+  if (explicitLink) return explicitLink;
+  const type = String(item.type || "").toLowerCase();
+  const role = String(item.userRole || "").toLowerCase();
+  const caseId = extractId(
+    item.caseId ||
+      payload.caseId ||
+      payload.caseID ||
+      payload.case ||
+      payload.case_id ||
+      payload.caseRef ||
+      payload.caseDoc
+  );
+  if (caseId) {
+    const base = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
+    if (type === "message") return `${base}#messages`;
+    if (type === "case_file_uploaded") return `${base}#caseFilesSection`;
+    if (type === "case_invite") return "paralegal-invitations.html";
+    return base;
+  }
+  if (type === "case_invite") return "paralegal-invitations.html";
+  const jobId = extractId(item.jobId || payload.jobId || payload.job || payload.job_id || payload.jobRef);
+  if (type === "application_submitted" && role === "attorney") {
+    return "dashboard-attorney.html#applicationsSection";
+  }
+  if (type === "application_accepted") {
+    return caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "dashboard-paralegal.html";
+  }
+  if (type === "application_denied") {
+    return "browse-jobs.html";
+  }
+  if (jobId) return `browse-jobs.html?id=${encodeURIComponent(jobId)}`;
+  if (type === "profile_approved" || type === "resume_uploaded") {
+    return "profile-settings.html";
+  }
+  if (type === "payout_released") {
+    return role === "attorney" ? "dashboard-attorney.html#billing" : "dashboard-paralegal.html";
+  }
+  if (role === "attorney") return "dashboard-attorney.html";
+  if (role === "paralegal") return "dashboard-paralegal.html";
+  return "";
 }
 
 if (!notificationsOptOut) {
@@ -574,7 +675,7 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
   wrapper.appendChild(main);
   wrapper.appendChild(dismiss);
 
-  const link = typeof normalized.link === "string" ? normalized.link.trim() : "";
+  const link = resolveNotificationLink(normalized);
   wrapper.addEventListener("click", async () => {
     const id = normalized._id || normalized.id;
     if (!isNotificationRead(normalized) && id) {

@@ -128,7 +128,7 @@
         background:#fafafa;
       }
       #paralegalFloatingCluster #notifList{
-        max-height:300px;
+        max-height:220px;
         overflow-y:auto;
       }
       #paralegalFloatingCluster .notif-item{

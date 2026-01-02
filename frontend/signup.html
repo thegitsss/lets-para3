@@ -24,9 +24,9 @@
   <script src="https://www.google.com/recaptcha/api.js?render=6Lfmq1orAAAAAEfFBDqDFpXtHMGld5aesRFjvIEM" defer></script>
 
     <style>
-    .gold{color:#b4975a;}
+    .gold{color:var(--gold);}
     :root {
-      --gold: #b4975a;
+      --gold: #887244;
       --navy: #27394d;
       --line: #e8edf3;
       --muted: #64748b;
@@ -262,6 +262,11 @@
       transform: scale(1.01);
     }
 
+    .btn:focus-visible {
+      outline: 2px solid var(--gold);
+      outline-offset: 2px;
+    }
+
     .msg {
       min-height: 1px;
       font-size: 0.9rem;
@@ -402,8 +407,9 @@
 </head>
 
 <body class="signup-page">
+  <a class="skip-link" href="#main">Skip to main content</a>
   <a href="index.html" class="brand-fixed">Let’s-ParaConnect</a>
-  <div class="overlay">
+  <div class="overlay" id="main" role="main" tabindex="-1">
     <div class="left-panel">
       <div class="form-container fade-in">
         <p class="prelaunch-note">

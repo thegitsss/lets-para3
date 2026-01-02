@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lets-ParaConnect Email Preferences</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Sarabun:wght@300;400;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+
+      :root {
+        --bg: #f0f1f5;
+        --panel: #ffffff;
+        --ink: #0e1b10;
+        --muted: #6e6e6e;
+        --accent: #ffbd59;
+        --border: #d7dbe2;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: "Sarabun", Arial, sans-serif;
+      }
+      .wrap {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px 16px;
+      }
+      .card {
+        width: 100%;
+        max-width: 640px;
+        background: var(--panel);
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        padding: 32px;
+        text-align: center;
+        box-shadow: 0 18px 50px rgba(10, 20, 30, 0.08);
+      }
+      .logo {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 24px;
+      }
+      .logo img {
+        width: 42px;
+        height: 42px;
+        display: block;
+      }
+      .logo span {
+        font-family: "Cormorant Garamond", Georgia, serif;
+        font-size: 28px;
+        letter-spacing: 0.04em;
+      }
+      h1 {
+        font-family: "Cormorant Garamond", Georgia, serif;
+        font-size: 34px;
+        margin: 0 0 12px;
+        color: var(--muted);
+      }
+      p {
+        margin: 0 0 18px;
+        line-height: 1.7;
+      }
+      .actions {
+        margin-top: 22px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: center;
+      }
+      .btn {
+        background: var(--accent);
+        color: #ffffff;
+        text-decoration: none;
+        padding: 12px 28px;
+        border-radius: 999px;
+        font-family: "Cormorant Garamond", Georgia, serif;
+        font-size: 20px;
+      }
+      .link {
+        color: var(--ink);
+        text-decoration: none;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+        padding-bottom: 2px;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+    <div class="wrap" id="main" role="main" tabindex="-1">
+      <div class="card">
+        <div class="logo">
+          <img src="Cleanfav.png" alt="Lets-ParaConnect" />
+          <span>Let's-ParaConnect</span>
+        </div>
+        <h1 id="title">You're unsubscribed</h1>
+        <p id="message">
+          You're no longer receiving Lets-ParaConnect emails. You can re-enable email
+          notifications in your profile settings at any time.
+        </p>
+        <div class="actions">
+          <a class="btn" href="login.html">Login</a>
+          <a class="link" href="mailto:support@lets-paraconnect.com">Email support</a>
+        </div>
+        <p class="muted" style="margin-top: 20px;">
+          Need help updating preferences? Log in and visit Profile Settings.
+        </p>
+      </div>
+    </div>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const status = params.get("status");
+      const reason = params.get("reason");
+      const title = document.getElementById("title");
+      const message = document.getElementById("message");
+      if (status === "error") {
+        title.textContent = "We could not unsubscribe you";
+        const reasonMap = {
+          missing: "The unsubscribe link is missing required information.",
+          invalid: "This unsubscribe link is invalid or expired.",
+          not_found: "We could not find the account tied to this link.",
+        };
+        message.textContent =
+          reasonMap[reason] ||
+          "Please contact support if you continue to have trouble.";
+      }
+    </script>
+  </body>
+</html>

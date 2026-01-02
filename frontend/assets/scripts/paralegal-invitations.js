@@ -9,38 +9,105 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 async function loadInvitationsList() {
   const section = document.getElementById("invitationList");
-  section.innerHTML = "<h3>Invitations</h3>";
+  section.innerHTML = "";
 
   const res = await secureFetch("/api/cases/invited-to");
   const { items = [] } = await res.json();
 
   if (!items.length) {
-    section.innerHTML += "<p>No invitations yet.</p>";
+    section.innerHTML = "<p class=\"pending-empty\">No invitations yet.</p>";
     return;
   }
 
   items.forEach(inv => {
+    const attorneyName = inv.attorney?.name ||
+      [inv.attorney?.firstName, inv.attorney?.lastName].filter(Boolean).join(" ").trim() ||
+      inv.attorneyNameSnapshot ||
+      "Unknown";
     section.innerHTML += `
       <div class="invite-card">
-        <strong>${inv.title}</strong><br>
-        <span>Attorney: ${inv.attorneyName}</span><br>
-        <button class="acceptBtn" data-id="${inv._id}">Accept</button>
-        <button class="declineBtn" data-id="${inv._id}">Decline</button>
+        <div class="invite-main">
+          <div class="invite-title">${inv.title || "Untitled case"}</div>
+          <div class="invite-meta">Attorney: ${attorneyName}</div>
+        </div>
+        <div class="invite-actions">
+          <button class="btn primary acceptBtn" data-id="${inv._id}">Accept</button>
+          <button class="btn secondary declineBtn" data-id="${inv._id}">Decline</button>
+        </div>
       </div>
     `;
   });
 
   document.querySelectorAll(".acceptBtn").forEach(btn => {
     btn.addEventListener("click", async () => {
-      await secureFetch(`/api/cases/${btn.dataset.id}/invite/accept`, { method: "POST" });
-      await loadInvitationsList();
+      const toast = window.toastUtils;
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Accepting…";
+      try {
+        const res = await secureFetch(`/api/cases/${btn.dataset.id}/invite/accept`, {
+          method: "POST",
+          noRedirect: true,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const message = data?.error || "Unable to accept invitation.";
+          if (res.status === 403 && /stripe/i.test(message)) {
+            toast?.show?.(message, { targetId: "toastBanner", type: "error" });
+            promptStripeOnboarding(message);
+            return;
+          }
+          throw new Error(message);
+        }
+        toast?.show?.("Case accepted.", { targetId: "toastBanner", type: "success" });
+        if (typeof window.refreshNotificationCenters === "function") {
+          window.refreshNotificationCenters();
+        }
+        await loadInvitationsList();
+      } catch (err) {
+        toast?.show?.(err.message || "Unable to accept invitation.", {
+          targetId: "toastBanner",
+          type: "error",
+        });
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
     });
   });
 
   document.querySelectorAll(".declineBtn").forEach(btn => {
     btn.addEventListener("click", async () => {
-      await secureFetch(`/api/cases/${btn.dataset.id}/invite/decline`, { method: "POST" });
-      await loadInvitationsList();
+      const toast = window.toastUtils;
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Declining…";
+      try {
+        const res = await secureFetch(`/api/cases/${btn.dataset.id}/invite/decline`, { method: "POST" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data?.error || "Unable to decline invitation.");
+        }
+        toast?.show?.("Invitation declined.", { targetId: "toastBanner", type: "success" });
+        if (typeof window.refreshNotificationCenters === "function") {
+          window.refreshNotificationCenters();
+        }
+        await loadInvitationsList();
+      } catch (err) {
+        toast?.show?.(err.message || "Unable to decline invitation.", {
+          targetId: "toastBanner",
+          type: "error",
+        });
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
     });
   });
+}
+
+function promptStripeOnboarding(message) {
+  const copy = message || "Complete Stripe onboarding before accepting invitations.";
+  const go = window.confirm(`${copy} Open Profile Settings to connect Stripe now?`);
+  if (go) window.location.href = "profile-settings.html";
 }

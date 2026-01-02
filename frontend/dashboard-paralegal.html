@@ -7,6 +7,23 @@
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
 <script src="assets/scripts/utils/session.js"></script>
   <style>
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+
     .gold{color:#b4975a;}
     :root {
       --bg: #ffffff;
@@ -281,15 +298,18 @@
       transition: background 0.3s ease;
     }
 
-    body.theme-mountain .sidebar {
+    body.theme-mountain .sidebar,
+    body.theme-mountain-dark .sidebar {
       background: url('hero-mountain.jpg') center/cover no-repeat;
     }
 
-    body.theme-mountain .sidebar::before {
+    body.theme-mountain .sidebar::before,
+    body.theme-mountain-dark .sidebar::before {
       background: rgba(0, 0, 0, 0.45);
     }
 
-    body.theme-mountain .sidebar > * {
+    body.theme-mountain .sidebar > *,
+    body.theme-mountain-dark .sidebar > * {
       position: relative;
       z-index: 1;
     }
@@ -316,23 +336,29 @@
       background: rgba(255, 255, 255, 0.12);
     }
 
-    body.theme-mountain nav a {
+    body.theme-mountain nav a,
+    body.theme-mountain-dark nav a {
       color: #fff;
     }
 
     body.theme-mountain nav a.active,
-    body.theme-mountain nav a:hover {
+    body.theme-mountain nav a:hover,
+    body.theme-mountain-dark nav a.active,
+    body.theme-mountain-dark nav a:hover {
       background: rgba(255, 255, 255, 0.18);
     }
 
-    body.theme-mountain .sidebar-link {
+    body.theme-mountain .sidebar-link,
+    body.theme-mountain-dark .sidebar-link {
       color: #fff;
     }
 
     body.theme-dark .sidebar-link:hover,
     body.theme-mountain .sidebar-link:hover,
     body.theme-mountain .sidebar-link:focus,
-    body.theme-dark .sidebar-link:focus {
+    body.theme-dark .sidebar-link:focus,
+    body.theme-mountain-dark .sidebar-link:hover,
+    body.theme-mountain-dark .sidebar-link:focus {
       color: #fff;
     }
 
@@ -530,6 +556,26 @@
       align-items: center;
     }
 
+    .case-item,
+    .case-item * {
+      font-family: var(--font-sans);
+      font-weight: 200;
+    }
+
+    .case-title {
+      font-size: 1.15rem;
+      font-weight: 300;
+      margin-bottom: 0.35rem;
+    }
+
+    .case-meta {
+      color: var(--muted);
+      font-size: 0.95rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
     .open-case-btn {
       background: var(--accent);
       color: white;
@@ -557,6 +603,28 @@
     .open-case-btn[disabled]:hover,
     .open-case-btn[aria-disabled="true"]:hover {
       transform: none;
+    }
+
+    .withdraw-application-btn {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-family: var(--font-sans);
+      font-weight: 200;
+      cursor: pointer;
+      transition: transform 0.1s ease, background 0.2s ease;
+    }
+
+    .withdraw-application-btn:hover {
+      transform: translateY(-1px);
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .withdraw-application-btn[disabled] {
+      cursor: not-allowed;
+      opacity: 0.6;
     }
 
     .toast {
@@ -871,7 +939,7 @@
       box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
       display: none;
       flex-direction: column;
-      z-index: 200;
+      z-index: 5000;
     }
 
     .notif-panel.show {
@@ -892,7 +960,7 @@
     }
 
     #notifList {
-      max-height: 360px;
+      max-height: 220px;
       overflow-y: auto;
     }
 
@@ -1193,6 +1261,7 @@
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
     <nav>
@@ -1204,7 +1273,7 @@
     <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
     <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
   </aside>
-  <main class="main">
+  <main id="main" tabindex="-1" class="main">
     <div class="topbar" data-attorney-header>
       <div class="profile-header-controls" data-notification-center>
         <div class="notification-wrapper">
@@ -1302,6 +1371,9 @@
                 <h2>No invitations yet</h2>
                 <div class="case-subinfo">Case invites will appear here.</div>
               </div>
+            </div>
+            <div class="case-actions">
+              <a class="open-case-btn" href="browse-jobs.html">Browse new postings and apply</a>
             </div>
           </div>
         </section>

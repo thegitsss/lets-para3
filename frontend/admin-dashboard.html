@@ -9,6 +9,23 @@
 <script src="assets/scripts/utils/session.js"></script>
 <script type="module" src="assets/scripts/auth.js"></script>
 <style>
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: #1a2230;
+      color: #ffffff;
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      z-index: 10000;
+      font-size: 14px;
+    }
+
+    .skip-link:focus {
+      top: 12px;
+    }
+
     .gold{color:#b4975a;}
 :root{
 --accent:#b6a47a;
@@ -259,6 +276,8 @@ font-size:.95rem;
 .pending-controls{display:flex;flex-wrap:wrap;gap:.75rem;margin-bottom:1rem;align-items:flex-start;}
 .pending-controls .search{flex:1;min-width:220px;}
 .pending-controls select{padding:.55rem .8rem;border:1px solid var(--line);border-radius:6px;background:#fff;font-family:var(--font-sans);font-size:.95rem;}
+.test-email-row{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;}
+.test-email-row .search{flex:1;min-width:220px;}
 .pending-count{color:var(--muted);font-size:.9rem;}
 .pending-empty{padding:1rem;text-align:center;color:var(--muted);}
 .pending-users-table td.actions{width:140px;}
@@ -271,6 +290,7 @@ font-size:.95rem;
 </head>
 
 <body>
+  <a class="skip-link" href="#main">Skip to main content</a>
 <aside class="sidebar">
 <div class="logo">Admin Panel</div>
 <nav>
@@ -287,7 +307,7 @@ font-size:.95rem;
 <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
 </aside>
 
-<main class="main">
+<main id="main" tabindex="-1" class="main">
 
 <!-- OVERVIEW (default visible) -->
 <section id="section-overview" class="section visible">
@@ -319,7 +339,7 @@ font-size:.95rem;
 
 <!-- Escrow -->
 <div class="panel" id="escrowPanel">
-<h2 onclick="togglePanel('escrowPanel')">Escrow Overview <span>▾</span></h2>
+<h2 onclick="togglePanel('escrowPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('escrowPanel');}" role="button" tabindex="0" aria-expanded="true">Escrow Overview <span>▾</span></h2>
 <div class="panel-content">
 <canvas id="escrowChart" height="150"></canvas>
 <table>
@@ -334,7 +354,7 @@ font-size:.95rem;
 
 <!-- New Users -->
 <div class="panel" id="userPanel">
-<h2 onclick="togglePanel('userPanel')">New Users Analytics <span>▾</span></h2>
+<h2 onclick="togglePanel('userPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('userPanel');}" role="button" tabindex="0" aria-expanded="true">New Users Analytics <span>▾</span></h2>
 <div class="panel-content">
 <canvas id="userChart" height="150"></canvas>
 <button class="btn primary" onclick="alert('Opening Review Queue…')">Review New Users</button>
@@ -343,13 +363,13 @@ font-size:.95rem;
 
 <!-- Revenue -->
 <div class="panel" id="revenuePanel">
-<h2 onclick="togglePanel('revenuePanel')">Revenue Reports <span>▾</span></h2>
+<h2 onclick="togglePanel('revenuePanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('revenuePanel');}" role="button" tabindex="0" aria-expanded="true">Revenue Reports <span>▾</span></h2>
 <div class="panel-content"><canvas id="revChart" height="150"></canvas></div>
 </div>
 
 <!-- Recent Posts -->
 <div class="panel" id="postsPanel">
-<h2 onclick="togglePanel('postsPanel')">Recent Job Posts <span>▾</span></h2>
+<h2 onclick="togglePanel('postsPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('postsPanel');}" role="button" tabindex="0" aria-expanded="true">Recent Job Posts <span>▾</span></h2>
 <div class="panel-content">
 <table>
 <thead><tr><th>Title</th><th>Posted By</th><th>Date</th></tr></thead>
@@ -362,7 +382,7 @@ font-size:.95rem;
 
 <!-- Audit Logs -->
 <div class="panel" id="logsPanel">
-<h2 onclick="togglePanel('logsPanel')">Admin Activity / Audit Logs <span>▾</span></h2>
+<h2 onclick="togglePanel('logsPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('logsPanel');}" role="button" tabindex="0" aria-expanded="true">Admin Activity / Audit Logs <span>▾</span></h2>
 <div class="panel-content">
 <ul id="logsList" style="list-style:none;padding:0;margin:0;">
 <li style="color:var(--muted)">No activity yet</li>
@@ -412,7 +432,7 @@ font-size:.95rem;
 <div class="lower-grid">
 <div class="panel new-users">
 <h2>New Users</h2>
-<input type="text" placeholder="Search…" class="search" />
+<input type="text" placeholder="Search…" class="search" aria-label="Search" />
 <ul class="user-list" id="newUsersList">
 <li style="color:var(--muted)">Loading…</li>
 </ul>
@@ -451,6 +471,86 @@ font-size:.95rem;
 </table>
 </div>
 </div>
+
+<div class="panel" id="approvalEmailTestPanel">
+<div class="panel-header">
+<h2>Approval Email Test</h2>
+<p class="pending-count">Send the approval email without changing user status.</p>
+</div>
+<div class="test-email-row">
+<input type="email" id="approvalTestEmail" class="search" placeholder="Email address" aria-label="Approval email test address" />
+<button class="btn secondary" type="button" id="approvalTestSendBtn">Send Approval Email</button>
+</div>
+</div>
+
+<div class="panel" id="suspendedUsersPanel">
+<div class="panel-header">
+<h2>Suspended Users</h2>
+<p id="suspendedUsersCountLabel" class="pending-count">0 suspended users</p>
+</div>
+<div class="pending-controls">
+<input type="search" id="suspendedSearch" class="search" placeholder="Search name or email…" aria-label="Search suspended users" />
+<select id="suspendedRoleFilter" aria-label="Filter by role">
+<option value="all">All Roles</option>
+<option value="attorney">Attorneys</option>
+<option value="paralegal">Paralegals</option>
+</select>
+<button class="btn secondary" type="button" id="refreshSuspendedUsers">Refresh</button>
+<button class="btn danger" type="button" id="removeSuspendedSelected">Remove Selected</button>
+<button class="btn secondary" type="button" id="restoreSuspendedSelected">Restore Selected</button>
+</div>
+<div class="table-wrap">
+<table class="pending-users-table">
+<thead>
+<tr>
+<th><input type="checkbox" id="suspendedSelectAll" aria-label="Select all suspended users"></th>
+<th>Name</th>
+<th>Role</th>
+<th>Email</th>
+<th>Updated</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody id="suspendedUsersBody">
+<tr><td colspan="6" class="pending-empty">Loading suspended users…</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div class="panel" id="deletedUsersPanel">
+<div class="panel-header">
+<h2>Deleted Users</h2>
+<p id="deletedUsersCountLabel" class="pending-count">0 deleted users</p>
+</div>
+<div class="pending-controls">
+<input type="search" id="deletedSearch" class="search" placeholder="Search name or email…" aria-label="Search deleted users" />
+<select id="deletedRoleFilter" aria-label="Filter by role">
+<option value="all">All Roles</option>
+<option value="attorney">Attorneys</option>
+<option value="paralegal">Paralegals</option>
+</select>
+<button class="btn secondary" type="button" id="refreshDeletedUsers">Refresh</button>
+<button class="btn danger" type="button" id="purgeDeletedSelected">Permanently Delete Selected</button>
+</div>
+<div class="table-wrap">
+<table class="pending-users-table">
+<thead>
+<tr>
+<th><input type="checkbox" id="deletedSelectAll" aria-label="Select all deleted users"></th>
+<th>Name</th>
+<th>Role</th>
+<th>Email</th>
+<th>Deleted</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody id="deletedUsersBody">
+<tr><td colspan="6" class="pending-empty">Loading deleted users…</td></tr>
+</tbody>
+</table>
+</div>
+</div>
 </section>
 
 <!-- ESCROW -->
@@ -481,6 +581,15 @@ font-size:.95rem;
 <div><strong>1</strong><span>Pending Withdrawals</span></div>
 <div><strong>1</strong><span>Pending Deposits</span></div>
 <div><strong>0</strong><span>Rejected Deposits</span></div>
+</div>
+
+<div class="panel">
+<h2>Reconcile Case Payment</h2>
+<p class="small">Force-sync Stripe payment status for a case.</p>
+<label for="reconcileCaseId">Case ID</label>
+<input type="text" id="reconcileCaseId" class="input-field" placeholder="Enter case ID">
+<button class="btn primary" type="button" id="reconcileCaseBtn">Reconcile</button>
+<p class="small" id="reconcileStatus"></p>
 </div>
 
 <!-- Tickets -->
@@ -727,6 +836,51 @@ font-size:.95rem;
 <section id="section-activity-logs" class="section">
 <h2>Admin Activity Logs</h2>
 <p>View and export full audit logs for compliance.</p>
+<div class="panel">
+<div class="panel-header">
+<h3>Log Entries</h3>
+<p id="auditLogsCountLabel" class="pending-count">0 entries</p>
+</div>
+<div class="pending-controls">
+<input type="search" id="auditSearch" class="search" placeholder="Search action, actor, or path…" aria-label="Search activity logs" />
+<select id="auditRoleFilter" aria-label="Filter by actor role">
+<option value="all">All Roles</option>
+<option value="admin">Admin</option>
+<option value="attorney">Attorney</option>
+<option value="paralegal">Paralegal</option>
+<option value="system">System</option>
+</select>
+<select id="auditTargetFilter" aria-label="Filter by target type">
+<option value="all">All Targets</option>
+<option value="user">User</option>
+<option value="case">Case</option>
+<option value="payment">Payment</option>
+<option value="message">Message</option>
+<option value="dispute">Dispute</option>
+<option value="document">Document</option>
+<option value="other">Other</option>
+</select>
+<button class="btn secondary" type="button" id="refreshAuditLogs">Refresh</button>
+<button class="btn secondary" type="button" id="exportAuditLogs">Export CSV</button>
+</div>
+<div class="table-wrap">
+<table class="pending-users-table">
+<thead>
+<tr>
+<th>Time</th>
+<th>Actor</th>
+<th>Role</th>
+<th>Action</th>
+<th>Target</th>
+<th>Details</th>
+</tr>
+</thead>
+<tbody id="auditLogsBody">
+<tr><td colspan="6" class="pending-empty">Loading activity logs…</td></tr>
+</tbody>
+</table>
+</div>
+</div>
 </section>
 
 <!-- SETTINGS -->
@@ -752,6 +906,7 @@ font-size:.95rem;
 <div class="pending-modal-actions">
 <button type="button" class="btn danger" id="denyUserBtn">Deny</button>
 <button type="button" class="btn primary" id="approveUserBtn">Approve</button>
+<button type="button" class="btn secondary" id="testApprovalEmailBtn">Send Approval Email</button>
 </div>
 </div>
 </div>
@@ -770,6 +925,8 @@ const adminSession = window.checkSession('admin');
 const navLinks=document.querySelectorAll("nav a");
 const sections=document.querySelectorAll(".section");
 const logoutButton=document.getElementById("logoutBtn");
+const ACTIVE_SECTION_KEY="adminActiveSection";
+const SCROLL_POS_KEY="adminScrollY";
 const refreshCharts=()=>{
 if(!window.dashboardCharts?.length) return;
 window.dashboardCharts.forEach(chart=>chart.resize());
@@ -777,6 +934,7 @@ window.dashboardCharts.forEach(chart=>chart.resize());
 
 function activateSection(sectionName){
 if(!sectionName) return;
+try{sessionStorage.setItem(ACTIVE_SECTION_KEY,sectionName);}catch{}
 navLinks.forEach(link=>{
 const match=link.dataset.section===sectionName;
 link.classList.toggle("active",match);
@@ -795,6 +953,13 @@ const target=link.dataset.section;
 if(target) activateSection(target);
 });
 });
+
+const savedSection=sessionStorage.getItem(ACTIVE_SECTION_KEY);
+if(savedSection) activateSection(savedSection);
+const savedScroll=Number(sessionStorage.getItem(SCROLL_POS_KEY));
+if(Number.isFinite(savedScroll)){
+requestAnimationFrame(()=>window.scrollTo(0,savedScroll));
+}
 
 const pendingMetricCard=document.getElementById("pendingUsers")?.closest(".metric");
 if(pendingMetricCard){
@@ -897,8 +1062,20 @@ import { secureFetch, fetchCSRF, logoutUser } from './assets/scripts/auth.js';
 const toastHelper = window.toastUtils;
 const toastTarget = 'toastBanner';
 
-function togglePanel(id){document.getElementById(id).classList.toggle('collapsed');}
+function togglePanel(id){
+const panel=document.getElementById(id);
+if(!panel){return;}
+panel.classList.toggle('collapsed');
+const heading=panel.querySelector('h2[role="button"]');
+if(heading){
+heading.setAttribute('aria-expanded',String(!panel.classList.contains('collapsed')));
+}
+}
 const dashboardCharts=window.dashboardCharts||(window.dashboardCharts=[]);
+if (window.Chart) {
+Chart.defaults.devicePixelRatio = 1;
+Chart.defaults.animation = false;
+}
 const payoutTotalEl=document.getElementById("payoutTotal");
 const payoutCountEl=document.getElementById("payoutCount");
 const incomeTotalEl=document.getElementById("incomeTotal");
@@ -1498,9 +1675,6 @@ const r=prompt(`Enter reason for pausing Case #${id||'Unknown'}:`);
 if(r)alert("Flag submitted to Admin. You will be contacted within 1 business day.\n\nReason: "+r);
 }
 
-/* -------- Auto-Refresh every 5 min -------- */
-setInterval(()=>location.reload(),300000);
-
 window.togglePanel = togglePanel;
 window.pauseReportActivity = pauseReportActivity;
 window.editPost = editPost;
@@ -1515,6 +1689,28 @@ const pendingCountLabel = document.getElementById('pendingUsersCountLabel');
 const pendingSearch = document.getElementById('pendingSearch');
 const pendingRoleFilter = document.getElementById('pendingRoleFilter');
 const refreshPendingBtn = document.getElementById('refreshPendingUsers');
+const suspendedTableBody = document.getElementById('suspendedUsersBody');
+const suspendedCountLabel = document.getElementById('suspendedUsersCountLabel');
+const suspendedSearch = document.getElementById('suspendedSearch');
+const suspendedRoleFilter = document.getElementById('suspendedRoleFilter');
+const refreshSuspendedBtn = document.getElementById('refreshSuspendedUsers');
+const removeSuspendedBtn = document.getElementById('removeSuspendedSelected');
+const restoreSuspendedBtn = document.getElementById('restoreSuspendedSelected');
+const suspendedSelectAll = document.getElementById('suspendedSelectAll');
+const deletedTableBody = document.getElementById('deletedUsersBody');
+const deletedCountLabel = document.getElementById('deletedUsersCountLabel');
+const deletedSearch = document.getElementById('deletedSearch');
+const deletedRoleFilter = document.getElementById('deletedRoleFilter');
+const refreshDeletedBtn = document.getElementById('refreshDeletedUsers');
+const purgeDeletedBtn = document.getElementById('purgeDeletedSelected');
+const deletedSelectAll = document.getElementById('deletedSelectAll');
+const auditLogsBody = document.getElementById('auditLogsBody');
+const auditLogsCountLabel = document.getElementById('auditLogsCountLabel');
+const auditSearch = document.getElementById('auditSearch');
+const auditRoleFilter = document.getElementById('auditRoleFilter');
+const auditTargetFilter = document.getElementById('auditTargetFilter');
+const refreshAuditLogsBtn = document.getElementById('refreshAuditLogs');
+const exportAuditLogsBtn = document.getElementById('exportAuditLogs');
 const modal = document.getElementById('pendingUserModal');
 const modalTitle = document.getElementById('pendingModalTitle');
 const modalSubhead = document.getElementById('pendingModalSubhead');
@@ -1522,10 +1718,19 @@ const modalDetails = document.getElementById('pendingUserDetails');
 const closeModalBtn = document.getElementById('closePendingModal');
 const approveBtn = document.getElementById('approveUserBtn');
 const denyBtn = document.getElementById('denyUserBtn');
+const testApprovalEmailBtn = document.getElementById('testApprovalEmailBtn');
+const approvalTestEmailInput = document.getElementById('approvalTestEmail');
+const approvalTestSendBtn = document.getElementById('approvalTestSendBtn');
 
 let pendingUsers = [];
 let pendingRequestId = 0;
 let activeUserId = null;
+let suspendedUsers = [];
+let suspendedRequestId = 0;
+let deletedUsers = [];
+let deletedRequestId = 0;
+let auditLogs = [];
+let auditRequestId = 0;
 
 const showToast = (message, type = 'info') => {
 if (toastHelper?.show) {
@@ -1534,6 +1739,50 @@ toastHelper.show(message, { targetId: toastTarget, type });
 alert(message);
 }
 };
+
+const reconcileCaseInput = document.getElementById("reconcileCaseId");
+const reconcileCaseBtn = document.getElementById("reconcileCaseBtn");
+const reconcileStatus = document.getElementById("reconcileStatus");
+
+if (reconcileCaseBtn) {
+reconcileCaseBtn.addEventListener("click", async () => {
+const caseId = reconcileCaseInput?.value.trim();
+if (!caseId) {
+showToast("Enter a case ID to reconcile.", "err");
+if (reconcileStatus) reconcileStatus.textContent = "Case ID is required.";
+return;
+}
+const originalLabel = reconcileCaseBtn.textContent || "Reconcile";
+reconcileCaseBtn.disabled = true;
+reconcileCaseBtn.textContent = "Reconciling…";
+if (reconcileStatus) reconcileStatus.textContent = "Checking Stripe status…";
+try {
+await fetchCSRF?.();
+const res = await secureFetch(`/api/payments/reconcile/${encodeURIComponent(caseId)}`, {
+method: "POST",
+headers: { Accept: "application/json" },
+});
+const payload = await res.json().catch(() => ({}));
+if (!res.ok) {
+throw new Error(payload?.error || "Unable to reconcile this case.");
+}
+const statusLabel = payload.status || "—";
+const escrowLabel = payload.escrowStatus || "—";
+const paymentLabel = payload.paymentStatus || payload.paymentIntentStatus || "—";
+if (reconcileStatus) {
+reconcileStatus.textContent = `Status: ${statusLabel} · Escrow: ${escrowLabel} · Payment: ${paymentLabel}`;
+}
+showToast("Reconciliation complete.", "info");
+} catch (err) {
+const message = err?.message || "Unable to reconcile this case.";
+if (reconcileStatus) reconcileStatus.textContent = message;
+showToast(message, "err");
+} finally {
+reconcileCaseBtn.disabled = false;
+reconcileCaseBtn.textContent = originalLabel;
+}
+});
+}
 
 const toTitle = (value) => {
 if (!value) return '—';
@@ -1589,10 +1838,49 @@ count === 1 ? '1 pending user' : `${count} pending users`;
 }
 };
 
+const updateSuspendedCount = (count = 0) => {
+if (suspendedCountLabel) {
+suspendedCountLabel.textContent =
+count === 1 ? '1 suspended user' : `${count} suspended users`;
+}
+};
+
+const updateDeletedCount = (count = 0) => {
+if (deletedCountLabel) {
+deletedCountLabel.textContent =
+count === 1 ? '1 deleted user' : `${count} deleted users`;
+}
+};
+
+const updateAuditCount = (count = 0) => {
+if (auditLogsCountLabel) {
+auditLogsCountLabel.textContent =
+count === 1 ? '1 entry' : `${count} entries`;
+}
+};
+
 const setPendingLoading = (loading) => {
 if (!refreshPendingBtn) return;
 refreshPendingBtn.disabled = loading;
 refreshPendingBtn.textContent = loading ? 'Refreshing…' : 'Refresh';
+};
+
+const setSuspendedLoading = (loading) => {
+if (!refreshSuspendedBtn) return;
+refreshSuspendedBtn.disabled = loading;
+refreshSuspendedBtn.textContent = loading ? 'Refreshing…' : 'Refresh';
+};
+
+const setDeletedLoading = (loading) => {
+if (!refreshDeletedBtn) return;
+refreshDeletedBtn.disabled = loading;
+refreshDeletedBtn.textContent = loading ? 'Refreshing…' : 'Refresh';
+};
+
+const setAuditLoading = (loading) => {
+if (!refreshAuditLogsBtn) return;
+refreshAuditLogsBtn.disabled = loading;
+refreshAuditLogsBtn.textContent = loading ? 'Refreshing…' : 'Refresh';
 };
 
 const displayName = (user = {}) => {
@@ -1652,6 +1940,154 @@ actionsTd.appendChild(removeBtn);
 tr.appendChild(td)
 );
 pendingTableBody.appendChild(tr);
+});
+};
+
+const renderSuspendedUsers = () => {
+if (!suspendedTableBody) return;
+if (!suspendedUsers.length) {
+suspendedTableBody.innerHTML =
+'<tr><td colspan="6" class="pending-empty">No suspended users found.</td></tr>';
+if (suspendedSelectAll) suspendedSelectAll.checked = false;
+return;
+}
+suspendedTableBody.innerHTML = '';
+suspendedUsers.forEach((user) => {
+const tr = document.createElement('tr');
+
+const selectTd = document.createElement('td');
+const checkbox = document.createElement('input');
+checkbox.type = 'checkbox';
+checkbox.className = 'suspended-select';
+checkbox.dataset.userId = String(user.id || user._id || '');
+selectTd.appendChild(checkbox);
+
+const nameTd = document.createElement('td');
+nameTd.textContent = displayName(user);
+
+const roleTd = document.createElement('td');
+roleTd.textContent = toTitle(user.role);
+
+const emailTd = document.createElement('td');
+emailTd.textContent = user.email || '—';
+
+const updatedTd = document.createElement('td');
+updatedTd.textContent = formatDate(user.updatedAt || user.createdAt);
+
+const statusTd = document.createElement('td');
+const badge = document.createElement('span');
+const statusValue = (user.status || 'denied').toLowerCase();
+const isSuspended = statusValue === 'denied' || statusValue === 'rejected';
+badge.className = `status ${isSuspended ? 'pending' : statusValue}`;
+badge.textContent = isSuspended ? 'Suspended' : toTitle(statusValue);
+statusTd.appendChild(badge);
+
+[selectTd, nameTd, roleTd, emailTd, updatedTd, statusTd].forEach((td) =>
+tr.appendChild(td)
+);
+suspendedTableBody.appendChild(tr);
+});
+if (suspendedSelectAll) suspendedSelectAll.checked = false;
+};
+
+const renderDeletedUsers = () => {
+if (!deletedTableBody) return;
+if (!deletedUsers.length) {
+deletedTableBody.innerHTML =
+'<tr><td colspan="6" class="pending-empty">No deleted users found.</td></tr>';
+if (deletedSelectAll) deletedSelectAll.checked = false;
+return;
+}
+deletedTableBody.innerHTML = '';
+deletedUsers.forEach((user) => {
+const tr = document.createElement('tr');
+
+const selectTd = document.createElement('td');
+const checkbox = document.createElement('input');
+checkbox.type = 'checkbox';
+checkbox.className = 'deleted-select';
+checkbox.dataset.userId = String(user.id || user._id || '');
+selectTd.appendChild(checkbox);
+
+const nameTd = document.createElement('td');
+nameTd.textContent = displayName(user);
+
+const roleTd = document.createElement('td');
+roleTd.textContent = toTitle(user.role);
+
+const emailTd = document.createElement('td');
+emailTd.textContent = user.email || '—';
+
+const deletedTd = document.createElement('td');
+deletedTd.textContent = formatDate(user.deletedAt || user.updatedAt || user.createdAt);
+
+const statusTd = document.createElement('td');
+const badge = document.createElement('span');
+badge.className = 'status held';
+badge.textContent = 'Deleted';
+statusTd.appendChild(badge);
+
+[selectTd, nameTd, roleTd, emailTd, deletedTd, statusTd].forEach((td) =>
+tr.appendChild(td)
+);
+deletedTableBody.appendChild(tr);
+});
+if (deletedSelectAll) deletedSelectAll.checked = false;
+};
+
+const renderAuditLogs = () => {
+if (!auditLogsBody) return;
+if (!auditLogs.length) {
+auditLogsBody.innerHTML =
+'<tr><td colspan="6" class="pending-empty">No activity logs found.</td></tr>';
+return;
+}
+auditLogsBody.innerHTML = '';
+auditLogs.forEach((entry) => {
+const tr = document.createElement('tr');
+
+const timeTd = document.createElement('td');
+timeTd.textContent = formatDate(entry.createdAt);
+
+const actorTd = document.createElement('td');
+actorTd.textContent = entry.actorName || entry.actorEmail || entry.actorId || 'System';
+
+const roleTd = document.createElement('td');
+roleTd.textContent = toTitle(entry.actorRole || 'system');
+
+const actionTd = document.createElement('td');
+actionTd.textContent = entry.action || '—';
+
+const targetParts = [];
+if (entry.caseTitle) {
+targetParts.push(entry.caseTitle);
+} else if (entry.caseId) {
+targetParts.push(`Case ${entry.caseId}`);
+}
+const targetTd = document.createElement('td');
+const rawCategory = String(entry.targetType || 'other').toLowerCase();
+const category = ['user', 'case', 'payment', 'message', 'dispute', 'document', 'other'].includes(rawCategory)
+? rawCategory
+: 'other';
+const badge = document.createElement('span');
+badge.className = `status ${category}`;
+badge.textContent = toTitle(category);
+badge.style.marginRight = '8px';
+targetTd.appendChild(badge);
+const targetLabel = targetParts.length ? targetParts.join(' · ') : '—';
+const targetText = document.createElement('span');
+targetText.textContent = targetLabel;
+targetTd.appendChild(targetText);
+
+const detailTd = document.createElement('td');
+const method = entry.method || '';
+const path = entry.path || '';
+detailTd.textContent = path ? `${method} ${path}`.trim() : '—';
+
+[timeTd, actorTd, roleTd, actionTd, targetTd, detailTd].forEach((td) =>
+tr.appendChild(td)
+);
+auditLogsBody.appendChild(tr);
 });
 };
 
@@ -1763,6 +2199,69 @@ btn.textContent = originalText;
 }
 };
 
+const sendApprovalEmailTest = async () => {
+if (!activeUserId || !testApprovalEmailBtn) return;
+const originalText = testApprovalEmailBtn.textContent;
+testApprovalEmailBtn.disabled = true;
+testApprovalEmailBtn.textContent = 'Sending…';
+try {
+await fetchCSRF();
+const res = await secureFetch('/api/admin/email/approval-test', {
+method: 'POST',
+body: { userId: activeUserId },
+});
+let payload = {};
+try {
+payload = await res.json();
+} catch (_) {
+payload = {};
+}
+if (!res.ok) {
+throw new Error(payload?.msg || payload?.error || 'Unable to send approval email.');
+}
+showToast('Approval email sent.', 'ok');
+} catch (err) {
+showToast(err?.message || 'Unable to send approval email.', 'err');
+} finally {
+testApprovalEmailBtn.disabled = false;
+testApprovalEmailBtn.textContent = originalText;
+}
+};
+
+const sendApprovalEmailTestByEmail = async () => {
+if (!approvalTestSendBtn) return;
+const email = approvalTestEmailInput?.value?.trim() || '';
+if (!email) {
+showToast('Enter an email address.', 'err');
+return;
+}
+const originalText = approvalTestSendBtn.textContent;
+approvalTestSendBtn.disabled = true;
+approvalTestSendBtn.textContent = 'Sending…';
+try {
+await fetchCSRF();
+const res = await secureFetch('/api/admin/email/approval-test', {
+method: 'POST',
+body: { email },
+});
+let payload = {};
+try {
+payload = await res.json();
+} catch (_) {
+payload = {};
+}
+if (!res.ok) {
+throw new Error(payload?.msg || payload?.error || 'Unable to send approval email.');
+}
+showToast('Approval email sent.', 'ok');
+} catch (err) {
+showToast(err?.message || 'Unable to send approval email.', 'err');
+} finally {
+approvalTestSendBtn.disabled = false;
+approvalTestSendBtn.textContent = originalText;
+}
+};
+
 const loadPendingUsers = async () => {
 if (!pendingTableBody) return;
 const requestId = ++pendingRequestId;
@@ -1799,6 +2298,107 @@ if (requestId === pendingRequestId) setPendingLoading(false);
 }
 };
 
+const loadSuspendedUsers = async () => {
+if (!suspendedTableBody) return;
+const requestId = ++suspendedRequestId;
+setSuspendedLoading(true);
+suspendedTableBody.innerHTML =
+'<tr><td colspan="6" class="pending-empty">Loading suspended users…</td></tr>';
+const params = new URLSearchParams({ status: 'suspended', limit: '50' });
+const roleValue = (suspendedRoleFilter?.value || '').toLowerCase();
+if (roleValue && roleValue !== 'all') params.set('role', roleValue);
+const query = suspendedSearch?.value.trim();
+if (query) params.set('q', query);
+
+try {
+const res = await secureFetch(`/api/admin/pending-users?${params.toString()}`, {
+headers: { Accept: 'application/json' },
+});
+const data = res.ok ? await res.json() : { users: [] };
+if (requestId !== suspendedRequestId) return;
+suspendedUsers = Array.isArray(data.users) ? data.users : [];
+renderSuspendedUsers();
+updateSuspendedCount(
+typeof data.total === 'number' ? data.total : suspendedUsers.length
+);
+} catch (err) {
+if (requestId !== suspendedRequestId) return;
+suspendedUsers = [];
+updateSuspendedCount(0);
+suspendedTableBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${err?.message || 'Unable to load suspended users.'}</td></tr>`;
+} finally {
+if (requestId === suspendedRequestId) setSuspendedLoading(false);
+}
+};
+
+const loadDeletedUsers = async () => {
+if (!deletedTableBody) return;
+const requestId = ++deletedRequestId;
+setDeletedLoading(true);
+deletedTableBody.innerHTML =
+'<tr><td colspan="6" class="pending-empty">Loading deleted users…</td></tr>';
+const params = new URLSearchParams({ status: 'deleted', limit: '50' });
+const roleValue = (deletedRoleFilter?.value || '').toLowerCase();
+if (roleValue && roleValue !== 'all') params.set('role', roleValue);
+const query = deletedSearch?.value.trim();
+if (query) params.set('q', query);
+
+try {
+const res = await secureFetch(`/api/admin/pending-users?${params.toString()}`, {
+headers: { Accept: 'application/json' },
+});
+const data = res.ok ? await res.json() : { users: [] };
+if (requestId !== deletedRequestId) return;
+deletedUsers = Array.isArray(data.users) ? data.users : [];
+renderDeletedUsers();
+updateDeletedCount(
+typeof data.total === 'number' ? data.total : deletedUsers.length
+);
+} catch (err) {
+if (requestId !== deletedRequestId) return;
+deletedUsers = [];
+updateDeletedCount(0);
+deletedTableBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${err?.message || 'Unable to load deleted users.'}</td></tr>`;
+} finally {
+if (requestId === deletedRequestId) setDeletedLoading(false);
+}
+};
+
+const loadAuditLogs = async () => {
+if (!auditLogsBody) return;
+const requestId = ++auditRequestId;
+setAuditLoading(true);
+auditLogsBody.innerHTML =
+'<tr><td colspan="6" class="pending-empty">Loading activity logs…</td></tr>';
+const params = new URLSearchParams({ limit: '50' });
+const roleValue = (auditRoleFilter?.value || '').toLowerCase();
+if (roleValue && roleValue !== 'all') params.set('role', roleValue);
+const targetValue = (auditTargetFilter?.value || '').toLowerCase();
+if (targetValue && targetValue !== 'all') params.set('targetType', targetValue);
+const query = auditSearch?.value.trim();
+if (query) params.set('q', query);
+
+try {
+const res = await secureFetch(`/api/admin/audit-logs?${params.toString()}`, {
+headers: { Accept: 'application/json' },
+});
+const data = res.ok ? await res.json() : { logs: [] };
+if (requestId !== auditRequestId) return;
+auditLogs = Array.isArray(data.logs) ? data.logs : [];
+renderAuditLogs();
+updateAuditCount(
+typeof data.total === 'number' ? data.total : auditLogs.length
+);
+} catch (err) {
+if (requestId !== auditRequestId) return;
+auditLogs = [];
+updateAuditCount(0);
+auditLogsBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${err?.message || 'Unable to load activity logs.'}</td></tr>`;
+} finally {
+if (requestId === auditRequestId) setAuditLoading(false);
+}
+};
+
 const debounce = (fn, wait = 320) => {
 let timeout;
 return (...args) => {
@@ -1810,6 +2410,207 @@ timeout = setTimeout(() => fn.apply(null, args), wait);
 pendingRoleFilter?.addEventListener('change', () => loadPendingUsers());
 refreshPendingBtn?.addEventListener('click', () => loadPendingUsers());
 pendingSearch?.addEventListener('input', debounce(() => loadPendingUsers()));
+suspendedRoleFilter?.addEventListener('change', () => loadSuspendedUsers());
+refreshSuspendedBtn?.addEventListener('click', () => loadSuspendedUsers());
+suspendedSearch?.addEventListener('input', debounce(() => loadSuspendedUsers()));
+deletedRoleFilter?.addEventListener('change', () => loadDeletedUsers());
+refreshDeletedBtn?.addEventListener('click', () => loadDeletedUsers());
+deletedSearch?.addEventListener('input', debounce(() => loadDeletedUsers()));
+auditRoleFilter?.addEventListener('change', () => loadAuditLogs());
+auditTargetFilter?.addEventListener('change', () => loadAuditLogs());
+refreshAuditLogsBtn?.addEventListener('click', () => loadAuditLogs());
+auditSearch?.addEventListener('input', debounce(() => loadAuditLogs()));
+if (suspendedSelectAll) {
+suspendedSelectAll.addEventListener('change', () => {
+const checked = suspendedSelectAll.checked;
+document.querySelectorAll('.suspended-select').forEach((input) => {
+input.checked = checked;
+});
+});
+}
+if (deletedSelectAll) {
+deletedSelectAll.addEventListener('change', () => {
+const checked = deletedSelectAll.checked;
+document.querySelectorAll('.deleted-select').forEach((input) => {
+input.checked = checked;
+});
+});
+}
+if (removeSuspendedBtn) {
+removeSuspendedBtn.addEventListener('click', async () => {
+const selected = Array.from(document.querySelectorAll('.suspended-select:checked'))
+  .map((input) => input.dataset.userId)
+  .filter(Boolean);
+if (!selected.length) {
+showToast('Select at least one user to remove.', 'err');
+return;
+}
+const confirmed = window.confirm(`Remove ${selected.length} suspended user${selected.length === 1 ? '' : 's'}?`);
+if (!confirmed) return;
+removeSuspendedBtn.disabled = true;
+const originalLabel = removeSuspendedBtn.textContent || 'Remove Selected';
+removeSuspendedBtn.textContent = 'Removing…';
+try {
+await fetchCSRF?.();
+const results = await Promise.allSettled(
+selected.map((userId) =>
+secureFetch(`/api/admin/users/${encodeURIComponent(userId)}/delete`, {
+method: 'POST',
+body: {},
+headers: { Accept: 'application/json' },
+})
+)
+);
+const failed = results.filter((r) => r.status === 'rejected');
+if (failed.length) {
+showToast(`Removed ${selected.length - failed.length}. ${failed.length} failed.`, 'err');
+} else {
+showToast('Removed selected users.', 'info');
+}
+await loadSuspendedUsers();
+await loadDeletedUsers();
+} catch (err) {
+showToast(err?.message || 'Unable to remove users.', 'err');
+} finally {
+removeSuspendedBtn.disabled = false;
+removeSuspendedBtn.textContent = originalLabel;
+if (suspendedSelectAll) suspendedSelectAll.checked = false;
+}
+});
+}
+if (restoreSuspendedBtn) {
+restoreSuspendedBtn.addEventListener('click', async () => {
+const selected = Array.from(document.querySelectorAll('.suspended-select:checked'))
+  .map((input) => input.dataset.userId)
+  .filter(Boolean);
+if (!selected.length) {
+showToast('Select at least one user to restore.', 'err');
+return;
+}
+const confirmed = window.confirm(`Restore ${selected.length} user${selected.length === 1 ? '' : 's'}?`);
+if (!confirmed) return;
+restoreSuspendedBtn.disabled = true;
+const originalLabel = restoreSuspendedBtn.textContent || 'Restore Selected';
+restoreSuspendedBtn.textContent = 'Restoring…';
+try {
+await fetchCSRF?.();
+const results = await Promise.allSettled(
+selected.map((userId) =>
+secureFetch(`/api/admin/users/${encodeURIComponent(userId)}/approve`, {
+method: 'POST',
+body: {},
+headers: { Accept: 'application/json' },
+})
+)
+);
+const failed = results.filter((r) => r.status === 'rejected');
+if (failed.length) {
+showToast(`Restored ${selected.length - failed.length}. ${failed.length} failed.`, 'err');
+} else {
+showToast('Restored selected users.', 'info');
+}
+await loadSuspendedUsers();
+} catch (err) {
+showToast(err?.message || 'Unable to restore users.', 'err');
+} finally {
+restoreSuspendedBtn.disabled = false;
+restoreSuspendedBtn.textContent = originalLabel;
+if (suspendedSelectAll) suspendedSelectAll.checked = false;
+}
+});
+}
+if (purgeDeletedBtn) {
+purgeDeletedBtn.addEventListener('click', async () => {
+const selected = Array.from(document.querySelectorAll('.deleted-select:checked'))
+  .map((input) => input.dataset.userId)
+  .filter(Boolean);
+if (!selected.length) {
+showToast('Select at least one user to permanently delete.', 'err');
+return;
+}
+const confirmed = window.confirm(
+`Permanently delete ${selected.length} user${selected.length === 1 ? '' : 's'}? This cannot be undone.`
+);
+if (!confirmed) return;
+purgeDeletedBtn.disabled = true;
+const originalLabel = purgeDeletedBtn.textContent || 'Permanently Delete Selected';
+purgeDeletedBtn.textContent = 'Deleting…';
+try {
+await fetchCSRF?.();
+const results = await Promise.allSettled(
+selected.map((userId) =>
+secureFetch(`/api/admin/users/${encodeURIComponent(userId)}/purge`, {
+method: 'POST',
+body: {},
+headers: { Accept: 'application/json' },
+})
+)
+);
+const failed = results.filter((r) => r.status === 'rejected');
+if (failed.length) {
+showToast(`Deleted ${selected.length - failed.length}. ${failed.length} failed.`, 'err');
+} else {
+showToast('Permanently deleted selected users.', 'info');
+}
+await loadDeletedUsers();
+} catch (err) {
+showToast(err?.message || 'Unable to permanently delete users.', 'err');
+} finally {
+purgeDeletedBtn.disabled = false;
+purgeDeletedBtn.textContent = originalLabel;
+if (deletedSelectAll) deletedSelectAll.checked = false;
+}
+});
+}
+if (exportAuditLogsBtn) {
+exportAuditLogsBtn.addEventListener('click', () => {
+if (!auditLogs.length) {
+showToast('No activity logs to export.', 'err');
+return;
+}
+const headers = [
+'Time',
+'Actor',
+'Role',
+'Action',
+'Target Type',
+'Target ID',
+'Case ID',
+'Case Title',
+'Path',
+'Method',
+];
+const rows = auditLogs.map((entry) => [
+formatDate(entry.createdAt),
+entry.actorName || entry.actorEmail || entry.actorId || 'System',
+entry.actorRole || 'system',
+entry.action || '',
+entry.targetType || '',
+entry.targetId || '',
+entry.caseId || '',
+entry.caseTitle || '',
+entry.path || '',
+entry.method || '',
+]);
+const escapeCsv = (value) => {
+const text = String(value ?? '');
+return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+const csv = [headers, ...rows]
+  .map((row) => row.map(escapeCsv).join(','))
+  .join('\n');
+const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+const url = URL.createObjectURL(blob);
+const link = document.createElement('a');
+const stamp = new Date().toISOString().slice(0, 10);
+link.href = url;
+link.download = `audit-logs-${stamp}.csv`;
+document.body.appendChild(link);
+link.click();
+link.remove();
+URL.revokeObjectURL(url);
+});
+}
 closeModalBtn?.addEventListener('click', () => closePendingModal());
 modal?.addEventListener('click', (event) => {
 if (event.target === modal) closePendingModal();
@@ -1821,8 +2622,51 @@ closePendingModal();
 });
 approveBtn?.addEventListener('click', () => submitDecision('approve'));
 denyBtn?.addEventListener('click', () => submitDecision('deny'));
+testApprovalEmailBtn?.addEventListener('click', () => sendApprovalEmailTest());
+approvalTestSendBtn?.addEventListener('click', () => sendApprovalEmailTestByEmail());
+
+let softRefreshInFlight = false;
+let softRefreshTimer = null;
+const startSoftRefresh = () => {
+if (softRefreshTimer) clearInterval(softRefreshTimer);
+softRefreshTimer = setInterval(softRefreshAdmin, 300000);
+};
+const stopSoftRefresh = () => {
+if (softRefreshTimer) clearInterval(softRefreshTimer);
+softRefreshTimer = null;
+};
+const softRefreshAdmin = async () => {
+if (document.hidden || softRefreshInFlight) return;
+softRefreshInFlight = true;
+const tasks = [];
+if (typeof window.loadSidebarWeather === 'function') {
+tasks.push(window.loadSidebarWeather());
+}
+tasks.push(
+loadFinanceCards(),
+loadAdminPosts(),
+loadPendingUsers(),
+loadSuspendedUsers(),
+loadDeletedUsers(),
+loadAuditLogs()
+);
+await Promise.allSettled(tasks);
+softRefreshInFlight = false;
+};
+document.addEventListener('visibilitychange', () => {
+if (document.hidden) {
+stopSoftRefresh();
+} else {
+startSoftRefresh();
+softRefreshAdmin();
+}
+});
+startSoftRefresh();
 
 loadPendingUsers();
+loadSuspendedUsers();
+loadDeletedUsers();
+loadAuditLogs();
 window.renderPendingUsers = renderPendingUsers;
 window.updatePendingCount = updatePendingCount;
 </script>

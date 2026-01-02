@@ -16,14 +16,14 @@
   <script type="module" src="assets/scripts/auth.js"></script>
   <style>
     :root {
-      --gold: #b4975a;
+      --gold: #887244;
       --navy: #27394d;
       --muted: #64748b;
       --line: #e8edf3;
       --bg: #ffffff;
     }
 
-    .gold { color: #b4975a; }
+    .gold { color: var(--gold); }
 
     body.browse-jobs-page {
       font-family: 'Sarabun', sans-serif;
@@ -86,7 +86,7 @@
       justify-self: center;
     }
 
-    .site-header .brand .accent-apostrophe { color: #b4975a; }
+    .site-header .brand .accent-apostrophe { color: var(--gold); }
 
     .site-header .header-actions {
       display: flex;
@@ -199,14 +199,14 @@
       padding: 0.5rem 1rem;
       font-size: 0.95rem;
       border-radius: 999px;
-      border: 1px solid #b4975a;
+      border: 1px solid var(--gold);
       background: transparent;
-      color: #b4975a;
+      color: var(--gold);
       cursor: pointer;
       letter-spacing: 0.04em;
     }
 
-    .filter-actions button.primary { background: #b4975a; color: #fff; }
+    .filter-actions button.primary { background: var(--gold); color: #fff; }
 
     .results {
       flex: 1;
@@ -268,9 +268,9 @@
     }
 
     .auth-blocker__actions .btn.primary {
-      background: #b4975a;
+      background: var(--gold);
       color: #fff;
-      border-color: #b4975a;
+      border-color: var(--gold);
     }
 
     .auth-blocker__actions .btn.secondary {
@@ -327,7 +327,7 @@
 
     .job-card {
       border: 1px solid rgba(26, 34, 48, 0.08);
-      border-left: 4px solid #b4975a;
+      border-left: 4px solid var(--gold);
       background: #fff;
       padding: 1.4rem 1.6rem;
       border-radius: 18px;
@@ -351,7 +351,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 0.65rem;
-      color: #94a3b8;
+      color: #6b7280;
       font-size: 0.9rem;
       margin-bottom: 0.8rem;
     }
@@ -364,17 +364,17 @@
 
     .clear-button,
     .apply-button {
-      border: 1px solid #b4975a;
+      border: 1px solid var(--gold);
       border-radius: 999px;
       padding: 0.45rem 1.3rem;
       font-size: 0.9rem;
       cursor: pointer;
       background: transparent;
-      color: #b4975a;
+      color: var(--gold);
       letter-spacing: 0.02em;
     }
 
-    .apply-button { background: #b4975a; color: #fff; }
+    .apply-button { background: var(--gold); color: #fff; }
 
     .clear-button:hover { background: rgba(180, 151, 90, 0.1); }
     .apply-button:hover { background: #a2864d; border-color: #a2864d; }
@@ -390,7 +390,7 @@
 
     #pagination {
       text-align: center;
-      color: #94a3b8;
+      color: #6b7280;
       font-size: 0.95rem;
     }
 
@@ -399,7 +399,7 @@
       padding: 32px 0;
       background: #ffffff;
       text-align: center;
-      color: #9ca3af;
+      color: #6b7280;
       font-size: 0.95rem;
     }
 
@@ -409,7 +409,7 @@
       margin: 0 0 8px;
     }
 
-    footer a { color: #94a3b8; text-decoration: none; }
+    footer a { color: #6b7280; text-decoration: none; }
 
     @media (max-width: 960px) {
       .layout { flex-direction: column; }
@@ -853,6 +853,7 @@
   </style>
 </head>
 <body class="browse-jobs-page browse-paralegals-page">
+  <a class="skip-link" href="#main">Skip to main content</a>
   <header class="site-header">
     <div class="header-inner">
       <nav aria-label="Primary"></nav>
@@ -865,7 +866,7 @@
 
   <div class="hero-banner" role="presentation" aria-hidden="true" data-hero-banner></div>
 
-  <main class="jobs-shell">
+  <main id="main" tabindex="-1" class="jobs-shell">
     <div class="layout">
       <aside class="filter" id="filterMenu">
         <h2>Filter</h2>

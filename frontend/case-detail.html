@@ -4,2742 +4,737 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <meta name="theme-color" content="#0B2A4A">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Case Detail – Let’s-ParaConnect</title>
+  <meta name="theme-color" content="#0B2A4A">
+  <title>Case Workspace - Let's-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
-
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/styles/dashboard.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://js.stripe.com/v3/"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&family=Cormorant+Garamond:wght@400;600&display=swap" rel="stylesheet" />
   <script src="assets/scripts/utils/session.js"></script>
-
   <style>
-    .gold{color:#b4975a;}
     :root {
-      --bg: #ffffff;
-      --sidebar-bg: #f5f5f5e6;
-      --sidebar-text: #1a1a1a;
-      --accent: #b6a47a;
-      --line: rgba(0,0,0,0.08);
-      --muted: #8a8a8a;
-      --ink: #1a1a1a;
-      --panel: #fcfcfc;
-      --font-serif: 'Cormorant Garamond', serif;
-      --font-sans: 'Sarabun', sans-serif;
-      --radius: 12px;
+      --font-sans: "Sarabun", sans-serif;
+      --font-serif: "Cormorant Garamond", serif;
+
+      --app-background: #f5f6f8;
+      --app-rail: #ffffff;
+      --app-surface: #ffffff;
+      --app-surface-muted: #f0f3f7;
+      --app-card: #ffffff;
+      --app-border: #e1e6ee;
+      --app-text: #141b24;
+      --app-muted: #5d6b7a;
+      --app-accent: #2c6fb8;
+      --app-accent-soft: rgba(44, 111, 184, 0.14);
+      --app-focus: #2c6fb8;
+
+      --app-shadow-soft: 0 12px 30px rgba(20, 27, 36, 0.08);
+      --app-shadow-card: 0 18px 45px rgba(20, 27, 36, 0.12);
+      --app-shadow-rail: 0 20px 50px rgba(20, 27, 36, 0.08);
     }
+
+    body.theme-dark {
+      --app-background: #0c1118;
+      --app-rail: #151c26;
+      --app-surface: #121822;
+      --app-surface-muted: #0f151f;
+      --app-card: #171f2b;
+      --app-border: #253042;
+      --app-text: #eef2f7;
+      --app-muted: #9aa7b6;
+      --app-accent: #6ea4e2;
+      --app-accent-soft: rgba(110, 164, 226, 0.16);
+      --app-focus: #6ea4e2;
+
+      --app-shadow-soft: 0 14px 40px rgba(6, 10, 15, 0.35);
+      --app-shadow-card: 0 22px 55px rgba(6, 10, 15, 0.45);
+      --app-shadow-rail: 0 24px 60px rgba(6, 10, 15, 0.4);
+    }
+
+    body.theme-mountain {
+      --app-background: linear-gradient(135deg, #f4efe5 0%, #f7f9fb 45%, #eef2f6 100%);
+      --app-rail: rgba(255, 255, 255, 0.94);
+      --app-surface: #ffffff;
+      --app-surface-muted: #f3f4f1;
+      --app-card: #ffffff;
+      --app-border: #e2e4e1;
+      --app-text: #1c2228;
+      --app-muted: #5f6a73;
+      --app-accent: #5b6f83;
+      --app-accent-soft: rgba(91, 111, 131, 0.18);
+      --app-focus: #5b6f83;
+
+      --app-shadow-soft: 0 14px 40px rgba(78, 63, 50, 0.12);
+      --app-shadow-card: 0 20px 50px rgba(78, 63, 50, 0.16);
+      --app-shadow-rail: 0 26px 64px rgba(78, 63, 50, 0.16);
+    }
+
+    body.theme-mountain-dark {
+      --app-background: linear-gradient(130deg, #0d1118 0%, #131c27 55%, #1b2634 100%);
+      --app-rail: rgba(17, 23, 33, 0.96);
+      --app-surface: #111824;
+      --app-surface-muted: #0c131e;
+      --app-card: #161f2c;
+      --app-border: #263245;
+      --app-text: #ecf0f4;
+      --app-muted: #9aa7b6;
+      --app-accent: #8ba6c1;
+      --app-accent-soft: rgba(139, 166, 193, 0.2);
+      --app-focus: #8ba6c1;
+
+      --app-shadow-soft: 0 18px 48px rgba(4, 8, 14, 0.5);
+      --app-shadow-card: 0 26px 65px rgba(4, 8, 14, 0.55);
+      --app-shadow-rail: 0 28px 72px rgba(4, 8, 14, 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
       font-family: var(--font-sans);
-      background: var(--bg);
-      color: var(--ink);
+      background: var(--app-background);
+      color: var(--app-text);
       min-height: 100vh;
-      display: flex;
     }
-    .sidebar {
-      width: 240px;
-      background: var(--sidebar-bg);
-      display: flex;
-      flex-direction: column;
-      border-right: 1px solid var(--line);
-      padding: 24px 16px;
-      color: var(--sidebar-text);
-      position: relative;
-    }
-    .sidebar::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: transparent;
-      pointer-events: none;
-      transition: background 0.3s ease;
-    }
-    body.theme-mountain .sidebar {
-      background: url('hero-mountain.jpg') center/cover no-repeat;
-    }
-    body.theme-mountain .sidebar::before {
-      background: rgba(0,0,0,0.45);
-    }
-    body.theme-mountain .sidebar > * {
-      position: relative;
-      z-index: 1;
-    }
-    .logo {
-      font-family: var(--font-serif);
-      font-size: 1.6rem;
-      font-weight: 300;
-      text-align: center;
-      margin-bottom: 36px;
-    }
-    nav {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-    nav a {
+
+    a {
+      color: inherit;
       text-decoration: none;
-      color: var(--sidebar-text);
-      font-size: 0.95rem;
-      padding: 10px 14px;
-      border-radius: var(--radius);
-      transition: background 0.3s;
     }
-    nav a.active,
-    nav a:hover {
-      background: rgba(0,0,0,0.04);
+
+    a:focus,
+    button:focus,
+    input:focus,
+    textarea:focus {
+      outline: 2px solid var(--app-focus);
+      outline-offset: 2px;
     }
-    body.theme-dark nav a.active,
-    body.theme-dark nav a:hover {
-      background: rgba(255,255,255,0.12);
+
+    .skip-link {
+      position: absolute;
+      left: 16px;
+      top: -50px;
+      background: var(--app-card);
+      color: var(--app-text);
+      border: 1px solid var(--app-border);
+      padding: 8px 12px;
+      border-radius: 8px;
+      box-shadow: var(--app-shadow-soft);
+      z-index: 10;
     }
-    body.theme-mountain nav a {
-      color: #fff;
+
+    .skip-link:focus {
+      top: 16px;
     }
-    body.theme-mountain nav a.active,
-    body.theme-mountain nav a:hover {
-      background: rgba(255,255,255,0.18);
+
+    .case-workspace {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr) 340px;
+      gap: 24px;
+      padding: 24px;
     }
-    .sidebar-bottom {
-      margin-top: auto;
+
+    .case-rail {
+      background: var(--app-rail);
+      border: 1px solid var(--app-border);
+      border-radius: 18px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      box-shadow: var(--app-shadow-rail);
+    }
+
+    .case-rail-header {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .case-rail-logo {
+      font-family: var(--font-serif);
+      font-size: 1.4rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .case-rail-note {
+      font-size: 0.9rem;
+      color: var(--app-muted);
+    }
+
+    .case-rail-filters h2 {
+      font-size: 1rem;
+      margin-bottom: 10px;
+    }
+
+    .case-rail-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .case-rail-tabs button {
+      border: 1px solid var(--app-border);
+      background: var(--app-surface);
+      color: var(--app-text);
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .case-rail-tabs button[aria-selected="true"] {
+      background: var(--app-accent-soft);
+      border-color: var(--app-accent);
+      color: var(--app-text);
+    }
+
+    .case-rail-filters label {
+      display: block;
+      font-size: 0.85rem;
+      margin-bottom: 6px;
+      color: var(--app-muted);
+    }
+
+    .case-rail-filters input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--app-border);
+      background: var(--app-surface);
+      color: var(--app-text);
+    }
+
+    .case-rail-list ul {
+      list-style: none;
       display: flex;
       flex-direction: column;
       gap: 12px;
-    }
-    .sidebar-footer {
-      font-size: 0.7rem;
-      color: var(--muted);
-      text-align: center;
-    }
-    .main {
-      flex: 1;
-      padding: 40px;
-      overflow-y: auto;
-    }
-    body.theme-dark {
-      --bg: #0f172a;
-      --sidebar-bg: #1c2333;
-      --panel: #151b29;
-      --ink: #f5f6fb;
-      --muted: #9aa7c4;
-      --line: rgba(255,255,255,0.08);
-      --sidebar-text: #f8fbff;
-    }
-    body.theme-mountain {
-      --bg: #f8f6f1;
-      --panel: #ffffff;
-      --muted: #7a736a;
-      --sidebar-text: #ffffff;
+      margin: 0;
+      padding: 0;
     }
 
-    .toast {
-      position: fixed;
-      left: 50%;
-      bottom: 32px;
-      transform: translate(-50%, 30px);
-      background: rgba(15, 23, 42, 0.92);
-      color: #fff;
-      padding: 0.85rem 1.25rem;
+    .case-card {
+      width: 100%;
+      border: 1px solid var(--app-border);
+      background: var(--app-surface);
       border-radius: 14px;
-      font-size: 0.9rem;
-      font-family: var(--font-sans);
-      display: flex;
-      gap: 0.75rem;
-      align-items: center;
-      box-shadow: 0 20px 45px rgba(15, 23, 42, 0.22);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.25s ease, transform 0.25s ease;
-      z-index: 4000;
-    }
-    .toast.show {
-      opacity: 1;
-      transform: translate(-50%, 0);
-    }
-    .toast[data-toast-type="success"] {
-      background: #1f7a4a;
-    }
-    .toast[data-toast-type="error"],
-    .toast[data-toast-type="err"] {
-      background: #8c2f2f;
-    }
-    .toast[data-toast-type="info"] {
-      background: rgba(11, 42, 74, 0.92);
-    }
-    .toast-cta {
-      border: 1px solid rgba(255,255,255,0.7);
-      border-radius: 999px;
-      padding: 0.25rem 0.9rem;
-      font-size: 0.85rem;
-      color: #fff;
-      text-decoration: none;
-      font-weight: 500;
-      transition: background 0.2s ease, color 0.2s ease;
-    }
-    .toast-cta:hover {
-      background: rgba(255,255,255,0.12);
-      color: #fff;
-    }
-
-    /* Case Layout */
-    .back-arrow {
-      font-family: var(--font-serif);
-      font-size: 1rem;
-      color: var(--accent);
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 1rem;
-    }
-    .back-arrow:hover { opacity: 0.8; }
-
-    .case-header {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 1rem;
-    }
-    .case-header h1 {
-      font-family: var(--font-serif);
-      font-weight: 300;
-      font-size: 2rem;
-      margin-bottom: 0.25rem;
-    }
-    .case-header small {
-      display: block;
-      color: var(--muted);
-      font-weight: 300;
-      font-size: 0.95rem;
-    }
-    .case-header-meta{
-      display:flex;
-      flex-direction:column;
-      gap:.35rem;
-    }
-    .case-submeta{
-      display:flex;
-      align-items:center;
-      gap:.5rem;
-      flex-wrap:wrap;
-    }
-    .case-status {
-      background: rgba(31,122,74,.1);
-      color: #1f7a4a;
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      font-weight: 300;
-      margin-top: 6px;
-      display: inline-block;
-    }
-    .case-live-copy{
-      margin:0;
-      color:#1f7a4a;
-      font-weight:400;
-      font-size:0.95rem;
-    }
-    .case-amount{
-      margin-top:0.35rem;
-      font-weight:600;
-      color:var(--ink);
-    }
-    .case-amount .muted{color:var(--muted);font-weight:400;}
-    .case-funding-alert{
-      margin-top:0.5rem;
-      padding:10px 12px;
-      border:1px solid #f2c94c;
-      background:#fff8e5;
-      color:#8a6d1f;
-      border-radius:8px;
-      font-weight:600;
-      width:fit-content;
-    }
-    .case-funding-alert.hidden{display:none;}
-    .work-locked-banner{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      padding:12px 14px;
-      border:1px solid var(--line);
-      background:#fff5ec;
-      color:#9a4b00;
-      border-radius:10px;
-      margin:0 0 12px 0;
-      font-weight:600;
-    }
-    body.theme-dark .work-locked-banner{
-      background:rgba(154,75,0,0.12);
-      color:#ffb469;
-    }
-    .work-locked-banner.hidden{display:none;}
-    .case-header-actions.locked{
-      opacity:0.6;
-      pointer-events:none;
-    }
-    .case-header-actions.locked .btn{
-      cursor:not-allowed;
-    }
-    .case-header-actions{
-      display:flex;
-      align-items:center;
-      gap:.5rem;
-      flex-wrap:wrap;
-    }
-    .case-header-actions .btn{
-      min-width:160px;
-      justify-content:center;
-    }
-    .case-header .btn {
-      align-self: center;
-    }
-
-    .case-actions {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      gap: 10px;
-      margin: 1rem 0 2rem;
-    }
-    .btn {
-      border: none;
-      border-radius: 6px;
-      padding: 8px 16px;
-      font-family: var(--font-sans);
-      font-size: 0.9rem;
-      font-weight: 300;
-      cursor: pointer;
-      transition: all 0.25s ease;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      text-decoration: none;
-      gap: 0.35rem;
-    }
-    .btn.primary { background: var(--accent); color: #fff; }
-    .btn.primary:hover { background: #a38e5f; }
-    .btn.secondary { background: #fff; border: 1px solid var(--line); color: var(--ink); }
-    .btn.secondary:hover { border-color: var(--accent); color: var(--accent); }
-    .case-options {
-      position: relative;
-      display: inline-flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .case-options summary {
-      list-style: none;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.45rem 1rem;
-      border-radius: 10px;
-      border: none;
-    }
-    .case-options summary::-webkit-details-marker {
-      display: none;
-    }
-    .case-options[open] .case-options-menu {
-      display: block;
-    }
-    .case-options-menu {
-      position: absolute;
-      left: 50%;
-      top: calc(100% + 8px);
-      transform: translateX(-50%);
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      box-shadow: 0 15px 45px rgba(15, 23, 42, 0.15);
-      min-width: 200px;
-      width: max(200px, 115%);
-      padding: 6px 0;
-      display: none;
-      z-index: 60;
-    }
-    .case-options-menu::before {
-      content: "";
-      position: absolute;
-      top: -8px;
-      left: 50%;
-      width: 16px;
-      height: 16px;
-      background: #fff;
-      border-left: 1px solid var(--line);
-      border-top: 1px solid var(--line);
-      transform: translate(-50%, 0) rotate(45deg);
-    }
-    .case-options-menu button {
-      width: 100%;
-      background: none;
-      border: none;
-      padding: 0.65rem 1rem;
+      padding: 12px 14px;
       text-align: left;
-      font-size: 0.9rem;
-      font-family: var(--font-sans);
-      cursor: pointer;
-      color: var(--ink);
-    }
-    .case-options-menu button:hover {
-      background: rgba(0,0,0,0.04);
-    }
-    .payment-panel {
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 1rem;
-      min-width: 260px;
-    }
-        .sidebar-link {
-      display: block;
-      width: 100%;
-      border: none;
-      background: none;
-      color: var(--sidebar-text);
-      font-size: 0.95rem;
-      font-family: var(--font-sans);
-      font-weight: 300;
-      text-align: center;
-      padding: 10px 14px;
-      border-radius: var(--radius);
-      cursor: pointer;
-      transition: background 0.3s ease;
-    }
-
-    .sidebar-link:hover,
-    .sidebar-link:focus {
-      background: rgba(0, 0, 0, 0.04);
-      outline: none;
-    }
-    body.theme-dark .sidebar-link:hover,
-    body.theme-dark .sidebar-link:focus,
-    body.theme-mountain .sidebar-link:hover,
-    body.theme-mountain .sidebar-link:focus {
-      color: #fff;
-    }
-    body.theme-mountain .sidebar-link {
-      color: #fff;
-    }
-    .sidebar-bottom{
-      margin-top:auto;
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-      align-items:center;
-    }
-    .sidebar-bottom .sidebar-link{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-    }
-    #card-element {
-      padding: 12px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      background: #fff;
-    }
-    #card-errors {
-      color: #b00020;
-      font-size: 0.85rem;
-      margin-top: 0.4rem;
-      min-height: 1.1rem;
-    }
-
-    .case-overview {
-      font-size: 0.95rem;
-      line-height: 1.6;
-      color: var(--ink);
-      border-bottom: 1px solid var(--line);
-      padding-bottom: 1.2rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .case-section {
-      margin-bottom: 2rem;
-    }
-    .case-section.is-muted {
-      opacity: 0.7;
-      filter: grayscale(0.05);
-    }
-    .case-section.is-muted h2 {
-      font-weight: 200;
-    }
-    .case-section h2 {
-      font-family: var(--font-serif);
-      font-weight: 300;
-      font-size: 1.4rem;
-      margin-bottom: 0.75rem;
-    }
-    .applicant-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-    .applicant-card {
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 1rem;
-      background: #fff;
-    }
-    .applicant-card h4 {
-      margin: 0 0 0.35rem;
-      font-family: var(--font-serif);
-      font-weight: 300;
-    }
-    .applicant-card p {
-      margin: 0.15rem 0;
-      font-size: 0.9rem;
-      color: var(--muted);
-    }
-    .applicant-card .chip {
-      display: inline-flex;
-      align-items: center;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 0.2rem 0.75rem;
-      font-size: 0.8rem;
-      margin-right: 0.35rem;
-      margin-top: 0.35rem;
-      color: var(--ink);
-      text-decoration: none;
-    }
-    .applicant-card .chip.muted {
-      color: var(--muted);
-      border-style: dashed;
-    }
-    .task-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-    .task-card {
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: #fff;
-      padding: 0.9rem 1rem;
-    }
-    .task-card h3 {
-      margin: 0 0 0.3rem;
-      font-family: var(--font-serif);
-      font-weight: 300;
-    }
-    .task-card p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.9rem;
-    }
-    .task-card .task-meta {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.8rem;
-      margin-top: 0.5rem;
-      color: #666;
-    }
-
-    /* Uploaded Documents */
-    .doc-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.8rem;
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .doc-item {
-      background: #f9f9f9;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 8px 12px;
-      font-size: 0.9rem;
-      color: var(--ink);
-      transition: all 0.2s ease;
-    }
-    .doc-item:hover { border-color: var(--accent); }
-
-    .upload-form {
-      margin-top: 1rem;
-      display: flex;
-      align-items: center;
-      gap: 0.8rem;
-    }
-    .upload-form label {
-      background: var(--accent);
-      color: #fff;
-      border-radius: 6px;
-      padding: 8px 16px;
-      cursor: pointer;
-      font-size: 0.9rem;
-    }
-    .upload-form input[type=file] { display: none; }
-
-    /* Deadlines */
-    .deadlines ul { list-style: none; padding: 0; }
-    .deadlines li { font-size: 0.95rem; margin-bottom: 0.4rem; }
-
-    /* Video Meeting */
-    .meeting-dropdown { position: relative; display: inline-block; }
-    .meeting-dropdown button {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      padding: 8px 16px;
-      font-size: 0.9rem;
-      cursor: pointer;
-    }
-    .meeting-options {
-      display: none;
-      position: absolute;
-      top: 38px;
-      left: 0;
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-      min-width: 160px;
-      z-index: 10;
-    }
-    .meeting-options a {
-      display: block;
-      padding: 8px 12px;
-      text-decoration: none;
-      color: var(--ink);
-      font-size: 0.9rem;
-    }
-    .meeting-options a:hover { background: #f7f7f7; color: var(--accent); }
-    .meeting-dropdown.active .meeting-options { display: block; }
-
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.45);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 999;
-      padding: 20px;
-    }
-    .modal-overlay.show {
-      display: flex;
-    }
-    .modal-card {
-      background: #fff;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 24px;
-      width: 100%;
-      max-width: 420px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.12);
-      font-family: var(--font-sans);
-      color: var(--ink);
-    }
-    .modal-card h3 {
-      margin: 0 0 12px;
-      font-family: var(--font-serif);
-      font-weight: 300;
-      font-size: 1.35rem;
-    }
-    .modal-field {
-      display: block;
-      margin-top: 14px;
-      font-size: 0.9rem;
-      font-weight: 300;
-    }
-    .modal-field span {
-      display: block;
-      margin-bottom: 6px;
-      color: var(--muted);
-      font-family: var(--font-sans);
-    }
-    .modal-field input,
-    .modal-field textarea {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      font-family: var(--font-sans);
-      font-size: 0.95rem;
-      color: var(--ink);
-    }
-    .modal-field textarea {
-      min-height: 90px;
-      resize: vertical;
-    }
-    .modal-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-      margin-top: 22px;
-    }
-
-    /* Notes */
-    #caseNotes {
-      width: 100%;
-      height: 140px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 12px;
-      font-family: var(--font-sans);
-      font-size: 0.9rem;
-      background: var(--panel);
-      resize: vertical;
-    }
-
-    /* Review Work */
-    .review-list { list-style: none; padding: 0; margin: 0; }
-    .review-item {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 0.8rem;
-      background: #fafafa;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    /* Chat */
-    .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-    .column-stack { display:flex; flex-direction:column; gap:1rem; }
-    .chat-box {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
-      padding: 1rem;
-      height: 260px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-    }
-    .chat-msg {
-      padding: 0.6rem 0.8rem;
-      border-radius: 6px;
-      font-size: 0.9rem;
-      max-width: 80%;
-    }
-    .chat-msg.you { align-self: flex-end; background: var(--accent); color: #fff; }
-    .chat-msg.them { align-self: flex-start; background: #f4f4f4; color: var(--ink); }
-
-    .chat-input { display: flex; margin-top: 0.75rem; gap: 0.5rem; }
-    .chat-input input {
-      flex: 1;
-      padding: 8px;
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      font-size: 0.9rem;
-    }
-
-    /* === Refined Review & Messaging Section === */
-    .review-container {
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: var(--panel);
-      padding: 2rem;
-      margin-top: 2rem;
-      display: flex;
-      flex-direction: column;
-      gap: 2rem;
-      font-family: var(--font-sans);
-    }
-    .review-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .review-header h2 {
-      font-family: var(--font-serif);
-    }
-    .review-body {
       display: grid;
-      grid-template-columns: 1.1fr 1fr;
-      gap: 2rem;
-    }
-    .review-left {
-      display: flex;
-      flex-direction: column;
-      gap: 2rem;
-    }
-    .review-item {
-      background: #f8f8f8;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 1rem 1.25rem;
-      font-family: var(--font-sans);
-    }
-    .notes-section h3,
-    .upload-box h3,
-    .video-box h3 {
-      font-family: var(--font-serif);
-      margin-bottom: 0.5rem;
-    }
-    .notes-section textarea {
-      width: 100%;
-      height: 120px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 0.8rem;
-      resize: none;
-      background: #fff;
-      margin-bottom: 0.5rem;
-      font-family: var(--font-sans);
-    }
-    .note-actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 0.5rem;
-    }
-    .notes-hint {
-      color: var(--muted);
-      font-size: 0.85rem;
-      margin-bottom: 0.35rem;
-    }
-    .upload-video {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-    .upload-box,
-    .video-box {
-      flex: 1;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 1.25rem;
-      background: #fff;
-      min-width: 240px;
-    }
-    .dropzone {
-      border: 2px dashed var(--accent);
-      border-radius: var(--radius);
-      padding: 2rem;
-      text-align: center;
-      font-size: 0.9rem;
-      background: #fff;
-      color: var(--muted);
+      gap: 6px;
       cursor: pointer;
-      transition: all 0.2s ease;
-      font-family: var(--font-sans);
-    }
-    .dropzone:hover {
-      background: #fdfbf6;
-      border-color: #a58c5c;
-    }
-    .dropzone.drag-over,
-    .dropzone.uploading {
-      border-color: #a58c5c;
-      background: rgba(182, 164, 122, 0.08);
-      color: var(--ink);
-    }
-    .video-box .btn {
-      margin-top: 1rem;
-    }
-    .review-right {
-      display: flex;
-      flex-direction: column;
-    }
-    .review-right h3 {
-      font-family: var(--font-serif);
-      margin-bottom: 0.5rem;
-    }
-    .review-right .chat-window {
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: #fff;
-      padding: 1rem;
-      height: 320px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-      font-family: var(--font-sans);
-    }
-    .review-right .chat-msg {
-      padding: 0.75rem 1rem;
-      border-radius: 10px;
-      font-size: 0.9rem;
-      max-width: 80%;
-      font-family: var(--font-sans);
-    }
-    .review-right .chat-msg.you {
-      align-self: flex-end;
-      background: var(--accent);
-      color: #fff;
-    }
-    .review-right .chat-msg.them {
-      align-self: flex-start;
-      background: #f4f4f4;
-    }
-    .review-right .chat-input {
-      display: flex;
-      gap: 0.5rem;
-      margin-top: 1rem;
-    }
-    .review-right .chat-input input {
-      flex: 1;
-      padding: 0.75rem;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      font-size: 0.9rem;
-      font-family: var(--font-sans);
+      position: relative;
+      box-shadow: var(--app-shadow-soft);
     }
 
-    /* Modal */
-    .hidden { display: none; }
-    .modal {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.45);
-      justify-content: center;
-      align-items: center;
-      z-index: 2000;
-    }
-    .modal-content {
-      background: #fff;
-      padding: 2rem;
-      border-radius: 12px;
-      text-align: center;
-      width: min(480px, 95%);
-      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
-      font-family: var(--font-sans);
-    }
-    .modal-content h2 {
-      font-family: var(--font-serif);
-      font-weight: 300;
-      margin-bottom: 0.75rem;
-    }
-    .modal-content p {
-      color: var(--muted);
-      line-height: 1.5;
-      font-size: 0.95rem;
-    }
-    .export-progress {
-      background: rgba(182,164,122,0.06);
-      border-radius: 10px;
-      padding: 1rem;
-      margin-top: 1rem;
-    }
-    .modal-actions {
-      margin-top: 1.5rem;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      justify-content: center;
-    }
-    .modal-actions .btn {
-      flex: 1 1 135px;
-      min-width: 135px;
-      max-width: 190px;
-      padding: 0.5rem 0.85rem;
-      height: 42px;
-      white-space: nowrap;
-    }
-    .progress-bar {
-      width: 100%;
-      height: 6px;
-      background: #eee;
-      border-radius: 4px;
-      overflow: hidden;
-      margin-top: 0.75rem;
-    }
-    .bar {
-      height: 6px;
-      width: 0%;
-      background: var(--accent);
-      transition: width 0.4s ease;
-    }
-    .btn.danger {
-      background: #d9534f;
-      color: #fff;
-      border: none;
-    }
-    .btn.danger:hover {
-      background: #c9302c;
+    .case-card[aria-current="true"] {
+      border-color: var(--app-accent);
+      box-shadow: var(--app-shadow-card);
     }
 
-    .case-tabs {
-      display:flex;
-      gap:.5rem;
-      border-bottom:1px solid var(--line);
-      margin:2rem 0 1rem;
-    }
-    .case-tabs .tab {
-      background:#fff;
-      border:1px solid var(--line);
-      border-bottom:none;
-      border-radius:8px 8px 0 0;
-      padding:.6rem 1.2rem;
-      font-family:var(--font-sans);
-      font-size:.9rem;
-      cursor:pointer;
-      transition:background .2s ease;
-    }
-    .case-tabs .tab.active {
-      background:var(--accent);
-      color:#fff;
-      border-color:var(--accent);
-    }
-    .tab-panels {
-      border:1px solid var(--line);
-      border-radius:0 0 8px 8px;
-      background:var(--panel);
-      padding:1.5rem;
-    }
-    .tab-panel {display:none;}
-    .tab-panel.visible {display:block;animation:fadeIn .25s ease;}
-    @keyframes fadeIn{from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:translateY(0);}}
-
-    .details-grid {
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
-      gap:1.5rem;
-    }
-    .party-card {
-      border:1px solid var(--line);
-      border-radius:8px;
-      background:#fff;
-      padding:1rem 1.2rem;
-      line-height:1.5;
-    }
-    .party-card h4 {
-      font-family:var(--font-serif);
-      font-weight:300;
-      margin-bottom:.5rem;
-    }
-    .party-card a {color:var(--accent);text-decoration:none;font-size:.85rem;}
-    .party-card a:hover{text-decoration:underline;}
-    .party-card .card-actions{
-      display:flex;
-      gap:.5rem;
-      margin-top:.75rem;
-      flex-wrap:wrap;
-    }
-    .party-card .card-actions .btn{
-      flex:1 1 140px;
-      justify-content:center;
-    }
-
-    .drop-zone {
-      border:2px dashed var(--line);
-      border-radius:10px;
-      background:#fff;
-      padding:2rem;
-      text-align:center;
-      cursor:pointer;
-      transition:all .25s ease;
-      color:var(--muted);
-      font-size:.95rem;
-      position:relative;
-    }
-    .drop-zone:hover { border-color:var(--accent); background:#faf9f5; }
-    .drop-zone-icon {
-      font-size:3rem;
-      color:var(--accent);
-      margin-bottom:.5rem;
-    }
-    .drop-zone input[type=file] {
-      position:absolute;
-      inset:0;
-      width:100%;
-      height:100%;
-      opacity:0;
-      cursor:pointer;
-    }
-    .uploaded-list {
-      list-style:none;
-      margin-top:1rem;
-      padding:0;
-    }
-    .uploaded-list li {
-      background:#f9f9f9;
-      border:1px solid var(--line);
-      border-radius:6px;
-      padding:.6rem .8rem;
-      margin-bottom:.4rem;
-      font-size:.9rem;
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      transition:background .2s ease;
-    }
-    .uploaded-list li:hover { background:#fffbe9; border-color:var(--accent); }
-
-    .progress-fill {
-      background:var(--accent);
-      height:100%;
-      width:0;
-      transition:width .3s ease;
-    }
-
-    .upload-zone-section {
-      margin-bottom:0.5rem;
-      flex:1;
-    }
-    .video-meeting-card { flex:1; }
-    .upload-zone-body {
-      display:flex;
-      gap:1rem;
-      align-items:flex-start;
-    }
-    .upload-zone-body .drop-zone {
-      width:220px;
-      padding:1rem;
-      position:relative;
-      flex-shrink:0;
-    }
-
-    .payment-modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.45);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 2000;
-    }
-    .payment-modal.hidden { display: none; }
-    .payment-modal .modal-card {
-      background: #fff;
-      border-radius: 12px;
-      padding: 1.5rem;
-      max-width: 420px;
-      width: 90%;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.15);
-      color: #1a1a1a;
-    }
-    .payment-modal h3 {
-      margin-top: 0;
-      font-weight: 400;
-      margin-bottom: 0.5rem;
-    }
-    .payment-modal p {
-      margin: 0 0 1rem 0;
-      color: var(--muted);
-      line-height: 1.4;
-    }
-    .payment-modal .actions {
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-    .payment-modal .actions button,
-    .payment-modal .actions a {
-      border: none;
-      border-radius: 10px;
-      padding: 0.6rem 1rem;
-      cursor: pointer;
-      text-decoration: none;
+    .case-title {
       font-weight: 600;
     }
-    .payment-modal .actions .primary {
-      background: var(--accent);
-      color: #fff;
+
+    .case-meta,
+    .case-preview {
+      font-size: 0.85rem;
+      color: var(--app-muted);
     }
-    .payment-modal .actions .secondary {
-      background: #f3f4f6;
-      color: #111827;
+
+    .case-unread {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: var(--app-accent);
+      color: var(--app-surface);
+      min-width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-size: 0.75rem;
     }
-    .upload-video-wrap {
-      display:flex;
-      gap:1rem;
-      align-items:flex-start;
-      flex-wrap:wrap;
+
+    .case-thread {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
     }
-    .upload-zone-body .drop-zone-icon {
-      font-size:2rem;
+
+    .case-thread-header {
+      background: var(--app-surface);
+      border: 1px solid var(--app-border);
+      border-radius: 18px;
+      padding: 18px 20px;
+      box-shadow: var(--app-shadow-soft);
     }
-    .upload-zone-body .uploaded-list {
-      margin:0;
-      flex:1;
+
+    .case-thread-header h1 {
+      font-size: 1.6rem;
+      font-family: var(--font-serif);
     }
-    @media (max-width:640px) {
-      .upload-zone-body {
-        flex-direction:column;
+
+    .case-thread-title {
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    .case-thread-subtitle,
+    .case-thread-note {
+      font-size: 0.9rem;
+      color: var(--app-muted);
+      margin-top: 4px;
+    }
+
+    .case-participants,
+    .message-history,
+    .message-composer {
+      background: var(--app-surface);
+      border: 1px solid var(--app-border);
+      border-radius: 18px;
+      padding: 18px 20px;
+      box-shadow: var(--app-shadow-soft);
+    }
+
+    .message-history {
+      background: var(--app-surface-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: clamp(360px, 55vh, 620px);
+    }
+
+    .message-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 2px 2px;
+    }
+
+    .case-participants h2,
+    .message-history h2,
+    .message-composer h2 {
+      font-size: 1.1rem;
+      margin-bottom: 10px;
+    }
+
+    .case-participants ul {
+      list-style: none;
+      display: grid;
+      gap: 6px;
+      color: var(--app-muted);
+      margin: 0;
+      padding: 0;
+    }
+
+    .message-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin: 0;
+      padding: 0;
+    }
+
+    .thread-card {
+      background: var(--app-card);
+      border: 1px solid var(--app-border);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: var(--app-shadow-card);
+      display: grid;
+      gap: 12px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .card-header h3 {
+      font-size: 1rem;
+      margin-bottom: 4px;
+    }
+
+    .card-role {
+      font-size: 0.85rem;
+      color: var(--app-muted);
+    }
+
+    .card-body p {
+      line-height: 1.6;
+    }
+
+    .document-card {
+      border-left: 4px solid var(--app-accent);
+    }
+
+    .document-card dl {
+      display: grid;
+      gap: 8px;
+      font-size: 0.9rem;
+    }
+
+    .document-card dt {
+      color: var(--app-muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .document-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .document-actions button {
+      border: 1px solid var(--app-border);
+      background: var(--app-surface-muted);
+      color: var(--app-text);
+      padding: 6px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .document-actions a {
+      border: 1px solid var(--app-border);
+      background: var(--app-surface-muted);
+      color: var(--app-text);
+      padding: 6px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .document-comments {
+      border-top: 1px solid var(--app-border);
+      padding-top: 12px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .document-comments h4 {
+      font-size: 0.95rem;
+    }
+
+    .document-comments ol {
+      list-style: none;
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+    }
+
+    .document-comments article {
+      background: var(--app-surface-muted);
+      border-radius: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--app-border);
+    }
+
+    .document-comments h5 {
+      font-size: 0.9rem;
+      margin-bottom: 4px;
+    }
+
+    .message-composer form,
+    .document-upload form,
+    .document-comments form {
+      display: grid;
+      gap: 10px;
+    }
+
+    .message-composer textarea,
+    .document-upload textarea,
+    .document-comments textarea {
+      width: 100%;
+      border: 1px solid var(--app-border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: var(--app-surface);
+      color: var(--app-text);
+      font-family: var(--font-sans);
+    }
+
+    .message-composer input,
+    .document-upload input,
+    .document-comments input {
+      border: 1px solid var(--app-border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: var(--app-surface);
+      color: var(--app-text);
+      font-family: var(--font-sans);
+    }
+
+    .composer-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .message-composer.is-dragover {
+      border-color: var(--app-accent);
+      box-shadow: var(--app-shadow-card);
+    }
+
+    .composer-attachments {
+      border: 1px dashed var(--app-border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: var(--app-surface-muted);
+      display: grid;
+      gap: 8px;
+    }
+
+    .composer-attachments[hidden] {
+      display: none;
+    }
+
+    .attachment-item {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 0.9rem;
+    }
+
+    .attachment-name {
+      font-weight: 600;
+    }
+
+    .attachment-meta {
+      color: var(--app-muted);
+      font-size: 0.85rem;
+    }
+
+    .attachment-progress {
+      width: 100%;
+      height: 8px;
+    }
+
+    .attachment-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .attachment-error {
+      color: var(--app-muted);
+      font-size: 0.8rem;
+      margin-top: 4px;
+    }
+
+    .attachment-remove {
+      border: 1px solid var(--app-border);
+      background: var(--app-surface);
+      color: var(--app-text);
+      padding: 4px 10px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    button[type="submit"] {
+      background: var(--app-accent);
+      color: var(--app-surface);
+      border: none;
+      border-radius: 10px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .case-overview-panel {
+      background: var(--app-surface);
+      border: 1px solid var(--app-border);
+      border-radius: 18px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: var(--app-shadow-rail);
+    }
+
+    .case-overview-panel h2 {
+      font-size: 1.3rem;
+      font-family: var(--font-serif);
+    }
+
+    .case-overview-panel h3 {
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+
+    .case-overview-panel dl,
+    .case-overview-panel ul {
+      display: grid;
+      gap: 8px;
+      list-style: none;
+      font-size: 0.9rem;
+      color: var(--app-muted);
+      margin: 0;
+      padding: 0;
+    }
+
+    .case-overview-panel a {
+      color: var(--app-accent);
+      font-weight: 600;
+    }
+
+    @media (max-width: 1200px) {
+      .case-workspace {
+        grid-template-columns: 240px minmax(0, 1fr);
       }
-      .upload-zone-body .drop-zone {
-        width:100%;
+
+      .case-overview-panel {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .case-workspace {
+        grid-template-columns: 1fr;
       }
     }
   </style>
 </head>
+<body>
+  <a href="#case-messages" class="skip-link">Skip to case messages</a>
 
-<body data-case-id="case-motion-summary-judgment">
-  <aside class="sidebar">
-    <div class="logo">Dashboard</div>
-    <nav>
-      <a href="dashboard-paralegal.html" class="active">Home</a>
-      <a href="case-files.html">Active Cases</a>
-      <a href="profile-settings.html">Profile Settings</a>
-      <a href="help.html">Help</a>
-    </nav>
-    <div class="sidebar-bottom">
-      <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-      <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
-    </div>
-  </aside>
+  <div class="case-workspace" role="presentation">
+    <aside class="case-rail" aria-label="Case switcher">
+      <header class="case-rail-header">
+        <a href="case-dashboard.html" class="case-rail-logo">Let's-ParaConnect</a>
+        <p class="case-rail-note">Shared workspace for attorneys and paralegals.</p>
+      </header>
 
-  <main class="main">
-    <div class="topbar" data-attorney-header></div>
-
-    <a href="active-cases.html" class="back-arrow">← Back to Cases</a>
-
-    <div class="case-header">
-      <div class="case-header-meta">
-        <h1 id="caseTitle">Case Title</h1>
-        <div class="case-submeta">
-          <span class="case-status" id="caseStatusBadge">OPEN</span>
+      <section class="case-rail-filters" aria-label="Case filters">
+        <h2>Cases</h2>
+        <div class="case-rail-tabs" role="tablist" aria-label="Case view">
+          <button type="button" role="tab" aria-selected="true">Active</button>
+          <button type="button" role="tab" aria-selected="false">Unread</button>
         </div>
-        <div class="case-amount" id="caseAmount">Posted amount: —</div>
-        <div class="case-funding-alert hidden" id="fundingPrompt" data-attorney-only>
-          Hire & start work to charge your saved card and unlock tasks.
+        <label for="case-search">Search cases</label>
+        <input id="case-search" name="case-search" type="search" placeholder="Search by client or matter" />
+      </section>
+
+      <nav class="case-rail-list" aria-label="Active cases">
+        <p id="caseListStatus" class="case-rail-note">Loading cases...</p>
+        <ul id="caseList"></ul>
+      </nav>
+    </aside>
+
+    <main id="case-messages" class="case-thread" aria-label="Case conversation" data-case-id="">
+      <header class="case-thread-header">
+        <h1>Messages</h1>
+        <p class="case-thread-title" id="caseTitle">Select a case</p>
+        <p class="case-thread-subtitle" id="caseStatusLine">Waiting for case selection.</p>
+        <p class="case-thread-note">Lucid-style message cards support collaborative reading, drafting, and review.</p>
+      </header>
+
+      <section class="case-participants" aria-label="Participants">
+        <h2>Participants</h2>
+        <ul id="caseParticipants"></ul>
+      </section>
+
+      <section class="message-history" aria-label="Conversation">
+        <h2>Conversation</h2>
+        <div class="message-scroll" role="region" aria-label="Conversation thread">
+          <ol class="message-list" id="caseMessageList" data-case-id=""></ol>
         </div>
-        <p class="case-live-copy hidden" id="caseLiveCopy">This case is live and visible to vetted paralegals.</p>
-      </div>
-      <div class="case-header-actions">
-        <button type="button" class="btn primary hidden" id="primaryInviteBtn" data-attorney-only>
-          Invite Paralegal
-        </button>
-        <details class="case-options hidden" data-attorney-only id="caseOptionsRoot">
-          <summary class="btn secondary" id="caseOptionsToggle">Case Options ▾</summary>
-          <div class="case-options-menu" id="caseOptionsMenu">
-            <button type="button" data-case-option="edit">Edit</button>
-            <button type="button" data-case-option="share">Share</button>
-            <button type="button" data-case-option="pause">Pause</button>
-            <button type="button" data-case-option="delete">Delete</button>
+      </section>
+
+      <section class="message-composer" aria-label="Write a message">
+        <h2>New message</h2>
+        <form id="caseMessageForm">
+          <label for="caseMessageInput">Message</label>
+          <textarea id="caseMessageInput" name="message-body" rows="4" placeholder="Write your message"></textarea>
+          <div class="composer-actions">
+            <label for="message-attachment">Attach a file</label>
+            <input id="message-attachment" name="message-attachment" type="file" multiple />
+            <button type="submit">Send</button>
           </div>
-        </details>
-        <button class="btn primary hidden" id="openTaskModalBtn" data-attorney-only data-requires-paralegal>
-          + Create Task
-        </button>
-      </div>
-    </div>
-    <div class="work-locked-banner hidden" id="workLockedBanner">
-      <span aria-hidden="true">⏳</span>
-      <span>Work begins once payment is secured.</span>
-    </div>
-
-    <section class="case-section">
-      <div class="details-grid" id="caseDetailsPanel">
-        <div class="party-card">
-          <h4>Paralegal</h4>
-          <p id="caseParalegalName">Not yet hired</p>
-          <p id="caseParalegalEmail" class="muted"></p>
-        </div>
-      </div>
-    </section>
-
-    <div class="case-actions">
-      <button class="btn primary hidden" id="fundEscrowBtn" data-attorney-only>Hire &amp; Start Work</button>
-    </div>
-
-    <div class="case-overview" id="caseOverview">
-      <p>No description provided yet.</p>
-      <p id="caseTimelineMeta"></p>
-    </div>
-
-    <section class="case-section" data-attorney-only id="applicantsSection">
-      <h2>Applicants</h2>
-      <div id="applicantsList" class="applicant-list">
-        <p style="color:var(--muted);">No applications yet. Paralegals will appear here as soon as they apply.</p>
-      </div>
-    </section>
-
-    <section class="case-section" id="caseTasksSection">
-      <h2>Case Tasks</h2>
-      <div id="caseTasksGate" class="hidden" style="margin:0 0 0.5rem;color:var(--muted);"></div>
-      <div id="caseTasksContainer" class="task-list">
-        <p style="color:var(--muted);">Tasks will show here after you hire a paralegal and assign work.</p>
-      </div>
-    </section>
-
-    <section class="case-section" data-paralegal-only>
-      <h2>Uploaded Documents</h2>
-      <div class="doc-list" id="docList">
-        <p style="color:var(--muted);">No documents uploaded.</p>
-      </div>
-      <form class="upload-form" id="uploadForm">
-        <label for="fileInput">Upload Document</label>
-        <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt" required />
-      </form>
-    </section>
-
-    <section class="case-section deadlines">
-      <h2>Deadlines</h2>
-      <ul id="deadlinesList">
-        <li style="color:var(--muted);">Deadlines will appear here once work begins on this case.</li>
-      </ul>
-    </section>
-
-    <section class="case-section notes-section" data-attorney-only>
-      <h2>Case Notes</h2>
-      <p class="notes-hint">Private notes only you can see. Clear the field and save to delete.</p>
-      <textarea placeholder="Add internal notes for this case." data-case-note></textarea>
-      <div class="note-actions">
-        <button type="button" class="btn secondary" data-save-note>Save Notes</button>
-      </div>
-    </section>
-
-    <section class="review-container">
-      <div class="review-header">
-        <h2 style="font-weight:300;">Review & Messaging</h2>
-      </div>
-      <div class="review-body">
-        <p style="color:var(--muted);">Review workflows and messaging will appear here once activity begins on this case.</p>
-      </div>
-    </section>
-  </main>
-  <div id="taskModal" class="modal-overlay" data-paralegal-only>
-    <div class="modal-card">
-      <h3>New Task</h3>
-      <label class="modal-field" for="taskTitleInput">
-        <span>Title</span>
-        <input type="text" id="taskTitleInput" placeholder="e.g., Draft client declaration" />
-      </label>
-      <label class="modal-field" for="taskDescInput">
-        <span>Description (include context or deliverables)</span>
-        <textarea id="taskDescInput" placeholder="Add background details, files to cite, or specific outcomes needed."></textarea>
-      </label>
-      <label class="modal-field" for="taskDueInput">
-        <span>Due date (optional)</span>
-        <input type="date" id="taskDueInput" />
-      </label>
-      <div class="modal-actions">
-        <button id="cancelTaskBtn" class="btn btn-outline" type="button">Cancel</button>
-        <button id="saveTaskBtn" class="btn btn-primary" type="button">Save Task</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="paymentMethodModal" class="payment-modal hidden">
-    <div class="modal-card">
-      <h3>Payment method required</h3>
-      <p>To hire and start work, add a card on your account. You’ll be returned here to finish once it’s saved.</p>
-      <div class="actions">
-        <button type="button" class="secondary" id="paymentModalDismiss">Cancel</button>
-        <button type="button" class="primary" id="paymentModalAddCard">Add Card</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="exportPurgeModal" class="modal hidden">
-    <div class="modal-content">
-      <h2>Export &amp; Purge Case?</h2>
-      <p>
-        Once you confirm, a secure ZIP file containing all related data will be generated.
-        You’ll be able to download it immediately. This case data will be permanently deleted from our servers.
-      </p>
-
-      <div class="export-progress hidden" id="exportProgress">
-        <p>Preparing archive…</p>
-        <div class="progress-bar"><div class="bar" id="progressBar"></div></div>
-      </div>
-
-      <div class="modal-actions">
-        <div style="display:flex; gap:10px; justify-content:flex-end; margin-bottom:1rem;">
-          <button class="btn secondary" onclick="closeExportModal()">Cancel</button>
-          <a id="downloadLink" class="btn secondary hidden" download>Download Archive</a>
-        </div>
-        <button class="btn primary" id="exportBtn" onclick="startExport()">Generate ZIP</button>
-        <div style="text-align:right;">
-          <button class="btn danger hidden" id="purgeBtn" onclick="purgeCase()">Delete Case</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
-  <script>
-    (function preloadCaseTitle() {
-      const titleNode = document.getElementById('caseTitle');
-      if (!titleNode) return;
-      const params = new URLSearchParams(window.location.search || '');
-      const caseId = params.get('caseId') || document.body?.dataset?.caseId || '';
-      const stores = [sessionStorage, localStorage];
-      const CASE_TITLE_PREFIX = 'case_title_';
-      const PREFILL_KEY = 'lpc_last_case_prefill';
-
-      function readRaw(key) {
-        for (const store of stores) {
-          if (!store) continue;
-          try {
-            const value = store.getItem(key);
-            if (value) return value;
-          } catch {
-            /* ignore */
-          }
-        }
-        return '';
-      }
-
-      function readPrefillObject() {
-        for (const store of stores) {
-          if (!store) continue;
-          try {
-            const raw = store.getItem(PREFILL_KEY);
-            if (!raw) continue;
-            const parsed = JSON.parse(raw);
-            if (parsed && parsed.caseId === caseId && parsed.title) {
-              return parsed.title;
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-        return '';
-      }
-
-      let title = params.get('prefillTitle') || '';
-      if (!title && caseId) {
-        title = readRaw(`${CASE_TITLE_PREFIX}${caseId}`) || '';
-      }
-      if (!title && caseId) {
-        title = readPrefillObject();
-      }
-      if (title) {
-        titleNode.textContent = title;
-      }
-    })();
-  </script>
-  <script src="assets/scripts/utils/toast.js"></script>
-  <script type="module">
-    import { secureFetch } from "./assets/scripts/auth.js";
-
-    const toastHelper = window.toastUtils;
-    const toastBannerEl = document.getElementById('toastBanner');
-    let toastHideTimerId;
-
-    function showToastBanner(message, type = 'info', options = {}) {
-      if (!toastBannerEl || !message) return;
-      const normalizedOptions = (options && typeof options === 'object') ? options : {};
-      let actionConfig = normalizedOptions.cta;
-      if (!actionConfig && (normalizedOptions.label || normalizedOptions.href || normalizedOptions.onClick)) {
-        actionConfig = {
-          label: normalizedOptions.label,
-          href: normalizedOptions.href,
-          target: normalizedOptions.target,
-          onClick: normalizedOptions.onClick,
-        };
-      }
-      const hasAction = actionConfig && actionConfig.label && (actionConfig.href || typeof actionConfig.onClick === 'function');
-      toastBannerEl.innerHTML = '';
-      const textSpan = document.createElement('span');
-      textSpan.className = 'toast-message';
-      textSpan.textContent = message;
-      toastBannerEl.appendChild(textSpan);
-
-      if (hasAction) {
-        const action = document.createElement('a');
-        action.className = 'toast-cta';
-        action.textContent = actionConfig.label;
-        if (actionConfig.href) {
-          action.href = actionConfig.href;
-          if (actionConfig.target) {
-            action.target = actionConfig.target;
-            action.rel = 'noopener noreferrer';
-          } else {
-            action.rel = 'noopener';
-          }
-        } else {
-          action.href = '#';
-        }
-        if (typeof actionConfig.onClick === 'function') {
-          action.addEventListener('click', (event) => {
-            event.preventDefault();
-            actionConfig.onClick(event);
-          });
-        }
-        toastBannerEl.appendChild(action);
-      }
-
-      toastBannerEl.dataset.toastType = type;
-      toastBannerEl.classList.add('show');
-      clearTimeout(toastHideTimerId);
-      const hideDelay = typeof normalizedOptions.duration === 'number'
-        ? normalizedOptions.duration
-        : hasAction ? 6500 : 4000;
-      toastHideTimerId = setTimeout(() => toastBannerEl.classList.remove('show'), hideDelay);
-    }
-
-    if (toastHelper && typeof toastHelper.show === 'function') {
-      const originalShow = toastHelper.show.bind(toastHelper);
-      toastHelper.show = (message, options = {}) => {
-        if (!message) return;
-        const opts = options || {};
-        if (toastBannerEl) {
-          showToastBanner(message, opts.type || 'info', opts);
-        } else {
-          originalShow(message, options);
-        }
-      };
-    }
-
-    const FALLBACK_TOAST_KEY = toastHelper?.STORAGE_KEY || 'lpDashboardToast';
-    const stagedToast = toastHelper?.consume?.();
-    if (stagedToast?.message) {
-      showToastBanner(stagedToast.message, stagedToast.type || 'info');
-    }
-
-    let currentUser = null;
-    if (typeof window.checkSession === "function") {
-      const session = await window.checkSession(undefined, { redirectOnFail: false }).catch(() => null);
-      currentUser = session?.user || session || null;
-    }
-    if (!currentUser) {
-      // Guard will redirect unauthorized visitors.
-    } else {
-      applyRoleVisibility(currentUser);
-    // Upload Document
-    document.getElementById('fileInput').addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (file) {
-        const li = document.createElement('li');
-        li.className = 'doc-item';
-        li.textContent = file.name;
-        document.getElementById('docList').appendChild(li);
-        alert('File uploaded successfully.');
-      }
-    });
-
-    const chatWindow = document.querySelector('.review-right .chat-window');
-    const chatInputField = document.querySelector('.review-right .chat-input input');
-    const chatSendBtn = document.querySelector('.review-right .chat-input .btn.primary');
-
-    chatSendBtn?.addEventListener('click', () => {
-      const msg = chatInputField?.value.trim();
-      if (!msg) return;
-      const div = document.createElement('div');
-      div.className = 'chat-msg you';
-      div.textContent = 'You: ' + msg;
-      chatWindow?.appendChild(div);
-      chatInputField.value = '';
-      if (chatWindow) chatWindow.scrollTop = chatWindow.scrollHeight;
-    });
-
-    const reviewApproveBtn = document.querySelector('.review-header .btn.primary');
-    reviewApproveBtn?.addEventListener('click', () => alert('Work approved and archived.'));
-
-    const params = new URLSearchParams(window.location.search || '');
-    const queryCaseId = params.get('caseId');
-    if (queryCaseId) {
-      document.body.dataset.caseId = queryCaseId;
-    }
-    const caseId = queryCaseId || document.body?.dataset?.caseId || '';
-    const notesTextarea = document.querySelector('.notes-section textarea');
-    const notesSaveBtn = document.querySelector('.notes-section .btn.secondary');
-    if (caseId) {
-      try {
-        const existing = await fetchCaseNotes(caseId);
-        if (notesTextarea) notesTextarea.value = existing?.note || '';
-      } catch (err) {
-        console.warn('Unable to load case notes', err);
-      }
-    }
-    notesSaveBtn?.addEventListener('click', async () => {
-      if (!caseId) {
-        alert('Case not identified. Please refresh and try again.');
-        return;
-      }
-      const content = notesTextarea?.value.trim();
-      try {
-        await persistCaseNote(caseId, content || '');
-        showToastBanner('Notes saved.', 'success');
-        if (notesTextarea) notesTextarea.value = content || '';
-        window.dispatchEvent(new CustomEvent('lpc-case-notes-updated', { detail: { caseId } }));
-      } catch (err) {
-        console.error('Save note error', err);
-        showToastBanner(err?.message || 'Unable to save notes.', 'error');
-      }
-    });
-
-    const CASE_UPLOAD_LIMIT = 20 * 1024 * 1024;
-    const dropzoneEl = document.querySelector('.upload-box .dropzone');
-    const dropzoneInput = document.getElementById('caseDocumentInput');
-    const dropzoneLabel = dropzoneEl?.querySelector('span');
-    const baseDropzoneCopy = dropzoneLabel?.textContent || '📂 Drag & Drop or click to upload';
-
-    if (dropzoneEl && dropzoneInput) {
-      dropzoneEl.addEventListener('click', () => dropzoneInput.click());
-      dropzoneInput.addEventListener('change', () => {
-        const file = dropzoneInput.files?.[0];
-        if (file) {
-          uploadCaseFile(file);
-        }
-        dropzoneInput.value = '';
-      });
-      dropzoneEl.addEventListener('dragover', (event) => {
-        event.preventDefault();
-        dropzoneEl.classList.add('drag-over');
-      });
-      dropzoneEl.addEventListener('dragleave', () => {
-        dropzoneEl.classList.remove('drag-over');
-      });
-      dropzoneEl.addEventListener('drop', (event) => {
-        event.preventDefault();
-        dropzoneEl.classList.remove('drag-over');
-        const file = event.dataTransfer?.files?.[0];
-        if (file) {
-          uploadCaseFile(file);
-        }
-      });
-    }
-
-    const meetingBtn = document.querySelector('.video-box .btn.dropdown');
-    meetingBtn?.addEventListener('click', () => {
-      const platform = prompt('Enter preferred meeting platform (Zoom / Teams / Meet):', 'Zoom');
-      if (!platform) return;
-      const urls = {
-        zoom: 'https://zoom.us',
-        teams: 'https://teams.microsoft.com',
-        meet: 'https://meet.google.com'
-      };
-      const url = urls[platform.toLowerCase()];
-      if (url) {
-        window.open(url, '_blank');
-      } else {
-        alert('Unsupported platform.');
-      }
-    });
-
-    async function fetchCaseNotes(caseId) {
-      const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/notes`, {
-        headers: { Accept: "application/json" },
-        noRedirect: true,
-      });
-      if (!res.ok) throw new Error('Unable to load notes.');
-      return res.json();
-    }
-
-    async function persistCaseNote(caseId, note) {
-      const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/notes`, {
-        method: "PUT",
-        headers: { Accept: "application/json" },
-        body: { note },
-      });
-      if (!res.ok) throw new Error('Unable to save notes.');
-      return res.json();
-    }
-
-    async function uploadCaseFile(file) {
-      if (!caseId) {
-        alert('Case not identified. Please refresh and try again.');
-        return;
-      }
-      if (!file || file.size <= 0) {
-        alert('Please choose a valid file.');
-        return;
-      }
-      if (file.size > CASE_UPLOAD_LIMIT) {
-        alert('Files must be 20MB or less.');
-        return;
-      }
-      if (!dropzoneEl) return;
-      setDropzoneBusy(true);
-      try {
-        const form = new FormData();
-        form.append('file', file);
-        const res = await secureFetch(`/api/uploads/case/${encodeURIComponent(caseId)}`, {
-          method: 'POST',
-          body: form,
-          noRedirect: true,
-        });
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          throw new Error(payload?.msg || payload?.error || 'Upload failed.');
-        }
-        showToastBanner('File uploaded to this case.', 'success', {
-          label: 'View Document',
-          href: `case-detail.html?caseId=${encodeURIComponent(caseId)}#caseFilesSection`,
-        });
-      } catch (err) {
-        console.error('Case file upload error', err);
-        showToastBanner(err?.message || 'Unable to upload file.', 'error');
-      } finally {
-        setDropzoneBusy(false);
-      }
-    }
-
-    function setDropzoneBusy(isBusy) {
-      if (!dropzoneEl) return;
-      dropzoneEl.classList.toggle('uploading', isBusy);
-      if (dropzoneLabel) {
-        dropzoneLabel.textContent = isBusy ? 'Uploading…' : baseDropzoneCopy;
-      }
-    }
-
-    // Export & Purge Modal Controls
-    const exportModal = document.getElementById('exportPurgeModal');
-    const exportBtn = document.getElementById('exportBtn');
-    const exportProgress = document.getElementById('exportProgress');
-    const progressBar = document.getElementById('progressBar');
-    const downloadLink = document.getElementById('downloadLink');
-    const purgeBtn = document.getElementById('purgeBtn');
-    const exportStatusText = exportProgress.querySelector('p');
-    const caseStatus = document.querySelector('.case-status');
-    const caseMain = document.querySelector('.main');
-    const caseParams = new URLSearchParams(window.location.search);
-    const resolvedCaseId = caseParams.get('caseId') || document.body.dataset.caseId || 'demo-case-0001';
-    document.body.dataset.caseId = resolvedCaseId;
-    const CASE_ID = resolvedCaseId;
-    const CASE_CACHE_KEY = 'lpc_case_cache';
-    const LAST_CASE_PREFILL_KEY = 'lpc_last_case_prefill';
-    const CASE_CACHE_TTL = 5 * 60 * 1000;
-    const PREFILL_TITLE_PARAM = caseParams.get('prefillTitle');
-    const PREFILL_TITLE =
-      PREFILL_TITLE_PARAM ||
-      readCachedTitle(CASE_ID) ||
-      readLastPrefill(CASE_ID);
-    const AUTH_TOKEN_STORAGE_KEY = 'lpc_token';
-    const USER_STORAGE_KEY = 'lpc_user';
-    const paymentPanel = document.getElementById('escrowPayment');
-    const primaryInviteBtn = document.getElementById('primaryInviteBtn');
-    const liveCopy = document.getElementById('caseLiveCopy');
-    const createTaskBtn = document.getElementById('openTaskModalBtn');
-    const cardElementHost = document.getElementById('card-element');
-    const cardErrorsEl = document.getElementById('card-errors');
-    let cachedCsrfToken = window.__CSRF__ || '';
-    let stripeClientPromise;
-    let stripeLoaderPromise;
-    let stripeElementsInstance;
-    let cardElementInstance;
-    let caseDetails = null;
-    let progressInterval;
-    let exportTimeout;
-    const fundEscrowBtn = document.getElementById('fundEscrowBtn');
-    const releaseEscrowBtn = document.getElementById('releaseEscrowBtn');
-    const backLink = document.querySelector('.back-arrow');
-    if (backLink && CASE_ID) {
-      backLink.href = `active-cases.html?prefillCaseId=${encodeURIComponent(CASE_ID)}`;
-    }
-    const caseOptionsRoot = document.getElementById('caseOptionsRoot');
-    const caseOptionsMenu = document.getElementById('caseOptionsMenu');
-    if (PREFILL_TITLE) {
-      const titleEl = document.getElementById('caseTitle');
-      if (titleEl) titleEl.textContent = PREFILL_TITLE;
-    }
-
-    const cachedCaseDetails = readPrefilledCaseSummary(CASE_ID);
-    if (cachedCaseDetails) {
-      caseDetails = cachedCaseDetails;
-      updateCaseContent();
-    }
-
-    function showFieldError(target, message) {
-      if (!target) return;
-      clearFieldError(target);
-      target.classList?.add('input-error');
-      if (typeof target.setAttribute === 'function') {
-        target.setAttribute('aria-invalid', 'true');
-      }
-      const error = document.createElement('div');
-      error.className = 'field-error';
-      error.textContent = message;
-      const wrapper = target.closest('.field') || target.closest('[data-field-wrapper]');
-      if (wrapper) wrapper.appendChild(error);
-      else target.insertAdjacentElement('afterend', error);
-    }
-
-    function clearFieldError(target) {
-      if (!target) return;
-      target.classList?.remove('input-error');
-      if (typeof target.removeAttribute === 'function') {
-        target.removeAttribute('aria-invalid');
-      }
-      const wrapper = target.closest('.field') || target.closest('[data-field-wrapper]');
-      if (wrapper) {
-        const existing = wrapper.querySelector('.field-error');
-        if (existing) existing.remove();
-        return;
-      }
-      const next = target.nextElementSibling;
-      if (next?.classList.contains('field-error')) next.remove();
-    }
-
-    function readCaseCacheStore() {
-      const merged = {};
-      [localStorage, sessionStorage].forEach((store) => {
-        if (!store) return;
-        try {
-          const raw = store.getItem(CASE_CACHE_KEY);
-          if (!raw) return;
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === 'object') {
-            Object.assign(merged, parsed);
-          }
-        } catch {
-          /* noop */
-        }
-      });
-      return merged;
-    }
-
-    function readCachedTitle(caseId) {
-      if (!caseId) return '';
-      const key = `case_title_${caseId}`;
-      const stores = [sessionStorage, localStorage];
-      for (const store of stores) {
-        if (!store) continue;
-        try {
-          const value = store.getItem(key);
-          if (value) return value;
-        } catch {/* noop */}
-      }
-      return '';
-    }
-
-    function readLastPrefill(caseId) {
-      if (!caseId) return '';
-      const stores = [sessionStorage, localStorage];
-      for (const store of stores) {
-        if (!store) continue;
-        try {
-          const raw = store.getItem(LAST_CASE_PREFILL_KEY);
-          if (!raw) continue;
-          const parsed = JSON.parse(raw);
-          if (parsed && parsed.caseId === caseId && parsed.title) {
-            return parsed.title;
-          }
-        } catch {
-          /* noop */
-        }
-      }
-      return '';
-    }
-
-    function clearCachedTitle(caseId) {
-      if (!caseId) return;
-      const key = `case_title_${caseId}`;
-      [sessionStorage, localStorage].forEach((store) => {
-        if (!store) return;
-        try {
-          store.removeItem(key);
-        } catch {/* noop */}
-      });
-    }
-
-    function persistCaseCacheStore(cache) {
-      let payload = "";
-      try {
-        payload = JSON.stringify(cache || {});
-      } catch (err) {
-        console.warn('Unable to serialize case cache.', err);
-        return;
-      }
-      [sessionStorage, localStorage].forEach((store) => {
-        if (!store) return;
-        try {
-          store.setItem(CASE_CACHE_KEY, payload);
-        } catch (err) {
-          console.warn('Unable to persist case cache.', err);
-        }
-      });
-    }
-
-    function readPrefilledCaseSummary(targetCaseId) {
-      if (!targetCaseId) return null;
-      const store = readCaseCacheStore();
-      const entry = store[targetCaseId];
-      if (!entry) return null;
-      const expired = entry.storedAt && Date.now() - entry.storedAt > CASE_CACHE_TTL;
-      if (expired) {
-        delete store[targetCaseId];
-        persistCaseCacheStore(store);
-        return null;
-      }
-      return entry.data || entry.case || null;
-    }
-
-    function cacheCaseSummary(targetCaseId, payload) {
-      if (!targetCaseId || !payload) return;
-      const store = readCaseCacheStore();
-      store[targetCaseId] = {
-        data: payload,
-        storedAt: Date.now(),
-      };
-      persistCaseCacheStore(store);
-    }
-
-    function closeCaseOptionsMenu() {
-      caseOptionsRoot?.removeAttribute('open');
-    }
-
-    caseOptionsMenu?.addEventListener('click', (event) => {
-      const actionBtn = event.target.closest('[data-case-option]');
-      if (!actionBtn) return;
-      const action = actionBtn.getAttribute('data-case-option');
-      closeCaseOptionsMenu();
-      handleCaseOption(action);
-    });
-
-    function goToParalegalInvite() {
-      const target = CASE_ID ? `browse-paralegals.html?caseId=${encodeURIComponent(CASE_ID)}` : 'browse-paralegals.html';
-      window.location.href = target;
-    }
-
-    primaryInviteBtn?.addEventListener('click', goToParalegalInvite);
-
-    function handleCaseOption(action) {
-      switch (action) {
-        case 'edit':
-          window.location.href = `create-case.html?ref=existing&caseId=${encodeURIComponent(CASE_ID)}`;
-          break;
-        case 'share':
-          shareCaseLink();
-          break;
-        case 'pause':
-          pauseCurrentCase();
-          break;
-        case 'end-engagement':
-          endEngagementCase();
-          break;
-        case 'delete':
-          deleteCurrentCase();
-          break;
-        case 'download':
-          window.open(`case-detail.html?caseId=${encodeURIComponent(CASE_ID)}#caseFilesSection`, '_blank');
-          break;
-        case 'tasks':
-          document.getElementById('caseTasksSection')?.scrollIntoView({ behavior: 'smooth' });
-          break;
-        default:
-          break;
-      }
-    }
-
-    async function pauseCurrentCase() {
-      if (!CASE_ID) return;
-      const confirmed = confirm('Pause this case? It will move to Archived until you resume it.');
-      if (!confirmed) return;
-      try {
-        const res = await secureFetch(`/api/cases/${encodeURIComponent(CASE_ID)}/archive`, {
-          method: 'PATCH',
-          headers: { Accept: 'application/json' },
-          body: { archived: true },
-        });
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(payload?.error || 'Unable to pause this case.');
-        showToastBanner('Case paused. You can restore it from the Archived tab.', 'success');
-        setTimeout(() => {
-          window.location.href = 'active-cases.html';
-        }, 800);
-      } catch (err) {
-        showToastBanner(err?.message || 'Unable to pause this case.', 'error');
-      }
-    }
-
-    async function endEngagementCase() {
-      if (!CASE_ID) return;
-      const confirmed = confirm('Are you sure you want to end the engagement? This will move the case to Archived.');
-      if (!confirmed) return;
-      try {
-        const res = await secureFetch(`/api/cases/${encodeURIComponent(CASE_ID)}/archive`, {
-          method: 'PATCH',
-          headers: { Accept: 'application/json' },
-          body: { archived: true },
-        });
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(payload?.error || 'Unable to end this engagement.');
-        showToastBanner('Engagement ended. Case moved to Archived.', 'success');
-        setTimeout(() => {
-          window.location.href = 'dashboard-attorney.html#cases';
-        }, 800);
-      } catch (err) {
-        showToastBanner(err?.message || 'Unable to end this engagement.', 'error');
-      }
-    }
-
-    async function deleteCurrentCase() {
-      if (!CASE_ID) return;
-      const confirmed = confirm('Delete this case permanently? This cannot be undone.');
-      if (!confirmed) return;
-      try {
-        const res = await secureFetch(`/api/cases/${encodeURIComponent(CASE_ID)}`, {
-          method: 'DELETE',
-          headers: { Accept: 'application/json' },
-        });
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(payload?.error || 'Unable to delete this case.');
-        showToastBanner('Case deleted.', 'success');
-        setTimeout(() => {
-          window.location.href = 'active-cases.html';
-        }, 800);
-      } catch (err) {
-        showToastBanner(err?.message || 'Unable to delete this case.', 'error');
-      }
-    }
-
-    async function shareCaseLink() {
-      const shareUrl = `${window.location.origin}/case-detail.html?caseId=${encodeURIComponent(CASE_ID)}`;
-      const sharePayload = {
-        title: caseDetails?.title || 'Case',
-        text: 'Please review this case on Let’s-ParaConnect.',
-        url: shareUrl,
-      };
-      if (navigator.share) {
-        try {
-          await navigator.share(sharePayload);
-          return;
-        } catch (err) {
-          if (err?.name === 'AbortError') return;
-        }
-      }
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        showToastBanner('Case link copied to clipboard.', 'success');
-      } catch {
-        prompt('Copy this link to share:', shareUrl);
-      }
-    }
-
-    releaseEscrowBtn?.addEventListener('click', () => releaseEscrow(CASE_ID, releaseEscrowBtn));
-    loadCaseDetails();
-
-    function resetExportModalState() {
-      clearInterval(progressInterval);
-      clearTimeout(exportTimeout);
-      progressInterval = null;
-      exportTimeout = null;
-      exportBtn.disabled = false;
-      exportBtn.style.display = '';
-      exportProgress.classList.add('hidden');
-      exportStatusText.textContent = 'Preparing archive…';
-      progressBar.style.width = '0%';
-      if (downloadLink.dataset.blobUrl) {
-        URL.revokeObjectURL(downloadLink.dataset.blobUrl);
-        delete downloadLink.dataset.blobUrl;
-      }
-      downloadLink.classList.add('hidden');
-      downloadLink.removeAttribute('href');
-      downloadLink.removeAttribute('download');
-      purgeBtn.classList.add('hidden');
-    }
-
-    function readStoredToken() {
-      if (typeof window.getSessionToken === 'function') {
-        const token = window.getSessionToken();
-        return token || '';
-      }
-      try {
-        return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || '';
-      } catch {
-        return '';
-      }
-    }
-
-    function readStoredUser() {
-      if (typeof window.getStoredUser === 'function') {
-        return window.getStoredUser();
-      }
-      try {
-        const raw = localStorage.getItem(USER_STORAGE_KEY);
-        return raw ? JSON.parse(raw) : null;
-      } catch {
-        return null;
-      }
-    }
-
-    function readStoredRole() {
-      const user = readStoredUser();
-      return user?.role || '';
-    }
-
-    async function ensureCsrfToken() {
-      if (cachedCsrfToken) return cachedCsrfToken;
-      try {
-        const res = await fetch('/api/csrf', { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
-          cachedCsrfToken = data?.csrfToken || '';
-          window.__CSRF__ = cachedCsrfToken;
-        }
-      } catch (err) {
-        console.warn('Unable to refresh CSRF token.', err);
-      }
-      return cachedCsrfToken;
-    }
-
-    function formatPerson(person, fallbackLabel = '—') {
-      if (!person) return fallbackLabel;
-      const parts = [person.firstName, person.lastName].filter(Boolean).join(' ').trim();
-      return parts || person.name || fallbackLabel;
-    }
-
-    function formatDisplayDate(value) {
-      if (!value) return 'No deadline set';
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return 'No deadline set';
-      return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-    }
-
-    async function loadCaseDetails() {
-      const headers = new Headers();
-      const token = readStoredToken();
-      if (token) headers.set('Authorization', `Bearer ${token}`);
-      try {
-        const res = await fetch(`/api/cases/${encodeURIComponent(CASE_ID)}`, { headers, credentials: 'include' });
-        if (!res.ok) throw new Error('Unable to fetch case');
-        caseDetails = await res.json();
-        updateCaseContent();
-        cacheCaseSummary(CASE_ID, caseDetails);
-        clearCachedTitle(CASE_ID);
-        if (caseDetails?.title) {
-          [sessionStorage, localStorage].forEach((store) => {
-            if (!store) return;
-            try {
-              const raw = store.getItem(LAST_CASE_PREFILL_KEY);
-              if (!raw) return;
-              const payload = JSON.parse(raw);
-              if (payload?.caseId === CASE_ID) {
-                store.removeItem(LAST_CASE_PREFILL_KEY);
-              }
-            } catch {/* noop */}
-          });
-        }
-      } catch (err) {
-        console.warn('Unable to load case details.', err);
-        caseDetails = null;
-      } finally {
-        updatePaymentVisibility();
-      }
-    }
-
-    function shouldShowPaymentForm() {
-      const role = readStoredRole().toLowerCase();
-      const hasParalegal = !!(caseDetails && caseDetails.paralegal);
-      const escrowFunded = !!(caseDetails && caseDetails.escrowIntentId);
-      const alreadyReleased = !!(caseDetails && caseDetails.paymentReleased);
-      return role === 'attorney' && hasParalegal && !escrowFunded && !alreadyReleased;
-    }
-
-    function updatePaymentVisibility() {
-      const show = shouldShowPaymentForm();
-      fundEscrowBtn?.classList.toggle('hidden', !show);
-      paymentPanel?.classList.toggle('hidden', !show);
-      if (show) {
-        loadStripeScript()
-          .then(() => ensureCardElement())
-          .catch((err) => {
-            console.warn('Unable to initialize payment field.', err);
-            if (cardErrorsEl) {
-              cardErrorsEl.textContent = err?.message || 'Stripe is blocked. Allow js.stripe.com and try again.';
-            }
-          });
-      }
-    }
-
-    function updateCaseContent() {
-      if (!caseDetails) return;
-      const titleEl = document.getElementById('caseTitle');
-      const statusBadge = document.getElementById('caseStatusBadge');
-      const overviewEl = document.getElementById('caseOverview');
-      const timelineMeta = document.getElementById('caseTimelineMeta');
-      const paralegalNameEl = document.getElementById('caseParalegalName');
-      const paralegalEmailEl = document.getElementById('caseParalegalEmail');
-      const applicants = Array.isArray(caseDetails.applicants) ? caseDetails.applicants : [];
-      const isOpen = String(caseDetails.status || 'open').toLowerCase() === 'open';
-      const hasParalegal = !!caseDetails.paralegal;
-      const escrowFunded = !!caseDetails.escrowIntentId;
-      const shouldShowActivation = isOpen && !hasParalegal;
-      const tasksSection = document.getElementById('caseTasksSection');
-      const deadlinesSection = document.querySelector('.case-section.deadlines');
-      const notesSection = document.querySelector('.notes-section');
-      const noHireYet = !hasParalegal;
-      const applicantsSection = document.getElementById('applicantsSection');
-      const deleteOption = caseOptionsMenu?.querySelector('[data-case-option="delete"], [data-case-option="end-engagement"]');
-
-      if (titleEl) titleEl.textContent = caseDetails.title || 'Untitled Case';
-
-      if (statusBadge) {
-        const statusRaw = String(caseDetails.status || 'open')
-          .replace(/_/g, ' ')
-          .trim()
-          .toLowerCase();
-        const status = statusRaw.replace(/\b\w/g, (c) => c.toUpperCase());
-        statusBadge.textContent = status || 'Status';
-      }
-
-      if (overviewEl) {
-        const summary =
-          caseDetails.details ||
-          caseDetails.description ||
-          caseDetails.shortDescription ||
-          caseDetails.briefSummary ||
-          'This case has no additional description yet.';
-        overviewEl.querySelectorAll('p').forEach((node, index) => {
-          if (index === 0) node.textContent = summary;
-        });
-      }
-
-      if (timelineMeta) {
-        const deadline = caseDetails.deadline ? formatDisplayDate(caseDetails.deadline) : 'No deadline set';
-        const assigned = hasParalegal ? formatPerson(caseDetails.paralegal, 'Assigned paralegal') : 'No paralegal yet';
-        timelineMeta.innerHTML = `<strong>Deadline:</strong> ${deadline} · <strong>Paralegal:</strong> ${assigned}`;
-      }
-
-      if (hasParalegal) {
-        if (paralegalNameEl) paralegalNameEl.textContent = formatPerson(caseDetails.paralegal, 'Paralegal');
-        if (paralegalEmailEl) paralegalEmailEl.textContent = caseDetails.paralegal.email || '';
-      } else {
-        if (paralegalNameEl) paralegalNameEl.textContent = 'No paralegal hired yet';
-        if (paralegalEmailEl) paralegalEmailEl.textContent = '';
-      }
-
-      if (liveCopy) {
-        liveCopy.classList.toggle('hidden', !shouldShowActivation);
-      }
-      if (primaryInviteBtn) {
-        primaryInviteBtn.classList.toggle('hidden', !shouldShowActivation);
-      }
-      if (caseOptionsRoot) {
-        caseOptionsRoot.classList.remove('hidden');
-      }
-      if (createTaskBtn) {
-        const allowTaskCreate = hasParalegal && escrowFunded;
-        createTaskBtn.classList.toggle('hidden', !allowTaskCreate);
-        createTaskBtn.toggleAttribute('disabled', !allowTaskCreate);
-        createTaskBtn.dataset.lockedEscrow = allowTaskCreate ? '' : 'true';
-      }
-      if (deleteOption) {
-        if (hasParalegal) {
-          deleteOption.textContent = 'End Engagement';
-          deleteOption.setAttribute('data-case-option', 'end-engagement');
-        } else {
-          deleteOption.textContent = 'Delete';
-          deleteOption.setAttribute('data-case-option', 'delete');
-        }
-      }
-
-      [deadlinesSection, notesSection].forEach((section) => {
-        if (!section) return;
-        section.classList.toggle('is-muted', noHireYet);
-      });
-
-      if (applicantsSection) {
-        applicantsSection.classList.toggle('hidden', hasParalegal);
-      }
-      if (tasksSection) {
-        tasksSection.classList.toggle('is-muted', !hasParalegal || !escrowFunded);
-      }
-      const taskGateEl = document.getElementById('caseTasksGate');
-      if (taskGateEl) {
-        if (!hasParalegal) {
-          taskGateEl.classList.remove('hidden');
-          taskGateEl.textContent = 'Hire & start work to enable tasks and messaging.';
-        } else if (!escrowFunded) {
-          taskGateEl.classList.remove('hidden');
-          taskGateEl.textContent = 'Payment is still processing. We will unlock tasks once funding clears.';
-        } else {
-          taskGateEl.classList.add('hidden');
-          taskGateEl.textContent = '';
-        }
-      }
-
-      const detailsGrid = document.getElementById('caseDetailsPanel');
-      if (detailsGrid) {
-        detailsGrid.innerHTML = `
-          <div class="party-card">
-            <h4>Paralegal</h4>
-            <p>${hasParalegal ? formatPerson(caseDetails.paralegal, 'Paralegal') : 'No paralegal hired yet'}</p>
-            <p class="muted">${caseDetails?.paralegal?.email || ''}</p>
-          </div>
-        `;
-      }
-
-      const applicantsList = document.getElementById('applicantsList');
-      if (applicantsList) {
-        if (!applicants.length) {
-          applicantsList.innerHTML = '<p style="color:var(--muted);">No applications yet. Paralegals will appear here as soon as they apply.</p>';
-        } else {
-          const canHire = readStoredRole().toLowerCase() === 'attorney' && !caseDetails.paralegal;
-          applicantsList.innerHTML = applicants.map((app) => renderApplicantCard(app, canHire)).join("");
-          bindHireButtons();
-        }
-      }
-    }
-
-    function renderApplicantCard(applicant, canHire) {
-      const paralegal = applicant?.paralegalId || applicant?.paralegal || {};
-      const name = formatPerson(paralegal, 'Paralegal');
-      const status = (applicant?.status || 'pending').replace(/_/g, ' ');
-      const appliedAt = applicant?.appliedAt ? new Date(applicant.appliedAt).toLocaleDateString() : '';
-      const letter = applicant?.coverLetter || applicant?.note || '';
-      const resumeURL = applicant?.resumeURL || '';
-      const linkedInURL = applicant?.linkedInURL || '';
-      const paralegalId = paralegal?._id || paralegal?.id || applicant?.paralegalId || '';
-      const hireButton = canHire && paralegalId
-        ? `<button class="btn primary" data-hire-button data-case-id="${CASE_ID}" data-paralegal-id="${paralegalId}">Hire &amp; Start Work</button>`
-        : '';
-      return `
-        <div class="applicant-card">
-          <h4>${name}</h4>
-          <p>${status}${appliedAt ? ` · Applied ${appliedAt}` : ''}</p>
-          ${
-            letter
-              ? `<p>${letter.replace(/\n/g, '<br>')}</p>`
-              : ''
-          }
+          <div id="caseAttachmentStaging" class="composer-attachments" aria-live="polite" hidden></div>
+          <p id="caseMessageStatus" class="case-thread-subtitle" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+
+    <aside class="case-overview-panel" aria-label="Case overview">
+      <header>
+        <h2>Case overview</h2>
+      </header>
+
+      <section class="case-overview-escrow">
+        <h3>Escrow</h3>
+        <dl>
           <div>
-            ${
-              resumeURL
-                ? `<a class="chip" href="${resumeURL}" target="_blank" rel="noopener">Résumé</a>`
-                : `<span class="chip muted">No résumé</span>`
-            }
-            ${
-              linkedInURL
-                ? `<a class="chip" href="${linkedInURL}" target="_blank" rel="noopener">LinkedIn</a>`
-                : `<span class="chip muted">LinkedIn unavailable</span>`
-            }
+            <dt>Amount</dt>
+            <dd id="caseEscrowAmount">-</dd>
           </div>
-          ${hireButton}
-        </div>
-      `;
-    }
+          <div>
+            <dt>Status</dt>
+            <dd id="caseEscrowStatus">-</dd>
+          </div>
+        </dl>
+      </section>
 
-    function bindHireButtons() {
-      document.querySelectorAll('[data-hire-button]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const paralegalId = btn.dataset.paralegalId || '';
-          if (!paralegalId) {
-            alert('Paralegal ID is required.');
-            return;
-          }
-          const targetCase = btn.dataset.caseId || CASE_ID;
-          hireParalegal(targetCase, paralegalId, btn);
-        });
-      });
-    }
+      <section class="case-overview-hire">
+        <h3>Hire details</h3>
+        <dl>
+          <div>
+            <dt>Hire date</dt>
+            <dd id="caseHireDate">-</dd>
+          </div>
+          <div>
+            <dt>Matter type</dt>
+            <dd id="caseMatterType">-</dd>
+          </div>
+        </dl>
+      </section>
 
-    async function ensureCardElement() {
-      if (!paymentPanel || !cardElementHost) return null;
-      if (cardElementInstance) return cardElementInstance;
-      const stripe = await getStripeClient();
-      if (!stripeElementsInstance) {
-        stripeElementsInstance = stripe.elements();
-      }
-      cardElementInstance = stripeElementsInstance.create('card', {
-        style: {
-          base: {
-            color: '#1a1a1a',
-            fontFamily: '"Sarabun", sans-serif',
-            fontSize: '16px',
-            '::placeholder': { color: '#9ba6b1' },
-          },
-          invalid: { color: '#b00020' },
-        },
-      });
-      cardElementInstance.mount(cardElementHost);
-      cardElementInstance.on('change', (event) => {
-        if (cardErrorsEl) cardErrorsEl.textContent = event.error ? event.error.message : '';
-      });
-      return cardElementInstance;
-    }
+      <section class="case-overview-deadlines">
+        <h3>Deadlines</h3>
+        <ul id="caseDeadlineList"></ul>
+      </section>
 
-    async function hireParalegal(caseId, paralegalId, button) {
-      if (!caseId || !paralegalId) {
-        alert('Missing case or paralegal identifier.');
-        return;
-      }
+      <section class="case-overview-summary">
+        <h3>Case summary</h3>
+        <p id="caseSummary">-</p>
+      </section>
 
-      button?.setAttribute('disabled', 'disabled');
-      const headers = new Headers();
-      const token = readStoredToken();
-      if (token) headers.set('Authorization', `Bearer ${token}`);
-      const csrfToken = await ensureCsrfToken();
-      if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
+      <section class="case-overview-tasks">
+        <h3>Tasks</h3>
+        <ul id="caseTaskList"></ul>
+      </section>
 
-      let response;
-      try {
-        response = await fetch(`/api/cases/${encodeURIComponent(caseId)}/hire/${encodeURIComponent(paralegalId)}`, {
-          method: 'POST',
-          headers,
-          credentials: 'include'
-        });
-      } catch (networkErr) {
-        console.error('Network error hiring paralegal:', networkErr);
-        button?.removeAttribute('disabled');
-        alert('Network error hiring paralegal.');
-        return;
-      }
-
-      let payload = {};
-      try {
-        payload = await response.json();
-      } catch {
-        payload = {};
-      }
-
-      if (!response.ok) {
-        button?.removeAttribute('disabled');
-        alert(payload?.error || payload?.msg || 'Unable to hire paralegal.');
-        return;
-      }
-
-      button?.removeAttribute('disabled');
-      if (caseStatus) {
-        caseStatus.textContent = 'In Progress';
-        caseStatus.style.background = 'rgba(31,122,74,.1)';
-        caseStatus.style.color = '#1f7a4a';
-      }
-      if (toastHelper?.stage) {
-        toastHelper.stage('Paralegal hired and work started.', 'success');
-      } else {
-        alert('Paralegal hired and work started.');
-      }
-
-      loadCaseDetails();
-      return payload;
-    }
-    window.hireParalegal = hireParalegal;
-
-    async function loadStripeScript() {
-      if (typeof Stripe !== 'undefined') return true;
-      let attempt = 0;
-      const maxAttempts = 3;
-      while (attempt < maxAttempts && typeof Stripe === 'undefined') {
-        attempt += 1;
-        if (!stripeLoaderPromise) {
-          stripeLoaderPromise = new Promise((resolve, reject) => {
-            let script = document.querySelector('script[src*="js.stripe.com/v3"]');
-            if (script?.dataset?.failed === 'true') {
-              script.remove();
-              script = null;
-            }
-            if (!script) {
-              script = document.createElement('script');
-              script.src = `https://js.stripe.com/v3/?cacheBust=${Date.now()}`;
-              script.async = true;
-              script.id = 'stripe-js-dynamic';
-              script.crossOrigin = 'anonymous';
-              document.head.appendChild(script);
-            }
-            const timeout = setTimeout(() => {
-              script.dataset.failed = 'true';
-              script.removeEventListener('load', onLoad);
-              script.removeEventListener('error', onError);
-              reject(new Error('Stripe.js timed out loading. Please allow js.stripe.com and retry.'));
-            }, 30000);
-            const onLoad = () => {
-              clearTimeout(timeout);
-              script.removeEventListener('load', onLoad);
-              script.removeEventListener('error', onError);
-              resolve(true);
-            };
-            const onError = () => {
-              clearTimeout(timeout);
-              script.dataset.failed = 'true';
-              script.removeEventListener('load', onLoad);
-              script.removeEventListener('error', onError);
-              reject(new Error('Stripe.js failed to load. Please disable ad blockers or allow js.stripe.com.'));
-            };
-            script.addEventListener('load', onLoad);
-            script.addEventListener('error', onError);
-            if (script.complete && typeof Stripe !== 'undefined') {
-              clearTimeout(timeout);
-              script.removeEventListener('load', onLoad);
-              script.removeEventListener('error', onError);
-              resolve(true);
-            }
-          });
-        }
-        try {
-          await stripeLoaderPromise;
-        } catch (err) {
-          stripeLoaderPromise = null;
-          if (attempt >= maxAttempts) {
-            throw err;
-          }
-        }
-      }
-      return typeof Stripe !== 'undefined';
-    }
-
-    async function getStripeClient() {
-      if (stripeClientPromise) {
-        try {
-          return await stripeClientPromise;
-        } catch (err) {
-          stripeClientPromise = null;
-          throw err;
-        }
-      }
-      if (typeof Stripe === 'undefined') {
-        await loadStripeScript();
-      }
-      if (typeof Stripe === 'undefined') {
-        throw new Error('Stripe.js failed to load.');
-      }
-      stripeClientPromise = (async () => {
-        const res = await fetch('/api/payments/config', { credentials: 'include' });
-        const data = await res.json();
-        if (!data?.publishableKey) throw new Error('Stripe publishable key missing.');
-        return Stripe(data.publishableKey);
-      })();
-      return getStripeClient();
-    }
-
-    async function startEscrow(caseId, button) {
-      if (!caseId) {
-        alert('Missing case identifier.');
-        return;
-      }
-      if (!shouldShowPaymentForm()) {
-        alert('Escrow funding is currently unavailable.');
-        return;
-      }
-      try {
-        await ensureCardElement();
-      } catch (err) {
-        if (cardErrorsEl) cardErrorsEl.textContent = err?.message || 'Unable to load payment form (Stripe may be blocked).';
-        alert(err?.message || 'Unable to initialize payment form. Please allow js.stripe.com and retry.');
-        return;
-      }
-      if (!cardElementInstance) {
-        alert('Payment form is not ready.');
-        return;
-      }
-      if (cardErrorsEl) cardErrorsEl.textContent = '';
-      button?.setAttribute('disabled', 'disabled');
-      const headers = new Headers({ 'Content-Type': 'application/json' });
-      const token = readStoredToken();
-      if (token) headers.set('Authorization', `Bearer ${token}`);
-      const csrfToken = await ensureCsrfToken();
-      if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
-
-      let payload = {};
-      try {
-        const response = await fetch('/api/payments/start-escrow', {
-          method: 'POST',
-          headers,
-          credentials: 'include',
-          body: JSON.stringify({ caseId })
-        });
-        payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload?.error || payload?.msg || 'Unable to start escrow.');
-        }
-      } catch (err) {
-        button?.removeAttribute('disabled');
-        alert(err.message || 'Unable to start escrow.');
-        return;
-      }
-
-      let stripeClient;
-      try {
-        stripeClient = await getStripeClient();
-      } catch (err) {
-        button?.removeAttribute('disabled');
-        alert(err.message || 'Unable to load payment form.');
-        return;
-      }
-
-      try {
-        const result = await stripeClient.confirmCardPayment(payload.clientSecret, {
-          payment_method: { card: cardElementInstance },
-        });
-        if (result.error) {
-          if (cardErrorsEl) cardErrorsEl.textContent = result.error.message || 'Payment failed.';
-          throw new Error(result.error.message || 'Payment failed.');
-        }
-        if (result.paymentIntent?.status === 'succeeded') {
-          toastHelper?.stage
-            ? toastHelper.stage('Escrow funded successfully.', 'success')
-            : alert('Escrow funded successfully.');
-          window.location.reload();
-          return;
-        }
-        throw new Error('Payment not completed.');
-      } catch (err) {
-        button?.removeAttribute('disabled');
-        if (!cardErrorsEl?.textContent) {
-          alert(err.message || 'Unable to confirm payment.');
-        }
-      }
-    }
-    window.startEscrow = startEscrow;
-
-    async function releaseEscrow(caseId, button) {
-      if (!caseId) {
-        showFieldError(button, 'Missing case ID.');
-        if (toastHelper?.show) {
-          toastHelper.show('Missing case identifier.', { targetId: 'toastBanner', type: 'error' });
-        } else if (toastHelper?.stage) {
-          toastHelper.stage('Missing case identifier.', 'error');
-        } else {
-          alert('Missing case identifier.');
-        }
-        return;
-      }
-      clearFieldError(button);
-      button?.setAttribute('disabled', 'disabled');
-      const headers = new Headers({ 'Content-Type': 'application/json' });
-      const token = readStoredToken();
-      if (token) headers.set('Authorization', `Bearer ${token}`);
-      const csrfToken = await ensureCsrfToken();
-      if (csrfToken) headers.set('X-CSRF-Token', csrfToken);
-
-      try {
-        const response = await fetch('/api/payments/release', {
-          method: 'POST',
-          headers,
-          credentials: 'include',
-          body: JSON.stringify({ caseId })
-        });
-        const payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload?.error || payload?.msg || 'Unable to release funds.');
-        }
-      } catch (err) {
-        button?.removeAttribute('disabled');
-        showFieldError(button, err.message || 'Unable to release funds.');
-        if (toastHelper?.show) {
-          toastHelper.show(err.message || 'Unable to release funds.', { targetId: 'toastBanner', type: 'error' });
-        } else if (toastHelper?.stage) {
-          toastHelper.stage(err.message || 'Unable to release funds.', 'error');
-        } else {
-          alert(err.message || 'Unable to release funds.');
-        }
-        return;
-      }
-
-      clearFieldError(button);
-      if (toastHelper?.stage) {
-        toastHelper.stage('Funds released successfully.', 'success');
-      } else if (toastHelper?.show) {
-        toastHelper.show('Funds released successfully.', { targetId: 'toastBanner', type: 'success' });
-      } else {
-        alert('Funds released successfully.');
-      }
-      window.location.reload();
-    }
-    window.releaseEscrow = releaseEscrow;
-
-    function openExportModal() {
-      resetExportModalState();
-      exportModal.classList.remove('hidden');
-      exportModal.style.display = 'flex';
-    }
-
-    function closeExportModal() {
-      exportModal.style.display = 'none';
-      exportModal.classList.add('hidden');
-      resetExportModalState();
-    }
-
-    function markCasePendingPurge() {
-      if (!caseStatus) return;
-      caseStatus.textContent = 'Pending Purge (30 days)';
-      caseStatus.style.background = 'rgba(182,164,122,0.15)';
-      caseStatus.style.color = '#7a6637';
-    }
-
-    function removeCaseFromUI() {
-      if (!caseMain) return;
-      caseMain.innerHTML = `
-        <section class="case-section">
-          <h2>Case removed</h2>
-          <p>This case has been purged from the workspace. Redirecting to dashboard…</p>
-        </section>
-      `;
-    }
-
-    async function startExport() {
-      if (exportBtn.disabled) return;
-      markCasePendingPurge();
-      exportBtn.disabled = true;
-      exportProgress.classList.remove('hidden');
-      exportStatusText.textContent = 'Preparing archive…';
-
-      let width = 0;
-      progressInterval = setInterval(() => {
-        width = Math.min(width + 15, 100);
-        progressBar.style.width = width + '%';
-      }, 200);
-
-      const zip = new JSZip();
-      zip.file('Case_Summary.txt', `Case ID: ${CASE_ID}\nStatus: Completed\nExported: ${new Date().toLocaleString()}`);
-      zip.file('Job_Posting.txt', 'Sample job posting details for this case.');
-      zip.file('Messages.txt', 'Chat logs with paralegals and internal notes.');
-
-      try {
-        const files = await fetch('/assets/docs/sample.pdf');
-        if (files.ok) {
-          const blob = await files.blob();
-          zip.file('Documents/sample.pdf', blob);
-        }
-      } catch (err) {
-        console.warn('No sample document available for export bundle.', err);
-      }
-
-      exportTimeout = setTimeout(async () => {
-        clearInterval(progressInterval);
-        progressBar.style.width = '100%';
-        exportStatusText.textContent = 'Archive ready for download.';
-
-        const content = await zip.generateAsync({ type: 'blob' });
-        if (downloadLink.dataset.blobUrl) {
-          URL.revokeObjectURL(downloadLink.dataset.blobUrl);
-        }
-        const url = URL.createObjectURL(content);
-        downloadLink.href = url;
-        downloadLink.dataset.blobUrl = url;
-        downloadLink.download = `Case_Archive_${new Date().toISOString().split('T')[0]}.zip`;
-
-        downloadLink.classList.remove('hidden');
-        purgeBtn.classList.remove('hidden');
-        exportBtn.style.display = 'none';
-      }, 2200);
-    }
-
-    function purgeCase() {
-      if (confirm('Are you sure you want to permanently delete this case? This cannot be undone.')) {
-        localStorage.removeItem('currentCase');
-        removeCaseFromUI();
-        alert('Case successfully purged and removed from records.');
-        closeExportModal();
-        if (toastHelper?.stage) {
-          toastHelper.stage('Case removed successfully.', 'success');
-        } else {
-          sessionStorage.setItem(FALLBACK_TOAST_KEY, JSON.stringify({ message: 'Case removed successfully.', type: 'success' }));
-        }
-        window.location.href = 'dashboard-attorney.html';
-      }
-    }
-  }
-
-    function applyRoleVisibility(user) {
-      const role = String(user?.role || '').toLowerCase();
-      if (role === 'paralegal') {
-        document.querySelectorAll('[data-attorney-only]').forEach((el) => {
-          el.style.display = 'none';
-        });
-      }
-      if (role === 'attorney') {
-        document.querySelectorAll('[data-paralegal-only]').forEach((el) => {
-          el.style.display = 'none';
-        });
-      }
-    }
-
-    const logoutBtn = document.getElementById('logoutBtn');
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', () => {
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.href = 'index.html';
-      });
-    }
-  </script>
+      <section class="case-overview-meeting">
+        <h3>Zoom link</h3>
+        <a id="caseZoomLink" href="#" target="_blank" rel="noopener">Join scheduled Zoom</a>
+      </section>
+    </aside>
+  </div>
   <script type="module" src="assets/scripts/case-detail.js"></script>
 </body>
 </html>
