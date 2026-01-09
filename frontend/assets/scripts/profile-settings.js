@@ -286,10 +286,7 @@ document.addEventListener("DOMContentLoaded", () => {
     deleteBtn.addEventListener("click", async () => {
       if (!confirm("Are you sure? This action cannot be undone.")) return;
 
-      const res = await fetch("/api/account/delete", {
-        method: "DELETE",
-        credentials: "include"
-      });
+      const res = await secureFetch("/api/account/delete", { method: "DELETE" });
 
       if (res.ok) {
         window.location.href = "/goodbye.html";

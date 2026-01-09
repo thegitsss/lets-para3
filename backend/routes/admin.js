@@ -11,6 +11,7 @@ const AuditLog = require("../models/AuditLog"); // NOTE: file name fix
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
 const Notification = require("../models/Notification");
+const { purgeAttorneyAccount } = require("../services/userDeletion");
 const sendEmail = require("../utils/email");
 const { sendWelcomePacket } = sendEmail;
 
@@ -1233,6 +1234,18 @@ if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
 const user = await User.findById(id);
 if (!user) return res.status(404).json({ msg: "User not found" });
 
+if (String(user.role || "").toLowerCase() === "attorney") {
+  await purgeAttorneyAccount(user._id);
+  try {
+    await AuditLog.logFromReq(req, "admin.user.delete", {
+      targetType: "user",
+      targetId: user._id,
+      meta: { email: user.email || "", role: user.role || "" },
+    });
+  } catch {}
+  return res.json({ ok: true, id });
+}
+
 user.deleted = true;
 user.deletedAt = new Date();
 user.disabled = true;
@@ -1256,11 +1269,15 @@ if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
 const user = await User.findById(id);
 if (!user) return res.status(404).json({ msg: "User not found" });
 
-await User.findByIdAndDelete(id);
+if (String(user.role || "").toLowerCase() === "attorney") {
+  await purgeAttorneyAccount(user._id);
+} else {
+  await User.findByIdAndDelete(id);
 
-try {
-await Notification.deleteMany({ userId: id });
-} catch {}
+  try {
+    await Notification.deleteMany({ userId: id });
+  } catch {}
+}
 
 try {
 await AuditLog.logFromReq(req, "admin.user.purge", {

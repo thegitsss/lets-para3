@@ -4,6 +4,8 @@ const crypto = require("crypto");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved } = require("../utils/authz");
 const User = require("../models/User");
+const AuditLog = require("../models/AuditLog");
+const { purgeAttorneyAccount } = require("../services/userDeletion");
 
 // ----------------------------------------
 // CSRF (enabled in production or when ENABLE_CSRF=true)
@@ -154,6 +156,35 @@ router.post(
     await user.save();
 
     res.json({ codes });
+  })
+);
+
+router.delete(
+  "/delete",
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (String(user.role || "").toLowerCase() === "attorney") {
+      await purgeAttorneyAccount(user._id);
+    } else {
+      user.deleted = true;
+      user.deletedAt = new Date();
+      user.disabled = true;
+      user.status = "denied";
+      await user.save();
+    }
+
+    try {
+      await AuditLog.logFromReq(req, "account.delete", {
+        targetType: "user",
+        targetId: user._id,
+        meta: { email: user.email || "", role: user.role || "" },
+      });
+    } catch {}
+
+    res.json({ ok: true });
   })
 );
 
