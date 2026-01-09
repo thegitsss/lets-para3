@@ -68,6 +68,17 @@ router.post("/read-all", async (req, res) => {
   }
 });
 
+// Clear ALL notifications
+router.delete("/", async (req, res) => {
+  try {
+    await Notification.deleteMany({ userId: req.user.id });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Failed to clear notifications:", err);
+    res.status(500).json({ message: "Unable to clear notifications" });
+  }
+});
+
 // Dismiss a notification
 router.delete("/:id", async (req, res) => {
   try {

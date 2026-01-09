@@ -551,14 +551,27 @@ router.patch(
     }
 
     if (me.role === "paralegal") {
-      if (typeof resumeURL === "string" && (isURL(resumeURL) || isStorageKey(resumeURL))) {
-        me.resumeURL = resumeURL.trim();
+      if (resumeURL !== undefined) {
+        if (resumeURL === null || String(resumeURL).trim() === "") {
+          me.resumeURL = "";
+        } else if (typeof resumeURL === "string" && (isURL(resumeURL) || isStorageKey(resumeURL))) {
+          me.resumeURL = resumeURL.trim();
+        }
       }
-      if (typeof certificateURL === "string" && (isURL(certificateURL) || isStorageKey(certificateURL))) {
-        me.certificateURL = certificateURL.trim();
+      if (certificateURL !== undefined) {
+        if (certificateURL === null || String(certificateURL).trim() === "") {
+          me.certificateURL = "";
+        } else if (typeof certificateURL === "string" && (isURL(certificateURL) || isStorageKey(certificateURL))) {
+          me.certificateURL = certificateURL.trim();
+        }
       }
-      if (typeof body.writingSampleURL === "string" && (isURL(body.writingSampleURL) || isStorageKey(body.writingSampleURL))) {
-        me.writingSampleURL = body.writingSampleURL.trim();
+      if (body.writingSampleURL !== undefined) {
+        const writingSampleURL = body.writingSampleURL;
+        if (writingSampleURL === null || String(writingSampleURL).trim() === "") {
+          me.writingSampleURL = "";
+        } else if (typeof writingSampleURL === "string" && (isURL(writingSampleURL) || isStorageKey(writingSampleURL))) {
+          me.writingSampleURL = writingSampleURL.trim();
+        }
       }
       if (body.practiceAreas !== undefined) {
         me.practiceAreas = cleanList(body.practiceAreas);

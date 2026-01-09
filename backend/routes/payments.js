@@ -36,13 +36,28 @@ function trimSlash(value) {
   return String(value).replace(/\/$/, "");
 }
 
+function ensureAbsoluteUrl(value, defaultScheme = "https") {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("//")) return `${defaultScheme}:${trimmed}`;
+  const lower = trimmed.toLowerCase();
+  const isLocal =
+    lower.startsWith("localhost") ||
+    lower.startsWith("127.0.0.1") ||
+    lower.startsWith("0.0.0.0");
+  const scheme = isLocal ? "http" : defaultScheme;
+  return `${scheme}://${trimmed}`;
+}
+
 function resolveConnectUrls() {
-  const returnUrl = (process.env.STRIPE_CONNECT_RETURN_URL || "").trim();
-  const refreshUrl = (process.env.STRIPE_CONNECT_REFRESH_URL || "").trim();
+  const returnUrl = ensureAbsoluteUrl(process.env.STRIPE_CONNECT_RETURN_URL || "");
+  const refreshUrl = ensureAbsoluteUrl(process.env.STRIPE_CONNECT_REFRESH_URL || "");
   if (returnUrl && refreshUrl) {
     return { returnUrl, refreshUrl };
   }
-  const base = trimSlash(process.env.CLIENT_BASE_URL || process.env.FRONTEND_BASE_URL || process.env.APP_BASE_URL || "");
+  const baseRaw = process.env.CLIENT_BASE_URL || process.env.FRONTEND_BASE_URL || process.env.APP_BASE_URL || "";
+  const base = trimSlash(ensureAbsoluteUrl(baseRaw));
   if (!base) {
     throw new Error(
       "[payments] Stripe Connect requires STRIPE_CONNECT_RETURN_URL/STRIPE_CONNECT_REFRESH_URL or CLIENT_BASE_URL/FRONTEND_BASE_URL/APP_BASE_URL."

@@ -181,6 +181,7 @@ router.post(
       termsAccepted,
       phoneNumber,
       barState,
+      yearsExperience,
     } = req.body || {};
 
     const normalizedEmail = String(email || "").toLowerCase().trim();
@@ -295,6 +296,11 @@ router.post(
 
     // Let the model hash the password (pre-save hook)
 
+    const parsedYearsExperience = parseInt(yearsExperience, 10);
+    const safeYearsExperience = Number.isFinite(parsedYearsExperience)
+      ? Math.max(0, Math.min(80, parsedYearsExperience))
+      : undefined;
+
     const user = new User({
       firstName: safeFirst,
       lastName: safeLast,
@@ -309,6 +315,7 @@ router.post(
       lawFirm: roleLc === "attorney" ? (String(lawFirm || "").trim() || null) : null,
       termsAccepted: true,
       phoneNumber: phoneNumber ? String(phoneNumber).trim() || null : null,
+      yearsExperience: roleLc === "paralegal" ? safeYearsExperience : undefined,
     });
 
     if (roleLc === "attorney" && normalizedBarState) {
@@ -438,6 +445,9 @@ router.post(
       return res.status(400).json({ msg: "Invalid credentials" });
     }
 
+    const isFirstLogin = !user.lastLoginAt;
+    user.recordLoginSuccess();
+    await user.save();
     const token = signAccess(user);
     res.cookie("token", token, AUTH_COOKIE_OPTIONS);
     await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
@@ -453,6 +463,7 @@ router.post(
         role: user.role,
         status: user.status,
         disabled: Boolean(user.disabled),
+        isFirstLogin,
       },
     });
   })
@@ -480,14 +491,19 @@ router.post(
       return res.status(400).json({ error: "Incorrect code." });
     }
 
-    user.twoFactorTempCode = null;
-    user.twoFactorExpiresAt = null;
-    await user.save();
-
     const approvedFlag = String(user.status || "").toLowerCase() === "approved";
     if (!approvedFlag) {
+      user.twoFactorTempCode = null;
+      user.twoFactorExpiresAt = null;
+      await user.save();
       return res.status(403).json({ error: "Account pending approval" });
     }
+
+    const isFirstLogin = !user.lastLoginAt;
+    user.twoFactorTempCode = null;
+    user.twoFactorExpiresAt = null;
+    user.recordLoginSuccess();
+    await user.save();
 
     const token = signAccess(user);
     res.cookie("token", token, AUTH_COOKIE_OPTIONS);
@@ -504,6 +520,7 @@ router.post(
         role: user.role,
         status: user.status,
         disabled: Boolean(user.disabled),
+        isFirstLogin,
       },
     });
   })
@@ -535,9 +552,11 @@ router.post(
       return res.status(400).json({ error: "Invalid backup code." });
     }
 
+    const isFirstLogin = !user.lastLoginAt;
     user.twoFactorBackupCodes.splice(index, 1);
     user.twoFactorTempCode = null;
     user.twoFactorExpiresAt = null;
+    user.recordLoginSuccess();
     await user.save();
 
     const token = signAccess(user);
@@ -555,6 +574,7 @@ router.post(
         role: user.role,
         status: user.status,
         disabled: Boolean(user.disabled),
+        isFirstLogin,
       },
     });
   })
