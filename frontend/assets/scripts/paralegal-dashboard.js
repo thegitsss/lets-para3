@@ -173,7 +173,6 @@ async function loadStripeStatus() {
   const banner = document.getElementById("stripeGateBanner");
   const message = document.querySelector("[data-stripe-gate-message]");
   const cta = document.getElementById("stripeConnectCta");
-  if (!banner && !message) return null;
 
   const data = await getStripeConnectStatus({ force: true });
   stripeConnected = isStripeConnected(data);

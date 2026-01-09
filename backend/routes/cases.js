@@ -1572,17 +1572,20 @@ router.patch(
 router.delete(
   "/:caseId",
   csrfProtection,
-  requireCaseAccess("caseId", { project: "status paralegal attorney" }),
+  requireCaseAccess("caseId", { project: "status paralegal paralegalId attorney escrowStatus escrowIntentId paymentReleased" }),
   asyncHandler(async (req, res) => {
     if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
       return res.status(403).json({ error: "Only the case attorney can delete this case" });
     }
     const doc = req.case;
-    if (doc.paralegal) {
+    const hasParalegal = !!(doc.paralegal || doc.paralegalId);
+    if (hasParalegal) {
       return res.status(400).json({ error: "Cannot delete a case after hiring a paralegal" });
     }
-    if (!["open", "awaiting_documents"].includes(doc.status)) {
-      return res.status(400).json({ error: "Only open cases can be deleted" });
+    const escrowStatus = String(doc.escrowStatus || "").toLowerCase();
+    const escrowFunded = escrowStatus === "funded" || doc.paymentReleased === true;
+    if (escrowFunded) {
+      return res.status(400).json({ error: "Cannot delete a case after escrow is funded" });
     }
 
     await Case.deleteOne({ _id: doc._id });

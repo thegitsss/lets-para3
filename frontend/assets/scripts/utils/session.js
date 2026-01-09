@@ -318,17 +318,17 @@
     style.id = BETA_FOOTER_STYLE_ID;
     style.textContent = `
       .sidebar-footer{display:flex;flex-direction:column;align-items:center;}
-      .sidebar-footer .beta-footer{display:flex;align-items:center;justify-content:center;width:100%;gap:6px;font-size:0.76rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:8px;}
-      .sidebar-footer .beta-pill{padding:0;border:none;border-radius:0;font-size:0.74rem;letter-spacing:0.12em;}
+      .sidebar-footer .beta-footer{display:flex;align-items:center;justify-content:center;width:100%;gap:6px;font-size:0.82rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:8px;font-weight:400;}
+      .sidebar-footer .beta-pill{padding:0;border:none;border-radius:0;font-size:0.8rem;letter-spacing:0.12em;font-weight:400;}
       .sidebar-footer .beta-sep{font-size:0.7rem;letter-spacing:0;opacity:0.6;line-height:1;}
-      .sidebar-footer .beta-link{color:var(--muted);text-decoration:none;border-bottom:1px solid transparent;font-size:0.76rem;letter-spacing:0.08em;}
+      .sidebar-footer .beta-link{color:var(--muted);text-decoration:none;border-bottom:1px solid transparent;font-size:0.82rem;letter-spacing:0.08em;font-weight:400;}
       .sidebar-footer .beta-link:hover{border-bottom-color:currentColor;}
     `;
     document.head.appendChild(style);
   }
 
   function buildBugReportLink() {
-    const subject = encodeURIComponent("Beta Bug Report");
+    const subject = encodeURIComponent("Report an Issue");
     const body = encodeURIComponent(
       "What happened?\n\nWhat did you expect?\n\n(Optional) Page or feature:"
     );
@@ -354,7 +354,7 @@
       const link = document.createElement("a");
       link.className = "beta-link";
       link.href = href;
-      link.textContent = "Report Bug";
+      link.textContent = "Report an Issue";
       link.addEventListener("click", (event) => {
         event.stopPropagation();
       });

@@ -3589,29 +3589,8 @@ function removeCaseFromState(caseId) {
   buildCaseLookup();
 }
 
-async function ensureCaseOpenForDelete(caseId, suppressErrors = false) {
-  const entry = state.caseLookup.get(String(caseId));
-  try {
-    if (entry?.archived) {
-      await toggleCaseArchive(caseId, false);
-    }
-    const statusKey = String(entry?.status || "").toLowerCase();
-    if (statusKey && statusKey !== "open") {
-      const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, {
-        method: "PATCH",
-        headers: { Accept: "application/json" },
-        body: { status: "open" },
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || "Unable to prepare case for deletion.");
-      }
-      syncCaseCollections(data);
-    }
-  } catch (err) {
-    if (!suppressErrors) throw err;
-    console.warn("ensureCaseOpenForDelete failed", err);
-  }
+async function ensureCaseOpenForDelete(_caseId, _suppressErrors = false) {
+  // Deletion no longer requires status or archive normalization.
 }
 
 function syncCaseCollections(updatedCase) {
