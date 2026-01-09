@@ -22,6 +22,12 @@ function ensureNotificationStyles() {
     .notif-dismiss{background:transparent;border:none;color:var(--muted,#7a7a7a);font-size:0.9rem;cursor:pointer;padding:6px;border-radius:8px;align-self:flex-start;flex-shrink:0;}
     .notif-dismiss:hover{background:rgba(0,0,0,0.06);color:var(--ink,#1a1a1a);}
     .notif-time{color:var(--muted,#6b7280);}
+    .notif-actions{display:flex;gap:8px;justify-content:flex-end;padding:10px 12px;border-top:1px solid rgba(0,0,0,0.08);background:transparent;}
+    .notif-actions .notif-markall{border:1px solid var(--line, rgba(0,0,0,0.12));background:transparent;color:var(--ink,#1a1a1a);padding:6px 10px;text-align:center;font-size:0.82rem;font-weight:400;border-radius:10px;cursor:pointer;box-shadow:none;}
+    .notif-actions .notif-markall:hover{background:transparent;box-shadow:none;}
+    .notif-actions .notif-clear{color:var(--accent,#b6a47a);border-color:rgba(182,164,122,0.55);}
+    .notif-actions .notif-clear:hover{background:transparent;box-shadow:none;}
+    .notif-actions .notif-markall:disabled{opacity:0.5;cursor:default;}
   `;
   document.head.appendChild(style);
 }
@@ -238,6 +244,26 @@ function createCenter(root) {
   const list = root.querySelector("[data-notification-list]");
   const empty = root.querySelector("[data-notification-empty]");
   const markBtn = root.querySelector("[data-notification-mark]");
+  let clearBtn = root.querySelector("[data-notification-clear]");
+  if (!clearBtn && panel) {
+    clearBtn = document.createElement("button");
+    clearBtn.type = "button";
+    clearBtn.className = "notif-markall notif-clear";
+    clearBtn.textContent = "Clear All";
+    clearBtn.setAttribute("data-notification-clear", "true");
+  }
+  let actionsWrap = panel?.querySelector(".notif-actions") || null;
+  if (panel && !actionsWrap && (markBtn || clearBtn)) {
+    actionsWrap = document.createElement("div");
+    actionsWrap.className = "notif-actions";
+    panel.appendChild(actionsWrap);
+  }
+  if (actionsWrap) {
+    if (markBtn) actionsWrap.appendChild(markBtn);
+    if (clearBtn) actionsWrap.appendChild(clearBtn);
+  } else if (clearBtn && panel) {
+    panel.appendChild(clearBtn);
+  }
   const state = {
     root,
     toggle,
@@ -246,6 +272,7 @@ function createCenter(root) {
     list,
     empty,
     markBtn,
+    clearBtn,
     notifications: [],
     unread: 0,
     loading: false,
@@ -262,6 +289,7 @@ function createCenter(root) {
       }
     });
     markBtn?.addEventListener("click", () => markNotificationsRead(state));
+    clearBtn?.addEventListener("click", () => clearNotifications(state));
   }
   return state;
 }
@@ -388,6 +416,31 @@ async function markNotificationsRead(center) {
     renderNotifications(center);
   } catch (err) {
     console.warn("[notifications] mark read failed", err);
+  }
+}
+
+async function clearNotifications(center) {
+  if (!center?.notifications?.length) {
+    renderEmpty(center, "You're all caught up.");
+    return;
+  }
+  const confirmed = window.confirm("Confirm clear all notifications?");
+  if (!confirmed) return;
+  try {
+    await secureFetch("/api/notifications", {
+      method: "DELETE",
+      credentials: "include",
+    });
+    centers.forEach((c) => {
+      c.notifications = [];
+      c.unread = 0;
+      renderEmpty(c, "You're all caught up.");
+    });
+    const total = totalUnread();
+    lastKnownUnread = total;
+    syncNotificationBadges(total);
+  } catch (err) {
+    console.warn("[notifications] clear all failed", err);
   }
 }
 

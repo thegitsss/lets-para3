@@ -155,6 +155,13 @@
           syncStoredUser(user);
           applyThemeFromUser(user);
           applyFontSizeFromUser(user);
+          if (typeof document !== "undefined") {
+            if (document.readyState === "loading") {
+              document.addEventListener("DOMContentLoaded", () => injectBetaFooter(user), { once: true });
+            } else {
+              injectBetaFooter(user);
+            }
+          }
           try {
             if (user?.avatarURL) {
               localStorage.setItem("avatarURL", user.avatarURL);
@@ -300,6 +307,65 @@
     } catch (_) {
       return null;
     }
+  }
+
+  const BETA_FOOTER_STYLE_ID = "lpc-beta-footer-style";
+
+  function ensureBetaFooterStyles() {
+    if (typeof document === "undefined") return;
+    if (document.getElementById(BETA_FOOTER_STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = BETA_FOOTER_STYLE_ID;
+    style.textContent = `
+      .sidebar-footer{display:flex;flex-direction:column;align-items:center;}
+      .sidebar-footer .beta-footer{display:flex;align-items:center;justify-content:center;width:100%;gap:6px;font-size:0.76rem;color:var(--muted);letter-spacing:0.08em;margin-bottom:8px;}
+      .sidebar-footer .beta-pill{padding:0;border:none;border-radius:0;font-size:0.74rem;letter-spacing:0.12em;}
+      .sidebar-footer .beta-sep{font-size:0.7rem;letter-spacing:0;opacity:0.6;line-height:1;}
+      .sidebar-footer .beta-link{color:var(--muted);text-decoration:none;border-bottom:1px solid transparent;font-size:0.76rem;letter-spacing:0.08em;}
+      .sidebar-footer .beta-link:hover{border-bottom-color:currentColor;}
+    `;
+    document.head.appendChild(style);
+  }
+
+  function buildBugReportLink() {
+    const subject = encodeURIComponent("Beta Bug Report");
+    const body = encodeURIComponent(
+      "What happened?\n\nWhat did you expect?\n\n(Optional) Page or feature:"
+    );
+    return `mailto:support@lets-paraconnect.com?subject=${subject}&body=${body}`;
+  }
+
+  function injectBetaFooter(user) {
+    if (!user || typeof document === "undefined") return;
+    const footers = document.querySelectorAll(".sidebar-footer");
+    if (!footers.length) return;
+    ensureBetaFooterStyles();
+    const href = buildBugReportLink();
+    footers.forEach((footer) => {
+      if (footer.querySelector(".beta-footer")) return;
+      const wrap = document.createElement("div");
+      wrap.className = "beta-footer";
+      const pill = document.createElement("span");
+      pill.className = "beta-pill";
+      pill.textContent = "Beta";
+      const sep = document.createElement("span");
+      sep.className = "beta-sep";
+      sep.textContent = "•";
+      const link = document.createElement("a");
+      link.className = "beta-link";
+      link.href = href;
+      link.textContent = "Report Bug";
+      link.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
+      wrap.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
+      wrap.appendChild(pill);
+      wrap.appendChild(sep);
+      wrap.appendChild(link);
+      footer.prepend(wrap);
+    });
   }
 
   function normalizeUserId(user) {

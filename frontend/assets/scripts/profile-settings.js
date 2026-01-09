@@ -356,10 +356,8 @@ document.addEventListener("DOMContentLoaded", () => {
         stripeStatus.textContent = bankBits.length
           ? `Stripe connected for payouts (${bankBits.join(" ")})`
           : "Stripe connected for payouts.";
-      } else if (data.accountId) {
-        stripeStatus.textContent = "Stripe setup in progress. Finish onboarding to enable payouts.";
       } else {
-        stripeStatus.textContent = "Stripe not connected.";
+        stripeStatus.textContent = "Secure payouts powered by Stripe. Payments activate shortly.";
       }
     }
     if (connectStripeBtn) {
@@ -367,11 +365,10 @@ document.addEventListener("DOMContentLoaded", () => {
       connectStripeBtn.disabled = !connected;
       if (!connected) {
         connectStripeBtn.setAttribute("aria-disabled", "true");
-        connectStripeBtn.title = STRIPE_GATE_MESSAGE;
       } else {
         connectStripeBtn.removeAttribute("aria-disabled");
-        connectStripeBtn.removeAttribute("title");
       }
+      connectStripeBtn.removeAttribute("title");
     }
   };
 
@@ -388,13 +385,14 @@ document.addEventListener("DOMContentLoaded", () => {
       if (connectStripeBtn) {
         connectStripeBtn.disabled = true;
         connectStripeBtn.setAttribute("aria-disabled", "true");
-        connectStripeBtn.title = STRIPE_GATE_MESSAGE;
+        connectStripeBtn.removeAttribute("title");
       }
     }
   }
 
   if (connectStripeBtn) {
     connectStripeBtn.addEventListener("click", async () => {
+      if (connectStripeBtn.disabled) return;
       connectStripeBtn.disabled = true;
       connectStripeBtn.textContent = "Connecting…";
       try {
@@ -496,6 +494,10 @@ let settingsState = {
   pendingResumeKey: "",
   pendingCertificateKey: "",
   pendingWritingSampleKey: "",
+  removeResume: false,
+  removeCertificate: false,
+  removeWritingSample: false,
+  experienceDatesTouched: false,
   bio: "",
   education: [],
   awards: [],
@@ -665,6 +667,7 @@ function seedSettingsState(user = {}) {
     sms: false,
     ...(user.notificationPrefs || {})
   };
+  settingsState.experienceDatesTouched = false;
   settingsState.practiceDescription = user.practiceDescription || user.bio || "";
   const freq = typeof user.digestFrequency === "string" ? user.digestFrequency : "off";
   settingsState.digestFrequency = ["off", "daily", "weekly"].includes(freq) ? freq : "off";
@@ -763,6 +766,111 @@ function updateRoleLineFromExperience() {
     return;
   }
   roleLine.textContent = "Experience details pending";
+}
+
+const EXPERIENCE_MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const EXPERIENCE_MONTH_MAP = EXPERIENCE_MONTH_LABELS.reduce((acc, label, index) => {
+  const key = label.toLowerCase();
+  acc[key] = String(index + 1).padStart(2, "0");
+  return acc;
+}, {});
+
+function formatExperienceMonth(value) {
+  if (!value) return "";
+  const [year, month] = String(value).split("-");
+  const monthIndex = Number(month) - 1;
+  if (!year || Number.isNaN(monthIndex) || monthIndex < 0 || monthIndex > 11) return "";
+  return `${EXPERIENCE_MONTH_LABELS[monthIndex]} ${year}`;
+}
+
+function formatExperienceDateRange(startValue, endValue) {
+  const startLabel = formatExperienceMonth(startValue);
+  const endLabel = formatExperienceMonth(endValue);
+  if (startLabel && endLabel) return `${startLabel} - ${endLabel}`;
+  if (startLabel) return `${startLabel} - Present`;
+  return endLabel ? `Through ${endLabel}` : "";
+}
+
+function parseExperienceYearsLabel(value = "") {
+  const cleaned = String(value || "").trim().replace(/[–—]/g, "-");
+  if (!cleaned) return { start: "", end: "" };
+  const monthToken = "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)";
+  const rangeRe = new RegExp(`^${monthToken}\\s+(\\d{4})\\s*-\\s*${monthToken}\\s+(\\d{4})$`, "i");
+  const presentRe = new RegExp(`^${monthToken}\\s+(\\d{4})\\s*-\\s*Present$`, "i");
+  const throughRe = new RegExp(`^Through\\s+${monthToken}\\s+(\\d{4})$`, "i");
+  let match = cleaned.match(rangeRe);
+  if (match) {
+    const startMonth = EXPERIENCE_MONTH_MAP[match[1].toLowerCase()] || "";
+    const endMonth = EXPERIENCE_MONTH_MAP[match[3].toLowerCase()] || "";
+    return {
+      start: startMonth ? `${match[2]}-${startMonth}` : "",
+      end: endMonth ? `${match[4]}-${endMonth}` : "",
+    };
+  }
+  match = cleaned.match(presentRe);
+  if (match) {
+    const startMonth = EXPERIENCE_MONTH_MAP[match[1].toLowerCase()] || "";
+    return {
+      start: startMonth ? `${match[2]}-${startMonth}` : "",
+      end: "",
+    };
+  }
+  match = cleaned.match(throughRe);
+  if (match) {
+    const endMonth = EXPERIENCE_MONTH_MAP[match[1].toLowerCase()] || "";
+    return {
+      start: "",
+      end: endMonth ? `${match[2]}-${endMonth}` : "",
+    };
+  }
+  return { start: "", end: "" };
+}
+
+function applyExperienceDatesToTextarea() {
+  const experienceInput = document.getElementById("experienceInput");
+  const startInput = document.getElementById("experienceStartDate");
+  const endInput = document.getElementById("experienceEndDate");
+  if (!experienceInput || !startInput || !endInput) return;
+  const rangeLabel = formatExperienceDateRange(startInput.value, endInput.value);
+  const blocks = experienceInput.value.split(/\n\s*\n/);
+  if (!blocks.length) return;
+  const firstBlock = blocks[0] || "";
+  if (!firstBlock.trim()) return;
+  const lines = firstBlock.split("\n");
+  const header = lines[0] || "";
+  const title = header.split("—")[0].trim();
+  if (!title && !rangeLabel) return;
+  lines[0] = rangeLabel ? (title ? `${title} — ${rangeLabel}` : rangeLabel) : title;
+  blocks[0] = lines.join("\n").trim();
+  experienceInput.value = blocks.join("\n\n");
+}
+
+function hydrateExperienceDateInputs(entries = []) {
+  const startInput = document.getElementById("experienceStartDate");
+  const endInput = document.getElementById("experienceEndDate");
+  if (!startInput || !endInput) return;
+  startInput.value = "";
+  endInput.value = "";
+  if (!Array.isArray(entries) || !entries.length) return;
+  const yearsLabel = entries[0]?.years || "";
+  const parsed = parseExperienceYearsLabel(yearsLabel);
+  if (parsed.start) startInput.value = parsed.start;
+  if (parsed.end) endInput.value = parsed.end;
+}
+
+function bindExperienceDateInputs() {
+  const startInput = document.getElementById("experienceStartDate");
+  const endInput = document.getElementById("experienceEndDate");
+  if (!startInput || !endInput) return;
+  if (startInput.dataset.bound === "true" || endInput.dataset.bound === "true") return;
+  const markTouched = () => {
+    settingsState.experienceDatesTouched = true;
+    applyExperienceDatesToTextarea();
+  };
+  startInput.addEventListener("change", markTouched);
+  endInput.addEventListener("change", markTouched);
+  startInput.dataset.bound = "true";
+  endInput.dataset.bound = "true";
 }
 
 function setSectionDisplayText(element, value, fallback) {
@@ -1756,6 +1864,9 @@ async function loadSettings() {
           .map((e) => `${e.title || ""} — ${e.years || ""}\n${e.description || ""}`.trim())
           .filter(Boolean)
           .join("\n\n");
+        const experiences = Array.isArray(user.experience) ? user.experience : [];
+        hydrateExperienceDateInputs(experiences);
+        bindExperienceDateInputs();
       }
       renderEducationEditor(user.education || []);
       renderLanguageEditor(user.languages || []);
@@ -1831,6 +1942,8 @@ function hydrateProfileForm(user = {}) {
         })
         .filter(Boolean)
         .join("\n\n");
+      hydrateExperienceDateInputs(experiences);
+      bindExperienceDateInputs();
     }
     renderEducationEditor(user.education || []);
     renderLanguageEditor(user.languages || []);
@@ -1845,7 +1958,9 @@ function hydrateProfileForm(user = {}) {
 function loadCertificate(user) {
   const section = document.getElementById("settingsCertificate");
   if (!section) return;
-  const statusText = user.certificateURL ? "Certificate on file" : "No file uploaded";
+  settingsState.removeCertificate = false;
+  const hasCertificate = Boolean(user.certificateURL || settingsState.pendingCertificateKey);
+  const statusText = hasCertificate ? "Certificate on file" : "No file uploaded";
   section.innerHTML = `
     <div class="paralegal-doc-row">
       <div class="paralegal-doc-meta">
@@ -1860,6 +1975,7 @@ function loadCertificate(user) {
         </div>
         <input id="certificateInput" type="file" accept="application/pdf" class="file-input-hidden">
         <button id="uploadCertificateBtn" class="file-trigger upload-action-btn" type="button">Upload Certificate</button>
+        <button id="removeCertificateBtn" class="file-trigger remove-action-btn" type="button" ${hasCertificate ? "" : "disabled"}>Remove</button>
       </div>
     </div>
   `;
@@ -1916,17 +2032,37 @@ function loadCertificate(user) {
     const latestKey = payload.url || payload.key || "";
     certHidden.value = latestKey;
     settingsState.pendingCertificateKey = latestKey;
+    settingsState.removeCertificate = false;
     if (certInput) certInput.value = "";
     if (certFileName) certFileName.textContent = "Uploaded!";
     const status = document.getElementById("certificateStatus");
     if (status) status.textContent = "Certificate on file";
+    const removeBtn = document.getElementById("removeCertificateBtn");
+    if (removeBtn) removeBtn.disabled = false;
+  });
+
+  document.getElementById("removeCertificateBtn")?.addEventListener("click", () => {
+    const confirmed = window.confirm("Remove certificate? This will update after you save.");
+    if (!confirmed) return;
+    settingsState.pendingCertificateKey = "";
+    settingsState.removeCertificate = true;
+    const certHidden = document.getElementById("certificateKeyInput");
+    if (certHidden) certHidden.value = "";
+    if (certInput) certInput.value = "";
+    if (certFileName) certFileName.textContent = "No file chosen";
+    const status = document.getElementById("certificateStatus");
+    if (status) status.textContent = "Removed. Click Save to publish the update.";
+    const removeBtn = document.getElementById("removeCertificateBtn");
+    if (removeBtn) removeBtn.disabled = true;
   });
 }
 
 function loadResume(user) {
   const section = document.getElementById("settingsResume");
   if (!section) return;
-  const statusText = user.resumeURL ? "Résumé on file" : "No file uploaded";
+  settingsState.removeResume = false;
+  const hasResume = Boolean(user.resumeURL || settingsState.pendingResumeKey);
+  const statusText = hasResume ? "Résumé on file" : "No file uploaded";
   section.innerHTML = `
     <div class="paralegal-doc-row">
       <div class="paralegal-doc-meta">
@@ -1941,6 +2077,7 @@ function loadResume(user) {
         </div>
         <input id="resumeInput" type="file" accept="application/pdf" class="file-input-hidden">
         <button id="uploadResumeBtn" class="file-trigger upload-action-btn" type="button">Upload Résumé</button>
+        <button id="removeResumeBtn" class="file-trigger remove-action-btn" type="button" ${hasResume ? "" : "disabled"}>Remove</button>
       </div>
     </div>
   `;
@@ -1992,17 +2129,37 @@ function loadResume(user) {
     const latestKey = payload.url || payload.key || "";
     resumeHidden.value = latestKey;
     settingsState.pendingResumeKey = latestKey;
+    settingsState.removeResume = false;
     if (resumeInput) resumeInput.value = "";
     if (resumeFileName) resumeFileName.textContent = "Uploaded!";
     const status = document.getElementById("resumeStatus");
     if (status) status.textContent = "Résumé on file";
+    const removeBtn = document.getElementById("removeResumeBtn");
+    if (removeBtn) removeBtn.disabled = false;
+  });
+
+  document.getElementById("removeResumeBtn")?.addEventListener("click", () => {
+    const confirmed = window.confirm("Remove résumé? This will update after you save.");
+    if (!confirmed) return;
+    settingsState.pendingResumeKey = "";
+    settingsState.removeResume = true;
+    const resumeHidden = document.getElementById("resumeKeyInput");
+    if (resumeHidden) resumeHidden.value = "";
+    if (resumeInput) resumeInput.value = "";
+    if (resumeFileName) resumeFileName.textContent = "No file chosen";
+    const status = document.getElementById("resumeStatus");
+    if (status) status.textContent = "Removed. Click Save to publish the update.";
+    const removeBtn = document.getElementById("removeResumeBtn");
+    if (removeBtn) removeBtn.disabled = true;
   });
 }
 
 function loadWritingSample(user) {
   const section = document.getElementById("settingsWritingSample");
   if (!section) return;
-  const statusText = user.writingSampleURL ? "Writing sample on file" : "No file uploaded";
+  settingsState.removeWritingSample = false;
+  const hasSample = Boolean(user.writingSampleURL || settingsState.pendingWritingSampleKey);
+  const statusText = hasSample ? "Writing sample on file" : "No file uploaded";
   section.innerHTML = `
     <div class="paralegal-doc-row">
       <div class="paralegal-doc-meta">
@@ -2017,6 +2174,7 @@ function loadWritingSample(user) {
         </div>
         <input id="writingSampleInput" type="file" accept="application/pdf" class="file-input-hidden">
         <button id="uploadWritingSampleBtn" class="file-trigger upload-action-btn" type="button">Upload Writing Sample</button>
+        <button id="removeWritingSampleBtn" class="file-trigger remove-action-btn" type="button" ${hasSample ? "" : "disabled"}>Remove</button>
       </div>
     </div>
   `;
@@ -2073,10 +2231,28 @@ function loadWritingSample(user) {
     const latestKey = payload.url || payload.key || "";
     hidden.value = latestKey;
     settingsState.pendingWritingSampleKey = latestKey;
+    settingsState.removeWritingSample = false;
     if (sampleInput) sampleInput.value = "";
     if (sampleFileName) sampleFileName.textContent = "Uploaded!";
     const status = document.getElementById("writingSampleStatus");
     if (status) status.textContent = "Writing sample on file";
+    const removeBtn = document.getElementById("removeWritingSampleBtn");
+    if (removeBtn) removeBtn.disabled = false;
+  });
+
+  document.getElementById("removeWritingSampleBtn")?.addEventListener("click", () => {
+    const confirmed = window.confirm("Remove writing sample? This will update after you save.");
+    if (!confirmed) return;
+    settingsState.pendingWritingSampleKey = "";
+    settingsState.removeWritingSample = true;
+    const sampleHidden = document.getElementById("writingSampleKeyInput");
+    if (sampleHidden) sampleHidden.value = "";
+    if (sampleInput) sampleInput.value = "";
+    if (sampleFileName) sampleFileName.textContent = "No file chosen";
+    const status = document.getElementById("writingSampleStatus");
+    if (status) status.textContent = "Removed. Click Save to publish the update.";
+    const removeBtn = document.getElementById("removeWritingSampleBtn");
+    if (removeBtn) removeBtn.disabled = true;
   });
 }
 
@@ -2392,18 +2568,33 @@ async function saveSettings() {
         .filter((entry) => entry.title || entry.description)
         .filter((entry) => entry.title || entry.description)
     : [];
+  const experienceStartInput = document.getElementById("experienceStartDate");
+  const experienceEndInput = document.getElementById("experienceEndDate");
+  if (settingsState.experienceDatesTouched && Array.isArray(body.experience) && body.experience.length) {
+    const rangeLabel = formatExperienceDateRange(
+      experienceStartInput?.value || "",
+      experienceEndInput?.value || ""
+    );
+    body.experience[0].years = rangeLabel || "";
+  }
   body.education = collectEducationFromEditor();
   const resumeKeyValue = resumeKeyInput?.value || settingsState.pendingResumeKey || "";
-  if (resumeKeyValue) {
+  if (settingsState.removeResume) {
+    body.resumeURL = "";
+  } else if (resumeKeyValue) {
     body.resumeURL = resumeKeyValue;
   }
   const certificateKeyValue = certificateKeyInput?.value || settingsState.pendingCertificateKey || "";
-  if (certificateKeyValue) {
+  if (settingsState.removeCertificate) {
+    body.certificateURL = "";
+  } else if (certificateKeyValue) {
     body.certificateURL = certificateKeyValue;
   }
   const writingSampleInput = document.getElementById("writingSampleKeyInput");
   const writingSampleValue = writingSampleInput?.value || settingsState.pendingWritingSampleKey || "";
-  if (writingSampleValue) {
+  if (settingsState.removeWritingSample) {
+    body.writingSampleURL = "";
+  } else if (writingSampleValue) {
     body.writingSampleURL = writingSampleValue;
   }
 
@@ -2441,6 +2632,10 @@ async function saveSettings() {
   settingsState.pendingResumeKey = "";
   settingsState.pendingCertificateKey = "";
   settingsState.pendingWritingSampleKey = "";
+  settingsState.experienceDatesTouched = false;
+  settingsState.removeResume = false;
+  settingsState.removeCertificate = false;
+  settingsState.removeWritingSample = false;
   if (resumeKeyInput) resumeKeyInput.value = "";
   if (certificateKeyInput) certificateKeyInput.value = "";
   if (writingSampleKeyInput) writingSampleKeyInput.value = "";

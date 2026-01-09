@@ -672,11 +672,11 @@
                <label for="paralegalExperience"><span class="sr-only">Years of experience</span></label>
                <select id="paralegalExperience" class="select-field">
                  <option value="">Years of experience</option>
-                 <option value="0–1 years (Emerging)">0–1 years (Emerging)</option>
-                 <option value="1–3 years (Early Career)">1–3 years (Early Career)</option>
-                 <option value="3–7 years (Intermediate)">3–7 years (Intermediate)</option>
-                 <option value="7–12 years (Experienced)">7–12 years (Experienced)</option>
-                 <option value="12+ years (Advanced)">12+ years (Advanced)</option>
+                 <option value="0">0–1 years (Emerging)</option>
+                 <option value="1">1–3 years (Early Career)</option>
+                 <option value="3">3–7 years (Intermediate)</option>
+                 <option value="7">7–12 years (Experienced)</option>
+                 <option value="12">12+ years (Advanced)</option>
                </select>
              </div>
            </div>
@@ -788,6 +788,7 @@
       let attorneyBarState = '';
       let attorneyLawFirm = '';
       let paralegalLinkedIn = '';
+      let paralegalExperience = '';
       let paralegalCertFile = null;
 
       if (role === 'attorney') {
@@ -804,6 +805,7 @@
       } else {
         const resumeInput = document.getElementById('resumeUpload');
         if (!resumeInput || !resumeInput.files?.length) { say('Please upload your resume.', 'err'); return; }
+        paralegalExperience = (document.getElementById('paralegalExperience')?.value || '').trim();
         paralegalLinkedIn = (document.getElementById('paralegalLinkedIn')?.value || '').trim();
         if (paralegalLinkedIn && !isValidLinkedInUrl(paralegalLinkedIn)) {
           say('Enter a valid LinkedIn URL (e.g., https://www.linkedin.com/in/username).', 'err');
@@ -839,6 +841,7 @@
           if (resumeFile) formData.append('resume', resumeFile, resumeFile.name || 'resume.pdf');
           if (paralegalCertFile) formData.append('certificateFile', paralegalCertFile, paralegalCertFile.name || 'certificate.pdf');
           if (paralegalLinkedIn) formData.append('linkedInURL', paralegalLinkedIn);
+          if (paralegalExperience) formData.append('yearsExperience', paralegalExperience);
         }
 
         const recaptchaToken = await getRecaptchaToken('signup');

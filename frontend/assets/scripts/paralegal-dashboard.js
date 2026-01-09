@@ -68,6 +68,7 @@ const selectors = {
   assignmentTemplate: document.getElementById('assignmentCardTemplate'),
   toastBanner: document.getElementById('toastBanner'),
   nameHeading: document.getElementById('user-name-heading'),
+  welcomeGreeting: document.getElementById('welcomeGreeting'),
   inviteOverlay: document.getElementById('inviteOverlay'),
   inviteCaseTitle: document.getElementById('inviteCaseTitle'),
   inviteJobTitle: document.getElementById('inviteJobTitle'),
@@ -172,7 +173,23 @@ async function loadStripeStatus() {
   const banner = document.getElementById("stripeGateBanner");
   const message = document.querySelector("[data-stripe-gate-message]");
   const cta = document.getElementById("stripeConnectCta");
-  if (cta && !cta.dataset.bound) {
+  if (!banner && !message) return null;
+
+  const data = await getStripeConnectStatus({ force: true });
+  stripeConnected = isStripeConnected(data);
+  if (banner) banner.classList.toggle("hidden", stripeConnected);
+  if (message && !stripeConnected) {
+    message.textContent = "Secure payouts powered by Stripe. Payments activate shortly.";
+  }
+  if (cta) {
+    cta.disabled = !stripeConnected;
+    if (!stripeConnected) {
+      cta.setAttribute("aria-disabled", "true");
+    } else {
+      cta.removeAttribute("aria-disabled");
+    }
+  }
+  if (cta && stripeConnected && !cta.dataset.bound) {
     cta.dataset.bound = "true";
     cta.addEventListener("click", async () => {
       const original = cta.textContent || "Connect Stripe";
@@ -187,16 +204,6 @@ async function loadStripeStatus() {
         cta.textContent = original;
       }
     });
-  }
-  if (!banner && !message) return null;
-
-  const data = await getStripeConnectStatus({ force: true });
-  stripeConnected = isStripeConnected(data);
-  if (banner) banner.classList.toggle("hidden", stripeConnected);
-  if (message && !stripeConnected) {
-    message.textContent = data
-      ? "Stripe Connect is required to receive payment for completed assignments. You can manage payouts later in Profile Settings."
-      : "Stripe status unavailable. Connect Stripe to receive payment.";
   }
   applyStripeGateToApplyActions();
   return data;
@@ -758,6 +765,29 @@ function closeInviteOverlay() {
   activeInvite = null;
 }
 
+function getStoredUserSnapshot() {
+  if (typeof window.getStoredUser === "function") {
+    const stored = window.getStoredUser();
+    if (stored && typeof stored.isFirstLogin === "boolean") return stored;
+  }
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function updateWelcomeGreeting(user) {
+  const greetingEl = selectors.welcomeGreeting;
+  if (!greetingEl) return;
+  const stored = getStoredUserSnapshot();
+  const storedFlag = stored?.isFirstLogin;
+  const userFlag = user?.isFirstLogin;
+  const isFirstLogin = typeof storedFlag === "boolean" ? storedFlag : Boolean(userFlag);
+  greetingEl.textContent = isFirstLogin ? "Welcome" : "Welcome back";
+}
+
 function updateProfile(profile = {}) {
   const composedName =
     [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim() || profile.name || 'Paralegal';
@@ -772,6 +802,7 @@ function updateProfile(profile = {}) {
   if (selectors.nameHeading) {
     selectors.nameHeading.textContent = firstName;
   }
+  updateWelcomeGreeting(profile);
   const avatarUrl = getAvatarUrl(profile);
   document.querySelectorAll('[data-avatar]').forEach((node) => {
     node.src = avatarUrl;
