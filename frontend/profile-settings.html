@@ -69,6 +69,7 @@
     body {
       font-family: var(--font-sans);
       font-weight: 200;
+      line-height: 1.15;
       background: var(--bg);
       color: var(--ink);
       min-height: 100vh;
@@ -180,7 +181,7 @@
 
     .content {
       flex: 1;
-      padding: 40px 48px;
+      padding: 40px;
       overflow-y: auto;
       background: var(--bg);
     }
@@ -188,14 +189,19 @@
     .topbar {
       display: flex;
       justify-content: flex-end;
-      margin-bottom: 24px;
+      margin-bottom: 6px;
+      align-items: center;
+      gap: 1.5rem;
+      position: relative;
+      z-index: 3;
+      pointer-events: auto;
     }
 
     .unified-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 32px;
+      margin-bottom: 18px;
       position: relative;
     }
 
@@ -230,6 +236,11 @@
 
     .lpc-shared-header .notification-badge {
       display: none !important;
+    }
+
+    .topbar .lpc-shared-header {
+      margin-bottom: 0;
+      align-items: center;
     }
 
     .settings-panel {
@@ -415,6 +426,30 @@
       margin-top: 0;
     }
 
+    body.paralegal-flat #securitySection {
+      max-width: var(--paralegal-max-width);
+      margin: 0 auto 28px;
+    }
+
+    body.paralegal-flat #securitySection .settings-block {
+      margin-top: 32px;
+      padding: 0 0 24px;
+      border-radius: 0;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--line);
+      box-shadow: none;
+    }
+
+    body.paralegal-flat #securitySection .settings-block:first-child {
+      margin-top: 0;
+    }
+
+    body.paralegal-flat #securitySection .settings-block:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
     .settings-block {
       margin-top: 22px;
       padding: 18px 22px;
@@ -569,6 +604,54 @@ label {
       align-items: center;
     }
 
+    .education-editor {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .education-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .education-row .education-school {
+      flex: 2 1 240px;
+      min-width: 200px;
+    }
+
+    .education-row .education-month {
+      flex: 1 1 140px;
+      min-width: 120px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      padding: 10px 36px 10px 14px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background:
+        linear-gradient(135deg, rgba(182, 164, 122, 0.18), rgba(0, 0, 0, 0)) padding-box,
+        linear-gradient(135deg, rgba(182, 164, 122, 0.35), rgba(0, 0, 0, 0.05)) border-box;
+      color: var(--ink);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath fill='%23a08655' d='M7 9L0 0h14z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      background-size: 12px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .education-row .education-month:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.25);
+    }
+
+    .education-row .education-year {
+      flex: 1 1 120px;
+      min-width: 110px;
+    }
+
     .language-row .language-name {
       flex: 1 1 200px;
       min-width: 160px;
@@ -600,6 +683,15 @@ label {
     }
 
     .language-row .remove-language {
+      border: none;
+      background: none;
+      color: var(--danger);
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 6px 10px;
+    }
+
+    .education-row .remove-education {
       border: none;
       background: none;
       color: var(--danger);
@@ -1040,6 +1132,452 @@ input[type="number"],
       align-items: stretch;
     }
 
+    body.paralegal-flat {
+      --paralegal-max-width: 1350px;
+      --paralegal-radius: 8px;
+    }
+
+    body.paralegal-flat .unified-header {
+      margin-bottom: 8px;
+    }
+
+    #paralegalSettings {
+      max-width: var(--paralegal-max-width);
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    body.paralegal-flat #profileSection {
+      background: transparent;
+      border: none;
+      padding: 0;
+      margin-bottom: 0;
+      box-shadow: none;
+      animation: none;
+    }
+
+    #paralegalSettings label {
+      font-weight: 400;
+      font-size: 0.95rem;
+    }
+
+    #paralegalSettings .profile-layout {
+      display: grid;
+      grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.6fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    #paralegalSettings .profile-sidebar,
+    #paralegalSettings .profile-main {
+      display: flex;
+      flex-direction: column;
+      gap: 38px;
+    }
+
+    #paralegalSettings .profile-sidebar {
+      padding-right: 24px;
+      border-right: 1px solid var(--line);
+    }
+
+    #paralegalSettings .profile-main {
+      padding-left: 24px;
+    }
+
+    #paralegalSettings .profile-photo-block {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+      align-items: center;
+    }
+
+    #paralegalSettings .hero-photo-shell {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #paralegalSettings .hero-photo {
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: var(--panel);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+    }
+
+    #paralegalSettings .hero-photo .avatar-frame {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      font-size: 2.2rem;
+    }
+
+    #paralegalSettings .hero-photo .avatar-frame span {
+      position: static;
+    }
+
+    #paralegalSettings .profile-meta-stack {
+      width: 100%;
+    }
+
+    #paralegalSettings .profile-meta-columns {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 24px;
+    }
+
+    #paralegalSettings .meta-column {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #paralegalSettings .profile-docs-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #paralegalSettings .profile-header {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    #paralegalSettings .profile-header-main {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+    }
+
+    #paralegalSettings .profile-identity {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #paralegalSettings .profile-role-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    #paralegalSettings .hero-eyebrow {
+      font-size: 0.75rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    #paralegalSettings .profile-name-input {
+      font-family: var(--font-serif);
+      font-size: 3rem;
+      font-weight: 300;
+      letter-spacing: 0.6px;
+      width: 100%;
+    }
+
+    #paralegalSettings .bio-input {
+      max-width: 520px;
+    }
+
+    #paralegalSettings .hero-meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
+      border-radius: 0;
+      background: transparent;
+      border: none;
+      font-size: 0.9rem;
+      color: var(--muted);
+      text-align: left;
+    }
+
+    #paralegalSettings .card-header-label {
+      font-size: 0.8rem;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    #paralegalSettings .section-header {
+      position: relative;
+      text-align: center;
+      margin-bottom: 16px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    #paralegalSettings .section-header .card-header-label {
+      margin: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    #paralegalSettings .section-edit-toggle {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      border: none;
+      background: transparent;
+      padding: 4px;
+      cursor: pointer;
+      color: var(--muted);
+    }
+
+    #paralegalSettings .section-edit-toggle svg {
+      display: block;
+      width: 14px;
+      height: 14px;
+    }
+
+    #paralegalSettings [data-edit-section] .section-edit {
+      display: none;
+    }
+
+    #paralegalSettings [data-edit-section].is-editing .section-edit {
+      display: block;
+    }
+
+    #paralegalSettings [data-edit-section].is-editing .section-display {
+      display: none;
+    }
+
+    #paralegalSettings .section-display-text {
+      margin: 0;
+      white-space: pre-line;
+    }
+
+    #paralegalSettings .section-display-text.is-placeholder {
+      color: var(--muted);
+    }
+
+    #paralegalSettings #documentsSection:not(.is-editing) .paralegal-doc-actions {
+      display: none;
+    }
+
+    #paralegalSettings .chip-section {
+      margin-top: 10px;
+    }
+
+    #paralegalSettings #skillsSection {
+      margin-bottom: 18px;
+    }
+
+    #paralegalSettings .chip-cloud,
+    #paralegalSettings .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    #paralegalSettings .doc-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0;
+      border-radius: 0;
+      border: none;
+      background: transparent;
+      text-decoration: none;
+      color: var(--accent);
+      font-size: 0.9rem;
+    }
+
+    #paralegalSettings .paralegal-doc-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 280px);
+      gap: 18px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    #paralegalSettings .paralegal-doc-row:last-child {
+      border-bottom: none;
+    }
+
+    #paralegalSettings .paralegal-doc-meta h3 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 400;
+    }
+
+    #paralegalSettings .paralegal-doc-meta p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    #paralegalSettings .paralegal-doc-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    #paralegalSettings .paralegal-doc-actions .file-trigger {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink);
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      font-weight: 300;
+      border-radius: var(--paralegal-radius);
+      letter-spacing: 0.02em;
+      text-transform: none;
+    }
+
+    #paralegalSettings .paralegal-doc-actions .file-trigger:hover {
+      background: rgba(0, 0, 0, 0.04);
+      transform: none;
+    }
+
+    body.theme-dark #paralegalSettings .paralegal-doc-actions .file-trigger:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    #paralegalSettings .full-name-hidden {
+      display: none;
+    }
+
+    #paralegalSettings .full-name-input {
+      width: 100%;
+    }
+
+    #paralegalSettings .full-name-input input {
+      width: 100%;
+    }
+
+    #paralegalSettings .btn-row {
+      justify-content: flex-end;
+    }
+
+    #paralegalSettings input[type="text"],
+    #paralegalSettings input[type="email"],
+    #paralegalSettings input[type="tel"],
+    #paralegalSettings input[type="url"],
+    #paralegalSettings input[type="password"],
+    #paralegalSettings input[type="number"],
+    #paralegalSettings textarea,
+    #paralegalSettings select,
+    #paralegalSettings .dropdown-toggle,
+    #paralegalSettings .language-row .language-level,
+    #paralegalSettings .education-row .education-month,
+    #paralegalSettings .file-trigger,
+    #paralegalSettings .btn,
+    #paralegalSettings .upload-card,
+    #paralegalSettings .avatar-frame {
+      border-radius: var(--paralegal-radius);
+    }
+
+    #paralegalSettings input[type="text"],
+    #paralegalSettings input[type="email"],
+    #paralegalSettings input[type="tel"],
+    #paralegalSettings input[type="url"],
+    #paralegalSettings input[type="password"],
+    #paralegalSettings input[type="number"],
+    #paralegalSettings textarea,
+    #paralegalSettings select {
+      font-weight: 300;
+      width: 100%;
+    }
+
+    #paralegalSettings input[type="text"],
+    #paralegalSettings input[type="email"],
+    #paralegalSettings input[type="tel"],
+    #paralegalSettings input[type="url"],
+    #paralegalSettings input[type="password"],
+    #paralegalSettings input[type="number"],
+    #paralegalSettings textarea,
+    #paralegalSettings select {
+      border: none;
+      background: transparent;
+      box-shadow: none;
+      padding: 0;
+    }
+
+    #paralegalSettings input:focus,
+    #paralegalSettings textarea:focus,
+    #paralegalSettings select:focus {
+      border: none;
+      box-shadow: none;
+      outline: none;
+    }
+
+    body.theme-dark #paralegalSettings input[type="text"],
+    body.theme-dark #paralegalSettings input[type="email"],
+    body.theme-dark #paralegalSettings input[type="tel"],
+    body.theme-dark #paralegalSettings input[type="url"],
+    body.theme-dark #paralegalSettings input[type="password"],
+    body.theme-dark #paralegalSettings input[type="number"],
+    body.theme-dark #paralegalSettings textarea,
+    body.theme-dark #paralegalSettings select {
+      background-color: transparent;
+      border: none;
+      box-shadow: none;
+      color: var(--ink);
+    }
+
+    #paralegalSettings input:disabled,
+    #paralegalSettings textarea:disabled,
+    #paralegalSettings select:disabled {
+      background-image: none;
+    }
+
+    @media (max-width: 960px) {
+      #paralegalSettings .profile-layout {
+        grid-template-columns: 1fr;
+      }
+
+      #paralegalSettings .profile-photo-block,
+      #paralegalSettings .profile-header {
+        align-items: center;
+        text-align: center;
+      }
+
+      #paralegalSettings .profile-meta-stack {
+        align-items: center;
+      }
+
+      #paralegalSettings .profile-meta-columns {
+        grid-template-columns: 1fr;
+      }
+
+      #paralegalSettings .profile-header-main {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      #paralegalSettings .profile-sidebar {
+        padding-right: 0;
+        border-right: none;
+      }
+
+      #paralegalSettings .profile-main {
+        padding-left: 0;
+      }
+
+      #paralegalSettings .profile-role-row {
+        justify-content: center;
+      }
+
+      #paralegalSettings .paralegal-doc-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .btn-row {
       display: flex;
       gap: 12px;
@@ -1267,7 +1805,7 @@ input[type="number"],
       <button id="navPreferences" class="settings-item" data-target="preferencesSection">Preferences</button>
       <button id="navDelete" class="settings-item" data-target="deleteSection">Delete Account</button>
     </nav>
-    <a class="btn btn-outline btn-light" href="dashboard-attorney.html" style="margin-top:auto;">Return to Dashboard</a>
+    <a class="btn btn-outline btn-light" id="dashboardReturnLink" href="dashboard-attorney.html" style="margin-top:auto;">Return to Dashboard</a>
   </aside>
 
   <main id="main" tabindex="-1" class="content">
@@ -1288,7 +1826,7 @@ input[type="number"],
             <div class="attorney-grid">
               <div class="avatar-block">
                 <div class="photo-row">
-                  <div class="avatar-frame avatar-frame--large" id="attorneyAvatarFrame" role="button" tabindex="0">
+                  <div class="avatar-frame avatar-frame--large" id="attorneyAvatarFrame" role="button" tabindex="0" aria-label="Upload attorney profile photo">
                     <img id="attorneyAvatarPreview" alt="Profile photo" hidden />
                     <span id="attorneyAvatarInitials">A</span>
                   </div>
@@ -1399,91 +1937,192 @@ input[type="number"],
           </div>
         </div>
 
-        <div class="actions-row">
+        <div class="actions-row" data-attorney-only>
           <button id="saveAttorneyProfile" class="btn btn-outline" type="button">Save changes</button>
           <button id="attorneyPreviewProfileBtn" class="btn btn-outline" type="button">View Profile</button>
         </div>
-      </div>
 
       <div id="paralegalSettings" class="role-settings hidden">
-        <form id="profileForm">
-          <div class="photo-row">
-            <div class="avatar-frame" id="avatarFrame" role="button" tabindex="0">
-              <img id="avatarPreview" data-avatar alt="Profile photo" />
-              <span id="avatarInitials">A</span>
-            </div>
-          </div>
+        <form id="profileForm" class="paralegal-profile-form">
+          <section class="profile-layout">
+            <aside class="profile-sidebar">
+              <div class="profile-photo-block">
+                <div class="hero-photo-shell">
+                  <div class="hero-photo">
+                    <div class="avatar-frame" id="avatarFrame" role="button" tabindex="0" aria-label="Upload profile photo">
+                      <img id="avatarPreview" data-avatar alt="Profile photo" />
+                      <span id="avatarInitials">A</span>
+                    </div>
+                  </div>
+                </div>
+                <input type="file" id="avatarInput" accept="image/*" hidden />
+                <div class="profile-meta-stack">
+                  <div class="profile-meta-columns">
+                    <div class="meta-column">
+                      <label class="hero-meta-pill" for="emailInput">Email</label>
+                      <input type="email" id="emailInput" name="email" autocomplete="email" required />
+                      <label class="hero-meta-pill" for="linkedInInput">LinkedIn</label>
+                      <input type="url" id="linkedInInput" name="linkedInURL" placeholder="https://www.linkedin.com/in/username" />
+                    </div>
+                    <div class="meta-column">
+                      <label class="hero-meta-pill" for="yearsExperienceInput">Years of Experience</label>
+                      <input type="number" id="yearsExperienceInput" min="0" placeholder="e.g., 5" />
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-          <input type="file" id="avatarInput" accept="image/*" hidden />
+              <article class="profile-section section-editable" id="educationCard" data-edit-section="education">
+                <div class="section-header">
+                  <span class="card-header-label">Education</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="education" aria-label="Edit education" aria-pressed="false">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M3 14.5V17h2.5l7.4-7.4-2.5-2.5L3 14.5z" fill="currentColor"/>
+                      <path d="M14.7 2.8l2.5 2.5 1-1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1 1z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="section-display" data-section-display="education">
+                  <p id="educationDisplay" class="section-display-text"></p>
+                </div>
+                <div class="section-edit" data-section-edit="education">
+                  <div id="educationEditor" class="education-editor"></div>
+                  <button type="button" class="btn btn-outline" id="addEducationBtn">Add education</button>
+                </div>
+              </article>
 
-          <div class="grid">
-            <label for="firstNameInput">
-              First name
-              <input type="text" id="firstNameInput" name="firstName" autocomplete="given-name" required />
-            </label>
-            <label for="lastNameInput">
-              Last name
-              <input type="text" id="lastNameInput" name="lastName" autocomplete="family-name" required />
-            </label>
-            <label for="emailInput">
-              Email
-              <input type="email" id="emailInput" name="email" autocomplete="email" required />
-            </label>
-            <div data-attorney-only class="field-block">
-              <label for="lawFirmInput">Law Firm</label>
-              <input type="text" id="lawFirmInput" name="lawFirm" autocomplete="organization" />
-            </div>
-            <div class="field-block">
-              <label for="linkedInInput">LinkedIn</label>
-              <input type="url" id="linkedInInput" name="linkedInURL" placeholder="https://www.linkedin.com/in/username" />
-            </div>
-            <div class="field-block" data-paralegal-only data-force-visible>
-              <label for="practiceAreasInput">Practice Areas (comma separated)</label>
-              <input type="text" id="practiceAreasInput" placeholder="Litigation, Family Law, Immigration" />
-            </div>
-            <div class="field-block" data-paralegal-only>
-              <label for="yearsExperienceInput">Years of Experience</label>
-              <input type="number" id="yearsExperienceInput" min="0" placeholder="e.g., 5" />
-            </div>
-            <div class="field-block" data-paralegal-only>
-              <label for="skillsInput">Skills (comma separated)</label>
-              <input type="text" id="skillsInput" placeholder="Legal Research, Drafting, Discovery" />
-            </div>
-            <div class="field-block full-width" data-paralegal-only data-force-visible>
-              <label for="educationInput">Education (one per line)</label>
-              <textarea id="educationInput" placeholder="B.A. Criminal Justice — UCLA
-Paralegal Certificate — UCSD"></textarea>
-            </div>
-            <div class="field-block full-width" data-paralegal-only>
-              <label for="experienceInput">Experience Timeline (one per line)</label>
-              <textarea id="experienceInput" placeholder="Paralegal at Smith & Co. (2020–2023)
+              <article class="profile-section section-editable" id="skillsCard" data-edit-section="skills">
+                <div class="section-header">
+                  <span class="card-header-label">Skills &amp; Focus Areas</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="skills" aria-label="Edit skills and focus areas" aria-pressed="false">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M3 14.5V17h2.5l7.4-7.4-2.5-2.5L3 14.5z" fill="currentColor"/>
+                      <path d="M14.7 2.8l2.5 2.5 1-1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1 1z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="section-display" data-section-display="skills">
+                  <p id="skillsDisplay" class="section-display-text"></p>
+                </div>
+                <div class="section-edit" data-section-edit="skills">
+                  <div class="chip-section" id="skillsSection">
+                    <span class="card-header-label" style="text-align:center; width:100%;">Skills</span>
+                    <input type="text" id="skillsInput" placeholder="Legal Research, Drafting, Discovery" />
+                  </div>
+                  <div class="chip-section" id="practiceSection">
+                    <span class="card-header-label" style="text-align:center; width:100%;">Focus Areas</span>
+                    <input type="text" id="practiceAreasInput" placeholder="Litigation, Family Law, Immigration" />
+                  </div>
+                </div>
+              </article>
+
+              <article class="profile-section section-editable" id="languagesRow" data-edit-section="languages">
+                <div class="section-header">
+                  <span class="card-header-label">Languages</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="languages" aria-label="Edit languages" aria-pressed="false">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M3 14.5V17h2.5l7.4-7.4-2.5-2.5L3 14.5z" fill="currentColor"/>
+                      <path d="M14.7 2.8l2.5 2.5 1-1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1 1z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="section-display" data-section-display="languages">
+                  <p id="languagesDisplay" class="section-display-text"></p>
+                </div>
+                <div class="section-edit" data-section-edit="languages">
+                  <div id="languagesEditor" class="language-editor"></div>
+                  <button type="button" class="btn btn-outline" id="addLanguageBtn">Add language</button>
+                </div>
+              </article>
+            </aside>
+
+            <section class="profile-main">
+              <section class="profile-header" aria-label="Paralegal profile">
+                <div class="profile-header-main">
+                  <div class="profile-identity">
+                    <div class="hero-eyebrow">Paralegal profile</div>
+                    <div class="full-name-input">
+                      <input type="text" id="fullNameInput" name="fullName" autocomplete="name" required aria-label="Full name" class="profile-name-input" />
+                    </div>
+                    <div class="full-name-hidden">
+                      <input type="text" id="firstNameInput" name="firstName" autocomplete="given-name" required />
+                      <input type="text" id="lastNameInput" name="lastName" autocomplete="family-name" required />
+                    </div>
+                    <div class="profile-role-row">
+                      <span id="roleLine"></span>
+                    </div>
+                    <div class="profile-section section-editable" id="bioSection" data-edit-section="bio">
+                      <div class="section-header">
+                        <span class="card-header-label">Bio</span>
+                        <button class="section-edit-toggle" type="button" data-edit-toggle="bio" aria-label="Edit bio" aria-pressed="false">
+                          <svg viewBox="0 0 20 20" aria-hidden="true">
+                            <path d="M3 14.5V17h2.5l7.4-7.4-2.5-2.5L3 14.5z" fill="currentColor"/>
+                            <path d="M14.7 2.8l2.5 2.5 1-1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1 1z" fill="currentColor"/>
+                          </svg>
+                        </button>
+                      </div>
+                      <div class="section-display" data-section-display="bio">
+                        <p id="bioDisplay" class="section-display-text"></p>
+                      </div>
+                      <div class="section-edit" data-section-edit="bio">
+                        <label class="hero-meta-pill" for="bioInput">Bio (optional)</label>
+                        <textarea id="bioInput" name="bio" class="bio-input"></textarea>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <article class="profile-section section-editable" id="experienceCard" data-edit-section="experience">
+                <div class="section-header">
+                  <span class="card-header-label">Experience</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="experience" aria-label="Edit experience" aria-pressed="false">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M3 14.5V17h2.5l7.4-7.4-2.5-2.5L3 14.5z" fill="currentColor"/>
+                      <path d="M14.7 2.8l2.5 2.5 1-1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1 1z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="section-display" data-section-display="experience">
+                  <p id="experienceDisplay" class="section-display-text"></p>
+                </div>
+                <div class="section-edit" data-section-edit="experience">
+                  <textarea id="experienceInput" placeholder="Paralegal at Smith & Co. (2020–2023)
 Legal Assistant at..."></textarea>
-            </div>
-            <div class="field-block full-width" data-paralegal-only data-force-visible>
-              <label>Languages &amp; proficiency</label>
-              <div id="languagesEditor" class="language-editor"></div>
-              <button type="button" class="btn btn-outline" id="addLanguageBtn">Add language</button>
-            </div>
-            <div class="field-block" data-paralegal-only id="settingsCertificate"></div>
-            <div class="field-block" data-paralegal-only id="settingsResume"></div>
-            <div class="field-block" data-paralegal-only id="settingsWritingSample"></div>
-          </div>
-          <label for="bioInput">
-            Bio (optional)
-            <textarea id="bioInput" name="bio"></textarea>
-          </label>
-          <div class="btn-row">
+                </div>
+              </article>
+
+              <article class="profile-section section-editable" id="documentsSection" data-edit-section="documents">
+                <div class="section-header">
+                  <span class="card-header-label">Documents</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="documents" aria-label="Edit documents" aria-pressed="false">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M3 14.5V17h2.5l7.4-7.4-2.5-2.5L3 14.5z" fill="currentColor"/>
+                      <path d="M14.7 2.8l2.5 2.5 1-1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1 1z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="profile-docs-stack">
+                  <div class="field-block" data-paralegal-only id="settingsCertificate"></div>
+                  <div class="field-block" data-paralegal-only id="settingsResume"></div>
+                  <div class="field-block" data-paralegal-only id="settingsWritingSample"></div>
+                </div>
+              </article>
+            </section>
+          </section>
+
+          <div class="btn-row paralegal-actions">
             <button class="btn btn-primary" type="button" id="profileSaveBtn">Save changes</button>
             <button class="btn btn-outline" type="button" id="previewProfileBtn">
     View Profile
   </button>
           </div>
         </form>
-
-        <section class="settings-panel" id="settingsResume" data-paralegal-only></section>
-        <section class="settings-panel" id="settingsSkills" data-paralegal-only></section>
-        <section class="settings-panel" id="settingsEducation" data-paralegal-only></section>
-        <section class="settings-panel" id="settingsAwards" data-paralegal-only></section>
+        <div class="hidden" aria-hidden="true">
+          <section class="settings-panel" id="settingsSkills" data-paralegal-only></section>
+          <section class="settings-panel" id="settingsEducation" data-paralegal-only></section>
+          <section class="settings-panel" id="settingsAwards" data-paralegal-only></section>
+        </div>
       </div>
     </section>
 
@@ -1537,6 +2176,16 @@ Legal Assistant at..."></textarea>
           <input type="checkbox" id="paralegalCaseUpdates">
           <span class="slider"></span>
         </label>
+      </div>
+      <div class="pref-row">
+        <label for="fontSizePreference">Font size</label>
+        <select id="fontSizePreference">
+          <option value="xs">Extra Small</option>
+          <option value="sm">Small</option>
+          <option value="md" selected>Medium</option>
+          <option value="lg">Large</option>
+          <option value="xl">Extra Large</option>
+        </select>
       </div>
       <input type="hidden" id="themePreference" value="mountain" />
       <div class="theme-preview-grid" role="radiogroup" aria-label="Theme previews">

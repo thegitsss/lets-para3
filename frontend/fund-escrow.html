@@ -4,10 +4,40 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hire &amp; Start Work</title>
-  <link rel="stylesheet" href="assets/styles/main.css">
+  <meta name="theme-color" content="#0B2A4A">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Sarabun:wght@200&display=swap" rel="stylesheet" />
   <script src="https://js.stripe.com/v3/"></script>
 
   <style>
+    :root {
+      --bg: #f8f6f1;
+      --card: #ffffff;
+      --ink: #1a1a1a;
+      --muted: #6b7280;
+      --line: #e8e2d6;
+      --accent: #b6a47a;
+      --danger: #b00020;
+      --font-serif: "Cormorant Garamond", serif;
+      --font-sans: "Sarabun", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-weight: 200;
+      color: var(--ink);
+      background: var(--bg);
+    }
+
     .skip-link {
       position: absolute;
       left: 12px;
@@ -24,28 +54,182 @@
     .skip-link:focus {
       top: 12px;
     }
+
+    .fund-wrap {
+      max-width: 720px;
+      margin: 64px auto;
+      padding: 0 24px;
+    }
+
+    .fund-card {
+      background: var(--card);
+      border-radius: 18px;
+      padding: 32px;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+      border: 1px solid rgba(182, 164, 122, 0.14);
+    }
+
+    .fund-title {
+      margin: 0 0 10px;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 2.25rem;
+      color: #27394d;
+      text-align: center;
+    }
+
+    .fund-subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .fund-meta {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .fund-status {
+      margin: 6px 0 0;
+      color: #8a8a8a;
+      font-size: 0.95rem;
+    }
+
+    .amount-box {
+      margin: 24px 0;
+      padding: 18px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: #fcfbf9;
+    }
+
+    .amount-label {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #8a8a8a;
+    }
+
+    .amount-value {
+      margin-top: 6px;
+      font-size: 1.6rem;
+      font-weight: 400;
+      font-family: "Times New Roman", Times, serif;
+      color: #27394d;
+    }
+
+    .section-title {
+      margin: 18px 0 8px;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 1.4rem;
+      color: #27394d;
+    }
+
+    #card-element {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #ffffff;
+    }
+
+    .status-text {
+      margin-top: 12px;
+      min-height: 1.25rem;
+      color: var(--danger);
+      font-size: 0.95rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 20px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-size: 0.85rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .btn.primary {
+      background: #27394d;
+      color: #ffffff;
+      box-shadow: 0 10px 20px rgba(39, 57, 77, 0.18);
+    }
+
+    .btn.primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn.primary:not(:disabled):hover {
+      transform: translateY(-1px);
+    }
+
+    .btn.secondary {
+      background: transparent;
+      color: #27394d;
+      border-color: rgba(39, 57, 77, 0.35);
+    }
+
+    .btn.secondary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 16px rgba(39, 57, 77, 0.12);
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    @media (max-width: 600px) {
+      .fund-wrap {
+        margin: 40px auto;
+      }
+      .fund-card {
+        padding: 24px;
+      }
+      .fund-title {
+        font-size: 1.9rem;
+      }
+    }
   </style>
 </head>
 <body class="dash">
   <a class="skip-link" href="#main">Skip to main content</a>
-  <main id="main" tabindex="-1" class="container" style="max-width:640px;margin:2rem auto;padding:1.5rem;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
-    <h1 style="margin-top:0;">Hire &amp; Start Work</h1>
-    <p id="caseTitle" style="color:#444;margin-bottom:0.5rem;"></p>
-    <p id="caseStatus" style="color:#888;margin-top:0;"></p>
+  <main id="main" tabindex="-1" class="fund-wrap">
+    <section class="fund-card">
+      <h1 class="fund-title">Hire &amp; Start Work</h1>
+      <p id="caseTitle" class="fund-subtitle"></p>
+      <p id="caseParalegal" class="fund-meta"></p>
 
-    <div id="amountBox" style="margin:1rem 0;padding:1rem;border:1px solid #eee;border-radius:10px;background:#fafafa;">
-      <div style="font-size:0.9rem;color:#666;">Locked Amount</div>
-      <div id="lockedAmount" style="font-size:1.4rem;font-weight:600;">—</div>
-    </div>
+      <div id="amountBox" class="amount-box">
+        <div class="amount-label">Locked Amount</div>
+        <div id="lockedAmount" class="amount-value">—</div>
+      </div>
 
-    <div id="paymentPane" style="display:none;">
-      <p style="margin-bottom:0.5rem;">Payment Method</p>
-      <div id="card-element" style="padding:0.75rem;border:1px solid #ddd;border-radius:8px;"></div>
-      <div id="card-errors" role="alert" style="color:#b00020;margin-top:0.5rem;min-height:1.25rem;"></div>
-      <button id="fundBtn" class="btn primary" style="margin-top:1rem;">Hire &amp; Start Work</button>
-    </div>
+      <div id="paymentPane" style="display:none;">
+        <div class="section-title">Payment Method</div>
+        <div id="card-element"></div>
+        <div id="card-errors" role="alert" class="status-text"></div>
+        <div class="action-row">
+          <button id="fundBtn" class="btn primary">Hire &amp; Start Work</button>
+        </div>
+      </div>
 
-    <div id="statusMsg" style="margin-top:1rem;color:#b00020;"></div>
+      <div id="statusMsg" class="status-text"></div>
+      <div class="action-row">
+        <button id="cancelBtn" class="btn secondary" type="button">Cancel</button>
+      </div>
+    </section>
   </main>
 
   <script type="module" src="assets/scripts/fund-escrow.js"></script>

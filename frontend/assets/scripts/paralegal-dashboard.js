@@ -1,4 +1,10 @@
 import { secureFetch } from "./auth.js";
+import {
+  getStripeConnectStatus,
+  isStripeConnected,
+  startStripeOnboarding,
+  STRIPE_GATE_MESSAGE,
+} from "./utils/stripe-connect.js";
 
 const PLACEHOLDER_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
   `<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'>
@@ -24,6 +30,14 @@ function normalizeIdCandidate(value) {
   if (typeof value === "string") return value;
   if (typeof value === "object") return value._id || value.id || value.userId || "";
   return "";
+}
+
+function formatStatusLabel(value) {
+  const cleaned = String(value || "").trim();
+  if (!cleaned) return "";
+  const lower = cleaned.toLowerCase();
+  if (lower === "assigned") return "Invited";
+  return cleaned.replace(/_/g, " ");
 }
 
 function deriveAttorneyId(invite = {}) {
@@ -69,6 +83,15 @@ const selectors = {
   inviteDeclineBtn: document.getElementById('inviteDeclineBtn'),
 };
 
+const appliedFilters = {
+  search: document.getElementById('appliedSearch'),
+  status: document.getElementById('appliedStatusFilter'),
+  practice: document.getElementById('appliedPracticeFilter'),
+  dateRange: document.getElementById('appliedDateFilter'),
+  toggle: document.getElementById('appliedToggleBtn'),
+  count: document.getElementById('appliedCount'),
+};
+
 const JSON_HEADERS = { Accept: 'application/json' };
 
 async function fetchJson(url, options = {}) {
@@ -91,11 +114,92 @@ async function fetchJson(url, options = {}) {
 let viewerProfile = null;
 let latestMessageThread = null;
 let unreadMessageCount = 0;
+let stripeConnected = false;
+let stripeGateBound = false;
+let appliedAppsCache = [];
+let appliedShowAll = false;
+let appliedFiltersBound = false;
+const DEFAULT_APPLIED_LIMIT = 10;
+const applicationModal = document.getElementById('applicationDetailModal');
+const applicationDetail = applicationModal?.querySelector('[data-application-detail]');
+let applicationModalBound = false;
+let appliedPreviewBound = false;
+let appliedQueryHandled = false;
+
+function notifyStripeGate(message = STRIPE_GATE_MESSAGE) {
+  const toastHelper = window.toastUtils;
+  if (toastHelper?.show && selectors.toastBanner) {
+    toastHelper.show(message, { targetId: selectors.toastBanner.id, type: "info" });
+    return;
+  }
+  alert(message);
+}
+
+function applyStripeGateToApplyActions() {
+  const disabled = !stripeConnected;
+  document.querySelectorAll("[data-stripe-apply]").forEach((el) => {
+    if (el.tagName === "BUTTON") {
+      el.disabled = disabled;
+    } else {
+      el.setAttribute("aria-disabled", disabled ? "true" : "false");
+    }
+    if (disabled) {
+      el.setAttribute("title", STRIPE_GATE_MESSAGE);
+    } else {
+      el.removeAttribute("title");
+      el.removeAttribute("aria-disabled");
+    }
+  });
+  if (!stripeGateBound) {
+    stripeGateBound = true;
+    document.addEventListener("click", (event) => {
+      const target = event.target?.closest?.("[data-stripe-apply]");
+      if (!target || stripeConnected) return;
+      event.preventDefault();
+      event.stopPropagation();
+      notifyStripeGate();
+    });
+  }
+}
 
 async function loadViewerProfile() {
   const profile = await fetchJson('/api/users/me');
   viewerProfile = profile || null;
   return profile;
+}
+
+async function loadStripeStatus() {
+  const banner = document.getElementById("stripeGateBanner");
+  const message = document.querySelector("[data-stripe-gate-message]");
+  const cta = document.getElementById("stripeConnectCta");
+  if (cta && !cta.dataset.bound) {
+    cta.dataset.bound = "true";
+    cta.addEventListener("click", async () => {
+      const original = cta.textContent || "Connect Stripe";
+      cta.disabled = true;
+      cta.textContent = "Connecting...";
+      try {
+        await startStripeOnboarding();
+      } catch (err) {
+        console.error("Stripe connect failed", err);
+        alert(err?.message || "Unable to start Stripe onboarding.");
+        cta.disabled = false;
+        cta.textContent = original;
+      }
+    });
+  }
+  if (!banner && !message) return null;
+
+  const data = await getStripeConnectStatus({ force: true });
+  stripeConnected = isStripeConnected(data);
+  if (banner) banner.classList.toggle("hidden", stripeConnected);
+  if (message && !stripeConnected) {
+    message.textContent = data
+      ? "Stripe Connect is required to receive payment for completed assignments. You can manage payouts later in Profile Settings."
+      : "Stripe status unavailable. Connect Stripe to receive payment.";
+  }
+  applyStripeGateToApplyActions();
+  return data;
 }
 
 async function fetchParalegalData() {
@@ -200,7 +304,8 @@ function renderAssignments(assignments = []) {
 
     const attorney = assignment.attorney ? `Lead Attorney: ${assignment.attorney}` : '';
     const due = assignment.due ? `Due: ${assignment.due}` : '';
-    const status = assignment.status ? `Status: ${assignment.status}` : '';
+    const statusLabel = assignment.status ? formatStatusLabel(assignment.status) : '';
+    const status = statusLabel ? `Status: ${statusLabel}` : '';
     const metaParts = [attorney, due, status].filter(Boolean);
 
     titleEl.textContent = assignment.title || 'Case';
@@ -247,7 +352,7 @@ function mapActiveCasesToAssignments(activeCases = []) {
       : caseItem.createdAt
         ? new Date(caseItem.createdAt).toLocaleDateString()
         : '',
-    status: caseItem.status ? caseItem.status.replace(/_/g, ' ') : '',
+    status: caseItem.status ? formatStatusLabel(caseItem.status) : '',
     summary: caseItem.practiceArea ? `Practice area: ${caseItem.practiceArea}` : '',
   }));
 }
@@ -322,6 +427,11 @@ function renderInvites(invites = []) {
     acceptBtn.textContent = 'Accept';
     acceptBtn.dataset.inviteAction = 'accept';
     acceptBtn.dataset.caseId = invite.id || invite._id;
+    acceptBtn.dataset.stripeApply = "true";
+    if (!stripeConnected) {
+      acceptBtn.disabled = true;
+      acceptBtn.title = STRIPE_GATE_MESSAGE;
+    }
     const declineBtn = document.createElement('button');
     declineBtn.textContent = 'Decline';
     declineBtn.dataset.inviteAction = 'decline';
@@ -348,10 +458,15 @@ function renderInvites(invites = []) {
   footer.className = 'info-line';
   footer.innerHTML = '<a href="browse-jobs.html" class="card-link">Browse new postings →</a>';
   container.appendChild(footer);
+  applyStripeGateToApplyActions();
 }
 
 async function respondToInvite(caseId, action, button) {
   if (!caseId || !action) return;
+  if (action === "accept" && !stripeConnected) {
+    notifyStripeGate();
+    return;
+  }
   const endpoint = `/api/cases/${encodeURIComponent(caseId)}/invite/${action}`;
   const originalLabel = button?.textContent;
   if (button) {
@@ -409,18 +524,26 @@ async function loadAssignedCases() {
 function renderAssignedCases(items = []) {
   const list = selectors.assignedCasesList;
   if (!list) return;
-  if (!items.length) {
-    list.innerHTML = '<p>No assigned cases.</p>';
+  const visibleItems = items.filter((item) => String(item?.status || '').toLowerCase() !== 'completed');
+  if (!visibleItems.length) {
+    list.innerHTML = `
+      <div class="dashboard-card full-width" id="recommendedPostingsCard">
+        <h3 class="card-title">Recommended for You</h3>
+        <ul class="recommendations-list"></ul>
+        <a href="browse-jobs.html" class="card-link">Browse all postings →</a>
+      </div>
+    `;
+    void loadRecommendedJobs(viewerProfile || {});
     return;
   }
-  list.innerHTML = items
+  list.innerHTML = visibleItems
     .map(
       (c) => {
         const funded = String(c.escrowStatus || '').toLowerCase() === 'funded';
         const buttonLabel = funded ? 'Open Case' : 'Awaiting Attorney Funding';
         const disabledAttr = funded ? '' : ' disabled aria-disabled="true"';
         const statusValue = String(c.status || 'Active');
-        const statusLabel = statusValue.replace(/_/g, ' ').replace(/\s+/g, ' ').trim() || 'Active';
+        const statusLabel = formatStatusLabel(statusValue).replace(/\s+/g, ' ').trim() || 'Active';
         const statusKey = statusValue.toLowerCase().replace(/\s+/g, '_');
         const canWithdraw = !funded && statusKey === 'awaiting_funding';
         return `
@@ -552,7 +675,7 @@ function openInviteOverlay(invite) {
     [invite?.attorney?.firstName, invite?.attorney?.lastName].filter(Boolean).join(' ').trim() ||
     'Attorney';
   const practice = invite?.practiceArea || 'General matter';
-  const status = invite?.status ? invite.status.replace(/_/g, ' ') : '';
+  const status = invite?.status ? formatStatusLabel(invite.status) : '';
   const numericBudget = typeof invite?.budget === 'number' ? invite.budget : Number.NaN;
   const pay =
     (Number.isFinite(numericBudget) && `$${numericBudget.toLocaleString()} compensation`) ||
@@ -614,7 +737,13 @@ function openInviteOverlay(invite) {
   const caseId = invite?.id || invite?._id || '';
   if (inviteAcceptBtn) {
     inviteAcceptBtn.dataset.caseId = caseId;
-    inviteAcceptBtn.disabled = !caseId;
+    inviteAcceptBtn.dataset.stripeApply = "true";
+    inviteAcceptBtn.disabled = !caseId || !stripeConnected;
+    if (!stripeConnected) {
+      inviteAcceptBtn.title = STRIPE_GATE_MESSAGE;
+    } else {
+      inviteAcceptBtn.removeAttribute("title");
+    }
   }
   if (inviteDeclineBtn) {
     inviteDeclineBtn.dataset.caseId = caseId;
@@ -632,9 +761,16 @@ function closeInviteOverlay() {
 function updateProfile(profile = {}) {
   const composedName =
     [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim() || profile.name || 'Paralegal';
+  const firstName =
+    String(profile.firstName || '')
+      .trim() ||
+    String(profile.name || composedName)
+      .trim()
+      .split(/\s+/)[0] ||
+    'Paralegal';
   setField('name', composedName);
   if (selectors.nameHeading) {
-    selectors.nameHeading.textContent = composedName;
+    selectors.nameHeading.textContent = firstName;
   }
   const avatarUrl = getAvatarUrl(profile);
   document.querySelectorAll('[data-avatar]').forEach((node) => {
@@ -802,6 +938,173 @@ function escapeHtml(value = '') {
     .replace(/'/g, '&#039;');
 }
 
+function formatDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Recently';
+  return date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function formatMultiline(value) {
+  if (!value) return '';
+  return escapeHtml(value).replace(/\r?\n/g, '<br>');
+}
+
+function buildApplicationDetail(app) {
+  if (!app) {
+    return '<p class="muted">Application not found.</p>';
+  }
+  const job = app.jobId || app.job || {};
+  const title = escapeHtml(job.title || app.caseTitle || 'Job');
+  const practice = escapeHtml(job.practiceArea || 'General practice');
+  const description = escapeHtml(job.description || '');
+  const budgetValue = Number(job.budget);
+  const budget = job.compensationDisplay || job.payDisplay || (Number.isFinite(budgetValue) ? formatCurrency(budgetValue) : '');
+  const status = formatApplicationStatus(normalizeApplicationStatus(app.status));
+  const appliedAt = app.createdAt ? formatDate(app.createdAt) : 'Recently';
+  const cover = formatMultiline(app.coverLetter || '');
+
+  return `
+    <div class="detail-row">
+      <span class="detail-label">Job</span>
+      <span class="detail-value">${title}</span>
+    </div>
+    <div class="detail-row">
+      <span class="detail-label">Practice area</span>
+      <span class="detail-value">${practice}</span>
+    </div>
+    ${description ? `
+      <div class="detail-row">
+        <span class="detail-label">Summary</span>
+        <span class="detail-value">${description}</span>
+      </div>
+    ` : ''}
+    ${budget ? `
+      <div class="detail-row">
+        <span class="detail-label">Budget</span>
+        <span class="detail-value">${budget}</span>
+      </div>
+    ` : ''}
+    <div class="detail-row">
+      <span class="detail-label">Status</span>
+      <span class="detail-value">${escapeHtml(status)}</span>
+    </div>
+    <div class="detail-row">
+      <span class="detail-label">Applied on</span>
+      <span class="detail-value">${escapeHtml(appliedAt)}</span>
+    </div>
+    <div class="application-cover">
+      <strong>Cover message</strong>
+      <p>${cover || 'No cover message available.'}</p>
+    </div>
+  `;
+}
+
+function findAppliedApplication(applicationId, jobId) {
+  const appId = String(applicationId || '');
+  const jobKey = String(jobId || '');
+  return appliedAppsCache.find((app) => {
+    const id = String(app._id || app.id || '');
+    if (appId && id === appId) return true;
+    if (!jobKey) return false;
+    const appJobId = String(app.jobId?._id || app.jobId || '');
+    return appJobId === jobKey;
+  });
+}
+
+function setApplicationQuery(appId, jobId) {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('applicationId');
+    url.searchParams.delete('appId');
+    url.searchParams.delete('jobId');
+    if (appId) {
+      url.searchParams.set('applicationId', appId);
+    } else if (jobId) {
+      url.searchParams.set('jobId', jobId);
+    }
+    if (url.hash !== '#cases') {
+      url.hash = '#cases';
+    }
+    window.history.replaceState({}, '', url.toString());
+  } catch {}
+}
+
+function clearApplicationQuery() {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('applicationId');
+    url.searchParams.delete('appId');
+    url.searchParams.delete('jobId');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  } catch {}
+}
+
+function openApplicationModal(app) {
+  if (!applicationModal || !applicationDetail) return;
+  if (window.location.hash !== '#cases') return;
+  applicationDetail.innerHTML = buildApplicationDetail(app);
+  applicationModal.classList.remove('hidden');
+}
+
+function closeApplicationModal() {
+  if (!applicationModal) return;
+  applicationModal.classList.add('hidden');
+  clearApplicationQuery();
+}
+
+function bindApplicationModal() {
+  if (!applicationModal || applicationModalBound) return;
+  applicationModalBound = true;
+  applicationModal.querySelectorAll('[data-application-close]').forEach((btn) => {
+    btn.addEventListener('click', closeApplicationModal);
+  });
+  applicationModal.addEventListener('click', (event) => {
+    if (event.target === applicationModal) {
+      closeApplicationModal();
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !applicationModal.classList.contains('hidden')) {
+      closeApplicationModal();
+    }
+  });
+  window.addEventListener('hashchange', () => {
+    if (window.location.hash !== '#cases') {
+      closeApplicationModal();
+    }
+  });
+}
+
+function bindAppliedPreviewActions() {
+  if (appliedPreviewBound) return;
+  const container = document.getElementById('appliedJobsList');
+  if (!container) return;
+  appliedPreviewBound = true;
+  container.addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-application-view]');
+    if (!trigger || !applicationModal || !applicationDetail) return;
+    event.preventDefault();
+    const appId = trigger.dataset.applicationId || '';
+    const jobId = trigger.dataset.jobId || '';
+    const match = findAppliedApplication(appId, jobId);
+    setApplicationQuery(appId, jobId);
+    openApplicationModal(match);
+  });
+}
+
+function maybeOpenApplicationFromQuery() {
+  if (appliedQueryHandled) return;
+  if (window.location.hash !== '#cases') return;
+  if (!applicationModal || !applicationDetail) return;
+  const params = new URLSearchParams(window.location.search);
+  const applicationId = (params.get('applicationId') || params.get('appId') || '').trim();
+  const jobId = (params.get('jobId') || '').trim();
+  if (!applicationId && !jobId) return;
+  appliedQueryHandled = true;
+  const match = findAppliedApplication(applicationId, jobId);
+  openApplicationModal(match);
+}
+
 async function loadRecommendedJobs(profile = {}) {
   const list = document.querySelector('#recommendedPostingsCard .recommendations-list');
   if (!list) return;
@@ -866,6 +1169,8 @@ async function loadAppliedJobs() {
   const container = document.getElementById('appliedJobsList');
   if (!container) return;
   container.innerHTML = '';
+  bindApplicationModal();
+  bindAppliedPreviewActions();
   const loading = document.createElement('div');
   loading.className = 'case-card';
   loading.innerHTML = '<div class="case-header"><div><h2>Loading applications…</h2></div></div>';
@@ -874,44 +1179,15 @@ async function loadAppliedJobs() {
   try {
     const res = await secureFetch('/api/applications/my', { headers: { Accept: 'application/json' } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const apps = await res.json();
-    if (!Array.isArray(apps) || !apps.length) {
-      container.innerHTML = `
-        <div class="case-card empty-state">
-          <div class="case-header">
-            <div>
-              <h2>No applications yet</h2>
-              <div class="case-subinfo">Jobs you apply to will appear here.</div>
-            </div>
-          </div>
-        </div>`;
-      return;
-    }
-    container.innerHTML = apps
-      .map((app) => {
-        const job = app.jobId || {};
-        const title = escapeHtml(job.title || 'Untitled job');
-        const practice = escapeHtml(job.practiceArea || 'General practice');
-        const when = app.createdAt
-          ? new Date(app.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
-          : 'Recently';
-        const href = job._id || job.id ? `browse-jobs.html?id=${encodeURIComponent(job._id || job.id)}` : 'browse-jobs.html';
-        return `
-          <div class="case-card applied-card">
-            <div class="case-header">
-              <div>
-                <h2>${title}</h2>
-                <div class="case-subinfo">${practice}</div>
-                <div class="case-subinfo">Applied on ${when}</div>
-              </div>
-              <div class="case-actions">
-                <a class="card-link" href="${href}">View →</a>
-              </div>
-            </div>
-          </div>
-        `;
-      })
-      .join('');
+    const payload = await res.json().catch(() => []);
+    const apps = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
+    const visibleApps = apps.filter((app) => normalizeApplicationStatus(app.status) !== 'accepted');
+    appliedAppsCache = visibleApps;
+    appliedShowAll = false;
+    bindAppliedFilters();
+    populateAppliedFilterOptions(visibleApps);
+    applyAppliedFilters();
+    maybeOpenApplicationFromQuery();
   } catch (err) {
     console.error('Failed to load applied jobs', err);
     container.innerHTML = `
@@ -923,15 +1199,200 @@ async function loadAppliedJobs() {
           </div>
         </div>
       </div>`;
+    updateAppliedCount(0, 0, true);
+    maybeOpenApplicationFromQuery();
   }
+}
+
+function bindAppliedFilters() {
+  if (appliedFiltersBound) return;
+  const { search, status, practice, dateRange, toggle } = appliedFilters;
+  if (!search || !status || !practice || !dateRange || !toggle) return;
+  appliedFiltersBound = true;
+  search.addEventListener('input', () => applyAppliedFilters());
+  status.addEventListener('change', () => applyAppliedFilters());
+  practice.addEventListener('change', () => applyAppliedFilters());
+  dateRange.addEventListener('change', () => applyAppliedFilters());
+  toggle.addEventListener('click', () => {
+    appliedShowAll = !appliedShowAll;
+    applyAppliedFilters();
+  });
+}
+
+function populateAppliedFilterOptions(apps = []) {
+  const { status, practice } = appliedFilters;
+  if (!status || !practice) return;
+
+  const currentStatus = status.value || 'all';
+  const currentPractice = practice.value || 'all';
+
+  const statusValues = new Set();
+  const practiceValues = new Set();
+  apps.forEach((app) => {
+    statusValues.add(normalizeApplicationStatus(app.status));
+    const job = app.jobId || {};
+    const area = String(job.practiceArea || '').trim();
+    if (area) practiceValues.add(area);
+  });
+
+  const statusOptions = Array.from(statusValues).filter(Boolean).sort();
+  const practiceOptions = Array.from(practiceValues).sort((a, b) => a.localeCompare(b));
+
+  status.innerHTML = `<option value="all">All statuses</option>` +
+    statusOptions.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(formatApplicationStatus(value))}</option>`).join('');
+  practice.innerHTML = `<option value="all">All practice areas</option>` +
+    practiceOptions.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
+
+  if (statusOptions.includes(currentStatus)) status.value = currentStatus;
+  if (practiceOptions.includes(currentPractice)) practice.value = currentPractice;
+}
+
+function applyAppliedFilters() {
+  const container = document.getElementById('appliedJobsList');
+  if (!container) return;
+
+  const { search, status, practice, dateRange } = appliedFilters;
+  const query = String(search?.value || '').trim().toLowerCase();
+  const statusFilter = String(status?.value || 'all');
+  const practiceFilter = String(practice?.value || 'all');
+  const rangeFilter = String(dateRange ? dateRange.value : 'all');
+
+  let filtered = [...appliedAppsCache];
+
+  if (query) {
+    filtered = filtered.filter((app) => {
+      const job = app.jobId || {};
+      const title = String(job.title || '').toLowerCase();
+      const area = String(job.practiceArea || '').toLowerCase();
+      return title.includes(query) || area.includes(query);
+    });
+  }
+
+  if (statusFilter !== 'all') {
+    filtered = filtered.filter((app) => normalizeApplicationStatus(app.status) === statusFilter);
+  }
+
+  if (practiceFilter !== 'all') {
+    filtered = filtered.filter((app) => {
+      const job = app.jobId || {};
+      return String(job.practiceArea || '') === practiceFilter;
+    });
+  }
+
+  if (rangeFilter !== 'all') {
+    const days = Number(rangeFilter);
+    if (Number.isFinite(days)) {
+      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+      filtered = filtered.filter((app) => {
+        const createdAt = new Date(app.createdAt || 0).getTime();
+        return Number.isFinite(createdAt) && createdAt >= cutoff;
+      });
+    }
+  }
+
+  filtered.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+  const total = filtered.length;
+  const limited = appliedShowAll ? filtered : filtered.slice(0, DEFAULT_APPLIED_LIMIT);
+  renderAppliedJobs(container, limited, total);
+}
+
+function renderAppliedJobs(container, apps, total) {
+  if (!appliedAppsCache.length) {
+    container.innerHTML = `
+      <div class="case-card empty-state">
+        <div class="case-header">
+          <div>
+            <h2>No applications yet</h2>
+            <div class="case-subinfo">Jobs you apply to will appear here.</div>
+          </div>
+        </div>
+      </div>`;
+    updateAppliedCount(0, 0, true);
+    return;
+  }
+
+  if (!total) {
+    container.innerHTML = `
+      <div class="case-card empty-state">
+        <div class="case-header">
+          <div>
+            <h2>No matching applications</h2>
+            <div class="case-subinfo">Try adjusting your search or filters.</div>
+          </div>
+        </div>
+      </div>`;
+    updateAppliedCount(0, 0, false);
+    return;
+  }
+
+  container.innerHTML = apps
+    .map((app) => {
+      const job = app.jobId || {};
+      const title = escapeHtml(job.title || 'Untitled job');
+      const practice = escapeHtml(job.practiceArea || 'General practice');
+      const when = app.createdAt
+        ? new Date(app.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
+        : 'Recently';
+      const applicationId = app._id || app.id || '';
+      const jobId = job._id || job.id || app.jobId || '';
+      const href = applicationId
+        ? `dashboard-paralegal.html?applicationId=${encodeURIComponent(applicationId)}#cases`
+        : jobId
+          ? `dashboard-paralegal.html?jobId=${encodeURIComponent(jobId)}#cases`
+          : 'dashboard-paralegal.html#cases';
+      return `
+        <div class="case-card applied-card">
+          <div class="case-header">
+            <div>
+              <h2>${title}</h2>
+              <div class="case-subinfo">${practice}</div>
+              <div class="case-subinfo">Applied on ${when}</div>
+            </div>
+            <div class="case-actions">
+              <a class="card-link" href="${href}" data-application-view data-application-id="${escapeHtml(applicationId)}" data-job-id="${escapeHtml(jobId)}">View →</a>
+            </div>
+          </div>
+        </div>
+      `;
+    })
+    .join('');
+
+  updateAppliedCount(apps.length, total, false);
+}
+
+function updateAppliedCount(shown, total, hideToggle) {
+  const { count, toggle } = appliedFilters;
+  if (count) {
+    count.textContent = total ? `Showing ${shown} of ${total}` : '';
+  }
+  if (toggle) {
+    if (hideToggle || total <= DEFAULT_APPLIED_LIMIT) {
+      toggle.hidden = true;
+    } else {
+      toggle.hidden = false;
+      toggle.textContent = appliedShowAll ? 'Show recent' : 'View all';
+    }
+  }
+}
+
+function normalizeApplicationStatus(value) {
+  const raw = String(value || 'submitted').trim().toLowerCase();
+  return raw.replace(/\s+/g, '_');
+}
+
+function formatApplicationStatus(value) {
+  const cleaned = String(value || 'submitted').replace(/_/g, ' ').toLowerCase();
+  return cleaned ? cleaned.charAt(0).toUpperCase() + cleaned.slice(1) : 'Submitted';
 }
 
 async function initDashboard() {
   attachUIHandlers();
   initQuickActions();
   try {
-    const [profile, dashboard, invites, deadlines, threads, unreadCount] = await Promise.all([
+    const [profile, _stripeStatus, dashboard, invites, deadlines, threads, unreadCount] = await Promise.all([
       loadViewerProfile().catch(() => ({})),
+      loadStripeStatus().catch(() => null),
       fetchParalegalData().catch(() => ({})),
       loadInvites().catch(() => []),
       loadDeadlineEvents().catch(() => []),
@@ -1023,6 +1484,8 @@ function initAvailabilityModal() {
   const dateInput = document.getElementById("availabilityDateInput");
   const statusDisplay = document.getElementById("availabilityStatus");
   const nextDisplay = document.getElementById("availabilityNext");
+  const nextRow = document.getElementById("availabilityNextRow");
+  const dateRow = document.getElementById("availabilityDateRow");
   const quickActionBtn = document.querySelector('.quick-actions [data-action="availability"]');
 
   if (!modal) console.error("❌ availabilityModal not found");
@@ -1030,9 +1493,31 @@ function initAvailabilityModal() {
 
   if (!modal) return;
 
+  const resolveStatusValue = (value) => {
+    const lowered = String(value || "").toLowerCase();
+    if (lowered.includes("unavail")) return "unavailable";
+    return "available";
+  };
+
+  const syncAvailabilityUI = (value) => {
+    const isUnavailable = resolveStatusValue(value) === "unavailable";
+    if (dateRow) dateRow.style.display = isUnavailable ? "" : "none";
+    if (nextRow) nextRow.style.display = isUnavailable ? "" : "none";
+    if (!isUnavailable && dateInput) dateInput.value = "";
+    if (!isUnavailable && nextDisplay) nextDisplay.textContent = "";
+  };
+
+  const syncFromDisplay = () => {
+    if (!statusInput) return;
+    const displayValue = statusDisplay?.textContent || "";
+    statusInput.value = resolveStatusValue(displayValue);
+    syncAvailabilityUI(statusInput.value);
+  };
+
   const showModal = (event) => {
     event?.preventDefault();
     if (!modal) return;
+    syncFromDisplay();
     modal.style.display = "flex";
     modal.classList.add("show");
   };
@@ -1061,10 +1546,18 @@ function initAvailabilityModal() {
     }
   });
 
+  if (statusInput) {
+    statusInput.addEventListener("change", () => {
+      syncAvailabilityUI(statusInput.value);
+    });
+  }
+
+  syncFromDisplay();
+
   if (saveBtn && statusInput && dateInput && statusDisplay && nextDisplay) {
     saveBtn.addEventListener("click", async () => {
       const status = statusInput.value;
-      const nextDate = dateInput.value;
+      const nextDate = status === "unavailable" ? dateInput.value : "";
 
       const payload = {
         status,
@@ -1091,15 +1584,25 @@ function initAvailabilityModal() {
         const friendly = formatAvailabilityDate(nextSource);
 
         statusDisplay.textContent = fallbackAvailability;
-        if (friendly) {
-          nextDisplay.textContent = `Available on ${friendly}`;
+        if (status === "unavailable") {
+          if (friendly) {
+            nextDisplay.textContent = `Available on ${friendly}`;
+          } else {
+            nextDisplay.textContent = "This week";
+          }
         } else {
-          nextDisplay.textContent = "This week";
+          nextDisplay.textContent = "";
         }
 
+        syncAvailabilityUI(status);
+
+        const nextAvailable =
+          status === "unavailable"
+            ? details.nextAvailable || (nextDate ? new Date(nextDate).toISOString() : null)
+            : null;
         persistAvailabilityState(availabilityLabel, {
           status: details.status || status,
-          nextAvailable: details.nextAvailable || (nextDate ? new Date(nextDate).toISOString() : null),
+          nextAvailable,
           updatedAt: details.updatedAt || new Date().toISOString()
         });
 

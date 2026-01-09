@@ -1422,6 +1422,112 @@
       flex-wrap:wrap;
     }
 
+    .case-preview-card{
+      width:min(92vw,720px);
+      max-height:85vh;
+      overflow:auto;
+    }
+
+    .case-preview-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:1rem;
+    }
+
+    .case-preview-header h3{
+      margin:0;
+      font-family:var(--font-serif);
+      font-weight:300;
+    }
+
+    .case-preview-close{
+      border:none;
+      background:none;
+      font-size:1.4rem;
+      cursor:pointer;
+      color:var(--muted);
+      line-height:1;
+    }
+
+    .case-preview-meta{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
+      gap:0.85rem 1.2rem;
+      font-size:0.95rem;
+    }
+
+    .case-preview-label{
+      display:block;
+      font-size:0.7rem;
+      letter-spacing:0.08em;
+      text-transform:uppercase;
+      color:var(--muted);
+      margin-bottom:0.25rem;
+    }
+
+    .case-preview-desc{
+      border-top:1px solid var(--line);
+      padding-top:0.85rem;
+      display:grid;
+      gap:0.5rem;
+    }
+
+    .case-preview-desc p{
+      margin:0;
+      white-space:pre-wrap;
+      line-height:1.5;
+    }
+
+    .case-invites-card{
+      width:min(92vw,560px);
+      max-height:85vh;
+      overflow:auto;
+    }
+
+    .case-invites-list{
+      display:grid;
+      gap:0.75rem;
+      margin-top:0.5rem;
+    }
+
+    .case-invite-item{
+      display:flex;
+      align-items:center;
+      gap:0.9rem;
+      padding:0.75rem;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:var(--panel);
+    }
+
+    .case-invite-item img{
+      width:44px;
+      height:44px;
+      border-radius:50%;
+      object-fit:cover;
+      border:1px solid rgba(0,0,0,0.06);
+    }
+
+    .case-invite-meta{
+      display:flex;
+      flex-direction:column;
+      gap:0.25rem;
+    }
+
+    .case-invite-meta a{
+      font-weight:600;
+      color:inherit;
+      text-decoration:none;
+    }
+
+    .case-invite-meta a:hover{text-decoration:underline;}
+
+    .case-invite-date{
+      font-size:0.85rem;
+      color:var(--muted);
+    }
+
     .btn{
       border-radius:999px;
       padding:0.55rem 1.4rem;
@@ -2050,7 +2156,6 @@
         <div class="section-title">Quick Actions</div>
         <button type="button" data-quick-link="create-case">Create New Request</button>
         <button type="button" data-quick-link="browse-paralegals">Browse Paralegals</button>
-        <button type="button" data-quick-link="upload-doc">Upload Document</button>
       </section>
 
       <section class="case-list" id="caseCards">
@@ -2231,6 +2336,67 @@
           <div class="note-modal-actions">
             <button type="button" class="btn secondary" data-note-cancel>Cancel</button>
             <button type="button" class="btn primary" data-note-save>Save Note</button>
+          </div>
+        </div>
+      </div>
+      <div id="casePreviewModal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="casePreviewTitle">
+        <div class="note-modal-card case-preview-card">
+          <header class="case-preview-header">
+            <h3 id="casePreviewTitle">Case Preview</h3>
+            <button type="button" class="case-preview-close" aria-label="Close case preview" data-case-preview-close>&times;</button>
+          </header>
+          <div class="case-preview-meta">
+            <div>
+              <span class="case-preview-label">Field of Law</span>
+              <span data-case-preview-field>—</span>
+            </div>
+            <div>
+              <span class="case-preview-label">Location</span>
+              <span data-case-preview-location>—</span>
+            </div>
+            <div>
+              <span class="case-preview-label">Compensation</span>
+              <span data-case-preview-comp>—</span>
+            </div>
+            <div>
+              <span class="case-preview-label">Experience</span>
+              <span data-case-preview-experience>—</span>
+            </div>
+          </div>
+          <div class="case-preview-desc">
+            <span class="case-preview-label">Description</span>
+            <p data-case-preview-description>—</p>
+          </div>
+          <div class="note-modal-actions">
+            <button type="button" class="btn secondary" data-case-preview-close>Close</button>
+          </div>
+        </div>
+      </div>
+      <div id="caseInvitesModal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="caseInvitesTitle">
+        <div class="note-modal-card case-invites-card">
+          <header class="case-preview-header">
+            <h3 id="caseInvitesTitle">Invited Paralegals</h3>
+            <button type="button" class="case-preview-close" aria-label="Close invited paralegals" data-case-invites-close>&times;</button>
+          </header>
+          <div class="case-invites-list" data-case-invites-list>
+            <p class="muted">Loading invited paralegals…</p>
+          </div>
+          <div class="note-modal-actions">
+            <button type="button" class="btn secondary" data-case-invites-close>Close</button>
+          </div>
+        </div>
+      </div>
+      <div id="caseApplicationsModal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="caseApplicationsTitle">
+        <div class="note-modal-card case-invites-card">
+          <header class="case-preview-header">
+            <h3 id="caseApplicationsTitle">Case Applications</h3>
+            <button type="button" class="case-preview-close" aria-label="Close case applications" data-case-applications-close>&times;</button>
+          </header>
+          <div class="case-invites-list" data-case-applications-list>
+            <p class="muted">Loading applications…</p>
+          </div>
+          <div class="note-modal-actions">
+            <button type="button" class="btn secondary" data-case-applications-close>Close</button>
           </div>
         </div>
       </div>

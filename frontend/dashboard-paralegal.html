@@ -497,10 +497,154 @@
       margin-right: 0.5rem;
     }
 
+    .stripe-gate {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 18px;
+      border: 1px solid #f0c984;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #fff7e5 0%, #fff2d6 100%);
+      margin: 12px 0 20px;
+      box-shadow: 0 16px 28px rgba(16, 44, 80, 0.08);
+    }
+
+    .stripe-gate.hidden {
+      display: none;
+    }
+
+    .stripe-gate-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+
+    .stripe-gate-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: var(--navy);
+      color: #ffffff;
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .stripe-gate-sub {
+      font-size: 0.95rem;
+      color: #5e5e5e;
+    }
+
+    .stripe-gate-btn {
+      background: var(--navy);
+      color: #ffffff;
+      text-decoration: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      white-space: nowrap;
+      border: none;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .stripe-gate-btn:hover {
+      opacity: 0.9;
+    }
+
+    @media (max-width: 820px) {
+      .stripe-gate {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+
     .case-list {
       display: flex;
       flex-direction: column;
       gap: 1.25rem;
+    }
+
+    .applied-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+
+    .applied-header h2 {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 300;
+    }
+
+    .applied-toggle-btn {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 0.35rem 1rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease;
+    }
+
+    .applied-toggle-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .applied-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+      margin: 1rem 0 1.5rem;
+    }
+
+    .applied-controls input,
+    .applied-controls select {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      background: var(--panel);
+      color: var(--ink);
+    }
+
+    .applied-controls input {
+      min-width: 220px;
+      flex: 1;
+    }
+
+    .applied-count {
+      margin-left: auto;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    @media (max-width: 820px) {
+      .applied-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .applied-controls {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .applied-count {
+        margin-left: 0;
+      }
     }
 
     .case-card {
@@ -534,6 +678,17 @@
       color: var(--muted);
       font-size: 0.95rem;
       margin-top: 0.25rem;
+    }
+
+    .receipt-link {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .receipt-link:hover,
+    .receipt-link:focus {
+      color: var(--accent);
+      text-decoration: none;
     }
 
     .case-content {
@@ -1258,6 +1413,110 @@
       text-decoration: underline;
     }
 
+    .note-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .note-modal.hidden {
+      display: none;
+    }
+
+    .note-modal-card {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 1.5rem;
+      width: min(92vw, 720px);
+      max-height: 85vh;
+      overflow: auto;
+      box-shadow: 0 30px 80px rgba(15, 23, 42, 0.25);
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .case-preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .case-preview-header h3 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-weight: 300;
+    }
+
+    .case-preview-close {
+      border: none;
+      background: none;
+      font-size: 1.4rem;
+      cursor: pointer;
+      color: var(--muted);
+      line-height: 1;
+    }
+
+    .application-detail {
+      display: grid;
+      gap: 0.75rem;
+      font-size: 0.95rem;
+    }
+
+    .application-detail .detail-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+    }
+
+    .application-detail .detail-label {
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      min-width: 140px;
+    }
+
+    .application-detail .detail-value {
+      color: var(--ink);
+    }
+
+    .application-cover {
+      border-top: 1px solid var(--line);
+      padding-top: 0.75rem;
+      line-height: 1.5;
+    }
+
+    .note-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .note-modal-actions button {
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      padding: 0.55rem 1.3rem;
+      font-size: 0.9rem;
+      font-family: inherit;
+      cursor: pointer;
+      background: var(--panel);
+      color: var(--ink);
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease, color 0.2s ease;
+    }
+
+    .note-modal-actions button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+      background: var(--panel);
+    }
+
   </style>
 </head>
 <body>
@@ -1266,7 +1525,7 @@
     <div class="logo">Dashboard</div>
     <nav>
       <a href="#home" class="active" data-view-link="home">Home</a>
-      <a href="#cases" data-view-link="cases">Active Cases</a>
+      <a href="#cases" data-view-link="cases">Cases and Applications</a>
       <a href="profile-settings.html">Profile Settings</a>
       <a href="help.html">Help</a>
     </nav>
@@ -1326,6 +1585,17 @@
         <p><span data-field="welcomeSubheading">You have 0 active assignments</span></p>
       </header>
 
+      <div id="stripeGateBanner" class="stripe-gate hidden" role="status" aria-live="polite">
+        <div>
+          <div class="stripe-gate-title">
+            <span class="stripe-gate-badge">Required</span>
+            Stripe Connect required for payouts
+          </div>
+          <div class="stripe-gate-sub" data-stripe-gate-message>Connect Stripe to receive payment for completed assignments. You can manage payouts later in Profile Settings.</div>
+        </div>
+        <button class="stripe-gate-btn" id="stripeConnectCta" type="button">Connect Stripe</button>
+      </div>
+
       <section class="summary">
         <div class="info-box"><span data-field="activeCases">0</span> active cases</div>
         <div class="info-box message-box" id="messageBox">
@@ -1335,24 +1605,11 @@
         <div class="info-box">$<span data-field="monthEarnings">0</span> earned this month</div>
       </section>
 
-      <section class="deadlines">
-        <div class="section-title">Upcoming Deadlines</div>
-        <div id="deadlineList">
-          <div class="info-line" data-deadline-empty>No assigned deadlines.</div>
-        </div>
-      </section>
-
       <div class="side-by-side-panels">
-        <section>
-          <div class="section-title">Latest Messages</div>
-          <div class="info-line" id="latestMessage">
-            <strong data-field="latestMessageName">—</strong>: <span data-field="latestMessageExcerpt">No new messages.</span>
-          </div>
-        </section>
         <section>
           <div class="section-title">Availability</div>
           <div class="info-line">Status: <span id="availabilityStatus">Available now</span></div>
-          <div class="info-line">Next available date: <span id="availabilityNext">This week</span></div>
+          <div class="info-line" id="availabilityNextRow">Next available date: <span id="availabilityNext">This week</span></div>
           <div class="info-line"><a href="#" id="updateAvailabilityLink" class="card-link">Update availability →</a></div>
         </section>
       </div>
@@ -1360,7 +1617,6 @@
       <section class="quick-actions">
         <div class="section-title">Quick Actions</div>
         <button type="button" data-action="browse">Browse new postings</button>
-        <button data-action="availability">Update availability</button>
       </section>
 
       <div class="side-by-side-panels">
@@ -1378,35 +1634,13 @@
           </div>
         </section>
         <section class="case-list" id="assignedCasesList">
-          <div class="case-card empty-state">
-            <div class="case-header">
-              <div>
-                <h2>No assigned cases</h2>
-                <div class="case-subinfo">Accepted cases will be listed here.</div>
-              </div>
-            </div>
+          <div class="dashboard-card full-width" id="recommendedPostingsCard">
+            <h3 class="card-title">Recommended for You</h3>
+            <ul class="recommendations-list"></ul>
+            <a href="browse-jobs.html" class="card-link">Browse all postings →</a>
           </div>
         </section>
       </div>
-
-      <div class="side-by-side-panels">
-        <section class="dashboard-card full-width" id="recommendedPostingsCard">
-          <h3 class="card-title">Recommended for You</h3>
-          <ul class="recommendations-list"></ul>
-          <a href="browse-jobs.html" class="card-link">Browse all postings →</a>
-        </section>
-      </div>
-
-      <section class="case-list" id="appliedJobsList">
-        <div class="case-card empty-state">
-          <div class="case-header">
-            <div>
-              <h2>No applications yet</h2>
-              <div class="case-subinfo">Jobs you apply to will appear here.</div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <section class="case-list" id="assignmentList">
         <div class="case-card empty-state">
@@ -1423,19 +1657,65 @@
     <div id="paralegalCasesView" class="dashboard-view" hidden>
       <header class="page-header">
         <div>
-          <h1>Active Cases</h1>
-          <p>View and manage every file associated with your current assignments.</p>
+          <h1>Cases and Applications</h1>
+          <p>Track your applications and manage active case files.</p>
         </div>
       </header>
+
+      <div class="section-title" style="margin-top:1.5rem;">Active Cases</div>
       <div class="filters">
         <button type="button" id="filterAll" class="active">All</button>
-        <button type="button" id="filterApproved">Approved</button>
-        <button type="button" id="filterPending">Pending Review</button>
-        <button type="button" id="filterRevisions">Requested Revisions</button>
+        <button type="button" id="filterCompleted">Completed</button>
       </div>
       <div class="case-files" id="filesContainer">
         <p class="case-files-empty">Loading files…</p>
       </div>
+      <section class="case-list" id="completedCasesList" hidden>
+        <div class="case-card empty-state">
+          <div class="case-header">
+            <div>
+              <h2>Loading completed cases</h2>
+              <div class="case-subinfo">Completed case history will appear here.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="applied-header" style="margin-top:1.5rem;">
+        <div>
+          <h2>My Applications</h2>
+          <div class="case-subinfo">Search and filter your recent applications.</div>
+        </div>
+        <button type="button" class="applied-toggle-btn" id="appliedToggleBtn">View all</button>
+      </div>
+      <div class="applied-controls">
+        <input type="search" id="appliedSearch" placeholder="Search by job title or practice area" />
+        <select id="appliedStatusFilter">
+          <option value="all">All statuses</option>
+        </select>
+        <select id="appliedPracticeFilter">
+          <option value="all">All practice areas</option>
+        </select>
+        <select id="appliedDateFilter">
+          <option value="3">Last 3 days</option>
+          <option value="5">Last 5 days</option>
+          <option value="7">Last week</option>
+          <option value="30">Last month</option>
+          <option value="all">All time</option>
+        </select>
+        <span class="applied-count" id="appliedCount"></span>
+      </div>
+
+      <section class="case-list" id="appliedJobsList">
+        <div class="case-card empty-state">
+          <div class="case-header">
+            <div>
+              <h2>No applications yet</h2>
+              <div class="case-subinfo">Jobs you apply to will appear here.</div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
   <template id="assignmentCardTemplate">
@@ -1445,7 +1725,7 @@
           <h2 data-field="assignmentTitle">Case name</h2>
           <div class="case-subinfo" data-field="assignmentMeta"></div>
         </div>
-        <div>▾</div>
+        <div aria-hidden="true">▾</div>
       </div>
       <div class="case-content">
         <p data-field="assignmentSummary"></p>
@@ -1469,7 +1749,7 @@
         </select>
       </label>
 
-      <label class="field-label">
+      <label class="field-label" id="availabilityDateRow">
         Next available date
         <input type="date" id="availabilityDateInput" />
       </label>
@@ -1477,6 +1757,20 @@
       <div class="modal-actions">
         <button type="button" id="saveAvailabilityBtn" class="confirm">Save</button>
         <button type="button" id="cancelAvailabilityBtn" class="cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <div id="applicationDetailModal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="applicationDetailTitle">
+    <div class="note-modal-card">
+      <header class="case-preview-header">
+        <h3 id="applicationDetailTitle">Application Details</h3>
+        <button type="button" class="case-preview-close" aria-label="Close application details" data-application-close>&times;</button>
+      </header>
+      <div class="application-detail" data-application-detail>
+        <p class="muted">Loading application...</p>
+      </div>
+      <div class="note-modal-actions">
+        <button type="button" class="btn secondary" data-application-close>Close</button>
       </div>
     </div>
   </div>
@@ -1532,6 +1826,7 @@
   <script type="module" src="assets/scripts/paralegal-dashboard.js"></script>
   <script type="module">
     import { initCaseFilesView } from "./assets/scripts/case-files-view.js";
+    import { secureFetch } from "./assets/scripts/auth.js";
 
     document.addEventListener("DOMContentLoaded", () => {
       const homeView = document.getElementById("paralegalHomeView");
@@ -1540,6 +1835,117 @@
       const basePath = window.location.pathname + window.location.search;
       const views = { home: homeView, cases: casesView };
       let casesReady = false;
+
+      const completedList = document.getElementById("completedCasesList");
+      const filesContainer = document.getElementById("filesContainer");
+      const filterButtons = Array.from(document.querySelectorAll(".filters button"));
+      const completedFilter = document.getElementById("filterCompleted");
+
+      function formatCurrency(value = 0) {
+        const amount = Number(value) || 0;
+        return amount.toLocaleString(undefined, { style: "currency", currency: "USD" });
+      }
+
+      function renderCompletedCases(items = []) {
+        if (!completedList) return;
+        if (!items.length) {
+          completedList.innerHTML = `
+            <div class="case-card empty-state">
+              <div class="case-header">
+                <div>
+                  <h2>No completed cases yet</h2>
+                  <div class="case-subinfo">Completed case history will appear here.</div>
+                </div>
+              </div>
+            </div>
+          `;
+          return;
+        }
+        completedList.innerHTML = items
+          .map((item) => {
+            const title = item.title || "Untitled Case";
+            const attorney = item.attorneyName || "Attorney";
+            const completedAt = item.completedAt
+              ? new Date(item.completedAt).toLocaleDateString()
+              : "—";
+            const payment = formatCurrency(item.paymentAmount || 0);
+            const receiptLink = item.caseId
+              ? `<a class="receipt-link" href="/api/payments/receipt/paralegal/${encodeURIComponent(item.caseId)}?regen=1" target="_blank" rel="noopener">Download Receipt</a>`
+              : "Receipt unavailable";
+            return `
+              <div class="case-card">
+                <div class="case-header">
+                  <div>
+                    <h2>${title}</h2>
+                    <div class="case-subinfo">Attorney: ${attorney}</div>
+                    <div class="case-subinfo">Completed: ${completedAt}</div>
+                    <div class="case-subinfo">Payment: ${payment}</div>
+                    <div class="case-subinfo">Receipt: ${receiptLink}</div>
+                  </div>
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+
+      async function loadCompletedCases() {
+        if (!completedList) return;
+        completedList.innerHTML = `
+          <div class="case-card empty-state">
+            <div class="case-header">
+              <div>
+                <h2>Loading completed cases</h2>
+                <div class="case-subinfo">Completed case history will appear here.</div>
+              </div>
+            </div>
+          </div>
+        `;
+        try {
+          const res = await secureFetch("/api/cases/my-completed?limit=200", {
+            headers: { Accept: "application/json" },
+          });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error(payload?.error || "Unable to load completed cases.");
+          }
+          const items = Array.isArray(payload?.items) ? payload.items : [];
+          renderCompletedCases(items);
+        } catch (err) {
+          completedList.innerHTML = `
+            <div class="case-card empty-state">
+              <div class="case-header">
+                <div>
+                  <h2>Unable to load completed cases</h2>
+                  <div class="case-subinfo">${err?.message || "Please refresh to try again."}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      function setCompletedMode(mode) {
+        const showCompleted = mode !== "hidden";
+        const hideFiles = mode === "completed";
+        if (filesContainer) {
+          filesContainer.hidden = hideFiles;
+          filesContainer.style.display = hideFiles ? "none" : "";
+        }
+        if (completedList) {
+          completedList.hidden = !showCompleted;
+          completedList.style.display = showCompleted ? "" : "none";
+        }
+        if (showCompleted) {
+          void loadCompletedCases();
+        }
+      }
+
+      function setActiveFilter(targetButton) {
+        filterButtons.forEach((btn) => {
+          btn.classList.toggle("active", btn === targetButton);
+        });
+      }
 
       function setActiveView(target = "home") {
         const key = target === "cases" ? "cases" : "home";
@@ -1564,18 +1970,26 @@
             containerId: "filesContainer",
             filters: [
               { id: "filterAll", fn: (files) => files },
-              { id: "filterApproved", fn: (files) => files.filter((f) => f.status === "approved") },
-              { id: "filterPending", fn: (files) => files.filter((f) => f.status === "pending_review") },
-              { id: "filterRevisions", fn: (files) => files.filter((f) => f.status === "attorney_revision") },
             ],
             emptyCopy: "No files found.",
+            gatedCopy: "No funded cases yet.",
             unauthorizedCopy: "You need a paralegal account to view these files.",
           }).catch((error) => console.warn("Case files view failed", error));
+        }
+        if (key === "cases") {
+          const allFilter = document.getElementById("filterAll");
+          const isCompleted = completedFilter?.classList.contains("active");
+          const isAll = allFilter?.classList.contains("active");
+          setCompletedMode(isCompleted ? "completed" : isAll ? "all" : "hidden");
         }
         if (key === "cases") {
           history.replaceState(null, "", `${basePath}#cases`);
         } else {
           history.replaceState(null, "", basePath);
+        }
+        if (key !== "cases") {
+          setCompletedMode("hidden");
+          setActiveFilter(document.getElementById("filterAll"));
         }
       }
 
@@ -1591,6 +2005,20 @@
 
       window.addEventListener("hashchange", () => {
         setActiveView(window.location.hash === "#cases" ? "cases" : "home");
+      });
+
+      filterButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (btn === completedFilter) {
+            setActiveFilter(btn);
+            setCompletedMode("completed");
+            return;
+          }
+          if (completedFilter) completedFilter.classList.remove("active");
+          const allFilter = document.getElementById("filterAll");
+          const isAll = btn === allFilter;
+          setCompletedMode(isAll ? "all" : "hidden");
+        });
       });
 
       setActiveView(window.location.hash === "#cases" ? "cases" : "home");

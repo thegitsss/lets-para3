@@ -5,6 +5,14 @@ import { j } from "../helpers.js";
 import { requireAuth } from "../auth.js";
 
 let stylesInjected = false;
+const FUNDED_WORKSPACE_STATUSES = new Set([
+  "funded_in_progress",
+  "in progress",
+  "in_progress",
+  "active",
+  "awaiting_documents",
+  "reviewing",
+]);
 
 export async function render(el, { escapeHTML, params: routeParams } = {}) {
   requireAuth();
@@ -20,6 +28,21 @@ export async function render(el, { escapeHTML, params: routeParams } = {}) {
 
   if (!caseId) {
     el.innerHTML = `<section class="dash"><div class="error">Missing caseId.</div></section>`;
+    return;
+  }
+
+  try {
+    const caseData = await j(`/api/cases/${encodeURIComponent(caseId)}`);
+    if (!canUseMessaging(caseData)) {
+      redirectFromChat();
+      return;
+    }
+  } catch (err) {
+    if (err?.status === 403 || err?.status === 404) {
+      redirectFromChat();
+      return;
+    }
+    el.innerHTML = `<section class="dash"><div class="error">${h(err?.message || "Unable to load case.")}</div></section>`;
     return;
   }
 
@@ -85,21 +108,102 @@ export async function render(el, { escapeHTML, params: routeParams } = {}) {
   el.__chatPollId = setInterval(refresh, 2000);
 }
 
+function normalizeCaseStatus(value) {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  if (!trimmed) return "";
+  const lower = trimmed.toLowerCase();
+  if (lower === "in_progress") return "in progress";
+  return lower;
+}
+
+function normalizeUserId(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return String(value.id || value._id || value.userId || "");
+}
+
+function getCurrentUserId() {
+  const cached = window.getStoredUser?.();
+  const cachedId = normalizeUserId(cached);
+  if (cachedId) return cachedId;
+  try {
+    const stored = localStorage.getItem("lpc_user");
+    return normalizeUserId(stored ? JSON.parse(stored) : null);
+  } catch (_) {}
+  return "";
+}
+
+function getMessageSenderId(message) {
+  return normalizeUserId(
+    message?.senderId ||
+      message?.sender ||
+      message?.user ||
+      message?.userId ||
+      message?.senderUserId
+  );
+}
+
+function canUseMessaging(caseData) {
+  const status = normalizeCaseStatus(caseData?.status);
+  const hasParalegal = !!(caseData?.paralegal || caseData?.paralegalId);
+  const escrowFunded =
+    !!caseData?.escrowIntentId && String(caseData?.escrowStatus || "").toLowerCase() === "funded";
+  return hasParalegal && escrowFunded && FUNDED_WORKSPACE_STATUSES.has(status);
+}
+
+function getDefaultBackUrl() {
+  try {
+    const stored = localStorage.getItem("lpc_user");
+    const user = stored ? JSON.parse(stored) : null;
+    const role = String(user?.role || "").toLowerCase();
+    if (role === "paralegal") return "dashboard-paralegal.html#cases";
+    if (role === "admin") return "admin-dashboard.html";
+  } catch {
+    /* ignore */
+  }
+  return "dashboard-attorney.html#cases";
+}
+
+function redirectFromChat() {
+  if (window.history.length > 1) {
+    window.history.back();
+    return;
+  }
+  const referrer = document.referrer;
+  if (referrer) {
+    try {
+      const referrerUrl = new URL(referrer);
+      if (referrerUrl.origin === window.location.origin) {
+        window.location.href = referrer;
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  window.location.href = getDefaultBackUrl();
+}
+
 function renderMessages(list, messages = [], escapeHTML) {
   if (!list) return;
   if (!messages.length) {
     list.innerHTML = `<div class="empty">No messages yet. Start the conversation below.</div>`;
     return;
   }
+  const currentUserId = getCurrentUserId();
   list.innerHTML = messages
     .map((msg) => {
       const sender = msg?.senderId || null;
+      const senderId = getMessageSenderId(msg);
+      const isSelf = senderId && currentUserId && String(senderId) === String(currentUserId);
       const displayName = sender
         ? `${sender.firstName || ""} ${sender.lastName || ""}`.trim() || "Unknown User"
         : "Unknown User";
       const when = msg.createdAt ? new Date(msg.createdAt).toLocaleString() : "";
+      const bubbleClass = `chat-bubble${isSelf ? " is-outgoing" : ""}`;
       return `
-        <article class="chat-bubble">
+        <article class="${bubbleClass}">
           <div class="chat-header">
             <span class="chat-sender">${escapeHTML(displayName)}</span>
             <span class="chat-time">${escapeHTML(when)}</span>
@@ -133,6 +237,7 @@ function ensureStyles() {
     .dash{display:grid;gap:12px}
     .chat-window{min-height:320px;border:1px solid #e5e7eb;border-radius:12px;padding:12px;background:#fff;overflow-y:auto;display:grid;gap:10px}
     .chat-bubble{border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#f9fafb}
+    .chat-bubble.is-outgoing{justify-self:end}
     .chat-header{display:flex;justify-content:space-between;font-size:.85rem;color:#6b7280;margin-bottom:4px}
     .chat-sender{font-weight:600;color:#111827}
     .chat-form{display:flex;gap:8px}

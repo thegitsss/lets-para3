@@ -13,82 +13,63 @@
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600&family=Cormorant+Garamond:wght@400;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;300;400;600&family=Cormorant+Garamond:wght@300;400;600&display=swap" rel="stylesheet" />
   <script src="assets/scripts/utils/session.js"></script>
   <style>
     :root {
       --font-sans: "Sarabun", sans-serif;
       --font-serif: "Cormorant Garamond", serif;
 
-      --app-background: #f5f6f8;
-      --app-rail: #ffffff;
-      --app-surface: #ffffff;
-      --app-surface-muted: #f0f3f7;
-      --app-card: #ffffff;
-      --app-border: #e1e6ee;
-      --app-text: #141b24;
-      --app-muted: #5d6b7a;
-      --app-accent: #2c6fb8;
-      --app-accent-soft: rgba(44, 111, 184, 0.14);
-      --app-focus: #2c6fb8;
+      --bg: #ffffff;
+      --sidebar-bg: #f5f5f5e6;
+      --accent: #b6a47a;
+      --ink: #1a1a1a;
+      --muted: #8a8a8a;
+      --line: rgba(0, 0, 0, 0.08);
+      --panel: #fcfcfc;
+      --sidebar-text: #1a1a1a;
 
-      --app-shadow-soft: 0 12px 30px rgba(20, 27, 36, 0.08);
-      --app-shadow-card: 0 18px 45px rgba(20, 27, 36, 0.12);
-      --app-shadow-rail: 0 20px 50px rgba(20, 27, 36, 0.08);
+      --app-background: var(--bg);
+      --app-rail: var(--sidebar-bg);
+      --app-surface: var(--panel);
+      --app-surface-muted: var(--panel);
+      --app-surface-contrast: var(--panel);
+      --app-card: var(--panel);
+      --app-card-muted: var(--panel);
+      --app-border: var(--line);
+      --app-border-soft: var(--line);
+      --app-text: var(--ink);
+      --app-muted: var(--muted);
+      --app-accent: var(--accent);
+      --app-accent-soft: rgba(182, 164, 122, 0.18);
+      --app-focus: var(--accent);
+
+      --app-shadow-soft: 0 10px 24px rgba(15, 23, 42, 0.08);
+      --app-shadow-card: 0 18px 36px rgba(15, 23, 42, 0.12);
+      --app-shadow-rail: 0 20px 36px rgba(15, 23, 42, 0.08);
+
+      --radius-lg: 16px;
+      --radius-md: 14px;
+      --radius-sm: 12px;
+      --radius: 14px;
     }
 
     body.theme-dark {
-      --app-background: #0c1118;
-      --app-rail: #151c26;
-      --app-surface: #121822;
-      --app-surface-muted: #0f151f;
-      --app-card: #171f2b;
-      --app-border: #253042;
-      --app-text: #eef2f7;
-      --app-muted: #9aa7b6;
-      --app-accent: #6ea4e2;
-      --app-accent-soft: rgba(110, 164, 226, 0.16);
-      --app-focus: #6ea4e2;
-
-      --app-shadow-soft: 0 14px 40px rgba(6, 10, 15, 0.35);
-      --app-shadow-card: 0 22px 55px rgba(6, 10, 15, 0.45);
-      --app-shadow-rail: 0 24px 60px rgba(6, 10, 15, 0.4);
+      --bg: #0f172a;
+      --sidebar-bg: #1c2333;
+      --panel: #151b29;
+      --ink: #f5f6fb;
+      --muted: #9aa7c4;
+      --line: rgba(255, 255, 255, 0.08);
+      --sidebar-text: #f8fbff;
     }
 
     body.theme-mountain {
-      --app-background: linear-gradient(135deg, #f4efe5 0%, #f7f9fb 45%, #eef2f6 100%);
-      --app-rail: rgba(255, 255, 255, 0.94);
-      --app-surface: #ffffff;
-      --app-surface-muted: #f3f4f1;
-      --app-card: #ffffff;
-      --app-border: #e2e4e1;
-      --app-text: #1c2228;
-      --app-muted: #5f6a73;
-      --app-accent: #5b6f83;
-      --app-accent-soft: rgba(91, 111, 131, 0.18);
-      --app-focus: #5b6f83;
-
-      --app-shadow-soft: 0 14px 40px rgba(78, 63, 50, 0.12);
-      --app-shadow-card: 0 20px 50px rgba(78, 63, 50, 0.16);
-      --app-shadow-rail: 0 26px 64px rgba(78, 63, 50, 0.16);
-    }
-
-    body.theme-mountain-dark {
-      --app-background: linear-gradient(130deg, #0d1118 0%, #131c27 55%, #1b2634 100%);
-      --app-rail: rgba(17, 23, 33, 0.96);
-      --app-surface: #111824;
-      --app-surface-muted: #0c131e;
-      --app-card: #161f2c;
-      --app-border: #263245;
-      --app-text: #ecf0f4;
-      --app-muted: #9aa7b6;
-      --app-accent: #8ba6c1;
-      --app-accent-soft: rgba(139, 166, 193, 0.2);
-      --app-focus: #8ba6c1;
-
-      --app-shadow-soft: 0 18px 48px rgba(4, 8, 14, 0.5);
-      --app-shadow-card: 0 26px 65px rgba(4, 8, 14, 0.55);
-      --app-shadow-rail: 0 28px 72px rgba(4, 8, 14, 0.5);
+      --bg: #f8f6f1;
+      --panel: #ffffff;
+      --muted: #7a736a;
+      --sidebar-text: #ffffff;
+      --sidebar-bg: rgba(255, 255, 255, 0.15);
     }
 
     * {
@@ -99,9 +80,14 @@
 
     body {
       font-family: var(--font-sans);
+      font-weight: 200;
       background: var(--app-background);
       color: var(--app-text);
       min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
+      line-height: 1.6;
+      letter-spacing: 0.01em;
     }
 
     a {
@@ -134,46 +120,574 @@
       top: 16px;
     }
 
-    .case-workspace {
+    .case-shell {
       min-height: 100vh;
-      display: grid;
-      grid-template-columns: 280px minmax(0, 1fr) 340px;
+      height: 100vh;
+      display: flex;
+    }
+
+    .sidebar {
+      width: 240px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--line);
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      color: var(--sidebar-text);
+      position: relative;
+      min-height: 100vh;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      overflow-y: auto;
+    }
+
+    .sidebar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: transparent;
+      pointer-events: none;
+      transition: background 0.3s ease;
+    }
+
+    body.theme-mountain .sidebar,
+    body.theme-mountain-dark .sidebar {
+      background: url("hero-mountain.jpg") center/cover no-repeat;
+      color: #ffffff;
+    }
+
+    body.theme-mountain .sidebar::before,
+    body.theme-mountain-dark .sidebar::before {
+      background: rgba(0, 0, 0, 0.45);
+    }
+
+    body.theme-mountain .sidebar > *,
+    body.theme-mountain-dark .sidebar > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      font-weight: 300;
+      letter-spacing: 0.5px;
+      margin-bottom: 36px;
+      text-align: center;
+    }
+
+    .logo a {
+      text-decoration: none;
+    }
+
+    .sidebar nav {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .sidebar nav a {
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      font-size: 0.95rem;
+      font-weight: 200;
+      transition: background 0.3s ease;
+      color: var(--sidebar-text);
+    }
+
+    .case-nav-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .case-nav-caret {
+      font-size: 0.75rem;
+      color: var(--muted);
+      transition: transform 0.2s ease;
+    }
+
+    .case-nav-toggle.is-open .case-nav-caret {
+      transform: rotate(180deg);
+    }
+
+    .case-nav-dropdown {
+      margin: 0 0 0 12px;
+      padding-left: 12px;
+      border-left: 1px solid var(--line);
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      overflow: hidden;
+    }
+
+    .case-nav-dropdown.show {
+      display: flex;
+      margin-top: 6px;
+      margin-bottom: 8px;
+      animation: caseNavDropdownIn 0.25s ease;
+    }
+
+    @keyframes caseNavDropdownIn {
+      from {
+        max-height: 0;
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+      to {
+        max-height: 320px;
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .case-nav-status {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .case-nav-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
+    }
+
+    .case-nav-link {
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      color: var(--ink);
+      text-decoration: none;
+      transition: background 0.2s ease;
+    }
+
+    .case-nav-link:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .sidebar nav a.active,
+    .sidebar nav a:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    body.theme-dark .sidebar nav a.active,
+    body.theme-dark .sidebar nav a:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    body.theme-mountain .sidebar nav a,
+    body.theme-mountain-dark .sidebar nav a {
+      color: #ffffff;
+    }
+
+    body.theme-mountain .sidebar nav a.active,
+    body.theme-mountain .sidebar nav a:hover,
+    body.theme-mountain-dark .sidebar nav a.active,
+    body.theme-mountain-dark .sidebar nav a:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    body.theme-mountain .case-nav-caret,
+    body.theme-mountain-dark .case-nav-caret,
+    body.theme-dark .case-nav-caret {
+      color: inherit;
+    }
+
+    body.theme-mountain .case-nav-dropdown,
+    body.theme-mountain-dark .case-nav-dropdown {
+      border-color: rgba(255, 255, 255, 0.35);
+    }
+
+    body.theme-mountain .case-nav-status,
+    body.theme-mountain-dark .case-nav-status,
+    body.theme-dark .case-nav-status {
+      color: inherit;
+    }
+
+    body.theme-mountain .case-nav-link,
+    body.theme-mountain-dark .case-nav-link,
+    body.theme-dark .case-nav-link {
+      color: inherit;
+    }
+
+    body.theme-mountain .case-nav-link:hover,
+    body.theme-mountain-dark .case-nav-link:hover,
+    body.theme-dark .case-nav-link:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    .sidebar-bottom {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .sidebar-link {
+      margin-top: 1.5rem;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 0.6rem 1rem;
+      background: transparent;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      cursor: pointer;
+      color: var(--sidebar-text);
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .sidebar-link:hover,
+    .sidebar-link:focus {
+      background: rgba(0, 0, 0, 0.05);
+      color: var(--accent);
+      outline: none;
+    }
+
+    body.theme-mountain .sidebar-link,
+    body.theme-mountain-dark .sidebar-link {
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    body.theme-mountain .sidebar-link:hover,
+    body.theme-mountain .sidebar-link:focus,
+    body.theme-mountain-dark .sidebar-link:hover,
+    body.theme-mountain-dark .sidebar-link:focus,
+    body.theme-dark .sidebar-link:hover,
+    body.theme-dark .sidebar-link:focus {
+      color: #ffffff;
+    }
+
+    .sidebar-footer {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .case-main {
+      flex: 1;
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
       gap: 24px;
-      padding: 24px;
+      min-width: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .case-topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--app-border-soft);
+    }
+
+    .case-topbar-left {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .case-topbar-title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+      text-align: left;
+    }
+
+    .case-topbar-title h1 {
+      font-size: 1.6rem;
+      font-family: var(--font-serif);
+      font-weight: 300;
+    }
+
+    .case-topbar-title .case-thread-title {
+      font-weight: 300;
+      font-size: 1rem;
+    }
+
+    .case-topbar-title .case-thread-subtitle {
+      font-size: 0.85rem;
+    }
+
+    .back-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      background: transparent;
+      color: var(--app-muted);
+      font-size: 0.95rem;
+      cursor: pointer;
+      padding: 2px 0 0;
+    }
+
+    .back-button:hover {
+      color: var(--app-text);
+    }
+
+    .back-button svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .case-topbar-controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      position: relative;
+    }
+
+    .notification-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1px solid var(--app-border-soft);
+      display: grid;
+      place-items: center;
+      background: var(--app-surface);
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .notification-icon:hover {
+      border-color: var(--app-accent);
+      transform: translateY(-1px);
+    }
+
+    .notification-icon svg {
+      width: 22px;
+      height: 22px;
+      color: var(--app-text);
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--app-accent);
+      color: var(--app-surface);
+      font-size: 0.7rem;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+    }
+
+    .notification-badge.show {
+      display: inline-flex;
+    }
+
+    .notifications-panel {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      width: 320px;
+      background: var(--app-surface);
+      border-radius: 14px;
+      border: 1px solid var(--app-border);
+      box-shadow: var(--app-shadow-card);
+      padding: 0;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(-10px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .notifications-panel.show {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    .notifications-panel.hidden {
+      display: none;
+    }
+
+    .notifications-panel .notif-header {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 1.1rem;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--app-border-soft);
+      background: var(--app-surface-contrast);
+    }
+
+    .notifications-panel .notif-scroll {
+      max-height: 260px;
+      overflow-y: auto;
+    }
+
+    .notifications-panel .notif-item {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--app-border-soft);
+      cursor: pointer;
+    }
+
+    .notifications-panel .notif-item:last-child {
+      border-bottom: none;
+    }
+
+    .notifications-panel .notif-item.unread {
+      border-left: 3px solid var(--app-accent);
+    }
+
+    .notifications-panel .notif-item.read {
+      opacity: 0.75;
+    }
+
+    .notifications-panel .notif-body {
+      color: var(--app-muted);
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    .notifications-panel .notif-time {
+      font-size: 0.78rem;
+      color: var(--app-muted);
+      margin-top: 4px;
+    }
+
+    .notifications-panel .notif-empty {
+      padding: 16px;
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--app-muted);
+    }
+
+    .notifications-panel .notif-markall {
+      border: none;
+      border-top: 1px solid var(--app-border-soft);
+      background: var(--app-surface-contrast);
+      padding: 12px 18px;
+      text-align: left;
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-family: var(--font-sans);
+      color: var(--app-text);
+    }
+
+    .user-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--app-surface);
+      border: 1px solid var(--app-border-soft);
+      cursor: pointer;
+      font-family: var(--font-sans);
+      color: var(--app-text);
+      text-align: left;
+    }
+
+    .user-chip img {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .user-chip strong {
+      display: block;
+      font-weight: 600;
+    }
+
+    .user-chip span {
+      font-size: 0.82rem;
+      color: var(--app-muted);
+    }
+
+    .profile-dropdown {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 10px);
+      background: var(--app-surface);
+      border: 1px solid var(--app-border);
+      border-radius: 14px;
+      box-shadow: var(--app-shadow-card);
+      display: none;
+      flex-direction: column;
+      min-width: 200px;
+      z-index: 40;
+    }
+
+    .profile-dropdown.show {
+      display: flex;
+    }
+
+    .profile-dropdown button {
+      background: none;
+      border: none;
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 0.92rem;
+      cursor: pointer;
+      color: var(--app-text);
+    }
+
+    .profile-dropdown button:hover {
+      background: var(--app-surface-contrast);
+    }
+
+    .case-workspace {
+      display: grid;
+      grid-template-columns: minmax(170px, 200px) minmax(0, 1fr) minmax(190px, 220px);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .case-rail-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
 
     .case-rail {
-      background: var(--app-rail);
+      background: var(--app-surface);
       border: 1px solid var(--app-border);
-      border-radius: 18px;
-      padding: 20px;
+      border-radius: var(--radius-lg);
+      padding: 18px;
       display: flex;
       flex-direction: column;
-      gap: 20px;
-      box-shadow: var(--app-shadow-rail);
+      gap: 18px;
+      box-shadow: none;
     }
 
     .case-rail-header {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
     }
 
-    .case-rail-logo {
+    .case-rail-title {
       font-family: var(--font-serif);
-      font-size: 1.4rem;
-      font-weight: 600;
+      font-size: 1.2rem;
+      font-weight: 300;
       letter-spacing: 0.02em;
     }
 
     .case-rail-note {
       font-size: 0.9rem;
       color: var(--app-muted);
-    }
-
-    .case-rail-filters h2 {
-      font-size: 1rem;
-      margin-bottom: 10px;
     }
 
     .case-rail-tabs {
@@ -183,10 +697,10 @@
     }
 
     .case-rail-tabs button {
-      border: 1px solid var(--app-border);
-      background: var(--app-surface);
+      border: none;
+      background: var(--app-card-muted);
       color: var(--app-text);
-      padding: 6px 12px;
+      padding: 8px 14px;
       border-radius: 999px;
       font-size: 0.85rem;
       cursor: pointer;
@@ -194,7 +708,6 @@
 
     .case-rail-tabs button[aria-selected="true"] {
       background: var(--app-accent-soft);
-      border-color: var(--app-accent);
       color: var(--app-text);
     }
 
@@ -207,9 +720,10 @@
 
     .case-rail-filters input {
       width: 100%;
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: 1px solid var(--app-border);
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      border: none;
+      box-shadow: inset 0 0 0 1px var(--app-border-soft);
       background: var(--app-surface);
       color: var(--app-text);
     }
@@ -225,25 +739,25 @@
 
     .case-card {
       width: 100%;
-      border: 1px solid var(--app-border);
-      background: var(--app-surface);
-      border-radius: 14px;
-      padding: 12px 14px;
+      border: 1px solid var(--app-border-soft);
+      background: var(--app-card);
+      border-radius: var(--radius-md);
+      padding: 16px 18px;
       text-align: left;
       display: grid;
-      gap: 6px;
+      gap: 8px;
       cursor: pointer;
       position: relative;
-      box-shadow: var(--app-shadow-soft);
+      box-shadow: none;
     }
 
     .case-card[aria-current="true"] {
       border-color: var(--app-accent);
-      box-shadow: var(--app-shadow-card);
+      box-shadow: var(--app-shadow-soft);
     }
 
     .case-title {
-      font-weight: 600;
+      font-weight: 300;
     }
 
     .case-meta,
@@ -254,8 +768,8 @@
 
     .case-unread {
       position: absolute;
-      top: 12px;
-      right: 12px;
+      top: 14px;
+      right: 14px;
       background: var(--app-accent);
       color: var(--app-surface);
       min-width: 22px;
@@ -269,60 +783,149 @@
     .case-thread {
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 16px;
+      min-width: 0;
     }
 
     .case-thread-header {
-      background: var(--app-surface);
-      border: 1px solid var(--app-border);
-      border-radius: 18px;
-      padding: 18px 20px;
-      box-shadow: var(--app-shadow-soft);
-    }
-
-    .case-thread-header h1 {
-      font-size: 1.6rem;
-      font-family: var(--font-serif);
-    }
-
-    .case-thread-title {
-      font-weight: 600;
-      margin-top: 6px;
+      display: none;
     }
 
     .case-thread-subtitle,
     .case-thread-note {
       font-size: 0.9rem;
       color: var(--app-muted);
-      margin-top: 4px;
     }
+
 
     .case-participants,
-    .message-history,
-    .message-composer {
+    .message-panel {
       background: var(--app-surface);
       border: 1px solid var(--app-border);
-      border-radius: 18px;
-      padding: 18px 20px;
-      box-shadow: var(--app-shadow-soft);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: none;
     }
 
-    .message-history {
-      background: var(--app-surface-muted);
+    .message-panel {
       display: flex;
       flex-direction: column;
       gap: 12px;
-      height: clamp(360px, 55vh, 620px);
+      height: clamp(680px, 82vh, 980px);
+      padding: 20px;
+      position: relative;
+      border: 1px solid var(--app-border-soft);
+      box-shadow: none;
+    }
+
+    .message-panel.is-dragover {
+      border-color: var(--app-accent);
+      box-shadow: var(--app-shadow-soft);
+    }
+
+    .message-panel-header {
+      display: grid;
+      gap: 4px;
+    }
+
+    .message-panel-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .message-panel-title-row h2 {
+      font-size: 1.2rem;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      margin: 0;
+    }
+
+    .message-panel-info {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      border: 1px solid var(--app-border-soft);
+      background: var(--app-surface);
+      color: var(--app-muted);
+      display: grid;
+      place-items: center;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .message-panel-subtitle {
+      font-size: 0.9rem;
+      color: var(--app-muted);
+    }
+
+    .message-panel-banner {
+      background: var(--app-surface-muted);
+      border: 1px solid var(--app-border-soft);
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      font-size: 0.9rem;
+      color: var(--app-muted);
+      text-align: center;
+    }
+
+    .message-panel-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--app-muted);
+      font-size: 0.85rem;
+      text-transform: capitalize;
+    }
+
+    .message-panel-divider::before,
+    .message-panel-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--app-border-soft);
+    }
+
+    .message-dropzone {
+      position: absolute;
+      inset: 16px;
+      border: 2px dashed var(--app-border);
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.7);
+      color: var(--app-muted);
+      font-size: 1.1rem;
+      font-weight: 300;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+      text-transform: uppercase;
+    }
+
+    body.theme-dark .message-dropzone,
+    body.theme-mountain-dark .message-dropzone {
+      background: rgba(12, 18, 28, 0.75);
+      border-color: var(--app-border-soft);
+      color: var(--app-text);
+    }
+
+    .message-dropzone.active {
+      display: flex;
     }
 
     .message-scroll {
       flex: 1;
       overflow-y: auto;
-      padding: 4px 2px 2px;
+      padding: 2px 4px;
+      background: transparent;
+      border-radius: var(--radius-md);
+      min-height: 0;
     }
 
     .case-participants h2,
-    .message-history h2,
+    .message-panel h2,
     .message-composer h2 {
       font-size: 1.1rem;
       margin-bottom: 10px;
@@ -341,44 +944,165 @@
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 12px;
       margin: 0;
       padding: 0;
     }
 
+    .message-list li {
+      display: flex;
+    }
+
     .thread-card {
-      background: var(--app-card);
-      border: 1px solid var(--app-border);
-      border-radius: 18px;
-      padding: 18px;
-      box-shadow: var(--app-shadow-card);
-      display: grid;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
+      display: flex;
       gap: 12px;
+    }
+
+    .message-card {
+      max-width: 78%;
+      align-items: flex-start;
+    }
+
+    .message-card.is-outgoing {
+      margin-left: auto;
+    }
+
+    .message-card.is-outgoing .message-avatar {
+      display: none;
+    }
+
+    .message-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--app-surface-contrast);
+      color: var(--app-muted);
+      font-weight: 600;
+      display: grid;
+      place-items: center;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .message-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .message-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .message-bubble {
+      background: var(--app-surface);
+      border: 1px solid var(--app-border-soft);
+      border-radius: 14px;
+      padding: 10px 14px;
+      box-shadow: var(--app-shadow-soft);
+    }
+
+    .message-card.is-outgoing .message-bubble {
+      background: var(--app-surface-contrast);
+    }
+
+    .message-bubble .card-header {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .message-bubble .card-header h3 {
+      font-size: 0.95rem;
+      margin: 0;
+      font-weight: 600;
+    }
+
+    .message-bubble .card-role {
+      display: none;
+    }
+
+    .message-bubble .card-body p {
+      font-size: 0.92rem;
+      color: var(--app-text);
+    }
+
+    .message-time {
+      font-size: 0.78rem;
+      color: var(--app-muted);
+      padding-left: 6px;
+      margin-top: 4px;
+    }
+
+    .message-time.is-empty {
+      display: none;
+    }
+
+    .message-card.is-outgoing .message-content {
+      align-items: flex-end;
+    }
+
+    .message-card.is-outgoing .message-time {
+      padding-left: 0;
+      padding-right: 6px;
+      text-align: right;
+    }
+
+    .document-card {
+      background: var(--app-surface-contrast);
+      border: 1px solid var(--app-border-soft);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      box-shadow: none;
+      display: grid;
+      gap: 14px;
+      max-width: 78%;
+    }
+
+    .message-composer {
+      background: transparent;
+      border-top: 1px solid var(--app-border-soft);
+      padding-top: 10px;
+      box-shadow: none;
+    }
+
+    .message-composer h2 {
+      font-size: 0.95rem;
+      font-weight: 300;
+      color: var(--app-muted);
     }
 
     .card-header {
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
+      align-items: center;
       gap: 12px;
     }
 
     .card-header h3 {
-      font-size: 1rem;
-      margin-bottom: 4px;
+      font-size: 1.05rem;
+      margin: 0;
     }
 
     .card-role {
       font-size: 0.85rem;
       color: var(--app-muted);
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
     }
 
     .card-body p {
-      line-height: 1.6;
-    }
-
-    .document-card {
-      border-left: 4px solid var(--app-accent);
+      line-height: 1.7;
     }
 
     .document-card dl {
@@ -401,21 +1125,21 @@
     }
 
     .document-actions button {
-      border: 1px solid var(--app-border);
-      background: var(--app-surface-muted);
+      border: none;
+      background: var(--app-card-muted);
       color: var(--app-text);
-      padding: 6px 12px;
-      border-radius: 10px;
+      padding: 8px 14px;
+      border-radius: 999px;
       cursor: pointer;
       font-size: 0.85rem;
     }
 
     .document-actions a {
-      border: 1px solid var(--app-border);
-      background: var(--app-surface-muted);
+      border: none;
+      background: var(--app-card-muted);
       color: var(--app-text);
-      padding: 6px 12px;
-      border-radius: 10px;
+      padding: 8px 14px;
+      border-radius: 999px;
       cursor: pointer;
       font-size: 0.85rem;
       text-decoration: none;
@@ -425,7 +1149,7 @@
     }
 
     .document-comments {
-      border-top: 1px solid var(--app-border);
+      border-top: 1px solid var(--app-border-soft);
       padding-top: 12px;
       display: grid;
       gap: 12px;
@@ -445,9 +1169,10 @@
 
     .document-comments article {
       background: var(--app-surface-muted);
-      border-radius: 12px;
-      padding: 10px 12px;
-      border: 1px solid var(--app-border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      border: none;
+      box-shadow: var(--app-shadow-soft);
     }
 
     .document-comments h5 {
@@ -459,27 +1184,57 @@
     .document-upload form,
     .document-comments form {
       display: grid;
-      gap: 10px;
+      gap: 6px;
     }
 
     .message-composer textarea,
     .document-upload textarea,
     .document-comments textarea {
       width: 100%;
-      border: 1px solid var(--app-border);
-      border-radius: 12px;
+      border: none;
+      border-radius: var(--radius-sm);
       padding: 10px 12px;
+      box-shadow: inset 0 0 0 1px var(--app-border-soft);
       background: var(--app-surface);
       color: var(--app-text);
       font-family: var(--font-sans);
+      min-height: 52px;
+      max-height: 140px;
+      font-size: 0.9rem;
+    }
+
+    .composer-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--app-border-soft);
+      background: var(--app-surface);
+    }
+
+    .composer-row textarea {
+      flex: 1;
+      min-height: 24px;
+      max-height: 88px;
+      padding: 4px 0;
+      border: none;
+      box-shadow: none;
+      background: transparent;
+      resize: none;
+    }
+
+    .composer-row textarea:focus {
+      outline: none;
     }
 
     .message-composer input,
     .document-upload input,
     .document-comments input {
-      border: 1px solid var(--app-border);
-      border-radius: 10px;
-      padding: 8px 10px;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      box-shadow: inset 0 0 0 1px var(--app-border-soft);
       background: var(--app-surface);
       color: var(--app-text);
       font-family: var(--font-sans);
@@ -487,23 +1242,72 @@
 
     .composer-actions {
       display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
       align-items: center;
+      justify-content: space-between;
+      gap: 8px;
     }
 
-    .message-composer.is-dragover {
+    .attach-button {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--app-border-soft);
+      background: var(--app-surface);
+      color: var(--app-muted);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease;
+    }
+
+    .attach-button:hover {
       border-color: var(--app-accent);
-      box-shadow: var(--app-shadow-card);
+      color: var(--app-accent);
+    }
+
+    .attach-button svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .attachment-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+
+    .composer-send {
+      margin-left: auto;
+      border-radius: 10px;
+      padding: 6px 14px;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
     }
 
     .composer-attachments {
-      border: 1px dashed var(--app-border);
-      border-radius: 12px;
-      padding: 10px 12px;
-      background: var(--app-surface-muted);
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      background: var(--app-card-muted);
+      box-shadow: inset 0 0 0 1px var(--app-border-soft);
       display: grid;
-      gap: 8px;
+      gap: 6px;
     }
 
     .composer-attachments[hidden] {
@@ -515,21 +1319,22 @@
       align-items: flex-start;
       justify-content: space-between;
       gap: 12px;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
     }
 
     .attachment-name {
       font-weight: 600;
+      font-size: 0.85rem;
     }
 
     .attachment-meta {
       color: var(--app-muted);
-      font-size: 0.85rem;
+      font-size: 0.8rem;
     }
 
     .attachment-progress {
       width: 100%;
-      height: 8px;
+      height: 6px;
     }
 
     .attachment-actions {
@@ -541,48 +1346,55 @@
 
     .attachment-error {
       color: var(--app-muted);
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       margin-top: 4px;
     }
 
     .attachment-remove {
-      border: 1px solid var(--app-border);
-      background: var(--app-surface);
+      border: none;
+      background: var(--app-card-muted);
       color: var(--app-text);
       padding: 4px 10px;
       border-radius: 999px;
       cursor: pointer;
-      font-size: 0.8rem;
+      font-size: 0.75rem;
     }
 
     button[type="submit"] {
       background: var(--app-accent);
       color: var(--app-surface);
       border: none;
-      border-radius: 10px;
-      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      padding: 10px 16px;
       cursor: pointer;
       font-weight: 600;
+    }
+
+    .message-composer .composer-send {
+      border-radius: 10px;
+      padding: 8px 18px;
     }
 
     .case-overview-panel {
       background: var(--app-surface);
       border: 1px solid var(--app-border);
-      border-radius: 18px;
-      padding: 20px;
+      border-radius: var(--radius-lg);
+      padding: 18px;
       display: flex;
       flex-direction: column;
       gap: 18px;
-      box-shadow: var(--app-shadow-rail);
+      box-shadow: none;
     }
 
     .case-overview-panel h2 {
-      font-size: 1.3rem;
+      font-size: 1.4rem;
       font-family: var(--font-serif);
+      font-weight: 300;
     }
 
     .case-overview-panel h3 {
-      font-size: 1rem;
+      font-size: 1.05rem;
+      font-weight: 300;
       margin-bottom: 8px;
     }
 
@@ -591,7 +1403,7 @@
       display: grid;
       gap: 8px;
       list-style: none;
-      font-size: 0.9rem;
+      font-size: 0.92rem;
       color: var(--app-muted);
       margin: 0;
       padding: 0;
@@ -602,9 +1414,47 @@
       font-weight: 600;
     }
 
+    .case-overview-actions {
+      border: 1px solid var(--app-border);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      background: var(--app-card);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .case-overview-note {
+      font-size: 0.88rem;
+      color: var(--app-muted);
+      margin: 0;
+    }
+
+    .case-action-btn {
+      align-self: flex-start;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 10px 16px;
+      font-weight: 600;
+      background: var(--app-accent);
+      color: var(--app-surface);
+      cursor: pointer;
+    }
+
+    .case-action-btn.secondary {
+      background: transparent;
+      color: var(--app-text);
+      border: 1px solid var(--app-border);
+    }
+
+    .case-action-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
     @media (max-width: 1200px) {
       .case-workspace {
-        grid-template-columns: 240px minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       }
 
       .case-overview-panel {
@@ -612,9 +1462,47 @@
       }
     }
 
+    @media (max-width: 1024px) {
+      .case-shell {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--app-border);
+      }
+    }
+
     @media (max-width: 900px) {
       .case-workspace {
         grid-template-columns: 1fr;
+      }
+
+      .case-thread-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .case-thread-note {
+        text-align: left;
+        max-width: none;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .case-topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .case-topbar-controls {
+        width: 100%;
+        justify-content: flex-end;
+      }
+
+      .case-main {
+        padding: 24px;
       }
     }
   </style>
@@ -622,119 +1510,215 @@
 <body>
   <a href="#case-messages" class="skip-link">Skip to case messages</a>
 
-  <div class="case-workspace" role="presentation">
-    <aside class="case-rail" aria-label="Case switcher">
-      <header class="case-rail-header">
-        <a href="case-dashboard.html" class="case-rail-logo">Let's-ParaConnect</a>
-        <p class="case-rail-note">Shared workspace for attorneys and paralegals.</p>
-      </header>
-
-      <section class="case-rail-filters" aria-label="Case filters">
-        <h2>Cases</h2>
-        <div class="case-rail-tabs" role="tablist" aria-label="Case view">
-          <button type="button" role="tab" aria-selected="true">Active</button>
-          <button type="button" role="tab" aria-selected="false">Unread</button>
+  <div class="case-shell">
+    <aside class="sidebar">
+      <div class="logo">Dashboard</div>
+      <nav aria-label="Attorney navigation" data-visible="attorney">
+        <a href="dashboard-attorney.html#home" data-view-target="home">Home</a>
+        <a href="dashboard-attorney.html#cases" class="active case-nav-toggle" data-view-target="cases" data-case-nav-toggle>
+          Cases &amp; Files
+          <span class="case-nav-caret" aria-hidden="true">▾</span>
+        </a>
+        <div class="case-nav-dropdown" data-case-nav-dropdown aria-hidden="true">
+          <div class="case-nav-status" data-case-nav-status>Loading cases...</div>
+          <ul class="case-nav-list" data-case-nav-list></ul>
         </div>
-        <label for="case-search">Search cases</label>
-        <input id="case-search" name="case-search" type="search" placeholder="Search by client or matter" />
-      </section>
-
-      <nav class="case-rail-list" aria-label="Active cases">
-        <p id="caseListStatus" class="case-rail-note">Loading cases...</p>
-        <ul id="caseList"></ul>
+        <a href="dashboard-attorney.html#billing" data-view-target="billing">Billing &amp; Escrow</a>
+        <a href="help.html">Help</a>
       </nav>
-    </aside>
-
-    <main id="case-messages" class="case-thread" aria-label="Case conversation" data-case-id="">
-      <header class="case-thread-header">
-        <h1>Messages</h1>
-        <p class="case-thread-title" id="caseTitle">Select a case</p>
-        <p class="case-thread-subtitle" id="caseStatusLine">Waiting for case selection.</p>
-        <p class="case-thread-note">Lucid-style message cards support collaborative reading, drafting, and review.</p>
-      </header>
-
-      <section class="case-participants" aria-label="Participants">
-        <h2>Participants</h2>
-        <ul id="caseParticipants"></ul>
-      </section>
-
-      <section class="message-history" aria-label="Conversation">
-        <h2>Conversation</h2>
-        <div class="message-scroll" role="region" aria-label="Conversation thread">
-          <ol class="message-list" id="caseMessageList" data-case-id=""></ol>
+      <nav aria-label="Paralegal navigation" data-visible="paralegal">
+        <a href="dashboard-paralegal.html#home" data-view-link="home">Home</a>
+        <a href="dashboard-paralegal.html#cases" class="active case-nav-toggle" data-view-link="cases" data-case-nav-toggle>
+          Active Cases
+          <span class="case-nav-caret" aria-hidden="true">▾</span>
+        </a>
+        <div class="case-nav-dropdown" data-case-nav-dropdown aria-hidden="true">
+          <div class="case-nav-status" data-case-nav-status>Loading cases...</div>
+          <ul class="case-nav-list" data-case-nav-list></ul>
         </div>
-      </section>
-
-      <section class="message-composer" aria-label="Write a message">
-        <h2>New message</h2>
-        <form id="caseMessageForm">
-          <label for="caseMessageInput">Message</label>
-          <textarea id="caseMessageInput" name="message-body" rows="4" placeholder="Write your message"></textarea>
-          <div class="composer-actions">
-            <label for="message-attachment">Attach a file</label>
-            <input id="message-attachment" name="message-attachment" type="file" multiple />
-            <button type="submit">Send</button>
-          </div>
-          <div id="caseAttachmentStaging" class="composer-attachments" aria-live="polite" hidden></div>
-          <p id="caseMessageStatus" class="case-thread-subtitle" role="status" aria-live="polite"></p>
-        </form>
-      </section>
-    </main>
-
-    <aside class="case-overview-panel" aria-label="Case overview">
-      <header>
-        <h2>Case overview</h2>
-      </header>
-
-      <section class="case-overview-escrow">
-        <h3>Escrow</h3>
-        <dl>
-          <div>
-            <dt>Amount</dt>
-            <dd id="caseEscrowAmount">-</dd>
-          </div>
-          <div>
-            <dt>Status</dt>
-            <dd id="caseEscrowStatus">-</dd>
-          </div>
-        </dl>
-      </section>
-
-      <section class="case-overview-hire">
-        <h3>Hire details</h3>
-        <dl>
-          <div>
-            <dt>Hire date</dt>
-            <dd id="caseHireDate">-</dd>
-          </div>
-          <div>
-            <dt>Matter type</dt>
-            <dd id="caseMatterType">-</dd>
-          </div>
-        </dl>
-      </section>
-
-      <section class="case-overview-deadlines">
-        <h3>Deadlines</h3>
-        <ul id="caseDeadlineList"></ul>
-      </section>
-
-      <section class="case-overview-summary">
-        <h3>Case summary</h3>
-        <p id="caseSummary">-</p>
-      </section>
-
-      <section class="case-overview-tasks">
-        <h3>Tasks</h3>
-        <ul id="caseTaskList"></ul>
-      </section>
-
-      <section class="case-overview-meeting">
-        <h3>Zoom link</h3>
-        <a id="caseZoomLink" href="#" target="_blank" rel="noopener">Join scheduled Zoom</a>
-      </section>
+        <a href="profile-settings.html">Profile Settings</a>
+        <a href="help.html">Help</a>
+      </nav>
+      <div class="sidebar-bottom">
+        <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
+        <div class="sidebar-footer">&copy; Let&#8217;s-ParaConnect 2025</div>
+      </div>
     </aside>
+
+    <main class="case-main" role="main">
+      <div class="case-topbar">
+        <div class="case-topbar-left">
+          <button type="button" class="back-button" data-back-button aria-label="Go back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+            Back
+          </button>
+          <div class="case-topbar-title">
+            <h1>Messages</h1>
+            <p class="case-thread-title" id="caseTitle">Select a case</p>
+            <p class="case-thread-subtitle" id="caseStatusLine">Waiting for case selection.</p>
+          </div>
+        </div>
+        <div class="case-topbar-controls" data-notification-center>
+          <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 01-3.46 0" />
+            </svg>
+            <span class="notification-badge" data-notification-badge>0</span>
+          </button>
+          <div class="notifications-panel hidden" role="region" aria-live="polite" data-notification-panel>
+            <div class="notif-header">Notifications</div>
+            <div class="notif-scroll" data-notification-list></div>
+            <div class="notif-empty" data-notification-empty>Loading...</div>
+            <button type="button" class="notif-markall" data-notification-mark>Mark All Read</button>
+          </div>
+          <button type="button" class="user-chip" data-profile-toggle aria-haspopup="true" aria-expanded="false">
+            <img class="globalProfileImage" data-avatar src="assets/default-avatar.png" alt="Profile avatar" />
+            <div>
+              <strong class="globalProfileName">Member</strong>
+              <span class="globalProfileRole">User</span>
+            </div>
+          </button>
+          <div class="profile-dropdown" data-profile-menu>
+            <button type="button" data-account-settings>Account Settings</button>
+            <button type="button" data-logout>Log Out</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="case-workspace">
+        <div class="case-rail-stack">
+          <aside class="case-rail" aria-label="Case switcher">
+            <header class="case-rail-header">
+              <div class="case-rail-title">Cases</div>
+              <p class="case-rail-note">Shared workspace for attorneys and paralegals.</p>
+            </header>
+
+            <section class="case-rail-filters" aria-label="Case filters">
+              <div class="case-rail-tabs" role="tablist" aria-label="Case view">
+                <button type="button" role="tab" aria-selected="true">Active</button>
+                <button type="button" role="tab" aria-selected="false">Unread</button>
+              </div>
+              <label for="case-search">Search cases</label>
+              <input id="case-search" name="case-search" type="search" placeholder="Search by client or matter" />
+            </section>
+
+            <nav class="case-rail-list" aria-label="Active cases">
+              <p id="caseListStatus" class="case-rail-note">Loading cases...</p>
+              <ul id="caseList"></ul>
+            </nav>
+          </aside>
+
+          <section class="case-participants" aria-label="Participants">
+            <h2>Participants</h2>
+            <ul id="caseParticipants"></ul>
+          </section>
+        </div>
+
+        <section id="case-messages" class="case-thread" aria-label="Case conversation" data-case-id="">
+          <section class="message-panel" aria-label="Conversation">
+            <header class="message-panel-header">
+              <div class="message-panel-title-row">
+                <h2 id="messagePanelTitle">Case conversation</h2>
+                <button type="button" class="message-panel-info" aria-label="Case details">i</button>
+              </div>
+              <p class="message-panel-subtitle" id="messagePanelSubtitle">Case details</p>
+            </header>
+            <div class="message-panel-banner" id="messagePanelBanner">Case updates will appear here.</div>
+            <div class="message-panel-divider"><span id="messagePanelDivider">Today</span></div>
+            <div class="message-dropzone" id="caseDropzoneOverlay" aria-hidden="true">Drop files here</div>
+            <div class="message-scroll" role="region" aria-label="Conversation thread">
+              <ol class="message-list" id="caseMessageList" data-case-id=""></ol>
+            </div>
+            <section class="message-composer" aria-label="Write a message">
+              <form id="caseMessageForm">
+                <label for="caseMessageInput" class="visually-hidden">Message</label>
+                <div class="composer-row">
+                  <label for="message-attachment" class="attach-button">
+                    <span class="visually-hidden">Attach a file</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21.44 11.05l-7.78 7.78a5 5 0 01-7.07-7.07l8.49-8.49a3.5 3.5 0 014.95 4.95l-8.13 8.13a2 2 0 11-2.83-2.83l7.78-7.78" />
+                    </svg>
+                  </label>
+                  <input id="message-attachment" name="message-attachment" type="file" multiple class="attachment-input" />
+                  <textarea id="caseMessageInput" name="message-body" rows="1" placeholder="Write your message"></textarea>
+                  <button type="submit" class="composer-send">Send</button>
+                </div>
+                <div id="caseAttachmentStaging" class="composer-attachments" aria-live="polite" hidden></div>
+                <p id="caseMessageStatus" class="case-thread-subtitle" role="status" aria-live="polite"></p>
+              </form>
+            </section>
+          </section>
+        </section>
+
+        <aside class="case-overview-panel" aria-label="Case overview">
+          <header>
+            <h2>Case overview</h2>
+          </header>
+
+          <section class="case-overview-escrow">
+            <h3>Escrow</h3>
+            <dl>
+              <div>
+                <dt>Amount</dt>
+                <dd id="caseEscrowAmount">-</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd id="caseEscrowStatus">-</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="case-overview-actions" id="caseCompleteSection" data-visible="attorney" hidden>
+            <h3>Complete &amp; release</h3>
+            <p class="case-overview-note" id="caseCompleteNote">
+              Mark work complete and release escrow to the paralegal.
+            </p>
+            <button type="button" class="case-action-btn" id="caseCompleteButton">Complete &amp; Release Funds</button>
+            <p class="case-overview-note" id="caseCompleteStatus" role="status" aria-live="polite"></p>
+          </section>
+
+          <section class="case-overview-hire">
+            <h3>Hire details</h3>
+            <dl>
+              <div>
+                <dt>Hire date</dt>
+                <dd id="caseHireDate">-</dd>
+              </div>
+              <div>
+                <dt>Matter type</dt>
+                <dd id="caseMatterType">-</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="case-overview-deadlines">
+            <h3>Deadlines</h3>
+            <ul id="caseDeadlineList"></ul>
+          </section>
+
+          <section class="case-overview-summary">
+            <h3>Case summary</h3>
+            <p id="caseSummary">-</p>
+          </section>
+
+          <section class="case-overview-tasks">
+            <h3>Tasks</h3>
+            <ul id="caseTaskList"></ul>
+          </section>
+
+          <section class="case-overview-meeting">
+            <h3>Zoom link</h3>
+            <a id="caseZoomLink" href="#" target="_blank" rel="noopener">Join scheduled Zoom</a>
+          </section>
+        </aside>
+      </div>
+    </main>
   </div>
+  <script type="module" src="assets/scripts/utils/notifications.js"></script>
   <script type="module" src="assets/scripts/case-detail.js"></script>
 </body>
 </html>

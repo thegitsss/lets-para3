@@ -7,9 +7,16 @@
   let sessionPromise = null;
   let cachedSessionToken = null;
   const LEGACY_TOKEN_KEYS = ["lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"];
-  const THEME_STORAGE_KEY = "lpc_theme";
   const VALID_THEMES = ["light", "dark", "mountain", "mountain-dark"];
+  const FONT_SIZE_MAP = {
+    xs: "14px",
+    sm: "15px",
+    md: "16px",
+    lg: "17px",
+    xl: "20px"
+  };
   let currentTheme = null;
+  let currentFontSize = null;
 
   function normalizeTheme(value) {
     const candidate = String(value || "").toLowerCase();
@@ -53,28 +60,8 @@
     return normalized;
   }
 
-  function getThemeStorageKey(userId) {
-    return userId ? `${THEME_STORAGE_KEY}_${userId}` : THEME_STORAGE_KEY;
-  }
-
-  function readStoredTheme(userId) {
-    try {
-      const stored = localStorage.getItem(getThemeStorageKey(userId));
-      if (stored) return normalizeTheme(stored);
-    } catch (_) {}
-    return userId ? null : "mountain";
-  }
-
-  function persistTheme(theme, userId) {
-    try {
-      localStorage.setItem(getThemeStorageKey(userId), theme);
-    } catch (_) {}
-  }
-
   function applyThemePreference(theme) {
     const normalized = setThemeClass(theme);
-    const userId = cachedUser?.id || cachedUser?._id;
-    persistTheme(normalized, userId || null);
     if (cachedUser) {
       cachedUser.preferences = { ...(cachedUser.preferences || {}), theme: normalized };
       try {
@@ -84,16 +71,47 @@
     return normalized;
   }
 
-  function applyThemeFromUser(user) {
-    const userId = user?.id || user?._id;
-    const theme =
-      (user && user.preferences && user.preferences.theme) ||
-      readStoredTheme(userId) ||
-      "mountain";
-    applyThemePreference(theme);
+  function normalizeFontSize(value) {
+    const key = String(value || "").toLowerCase();
+    return FONT_SIZE_MAP[key] ? key : "md";
   }
 
-  applyThemePreference(readStoredTheme());
+  function applyFontSizePreference(fontSize) {
+    const normalized = normalizeFontSize(fontSize);
+    if (currentFontSize === normalized) return normalized;
+    const size = FONT_SIZE_MAP[normalized] || FONT_SIZE_MAP.md;
+    if (document.documentElement) {
+      document.documentElement.style.fontSize = size;
+    } else {
+      document.addEventListener(
+        "DOMContentLoaded",
+        () => {
+          if (document.documentElement) {
+            document.documentElement.style.fontSize = size;
+          }
+        },
+        { once: true }
+      );
+    }
+    currentFontSize = normalized;
+    if (cachedUser) {
+      cachedUser.preferences = { ...(cachedUser.preferences || {}), fontSize: normalized };
+      try {
+        localStorage.setItem("lpc_user", JSON.stringify(cachedUser));
+      } catch (_) {}
+    }
+    return normalized;
+  }
+
+  function applyThemeFromUser(user) {
+    const theme = user?.preferences?.theme;
+    if (theme) applyThemePreference(theme);
+  }
+
+  function applyFontSizeFromUser(user) {
+    const fontSize = user?.preferences?.fontSize;
+    if (fontSize) applyFontSizePreference(fontSize);
+  }
 
   function redirectToLogin() {
     if (hasRedirected) return;
@@ -136,6 +154,7 @@
           cachedUser = user;
           syncStoredUser(user);
           applyThemeFromUser(user);
+          applyFontSizeFromUser(user);
           try {
             if (user?.avatarURL) {
               localStorage.setItem("avatarURL", user.avatarURL);
@@ -244,6 +263,7 @@
     if (!user || typeof user !== "object") return;
     cachedUser = { ...(cachedUser || {}), ...user };
     applyThemeFromUser(cachedUser);
+    applyFontSizeFromUser(cachedUser);
     sessionPromise = Promise.resolve(cachedUser);
     persistStoredUser(cachedUser);
     if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
@@ -348,8 +368,9 @@
   window.refreshSession = refreshSession;
   window.updateSessionUser = updateSessionUser;
   window.applyThemePreference = applyThemePreference;
-  window.getThemePreference = () =>
-    currentTheme || readStoredTheme(cachedUser?.id || cachedUser?._id);
+  window.getThemePreference = () => cachedUser?.preferences?.theme || null;
+  window.applyFontSizePreference = applyFontSizePreference;
+  window.getFontSizePreference = () => cachedUser?.preferences?.fontSize || null;
 
   function updateHeaderBasedOnAuth(isLoggedIn) {
     document.querySelectorAll("[data-authed-only]").forEach((el) => {

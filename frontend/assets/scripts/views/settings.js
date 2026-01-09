@@ -2,6 +2,7 @@
 // Settings view aligned to Express/Mongo backend.
 
 import { secureJSON, secureFetch, logout, requireAuth } from "../auth.js";
+import { STRIPE_GATE_MESSAGE } from "../utils/stripe-connect.js";
 
 let stylesInjected = false;
 
@@ -155,13 +156,26 @@ function initStripeConnect(root) {
   const button = root.querySelector("#connectStripeBtn");
   if (!row || !statusText || !button) return;
 
-  const setState = ({ details_submitted, accountId }) => {
-    const connected = !!details_submitted;
-    statusText.textContent = connected ? "Connected" : "Not connected";
+  const setState = ({ details_submitted, charges_enabled, payouts_enabled, accountId, bank_name, bank_last4 }) => {
+    const connected = !!details_submitted && !!payouts_enabled;
+    const bankName = String(bank_name || "").trim();
+    const bankLast4 = String(bank_last4 || "").trim();
+    const bankBits = [];
+    if (bankName) bankBits.push(bankName);
+    if (bankLast4) bankBits.push(`**** ${bankLast4}`);
+    const bankLabel = bankBits.length ? ` (${bankBits.join(" ")})` : "";
+    statusText.textContent = connected ? `Connected${bankLabel}` : "Not connected";
     statusText.classList.toggle("ok", connected);
     statusText.classList.toggle("muted", !connected);
     button.textContent = connected ? "Update Stripe Details" : "Connect Stripe Account";
-    button.disabled = false;
+    button.disabled = !connected;
+    if (!connected) {
+      button.setAttribute("aria-disabled", "true");
+      button.title = STRIPE_GATE_MESSAGE;
+    } else {
+      button.removeAttribute("aria-disabled");
+      button.removeAttribute("title");
+    }
     if (hint) {
       hint.style.display = "block";
       hint.textContent = connected
@@ -182,6 +196,9 @@ function initStripeConnect(root) {
       statusText.textContent = "Status unavailable";
       statusText.classList.add("muted");
       row.style.display = "flex";
+      button.disabled = true;
+      button.setAttribute("aria-disabled", "true");
+      button.title = STRIPE_GATE_MESSAGE;
     }
   }
 

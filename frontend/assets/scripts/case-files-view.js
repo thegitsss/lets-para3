@@ -2,6 +2,17 @@ import { secureFetch } from "./auth.js";
 
 let allFiles = [];
 let currentConfig = null;
+let gatedEmpty = false;
+let actionsBound = false;
+
+const FUNDED_WORKSPACE_STATUSES = new Set([
+  "funded_in_progress",
+  "in progress",
+  "in_progress",
+  "active",
+  "awaiting_documents",
+  "reviewing",
+]);
 
 export async function initCaseFilesView(config = {}) {
   currentConfig = normalizeConfig(config);
@@ -10,6 +21,7 @@ export async function initCaseFilesView(config = {}) {
     return;
   }
   await loadCaseFiles();
+  bindFileActions();
   bindFilters();
   renderFiles(allFiles);
 }
@@ -24,11 +36,43 @@ function normalizeConfig(config) {
     emptyCopy: config.emptyCopy || "No files found.",
     emptySubtext: config.emptySubtext || "",
     unauthorizedCopy: config.unauthorizedCopy || "Unable to load files.",
+    gatedCopy: config.gatedCopy || "No funded cases yet.",
     formatStatus:
       typeof config.formatStatus === "function"
         ? config.formatStatus
         : defaultFormatStatus,
   };
+}
+
+function normalizeCaseListPayload(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.cases)) return payload.cases;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+}
+
+function normalizeCaseStatus(status) {
+  const value = String(status || "").trim();
+  if (!value) return "";
+  if (value.toLowerCase() === "in_progress") return "in progress";
+  return value.toLowerCase();
+}
+
+function isFundedWorkspaceCase(caseItem) {
+  if (!caseItem) return false;
+  if (caseItem.archived !== false) return false;
+  if (caseItem.paymentReleased !== false) return false;
+
+  const status = normalizeCaseStatus(caseItem?.status);
+  if (!status || !FUNDED_WORKSPACE_STATUSES.has(status)) return false;
+
+  const escrowStatus = String(caseItem?.escrowStatus || "").toLowerCase();
+  const escrowIntentId = caseItem?.escrowIntentId;
+  const escrowFunded = !!escrowIntentId && escrowStatus === "funded";
+  if (!escrowFunded) return false;
+
+  const hasParalegal = caseItem?.paralegal || caseItem?.paralegalId;
+  return !!hasParalegal;
 }
 
 async function loadCaseFiles() {
@@ -80,8 +124,10 @@ async function loadCaseFiles() {
       err.status = status;
       throw err;
     }
-    const cases = Array.isArray(data?.cases) ? data.cases : [];
-    allFiles = cases.flatMap((caseItem = {}) => {
+    const cases = normalizeCaseListPayload(data);
+    const eligibleCases = cases.filter((caseItem) => isFundedWorkspaceCase(caseItem));
+    gatedEmpty = cases.length > 0 && eligibleCases.length === 0;
+    allFiles = eligibleCases.flatMap((caseItem = {}) => {
       const caseId = caseItem.id || caseItem._id;
       const caseTitle = caseItem.title || caseItem.name || "Untitled Case";
       const caseStatus = normalizeStatus(caseItem.status) || "pending";
@@ -107,7 +153,9 @@ async function loadCaseFiles() {
     // Fallback: if no cases/files returned, pull active cases from dashboard data
     if (!allFiles.length) {
       const activeCases = await fetchActiveCasesFallback();
-      allFiles = activeCases.map((c) => ({
+      const eligibleFallback = activeCases.filter((caseItem) => isFundedWorkspaceCase(caseItem));
+      gatedEmpty = activeCases.length > 0 && eligibleFallback.length === 0;
+      allFiles = eligibleFallback.map((c) => ({
         placeholder: true,
         caseId: c.caseId || c.id || c._id || "",
         caseTitle: c.jobTitle || c.title || c.practiceArea || "Case",
@@ -155,7 +203,8 @@ function renderFiles(files) {
   const container = document.getElementById(currentConfig.containerId);
   if (!container) return;
   if (!files.length) {
-    const primary = `<p class="case-files-empty">${sanitize(currentConfig.emptyCopy)}</p>`;
+    const message = gatedEmpty ? currentConfig.gatedCopy : currentConfig.emptyCopy;
+    const primary = `<p class="case-files-empty">${sanitize(message)}</p>`;
     container.innerHTML = currentConfig.emptySubtext
       ? `${primary}<p class="case-files-empty">${sanitize(currentConfig.emptySubtext)}</p>`
       : primary;
@@ -165,21 +214,26 @@ function renderFiles(files) {
     .map((file) => {
       const caseId = file.caseId || file.id || "";
       const caseLink = caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "#";
-      const downloadUrl = file.downloadUrl || file.key || file.url || "#";
-      const sizeLabel =
-        typeof file.size === "number" ? `${(file.size / 1024).toFixed(1)} KB` : "—";
-      const statusLabel = sanitize(currentConfig.formatStatus(file.status));
-      const caseMeta = `<div class="file-meta"><span>Case: ${sanitize(file.caseTitle || "Case")}</span></div>`;
+      const fileId = file.id || file._id || "";
+      const fileKey = file.storageKey || file.key || "";
+      const fileName = file.original || file.filename || "Untitled document";
+      const mimeType = file.mimeType || file.mime || "";
+      const downloadUrl =
+        caseId && fileId
+          ? `/api/uploads/case/${encodeURIComponent(caseId)}/${encodeURIComponent(fileId)}/download`
+          : "";
+      const viewUrl =
+        caseId && fileKey
+          ? `/api/uploads/view?caseId=${encodeURIComponent(caseId)}&key=${encodeURIComponent(fileKey)}`
+          : "";
       if (file.placeholder) {
         return `
           <article class="file-card" data-case-id="${sanitize(caseId)}">
             <div class="file-line">
               <span class="file-name">${sanitize(file.caseTitle || "Case")}</span>
-              <span class="file-status">${statusLabel}</span>
             </div>
-            ${caseMeta}
             <div class="file-actions">
-              <a href="${caseLink}" class="btn-link">Open Case</a>
+              <a href="${caseLink}" class="btn-link">View</a>
             </div>
           </article>
         `;
@@ -187,21 +241,58 @@ function renderFiles(files) {
       return `
         <article class="file-card" data-case-id="${sanitize(caseId)}">
           <div class="file-line">
-            <span class="file-name">${sanitize(file.original || file.filename || "Untitled document")}</span>
-            <span class="file-status">${statusLabel}</span>
-          </div>
-          <div class="file-meta">
-            <span>Case: ${sanitize(file.caseTitle || "Case")}</span>
-            <span>${sanitize(sizeLabel)}</span>
+            <span class="file-name">${sanitize(fileName)}</span>
           </div>
           <div class="file-actions">
-            <a href="${caseLink}" class="btn-link">Open Case</a>
-            <a href="${downloadUrl}" class="btn-link" download>Download</a>
+            <a href="${viewUrl || "#"}" class="btn-link" data-file-action="view" data-case-id="${sanitize(caseId)}" data-file-key="${sanitize(fileKey)}" data-file-name="${sanitize(fileName)}" data-file-mime="${sanitize(mimeType)}" target="_blank" rel="noopener">View</a>
+            <a href="${downloadUrl || "#"}" class="btn-link" data-file-action="download" data-case-id="${sanitize(caseId)}" data-file-id="${sanitize(fileId)}" data-file-name="${sanitize(fileName)}" download>Download</a>
           </div>
         </article>
       `;
     })
     .join("");
+}
+
+function bindFileActions() {
+  if (actionsBound) return;
+  const container = document.getElementById(currentConfig.containerId);
+  if (!container) return;
+  actionsBound = true;
+  container.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-file-action]");
+    if (!target) return;
+    const action = target.dataset.fileAction;
+    const fileName = target.dataset.fileName || "File";
+    const mimeType = target.dataset.fileMime || "";
+    const caseId = target.dataset.caseId || "";
+    const fileKey = target.dataset.fileKey || "";
+
+    if (action === "view") {
+      event.preventDefault();
+      if (!isPreviewSupported({ fileName, mimeType })) {
+        notifyFileAction("Preview not supported for this file type. Please download to view.");
+        return;
+      }
+      if (!caseId || !fileKey) {
+        notifyFileAction("Preview unavailable for this file.");
+        return;
+      }
+      const viewUrl = buildViewUrl({ caseId, fileKey });
+      if (!viewUrl) {
+        notifyFileAction("Preview unavailable for this file.");
+        return;
+      }
+      window.open(viewUrl, "_blank", "noopener");
+      return;
+    }
+
+    if (action === "download") {
+      if (!target.getAttribute("href") || target.getAttribute("href") === "#") {
+        event.preventDefault();
+        notifyFileAction("Download unavailable for this file.");
+      }
+    }
+  });
 }
 
 function defaultFormatStatus(status) {
@@ -218,6 +309,36 @@ function normalizeStatus(status) {
   if (!value) return "";
   if (value.toLowerCase() === "in_progress") return "in progress";
   return value;
+}
+
+function getFileExtension(name) {
+  const base = String(name || "").trim();
+  if (!base) return "";
+  const parts = base.split(".");
+  if (parts.length < 2) return "";
+  return parts.pop().toLowerCase();
+}
+
+function isPreviewSupported({ fileName, mimeType } = {}) {
+  const mime = String(mimeType || "").toLowerCase();
+  if (mime.startsWith("image/")) return true;
+  if (mime === "application/pdf") return true;
+  const ext = getFileExtension(fileName);
+  return ["pdf", "png", "jpg", "jpeg", "gif", "webp"].includes(ext);
+}
+
+function buildViewUrl({ caseId, fileKey } = {}) {
+  if (!caseId || !fileKey) return "";
+  return `/api/uploads/view?caseId=${encodeURIComponent(caseId)}&key=${encodeURIComponent(fileKey)}`;
+}
+
+function notifyFileAction(message) {
+  const toastTarget = document.getElementById("toastBanner");
+  if (window.toastUtils?.show && toastTarget) {
+    window.toastUtils.show(message, { targetId: toastTarget, type: "info" });
+    return;
+  }
+  alert(message);
 }
 
 function sanitize(value = "") {

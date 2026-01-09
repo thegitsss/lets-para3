@@ -73,10 +73,10 @@
       position: fixed;
       inset: 0;
       background:
-        linear-gradient(to bottom, rgba(0,0,0,0.32), rgba(0,0,0,0.14), rgba(0,0,0,0.48)),
+        linear-gradient(to bottom, rgba(255,255,255,0.94), rgba(255,255,255,0.88), rgba(255,255,255,0.94)),
         url('hero-mountain.jpg') center/cover no-repeat;
-      filter: blur(4px) brightness(0.38) saturate(0.95);
-      opacity: 0.62;
+      filter: blur(4px) brightness(1.55) saturate(0.2);
+      opacity: 0.48;
       transform: scale(1.05);
       z-index: 0;
       pointer-events: none;
@@ -108,7 +108,7 @@
       margin-bottom: 24px;
       gap: 16px;
       position: relative;
-      z-index: 3;
+      z-index: 200;
       pointer-events: auto;
     }
 
@@ -117,7 +117,7 @@
       align-items: center;
       gap: 16px;
       position: relative;
-      z-index: 4;
+      z-index: 201;
       pointer-events: auto;
     }
 
@@ -387,11 +387,11 @@
     /* HERO CARD (matches UX layout) */
 
     .hero-card {
-      background: linear-gradient(135deg, #fdfbf7, #f6f0e6);
+      background: #ffffff;
       border-radius: var(--radius-lg);
       padding: 32px 36px 34px;
       box-shadow:
-        0 30px 80px rgba(0, 0, 0, 0.12),
+        0 18px 48px rgba(0, 0, 0, 0.08),
         inset 0 1px 0 rgba(255, 255, 255, 0.55);
       margin-bottom: 32px;
       position: relative;
@@ -429,12 +429,12 @@
       font-size: 14px;
       font-weight: 300;
       box-shadow: none;
-      transition: transform 0.15s ease, box-shadow 0.15s ease, translate 0.15s ease;
+      transition: none;
     }
 
     .back-link:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+      transform: none;
+      box-shadow: none;
     }
 
     .back-link svg {
@@ -449,13 +449,13 @@
     }
 
     .hero-photo {
-      width: 200px;
-      height: 200px;
+      width: 240px;
+      height: 240px;
       border-radius: 50%;
       overflow: hidden;
       background: var(--panel);
       box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
-      border: 6px solid #ffffff;
+      border: none;
     }
 
     .hero-photo img {
@@ -498,20 +498,131 @@
     }
 
     .hero-meta-pill {
-      padding: 6px 14px;
-      border-radius: 999px;
-      background: var(--panel);
-      border: 1px solid var(--line);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
+      border-radius: 0;
+      background: transparent;
+      border: none;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.08);
+    }
+
+    .hero-meta-link,
+    .meta-line {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .meta-icon {
+      display: inline-flex;
+      width: 18px;
+      height: 18px;
+      color: currentColor;
     }
 
     .hero-meta-pill a {
       color: var(--accent);
       text-decoration: none;
       font-weight: 400;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.08);
     }
 
     .hero-meta-pill a:hover {
       text-decoration: underline;
+    }
+
+    .profile-layout {
+      display: grid;
+      grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.6fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .profile-sidebar,
+    .profile-main {
+      display: flex;
+      flex-direction: column;
+      gap: 38px;
+    }
+
+    .profile-sidebar {
+      padding-right: 24px;
+      border-right: 1px solid var(--line);
+    }
+
+    .profile-main {
+      padding-left: 24px;
+    }
+
+    .profile-photo-block {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .profile-meta-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .profile-meta-columns {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 24px;
+    }
+
+    .meta-column {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .meta-column.has-meta-icon .profile-docs-stack {
+      padding-left: 20px;
+    }
+
+    .profile-docs-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .profile-header {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    .profile-header-main {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+    }
+
+    .profile-header-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      align-items: flex-end;
+    }
+
+    .profile-header-actions .hero-cta-row {
+      justify-content: flex-end;
+    }
+
+    .profile-role-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .profile-sidebar .hero-photo-shell {
+      justify-content: center;
     }
 
     .status-chip {
@@ -542,13 +653,13 @@
       background: #ffffff;
       cursor: pointer;
       letter-spacing: 0.03em;
-      transition: background 0.2s ease, border-color 0.2s ease, transform 0.1s ease;
+      transition: background 0.2s ease, border-color 0.2s ease;
     }
 
     .hero-cta-row button:hover:not(:disabled) {
       background: var(--accent-soft);
       border-color: var(--accent);
-      transform: translateY(-1px);
+      transform: none;
     }
 
     .hero-cta-row button:disabled {
@@ -576,11 +687,11 @@
     }
 
     .card {
-      background: linear-gradient(145deg, #fdfbf8, #f6f2ea);
+      background: #ffffff;
       border-radius: var(--radius-md);
       padding: 18px 22px;
       box-shadow:
-        0 18px 55px rgba(0, 0, 0, 0.08),
+        0 12px 32px rgba(0, 0, 0, 0.06),
         inset 0 1px 0 rgba(255, 255, 255, 0.6);
       position: relative;
       z-index: 40;
@@ -588,9 +699,9 @@
     .card.compact {
       padding: 18px 18px;
       box-shadow:
-        0 18px 58px rgba(0, 0, 0, 0.07),
+        0 12px 30px rgba(0, 0, 0, 0.05),
         inset 0 1px 0 rgba(255, 255, 255, 0.55);
-      background: linear-gradient(145deg, #fdfbf8, #f5efe6);
+      background: #ffffff;
     }
 
     .card-header-label {
@@ -599,6 +710,8 @@
       text-transform: uppercase;
       color: var(--muted);
       margin-bottom: 6px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--line);
     }
 
     .card-title {
@@ -616,6 +729,21 @@
       margin-top: 10px;
     }
 
+    #languagesList {
+      gap: 0;
+    }
+
+    #languagesList .chip {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    #languagesList .chip:not(:last-child)::after {
+      content: "·";
+      margin: 0 10px;
+      color: var(--muted);
+    }
+
     .chip-section {
       margin-top: 10px;
     }
@@ -631,20 +759,21 @@
     }
 
     .chip {
-      padding: 7px 12px;
-      border-radius: 999px;
-      background: var(--accent-soft);
-      border: 1px solid var(--line);
+      padding: 0;
+      border-radius: 0;
+      background: transparent;
+      border: none;
       font-size: 0.92rem;
-      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+      transition: none;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.08);
     }
 
     .chip:hover,
     .timeline-item:hover,
     .edu-pill:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 24px rgba(0,0,0,0.08);
-      background: #fff;
+      transform: none;
+      box-shadow: none;
+      background: transparent;
     }
 
     .timeline-list {
@@ -663,7 +792,7 @@
       border: 1px solid var(--line);
       border-radius: 12px;
       background: #fff;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      transition: none;
     }
 
     .timeline-role {
@@ -684,12 +813,13 @@
     }
 
     .edu-pill {
-      padding: 6px 10px;
-      border-radius: 10px;
-      border: 1px dashed var(--line);
-      background: #fff;
+      padding: 0;
+      border-radius: 0;
+      border: none;
+      background: transparent;
       font-size: 0.9rem;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      transition: none;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.08);
     }
 
     .inline-row {
@@ -715,13 +845,14 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 7px 12px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      background: var(--panel);
+      padding: 0;
+      border-radius: 0;
+      border: none;
+      background: transparent;
       text-decoration: none;
       color: var(--accent);
       font-size: 0.9rem;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.08);
     }
 
     .languages-empty {
@@ -901,30 +1032,48 @@
         padding: 32px 20px 80px;
       }
 
-      .hero-card {
-        padding: 32px 24px 36px;
-      }
-
-      .hero-content {
+      .profile-layout {
         grid-template-columns: 1fr;
-        row-gap: 24px;
       }
 
-      .hero-main {
+      .profile-photo-block,
+      .profile-header {
         align-items: center;
         text-align: center;
       }
 
-      #bioCopy {
-        max-width: 100%;
+      .profile-meta-stack {
+        align-items: center;
       }
 
-      .hero-meta-row {
+      .profile-meta-columns {
+        grid-template-columns: 1fr;
+      }
+
+      .profile-header-main {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .profile-header-actions {
+        align-items: center;
+      }
+
+      .profile-header-actions .hero-cta-row {
         justify-content: center;
       }
 
-      .fold-grid {
-        grid-template-columns: 1fr;
+      .profile-sidebar {
+        padding-right: 0;
+        border-right: none;
+      }
+
+      .profile-main {
+        padding-left: 0;
+      }
+
+      .profile-role-row {
+        justify-content: center;
       }
     }
   </style>
@@ -992,75 +1141,106 @@
     </div>
     <div id="profileError" class="error-card hidden"></div>
 
-    <!-- HERO CARD -->
-    <section class="hero-card">
-      <div class="hero-eyebrow">Paralegal profile</div>
-      <div class="hero-content">
-        <div class="hero-photo-shell">
-          <div class="hero-photo">
-            <img id="user-avatar" src="" alt="Profile photo" />
-          </div>
-        </div>
-        <div class="hero-main">
-          <h1 id="profileName">Natalie Testing</h1>
-          <p id="roleLine">5 years experience • elite paralegal professional</p>
-          <p id="bioCopy">Hello, pleased to meet you.</p>
-
-          <div class="status-chip" id="statusChip">Available now</div>
-
-          <div class="hero-meta-row">
-            <span id="credentialMeta" class="hero-meta-pill">Credentials available upon request</span>
-            <div class="hero-doc-buttons doc-buttons">
-              <a href="#" target="_blank" rel="noopener" id="certificateLink" class="doc-chip hidden">Certificate</a>
-              <a href="#" target="_blank" rel="noopener" id="resumeLink" class="doc-chip hidden">Résumé</a>
-              <a href="#" target="_blank" rel="noopener" id="writingSampleLink" class="doc-chip hidden">Writing Sample</a>
+    <section class="profile-layout">
+      <aside class="profile-sidebar">
+        <div class="profile-photo-block">
+          <div class="hero-photo-shell">
+            <div class="hero-photo">
+              <img id="user-avatar" src="" alt="Profile photo" />
             </div>
-            <span id="locationMeta" class="hero-meta-pill">Location</span>
           </div>
-
-          <div class="hero-cta-row">
-            <button type="button" class="cta-secondary hidden" id="messageBtn">Message</button>
-            <button type="button" class="cta-primary hidden" id="inviteToCaseBtn">Invite to Case</button>
-            <button type="button" class="cta-ghost hidden" id="editProfileBtn">Edit Profile</button>
+          <div class="profile-meta-stack">
+            <div class="profile-meta-columns">
+              <div class="meta-column">
+                <span id="locationMeta" class="hero-meta-pill">Location</span>
+                <span id="joinedMeta" class="hero-meta-pill">Joined date unavailable</span>
+              </div>
+              <div class="meta-column">
+                <span id="credentialMeta" class="hero-meta-pill">Credentials available upon request</span>
+                <div class="profile-docs-stack">
+                  <a href="#" target="_blank" rel="noopener" id="certificateLink" class="doc-chip hidden">Certificate</a>
+                  <a href="#" target="_blank" rel="noopener" id="resumeLink" class="doc-chip hidden">Résumé</a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
 
-    <section class="fold-grid">
-      <article class="card compact" id="skillsCard">
-        <div class="chip-section">
-          <span class="card-header-label" style="text-align:center; width:100%;">Skills</span>
-          <div id="skillsList" class="chip-cloud"></div>
-          <p class="muted hidden" id="skillsEmpty">No skills added yet.</p>
-        </div>
-        <div class="chip-section">
-          <span class="card-header-label" style="text-align:center; width:100%;">Focus Areas</span>
-          <div id="practiceList" class="chip-cloud"></div>
-          <p class="muted hidden" id="practiceEmpty">No focus areas added yet.</p>
-        </div>
-      </article>
+        <article class="profile-section" id="educationCard">
+          <div class="education-section" id="educationSection">
+            <div class="card-header-label" style="text-align:center;">Education</div>
+            <div id="educationList" class="edu-inline">
+              <!-- folded education inline -->
+            </div>
+          </div>
+        </article>
 
-      <article class="card compact" id="experienceCard">
-        <div class="card-header-label" style="text-align:center;">Experience</div>
-        <div id="experienceList" class="timeline-list">
-          <!-- condensed experience timeline -->
-        </div>
-        <div id="educationList" class="edu-inline">
-          <!-- folded education inline -->
-        </div>
-        <div class="inline-row">
-          <span class="card-header-label" style="text-align:center;width:100%;">Languages</span>
+        <article class="profile-section" id="skillsCard">
+          <div class="chip-section" id="skillsSection">
+            <span class="card-header-label" style="text-align:center; width:100%;">Skills</span>
+            <div id="skillsList" class="chip-cloud"></div>
+          </div>
+          <div class="chip-section" id="practiceSection">
+            <span class="card-header-label" style="text-align:center; width:100%;">Focus Areas</span>
+            <div id="practiceList" class="chip-cloud"></div>
+          </div>
+        </article>
+
+        <article class="profile-section" id="languagesRow">
+          <div class="card-header-label" style="text-align:center;">Languages</div>
           <div class="chip-row" id="languagesList"></div>
-          <p class="muted hidden" id="languagesEmpty">No languages added yet.</p>
-        </div>
-        <div class="inline-row credentials-row" id="documentsCard">
-          <span id="joinedMeta" class="hero-meta-pill" style="margin:0 auto;">Joined date unavailable</span>
-        </div>
-      </article>
+        </article>
+
+        <article class="profile-section hidden" id="documentsSection">
+          <div class="card-header-label" style="text-align:center;">Documents</div>
+          <div class="doc-buttons">
+            <a href="#" target="_blank" rel="noopener" id="writingSampleLink" class="doc-chip hidden">Writing Sample</a>
+          </div>
+        </article>
+      </aside>
+
+      <section class="profile-main">
+        <section class="profile-header" aria-label="Paralegal profile">
+          <div class="profile-header-main">
+            <div class="profile-identity">
+              <div class="hero-eyebrow">Paralegal profile</div>
+              <h1 id="profileName">Natalie Testing</h1>
+              <div class="profile-role-row">
+                <span id="roleLine">5 years experience • elite paralegal professional</span>
+                <span class="status-chip" id="statusChip">Available now</span>
+              </div>
+              <p id="bioCopy" class="hidden">Hello, pleased to meet you.</p>
+            </div>
+            <div class="profile-header-actions">
+              <div class="hero-cta-row">
+                <button type="button" class="cta-secondary hidden" id="messageBtn">Message</button>
+                <button type="button" class="cta-primary hidden" id="inviteToCaseBtn">Invite to Case</button>
+                <button type="button" class="cta-ghost hidden" id="editProfileBtn">Edit Profile</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="profileCompletionPrompt" class="profile-completion hidden" role="status">
+            <div>
+              <strong>Complete your profile</strong>
+              <span id="profileCompletionDetails" class="muted">Add missing details to improve your profile visibility.</span>
+            </div>
+            <button type="button" id="completeProfileBtn">Complete profile</button>
+          </div>
+        </section>
+
+        <article class="profile-section" id="experienceCard">
+          <div class="experience-section" id="experienceSection">
+            <div class="card-header-label" style="text-align:center;">Experience</div>
+            <div id="experienceList" class="timeline-list">
+              <!-- condensed experience timeline -->
+            </div>
+          </div>
+        </article>
+      </section>
     </section>
 
-    <article class="card hidden" id="funFactsCard">
+    <article class="profile-section hidden" id="funFactsCard">
       <div class="card-header-label">Fun facts</div>
       <div class="card-title">Fun Facts &amp; Extras</div>
       <p id="funFactsCopy"></p>

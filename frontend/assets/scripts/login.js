@@ -118,7 +118,7 @@ if (!skipInit) {
 
       if (!res.ok) {
         clearLocalSession();
-        const msg = data?.msg || data?.message || "Login failed";
+        const msg = data?.error || data?.msg || data?.message || "Login failed";
         if (toastHelper) {
           toastHelper.show(msg, { targetId: "toastBanner", type: "err" });
         } else {

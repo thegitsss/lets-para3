@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0B2A4A">
+  <title>Case Applications – Let’s-ParaConnect</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;300;400;600&family=Cormorant+Garamond:wght@300;400;600&display=swap" rel="stylesheet" />
+  <script src="assets/scripts/utils/session.js"></script>
+  <style>
+    :root {
+      --font-sans: "Sarabun", sans-serif;
+      --font-serif: "Cormorant Garamond", serif;
+      --bg: #f7f5f0;
+      --panel: #ffffff;
+      --ink: #1a1a1a;
+      --muted: #7a7a7a;
+      --line: rgba(0, 0, 0, 0.08);
+      --accent: #0b2a4a;
+      --accent-soft: rgba(11, 42, 74, 0.12);
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -40px;
+      background: var(--panel);
+      color: var(--ink);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      text-decoration: none;
+      z-index: 10;
+    }
+    .skip-link:focus { top: 12px; }
+
+    header {
+      padding: 28px 24px 18px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(120deg, rgba(182, 164, 122, 0.2), rgba(11, 42, 74, 0.08));
+    }
+    header h1 {
+      font-family: var(--font-serif);
+      font-weight: 400;
+      font-size: 2rem;
+      margin-bottom: 6px;
+    }
+    header .meta {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    header .actions {
+      margin-top: 14px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-weight: 600;
+      background: var(--panel);
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+    }
+    .btn.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .btn.primary[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    main { max-width: 980px; margin: 0 auto; padding: 28px 24px 48px; }
+    .notice {
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      margin-bottom: 20px;
+      border: 1px solid rgba(11, 42, 74, 0.18);
+    }
+    .notice.error {
+      background: #fef2f2;
+      color: #b91c1c;
+      border-color: #fecaca;
+    }
+
+    .applicant-list {
+      list-style: none;
+      display: grid;
+      gap: 16px;
+    }
+    .applicant-card {
+      display: grid;
+      grid-template-columns: 70px 1fr auto;
+      gap: 16px;
+      padding: 18px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--panel);
+      align-items: start;
+    }
+    .applicant-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      background: rgba(11, 42, 74, 0.08);
+      display: grid;
+      place-items: center;
+      font-weight: 600;
+      color: var(--accent);
+      overflow: hidden;
+    }
+    .applicant-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .applicant-name {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .applicant-meta {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .applicant-summary {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      background: #fafafa;
+      text-decoration: none;
+    }
+    .chip.muted {
+      opacity: 0.6;
+    }
+    .cover {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #fafafa;
+      border: 1px dashed rgba(0,0,0,0.08);
+      font-size: 0.95rem;
+      color: #2d2d2d;
+    }
+    .cover .label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .applicant-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .empty {
+      color: var(--muted);
+      font-size: 0.95rem;
+      padding: 14px 0;
+    }
+    @media (max-width: 800px) {
+      .applicant-card {
+        grid-template-columns: 1fr;
+      }
+      .applicant-actions {
+        flex-direction: row;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header>
+    <h1 id="caseTitle">Case Applications</h1>
+    <div class="meta" id="caseMeta">Loading case details…</div>
+    <div class="actions">
+      <a class="btn" id="backBtn" href="dashboard-attorney.html">Back to dashboard</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="notice" id="caseNotice" hidden></div>
+    <ul class="applicant-list" id="applicantList"></ul>
+  </main>
+
+  <script type="module" src="assets/scripts/case-applications.js"></script>
+</body>
+</html>

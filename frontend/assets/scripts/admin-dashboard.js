@@ -1,4 +1,4 @@
-import { secureFetch } from "./auth.js";
+import { secureFetch, fetchCSRF } from "./auth.js";
 
 const REFRESH_INTERVAL_MS = 60_000;
 
@@ -62,6 +62,15 @@ return dollars.toLocaleString(undefined, { style: "currency", currency: "USD" })
 function formatNumber(value) {
 if (!Number.isFinite(Number(value))) return "0";
 return Number(value).toLocaleString();
+}
+
+function showToast(message, type = "info") {
+  const toast = window.toastUtils;
+  if (toast?.show) {
+    toast.show(message, { targetId: "toastBanner", type });
+  } else if (message) {
+    alert(message);
+  }
 }
 
 function formatDate(value) {
@@ -403,7 +412,7 @@ async function deactivateUser(userId, { source } = {}) {
   const confirmed = window.confirm("Remove/deactivate this user?");
   if (!confirmed) return;
   try {
-    await fetchCSRF?.();
+    await fetchCSRF();
   } catch (_) {}
   try {
     const res = await secureFetch(`/api/admin/users/${encodeURIComponent(userId)}/deny`, {
@@ -457,6 +466,14 @@ function escapeAttribute(value = "") {
 return String(value || "").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
+function buildFileHref(value) {
+const raw = String(value || "").trim();
+if (!raw) return "";
+if (/^https?:\/\//i.test(raw)) return raw;
+if (raw.startsWith("/api/uploads/view")) return raw;
+return `/api/uploads/view?key=${encodeURIComponent(raw)}`;
+}
+
 function renderVerificationList(items) {
 const list = document.getElementById("paralegalVerificationList");
 if (!list) return;
@@ -475,9 +492,7 @@ const yearsLabel = years === null ? "N/A" : `${years} year${years === 1 ? "" : "
 const linkedIn = p.linkedInURL
 ? `<p><a href="${escapeAttribute(p.linkedInURL)}" target="_blank" rel="noopener">LinkedIn Profile</a></p>`
 : "<p>LinkedIn profile not provided.</p>";
-const certificateHref = p.certificateURL
-? `/api/uploads/view/${encodeURIComponent(p.certificateURL)}`
-: "";
+const certificateHref = buildFileHref(p.certificateURL);
 const certificate = certificateHref
 ? `<p><a href="${escapeAttribute(certificateHref)}" target="_blank" rel="noopener">Certificate</a></p>`
 : "<p>Certificate not uploaded.</p>";

@@ -1,4 +1,5 @@
 import { secureFetch } from "./auth.js";
+import { getStripeConnectStatus, isStripeConnected, STRIPE_GATE_MESSAGE } from "./utils/stripe-connect.js";
 
 const jobModal = document.getElementById("jobModal");
 const jobModalClose = document.getElementById("jobModalClose");
@@ -14,12 +15,34 @@ const attorneyNameEl = document.getElementById("jobAttorneyName");
 const attorneyFirmEl = document.getElementById("jobAttorneyFirm");
 const FALLBACK_AVATAR = "https://via.placeholder.com/64x64.png?text=A";
 const attorneyPreviewCache = new Map();
+const urlParams = new URLSearchParams(window.location.search);
+const previewCaseId = urlParams.get("caseId");
+const previewMode = Boolean(previewCaseId);
 
 let jobsCache = [];
 let modalJob = null;
+let stripeConnected = false;
+let viewerRole = "";
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await window.checkSession("paralegal");
+  let session = null;
+  if (previewMode) {
+    try {
+      session = await window.checkSession(undefined, { redirectOnFail: false });
+    } catch (_) {
+      session = null;
+    }
+  } else {
+    session = await window.checkSession("paralegal");
+  }
+  viewerRole = String(session?.role || session?.user?.role || "").toLowerCase();
+  if (viewerRole === "paralegal") {
+    await loadStripeStatus();
+  }
+  if (previewMode) {
+    await loadSingleCase(previewCaseId);
+    return;
+  }
   await loadJobs();
   const REFRESH_MS = 30000;
   setInterval(() => {
@@ -42,26 +65,72 @@ async function loadJobs() {
   const jobs = Array.isArray(payload) ? payload : Array.isArray(payload.items) ? payload.items : [];
   jobsCache = jobs;
 
+  renderJobs(jobs);
+  bindJobListEvents();
+}
+
+async function loadSingleCase(caseId) {
+  const section = document.getElementById("jobList");
+  section.innerHTML = "<h3>Available Jobs</h3><p>Loading...</p>";
+  if (!caseId) {
+    section.innerHTML = "<p>Unable to load case preview.</p>";
+    return;
+  }
+  try {
+    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, {
+      headers: { Accept: "application/json" },
+      noRedirect: true,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      section.innerHTML = `<p>${escapeHtml(data?.error || "Unable to load case preview.")}</p>`;
+      return;
+    }
+    const job = shapeJobFromCase(data);
+    jobsCache = [job];
+    renderJobs(jobsCache);
+    bindJobListEvents();
+  } catch (err) {
+    section.innerHTML = "<p>Unable to load case preview.</p>";
+  }
+}
+
+function renderJobs(jobs) {
+  const section = document.getElementById("jobList");
+  if (!section) return;
   if (!jobs.length) {
     section.innerHTML = "<h3>Available Jobs</h3><p>No available jobs at this time.</p>";
     return;
   }
 
+  const canApply = viewerRole === "paralegal";
+  const applyDisabled = canApply && stripeConnected ? "" : "disabled";
+  const applyTitle = !canApply
+    ? `title="Only paralegals can apply."`
+    : stripeConnected
+    ? ""
+    : `title="${escapeHtml(STRIPE_GATE_MESSAGE)}"`;
+
   const parts = ["<h3>Available Jobs</h3>"];
   jobs.forEach((job, idx) => {
+    const applyId = job.jobId || job._id || job.id || "";
     parts.push(`
       <div class="job-card" data-job-index="${idx}">
         <strong>${escapeHtml(job.title || "Untitled job")}</strong><br>
         <span>${escapeHtml(job.practiceArea || job.shortDescription || "")}</span><br>
         <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
           <button class="viewJobBtn" data-job-index="${idx}">View</button>
-          <button class="applyBtn" data-id="${job._id || job.id || ""}">Apply</button>
+          <button class="applyBtn" data-id="${escapeHtml(applyId)}" ${applyDisabled} ${applyTitle}>Apply</button>
         </div>
       </div>
     `);
   });
   section.innerHTML = parts.join("\n");
+}
 
+function bindJobListEvents() {
+  const section = document.getElementById("jobList");
+  if (!section) return;
   section.querySelectorAll(".job-card").forEach((card) => {
     card.addEventListener("click", (event) => {
       if (event.target.closest("button")) return;
@@ -85,6 +154,14 @@ async function loadJobs() {
   section.querySelectorAll(".applyBtn").forEach((btn) => {
     btn.addEventListener("click", async (event) => {
       event.stopPropagation();
+      if (viewerRole !== "paralegal") {
+        alert("Only paralegals can apply for jobs.");
+        return;
+      }
+      if (!stripeConnected) {
+        alert(STRIPE_GATE_MESSAGE);
+        return;
+      }
       const jobId = btn.dataset.id;
       if (!jobId) return;
       const coverLetter = promptCoverLetter();
@@ -118,7 +195,7 @@ async function submitQuickApplication(jobId, coverLetter) {
     if (!res.ok) {
       const message = data?.error || "Unable to submit application.";
       if (res.status === 403 && /stripe/i.test(message)) {
-        promptStripeOnboarding(message);
+        alert(STRIPE_GATE_MESSAGE);
         return;
       }
       throw new Error(message);
@@ -129,10 +206,10 @@ async function submitQuickApplication(jobId, coverLetter) {
   }
 }
 
-function promptStripeOnboarding(message) {
-  const copy = message || "Complete Stripe onboarding before applying.";
-  const go = window.confirm(`${copy} Open Profile Settings to connect Stripe now?`);
-  if (go) window.location.href = "profile-settings.html";
+async function loadStripeStatus() {
+  const data = await getStripeConnectStatus();
+  stripeConnected = isStripeConnected(data);
+  return data;
 }
 
 async function ensureAttorneyPreview(job) {
@@ -175,6 +252,37 @@ async function ensureAttorneyPreview(job) {
   return null;
 }
 
+function shapeJobFromCase(caseData = {}) {
+  const totalAmount = typeof caseData.totalAmount === "number" ? caseData.totalAmount : null;
+  const lockedTotalAmount = typeof caseData.lockedTotalAmount === "number" ? caseData.lockedTotalAmount : null;
+  const amountForCase = lockedTotalAmount != null ? lockedTotalAmount : totalAmount;
+  const budgetFromCase = amountForCase != null ? Math.round(amountForCase / 100) : null;
+  const attorney = caseData.attorney || null;
+  const attorneyId =
+    (attorney && (attorney._id || attorney.id)) ||
+    caseData.attorneyId ||
+    caseData.attorney ||
+    null;
+
+  return {
+    _id: caseData.jobId || caseData.job || caseData._id || caseData.id,
+    id: caseData._id || caseData.id,
+    caseId: caseData._id || caseData.id || null,
+    jobId: caseData.jobId || caseData.job || null,
+    title: caseData.title || "Untitled Case",
+    practiceArea: caseData.practiceArea || "",
+    shortDescription: caseData.briefSummary || "",
+    description: caseData.details || caseData.description || "",
+    totalAmount,
+    lockedTotalAmount,
+    budget: typeof budgetFromCase === "number" ? budgetFromCase : null,
+    currency: caseData.currency || "usd",
+    createdAt: caseData.createdAt || null,
+    attorneyId,
+    attorney,
+  };
+}
+
 async function openJobModal(job) {
   if (!jobModal) return;
   modalJob = job;
@@ -205,6 +313,15 @@ async function openJobModal(job) {
   if (attorneyBtn) {
     attorneyBtn.dataset.attorneyId = atty._id || job.attorneyId || "";
     attorneyBtn.dataset.jobId = job._id || job.id || "";
+  }
+  if (jobApplyBtn) {
+    jobApplyBtn.disabled = !stripeConnected;
+    jobApplyBtn.textContent = "Apply";
+    if (!stripeConnected) {
+      jobApplyBtn.title = STRIPE_GATE_MESSAGE;
+    } else {
+      jobApplyBtn.removeAttribute("title");
+    }
   }
 
   jobModal.classList.remove("hidden");
@@ -250,6 +367,10 @@ attorneyBtn?.addEventListener("click", async () => {
 });
 
 jobApplyBtn?.addEventListener("click", async () => {
+  if (!stripeConnected) {
+    alert(STRIPE_GATE_MESSAGE);
+    return;
+  }
   if (!modalJob) return;
   const jobId = modalJob._id || modalJob.id;
   if (!jobId) return;

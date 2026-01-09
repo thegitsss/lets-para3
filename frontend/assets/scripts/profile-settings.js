@@ -1,4 +1,5 @@
-import { secureFetch, persistSession } from "./auth.js";
+import { secureFetch, persistSession, getStoredSession } from "./auth.js";
+import { STRIPE_GATE_MESSAGE } from "./utils/stripe-connect.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const navItems = {
@@ -6,6 +7,27 @@ document.addEventListener("DOMContentLoaded", () => {
     navSecurity: "securitySection",
     navPreferences: "preferencesSection",
     navDelete: "deleteSection"
+  };
+  const topLevelSections = Object.values(navItems)
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+  const setActiveSection = (sectionId) => {
+    topLevelSections.forEach((sec) => {
+      sec.classList.remove("active");
+      sec.classList.add("hidden");
+      sec.setAttribute("aria-hidden", "true");
+      sec.hidden = true;
+      sec.style.setProperty("display", "none", "important");
+    });
+    const section = document.getElementById(sectionId);
+    if (section) {
+      section.classList.remove("hidden");
+      section.classList.add("active");
+      section.hidden = false;
+      section.removeAttribute("aria-hidden");
+      section.style.removeProperty("display");
+      section.style.display = "block";
+    }
   };
 
   Object.keys(navItems).forEach(navId => {
@@ -17,11 +39,28 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".settings-item").forEach(el => el.classList.remove("active"));
       btn.classList.add("active");
-      document.querySelectorAll(".settings-section").forEach(sec => sec.classList.remove("active"));
-      const section = document.getElementById(sectionId);
-      section?.classList.add("active");
+      setActiveSection(sectionId);
     });
   });
+
+  const initialNav = document.querySelector(".settings-item.active");
+  const initialSectionId = initialNav && navItems[initialNav.id]
+    ? navItems[initialNav.id]
+    : navItems.navProfile;
+  setActiveSection(initialSectionId);
+
+  const dashboardLink = document.getElementById("dashboardReturnLink");
+  if (dashboardLink) {
+    const session = getStoredSession();
+    const role = String(session?.role || session?.user?.role || "").toLowerCase();
+    if (role === "admin") {
+      dashboardLink.href = "admin-dashboard.html";
+    } else if (role === "paralegal") {
+      dashboardLink.href = "dashboard-paralegal.html";
+    } else {
+      dashboardLink.href = "dashboard-attorney.html";
+    }
+  }
 
   const passwordBtn = document.getElementById("savePasswordBtn");
   if (passwordBtn) {
@@ -49,6 +88,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const themeSelect = document.getElementById("themePreference");
   const themePreviewButtons = document.querySelectorAll("[data-theme-preview]");
   const emailToggle = document.getElementById("emailNotificationsToggle");
+  const fontSizeSelect = document.getElementById("fontSizePreference");
   statePreferenceSelect = document.getElementById("statePreference");
 
   const updateThemePreview = (value) => {
@@ -60,10 +100,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 
-  async function persistThemePreference(themeValue) {
+  async function persistThemePreference(themeValue, fontSizeValue) {
     try {
       const payload = {
-        theme: themeValue,
+        theme: themeValue || themeSelect?.value,
+        fontSize: fontSizeValue || fontSizeSelect?.value,
         email: emailToggle ? !!emailToggle.checked : false,
         state: statePreferenceSelect ? statePreferenceSelect.value : undefined
       };
@@ -87,12 +128,54 @@ document.addEventListener("DOMContentLoaded", () => {
     if (typeof window.applyThemePreference === "function") {
       window.applyThemePreference(value);
     }
-    persistThemePreference(value);
+    if (currentUser) {
+      currentUser.preferences = {
+        ...(currentUser.preferences || {}),
+        theme: value
+      };
+    }
+    persistThemePreference(value, fontSizeSelect?.value);
+  };
+
+  const fontSizeMap = {
+    xs: "14px",
+    sm: "15px",
+    md: "16px",
+    lg: "17px",
+    xl: "20px"
+  };
+
+  const applyFontSizeSelection = (value, options = {}) => {
+    if (!value) return;
+    if (fontSizeSelect) {
+      fontSizeSelect.value = value;
+    }
+    if (typeof window.applyFontSizePreference === "function") {
+      window.applyFontSizePreference(value);
+    } else {
+      const size = fontSizeMap[value] || fontSizeMap.md;
+      document.documentElement.style.fontSize = size;
+    }
+    if (currentUser) {
+      currentUser.preferences = {
+        ...(currentUser.preferences || {}),
+        fontSize: value
+      };
+    }
+    if (!options.skipPersist) {
+      persistThemePreference(themeSelect?.value, value);
+    }
   };
 
   if (themeSelect) {
     themeSelect.addEventListener("change", () => {
       applyThemeSelection(themeSelect.value);
+    });
+  }
+
+  if (fontSizeSelect) {
+    fontSizeSelect.addEventListener("change", () => {
+      applyFontSizeSelection(fontSizeSelect.value);
     });
   }
 
@@ -107,6 +190,19 @@ document.addEventListener("DOMContentLoaded", () => {
     updateThemePreview(themeSelect.value);
   }
 
+  const fullNameInput = document.getElementById("fullNameInput");
+  if (fullNameInput) {
+    fullNameInput.addEventListener("input", () => {
+      syncNamePartsFromFullName();
+    });
+  }
+  const yearsExperienceInput = document.getElementById("yearsExperienceInput");
+  if (yearsExperienceInput) {
+    yearsExperienceInput.addEventListener("input", () => {
+      updateRoleLineFromExperience();
+    });
+  }
+
   async function loadPreferences() {
     try {
       const res = await fetch("/api/account/preferences", {
@@ -116,18 +212,26 @@ document.addEventListener("DOMContentLoaded", () => {
       const prefs = await res.json();
       if (emailToggle) emailToggle.checked = !!prefs.email;
       if (themeSelect) {
-        const resolvedTheme =
-          prefs.theme ||
-          (typeof window.getThemePreference === "function"
-            ? window.getThemePreference()
-            : "mountain");
-        themeSelect.value = resolvedTheme;
-        updateThemePreview(resolvedTheme);
-        if (typeof window.applyThemePreference === "function") {
-          window.applyThemePreference(resolvedTheme);
+        const resolvedTheme = prefs.theme;
+        if (resolvedTheme) {
+          themeSelect.value = resolvedTheme;
+          updateThemePreview(resolvedTheme);
+          if (typeof window.applyThemePreference === "function") {
+            window.applyThemePreference(resolvedTheme);
+          }
+          if (currentUser) {
+            currentUser.preferences = {
+              ...(currentUser.preferences || {}),
+              theme: resolvedTheme
+            };
+          }
         }
       } else if (prefs.theme) {
         applyThemeSelection(prefs.theme);
+      }
+      if (fontSizeSelect) {
+        const resolvedSize = prefs.fontSize || fontSizeSelect.value || "md";
+        applyFontSizeSelection(resolvedSize, { skipPersist: true });
       }
       const stateValue = prefs.state || currentUser?.location || currentUser?.state || "";
       if (statePreferenceSelect) {
@@ -164,9 +268,13 @@ document.addEventListener("DOMContentLoaded", () => {
         window.applyThemePreference(theme);
       }
       if (currentUser) {
+        currentUser.preferences = {
+          ...(currentUser.preferences || {}),
+          theme
+        };
         currentUser.location = state || "";
         currentUser.state = state || "";
-        persistSession({ user: currentUser });
+        persistSession({ user: mergeSessionPreferences(currentUser) });
       }
       hydrateStatePreference(currentUser || { state });
       showToast("Preferences saved", "ok");
@@ -234,22 +342,80 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- STRIPE CONNECT ---
   const connectStripeBtn = document.getElementById("connectStripeBtn");
+  const stripeStatus = document.getElementById("stripeStatus");
+
+  const updateStripeStatus = (data = {}) => {
+    const connected = !!data.details_submitted && !!data.payouts_enabled;
+    const bankName = String(data.bank_name || "").trim();
+    const bankLast4 = String(data.bank_last4 || "").trim();
+    if (stripeStatus) {
+      if (connected) {
+        const bankBits = [];
+        if (bankName) bankBits.push(bankName);
+        if (bankLast4) bankBits.push(`**** ${bankLast4}`);
+        stripeStatus.textContent = bankBits.length
+          ? `Stripe connected for payouts (${bankBits.join(" ")})`
+          : "Stripe connected for payouts.";
+      } else if (data.accountId) {
+        stripeStatus.textContent = "Stripe setup in progress. Finish onboarding to enable payouts.";
+      } else {
+        stripeStatus.textContent = "Stripe not connected.";
+      }
+    }
+    if (connectStripeBtn) {
+      connectStripeBtn.textContent = connected ? "Update Stripe Details" : "Connect Stripe Account →";
+      connectStripeBtn.disabled = !connected;
+      if (!connected) {
+        connectStripeBtn.setAttribute("aria-disabled", "true");
+        connectStripeBtn.title = STRIPE_GATE_MESSAGE;
+      } else {
+        connectStripeBtn.removeAttribute("aria-disabled");
+        connectStripeBtn.removeAttribute("title");
+      }
+    }
+  };
+
+  async function refreshStripeStatus() {
+    if (!connectStripeBtn && !stripeStatus) return;
+    if (stripeStatus) stripeStatus.textContent = "Checking Stripe status…";
+    try {
+      const res = await secureFetch("/api/payments/connect/status");
+      if (!res.ok) throw new Error("Unable to fetch Stripe status");
+      const data = await res.json();
+      updateStripeStatus(data);
+    } catch (err) {
+      if (stripeStatus) stripeStatus.textContent = "Stripe status unavailable.";
+      if (connectStripeBtn) {
+        connectStripeBtn.disabled = true;
+        connectStripeBtn.setAttribute("aria-disabled", "true");
+        connectStripeBtn.title = STRIPE_GATE_MESSAGE;
+      }
+    }
+  }
+
   if (connectStripeBtn) {
     connectStripeBtn.addEventListener("click", async () => {
+      connectStripeBtn.disabled = true;
+      connectStripeBtn.textContent = "Connecting…";
       try {
-        const res = await fetch("/api/stripe/connect", {
+        const createRes = await secureFetch("/api/payments/connect/create-account", { method: "POST" });
+        if (!createRes.ok) throw new Error("Unable to prepare Stripe account");
+        const { accountId } = await createRes.json();
+        const linkRes = await secureFetch("/api/payments/connect/onboard-link", {
           method: "POST",
-          credentials: "include"
+          body: { accountId },
         });
-        const data = await res.json();
-        if (data?.url) {
-          window.location.href = data.url;
-        }
+        if (!linkRes.ok) throw new Error("Unable to start Stripe onboarding");
+        const { url } = await linkRes.json();
+        if (!url) throw new Error("Invalid Stripe onboarding link");
+        window.location.href = url;
       } catch (err) {
         console.error("Failed to start Stripe connect flow", err);
-        alert("Unable to connect Stripe right now.");
+        alert(err?.message || "Unable to connect Stripe right now.");
+        refreshStripeStatus();
       }
     });
+    refreshStripeStatus();
   }
 });
 
@@ -345,6 +511,8 @@ let statePreferenceSelect = null;
 let attorneyPrefsBound = false;
 let attorneySaveBound = false;
 let paralegalPrefsBound = false;
+let paralegalEditBound = false;
+let activeParalegalSection = null;
 
 const FIELD_OF_LAW_OPTIONS = [
   "Administrative Law",
@@ -408,6 +576,22 @@ const LANGUAGE_PROFICIENCY_OPTIONS = [
   { value: "Basic", label: "Basic" }
 ];
 
+const EDUCATION_MONTH_OPTIONS = [
+  { value: "", label: "Month (optional)" },
+  { value: "Jan", label: "January" },
+  { value: "Feb", label: "February" },
+  { value: "Mar", label: "March" },
+  { value: "Apr", label: "April" },
+  { value: "May", label: "May" },
+  { value: "Jun", label: "June" },
+  { value: "Jul", label: "July" },
+  { value: "Aug", label: "August" },
+  { value: "Sep", label: "September" },
+  { value: "Oct", label: "October" },
+  { value: "Nov", label: "November" },
+  { value: "Dec", label: "December" }
+];
+
 function normalizeStateValue(raw = "") {
   return String(raw || "")
     .trim()
@@ -430,9 +614,14 @@ function hydrateStatePreference(user = {}) {
 
 const languagesEditor = document.getElementById("languagesEditor");
 const addLanguageBtn = document.getElementById("addLanguageBtn");
+const educationEditor = document.getElementById("educationEditor");
+const addEducationBtn = document.getElementById("addEducationBtn");
 
 if (addLanguageBtn && languagesEditor) {
   addLanguageBtn.addEventListener("click", () => addLanguageRow());
+}
+if (addEducationBtn && educationEditor) {
+  addEducationBtn.addEventListener("click", () => addEducationRow(normalizeEducationEntry()));
 }
 
 function buildInitials(name = "", fallback = "A") {
@@ -506,6 +695,7 @@ function initParalegalSettings(user = {}) {
   showParalegalSettings();
   hydrateProfileForm(user);
   seedSettingsState(user);
+  initParalegalSectionEditing();
   hydrateParalegalNotificationPrefs(user);
   bindParalegalNotificationToggles();
   renderLanguageEditor(user.languages || []);
@@ -529,6 +719,188 @@ function showParalegalSettings() {
 function showAttorneySettings() {
   attorneySettingsSection?.classList.remove("hidden");
   paralegalSettingsSection?.classList.add("hidden");
+}
+
+function setFullNameInputs(user = {}) {
+  const firstName = user.firstName || "";
+  const lastName = user.lastName || "";
+  const firstNameInput = document.getElementById("firstNameInput");
+  const lastNameInput = document.getElementById("lastNameInput");
+  const fullNameInput = document.getElementById("fullNameInput");
+  if (firstNameInput) firstNameInput.value = firstName;
+  if (lastNameInput) lastNameInput.value = lastName;
+  if (fullNameInput) {
+    const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+    fullNameInput.value = fullName;
+  }
+}
+
+function syncNamePartsFromFullName() {
+  const fullNameInput = document.getElementById("fullNameInput");
+  if (!fullNameInput) return;
+  const value = fullNameInput.value.trim();
+  let firstName = "";
+  let lastName = "";
+  if (value) {
+    const parts = value.split(/\s+/);
+    firstName = parts.shift() || "";
+    lastName = parts.join(" ");
+  }
+  const firstNameInput = document.getElementById("firstNameInput");
+  const lastNameInput = document.getElementById("lastNameInput");
+  if (firstNameInput) firstNameInput.value = firstName;
+  if (lastNameInput) lastNameInput.value = lastName;
+}
+
+function updateRoleLineFromExperience() {
+  const roleLine = document.getElementById("roleLine");
+  if (!roleLine) return;
+  const yearsInput = document.getElementById("yearsExperienceInput");
+  const raw = yearsInput ? Number(yearsInput.value) : null;
+  if (raw && !Number.isNaN(raw)) {
+    const label = raw === 1 ? "year" : "years";
+    roleLine.textContent = `${raw} ${label} experience`;
+    return;
+  }
+  roleLine.textContent = "Experience details pending";
+}
+
+function setSectionDisplayText(element, value, fallback) {
+  if (!element) return;
+  const text = String(value || "").trim();
+  if (text) {
+    element.textContent = text;
+    element.classList.remove("is-placeholder");
+  } else {
+    element.textContent = fallback;
+    element.classList.add("is-placeholder");
+  }
+}
+
+function parseCommaList(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function formatEducationEntry(entry = {}) {
+  const pieces = [];
+  if (entry.degree) pieces.push(entry.degree);
+  if (entry.school) pieces.push(entry.school);
+  const startParts = [entry.startMonth, entry.startYear].filter(Boolean).join(" ");
+  const endParts = [entry.endMonth, entry.endYear].filter(Boolean).join(" ");
+  let range = "";
+  if (startParts && endParts) {
+    range = `${startParts} - ${endParts}`;
+  } else if (startParts) {
+    range = startParts;
+  } else if (endParts) {
+    range = endParts;
+  }
+  if (range) pieces.push(range);
+  return pieces.filter(Boolean).join(" - ");
+}
+
+function refreshParalegalSectionDisplays() {
+  const root = document.getElementById("paralegalSettings");
+  if (!root) return;
+
+  const bioDisplay = document.getElementById("bioDisplay");
+  const bioInput = document.getElementById("bioInput");
+  setSectionDisplayText(bioDisplay, bioInput?.value || "", "No bio provided.");
+
+  const experienceDisplay = document.getElementById("experienceDisplay");
+  const experienceInput = document.getElementById("experienceInput");
+  setSectionDisplayText(
+    experienceDisplay,
+    experienceInput?.value || "",
+    "No experience added yet."
+  );
+
+  const skillsDisplay = document.getElementById("skillsDisplay");
+  const skillsInput = document.getElementById("skillsInput");
+  const practiceInput = document.getElementById("practiceAreasInput");
+  const skills = parseCommaList(skillsInput?.value || "");
+  const focus = parseCommaList(practiceInput?.value || "");
+  if (skillsDisplay) {
+    const lines = [];
+    if (skills.length) lines.push(`Skills: ${skills.join(", ")}`);
+    if (focus.length) lines.push(`Focus Areas: ${focus.join(", ")}`);
+    setSectionDisplayText(
+      skillsDisplay,
+      lines.join("\n"),
+      "No skills or focus areas listed."
+    );
+  }
+
+  const educationDisplay = document.getElementById("educationDisplay");
+  if (educationDisplay) {
+    const entries = collectEducationFromEditor();
+    const lines = entries.map((entry) => formatEducationEntry(entry)).filter(Boolean);
+    setSectionDisplayText(
+      educationDisplay,
+      lines.join("\n"),
+      "No education entries yet."
+    );
+  }
+
+  const languagesDisplay = document.getElementById("languagesDisplay");
+  if (languagesDisplay) {
+    const entries = collectLanguagesFromEditor();
+    const lines = entries
+      .map((entry) => {
+        const name = entry?.name ? entry.name.trim() : "";
+        if (!name) return "";
+        const proficiency = entry?.proficiency ? entry.proficiency.trim() : "";
+        return proficiency ? `${name} (${proficiency})` : name;
+      })
+      .filter(Boolean);
+    setSectionDisplayText(
+      languagesDisplay,
+      lines.join("\n"),
+      "No languages listed."
+    );
+  }
+}
+
+function setActiveParalegalSection(sectionKey) {
+  const root = document.getElementById("paralegalSettings");
+  if (!root) return;
+  const sections = root.querySelectorAll("[data-edit-section]");
+  sections.forEach((section) => {
+    const isActive = section.dataset.editSection === sectionKey;
+    section.classList.toggle("is-editing", isActive);
+    const toggle = section.querySelector(".section-edit-toggle");
+    if (toggle) toggle.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+  activeParalegalSection = sectionKey || null;
+  refreshParalegalSectionDisplays();
+}
+
+function initParalegalSectionEditing() {
+  const root = document.getElementById("paralegalSettings");
+  if (!root) return;
+  const toggles = root.querySelectorAll(".section-edit-toggle");
+  if (!toggles.length) return;
+
+  if (!paralegalEditBound) {
+    toggles.forEach((toggle) => {
+      toggle.addEventListener("click", () => {
+        const targetKey = toggle.dataset.editToggle;
+        if (!targetKey) return;
+        const nextKey = activeParalegalSection === targetKey ? null : targetKey;
+        setActiveParalegalSection(nextKey);
+      });
+    });
+    paralegalEditBound = true;
+  }
+
+  if (!activeParalegalSection) {
+    setActiveParalegalSection(null);
+  } else {
+    setActiveParalegalSection(activeParalegalSection);
+  }
 }
 
 function hydrateAttorneyProfileForm(user = {}) {
@@ -930,9 +1302,9 @@ async function handleAttorneyProfileSave() {
     if (!res.ok) {
       throw new Error(updatedUser?.error || "Unable to save profile");
     }
-    currentUser = updatedUser;
-    persistSession({ user: updatedUser });
-    window.updateSessionUser?.(updatedUser);
+    currentUser = mergeSessionPreferences(updatedUser);
+    persistSession({ user: currentUser });
+    window.updateSessionUser?.(currentUser);
     settingsState.profileImage = updatedUser.profileImage || settingsState.profileImage;
     settingsState.practiceDescription = updatedUser.practiceDescription || updatedUser.bio || "";
     renderAttorneyPracticeAreas(updatedUser.practiceAreas || []);
@@ -975,6 +1347,37 @@ function normalizeLanguageEntry(entry) {
   };
 }
 
+function normalizeEducationEntry(entry) {
+  if (!entry) {
+    return {
+      school: "",
+      startMonth: "",
+      startYear: "",
+      endMonth: "",
+      endYear: "",
+      degree: ""
+    };
+  }
+  if (typeof entry === "string") {
+    return {
+      school: entry,
+      startMonth: "",
+      startYear: "",
+      endMonth: "",
+      endYear: "",
+      degree: ""
+    };
+  }
+  return {
+    school: entry.school || entry.institution || "",
+    startMonth: entry.startMonth || entry.beginMonth || "",
+    startYear: entry.startYear || entry.beginYear || "",
+    endMonth: entry.endMonth || entry.finishMonth || "",
+    endYear: entry.endYear || entry.finishYear || "",
+    degree: entry.degree || ""
+  };
+}
+
 function addLanguageRow(entry = {}) {
   if (!languagesEditor) return;
   const row = document.createElement("div");
@@ -1012,6 +1415,64 @@ function addLanguageRow(entry = {}) {
   languagesEditor.appendChild(row);
 }
 
+function createEducationMonthSelect(value, placeholderLabel) {
+  const select = document.createElement("select");
+  select.className = "education-month";
+  EDUCATION_MONTH_OPTIONS.forEach((opt) => {
+    const option = document.createElement("option");
+    option.value = opt.value;
+    option.textContent = opt.label || placeholderLabel;
+    select.appendChild(option);
+  });
+  select.value = value || "";
+  return select;
+}
+
+function addEducationRow(entry = {}) {
+  if (!educationEditor) return;
+  const row = document.createElement("div");
+  row.className = "education-row";
+  row.dataset.degree = entry.degree || "";
+
+  const schoolInput = document.createElement("input");
+  schoolInput.type = "text";
+  schoolInput.placeholder = "School";
+  schoolInput.className = "education-school";
+  schoolInput.value = entry.school || "";
+  row.appendChild(schoolInput);
+
+  const startMonthSelect = createEducationMonthSelect(entry.startMonth, "Begin month (optional)");
+  startMonthSelect.classList.add("education-start-month");
+  row.appendChild(startMonthSelect);
+
+  const startYearInput = document.createElement("input");
+  startYearInput.type = "number";
+  startYearInput.placeholder = "Begin year";
+  startYearInput.className = "education-year education-start-year";
+  startYearInput.value = entry.startYear || "";
+  row.appendChild(startYearInput);
+
+  const endMonthSelect = createEducationMonthSelect(entry.endMonth, "End month (optional)");
+  endMonthSelect.classList.add("education-end-month");
+  row.appendChild(endMonthSelect);
+
+  const endYearInput = document.createElement("input");
+  endYearInput.type = "number";
+  endYearInput.placeholder = "End year";
+  endYearInput.className = "education-year education-end-year";
+  endYearInput.value = entry.endYear || "";
+  row.appendChild(endYearInput);
+
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "remove-education";
+  removeBtn.textContent = "Remove";
+  removeBtn.addEventListener("click", () => row.remove());
+  row.appendChild(removeBtn);
+
+  educationEditor.appendChild(row);
+}
+
 function renderLanguageEditor(languages = []) {
   if (!languagesEditor) return;
   languagesEditor.innerHTML = "";
@@ -1020,6 +1481,17 @@ function renderLanguageEditor(languages = []) {
       ? languages.map((entry) => normalizeLanguageEntry(entry))
       : [normalizeLanguageEntry()];
   entries.forEach((entry) => addLanguageRow(entry));
+}
+
+function renderEducationEditor(education = []) {
+  if (!educationEditor) return;
+  educationEditor.innerHTML = "";
+  const entries =
+    Array.isArray(education) && education.length
+      ? education.map((entry) => normalizeEducationEntry(entry))
+      : [normalizeEducationEntry()];
+  entries.forEach((entry) => addEducationRow(entry));
+  settingsState.education = entries;
 }
 
 function collectLanguagesFromEditor() {
@@ -1034,6 +1506,32 @@ function collectLanguagesFromEditor() {
     .filter(Boolean);
 }
 
+function collectEducationFromEditor() {
+  if (!educationEditor) return settingsState.education || [];
+  return Array.from(educationEditor.querySelectorAll(".education-row"))
+    .map((row) => {
+      const school = row.querySelector(".education-school")?.value.trim() || "";
+      const startMonth = row.querySelector(".education-start-month")?.value || "";
+      const startYear = row.querySelector(".education-start-year")?.value || "";
+      const endMonth = row.querySelector(".education-end-month")?.value || "";
+      const endYear = row.querySelector(".education-end-year")?.value || "";
+      const degree = row.dataset.degree || "";
+      if (!school && !startYear && !endYear && !startMonth && !endMonth) {
+        return null;
+      }
+      const entry = {
+        school,
+        startMonth,
+        startYear,
+        endMonth,
+        endYear
+      };
+      if (degree) entry.degree = degree;
+      return entry;
+    })
+    .filter(Boolean);
+}
+
 function getCachedUser() {
   if (typeof window.getStoredUser === "function") {
     const stored = window.getStoredUser();
@@ -1044,6 +1542,24 @@ function getCachedUser() {
     if (raw) return JSON.parse(raw);
   } catch {}
   return null;
+}
+
+function mergeSessionPreferences(user = {}) {
+  if (!user || typeof user !== "object") return user;
+  const prefs = user.preferences && typeof user.preferences === "object" ? user.preferences : {};
+  const sessionTheme = typeof window.getThemePreference === "function" ? window.getThemePreference() : null;
+  const sessionFontSize = typeof window.getFontSizePreference === "function" ? window.getFontSizePreference() : null;
+  const theme = prefs.theme || sessionTheme;
+  const fontSize = prefs.fontSize || sessionFontSize;
+  if (!theme && !fontSize) return user;
+  return {
+    ...user,
+    preferences: {
+      ...prefs,
+      ...(theme ? { theme } : {}),
+      ...(fontSize ? { fontSize } : {})
+    }
+  };
 }
 
 function showToast(message, type = "info") {
@@ -1073,6 +1589,7 @@ function showForceVisible() {
 function applyUnifiedRoleStyling(user = {}) {
   showForceVisible();
   const role = (user.role || "").trim().toLowerCase();
+  const isParalegal = role === "paralegal";
   const eyebrow = document.querySelector(".unified-header .eyebrow");
   const title = document.querySelector(".unified-header h1");
 
@@ -1080,6 +1597,7 @@ function applyUnifiedRoleStyling(user = {}) {
   if (title) {
     title.textContent = role === "paralegal" ? "Account Settings" : "Account Settings";
   }
+  document.body.classList.toggle("paralegal-flat", isParalegal);
 
   document.querySelectorAll("[data-paralegal-only]").forEach((el) => {
     if (el.dataset.forceVisible !== undefined) {
@@ -1087,7 +1605,7 @@ function applyUnifiedRoleStyling(user = {}) {
       el.hidden = false;
       return;
     }
-    el.style.display = role === "paralegal" ? "" : "none";
+    el.style.display = isParalegal ? "" : "none";
   });
 
   document.querySelectorAll("[data-attorney-only]").forEach((el) => {
@@ -1178,9 +1696,9 @@ async function loadSettings() {
       } catch (_) {}
     }
     ensureUserStatus(user);
-    currentUser = user;
-    window.currentUser = user;
-    persistSession({ user });
+    currentUser = mergeSessionPreferences(user);
+    window.currentUser = currentUser;
+    persistSession({ user: currentUser });
     hydrateStatePreference(user);
 
     if (!hasSettingsAccess(user)) {
@@ -1192,7 +1710,7 @@ async function loadSettings() {
 
     if (currentUser?.role === "paralegal") {
       if (titleEl) titleEl.textContent = "Paralegal Account Settings";
-      if (subtitleEl) subtitleEl.textContent = "Keep your LPC profile accurate, stay secure, and manage your public paralegal profile.";
+      if (subtitleEl) subtitleEl.textContent = "Keep your LPC profile up-to-date.";
     }
 
     if (currentUser?.role === "attorney") {
@@ -1215,10 +1733,7 @@ async function loadSettings() {
     showParalegalSettings();
     hydrateProfileForm(user);
 
-    const firstNameInput = document.getElementById("firstNameInput");
-    if (firstNameInput) firstNameInput.value = user.firstName || "";
-    const lastNameInput = document.getElementById("lastNameInput");
-    if (lastNameInput) lastNameInput.value = user.lastName || "";
+    setFullNameInputs(user);
     const emailInput = document.getElementById("emailInput");
     if (emailInput) emailInput.value = user.email || "";
     const phoneInput = document.getElementById("phoneInput");
@@ -1242,14 +1757,10 @@ async function loadSettings() {
           .filter(Boolean)
           .join("\n\n");
       }
-      const educationInput = document.getElementById("educationInput");
-      if (educationInput) {
-        educationInput.value = (user.education || [])
-          .map((e) => `${e.degree || ""} — ${e.school || ""}`.trim())
-          .filter(Boolean)
-          .join("\n");
-      }
+      renderEducationEditor(user.education || []);
       renderLanguageEditor(user.languages || []);
+      updateRoleLineFromExperience();
+      refreshParalegalSectionDisplays();
     }
   } catch (err) {
     renderFallback("settingsCertificate", "Certificate");
@@ -1283,10 +1794,7 @@ async function loadSettings() {
 }
 
 function hydrateProfileForm(user = {}) {
-  const firstNameInput = document.getElementById("firstNameInput");
-  if (firstNameInput) firstNameInput.value = user.firstName || "";
-  const lastNameInput = document.getElementById("lastNameInput");
-  if (lastNameInput) lastNameInput.value = user.lastName || "";
+  setFullNameInputs(user);
   const emailInput = document.getElementById("emailInput");
   if (emailInput) emailInput.value = user.email || "";
   const phoneInput = document.getElementById("phoneInput");
@@ -1324,18 +1832,10 @@ function hydrateProfileForm(user = {}) {
         .filter(Boolean)
         .join("\n\n");
     }
-    const educationInput = document.getElementById("educationInput");
-    if (educationInput) {
-      const schools = Array.isArray(user.education) ? user.education : [];
-      educationInput.value = schools
-        .map((entry = {}) => {
-          const line = [entry.degree, entry.school].filter(Boolean).join(" — ");
-          return line || "";
-        })
-        .filter(Boolean)
-        .join("\n");
-    }
+    renderEducationEditor(user.education || []);
     renderLanguageEditor(user.languages || []);
+    updateRoleLineFromExperience();
+    refreshParalegalSectionDisplays();
   }
 }
 
@@ -1345,16 +1845,22 @@ function hydrateProfileForm(user = {}) {
 function loadCertificate(user) {
   const section = document.getElementById("settingsCertificate");
   if (!section) return;
+  const statusText = user.certificateURL ? "Certificate on file" : "No file uploaded";
   section.innerHTML = `
-    <div class="upload-card">
-      <h3>Upload Certificate (PDF)</h3>
-      <p>Share verified certifications or licenses with attorneys.</p>
-      <div class="file-input-row">
-        <label for="certificateInput" class="file-trigger">Choose File</label>
-        <span id="certificateFileName" class="file-name">${user.certificateURL ? "Certificate on file" : "No file chosen"}</span>
+    <div class="paralegal-doc-row">
+      <div class="paralegal-doc-meta">
+        <h3>Upload Certificate (PDF)</h3>
+        <p>Share verified certifications or licenses with attorneys.</p>
+        <p class="doc-status" id="certificateStatus">${statusText}</p>
       </div>
-      <input id="certificateInput" type="file" accept="application/pdf" class="file-input-hidden">
-      <button id="uploadCertificateBtn" class="file-trigger upload-action-btn" type="button">Upload Certificate</button>
+      <div class="paralegal-doc-actions">
+        <div class="file-input-row">
+          <label for="certificateInput" class="file-trigger">Choose File</label>
+          <span id="certificateFileName" class="file-name">${statusText}</span>
+        </div>
+        <input id="certificateInput" type="file" accept="application/pdf" class="file-input-hidden">
+        <button id="uploadCertificateBtn" class="file-trigger upload-action-btn" type="button">Upload Certificate</button>
+      </div>
     </div>
   `;
 
@@ -1412,22 +1918,30 @@ function loadCertificate(user) {
     settingsState.pendingCertificateKey = latestKey;
     if (certInput) certInput.value = "";
     if (certFileName) certFileName.textContent = "Uploaded!";
+    const status = document.getElementById("certificateStatus");
+    if (status) status.textContent = "Certificate on file";
   });
 }
 
 function loadResume(user) {
   const section = document.getElementById("settingsResume");
   if (!section) return;
+  const statusText = user.resumeURL ? "Résumé on file" : "No file uploaded";
   section.innerHTML = `
-    <div class="upload-card">
-      <h3>Upload Résumé (PDF)</h3>
-      <p>Upload a polished résumé so attorneys can verify your expertise.</p>
-      <div class="file-input-row">
-        <label for="resumeInput" class="file-trigger">Choose File</label>
-        <span id="resumeFileName" class="file-name">${user.resumeURL ? "Résumé on file" : "No file chosen"}</span>
+    <div class="paralegal-doc-row">
+      <div class="paralegal-doc-meta">
+        <h3>Upload Résumé (PDF)</h3>
+        <p>Upload a polished résumé so attorneys can verify your expertise.</p>
+        <p class="doc-status" id="resumeStatus">${statusText}</p>
       </div>
-      <input id="resumeInput" type="file" accept="application/pdf" class="file-input-hidden">
-      <button id="uploadResumeBtn" class="file-trigger upload-action-btn" type="button">Upload Résumé</button>
+      <div class="paralegal-doc-actions">
+        <div class="file-input-row">
+          <label for="resumeInput" class="file-trigger">Choose File</label>
+          <span id="resumeFileName" class="file-name">${statusText}</span>
+        </div>
+        <input id="resumeInput" type="file" accept="application/pdf" class="file-input-hidden">
+        <button id="uploadResumeBtn" class="file-trigger upload-action-btn" type="button">Upload Résumé</button>
+      </div>
     </div>
   `;
 
@@ -1480,22 +1994,30 @@ function loadResume(user) {
     settingsState.pendingResumeKey = latestKey;
     if (resumeInput) resumeInput.value = "";
     if (resumeFileName) resumeFileName.textContent = "Uploaded!";
+    const status = document.getElementById("resumeStatus");
+    if (status) status.textContent = "Résumé on file";
   });
 }
 
 function loadWritingSample(user) {
   const section = document.getElementById("settingsWritingSample");
   if (!section) return;
+  const statusText = user.writingSampleURL ? "Writing sample on file" : "No file uploaded";
   section.innerHTML = `
-    <div class="upload-card">
-      <h3>Upload Writing Sample (PDF)</h3>
-      <p>Attach a representative writing sample for attorneys to review.</p>
-      <div class="file-input-row">
-        <label for="writingSampleInput" class="file-trigger">Choose File</label>
-        <span id="writingSampleFileName" class="file-name">${user.writingSampleURL ? "Writing sample on file" : "No file chosen"}</span>
+    <div class="paralegal-doc-row">
+      <div class="paralegal-doc-meta">
+        <h3>Upload Writing Sample (PDF)</h3>
+        <p>Attach a representative writing sample for attorneys to review.</p>
+        <p class="doc-status" id="writingSampleStatus">${statusText}</p>
       </div>
-      <input id="writingSampleInput" type="file" accept="application/pdf" class="file-input-hidden">
-      <button id="uploadWritingSampleBtn" class="file-trigger upload-action-btn" type="button">Upload Writing Sample</button>
+      <div class="paralegal-doc-actions">
+        <div class="file-input-row">
+          <label for="writingSampleInput" class="file-trigger">Choose File</label>
+          <span id="writingSampleFileName" class="file-name">${statusText}</span>
+        </div>
+        <input id="writingSampleInput" type="file" accept="application/pdf" class="file-input-hidden">
+        <button id="uploadWritingSampleBtn" class="file-trigger upload-action-btn" type="button">Upload Writing Sample</button>
+      </div>
     </div>
   `;
 
@@ -1553,6 +2075,8 @@ function loadWritingSample(user) {
     settingsState.pendingWritingSampleKey = latestKey;
     if (sampleInput) sampleInput.value = "";
     if (sampleFileName) sampleFileName.textContent = "Uploaded!";
+    const status = document.getElementById("writingSampleStatus");
+    if (status) status.textContent = "Writing sample on file";
   });
 }
 
@@ -1805,6 +2329,7 @@ function loadNotifications(user) {
 // ================= SAVE SETTINGS =================
 
 async function saveSettings() {
+  syncNamePartsFromFullName();
   const firstNameInput = document.getElementById("firstNameInput");
   const lastNameInput = document.getElementById("lastNameInput");
   const emailInput = document.getElementById("emailInput");
@@ -1816,7 +2341,6 @@ async function saveSettings() {
   const practiceAreasInput = document.getElementById("practiceAreasInput");
   const skillsInput = document.getElementById("skillsInput");
   const experienceInput = document.getElementById("experienceInput");
-  const educationInput = document.getElementById("educationInput");
   const resumeKeyInput = document.getElementById("resumeKeyInput");
   const certificateKeyInput = document.getElementById("certificateKeyInput");
   const writingSampleKeyInput = document.getElementById("writingSampleKeyInput");
@@ -1868,17 +2392,7 @@ async function saveSettings() {
         .filter((entry) => entry.title || entry.description)
         .filter((entry) => entry.title || entry.description)
     : [];
-  body.education = educationInput
-    ? educationInput.value
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => {
-          const [degreePart = "", schoolPart = ""] = line.split("—").map((s) => s.trim());
-          return { degree: degreePart || line, school: schoolPart };
-        })
-        .filter((entry) => entry.degree || entry.school)
-    : [];
+  body.education = collectEducationFromEditor();
   const resumeKeyValue = resumeKeyInput?.value || settingsState.pendingResumeKey || "";
   if (resumeKeyValue) {
     body.resumeURL = resumeKeyValue;
@@ -1908,8 +2422,9 @@ async function saveSettings() {
   }
 
   const updatedUser = await secureFetch("/api/users/me").then((r) => r.json());
-  localStorage.setItem("lpc_user", JSON.stringify(updatedUser));
-  currentUser = updatedUser;
+  const mergedUser = mergeSessionPreferences(updatedUser);
+  localStorage.setItem("lpc_user", JSON.stringify(mergedUser));
+  currentUser = mergedUser;
   settingsState.bio = updatedUser.bio || "";
   settingsState.education = updatedUser.education || [];
   settingsState.awards = updatedUser.awards || [];
@@ -1931,8 +2446,8 @@ async function saveSettings() {
   if (writingSampleKeyInput) writingSampleKeyInput.value = "";
   if (writingSampleInput) writingSampleInput.value = "";
 
-  persistSession({ user: updatedUser });
-  window.updateSessionUser?.(updatedUser);
+  persistSession({ user: mergedUser });
+  window.updateSessionUser?.(mergedUser);
 
   applyAvatar?.(updatedUser);
   hydrateProfileForm(updatedUser);
@@ -1998,7 +2513,7 @@ async function handleAvatarUpload(config) {
   try {
     const uploadedUrl = await uploadProfilePhotoFile(file);
     if (uploadedUrl) {
-      const updatedUser = { ...(currentUser || {}), profileImage: uploadedUrl };
+      const updatedUser = mergeSessionPreferences({ ...(currentUser || {}), profileImage: uploadedUrl });
       currentUser = updatedUser;
       settingsState.profileImage = uploadedUrl;
       persistSession({ user: updatedUser });

@@ -20,12 +20,14 @@ function initBillingLite() {
   const replaceCardBtn = document.getElementById("replacePaymentMethodBtn");
   const saveCardBtn = document.getElementById("savePaymentMethodBtn");
   const cancelCardBtn = document.getElementById("cancelPaymentMethodBtn");
+  const PENDING_HIRE_KEY = "lpc_pending_hire_funding";
 
   let cachedEscrows = [];
   let openDrawerEl = null;
   let openDrawerTrigger = null;
   let setupElements = null;
   let setupPaymentElement = null;
+  let pendingHire = null;
 
   const STRIPE_JS_SRC = "https://js.stripe.com/v3/";
   let stripeJsPromise = null;
@@ -33,7 +35,14 @@ function initBillingLite() {
   (async function initBillingSurface() {
     console.log("billing-lite loaded");
     bindEvents();
-    await loadPaymentMethodStatus();
+    pendingHire = readPendingHire();
+    if (pendingHire?.message) {
+      showToast(pendingHire.message, "info");
+    }
+    const paymentStatus = await loadPaymentMethodStatus();
+    if (pendingHire && paymentStatus?.paymentMethod) {
+      resumePendingHire(pendingHire);
+    }
     const activeItems = await loadActiveEscrows(true);
     await Promise.all([loadFinanceAlerts(activeItems), loadHistory()]);
   })();
@@ -96,7 +105,7 @@ async function loadActiveEscrows(showLoading = false, { syncAlerts = false } = {
 function renderEscrowRow(entry = {}) {
   const caseName = escapeHtml(entry.caseName || entry.caseTitle || entry.title || "Case");
   const paralegal = escapeHtml(entry.paralegalName || "Paralegal pending");
-  const amount = formatCurrency(entry.amountHeld ?? entry.amount ?? entry.totalAmount);
+  const amount = formatCurrency(entry.amountHeld ?? entry.amount ?? entry.lockedTotalAmount ?? entry.totalAmount);
   const funded = formatDate(entry.fundedAt || entry.updatedAt);
   const statusLabel = formatStatusLabel(entry.status || "");
   const caseId = String(entry.caseId || entry.id || "");
@@ -116,7 +125,6 @@ function renderEscrowRow(entry = {}) {
           </button>
           <div class="action-menu" id="${menuId}" role="menu">
             <button type="button" data-escrow-action="view" data-case-id="${caseId}">View Case</button>
-            <button type="button" data-escrow-action="release" data-case-id="${caseId}">Approve &amp; Release Funds</button>
             <button type="button" data-escrow-action="messages" data-case-id="${caseId}">Message Paralegal</button>
           </div>
         </div>
@@ -167,20 +175,6 @@ function buildFinanceAlerts({ active = [], pending = [] } = {}) {
       ],
     });
   }
-  const releaseCandidates = active.filter((item) => isReleaseCandidate(item.status)).slice(0, 3);
-  releaseCandidates.forEach((item) => {
-    alerts.push({
-      id: `release-${item.caseId}`,
-      type: "release",
-      title: `Approve & release funds for ${item.caseName || "a case"}`,
-      body: "The paralegal has wrapped. Approve & release funds to pay them.",
-      actions: [
-        { type: "release", label: "Approve & Release Funds", caseId: item.caseId, primary: true },
-        { type: "view", label: "View Case", caseId: item.caseId },
-        { type: "messages", label: "Message Paralegal", caseId: item.caseId },
-      ],
-    });
-  });
   return alerts;
 }
 
@@ -395,7 +389,7 @@ function renderPaymentMethodSummary(payload = {}) {
         <div>
           <div class="pm-label">Primary payment method</div>
           <div class="pm-meta">${escapeHtml(brand)} ending in ${escapeHtml(last4)}${escapeHtml(exp)}</div>
-          <div class="pm-helper">Used to fund escrow securely. Funds are released only after approval.</div>
+          <div class="pm-helper">This card is used to fund escrow when you hire a paralegal. Funds are held securely and released only after you approve completed work.</div>
         </div>
       </div>
     `;
@@ -478,6 +472,10 @@ async function savePaymentMethod() {
     showToast("Card saved and set as default.", "success");
     await loadPaymentMethodStatus();
     cancelPaymentFlow();
+    if (!pendingHire) pendingHire = readPendingHire();
+    if (pendingHire?.caseId) {
+      resumePendingHire(pendingHire);
+    }
   } catch (err) {
     if (paymentErrorsEl) paymentErrorsEl.textContent = err?.message || "Unable to save card.";
   } finally {
@@ -509,11 +507,39 @@ function cancelPaymentFlow() {
   }
 }
 
+function readPendingHire() {
+  try {
+    const raw = localStorage.getItem(PENDING_HIRE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingHire() {
+  try {
+    localStorage.removeItem(PENDING_HIRE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function resumePendingHire(pending) {
+  if (!pending?.caseId) return;
+  pendingHire = null;
+  clearPendingHire();
+  const target = pending.fundUrl || `fund-escrow.html?caseId=${encodeURIComponent(pending.caseId)}`;
+  showToast("Payment method ready. Redirecting to fund escrow...", "success");
+  setTimeout(() => {
+    window.location.href = target;
+  }, 600);
+}
+
 function renderHistoryCard(entry = {}) {
   const caseName = escapeHtml(entry.caseName || entry.caseTitle || entry.title || "Case");
   const jobTitle = escapeHtml(entry.jobTitle || caseName);
   const paralegal = escapeHtml(entry.paralegalName || "Assigned Paralegal");
-  const amount = formatCurrency(entry.jobAmount ?? entry.amount ?? entry.totalAmount);
+  const amount = formatCurrency(entry.jobAmount ?? entry.amount ?? entry.lockedTotalAmount ?? entry.totalAmount);
   const datePaid = formatDate(entry.releaseDate || entry.paidOutAt || entry.completedAt);
   const receipt = sanitizeUrl(entry.stripeReceiptUrl || entry.receiptUrl || entry.receipt);
   const receiptLink = receipt
@@ -547,6 +573,8 @@ function renderHistoryCard(entry = {}) {
 
 function releaseEscrowCase(caseId, trigger) {
   if (!caseId) return;
+  showToast("Funds are released only via the case completion flow.", "info");
+  return;
   const confirmRelease = window.confirm("Release funds for this case?");
   if (!confirmRelease) return;
   const btn = trigger;

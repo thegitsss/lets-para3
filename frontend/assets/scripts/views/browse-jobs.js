@@ -1,4 +1,5 @@
 import { secureFetch } from "../auth.js";
+import { getStripeConnectStatus, isStripeConnected, STRIPE_GATE_MESSAGE } from "../utils/stripe-connect.js";
 
 const jobsGrid = document.getElementById("jobs-grid");
 const pagination = document.getElementById("pagination");
@@ -16,12 +17,18 @@ const jobAttorneyName = document.getElementById("jobAttorneyName");
 const jobAttorneyFirm = document.getElementById("jobAttorneyFirm");
 const FALLBACK_AVATAR = "https://via.placeholder.com/64x64.png?text=A";
 const attorneyPreviewCache = new Map();
+const urlParams = new URLSearchParams(window.location.search);
+const explicitCaseId = (urlParams.get("caseId") || urlParams.get("caseID") || urlParams.get("case_id") || "").trim();
+const idParam = (urlParams.get("id") || "").trim();
+let previewCaseId = explicitCaseId;
+let previewMode = Boolean(previewCaseId);
 
 let allJobs = [];
 let filteredJobs = [];
 const APPLY_MAX_CHARS = 2000;
 const APPLIED_STORAGE_KEY = "lpc_applied_jobs";
-const appliedJobs = new Map(loadAppliedJobs()); // jobId -> appliedAt ISO
+const appliedJobs = new Map(); // applyKey -> appliedAt ISO
+let viewerId = "";
 let applyModal = null;
 let applyTextarea = null;
 let applyStatus = null;
@@ -32,10 +39,10 @@ let currentApplyJob = null;
 let csrfToken = "";
 const toast = window.toastUtils;
 let expandedJobId = "";
-const initialJobParam = (() => {
-  const params = new URLSearchParams(window.location.search);
-  return (params.get("id") || params.get("caseId") || "").trim();
-})();
+let stripeConnected = false;
+let viewerRole = "";
+let allowApply = false;
+const initialJobParam = (idParam || explicitCaseId || "").trim();
 
 // Elements
 const filterToggle = document.getElementById("filterToggle");
@@ -56,25 +63,92 @@ const clearFiltersBtn = document.getElementById("clearFilters");
 
 let sessionReady = false;
 let modalJob = null;
+
+function readStoredRole() {
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    if (!raw) return "";
+    const user = JSON.parse(raw);
+    return String(user?.role || "").toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function readStoredUserId() {
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    if (!raw) return "";
+    const user = JSON.parse(raw);
+    return String(user?.id || user?._id || "");
+  } catch {
+    return "";
+  }
+}
+
+function getAppliedStorageKey() {
+  return viewerId ? `${APPLIED_STORAGE_KEY}:${viewerId}` : APPLIED_STORAGE_KEY;
+}
+
+async function resolveViewerRole() {
+  const stored = readStoredRole();
+  if (stored) return stored;
+  if (typeof window.getSessionData === "function") {
+    try {
+      const data = await window.getSessionData();
+      return String(data?.role || data?.user?.role || "").toLowerCase();
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
+
 async function ensureSession() {
   if (sessionReady) return true;
-  try {
-    if (typeof window.checkSession === "function") {
-      await window.checkSession("paralegal");
+  if (!previewMode && idParam) {
+    const role = await resolveViewerRole();
+    if (role && role !== "paralegal") {
+      previewMode = true;
+      previewCaseId = idParam;
+      viewerRole = role;
     }
+  }
+  if (previewMode) {
     sessionReady = true;
+    viewerRole = viewerRole || "";
+    viewerId = readStoredUserId();
+    allowApply = false;
     return true;
+  }
+  try {
+    let session = null;
+    if (typeof window.checkSession === "function") {
+      session = await window.checkSession("paralegal");
+    }
+    viewerRole = String(session?.role || session?.user?.role || "").toLowerCase();
+    viewerId = String(session?.user?.id || session?.user?._id || session?.id || session?._id || readStoredUserId());
+    allowApply = viewerRole === "paralegal";
+    sessionReady = true;
+    return previewMode ? true : !!session;
   } catch (err) {
     console.warn("Paralegal session required", err);
     return false;
   }
 }
 
-function promptStripeOnboarding(message) {
-  const copy = message || "Complete Stripe onboarding before applying.";
-  toast?.show?.(copy, { targetId: "toastBanner", type: "error" });
-  const go = window.confirm(`${copy} Open Profile Settings to connect Stripe now?`);
-  if (go) window.location.href = "profile-settings.html";
+function notifyStripeGate(message = STRIPE_GATE_MESSAGE) {
+  if (toast?.show) {
+    toast.show(message, { targetId: "toastBanner", type: "error" });
+  } else {
+    alert(message);
+  }
+}
+
+async function refreshStripeStatus() {
+  const data = await getStripeConnectStatus();
+  stripeConnected = isStripeConnected(data);
+  return data;
 }
 
 // Toggle filter menu
@@ -211,8 +285,13 @@ clearFiltersBtn?.addEventListener("click", clearFilters);
 // Helpers
 function getJobPayUSD(job) {
   if (!job) return 0;
-  if (typeof job.totalAmount === "number") return Math.max(0, job.totalAmount / 100);
-  if (typeof job.payAmount === "number") return Math.max(0, job.payAmount);
+  if (typeof job.lockedTotalAmount === "number" && job.lockedTotalAmount > 0) {
+    return Math.max(0, job.lockedTotalAmount / 100);
+  }
+  if (typeof job.totalAmount === "number" && job.totalAmount > 0) return Math.max(0, job.totalAmount / 100);
+  if (typeof job.payAmount === "number" && job.payAmount > 0) return Math.max(0, job.payAmount);
+  const parsedBudget = Number(job.budget);
+  if (Number.isFinite(parsedBudget) && parsedBudget > 0) return Math.max(0, parsedBudget);
   return 0;
 }
 
@@ -234,6 +313,19 @@ function getJobState(job) {
 function formatPay(value) {
   const rounded = Math.round((value + Number.EPSILON) * 100) / 100;
   return rounded.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function formatAppliedDate(value) {
+  if (!value) return "Applied";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Applied";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function isHiddenJob(job) {
+  const title = String(job?.title || job?.caseTitle || "").trim().toLowerCase();
+  const jobId = getJobIdForApply(job);
+  return title.includes("job not found") || !jobId;
 }
 
 function normalizeContentLines(raw) {
@@ -346,7 +438,8 @@ function renderJobs() {
     const when = job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "Recently posted";
     const jobId = getJobIdForApply(job);
     const caseId = getJobUniqueId(job) || jobId;
-    const appliedAt = appliedJobs.get(jobId) || appliedJobs.get(caseId);
+    const applyKey = getJobIdForApply(job);
+    const appliedAt = getAppliedAt(job);
     if (appliedAt) {
       card.classList.add("job-card--applied");
     }
@@ -378,7 +471,7 @@ function renderJobs() {
     });
     actions.appendChild(caseBtn);
 
-    actions.appendChild(buildApplyButton(job, jobId || caseId));
+    actions.appendChild(buildApplyButton(job, applyKey || jobId || caseId, appliedAt));
 
     card.appendChild(actions);
 
@@ -399,6 +492,10 @@ function renderJobs() {
 // Fetch jobs
 async function fetchJobs() {
   if (!sessionReady) return;
+  if (previewMode) {
+    await fetchPreviewCase();
+    return;
+  }
   try {
     const res = await fetch("/api/jobs/open", {
       headers: { Accept: "application/json" },
@@ -415,6 +512,7 @@ async function fetchJobs() {
     } else {
       allJobs = [];
     }
+    allJobs = allJobs.filter((job) => !isHiddenJob(job));
     filteredJobs = [...allJobs];
 
     populateFilters();
@@ -441,8 +539,78 @@ async function fetchJobs() {
   }
 }
 
-ensureSession().then((ready) => {
-  if (ready) fetchJobs();
+async function fetchPreviewCase() {
+  if (!previewCaseId) return;
+  try {
+    const res = await fetch(`/api/cases/${encodeURIComponent(previewCaseId)}`, {
+      headers: { Accept: "application/json" },
+      credentials: "include",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error || "Unable to load case details.");
+    }
+    const job = mapCaseToJob(data);
+    allJobs = [job];
+    filteredJobs = [job];
+    expandedJobId = getJobUniqueId(job) || "";
+    populateFilters();
+    applySort();
+    renderJobs();
+  } catch (err) {
+    console.error("Failed to load case preview", err);
+    allJobs = [];
+    filteredJobs = [];
+    renderJobs();
+    if (jobsGrid) {
+      const error = document.createElement("p");
+      error.className = "area";
+      error.style.textAlign = "center";
+      error.textContent = err?.message || "Unable to load case details.";
+      jobsGrid.appendChild(error);
+    }
+  }
+}
+
+function mapCaseToJob(caseData = {}) {
+  const totalAmount = typeof caseData.totalAmount === "number" ? caseData.totalAmount : null;
+  const lockedTotalAmount = typeof caseData.lockedTotalAmount === "number" ? caseData.lockedTotalAmount : null;
+  const amountForCase = lockedTotalAmount != null ? lockedTotalAmount : totalAmount;
+  const budgetFromCase = amountForCase != null ? Math.round(amountForCase / 100) : null;
+  const attorney = caseData.attorney || caseData.attorneyId || null;
+  const attorneyId =
+    (attorney && (attorney._id || attorney.id)) ||
+    caseData.attorneyId ||
+    caseData.attorney ||
+    null;
+  return {
+    id: caseData._id || caseData.id,
+    caseId: caseData._id || caseData.id,
+    jobId: caseData.jobId || caseData.job || null,
+    title: caseData.title || "Untitled Case",
+    practiceArea: caseData.practiceArea || "",
+    briefSummary: caseData.briefSummary || "",
+    shortDescription: caseData.briefSummary || "",
+    description: caseData.details || caseData.description || "",
+    totalAmount,
+    lockedTotalAmount,
+    budget: typeof budgetFromCase === "number" ? budgetFromCase : null,
+    currency: caseData.currency || "usd",
+    createdAt: caseData.createdAt || null,
+    state: caseData.state || caseData.locationState || "",
+    locationState: caseData.locationState || caseData.state || "",
+    attorneyId,
+    attorney,
+  };
+}
+
+ensureSession().then(async (ready) => {
+  if (!ready) return;
+  if (allowApply) {
+    await refreshStripeStatus();
+  }
+  await hydrateAppliedJobs();
+  fetchJobs();
 });
 
 sortSelect?.addEventListener("change", () => {
@@ -452,7 +620,17 @@ sortSelect?.addEventListener("change", () => {
 
 function openApplyModal(job) {
   if (!job) return;
+  if (!allowApply) {
+    showToast("Only paralegals can apply to cases.", "info");
+    return;
+  }
+  if (!stripeConnected) {
+    notifyStripeGate();
+    return;
+  }
   ensureApplyModal();
+  const existingConfirm = applyModal.querySelector(".apply-confirm");
+  if (existingConfirm) existingConfirm.remove();
   currentApplyJob = job;
   const jobId = getJobIdForApply(job);
   if (!jobId) return;
@@ -470,6 +648,7 @@ function openApplyModal(job) {
 function closeApplyModal() {
   if (applyModal) {
     applyModal.classList.remove("show");
+    applyModal.querySelector(".apply-confirm")?.remove();
   }
   currentApplyJob = null;
 }
@@ -529,6 +708,37 @@ function updateApplyCounter() {
   }
 }
 
+async function hydrateAppliedJobs() {
+  appliedJobs.clear();
+  const stored = loadAppliedJobs();
+  stored.forEach(([key, appliedAt]) => {
+    const normalizedKey = normalizeId(key);
+    if (normalizedKey) appliedJobs.set(normalizedKey, appliedAt);
+  });
+  if (allowApply) {
+    await loadAppliedJobsFromServer();
+  }
+}
+
+async function loadAppliedJobsFromServer() {
+  if (!allowApply) return;
+  try {
+    const res = await secureFetch("/api/applications/my", { headers: { Accept: "application/json" } });
+    if (!res.ok) return;
+    const apps = await res.json().catch(() => []);
+    if (!Array.isArray(apps)) return;
+    apps.forEach((app) => {
+      const job = app?.jobId || {};
+      const jobId = normalizeId(job?._id || job?.id || app?.jobId || "");
+      const appliedAt = app?.createdAt || new Date().toISOString();
+      if (jobId) appliedJobs.set(jobId, appliedAt);
+    });
+    persistAppliedJobs();
+  } catch (err) {
+    console.warn("Unable to load applied jobs", err);
+  }
+}
+
 async function submitApplication() {
   if (!currentApplyJob || !applyTextarea || !applyStatus || !applySubmitBtn) return;
   const jobId = getJobIdForApply(currentApplyJob);
@@ -563,27 +773,19 @@ async function submitApplication() {
     if (!res.ok) {
       const message = data?.error || "Unable to submit application.";
       if (res.status === 403 && /stripe/i.test(message)) {
-        applyStatus.textContent = message;
+        applyStatus.textContent = STRIPE_GATE_MESSAGE;
         applySubmitBtn.disabled = false;
         applySubmitBtn.textContent = "Submit application";
-        promptStripeOnboarding(message);
+        notifyStripeGate();
         return;
       }
       throw new Error(message);
     }
-    applyStatus.textContent = "Application submitted!";
+    applyStatus.textContent = "";
     markJobAsApplied(jobId);
     showToast("Application submitted successfully.", "ok");
-    if (applyModal) {
-      const conf = document.createElement("div");
-      conf.className = "apply-confirm";
-      conf.textContent = "Your application was sent to the attorney.";
-      applyModal.querySelector(".modal-actions")?.appendChild(conf);
-    }
-    setTimeout(() => {
-      closeApplyModal();
-      fetchJobs();
-    }, 800);
+    closeApplyModal();
+    fetchJobs();
   } catch (error) {
     console.error(error);
     applyStatus.textContent = error.message || "Unable to submit application.";
@@ -594,22 +796,44 @@ async function submitApplication() {
 
 function markJobAsApplied(jobId) {
   const now = new Date().toISOString();
-  appliedJobs.set(jobId, now);
+  const normalizedJobId = normalizeId(jobId);
+  if (normalizedJobId) appliedJobs.set(normalizedJobId, now);
   persistAppliedJobs();
-  const selector = `[data-job-id="${escapeAttr(jobId)}"]`;
-  document.querySelectorAll(selector).forEach((btn) => {
-    btn.disabled = true;
-    btn.textContent = "Application sent";
-  });
+  if (normalizedJobId) {
+    const selector = `[data-job-id="${escapeAttr(normalizedJobId)}"]`;
+    const label = `Case applied · ${formatAppliedDate(now)}`;
+    document.querySelectorAll(selector).forEach((btn) => {
+      btn.disabled = true;
+      btn.textContent = label;
+    });
+  }
+  if (currentApplyJob && normalizedJobId) {
+    currentApplyJob.appliedAt = now;
+  }
+  if (allJobs.length) {
+    allJobs.forEach((job) => {
+      const id = getJobIdForApply(job);
+      if (normalizedJobId && id === normalizedJobId) job.appliedAt = now;
+    });
+  }
   renderJobs(); // refresh cards to show applied state/date
 }
 
 function loadAppliedJobs() {
   try {
-    const raw = sessionStorage.getItem(APPLIED_STORAGE_KEY);
+    const storageKey = getAppliedStorageKey();
+    let raw = sessionStorage.getItem(storageKey);
+    if (!raw && storageKey !== APPLIED_STORAGE_KEY) {
+      raw = sessionStorage.getItem(APPLIED_STORAGE_KEY);
+      if (raw) {
+        sessionStorage.setItem(storageKey, raw);
+        sessionStorage.removeItem(APPLIED_STORAGE_KEY);
+      }
+    }
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
+      if (parsed.length && Array.isArray(parsed[0])) return parsed;
       return parsed.map((id) => [id, new Date().toISOString()]); // legacy list, mark now
     }
     return Array.isArray(parsed) ? parsed : [];
@@ -621,7 +845,7 @@ function loadAppliedJobs() {
 function persistAppliedJobs() {
   try {
     const entries = [...appliedJobs.entries()];
-    sessionStorage.setItem(APPLIED_STORAGE_KEY, JSON.stringify(entries));
+    sessionStorage.setItem(getAppliedStorageKey(), JSON.stringify(entries));
   } catch {
     /* ignore */
   }
@@ -683,6 +907,27 @@ async function ensureAttorneyPreview(job) {
 async function openJobModal(job) {
   if (!jobModal || !job) return;
   modalJob = job;
+  if (jobApplyBtn) {
+    const applyKey = getApplyKey(job);
+    const appliedAt = getAppliedAt(job);
+    if (!allowApply) {
+      jobApplyBtn.disabled = true;
+      jobApplyBtn.textContent = "Apply for this case";
+      jobApplyBtn.title = "Only paralegals can apply.";
+    } else if (appliedAt) {
+      jobApplyBtn.disabled = true;
+      jobApplyBtn.textContent = `Case applied · ${formatAppliedDate(appliedAt)}`;
+      jobApplyBtn.removeAttribute("title");
+    } else if (!stripeConnected) {
+      jobApplyBtn.disabled = true;
+      jobApplyBtn.textContent = "Apply for this case";
+      jobApplyBtn.title = STRIPE_GATE_MESSAGE;
+    } else {
+      jobApplyBtn.disabled = false;
+      jobApplyBtn.textContent = "Apply for this case";
+      jobApplyBtn.removeAttribute("title");
+    }
+  }
   try {
     await ensureAttorneyPreview(job);
   } catch (err) {
@@ -693,7 +938,8 @@ async function openJobModal(job) {
   const summary = job.shortDescription || job.practiceArea || job.briefSummary || "";
   const description = job.description || job.details || "No additional description provided.";
   const payUSD = getJobPayUSD(job);
-  const budget = typeof job.budget === "number" ? job.budget : null;
+  const budgetValue = Number(job.budget);
+  const budget = Number.isFinite(budgetValue) && budgetValue > 0 ? budgetValue : null;
   const compensation =
     job.compensationDisplay ||
     (budget ? `$${formatPay(budget)} compensation` : payUSD ? `$${formatPay(payUSD)} total` : "Rate negotiable");
@@ -765,6 +1011,14 @@ jobAttorneyButton?.addEventListener("click", async () => {
 
 jobApplyBtn?.addEventListener("click", (event) => {
   event.stopPropagation();
+  if (!allowApply) {
+    showToast("Only paralegals can apply to cases.", "info");
+    return;
+  }
+  if (!stripeConnected) {
+    notifyStripeGate();
+    return;
+  }
   if (modalJob) {
     openApplyModal(modalJob);
   }
@@ -820,14 +1074,42 @@ function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function normalizeId(value) {
+  if (!value) return "";
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (typeof value === "object") {
+    if (value._id || value.id || value.caseId || value.jobId) {
+      return normalizeId(value._id || value.id || value.caseId || value.jobId);
+    }
+    if (typeof value.toString === "function") {
+      const stringified = value.toString();
+      if (stringified && stringified !== "[object Object]") return String(stringified);
+    }
+    return "";
+  }
+  return String(value);
+}
+
 function getJobUniqueId(job) {
-  return String(
+  return normalizeId(
     job?.caseId || job?.case_id || job?.case || job?.id || job?._id || job?.jobId || job?.job_id || ""
   );
 }
 
 function getJobIdForApply(job) {
-  return String(job?.jobId || job?.job_id || job?._id || job?.id || "");
+  return normalizeId(job?.jobId || job?.job_id || "");
+}
+
+function getApplyKey(job) {
+  return normalizeId(getJobIdForApply(job) || "");
+}
+
+function getAppliedAt(job) {
+  if (!job) return null;
+  if (job.appliedAt) return job.appliedAt;
+  const jobKey = getJobIdForApply(job);
+  if (jobKey && appliedJobs.has(jobKey)) return appliedJobs.get(jobKey);
+  return null;
 }
 
 function expandJob(job) {
@@ -851,14 +1133,22 @@ function collapseExpanded() {
   }
 }
 
-function buildApplyButton(job, jobId) {
+function buildApplyButton(job, jobId, appliedAt) {
   const applyBtn = document.createElement("button");
   applyBtn.type = "button";
   applyBtn.className = "apply-button";
   applyBtn.dataset.jobId = jobId;
-  if (appliedJobs.has(jobId)) {
+  if (!allowApply) {
     applyBtn.disabled = true;
-    applyBtn.textContent = "Application sent";
+    applyBtn.textContent = "Apply for this case";
+    applyBtn.title = "Only paralegals can apply.";
+  } else if (appliedAt) {
+    applyBtn.disabled = true;
+    applyBtn.textContent = `Case applied · ${formatAppliedDate(appliedAt)}`;
+  } else if (!stripeConnected) {
+    applyBtn.disabled = true;
+    applyBtn.textContent = "Apply for this case";
+    applyBtn.title = STRIPE_GATE_MESSAGE;
   } else {
     applyBtn.textContent = "Apply for this case";
     applyBtn.addEventListener("click", (event) => {
@@ -874,9 +1164,11 @@ function renderExpandedJob(job) {
   card.className = "job-card expanded";
   const caseId = getJobUniqueId(job);
   const jobId = getJobIdForApply(job) || caseId;
-  const appliedAt = appliedJobs.get(jobId);
+  const applyKey = getApplyKey(job);
+  const appliedAt = getAppliedAt(job);
   const payUSD = getJobPayUSD(job);
-  const budget = typeof job.budget === "number" ? job.budget : null;
+  const budgetValue = Number(job.budget);
+  const budget = Number.isFinite(budgetValue) && budgetValue > 0 ? budgetValue : null;
   const compensation =
     job.compensationDisplay ||
     (budget ? `$${formatPay(budget)} compensation` : payUSD ? `$${formatPay(payUSD)} total` : "Rate negotiable");
@@ -888,6 +1180,20 @@ function renderExpandedJob(job) {
   const summary = scrubStateLines(rawSummary, jobState);
   const rawDescription = job.description || job.details || job.briefSummary || "";
   const { description, experienceLine } = prepareExpandedContent(rawDescription, jobState);
+  const applyInfoHtml = allowApply
+    ? `
+        <div class="apply-info">
+          <div class="apply-info-title">What Happens After You Apply</div>
+          <ul class="apply-info-list">
+            <li>The attorney reviews applications</li>
+            <li>Selected paralegals receive full case details</li>
+            <li>Work is completed through Let’s ParaConnect</li>
+            <li>Payment is released upon approval</li>
+          </ul>
+        </div>
+      `
+    : "";
+  const applyInfoBlock = applyInfoHtml ? `<div class="apply-info-block">${applyInfoHtml}</div>` : "";
 
   const title = escapeHtml(job.title || "Case");
   card.innerHTML = `
@@ -909,18 +1215,6 @@ function renderExpandedJob(job) {
         </div>
         <div class="expanded-actions"></div>
       </div>
-      <aside class="expanded-sidebar">
-        <div class="apply-info">
-          <div class="apply-info-title">What Happens After You Apply</div>
-          <ul class="apply-info-list">
-            <li>The attorney reviews applications</li>
-            <li>Selected paralegals receive full case details</li>
-            <li>Work is completed through Let’s ParaConnect</li>
-            <li>Payment is released upon approval</li>
-          </ul>
-        </div>
-        <div class="expanded-actions" data-expanded-buttons></div>
-      </aside>
       <div class="expanded-body">
         ${summary ? `<p class="lede">${escapeHtml(summary)}</p>` : ""}
         <div class="description-label">DESCRIPTION</div>
@@ -941,6 +1235,7 @@ function renderExpandedJob(job) {
         </div>
         <div class="expanded-footer-actions" data-footer-actions></div>
       </div>
+      ${applyInfoBlock}
     </div>
   `;
 
@@ -963,7 +1258,7 @@ function renderExpandedJob(job) {
       collapseExpanded();
     });
 
-    const applyBtn = buildApplyButton(job, jobId);
+    const applyBtn = buildApplyButton(job, applyKey || jobId, appliedAt);
     footerActions.appendChild(backBtn);
     footerActions.appendChild(applyBtn);
   }

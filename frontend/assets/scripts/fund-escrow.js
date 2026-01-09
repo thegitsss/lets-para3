@@ -8,22 +8,34 @@ if (!caseId && pathParts.length >= 3 && pathParts[0] === "cases" && pathParts[2]
 const cardErrors = document.getElementById("card-errors");
 const amountEl = document.getElementById("lockedAmount");
 const titleEl = document.getElementById("caseTitle");
+const paralegalEl = document.getElementById("caseParalegal");
 const statusEl = document.getElementById("caseStatus");
 const statusMsg = document.getElementById("statusMsg");
 const paymentPane = document.getElementById("paymentPane");
 const fundBtn = document.getElementById("fundBtn");
+const cancelBtn = document.getElementById("cancelBtn");
 let stripe;
 let elements;
 let card;
+const MIN_ESCROW_AMOUNT = 50;
 
 function formatCents(cents) {
   if (!Number.isFinite(cents)) return "—";
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-function showError(msg) {
-  if (cardErrors) cardErrors.textContent = msg || "";
+function showStatus(msg) {
   if (statusMsg) statusMsg.textContent = msg || "";
+}
+
+function showCardError(msg) {
+  if (cardErrors) cardErrors.textContent = msg || "";
+}
+
+function formatName(person) {
+  if (!person || typeof person !== "object") return "";
+  const full = `${person.firstName || ""} ${person.lastName || ""}`.trim();
+  return full || "";
 }
 
 function readToken() {
@@ -59,7 +71,7 @@ async function loadStripe() {
   });
   card.mount("#card-element");
   card.on("change", (evt) => {
-    if (cardErrors) cardErrors.textContent = evt.error?.message || "";
+    showCardError(evt.error?.message || "");
   });
 }
 
@@ -83,7 +95,8 @@ async function fund() {
   if (!stripe || !card) return;
   fundBtn.disabled = true;
   fundBtn.textContent = "Processing…";
-  showError("");
+  showStatus("");
+  showCardError("");
   try {
     const intent = await createIntent();
     const result = await stripe.confirmCardPayment(intent.clientSecret, {
@@ -98,7 +111,7 @@ async function fund() {
     }
     throw new Error("Payment not completed.");
   } catch (err) {
-    showError(err?.message || "Unable to fund escrow.");
+    showStatus(err?.message || "Unable to fund escrow.");
   } finally {
     fundBtn.disabled = false;
     fundBtn.textContent = "Hire & Start Work";
@@ -107,27 +120,65 @@ async function fund() {
 
 (async () => {
   if (!caseId) {
-    showError("Missing case id.");
+    showStatus("Missing case id.");
     return;
   }
   try {
     const caseData = await loadCase();
     titleEl.textContent = caseData.title || "Case";
-    statusEl.textContent = `Status: ${caseData.escrowStatus || caseData.status || "N/A"}`;
-    const locked = Number(caseData.lockedTotalAmount ?? caseData.totalAmount);
-    amountEl.textContent = formatCents(locked);
+    const paralegalName =
+      caseData.paralegalNameSnapshot ||
+      formatName(caseData.paralegal) ||
+      formatName(caseData.paralegalId);
+    if (paralegalEl) {
+      paralegalEl.textContent = `Paralegal: ${paralegalName || "Not assigned"}`;
+    }
+    if (statusEl) {
+      statusEl.textContent = `Status: ${caseData.escrowStatus || caseData.status || "N/A"}`;
+    }
+    const locked = Number(caseData.lockedTotalAmount);
+    const total = Number(caseData.totalAmount);
+    const hasLockedAmount = Number.isFinite(locked) && locked >= MIN_ESCROW_AMOUNT;
+    const displayAmount = Number.isFinite(locked) ? locked : total;
+    amountEl.textContent = formatCents(displayAmount);
     if (String(caseData.escrowStatus || "").toLowerCase() === "funded") {
-      statusEl.textContent = "Escrow funded.";
+      if (statusEl) statusEl.textContent = "Escrow funded.";
+      return;
+    }
+    if (!hasLockedAmount) {
+      showStatus("Escrow amount is not locked yet. Send an invitation or wait for a paralegal to apply before funding.");
       return;
     }
     await loadStripe();
     paymentPane.style.display = "block";
   } catch (err) {
-    showError(err?.message || "Unable to load funding screen.");
+    showStatus(err?.message || "Unable to load funding screen.");
   }
 })();
 
 fundBtn?.addEventListener("click", (e) => {
   e.preventDefault();
   fund();
+});
+
+cancelBtn?.addEventListener("click", () => {
+  try {
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+  } catch (_) {}
+
+  try {
+    const referrer = document.referrer;
+    if (referrer) {
+      const refUrl = new URL(referrer);
+      if (refUrl.origin === window.location.origin) {
+        window.location.href = referrer;
+        return;
+      }
+    }
+  } catch (_) {}
+
+  window.location.href = "dashboard-attorney.html#billing";
 });

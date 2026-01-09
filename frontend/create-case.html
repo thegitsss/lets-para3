@@ -375,6 +375,17 @@
   outline: none;
 }
 
+#comp:disabled {
+  background: #f4f1e8;
+  color: #7a6f5a;
+  border-color: #e0d7c4;
+  cursor: not-allowed;
+}
+
+.comp-wrapper.is-locked .dollar-sign {
+  color: #b1a58a;
+}
+
 .comp-type {
   display: flex;
   gap: 6px;
@@ -837,7 +848,7 @@
     <span class="dollar-sign">$</span>
     <input id="comp" type="number" min="0" placeholder="Amount" />
   </div>
-  <p class="muted lock-note" id="compLockNotice" hidden>Compensation is locked after a paralegal is invited or hired.</p>
+  <p class="muted lock-note" id="compLockNotice">You may edit the case amount until the first invitation is sent or a paralegal applies. After that point, the amount is automatically locked.</p>
 </div>
 
       <div class="field select-field">
@@ -991,6 +1002,7 @@
       deadline: document.getElementById("caseDeadline"),
     };
     const compLockNotice = document.getElementById("compLockNotice");
+    const compWrapper = fields.comp?.closest(".comp-wrapper");
     const titlePreview = document.getElementById("caseTitlePreviewText");
     const descriptionInput = document.getElementById("caseDescription");
     const descriptionCount = document.getElementById("descriptionCharCount");
@@ -1251,7 +1263,7 @@
       if (!fields.comp) return;
       fields.comp.disabled = !!locked;
       fields.comp.setAttribute("aria-disabled", locked ? "true" : "false");
-      if (compLockNotice) compLockNotice.hidden = !locked;
+      compWrapper?.classList.toggle("is-locked", !!locked);
     }
 
     function hasDescription() {
@@ -1596,7 +1608,11 @@
         clearCurrentDraftId();
         const caseId = created?.id || created?._id || editingCaseId;
         // Jobs are now mirrored automatically when a case is created on the backend.
-        const href = caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "dashboard-attorney.html#cases";
+        const href = caseId
+          ? isEditing
+            ? `case-detail.html?caseId=${encodeURIComponent(caseId)}`
+            : `dashboard-attorney.html?previewCaseId=${encodeURIComponent(caseId)}#cases`
+          : "dashboard-attorney.html#cases";
         showToast(
           isEditing ? "Your changes have been saved." : "Your case has been posted and is now open to applications.",
           href
@@ -1671,7 +1687,8 @@
       }
       const hasParalegal = !!(caseData.paralegal || caseData.paralegalId);
       const hasPendingParalegal = !!(caseData.pendingParalegal || caseData.pendingParalegalId);
-      setCompLocked(hasParalegal || hasPendingParalegal);
+      const isLocked = caseData.lockedTotalAmount != null || hasParalegal || hasPendingParalegal;
+      setCompLocked(isLocked);
       if (fields.experience && caseData.experience) {
         setSelectValue(fields.experience, caseData.experience);
       }

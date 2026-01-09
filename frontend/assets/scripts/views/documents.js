@@ -4,6 +4,14 @@
 
 const API_CASE      = (id) => `/api/cases/${encodeURIComponent(id)}`;
 const API_PRESIGN   = "/api/uploads/presign";
+const FUNDED_WORKSPACE_STATUSES = new Set([
+  "funded_in_progress",
+  "in progress",
+  "in_progress",
+  "active",
+  "awaiting_documents",
+  "reviewing",
+]);
 
 // We will *probe* these optional endpoints at runtime:
 const CANDIDATE_ATTACH_ENDPOINTS = [
@@ -263,6 +271,8 @@ export async function render(el) {
 
   let currentCaseId = "";
   let currentCaseReadOnly = false;
+  let currentCaseWorkspaceLocked = false;
+  let currentCaseLockReason = "";
   let allFiles = []; // as returned by case.files
   let downloadingEnabled = true; // we’ll flip to false if signed-get not available
 
@@ -284,15 +294,16 @@ export async function render(el) {
   });
 
   function applyLockedState() {
+    const locked = currentCaseReadOnly || currentCaseWorkspaceLocked;
     if (pickBtn) {
-      pickBtn.disabled = currentCaseReadOnly;
-      pickBtn.textContent = currentCaseReadOnly ? "Uploads locked" : pickDefaultText;
+      pickBtn.disabled = locked;
+      pickBtn.textContent = locked ? "Uploads locked" : pickDefaultText;
     }
-    dropEl.classList.toggle("locked", currentCaseReadOnly);
+    dropEl.classList.toggle("locked", locked);
     const note = dropEl.querySelector(".muted");
     if (note) {
-      note.textContent = currentCaseReadOnly
-        ? "This case is read-only. Uploads and deletions are disabled."
+      note.textContent = locked
+        ? currentCaseLockReason || "Uploads are locked for this case."
         : "Drag & drop PDF/PNG/JPEG here, or choose…";
     }
   }
@@ -308,6 +319,10 @@ export async function render(el) {
       const c = await fetchCase(id);
       allFiles = Array.isArray(c.files) ? c.files : [];
       currentCaseReadOnly = !!c.readOnly;
+      currentCaseWorkspaceLocked = !canUseWorkspace(c);
+      currentCaseLockReason = currentCaseReadOnly
+        ? "This case is read-only. Uploads and deletions are disabled."
+        : "Uploads unlock once the case is funded and in progress.";
       applyLockedState();
       if (!allFiles.length) {
         listEl.innerHTML = `<div class="muted">No files yet.</div>`;
@@ -317,6 +332,8 @@ export async function render(el) {
     } catch (e) {
       allFiles = [];
       currentCaseReadOnly = false;
+      currentCaseWorkspaceLocked = false;
+      currentCaseLockReason = "";
       applyLockedState();
       listEl.innerHTML = `<div class="muted">Could not load case or you lack access.</div>`;
     }
@@ -389,7 +406,7 @@ export async function render(el) {
 
       row.appendChild(left);
       row.appendChild(downloadBtn);
-      if (!currentCaseReadOnly) {
+      if (!currentCaseReadOnly && !currentCaseWorkspaceLocked) {
         const delBtn = document.createElement("button");
         delBtn.className = "btn danger";
         delBtn.textContent = "Delete";
@@ -422,8 +439,8 @@ export async function render(el) {
       toast("Load a Case ID first.");
       return;
     }
-    if (currentCaseReadOnly) {
-      toast("This case is read-only. Uploads are disabled.");
+    if (currentCaseReadOnly || currentCaseWorkspaceLocked) {
+      toast(currentCaseLockReason || "Uploads are locked for this case.");
       return;
     }
     const files = Array.from(fileList || []);
@@ -505,4 +522,21 @@ export async function render(el) {
 
   // initial empty state
   listEl.innerHTML = `<div class="muted">Enter a Case ID to view files.</div>`;
+}
+
+function normalizeCaseStatus(value) {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  if (!trimmed) return "";
+  const lower = trimmed.toLowerCase();
+  if (lower === "in_progress") return "in progress";
+  return lower;
+}
+
+function canUseWorkspace(caseData) {
+  const status = normalizeCaseStatus(caseData?.status);
+  const hasParalegal = !!(caseData?.paralegal || caseData?.paralegalId);
+  const escrowFunded =
+    !!caseData?.escrowIntentId && String(caseData?.escrowStatus || "").toLowerCase() === "funded";
+  return hasParalegal && escrowFunded && FUNDED_WORKSPACE_STATUSES.has(status);
 }

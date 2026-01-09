@@ -267,7 +267,23 @@ export async function loadUserHeaderInfo() {
     });
 
     document.querySelectorAll(".globalProfileRole").forEach((role) => {
-      role.textContent = user.role === "paralegal" ? "Paralegal" : "Attorney";
+      let resolvedRole = String(user?.role || "").toLowerCase();
+      if (!resolvedRole) {
+        try {
+          const stored = localStorage.getItem("lpc_user");
+          const storedUser = stored ? JSON.parse(stored) : null;
+          resolvedRole = String(storedUser?.role || "").toLowerCase();
+        } catch {}
+      }
+      if (resolvedRole === "paralegal") {
+        role.textContent = "Paralegal";
+      } else if (resolvedRole === "admin") {
+        role.textContent = "Admin";
+      } else if (resolvedRole) {
+        role.textContent = "Attorney";
+      } else {
+        role.textContent = "Member";
+      }
     });
   } catch (err) {
     console.warn("Could not load user header info:", err);

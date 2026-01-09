@@ -438,6 +438,7 @@
             { id: "filterRevisions", fn: (files) => files.filter((f) => f.status === "attorney_revision") },
           ],
           emptyCopy: "No files found.",
+          gatedCopy: "No funded cases yet.",
           unauthorizedCopy: "You need a paralegal account to view these files.",
         });
       } else {
@@ -453,6 +454,7 @@
           ],
           emptyCopy: "Awaiting paralegal submissions.",
           emptySubtext: "Once your paralegal uploads a file, you’ll be able to review it here.",
+          gatedCopy: "Fund a case to unlock file review.",
           unauthorizedCopy: "You need an attorney account to view these files.",
         });
       }

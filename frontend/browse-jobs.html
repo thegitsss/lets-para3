@@ -334,6 +334,10 @@
       text-transform: uppercase;
       margin-bottom: 8px;
     }
+    .expanded-card-grid {
+      display: grid;
+      gap: 1.6rem;
+    }
     .expanded-header {
       display: flex;
       justify-content: space-between;
@@ -351,27 +355,19 @@
       margin-top: 1rem;
       }
     .expanded-body .lede { color: #475569; margin: 0 0 0.65rem; line-height: 1.6; }
-    .expanded-body .rich-text { color: #0f172a; line-height: 1.8; white-space: pre-line; }
-    .expanded-sidebar {
-      border: 1px solid rgba(26, 34, 48, 0.08);
-      border-radius: 14px;
-      padding: 1rem 0.9rem;
-      background: #fbfcff;
-      display: grid;
-      gap: 0.9rem;
-      max-width: 320px;
-      width: 85%;
-      min-height: 200px;
-      justify-self: end;
-    }
-    .expanded-sidebar .stat {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+    .description-label {
       font-size: 0.95rem;
+      letter-spacing: 0.16em;
       color: #475569;
+      margin-top: 0.6rem;
     }
-    .expanded-sidebar .stat strong { color: #0f172a; font-size: 1.1rem; }
+    .expanded-body .main-description {
+      color: #0f172a;
+      line-height: 1.85;
+      white-space: pre-line;
+      font-size: 1.05rem;
+      margin-top: 0.3rem;
+    }
     .ghost-button {
       border: 1px solid rgba(26, 34, 48, 0.15);
       background: #fff;
@@ -383,6 +379,15 @@
       font-size: 0.95rem;
       color: #0f172a;
       text-align: center;
+    }
+    .apply-info-block {
+      border: 1px solid rgba(26, 34, 48, 0.08);
+      border-radius: 16px;
+      padding: 1.2rem 1.3rem;
+      background: #fbfcff;
+      max-width: 520px;
+      width: 100%;
+      margin: 0 auto 0.2rem;
     }
     .apply-info-title {
       font-family: 'Cormorant Garamond', serif;
@@ -428,8 +433,20 @@
       object-fit: cover;
       background: #e2e8f0;
     }
-    .posted-name { color: #0f172a; font-weight: 400; }
-    .posted-firm { color: #6b7280; font-size: 0.92rem; }
+    .posted-link { text-decoration: none; color: inherit; }
+    .posted-link:hover { text-decoration: none; }
+    .posted-name {
+      color: #0f172a;
+      font-weight: 400;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.1rem;
+    }
+    .posted-firm {
+      color: #6b7280;
+      font-size: 0.98rem;
+      font-family: 'Cormorant Garamond', serif;
+      text-decoration: none;
+    }
     .posted-trust { color: #475569; font-size: 0.9rem; }
     .expanded-footer-actions {
       position: absolute;

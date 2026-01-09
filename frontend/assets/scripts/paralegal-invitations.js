@@ -54,7 +54,6 @@ async function loadInvitationsList() {
           const message = data?.error || "Unable to accept invitation.";
           if (res.status === 403 && /stripe/i.test(message)) {
             toast?.show?.(message, { targetId: "toastBanner", type: "error" });
-            promptStripeOnboarding(message);
             return;
           }
           throw new Error(message);
@@ -104,10 +103,4 @@ async function loadInvitationsList() {
       }
     });
   });
-}
-
-function promptStripeOnboarding(message) {
-  const copy = message || "Complete Stripe onboarding before accepting invitations.";
-  const go = window.confirm(`${copy} Open Profile Settings to connect Stripe now?`);
-  if (go) window.location.href = "profile-settings.html";
 }

@@ -353,6 +353,11 @@ function updateBackLink() {
     elements.backLink.href = "dashboard-paralegal.html";
     return;
   }
+  if (role === "admin") {
+    elements.backLink.textContent = "← Back to dashboard";
+    elements.backLink.href = "admin-dashboard.html";
+    return;
+  }
   elements.backLink.textContent = "← Back to dashboard";
   elements.backLink.href = "dashboard-attorney.html";
 }

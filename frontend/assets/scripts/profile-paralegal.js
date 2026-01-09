@@ -85,16 +85,21 @@ const elements = {
   bioCopy: document.getElementById("bioCopy"),
   skillsList: document.getElementById("skillsList"),
   practiceList: document.getElementById("practiceList"),
-  skillsEmpty: document.getElementById("skillsEmpty"),
-  practiceEmpty: document.getElementById("practiceEmpty"),
   experienceList: document.getElementById("experienceList"),
   educationList: document.getElementById("educationList"),
+  experienceCard: document.getElementById("experienceCard"),
+  educationCard: document.getElementById("educationCard"),
+  skillsCard: document.getElementById("skillsCard"),
+  skillsSection: document.getElementById("skillsSection"),
+  practiceSection: document.getElementById("practiceSection"),
+  experienceSection: document.getElementById("experienceSection"),
+  educationSection: document.getElementById("educationSection"),
+  languagesRow: document.getElementById("languagesRow"),
   funFactsCard: document.getElementById("funFactsCard"),
   funFactsCopy: document.getElementById("funFactsCopy"),
   attorneyCard: document.getElementById("attorneyHighlightsCard"),
   attorneyHighlights: document.getElementById("attorneyHighlights"),
   languagesList: document.getElementById("languagesList"),
-  languagesEmpty: document.getElementById("languagesEmpty"),
   inviteModal: document.getElementById("inviteModal"),
   inviteCaseSelect: document.getElementById("inviteCaseSelect"),
   sendInviteBtn: document.getElementById("sendInviteBtn"),
@@ -117,8 +122,10 @@ const elements = {
   certificateLink: document.getElementById("certificateLink"),
   resumeLink: document.getElementById("resumeLink"),
   writingSampleLink: document.getElementById("writingSampleLink"),
-  documentsEmpty: document.getElementById("documentsEmpty"),
-  documentsCard: document.getElementById("documentsCard"),
+  documentsCard: document.getElementById("documentsSection"),
+  completionPrompt: document.getElementById("profileCompletionPrompt"),
+  completionDetails: document.getElementById("profileCompletionDetails"),
+  completionBtn: document.getElementById("completeProfileBtn"),
 };
 
 const PENDING_PROFILE_MESSAGE =
@@ -337,14 +344,16 @@ function bindCtaEvents() {
   elements.inviteBtn?.addEventListener("click", () => {
     openInviteModal();
   });
-  elements.editBtn?.addEventListener("click", async (event) => {
-    event.preventDefault();
+  const handleEditProfileClick = async (event) => {
+    event?.preventDefault?.();
     try {
       await cacheProfileForEditing();
     } finally {
       window.location.href = "profile-settings.html";
     }
-  });
+  };
+  elements.editBtn?.addEventListener("click", handleEditProfileClick);
+  elements.completionBtn?.addEventListener("click", handleEditProfileClick);
   elements.closeInviteBtn?.addEventListener("click", closeInviteModal);
   elements.inviteModal?.addEventListener("click", (event) => {
     if (event.target === elements.inviteModal) closeInviteModal();
@@ -806,24 +815,40 @@ function renderProfile(profile) {
   const roleLine = [experienceLabel, roleCopy].filter(Boolean).join(" • ") || "Paralegal";
   setFieldText(elements.roleLine, roleLine);
 
-  const summary = profile.bio || profile.about || "This professional hasn’t added a summary yet.";
-  setFieldText(elements.bioCopy, summary);
+  const summary = profile.bio || profile.about || "";
+  const hasSummary = Boolean(summary && summary.trim().length);
+  if (elements.bioCopy) {
+    setFieldText(elements.bioCopy, summary);
+    elements.bioCopy.classList.toggle("hidden", !hasSummary);
+  }
 
   renderAvatar(fullName, getProfileImageUrl(profile));
   renderStatus(profile);
   renderMetadata(profile);
-  renderLanguages(profile.languages || []);
+  const hasLanguages = renderLanguages(profile.languages || []);
   const skillValues =
     (Array.isArray(profile.skills) && profile.skills.length ? profile.skills : null) ||
     (Array.isArray(profile.highlightedSkills) && profile.highlightedSkills.length ? profile.highlightedSkills : null);
   const practiceValues =
     (Array.isArray(profile.practiceAreas) && profile.practiceAreas.length ? profile.practiceAreas : null) ||
     (Array.isArray(profile.specialties) && profile.specialties.length ? profile.specialties : null);
-  renderSkillsAndPractice(skillValues, practiceValues);
-  renderExperience(profile.experience);
-  renderEducation(profile.education);
+  const { hasSkills, hasPractice } = renderSkillsAndPractice(skillValues, practiceValues);
+  const hasExperience = renderExperience(profile.experience);
+  const hasEducation = renderEducation(profile.education);
   renderFunFacts(profile.about, profile.writingSamples);
-  renderDocumentLinks(profile);
+  const hasDocuments = renderDocumentLinks(profile);
+  if (elements.experienceCard) {
+    elements.experienceCard.classList.toggle("hidden", !hasExperience);
+  }
+  renderCompletionPrompt({
+    hasSummary,
+    hasSkills,
+    hasPractice,
+    hasExperience,
+    hasEducation,
+    hasLanguages,
+    hasDocuments,
+  });
 }
 
 function populateProfileForm(profile) {
@@ -875,7 +900,7 @@ function renderMetadata(profile) {
   const stateOnly = extractState(profile.location);
   if (stateOnly) {
     const href = `https://www.google.com/maps/search/${encodeURIComponent(stateOnly + " state")}`;
-    renderMetaLine(elements.locationMeta, "M", stateOnly, href);
+    renderMetaLine(elements.locationMeta, "map", stateOnly, href);
   } else {
     clearMetaLine(elements.locationMeta);
   }
@@ -885,9 +910,9 @@ function renderMetadata(profile) {
   } else {
     const linkedIn = profile.linkedInURL || profile.linkedin || "";
     if (linkedIn) {
-      renderMetaLine(elements.credentialMeta, "C", "LinkedIn", linkedIn);
+      renderMetaLine(elements.credentialMeta, "link", "LinkedIn", linkedIn);
     } else {
-      renderMetaLine(elements.credentialMeta, "C", "Credentials available upon request");
+      renderMetaLine(elements.credentialMeta, "", "Credentials available upon request");
     }
   }
 
@@ -976,12 +1001,10 @@ function renderDocumentLinks(profile) {
       elements.writingSampleLink.classList.add("hidden");
     }
   }
-  if (elements.documentsEmpty) {
-    elements.documentsEmpty.classList.toggle("hidden", hasDoc);
-  }
   if (elements.documentsCard) {
-    elements.documentsCard.classList.remove("hidden");
+    elements.documentsCard.classList.toggle("hidden", !profile.writingSampleURL);
   }
+  return hasDoc;
 }
 
 function normalizeLanguagesList(languages = []) {
@@ -1003,33 +1026,48 @@ function normalizeLanguagesList(languages = []) {
 
 function renderLanguages(languages = []) {
   const container = elements.languagesList;
-  const emptyState = elements.languagesEmpty;
-  if (!container) return;
+  if (!container) return false;
   container.innerHTML = "";
   const normalized = normalizeLanguagesList(languages);
-  if (!normalized.length) {
-    if (emptyState) emptyState.classList.remove("hidden");
-    return;
+  const hasLanguages = normalized.length > 0;
+  if (elements.languagesRow) {
+    elements.languagesRow.classList.toggle("hidden", !hasLanguages);
   }
-  if (emptyState) emptyState.classList.add("hidden");
+  if (!hasLanguages) return false;
   normalized.forEach((lang) => {
     const chip = document.createElement("span");
     chip.className = "chip";
     chip.textContent = lang.proficiency ? `${lang.name} — ${lang.proficiency}` : lang.name;
     container.appendChild(chip);
   });
+  return true;
 }
 
-function renderMetaLine(el, _iconLetter, text, href) {
+function renderMetaLine(el, iconKey, text, href) {
   if (!el) return;
   el.classList.remove("skeleton-block");
   el.classList.remove("hidden");
+  const metaColumn = el.closest(".meta-column");
+  const iconMap = {
+    map: `<svg viewBox="0 0 24 24" aria-hidden="true" role="img" focusable="false"><path d="M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="11" r="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`,
+    link: `<svg viewBox="0 0 24 24" aria-hidden="true" role="img" focusable="false"><path d="M8 11a5 5 0 0 1 5-5h3a5 5 0 0 1 0 10h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M16 13a5 5 0 0 1-5 5H8a5 5 0 0 1 0-10h3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M10 12h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+  };
+  const iconMarkup = iconKey && iconMap[iconKey]
+    ? `<span class="meta-icon">${iconMap[iconKey]}</span>`
+    : "";
+  if (metaColumn) {
+    metaColumn.classList.toggle("has-meta-icon", Boolean(iconMarkup));
+  }
   if (href) {
-    el.innerHTML = `<a class="hero-meta-link" href="${escapeHtml(href)}" target="_blank" rel="noopener">${escapeHtml(
+    el.innerHTML = `<a class="hero-meta-link" href="${escapeHtml(href)}" target="_blank" rel="noopener">${iconMarkup}<span class="meta-text">${escapeHtml(
       text
-    )}</a>`;
+    )}</span></a>`;
   } else {
-    el.textContent = text || "";
+    if (iconMarkup) {
+      el.innerHTML = `<span class="meta-line">${iconMarkup}<span class="meta-text">${escapeHtml(text || "")}</span></span>`;
+    } else {
+      el.textContent = text || "";
+    }
   }
 }
 
@@ -1106,8 +1144,8 @@ function renderPills(container, values, emptyCopy) {
 }
 
 function renderSkillsAndPractice(skills = [], practices = []) {
-  const renderList = (target, emptyEl, values, emptyCopy) => {
-    if (!target) return;
+  const renderList = (target, values) => {
+    if (!target) return 0;
     target.innerHTML = "";
     const seen = new Set();
     const cleaned = (Array.isArray(values) ? values : [])
@@ -1119,30 +1157,44 @@ function renderSkillsAndPractice(skills = [], practices = []) {
         seen.add(key);
         return true;
       });
-    if (!cleaned.length) {
-      if (emptyEl) emptyEl.classList.remove("hidden");
-      return;
-    }
-    if (emptyEl) emptyEl.classList.add("hidden");
+    if (!cleaned.length) return 0;
     cleaned.slice(0, 24).forEach((label) => {
       const chip = document.createElement("span");
       chip.className = "chip";
       chip.textContent = label;
       target.appendChild(chip);
     });
+    return cleaned.length;
   };
 
-  renderList(elements.skillsList, elements.skillsEmpty, skills, "No skills added yet.");
-  renderList(elements.practiceList, elements.practiceEmpty, practices, "No focus areas added yet.");
+  const skillsCount = renderList(elements.skillsList, skills);
+  const practiceCount = renderList(elements.practiceList, practices);
+  const hasSkills = skillsCount > 0;
+  const hasPractice = practiceCount > 0;
+  if (elements.skillsSection) {
+    elements.skillsSection.classList.toggle("hidden", !hasSkills);
+  }
+  if (elements.practiceSection) {
+    elements.practiceSection.classList.toggle("hidden", !hasPractice);
+  }
+  if (elements.skillsCard) {
+    elements.skillsCard.classList.toggle("hidden", !hasSkills && !hasPractice);
+  }
+  return { hasSkills, hasPractice };
 }
 
 function renderExperience(entries) {
-  if (!elements.experienceList) return;
+  if (!elements.experienceList) return false;
   elements.experienceList.innerHTML = "";
   const list = Array.isArray(entries) ? entries.filter((item) => item && (item.title || item.years)) : [];
   if (!list.length) {
-    elements.experienceList.innerHTML = `<p class="muted">No experience timeline yet.</p>`;
-    return;
+    if (elements.experienceSection) {
+      elements.experienceSection.classList.add("hidden");
+    }
+    return false;
+  }
+  if (elements.experienceSection) {
+    elements.experienceSection.classList.remove("hidden");
   }
   list.slice(0, 5).forEach((item) => {
     const block = document.createElement("div");
@@ -1157,6 +1209,7 @@ function renderExperience(entries) {
     block.appendChild(dates);
     elements.experienceList.appendChild(block);
   });
+  return true;
 }
 
 function formatExperienceRange(item = {}) {
@@ -1176,10 +1229,24 @@ function formatExperienceRange(item = {}) {
 }
 
 function renderEducation(entries) {
-  if (!elements.educationList) return;
+  if (!elements.educationList) return false;
   elements.educationList.innerHTML = "";
   const list = Array.isArray(entries) ? entries.filter((item) => item && (item.degree || item.school)) : [];
-  if (!list.length) return;
+  if (!list.length) {
+    if (elements.educationSection) {
+      elements.educationSection.classList.add("hidden");
+    }
+    if (elements.educationCard) {
+      elements.educationCard.classList.add("hidden");
+    }
+    return false;
+  }
+  if (elements.educationSection) {
+    elements.educationSection.classList.remove("hidden");
+  }
+  if (elements.educationCard) {
+    elements.educationCard.classList.remove("hidden");
+  }
   list.slice(0, 5).forEach((item) => {
     const pill = document.createElement("span");
     pill.className = "edu-pill";
@@ -1187,6 +1254,31 @@ function renderEducation(entries) {
     pill.textContent = parts || "Education detail";
     elements.educationList.appendChild(pill);
   });
+  return true;
+}
+
+function renderCompletionPrompt(stateSummary = {}) {
+  if (!elements.completionPrompt) return;
+  const isOwner = state.viewerRole === "paralegal" && state.viewerId && state.viewerId === state.paralegalId;
+  if (!isOwner) {
+    elements.completionPrompt.classList.add("hidden");
+    return;
+  }
+  const missing = [];
+  if (!stateSummary.hasSummary) missing.push("summary");
+  if (!stateSummary.hasSkills) missing.push("skills");
+  if (!stateSummary.hasPractice) missing.push("focus areas");
+  if (!stateSummary.hasExperience && !stateSummary.hasEducation) missing.push("experience");
+  if (!stateSummary.hasLanguages) missing.push("languages");
+  if (!stateSummary.hasDocuments) missing.push("documents");
+
+  const shouldShow = missing.length > 0;
+  elements.completionPrompt.classList.toggle("hidden", !shouldShow);
+  if (shouldShow && elements.completionDetails) {
+    const preview = missing.slice(0, 3).join(", ");
+    const suffix = missing.length > 3 ? " and more" : "";
+    elements.completionDetails.textContent = `Add ${preview}${suffix} to improve your profile visibility.`;
+  }
 }
 
 function renderFunFacts(about, writingSamples = []) {

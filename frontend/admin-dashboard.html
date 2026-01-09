@@ -750,7 +750,7 @@ font-size:.95rem;
 <div class="panel" style="margin-top:2rem;">
 <div class="panel-header">
 <h2>Latest Job Listings</h2>
-<input type="text" id="postSearch" class="search" placeholder="Search by keyword or author…">
+  <input type="text" id="postSearch" class="search" placeholder="Search by keyword or author…" aria-label="Search job posts">
 </div>
 <table class="posts-table">
 <thead>
@@ -1076,6 +1076,12 @@ if (window.Chart) {
 Chart.defaults.devicePixelRatio = 1;
 Chart.defaults.animation = false;
 }
+const pushChart = (el, config) => {
+if (!window.Chart || !el) return null;
+const chart = new Chart(el, config);
+dashboardCharts.push(chart);
+return chart;
+};
 const payoutTotalEl=document.getElementById("payoutTotal");
 const payoutCountEl=document.getElementById("payoutCount");
 const incomeTotalEl=document.getElementById("incomeTotal");
@@ -1116,13 +1122,13 @@ incomeCountEl.textContent = "Unable to load income";
 }
 
 /* -------- Charts (0 until data) -------- */
-dashboardCharts.push(new Chart(document.getElementById("userChart"),{type:"line",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],borderColor:"#b6a47a",backgroundColor:"rgba(182,164,122,0.15)",fill:true,tension:.4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}));
-dashboardCharts.push(new Chart(document.getElementById("revChart"),{type:"bar",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],backgroundColor:"#b6a47a"}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}}));
-dashboardCharts.push(new Chart(document.getElementById("escrowChart"),{type:"doughnut",data:{labels:["Held","Released","Pending"],datasets:[{data:[0,0,0],backgroundColor:["#b6a47a","#e6d9b8","#dcd5c0"]}]},options:{plugins:{legend:{position:"bottom"}}}}));
+pushChart(document.getElementById("userChart"),{type:"line",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],borderColor:"#b6a47a",backgroundColor:"rgba(182,164,122,0.15)",fill:true,tension:.4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+pushChart(document.getElementById("revChart"),{type:"bar",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],backgroundColor:"#b6a47a"}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+pushChart(document.getElementById("escrowChart"),{type:"doughnut",data:{labels:["Held","Released","Pending"],datasets:[{data:[0,0,0],backgroundColor:["#b6a47a","#e6d9b8","#dcd5c0"]}]},options:{plugins:{legend:{position:"bottom"}}}});
 
 /* -------- User Management Combo Chart -------- */
 const ctx = document.getElementById("userMgmtComboChart");
-dashboardCharts.push(new Chart(ctx,{
+pushChart(ctx,{
 type:"bar",
 data:{
 labels:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct"],
@@ -1157,7 +1163,7 @@ y1:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},title:{displa
 }));
 
 /* -------- Escrow Charts -------- */
-dashboardCharts.push(new Chart(document.getElementById("escrowReportChart"), {
+pushChart(document.getElementById("escrowReportChart"), {
 type:"line",
 data:{
 labels:["Mar 05","Mar 10","Mar 15","Mar 16","Mar 18"],
@@ -1173,7 +1179,7 @@ fill:true
 options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
 }));
 
-dashboardCharts.push(new Chart(document.getElementById("dailyLoginChart"), {
+pushChart(document.getElementById("dailyLoginChart"), {
 type:"line",
 data:{
 labels:["Feb 27","Mar 01","Mar 02","Mar 04","Mar 05","Mar 10","Mar 15","Mar 16","Mar 18"],
@@ -1228,7 +1234,7 @@ document.querySelectorAll(".tickets tbody tr td a").forEach(a=>{
 });
 
 /* -------- Revenue Charts -------- */
-dashboardCharts.push(new Chart(document.getElementById("revMainChart"),{
+pushChart(document.getElementById("revMainChart"),{
 type:"bar",
 data:{
 labels:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov"],
@@ -1259,7 +1265,7 @@ y1:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},title:{displa
 }
 }));
 
-dashboardCharts.push(new Chart(document.getElementById("revExpenseChart"),{
+pushChart(document.getElementById("revExpenseChart"),{
 type:"doughnut",
 data:{
 labels:["Platform Fees","Taxes","Operational Costs","Payouts"],
@@ -1305,28 +1311,25 @@ const flaggedPostStatuses=new Set(["disputed","cancelled"]);
 let adminPosts=[];
 
 const postCategoryCtx=document.getElementById("postCategoryChart");
-const postCategoryChart=postCategoryCtx?new Chart(postCategoryCtx,{
+const postCategoryChart=pushChart(postCategoryCtx,{
 type:"doughnut",
 data:{labels:[],datasets:[{data:[],backgroundColor:["#b6a47a","#1abc9c","#9b59b6","#f1c40f","#e67e22","#2c3e50"]}]},
 options:{plugins:{legend:{position:"bottom"}}}
-}):null;
-if(postCategoryChart)dashboardCharts.push(postCategoryChart);
+});
 
 const postStateCtx=document.getElementById("postStateChart");
-const postStateChart=postStateCtx?new Chart(postStateCtx,{
+const postStateChart=pushChart(postStateCtx,{
 type:"bar",
 data:{labels:[],datasets:[{label:"Posts",data:[],backgroundColor:"rgba(182,164,122,0.6)",borderRadius:6}]},
 options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
-}):null;
-if(postStateChart)dashboardCharts.push(postStateChart);
+});
 
 const qualityScoreCtx=document.getElementById("qualityScoreChart");
-const qualityScoreChart=qualityScoreCtx?new Chart(qualityScoreCtx,{
+const qualityScoreChart=pushChart(qualityScoreCtx,{
 type:"bar",
 data:{labels:[],datasets:[{label:"Quality Score",data:[],backgroundColor:[],borderRadius:6}]},
 options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,title:{display:true,text:"Score"}},x:{ticks:{autoSkip:false}}}}
-}):null;
-if(qualityScoreChart)dashboardCharts.push(qualityScoreChart);
+});
 
 function escapeHtml(value=""){
 return String(value||"").replace(/[&<>]/g,(char)=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[char]||char));
@@ -2116,6 +2119,14 @@ tr.appendChild(valueTd);
 modalDetails.appendChild(tr);
 };
 
+const buildFileHref = (value) => {
+const raw = String(value || '').trim();
+if (!raw) return '';
+if (/^https?:\/\//i.test(raw)) return raw;
+if (raw.startsWith('/api/uploads/view')) return raw;
+return `/api/uploads/view?key=${encodeURIComponent(raw)}`;
+};
+
 const openPendingModal = (userId) => {
 const user = pendingUsers.find((item) => String(item.id) === String(userId));
 if (!user || !modal || !modalDetails) return;
@@ -2133,8 +2144,8 @@ appendDetailRow('Availability', user.availability);
 appendDetailRow('Timezone', user.timezone);
 appendDetailRow('Location', user.location);
 appendDetailRow('Bar Number', user.barNumber);
-appendDetailRow('Resume', user.resumeURL, { link: true, linkLabel: 'Open' });
-appendDetailRow('Certification', user.certificateURL, {
+appendDetailRow('Resume', buildFileHref(user.resumeURL), { link: true, linkLabel: 'Open' });
+appendDetailRow('Certification', buildFileHref(user.certificateURL), {
 link: true,
 linkLabel: 'Open',
 });

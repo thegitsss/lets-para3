@@ -3,6 +3,7 @@
 
 import { j } from "../helpers.js";
 import { requireAuth } from "../auth.js";
+import { getStripeConnectStatus, isStripeConnected, STRIPE_GATE_MESSAGE } from "../utils/stripe-connect.js";
 
 let stylesInjected = false;
 
@@ -59,19 +60,39 @@ function draw(root, job, escapeHTML) {
 function wire(root, jobId) {
   const form = root.querySelector("[data-job-apply]");
   const textarea = root.querySelector("#coverLetter");
-  const status = root.querySelector("[data-apply-status]");
+  const statusNode = root.querySelector("[data-apply-status]");
   const submitBtn = form?.querySelector('button[type="submit"]');
   const defaultText = submitBtn?.textContent || "Apply to this job";
+  let stripeConnected = false;
+
+  if (submitBtn) submitBtn.disabled = true;
+  void (async () => {
+    const stripeStatus = await getStripeConnectStatus();
+    stripeConnected = isStripeConnected(stripeStatus);
+    if (!stripeConnected) {
+      if (statusNode) statusNode.textContent = STRIPE_GATE_MESSAGE;
+      if (submitBtn) submitBtn.disabled = true;
+    } else if (submitBtn) {
+      submitBtn.disabled = false;
+      if (statusNode && statusNode.textContent === STRIPE_GATE_MESSAGE) {
+        statusNode.textContent = "";
+      }
+    }
+  })();
 
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!stripeConnected) {
+      if (statusNode) statusNode.textContent = STRIPE_GATE_MESSAGE;
+      return;
+    }
     const letter = textarea?.value.trim();
     if (!letter) {
-      if (status) status.textContent = "Please include a brief cover letter.";
+      if (statusNode) statusNode.textContent = "Please include a brief cover letter.";
       return;
     }
 
-    if (status) status.textContent = "Submitting application…";
+    if (statusNode) statusNode.textContent = "Submitting application…";
 
     let restoreButton = true;
     if (submitBtn) {
@@ -84,13 +105,13 @@ function wire(root, jobId) {
         body: { coverLetter: letter },
         noRedirect: true,
       });
-      if (status) status.textContent = "Application submitted!";
+      if (statusNode) statusNode.textContent = "Application submitted!";
       if (textarea) textarea.value = "";
       restoreButton = false;
     } catch (err) {
-      if (status) status.textContent = err?.message || "Unable to apply right now.";
+      if (statusNode) statusNode.textContent = err?.message || "Unable to apply right now.";
       if (err?.status === 403 && /stripe/i.test(err?.message || "")) {
-        promptStripeOnboarding(err.message);
+        if (statusNode) statusNode.textContent = STRIPE_GATE_MESSAGE;
       }
     } finally {
       if (restoreButton && submitBtn) {
@@ -99,12 +120,6 @@ function wire(root, jobId) {
       }
     }
   });
-}
-
-function promptStripeOnboarding(message) {
-  const copy = message || "Complete Stripe onboarding before applying.";
-  const go = window.confirm(`${copy} Open Profile Settings to connect Stripe now?`);
-  if (go) window.location.href = "profile-settings.html";
 }
 
 function formatCurrency(amount) {

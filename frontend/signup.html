@@ -413,8 +413,7 @@
     <div class="left-panel">
       <div class="form-container fade-in">
         <p class="prelaunch-note">
-          Let’s-ParaConnect is in pre-launch. We are currently acceptinng and reviewing applicants
-          for Paralegals who wish to be part of our Founding Paralegal Collective. (All signups and accounts are free. No payments, no subscriptions.)
+          Let’s-ParaConnect is in pre-launch. All signups and accounts are free. No payments, no subscriptions.
         </p>
         <h1>Create your account</h1>
 
@@ -532,7 +531,36 @@
       }
     }
 
-    function attachResumeHandler() {}
+    function attachResumeHandler() {
+      const resumeInput = document.getElementById('resumeUpload');
+      const certInput = document.getElementById('certUpload');
+      const resumeHint = document.getElementById('resumeFileHint');
+      const certHint = document.getElementById('certFileHint');
+      const resumeLabel = document.querySelector('label[for="resumeUpload"]');
+      const certLabel = document.querySelector('label[for="certUpload"]');
+
+      const updateHint = (input, hintEl, labelEl, labelText) => {
+        if (!hintEl) return;
+        const file = input?.files?.[0] || null;
+        if (file) {
+          hintEl.textContent = `Selected: ${file.name || 'file'}`;
+          hintEl.classList.add('selected');
+        } else {
+          hintEl.textContent = 'No file selected';
+          hintEl.classList.remove('selected');
+        }
+        if (labelEl && labelText) labelEl.textContent = labelText;
+      };
+
+      if (resumeInput) {
+        resumeInput.onchange = () => updateHint(resumeInput, resumeHint, resumeLabel, 'Resume');
+        updateHint(resumeInput, resumeHint, resumeLabel, 'Resume');
+      }
+      if (certInput) {
+        certInput.onchange = () => updateHint(certInput, certHint, certLabel, 'Certificate / License');
+        updateHint(certInput, certHint, certLabel, 'Certificate / License');
+      }
+    }
 
     function validateStepOne() {
       const firstName = firstNameEl.value.trim();
@@ -632,12 +660,13 @@
            <label for="lawFirm"><span class="sr-only">Law Firm</span></label>
            <input id="lawFirm" type="text" autocomplete="organization" placeholder="Law Firm (optional)" />
            <p</p>`
-        : `<div class="name-row" style="gap:12px; align-items:flex-end;">
+        : `<div class="name-row" style="gap:12px; align-items:flex-start;">
              <div class="field-col">
                <div class="upload-wrapper">
                  <input id="resumeUpload" type="file" accept=".pdf,.doc,.docx" class="upload-input" aria-label="Resume" required />
                  <label for="resumeUpload" class="upload-placeholder">Resume</label>
                </div>
+               <div class="file-hint" id="resumeFileHint">No file selected</div>
              </div>
              <div class="field-col">
                <label for="paralegalExperience"><span class="sr-only">Years of experience</span></label>
@@ -657,7 +686,8 @@
            <div class="upload-wrapper">
              <input id="certUpload" type="file" accept=".pdf,.doc,.docx" class="upload-input" aria-label="Certification document" />
              <label for="certUpload" class="upload-placeholder">Certificate / License</label>
-           </div>`;
+           </div>
+           <div class="file-hint" id="certFileHint">No file selected</div>`;
       if (r === 'paralegal') attachResumeHandler();
     }
     setRole(role);
@@ -674,6 +704,15 @@
     });
 
     nextStepBtn?.addEventListener('click', () => {
+      if (validateStepOne()) {
+        goToStep(2);
+      }
+    });
+
+    form.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      if (currentStep !== 1) return;
+      e.preventDefault();
       if (validateStepOne()) {
         goToStep(2);
       }
@@ -698,8 +737,28 @@
       }, 5000);
     }
 
+    function sayPersistent(text, cls = '') {
+      if (!msg) return;
+      clearTimeout(msgFadeTimer);
+      msg.textContent = text;
+      msg.className = `msg ${cls}`.trim();
+      msg.classList.add('show');
+    }
+
     function isValidEmail(email) {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((email || '').trim());
+    }
+
+    function isValidLinkedInUrl(value) {
+      const raw = (value || '').trim();
+      if (!raw) return true;
+      try {
+        const url = new URL(raw);
+        const host = url.hostname.toLowerCase();
+        return (url.protocol === 'https:' || url.protocol === 'http:') && host.endsWith('linkedin.com');
+      } catch {
+        return false;
+      }
     }
 
     const defaultSubmitText = submitBtn?.textContent || "Create Account";
@@ -738,10 +797,18 @@
         attorneyLawFirm = (document.getElementById('lawFirm')?.value || '').trim();
         if (!attorneyBar) { say('State Bar Number is required for attorneys.', 'err'); return; }
         if (!attorneyBarState) { say('Please select the state for your bar number.', 'err'); return; }
+        if (attorneyLinkedIn && !isValidLinkedInUrl(attorneyLinkedIn)) {
+          say('Enter a valid LinkedIn URL (e.g., https://www.linkedin.com/in/username).', 'err');
+          return;
+        }
       } else {
         const resumeInput = document.getElementById('resumeUpload');
         if (!resumeInput || !resumeInput.files?.length) { say('Please upload your resume.', 'err'); return; }
         paralegalLinkedIn = (document.getElementById('paralegalLinkedIn')?.value || '').trim();
+        if (paralegalLinkedIn && !isValidLinkedInUrl(paralegalLinkedIn)) {
+          say('Enter a valid LinkedIn URL (e.g., https://www.linkedin.com/in/username).', 'err');
+          return;
+        }
         paralegalCertFile = document.getElementById('certUpload')?.files?.[0] || null;
       }
 
@@ -775,7 +842,7 @@
         }
 
         const recaptchaToken = await getRecaptchaToken('signup');
-        if (recaptchaToken) formData.append('recaptchaToken', recaptchaToken);
+        if (recaptchaToken) formData.append('captchaToken', recaptchaToken);
 
         const headers = {};
         if (window.__CSRF__) headers['X-CSRF-Token'] = window.__CSRF__;
@@ -793,14 +860,17 @@
         if (!res.ok) {
           if (res.status === 409) throw new Error('That email is already registered.');
           if (res.status === 429) throw new Error('Too many attempts. Please wait and try again.');
-          throw new Error(data?.msg || data?.message || 'Could not create account.');
+          throw new Error(data?.error || data?.msg || data?.message || 'Could not create account.');
         }
 
         localStorage.setItem('lastEmail', email);
         sessionStorage.setItem('signupToast', 'Your application has been submitted for approval.');
-        say('Application submitted. Await approval.', 'ok');
+        sayPersistent('Application submitted. Await approval.', 'ok');
         shouldRestoreButton = false;
-        setTimeout(() => location.href = 'login.html', 5000);
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Submitted';
+        }
       } catch (err) {
         console.error(err);
         say(err.message || 'Network error. Please try again.', 'err');
