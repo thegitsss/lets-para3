@@ -109,10 +109,7 @@ function shapeUser(payload) {
   const role = payload.role || payload["https://paraconnect.app/role"] || undefined;
   const email = payload.email || payload["https://paraconnect.app/email"] || undefined;
   const status = payload.status || undefined;
-  const approved =
-    payload.approved === true ||
-    String(status || "").toLowerCase() === "approved" ||
-    payload["https://paraconnect.app/approved"] === true;
+  const approved = String(status || "").toLowerCase() === "approved";
 
   // Optional extras (non-breaking)
   const scopes =

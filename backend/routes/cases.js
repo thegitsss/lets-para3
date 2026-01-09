@@ -250,10 +250,18 @@ function normalizeCaseStatusValue(status) {
   return lower;
 }
 
+const CLOSED_CASE_STATUSES = new Set(["completed", "closed", "cancelled", "disputed"]);
+
 function isFinalCaseDoc(doc) {
   if (!doc) return false;
   if (doc.paymentReleased === true) return true;
   return normalizeCaseStatusValue(doc.status) === "completed";
+}
+
+function isCaseClosedForFiles(doc) {
+  if (!doc) return false;
+  if (doc.paymentReleased === true) return true;
+  return CLOSED_CASE_STATUSES.has(normalizeCaseStatusValue(doc.status));
 }
 
 function hasWorkStarted(caseDoc) {
@@ -1804,11 +1812,14 @@ router.delete(
  */
 router.get(
   "/:caseId/files/signed-get",
-  requireCaseAccess("caseId", { project: "files" }),
+  requireCaseAccess("caseId", { project: "files paymentReleased" }),
   asyncHandler(async (req, res) => {
     const { key } = req.query;
     if (!key || typeof key !== "string") return res.status(400).json({ error: "key query param required" });
     const doc = req.case;
+    if (!req.acl?.isAdmin && isCaseClosedForFiles(doc)) {
+      return res.status(403).json({ error: "Files are no longer available. Download the archive instead." });
+    }
     const file = (doc.files || []).find((f) => f.key === key);
     if (!file) return res.status(404).json({ error: "File not found" });
 

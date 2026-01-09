@@ -64,6 +64,15 @@ function buildCasePrefix(caseId) {
   return `cases/${caseId}/`;
 }
 
+const CLOSED_CASE_STATUSES = new Set(["completed", "closed", "cancelled", "disputed"]);
+
+function isCaseClosedForAccess(caseDoc) {
+  if (!caseDoc) return false;
+  if (caseDoc.paymentReleased === true) return true;
+  const status = normalizeCaseStatus(caseDoc.status);
+  return CLOSED_CASE_STATUSES.has(status);
+}
+
 function normalizeKeyPath(key) {
   return String(key || "").replace(/^\/+/, "");
 }
@@ -100,7 +109,14 @@ async function ensureKeyAccess(req, key, explicitCaseId) {
       if (explicitCaseId && !cleaned.includes(buildCasePrefix(caseId))) {
         return false;
       }
-      return hasCaseAccess(req, caseId);
+      try {
+        const { caseDoc, isAdmin } = await loadCaseForUser(req, caseId);
+        if (!caseDoc) return false;
+        if (!isAdmin && isCaseClosedForAccess(caseDoc)) return false;
+        return true;
+      } catch {
+        return false;
+      }
     }
     return false;
   }
@@ -703,7 +719,7 @@ async function loadCaseForUser(req, caseId) {
     throw error;
   }
   const doc = await Case.findById(caseId).select(
-    "_id attorney attorneyId paralegal paralegalId title escrowIntentId escrowStatus status"
+    "_id attorney attorneyId paralegal paralegalId title escrowIntentId escrowStatus status paymentReleased readOnly paralegalAccessRevokedAt"
   );
   if (!doc) {
     const error = new Error("Case not found");
@@ -714,6 +730,11 @@ async function loadCaseForUser(req, caseId) {
   const isAdmin = req.user?.role === "admin";
   const isAttorney = sameId(doc.attorney, userId) || sameId(doc.attorneyId, userId);
   const isParalegal = sameId(doc.paralegal, userId) || sameId(doc.paralegalId, userId);
+  if (!isAdmin && isParalegal && doc.paralegalAccessRevokedAt) {
+    const error = new Error("Access revoked");
+    error.statusCode = 403;
+    throw error;
+  }
   if (!isAdmin && !isAttorney && !isParalegal) {
     const error = new Error("Forbidden");
     error.statusCode = 403;

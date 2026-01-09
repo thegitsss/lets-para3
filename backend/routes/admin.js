@@ -33,8 +33,6 @@ const APPROVAL_EMAIL_SUBJECT =
 "Your accout has been approved! Welcome to Let's-ParaConnect.";
 const DENIAL_EMAIL_SUBJECT =
 "Your application to join Let's-ParaConnect has been reviewed and was unfortunately not approved.";
-const VERIFICATION_ACCEPT_SUBJECT = "Let’s-ParaConnect Verification Approval";
-const VERIFICATION_REJECT_SUBJECT = "Let’s-ParaConnect Verification Update";
 
 // -----------------------------------------
 // Helpers
@@ -155,22 +153,6 @@ return text ? text.slice(0, 1000) : undefined;
 
 function escapeRegex(value = "") {
 return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function buildVerificationAcceptanceBody(user) {
-if (typeof sendEmail.sendAcceptedEmail === "function") {
-return sendEmail.sendAcceptedEmail(user?.lastName || "");
-}
-const last = user?.lastName || "Applicant";
-return `Dear Ms./Mr. ${last},<br/><br/>Congratulations! Your application has been approved. We will send onboarding instructions as we approach the official platform launch.<br/><br/>If you have any questions, contact us at support@lets-paraconnect.com.<br/><br/>Let’s-ParaConnect Verification Division`;
-}
-
-function buildVerificationRejectionBody(user) {
-if (typeof sendEmail.sendNotAcceptedEmail === "function") {
-return sendEmail.sendNotAcceptedEmail(user?.lastName || "");
-}
-const last = user?.lastName || "Applicant";
-return `Dear Ms./Mr. ${last},<br/><br/>Thank you for your interest in Let’s-ParaConnect. After reviewing your submission, we are unable to extend an invitation at this time. You are welcome to reapply in the future if circumstances change.<br/><br/>If you have any questions, contact us at support@lets-paraconnect.com.<br/><br/>Let’s-ParaConnect Verification Division`;
 }
 
 function buildUnsubscribeToken(user) {
@@ -439,6 +421,7 @@ const ACTIVE_USER_MATCH = {
   deleted: { $ne: true },
   role: { $ne: "admin" },
 };
+const PENDING_USER_MATCH = { status: "pending", deleted: { $ne: true } };
 
 router.get("/metrics", asyncHandler(async (_req, res) => {
 const ACTIVE_CASE_STATUSES = [
@@ -454,7 +437,7 @@ const ACTIVE_CASE_STATUSES = [
 const [roleAggregation, pendingApprovals, suspendedUsers, recentUsersRaw, monthlyRegistrationsRaw, caseAggregation, escrowAggregation, revenueAggregation] =
 await Promise.all([
 User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
-User.countDocuments({ status: "pending" }),
+User.countDocuments(PENDING_USER_MATCH),
 User.countDocuments({ status: { $in: ["denied", "rejected"] }, deleted: { $ne: true } }),
 User.find(ACTIVE_USER_MATCH)
 .sort({ createdAt: -1 })
@@ -527,7 +510,7 @@ recentUsers,
 router.get(
 "/pending-paralegals",
 asyncHandler(async (_req, res) => {
-  const pending = await User.find({ role: "paralegal", status: "pending" })
+const pending = await User.find({ role: "paralegal", status: "pending", deleted: { $ne: true } })
     .select("firstName lastName email linkedInURL certificateURL yearsExperience createdAt")
 .sort({ createdAt: 1 })
 .lean();
@@ -541,52 +524,34 @@ res.json({ items });
 
 router.post(
 "/approve/:id",
+csrfProtection,
 asyncHandler(async (req, res) => {
 const { id } = req.params;
   if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
   const user = await User.findById(id);
   if (!user) return res.status(404).json({ error: "User not found" });
   if (user.role !== "paralegal") return res.status(400).json({ error: "Only paralegals can be approved here" });
-  user.status = "approved";
-  if (!user.approvedAt) {
-    user.approvedAt = new Date();
+  const updated = await applyUserDecision(req, user, "approved");
+  try {
+    await sendWelcomePacket(updated);
+  } catch (err) {
+    console.warn("[admin] Failed to send welcome packet", err?.message || err);
   }
-  if (Object.prototype.hasOwnProperty.call(user, "verified")) {
-    user.verified = true;
-  }
-await user.save();
-await sendWelcomePacket(user);
-const html = buildVerificationAcceptanceBody(user);
-if (user.email) {
-try {
-await sendEmail(user.email, VERIFICATION_ACCEPT_SUBJECT, html);
-} catch (err) {
-console.warn("[admin] Failed to send acceptance email", err?.message || err);
-}
-}
-res.json({ ok: true });
+  res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
 })
 );
 
 router.post(
 "/reject/:id",
+csrfProtection,
 asyncHandler(async (req, res) => {
 const { id } = req.params;
 if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
 const user = await User.findById(id);
 if (!user) return res.status(404).json({ error: "User not found" });
 if (user.role !== "paralegal") return res.status(400).json({ error: "Only paralegals can be reviewed here" });
-user.status = "rejected";
-await user.save();
-const html = buildVerificationRejectionBody(user);
-if (user.email) {
-try {
-await sendEmail(user.email, VERIFICATION_REJECT_SUBJECT, html);
-} catch (err) {
-console.warn("[admin] Failed to send rejection email", err?.message || err);
-}
-}
-res.json({ ok: true });
+  const updated = await applyUserDecision(req, user, "denied");
+  res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
 })
 );
 
@@ -630,7 +595,7 @@ const ACTIVE_CASE_STATUSES = [
 ];
 const [roleAggregation, pendingUsers, caseAggregation, escrowHeldAgg, escrowReleasedAgg] = await Promise.all([
 User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
-User.countDocuments({ status: "pending" }),
+User.countDocuments(PENDING_USER_MATCH),
 Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
 Case.aggregate(
   buildApprovedCasePipeline({ paymentReleased: { $ne: true } }).concat([
@@ -717,8 +682,8 @@ upcomingPayoutCases,
 recentUsersRaw,
 ] = await Promise.all([
 User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
-User.countDocuments({ status: "pending" }),
-User.countDocuments({ status: { $in: ["denied", "rejected"] } }),
+User.countDocuments(PENDING_USER_MATCH),
+User.countDocuments({ status: { $in: ["denied", "rejected"] }, deleted: { $ne: true } }),
 User.aggregate([
 { $match: { ...ACTIVE_USER_MATCH, createdAt: { $gte: startWindow } } },
 { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } },

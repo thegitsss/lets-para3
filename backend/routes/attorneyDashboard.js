@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 
 const auth = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
+const { requireApproved } = require("../utils/authz");
 const Job = require("../models/Job");
 const Application = require("../models/Application");
 const Case = require("../models/Case");
@@ -38,7 +39,7 @@ async function getEscrowTotal(attorneyId) {
  * GET /api/attorney/dashboard
  * Main overview for the attorney dashboard.
  */
-router.get("/", auth, requireRole(["attorney"]), async (req, res) => {
+router.get("/", auth, requireApproved, requireRole(["attorney"]), async (req, res) => {
   try {
     const attorneyId = req.user._id;
 

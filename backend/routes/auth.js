@@ -75,8 +75,7 @@ const BOT_REPEATED = /(.)\1{3,}/;
 const BOT_FORBIDDEN_CHARS = /[{}[\]|\\^<>]/;
 
 function signAccess(user) {
-  const approved =
-    user.approved === true || String(user.status || "").toLowerCase() === "approved";
+  const approved = String(user.status || "").toLowerCase() === "approved";
   const payload = {
     id: user._id.toString(),
     role: user.role,
@@ -424,7 +423,7 @@ router.post(
     }
 
     const status = user.status || "pending";
-    const approvedFlag = user.approved === true || status === "approved";
+    const approvedFlag = status === "approved";
     if (!approvedFlag) {
       const msg =
         status === "pending"
@@ -485,7 +484,7 @@ router.post(
     user.twoFactorExpiresAt = null;
     await user.save();
 
-    const approvedFlag = user.approved === true || String(user.status || "").toLowerCase() === "approved";
+    const approvedFlag = String(user.status || "").toLowerCase() === "approved";
     if (!approvedFlag) {
       return res.status(403).json({ error: "Account pending approval" });
     }

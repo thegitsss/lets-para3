@@ -163,9 +163,7 @@ function requireCaseAccess(paramKey = "caseId", opts = {}) {
 // Additional approval/active guards
 function requireApproved(req, res, next) {
   const approved =
-    req.user &&
-    (req.user.approved === true ||
-      String(req.user.status || "").toLowerCase() === "approved");
+    req.user && String(req.user.status || "").toLowerCase() === "approved";
   if (!approved) {
     return res.status(403).json({ error: "Account pending approval" });
   }

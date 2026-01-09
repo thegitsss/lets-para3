@@ -612,9 +612,12 @@ router.patch(
           ? me.notificationPrefs.toObject()
           : { ...(me.notificationPrefs || {}) };
       const updates = body.notificationPrefs;
-      if (Object.prototype.hasOwnProperty.call(updates, "email")) {
-        currentPrefs.email = !!updates.email;
-      }
+      const allowed = ["email", "emailMessages", "emailCase", "inApp", "inAppMessages", "inAppCase"];
+      allowed.forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(updates, key)) {
+          currentPrefs[key] = !!updates[key];
+        }
+      });
       me.notificationPrefs = currentPrefs;
     }
 
@@ -640,7 +643,7 @@ router.patch(
         : { ...me.notificationPrefs }
       : {};
     const updates = req.body || {};
-    const allowed = ["inAppMessages", "inAppCase", "emailMessages", "emailCase", "email"];
+    const allowed = ["inApp", "inAppMessages", "inAppCase", "emailMessages", "emailCase", "email"];
     allowed.forEach((key) => {
       if (Object.prototype.hasOwnProperty.call(updates, key)) {
         current[key] = !!updates[key];

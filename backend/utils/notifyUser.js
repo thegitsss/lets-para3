@@ -197,6 +197,27 @@ function shouldSendEmailForType(user, type) {
   return true;
 }
 
+function shouldCreateInAppNotification(user, type) {
+  const prefs = user?.notificationPrefs || {};
+  if (prefs.inApp === false) return false;
+  if (type === "message") {
+    if (Object.prototype.hasOwnProperty.call(prefs, "inAppMessages")) {
+      return prefs.inAppMessages !== false;
+    }
+    return prefs.emailMessages !== false;
+  }
+  if (CASE_EMAIL_TYPES.has(type)) {
+    if (Object.prototype.hasOwnProperty.call(prefs, "inAppCase")) {
+      return prefs.inAppCase !== false;
+    }
+    return prefs.emailCase !== false;
+  }
+  if (Object.prototype.hasOwnProperty.call(prefs, "inApp")) {
+    return prefs.inApp !== false;
+  }
+  return prefs.email !== false;
+}
+
 async function notifyUser(userId, type, payload = {}, options = {}) {
   const user = await User.findById(userId);
   if (!user) return;
@@ -207,25 +228,24 @@ async function notifyUser(userId, type, payload = {}, options = {}) {
     return;
   }
   const actor = await resolveActorSnapshot(actorUserId);
-  const message = buildDisplayMessage(type, { ...payload, actorFirstName: actor.actorFirstName });
-
-  const notif = await Notification.create({
-    userId,
-    userRole: user.role || "",
-    type,
-    message,
-    link: payload.link || "",
-    payload,
-    actorUserId: actor.actorUserId,
-    actorFirstName: actor.actorFirstName,
-    actorProfileImage: actor.actorProfileImage,
-    read: false,
-    isRead: false,
-    createdAt: new Date(),
-  });
-
-  if (user.notificationPrefs?.categories && user.notificationPrefs.categories[type] === false) {
-    return notif;
+  const shouldCreateInApp = shouldCreateInAppNotification(user, type);
+  let notif = null;
+  if (shouldCreateInApp) {
+    const message = buildDisplayMessage(type, { ...payload, actorFirstName: actor.actorFirstName });
+    notif = await Notification.create({
+      userId,
+      userRole: user.role || "",
+      type,
+      message,
+      link: payload.link || "",
+      payload,
+      actorUserId: actor.actorUserId,
+      actorFirstName: actor.actorFirstName,
+      actorProfileImage: actor.actorProfileImage,
+      read: false,
+      isRead: false,
+      createdAt: new Date(),
+    });
   }
 
   if (shouldSendEmailForType(user, type)) {

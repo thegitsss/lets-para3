@@ -53,6 +53,11 @@ const notificationCategorySettingsSchema = new Schema(
 const notificationSettingsSchema = new Schema(
   {
     email: { type: Boolean, default: true },
+    emailMessages: { type: Boolean, default: true },
+    emailCase: { type: Boolean, default: true },
+    inApp: { type: Boolean, default: true },
+    inAppMessages: { type: Boolean, default: true },
+    inAppCase: { type: Boolean, default: true },
     browser: { type: Boolean, default: false },
     categories: { type: notificationCategorySettingsSchema, default: () => ({}) },
   },

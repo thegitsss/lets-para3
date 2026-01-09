@@ -4,6 +4,7 @@ const router = express.Router();
 
 const auth = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
+const { requireApproved } = require("../utils/authz");
 const Job = require("../models/Job");
 const Application = require("../models/Application");
 const Case = require("../models/Case");
@@ -68,7 +69,7 @@ async function getParalegalEarnings(paralegalId) {
  * GET /api/paralegal/dashboard
  * Returns job suggestions, applications, and active cases.
  */
-router.get("/", auth, requireRole(["paralegal"]), async (req, res) => {
+router.get("/", auth, requireApproved, requireRole(["paralegal"]), async (req, res) => {
   try {
 
     const paralegalId = req.user._id;

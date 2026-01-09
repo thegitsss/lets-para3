@@ -85,7 +85,7 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     err.status = 400;
     throw err;
   }
-  if (!user || user.approved !== true) {
+  if (!user || String(user.status || "").toLowerCase() !== "approved") {
     const err = new Error("Account pending approval");
     err.status = 403;
     throw err;
