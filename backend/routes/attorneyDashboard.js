@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const mongoose = require("mongoose");
 
 const auth = require("../utils/verifyToken");
 const requireRole = require("../middleware/requireRole");
@@ -49,7 +50,11 @@ router.get("/", auth, requireRole(["attorney"]), async (req, res) => {
 
       Job.find({ attorneyId }).select("_id status"),
 
-      Case.find({ attorneyId })
+      Case.find({
+        attorneyId,
+        archived: { $ne: true },
+        status: { $nin: ["completed", "closed", "cancelled"] },
+      })
         .populate("paralegalId", "firstName lastName email role")
         .populate("jobId", "title practiceArea")
         .sort({ createdAt: -1 })
@@ -72,19 +77,19 @@ router.get("/", auth, requireRole(["attorney"]), async (req, res) => {
     }
 
     // 3. Aggregate metrics
-  const [activeCasesCount, openJobsCount, pendingApplicationsCount, escrowTotal] =
-    await Promise.all([
+    const [activeCasesCount, openJobsCount, pendingApplicationsCount, escrowTotal] = await Promise.all([
       Case.countDocuments({
         attorneyId,
-        status: { $in: ["active", "awaiting_documents", "reviewing"] },
-        }),
-        Job.countDocuments({ attorneyId, status: "open" }),
-        Application.countDocuments({
-          jobId: { $in: jobIds },
-          status: "submitted",
-        }),
-        getEscrowTotal(attorneyId),
-      ]);
+        archived: { $ne: true },
+        status: { $in: ["active", "awaiting_documents", "reviewing", "in progress", "in_progress"] },
+      }),
+      Job.countDocuments({ attorneyId, status: "open" }),
+      Application.countDocuments({
+        jobId: { $in: jobIds },
+        status: "submitted",
+      }),
+      getEscrowTotal(attorneyId),
+    ]);
 
     const metrics = {
       activeCases: activeCasesCount,

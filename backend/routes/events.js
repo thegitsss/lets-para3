@@ -8,11 +8,12 @@ const { logAction } = require("../utils/audit");
 const { assertCaseParticipant } = require("../middleware/ensureCaseParticipant");
 
 // ----------------------------------------
-// Optional CSRF (enable via ENABLE_CSRF=true)
+// CSRF (enabled in production or when ENABLE_CSRF=true)
 // ----------------------------------------
 const noop = (_req, _res, next) => next();
 let csrfProtection = noop;
-if (process.env.ENABLE_CSRF === "true") {
+const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+if (REQUIRE_CSRF) {
   const csrf = require("csurf");
   csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
 }

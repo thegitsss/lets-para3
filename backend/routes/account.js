@@ -6,11 +6,12 @@ const { requireApproved } = require("../utils/authz");
 const User = require("../models/User");
 
 // ----------------------------------------
-// Optional CSRF (enable via ENABLE_CSRF=true)
+// CSRF (enabled in production or when ENABLE_CSRF=true)
 // ----------------------------------------
 const noop = (_req, _res, next) => next();
 let csrfProtection = noop;
-if (process.env.ENABLE_CSRF === "true") {
+const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+if (REQUIRE_CSRF) {
   const csrf = require("csurf");
   csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
 }
@@ -49,6 +50,9 @@ router.get(
       theme:
         (user.preferences && typeof user.preferences === "object" && user.preferences.theme) ||
         "mountain",
+      fontSize:
+        (user.preferences && typeof user.preferences === "object" && user.preferences.fontSize) ||
+        "md",
       state: user.location || user.state || "",
     });
   })
@@ -57,7 +61,7 @@ router.get(
 router.post(
   "/preferences",
   asyncHandler(async (req, res) => {
-    const { email, theme, state } = req.body || {};
+    const { email, theme, state, fontSize } = req.body || {};
     const user = await User.findById(req.user.id).select("notificationPrefs preferences location");
     if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -75,12 +79,17 @@ router.post(
       typeof theme === "string" && ["light", "dark", "mountain", "mountain-dark"].includes(theme.toLowerCase())
         ? theme.toLowerCase()
         : null;
-    if (normalizedTheme) {
+    const normalizedFontSize =
+      typeof fontSize === "string" && ["xs", "sm", "md", "lg", "xl"].includes(fontSize.toLowerCase())
+        ? fontSize.toLowerCase()
+        : null;
+    if (normalizedTheme || normalizedFontSize) {
       user.preferences = {
         ...(typeof user.preferences?.toObject === "function"
           ? user.preferences.toObject()
           : user.preferences || {}),
-        theme: normalizedTheme,
+        ...(normalizedTheme ? { theme: normalizedTheme } : {}),
+        ...(normalizedFontSize ? { fontSize: normalizedFontSize } : {}),
       };
     }
 
@@ -100,6 +109,7 @@ router.post(
       preferences: {
         email: !!email,
         theme: normalizedTheme || user.preferences?.theme || "mountain",
+        fontSize: normalizedFontSize || user.preferences?.fontSize || "md",
       },
       state: user.location || "",
     });

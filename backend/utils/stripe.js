@@ -177,6 +177,55 @@ function publicConfig() {
   };
 }
 
+function isStripeTestMode() {
+  return String(SECRET || "").startsWith("sk_test_");
+}
+
+function getPaymentIntentCharge(paymentIntent) {
+  if (!paymentIntent) return null;
+  const charges = paymentIntent.charges?.data;
+  if (Array.isArray(charges) && charges.length) return charges[0];
+  const latest = paymentIntent.latest_charge;
+  if (latest && typeof latest === "object") return latest;
+  if (latest && typeof latest === "string") return { id: latest };
+  return null;
+}
+
+function isTransferablePaymentIntent(paymentIntent, { caseId } = {}) {
+  if (!paymentIntent || paymentIntent.status !== "succeeded") {
+    return { transferable: false, charge: null };
+  }
+  const charge = getPaymentIntentCharge(paymentIntent);
+  if (charge) {
+    if (charge.status && charge.status === "failed") return { transferable: false, charge };
+    if (charge.paid === false || charge.captured === false) return { transferable: false, charge };
+    const amount = Number(charge.amount || 0);
+    const refunded = Number(charge.amount_refunded || 0);
+    if (amount > 0 && refunded >= amount) return { transferable: false, charge };
+  } else if (isStripeTestMode()) {
+    return { transferable: true, charge: null };
+  }
+  const expectedGroup = caseId ? caseTransferGroup(caseId) : "";
+  const transferGroup = paymentIntent.transfer_group || charge?.transfer_group || "";
+  if (expectedGroup && transferGroup && transferGroup !== expectedGroup) {
+    return { transferable: false, charge };
+  }
+  return { transferable: true, charge };
+}
+
+function sanitizeStripeError(err, fallback) {
+  const safeFallback = fallback || "We couldn't complete that Stripe action. Please try again.";
+  if (!err) return safeFallback;
+  const isStripe =
+    !!err.type ||
+    !!err.code ||
+    !!err.raw ||
+    !!err.decline_code ||
+    (typeof err === "object" && err.name === "StripeError");
+  if (isStripe) return safeFallback;
+  return err.message || safeFallback;
+}
+
 // ----------------------------------------
 // Exports
 // ----------------------------------------
@@ -188,3 +237,7 @@ module.exports.calculateFees = calculateFees;
 module.exports.caseTransferGroup = caseTransferGroup;
 module.exports.constructWebhookEvent = constructWebhookEvent;
 module.exports.publicConfig = publicConfig;
+module.exports.isStripeTestMode = isStripeTestMode;
+module.exports.getPaymentIntentCharge = getPaymentIntentCharge;
+module.exports.isTransferablePaymentIntent = isTransferablePaymentIntent;
+module.exports.sanitizeStripeError = sanitizeStripeError;

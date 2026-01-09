@@ -10,16 +10,25 @@ const Case = require("../models/Case");
 const Task = require("../models/Task");
 const Notification = require("../models/Notification");
 const Job = require("../models/Job");
+const Block = require("../models/Block");
 const { maskProfanity } = require("../utils/badWords");
 const { logAction } = require("../utils/audit");
 const { notifyUser } = require("../utils/notifyUser");
+const {
+  BLOCKED_MESSAGE,
+  getBlockedUserIds,
+  isBlockedBetween,
+  isBlockPairAllowed,
+  isBlockableRole,
+} = require("../utils/blocks");
 
 // ----------------------------------------
-// Optional CSRF (enable via ENABLE_CSRF=true)
+// CSRF (enabled in production or when ENABLE_CSRF=true)
 // ----------------------------------------
 const noop = (_req, _res, next) => next();
 let csrfProtection = noop;
-if (process.env.ENABLE_CSRF === "true") {
+const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+if (REQUIRE_CSRF) {
   const csrf = require("csurf");
   csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
 }
@@ -180,6 +189,9 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
       theme:
         (src.preferences && typeof src.preferences === "object" && src.preferences.theme) ||
         "mountain",
+      fontSize:
+        (src.preferences && typeof src.preferences === "object" && src.preferences.fontSize) ||
+        "md",
     },
   };
   if (includeEmail) {
@@ -324,7 +336,9 @@ router.get(
   asyncHandler(async (req, res) => {
     const me = await User.findById(req.user.id).select(SAFE_SELF_SELECT).lean();
     if (!me) return res.status(404).json({ error: "Not found" });
-    return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true }));
+    const payload = serializePublicUser(me, { includeEmail: true, includeStatus: true });
+    payload.role = me.role;
+    return res.json(payload);
   })
 );
 
@@ -365,9 +379,11 @@ router.post(
 router.get(
   "/me/blocked",
   asyncHandler(async (req, res) => {
-    const me = await User.findById(req.user.id).select("blockedUsers");
-    if (!me) return res.status(404).json({ error: "Not found" });
-    const ids = (me.blockedUsers || []).map((id) => String(id));
+    const blocks = await Block.find({ blockerId: req.user.id })
+      .sort({ createdAt: -1 })
+      .select("blockedId")
+      .lean();
+    const ids = blocks.map((block) => String(block.blockedId)).filter(Boolean);
     if (!ids.length) return res.json([]);
 
     const blockedUsers = await User.find({ _id: { $in: ids } }).select("firstName lastName email").lean();
@@ -399,20 +415,23 @@ router.post(
       return res.status(400).json({ error: "Cannot block yourself" });
     }
 
-    const [me, target] = await Promise.all([
-      User.findById(req.user.id).select("blockedUsers"),
-      User.findById(userId).select("_id firstName lastName email"),
-    ]);
-    if (!me) return res.status(404).json({ error: "User not found" });
-    if (!target) return res.status(404).json({ error: "Target not found" });
-
-    if (!Array.isArray(me.blockedUsers)) {
-      me.blockedUsers = [];
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    if (!isBlockableRole(requesterRole)) {
+      return res.status(403).json({ error: "Blocking is only available to attorneys and paralegals." });
     }
-    const already = me.blockedUsers.some((id) => String(id) === String(target._id));
+
+    const target = await User.findById(userId).select("_id firstName lastName email role");
+    if (!target) return res.status(404).json({ error: "Target not found" });
+    if (!isBlockPairAllowed(requesterRole, target.role)) {
+      return res.status(400).json({ error: "Blocking is only available between attorneys and paralegals." });
+    }
+
+    const already = await Block.findOne({
+      blockerId: req.user.id,
+      blockedId: target._id,
+    }).select("_id");
     if (!already) {
-      me.blockedUsers.push(target._id);
-      await me.save();
+      await Block.create({ blockerId: req.user.id, blockedId: target._id });
     }
 
     res.json({ ok: true, blocked: true });
@@ -427,12 +446,7 @@ router.post(
     const { userId } = req.body || {};
     if (!isObjId(userId)) return res.status(400).json({ error: "Invalid userId" });
 
-    const me = await User.findById(req.user.id).select("blockedUsers");
-    if (!me) return res.status(404).json({ error: "User not found" });
-
-    const current = Array.isArray(me.blockedUsers) ? me.blockedUsers : [];
-    me.blockedUsers = current.filter((id) => String(id) !== String(userId));
-    await me.save();
+    await Block.deleteOne({ blockerId: req.user.id, blockedId: userId });
 
     res.json({ ok: true, blocked: false });
   })
@@ -703,6 +717,12 @@ router.get(
   requireRole("attorney", "admin"),
   asyncHandler(async (req, res) => {
     const { filter, sortOpt, page: p, limit: l } = parseParalegalFilters(req.query);
+    if (String(req.user.role || "").toLowerCase() === "attorney") {
+      const blockedIds = await getBlockedUserIds(req.user.id);
+      if (blockedIds.length) {
+        filter._id = { $nin: blockedIds };
+      }
+    }
 
     const [docs, total] = await Promise.all([
       User.find(filter).sort(sortOpt).skip((p - 1) * l).limit(l).select(SAFE_PUBLIC_SELECT).lean(),
@@ -729,6 +749,13 @@ router.get(
     }
     if (!isObjId(attorneyId)) {
       return res.status(400).json({ error: "Invalid attorney id" });
+    }
+
+    if (requester.role === "paralegal") {
+      const blocked = await isBlockedBetween(requester._id || requester.id, attorneyId);
+      if (blocked) {
+        return res.status(403).json({ error: BLOCKED_MESSAGE });
+      }
     }
 
     if (requester.role === "admin") {
@@ -762,6 +789,10 @@ router.get(
 
     const u = await User.findById(userId).select(SAFE_PUBLIC_SELECT).lean();
     if (!u) return res.status(404).json({ error: "User not found" });
+    if (String(req.user?.role || "").toLowerCase() === "attorney") {
+      const blocked = await isBlockedBetween(req.user.id, u._id);
+      if (blocked) return res.status(403).json({ error: BLOCKED_MESSAGE });
+    }
     if (u.role !== "paralegal" || u.status !== "approved") {
       return res.status(403).json({ error: "Profile not available" });
     }
@@ -785,6 +816,12 @@ paralegalRouter.get(
   requireRole("paralegal", "attorney", "admin"),
   asyncHandler(async (req, res) => {
     const { filter, sortOpt, page, limit } = parseParalegalFilters(req.query);
+    if (String(req.user.role || "").toLowerCase() === "attorney") {
+      const blockedIds = await getBlockedUserIds(req.user.id);
+      if (blockedIds.length) {
+        filter._id = { $nin: blockedIds };
+      }
+    }
     const [docs, total] = await Promise.all([
       User.find(filter).sort(sortOpt).skip((page - 1) * limit).limit(limit).select(PARALEGAL_SELECT).lean(),
       User.countDocuments(filter),
@@ -810,6 +847,10 @@ paralegalRouter.get(
 
     const profile = await User.findById(targetId).select(PARALEGAL_SELECT);
     if (!profile) return res.status(404).json({ error: "Paralegal not found" });
+    if (String(req.user.role || "").toLowerCase() === "attorney") {
+      const blocked = await isBlockedBetween(req.user.id, profile._id);
+      if (blocked) return res.status(403).json({ error: BLOCKED_MESSAGE });
+    }
     if (profile.role !== "paralegal" && String(profile._id) !== String(req.user.id) && req.user.role !== "admin") {
       return res.status(404).json({ error: "Paralegal not found" });
     }
@@ -834,6 +875,7 @@ paralegalRouter.get(
 paralegalRouter.post(
   "/:paralegalId/update",
   requireApprovedUser,
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const targetId = resolveParalegalId(req.params.paralegalId, req.user.id);
     if (!isObjId(targetId)) return res.status(400).json({ error: "Invalid paralegal id" });
@@ -891,6 +933,7 @@ paralegalRouter.post(
 paralegalRouter.post(
   "/:paralegalId/invite",
   requireRole("attorney", "admin"),
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const targetId = resolveParalegalId(req.params.paralegalId, req.user.id);
     if (!isObjId(targetId)) return res.status(400).json({ error: "Invalid paralegal id" });
@@ -906,6 +949,10 @@ paralegalRouter.post(
 
     const caseDoc = await Case.findById(caseId).select("title attorney updates");
     if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+    const caseAttorneyId = caseDoc.attorney || caseDoc.attorneyId || null;
+    if (caseAttorneyId && (await isBlockedBetween(caseAttorneyId, paralegal._id))) {
+      return res.status(403).json({ error: BLOCKED_MESSAGE });
+    }
     if (req.user.role !== "admin" && String(caseDoc.attorney) !== String(req.user.id)) {
       return res.status(403).json({ error: "Only the case owner can send invites" });
     }

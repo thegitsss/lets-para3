@@ -197,6 +197,8 @@ const caseSchema = new Schema(
     // Escrow / payments (Stripe)
     currency: { type: String, default: "usd", lowercase: true, trim: true },
     totalAmount: { type: Number, default: 0, min: 0 }, // in cents
+    lockedTotalAmount: { type: Number, default: null, min: 0 }, // in cents; immutable once set
+    amountLockedAt: { type: Date, default: null },
     escrowIntentId: { type: String, default: null, index: true },
     escrowSessionId: { type: String, default: null, index: true }, // if using Checkout
     paymentIntentId: { type: String, default: null, index: true },
@@ -277,6 +279,9 @@ caseSchema.pre("validate", function (next) {
 // Normalize money fields to integer cents and non-negative
 caseSchema.pre("save", function (next) {
   this.totalAmount = cents(this.totalAmount);
+  if (this.lockedTotalAmount != null) {
+    this.lockedTotalAmount = cents(this.lockedTotalAmount);
+  }
   this.feeAttorneyAmount = cents(this.feeAttorneyAmount);
   this.feeParalegalAmount = cents(this.feeParalegalAmount);
   next();
@@ -290,7 +295,7 @@ const ALLOWED_TRANSITIONS = {
   open: ["assigned", "awaiting_funding", "active", "awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
   assigned: ["awaiting_funding", "active", "awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
   awaiting_funding: ["active", "awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
-  active: ["awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
+  active: ["awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "completed", "cancelled", "closed"],
   awaiting_documents: ["reviewing", STATUS_IN_PROGRESS, "completed", "cancelled", "closed"],
   reviewing: [STATUS_IN_PROGRESS, "completed", "cancelled", "closed"],
   [STATUS_IN_PROGRESS]: ["completed", "disputed", "cancelled", "closed"],

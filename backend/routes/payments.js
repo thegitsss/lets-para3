@@ -1,6 +1,7 @@
 // backend/routes/payments.js
 const router = require("express").Router();
 const mongoose = require("mongoose");
+const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
@@ -8,9 +9,11 @@ const stripe = require("../utils/stripe");
 const Case = require("../models/Case");
 const User = require("../models/User");
 const AuditLog = require("../models/AuditLog"); // match your filename
+const Notification = require("../models/Notification");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
 const sendEmail = require("../utils/email");
+const { buildReceiptPdfBuffer, uploadPdfToS3, getReceiptKey } = require("../services/caseLifecycle");
 const { notifyUser } = require("../utils/notifyUser");
 
 // ----------------------------------------
@@ -19,15 +22,39 @@ const { notifyUser } = require("../utils/notifyUser");
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const isObjId = (id) => mongoose.isValidObjectId(id);
 
+// CSRF (enabled in production or when ENABLE_CSRF=true)
 const noop = (_req, _res, next) => next();
 let csrfProtection = noop;
-if (process.env.ENABLE_CSRF === "true") {
+const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+if (REQUIRE_CSRF) {
   const csrf = require("csurf");
   csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
 }
 
-const CONNECT_RETURN_URL = process.env.STRIPE_CONNECT_RETURN_URL || "https://yourdomain.com/paralegal/settings?onboarding=success";
-const CONNECT_REFRESH_URL = process.env.STRIPE_CONNECT_REFRESH_URL || "https://yourdomain.com/paralegal/settings?onboarding=refresh";
+function trimSlash(value) {
+  if (!value) return "";
+  return String(value).replace(/\/$/, "");
+}
+
+function resolveConnectUrls() {
+  const returnUrl = (process.env.STRIPE_CONNECT_RETURN_URL || "").trim();
+  const refreshUrl = (process.env.STRIPE_CONNECT_REFRESH_URL || "").trim();
+  if (returnUrl && refreshUrl) {
+    return { returnUrl, refreshUrl };
+  }
+  const base = trimSlash(process.env.CLIENT_BASE_URL || process.env.FRONTEND_BASE_URL || process.env.APP_BASE_URL || "");
+  if (!base) {
+    throw new Error(
+      "[payments] Stripe Connect requires STRIPE_CONNECT_RETURN_URL/STRIPE_CONNECT_REFRESH_URL or CLIENT_BASE_URL/FRONTEND_BASE_URL/APP_BASE_URL."
+    );
+  }
+  return {
+    returnUrl: `${base}/profile-settings.html?onboarding=success`,
+    refreshUrl: `${base}/profile-settings.html?onboarding=refresh`,
+  };
+}
+
+const { returnUrl: CONNECT_RETURN_URL, refreshUrl: CONNECT_REFRESH_URL } = resolveConnectUrls();
 const CONNECT_COUNTRY = process.env.STRIPE_CONNECT_COUNTRY || "US";
 const { Types } = mongoose;
 
@@ -35,14 +62,21 @@ const PLATFORM_FEE_PERCENT = Number(process.env.PLATFORM_FEE_PERCENT || 15);
 const MAX_HISTORY_ROWS = Number(process.env.BILLING_HISTORY_LIMIT || 500);
 const MAX_EXPORT_ROWS = Number(process.env.BILLING_EXPORT_LIMIT || 2000);
 
-function trimSlash(value) {
-  if (!value) return "";
-  return String(value).replace(/\/$/, "");
-}
-
 const CLIENT_BASE_URL = trimSlash(process.env.CLIENT_BASE_URL || process.env.FRONTEND_BASE_URL || process.env.APP_BASE_URL);
 const CHECKOUT_SUCCESS_URL = (process.env.STRIPE_CHECKOUT_SUCCESS_URL || "").trim();
 const CHECKOUT_CANCEL_URL = (process.env.STRIPE_CHECKOUT_CANCEL_URL || "").trim();
+
+const S3_BUCKET = process.env.S3_BUCKET || "";
+const s3 = new S3Client({
+  region: process.env.S3_REGION,
+  credentials:
+    process.env.S3_ACCESS_KEY && process.env.S3_SECRET_KEY
+      ? {
+          accessKeyId: process.env.S3_ACCESS_KEY,
+          secretAccessKey: process.env.S3_SECRET_KEY,
+        }
+      : undefined,
+});
 
 function buildAttorneyMatch(userId) {
   if (!userId) return {};
@@ -71,21 +105,95 @@ function computePlatformFee(doc = {}) {
   return Math.max(0, Math.round(cents(base) * (pct / 100)));
 }
 
+function isFinalCaseDoc(doc) {
+  if (!doc) return false;
+  if (doc.paymentReleased === true) return true;
+  return String(doc.status || "").toLowerCase() === "completed";
+}
+
+async function hasCaseNotification(userId, type, caseDoc, payload = {}) {
+  if (!userId || !caseDoc?._id) return false;
+  const query = {
+    userId,
+    type,
+    "payload.caseId": caseDoc._id,
+  };
+  if (payload.summary) {
+    query["payload.summary"] = payload.summary;
+  }
+  if (payload.amount) {
+    query["payload.amount"] = payload.amount;
+  }
+  const existing = await Notification.findOne(query).select("_id").lean();
+  return !!existing;
+}
+
+function hasActiveDispute(doc) {
+  if (!doc) return false;
+  const termination = String(doc.terminationStatus || "").toLowerCase();
+  if (termination === "disputed" || termination === "resolved") return true;
+  if (!Array.isArray(doc.disputes)) return false;
+  return doc.disputes.some((d) => {
+    const status = String(d?.status || "").toLowerCase();
+    return status === "open" || status === "resolved";
+  });
+}
+
+function hasResolvedDispute(doc) {
+  if (!doc) return false;
+  const termination = String(doc.terminationStatus || "").toLowerCase();
+  if (termination === "resolved") return true;
+  if (!Array.isArray(doc.disputes)) return false;
+  return doc.disputes.some((d) => String(d?.status || "").toLowerCase() === "resolved");
+}
+
 async function ensureStripeOnboarded(paralegal) {
   if (!paralegal?.stripeAccountId) return false;
-  if (paralegal.stripeOnboarded) return true;
+  if (paralegal.stripeOnboarded && paralegal.stripePayoutsEnabled) return true;
   try {
     const account = await stripe.accounts.retrieve(paralegal.stripeAccountId);
     const submitted = !!account?.details_submitted;
-    if (submitted) {
-      paralegal.stripeOnboarded = true;
-      await paralegal.save();
-      return true;
-    }
+    const chargesEnabled = !!account?.charges_enabled;
+    const payoutsEnabled = !!account?.payouts_enabled;
+    paralegal.stripeChargesEnabled = chargesEnabled;
+    paralegal.stripePayoutsEnabled = payoutsEnabled;
+    paralegal.stripeOnboarded = submitted && payoutsEnabled;
+    await paralegal.save();
+    return paralegal.stripeOnboarded;
   } catch (err) {
     console.warn("[payments] stripe onboarding status check failed", err?.message || err);
   }
   return false;
+}
+
+async function ensureConnectAccount(user) {
+  if (!user) throw new Error("User not found");
+  if (!user.email) throw new Error("Email is required for Stripe onboarding");
+  if (user.stripeAccountId) return user.stripeAccountId;
+  const account = await stripe.accounts.create({
+    type: "express",
+    country: CONNECT_COUNTRY,
+    email: user.email,
+    business_type: "individual",
+    capabilities: {
+      transfers: { requested: true },
+    },
+  });
+  user.stripeAccountId = account.id;
+  user.stripeOnboarded = false;
+  user.stripeChargesEnabled = false;
+  user.stripePayoutsEnabled = false;
+  await user.save();
+  return account.id;
+}
+
+async function createConnectLink(accountId) {
+  return stripe.accountLinks.create({
+    account: accountId,
+    refresh_url: CONNECT_REFRESH_URL,
+    return_url: CONNECT_RETURN_URL,
+    type: "account_onboarding",
+  });
 }
 
 function pickLimit(rawValue, fallback = 200, max = 1000) {
@@ -100,6 +208,17 @@ function resolveClientBase(req) {
   if (origin) return trimSlash(origin);
   const fallback = process.env.PUBLIC_ORIGIN || "http://localhost:5001";
   return trimSlash(fallback);
+}
+
+function extractBankDetails(account) {
+  const accounts = Array.isArray(account?.external_accounts?.data)
+    ? account.external_accounts.data
+    : [];
+  const bank = accounts.find((item) => item?.object === "bank_account") || accounts[0] || null;
+  return {
+    bankName: bank?.bank_name || "",
+    bankLast4: bank?.last4 || "",
+  };
 }
 
 function buildReturnUrl(req, type, caseId) {
@@ -149,19 +268,20 @@ async function applyPaymentIntentSnapshot(caseDoc, paymentIntent, { notifyOnSucc
   const wasFunded = String(caseDoc.escrowStatus || "").toLowerCase() === "funded";
   const hasParalegal = !!(caseDoc.paralegal || caseDoc.paralegalId);
   const piStatus = paymentIntent.status || "";
+  const { transferable } = stripe.isTransferablePaymentIntent(paymentIntent, { caseId: caseDoc._id });
 
   if (!caseDoc.paymentIntentId) caseDoc.paymentIntentId = paymentIntent.id;
   if (!caseDoc.escrowIntentId) caseDoc.escrowIntentId = paymentIntent.id;
   if (!caseDoc.currency) caseDoc.currency = paymentIntent.currency || caseDoc.currency || "usd";
-  if ((!caseDoc.totalAmount || caseDoc.totalAmount <= 0) && Number.isFinite(paymentIntent.amount)) {
+  if (caseDoc.lockedTotalAmount == null && (!caseDoc.totalAmount || caseDoc.totalAmount <= 0) && Number.isFinite(paymentIntent.amount)) {
     caseDoc.totalAmount = paymentIntent.amount;
   }
-  if (!caseDoc.lockedTotalAmount && caseDoc.totalAmount) {
+  if (caseDoc.lockedTotalAmount == null && caseDoc.totalAmount) {
     caseDoc.lockedTotalAmount = caseDoc.totalAmount;
   }
   caseDoc.paymentStatus = piStatus || caseDoc.paymentStatus || "pending";
 
-  if (piStatus === "succeeded") {
+  if (piStatus === "succeeded" && transferable) {
     caseDoc.escrowStatus = "funded";
     const status = String(caseDoc.status || "").toLowerCase();
     if (hasParalegal && ["awaiting_funding", "assigned", "open"].includes(status)) {
@@ -177,7 +297,7 @@ async function applyPaymentIntentSnapshot(caseDoc, paymentIntent, { notifyOnSucc
 
   await caseDoc.save();
 
-  if (!wasFunded && piStatus === "succeeded" && hasParalegal && notifyOnSuccess) {
+  if (!wasFunded && piStatus === "succeeded" && transferable && hasParalegal && notifyOnSuccess) {
     const paralegalId = caseDoc.paralegal?._id || caseDoc.paralegalId || caseDoc.paralegal;
     if (paralegalId) {
       try {
@@ -404,6 +524,114 @@ function formatDollars(centsValue) {
   return (Number(centsValue || 0) / 100).toFixed(2);
 }
 
+function formatCurrency(value) {
+  const cents = Number(value || 0);
+  if (!Number.isFinite(cents) || cents <= 0) return "$0.00";
+  const dollars = cents / 100;
+  return `$${dollars.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function safeReceiptFilename(title, label) {
+  const cleaned = String(title || "")
+    .replace(/[\u0000-\u001F\u007F]/g, "")
+    .replace(/[^a-z0-9._-]+/gi, "-")
+    .replace(/-+/g, "-")
+    .trim();
+  const base = cleaned || "receipt";
+  const suffix = label ? `-${label}` : "";
+  return `${base}${suffix}.pdf`.slice(0, 120);
+}
+
+async function resolvePaymentMethodLabel(caseDoc) {
+  const intentId = caseDoc?.paymentIntentId || caseDoc?.escrowIntentId;
+  if (!intentId || !stripe?.paymentIntents?.retrieve) return "Card on file";
+  try {
+    const intent = await stripe.paymentIntents.retrieve(intentId, {
+      expand: ["charges.data.payment_method_details", "payment_method"],
+    });
+    const charge = intent?.charges?.data?.[0];
+    const card = charge?.payment_method_details?.card || intent?.payment_method?.card || null;
+    if (card?.last4) {
+      const brand = card?.brand ? String(card.brand).replace(/_/g, " ") : "Card";
+      return `${brand} ending ${card.last4}`;
+    }
+  } catch (err) {
+    console.warn("[payments] payment method lookup failed", err?.message || err);
+  }
+  return "Card on file";
+}
+
+function buildAttorneyReceiptPayload(caseDoc, paymentMethodLabel) {
+  const baseAmount = Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
+  const platformFee = computePlatformFee(caseDoc);
+  const attorneyName = fullName(caseDoc.attorney || {}) || caseDoc.attorneyNameSnapshot || "Attorney";
+  const issuedAt = caseDoc.completedAt || caseDoc.paidOutAt || caseDoc.updatedAt || new Date();
+  return {
+    title: "Receipt",
+    receiptId: caseDoc.paymentIntentId || caseDoc.escrowIntentId || String(caseDoc._id),
+    issuedAt: new Date(issuedAt).toLocaleDateString("en-US"),
+    partyLabel: "Billed to",
+    partyName: attorneyName,
+    caseTitle: caseDoc.title || "Case",
+    lineItems: [
+      { label: "Case fee", value: formatCurrency(baseAmount) },
+      { label: `Platform fee (${PLATFORM_FEE_PERCENT}%)`, value: formatCurrency(platformFee) },
+    ],
+    totalLabel: "Total paid",
+    totalAmount: formatCurrency(baseAmount + platformFee),
+    paymentMethod: paymentMethodLabel || "Card on file",
+    paymentStatus: "Paid in full",
+  };
+}
+
+function buildParalegalReceiptPayload(caseDoc, payoutDoc) {
+  const baseAmount = Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
+  const platformFee = computePlatformFee(caseDoc);
+  const payoutAmount =
+    Number.isFinite(payoutDoc?.amountPaid) && payoutDoc.amountPaid >= 0
+      ? payoutDoc.amountPaid
+      : Math.max(0, baseAmount - platformFee);
+  const attorneyName = fullName(caseDoc.attorney || {}) || caseDoc.attorneyNameSnapshot || "Attorney";
+  const paralegalName = fullName(caseDoc.paralegal || {}) || caseDoc.paralegalNameSnapshot || "Paralegal";
+  const issuedAt = caseDoc.paidOutAt || caseDoc.completedAt || caseDoc.updatedAt || new Date();
+  return {
+    title: "Payout Receipt",
+    receiptId: payoutDoc?.transferId || caseDoc.payoutTransferId || String(caseDoc._id),
+    issuedAt: new Date(issuedAt).toLocaleDateString("en-US"),
+    partyLabel: "Payee",
+    partyName: paralegalName,
+    attorneyName,
+    caseTitle: caseDoc.title || "Case",
+    lineItems: [
+      { label: "Gross amount", value: formatCurrency(baseAmount) },
+      { label: `Platform fee (${PLATFORM_FEE_PERCENT}%)`, value: formatCurrency(platformFee) },
+    ],
+    totalLabel: "Net paid",
+    totalAmount: formatCurrency(payoutAmount),
+    paymentMethod: "Escrow release",
+    paymentStatus: "Paid",
+  };
+}
+
+async function tryStreamReceipt(res, key, filename) {
+  if (!S3_BUCKET) return false;
+  try {
+    const cmd = new GetObjectCommand({ Bucket: S3_BUCKET, Key: key });
+    const data = await s3.send(cmd);
+    if (!data?.Body) return false;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    data.Body.on("error", (err) => {
+      console.error("[payments] receipt stream error", err);
+      res.destroy(err);
+    });
+    data.Body.pipe(res);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
 async function ensureStripeCustomer(user) {
   if (!user) throw new Error("User not found");
   if (user.stripeCustomerId) return user.stripeCustomerId;
@@ -453,11 +681,6 @@ async function fetchDefaultPaymentMethod(customerId) {
 // ----------------------------------------
 router.get('/config', (req, res) => {
   res.json({ publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '' });
-});
-
-// Temporary stub for Stripe Connect onboarding
-router.get('/connect', (_req, res) => {
-  res.json({ ok: true });
 });
 
 // All routes below require auth + approval
@@ -687,18 +910,53 @@ router.post(
  */
 router.post(
   "/release",
-  requireRole("attorney"),
+  requireRole("attorney", "admin"),
   csrfProtection,
   asyncHandler(async (req, res) => {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Funds are released only via case completion." });
+    }
     const { caseId } = req.body || {};
     if (!caseId || !isObjId(caseId)) {
       return res.status(400).json({ error: "Valid caseId is required" });
     }
 
     const c = await Case.findById(caseId)
-      .populate("paralegal", "stripeAccountId stripeOnboarded firstName lastName email role")
+      .populate(
+        "paralegal",
+        "stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled firstName lastName email role"
+      )
       .populate("attorney", "firstName lastName email role");
     if (!c) return res.status(404).json({ error: "Case not found" });
+    if (c.status === "completed" || c.paymentReleased) {
+      return res.json({ ok: true, alreadyReleased: true });
+    }
+    const existingPayout = await Payout.findOne({ caseId: c._id })
+      .select("amountPaid transferId")
+      .lean();
+    if (existingPayout) {
+      return res.json({
+        ok: true,
+        alreadyReleased: true,
+        payout: existingPayout.amountPaid,
+        transferId: existingPayout.transferId,
+      });
+    }
+    if (c.payoutTransferId) {
+      return res.json({
+        ok: true,
+        alreadyReleased: true,
+        transferId: c.payoutTransferId,
+      });
+    }
+    if (c.payoutTransferId) {
+      return res.json({
+        ok: true,
+        alreadyReleased: true,
+        transferId: c.payoutTransferId,
+      });
+    }
+    return res.status(400).json({ error: "Funds are released only via case completion." });
 
     const attorneyRef =
       (c.attorney && c.attorney._id) || c.attorneyId || c.attorney;
@@ -706,19 +964,20 @@ router.post(
       return res.status(403).json({ error: "Only the case attorney can release funds" });
     }
 
-    if (!c.paymentIntentId) {
+    const intentId = c.paymentIntentId || c.escrowIntentId;
+    if (!intentId) {
       return res.status(400).json({ error: "Case has no funded payment intent" });
     }
     if (!c.paralegal || !c.paralegal.stripeAccountId) {
       return res.status(400).json({ error: "Paralegal is not onboarded for payouts" });
     }
-    if (!c.paralegal.stripeOnboarded) {
+    if (!c.paralegal.stripeOnboarded || !c.paralegal.stripePayoutsEnabled) {
       const refreshed = await ensureStripeOnboarded(c.paralegal);
       if (!refreshed) {
         return res.status(400).json({ error: "Paralegal must complete Stripe Connect onboarding before payouts" });
       }
     }
-    if (!c.paralegal.stripeOnboarded) {
+    if (!c.paralegal.stripeOnboarded || !c.paralegal.stripePayoutsEnabled) {
       return res.status(400).json({ error: "Paralegal must complete Stripe Connect onboarding before payouts" });
     }
 
@@ -746,7 +1005,22 @@ router.post(
         ? String(c.paralegalId)
         : "";
 
-    const transfer = await stripe.transfers.create({
+    let paymentIntent;
+    try {
+      paymentIntent = await stripe.paymentIntents.retrieve(intentId, {
+        expand: ["charges.data.balance_transaction"],
+      });
+    } catch (err) {
+      console.error("[payments] release intent lookup failed", err?.message || err);
+      return res.status(502).json({ error: "Unable to verify escrow funding." });
+    }
+
+    const { transferable, charge } = stripe.isTransferablePaymentIntent(paymentIntent, { caseId: c._id });
+    if (!transferable) {
+      return res.status(400).json({ error: "Escrow payment is not ready to release yet." });
+    }
+
+    const transferPayload = {
       amount: payout,
       currency: c.currency || "usd",
       destination: c.paralegal.stripeAccountId,
@@ -757,9 +1031,24 @@ router.post(
         paralegalId: paralegalMetaId,
         description: "LPC Escrow Release",
       },
-    });
+    };
+    if (charge?.id) {
+      transferPayload.source_transaction = charge.id;
+    }
 
-    const completedAt = new Date();
+    let transfer;
+    try {
+      transfer = await stripe.transfers.create(transferPayload);
+    } catch (err) {
+      console.error("[payments] release transfer failed", err?.message || err);
+      const message = stripe.sanitizeStripeError(
+        err,
+        "We couldn't release funds right now. Please try again shortly."
+      );
+      return res.status(400).json({ error: message });
+    }
+
+    const completedAt = c.completedAt || new Date();
     const paralegalName = `${c.paralegal?.firstName || ""} ${c.paralegal?.lastName || ""}`.trim() || "Paralegal";
     const downloadPaths = (c.files || [])
       .map((file) => {
@@ -770,7 +1059,7 @@ router.post(
       .filter(Boolean);
 
     c.status = "completed";
-    c.completedAt = completedAt;
+    c.completedAt = c.completedAt || completedAt;
     c.briefSummary = `${c.title} – ${paralegalName} – completed ${completedAt.toISOString().split("T")[0]}`;
     c.archived = true;
     c.paymentReleased = true;
@@ -788,19 +1077,36 @@ router.post(
     const attorneyObjectId = c.attorney?._id || c.attorneyId || c.attorney;
     const paralegalObjectId = c.paralegal?._id || c.paralegalId || c.paralegal;
 
+    const existingIncome = await PlatformIncome.findOne({ caseId: c._id })
+      .select("_id")
+      .lean();
     await Promise.all([
-      Payout.create({
-        paralegalId: paralegalObjectId,
-        caseId: c._id,
-        amountPaid: payout,
-        transferId: transfer.id,
+      Payout.updateOne(
+        { caseId: c._id },
+        {
+          $setOnInsert: {
+            paralegalId: paralegalObjectId,
+            caseId: c._id,
+            amountPaid: payout,
+            transferId: transfer.id,
+          },
+        },
+        { upsert: true }
+      ).catch((err) => {
+        if (err?.code === 11000) return null;
+        throw err;
       }),
-      PlatformIncome.create({
-        caseId: c._id,
-        attorneyId: attorneyObjectId,
-        paralegalId: paralegalObjectId,
-        feeAmount: Math.max(0, (c.feeAttorneyAmount || 0) + feeAmount),
-      }),
+      existingIncome
+        ? Promise.resolve(null)
+        : PlatformIncome.create({
+            caseId: c._id,
+            attorneyId: attorneyObjectId,
+            paralegalId: paralegalObjectId,
+            feeAmount: Math.max(0, (c.feeAttorneyAmount || 0) + feeAmount),
+          }).catch((err) => {
+            if (err?.code === 11000) return null;
+            throw err;
+          }),
     ]);
 
     await AuditLog.logFromReq(req, "payment.release.transfer", {
@@ -821,17 +1127,16 @@ router.post(
     const totalDisplay = `$${(budgetCents / 100).toFixed(2)}`;
     try {
       const link = `case-detail.html?caseId=${encodeURIComponent(c._id)}`;
-      await notifyUser(
-        paralegalObjectId,
-        "payout_released",
-        {
-          caseId: c._id,
-          caseTitle: c.title || "Case",
-          amount: payoutDisplay,
-          link,
-        },
-        { actorUserId: req.user.id }
-      );
+      const payload = {
+        caseId: c._id,
+        caseTitle: c.title || "Case",
+        amount: payoutDisplay,
+        link,
+      };
+      const alreadySent = await hasCaseNotification(paralegalObjectId, "payout_released", c, payload);
+      if (!alreadySent) {
+        await notifyUser(paralegalObjectId, "payout_released", payload, { actorUserId: req.user.id });
+      }
     } catch (err) {
       console.warn("[payments] payout notification failed", err?.message || err);
     }
@@ -865,33 +1170,35 @@ router.post(
 );
 
 router.post(
+  "/connect",
+  requireRole("paralegal"),
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user.id).select("email stripeAccountId stripeOnboarded");
+    if (!user) return res.status(404).json({ error: "User not found" });
+    try {
+      const accountId = await ensureConnectAccount(user);
+      const link = await createConnectLink(accountId);
+      res.json({ url: link.url, accountId });
+    } catch (err) {
+      res.status(400).json({ error: err?.message || "Unable to start Stripe onboarding" });
+    }
+  })
+);
+
+router.post(
   "/connect/create-account",
   requireRole("paralegal"),
   csrfProtection,
   asyncHandler(async (req, res) => {
     const user = await User.findById(req.user.id).select("email stripeAccountId stripeOnboarded");
     if (!user) return res.status(404).json({ error: "User not found" });
-    if (!user.email) return res.status(400).json({ error: "Email is required for Stripe onboarding" });
-
-    if (user.stripeAccountId) {
-      return res.json({ ok: true, accountId: user.stripeAccountId });
+    try {
+      const accountId = await ensureConnectAccount(user);
+      res.json({ ok: true, accountId });
+    } catch (err) {
+      res.status(400).json({ error: err?.message || "Unable to prepare Stripe account" });
     }
-
-    const account = await stripe.accounts.create({
-      type: "express",
-      country: CONNECT_COUNTRY,
-      email: user.email,
-      business_type: "individual",
-      capabilities: {
-        transfers: { requested: true },
-      },
-    });
-
-    user.stripeAccountId = account.id;
-    user.stripeOnboarded = false;
-    await user.save();
-
-    res.json({ ok: true, accountId: account.id });
   })
 );
 
@@ -911,12 +1218,7 @@ router.post(
       return res.status(403).json({ error: "Invalid account reference" });
     }
 
-    const link = await stripe.accountLinks.create({
-      account: targetAccount,
-      refresh_url: CONNECT_REFRESH_URL,
-      return_url: CONNECT_RETURN_URL,
-      type: "account_onboarding",
-    });
+    const link = await createConnectLink(targetAccount);
 
     res.json({ url: link.url });
   })
@@ -927,23 +1229,61 @@ router.get(
   requireRole("paralegal"),
   csrfProtection,
   asyncHandler(async (req, res) => {
-    const user = await User.findById(req.user.id).select("stripeAccountId stripeOnboarded");
+    const user = await User.findById(req.user.id).select(
+      "stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled"
+    );
     if (!user) return res.status(404).json({ error: "User not found" });
     if (!user.stripeAccountId) {
-      return res.json({ details_submitted: false, connected: false, accountId: null });
+      return res.json({
+        details_submitted: false,
+        charges_enabled: false,
+        payouts_enabled: false,
+        connected: false,
+        accountId: null,
+        bank_name: "",
+        bank_last4: "",
+      });
     }
 
     try {
-      const account = await stripe.accounts.retrieve(user.stripeAccountId);
+      const account = await stripe.accounts.retrieve(user.stripeAccountId, {
+        expand: ["external_accounts"],
+      });
       const submitted = !!account?.details_submitted;
-      if (submitted && !user.stripeOnboarded) {
-        user.stripeOnboarded = true;
+      const chargesEnabled = !!account?.charges_enabled;
+      const payoutsEnabled = !!account?.payouts_enabled;
+      const connected = submitted && payoutsEnabled;
+      const { bankName, bankLast4 } = extractBankDetails(account);
+      const shouldSave =
+        user.stripeOnboarded !== connected ||
+        user.stripeChargesEnabled !== chargesEnabled ||
+        user.stripePayoutsEnabled !== payoutsEnabled;
+      if (shouldSave) {
+        user.stripeOnboarded = connected;
+        user.stripeChargesEnabled = chargesEnabled;
+        user.stripePayoutsEnabled = payoutsEnabled;
         await user.save();
       }
-      return res.json({ details_submitted: submitted, connected: submitted, accountId: user.stripeAccountId });
+      return res.json({
+        details_submitted: submitted,
+        charges_enabled: chargesEnabled,
+        payouts_enabled: payoutsEnabled,
+        connected,
+        accountId: user.stripeAccountId,
+        bank_name: bankName,
+        bank_last4: bankLast4,
+      });
     } catch (err) {
       console.error("[connect] status error", err?.message || err);
-      return res.json({ details_submitted: false, connected: false, accountId: user.stripeAccountId });
+      return res.json({
+        details_submitted: false,
+        charges_enabled: false,
+        payouts_enabled: false,
+        connected: false,
+        accountId: user.stripeAccountId,
+        bank_name: "",
+        bank_last4: "",
+      });
     }
   })
 );
@@ -967,8 +1307,13 @@ router.patch(
       return res.status(403).json({ msg: "Only the case attorney or admin can update budget" });
     }
 
+    if (c.lockedTotalAmount != null) {
+      return res.status(403).json({
+        error: "Escrow amount is locked and cannot be modified.",
+      });
+    }
     if (!isAdmin) {
-      if (c.lockedTotalAmount || c.paralegalId || c.pendingParalegalId) {
+      if (c.paralegalId || c.pendingParalegalId) {
         return res.status(403).json({
           error: "Escrow amount is locked and cannot be modified.",
         });
@@ -1126,7 +1471,15 @@ router.post(
       return res.status(400).json({ error: "No escrow payment intent found." });
     }
 
-    const pi = await stripe.paymentIntents.retrieve(c.escrowIntentId);
+    let pi;
+    try {
+      pi = await stripe.paymentIntents.retrieve(c.escrowIntentId, {
+        expand: ["charges.data.balance_transaction"],
+      });
+    } catch (err) {
+      console.error("[payments] confirm intent lookup failed", err?.message || err);
+      return res.status(502).json({ error: "Unable to verify escrow funding." });
+    }
     if (!pi || pi.status !== "succeeded") {
       if (pi) {
         await applyPaymentIntentSnapshot(c, pi);
@@ -1179,7 +1532,9 @@ router.post(
 
     let pi;
     try {
-      pi = await stripe.paymentIntents.retrieve(intentId);
+      pi = await stripe.paymentIntents.retrieve(intentId, {
+        expand: ["charges.data.balance_transaction"],
+      });
     } catch (err) {
       console.error("[payments] reconcile retrieve failed", err?.message || err);
       return res.status(502).json({ error: "Unable to load payment intent" });
@@ -1218,8 +1573,27 @@ router.post(
   "/release/:caseId",
   requireRole("attorney", "admin"),
   asyncHandler(async (req, res) => {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Funds are released only via case completion." });
+    }
     const c = await Case.findById(req.params.caseId);
     if (!c) return res.status(404).json({ error: "Case not found" });
+    const existingPayout = await Payout.findOne({ caseId: c._id })
+      .select("amountPaid transferId")
+      .lean();
+    if (c.paymentReleased || existingPayout || c.payoutTransferId) {
+      return res.json({
+        ok: true,
+        alreadyReleased: true,
+        payout: existingPayout?.amountPaid,
+        transferId: existingPayout?.transferId || c.payoutTransferId || null,
+      });
+    }
+    return res.status(400).json({ error: "Funds are released only via case completion." });
+    const finalCase = isFinalCaseDoc(c);
+    if (finalCase && !(req.user.role === "admin" && hasActiveDispute(c))) {
+      return res.status(400).json({ error: "Completed cases cannot be released outside dispute resolution." });
+    }
 
     if (String(c.attorney) !== String(req.user.id) && req.user.role !== "admin") {
       return res.status(403).json({ error: "Only the attorney can release funds" });
@@ -1227,7 +1601,13 @@ router.post(
     if (!c.escrowIntentId) return res.status(400).json({ error: "No funded escrow" });
     if (c.paymentReleased) return res.status(400).json({ error: "Already released" });
 
-    const pi = await stripe.paymentIntents.retrieve(c.escrowIntentId);
+    let pi;
+    try {
+      pi = await stripe.paymentIntents.retrieve(c.escrowIntentId);
+    } catch (err) {
+      console.error("[payments] release lookup failed", err?.message || err);
+      return res.status(502).json({ error: "Unable to verify escrow funding." });
+    }
     if (pi.status !== "succeeded") return res.status(400).json({ error: "Escrow not captured yet" });
 
     const base = c.lockedTotalAmount ?? c.totalAmount;
@@ -1269,18 +1649,40 @@ router.post(
   asyncHandler(async (req, res) => {
     const c = await Case.findById(req.params.caseId).populate(
       "paralegal",
-      "stripeAccountId firstName lastName email role"
+      "stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled firstName lastName email role"
     );
     if (!c) return res.status(404).json({ error: "Case not found" });
+    const existingPayout = await Payout.findOne({ caseId: c._id })
+      .select("amountPaid transferId")
+      .lean();
+    if (c.paymentReleased || existingPayout || c.payoutTransferId) {
+      return res.json({
+        ok: true,
+        alreadyReleased: true,
+        payout: existingPayout?.amountPaid,
+        transferId: existingPayout?.transferId || c.payoutTransferId || null,
+      });
+    }
+    return res.status(400).json({ error: "Payouts are handled via case completion only." });
+    const finalCase = isFinalCaseDoc(c);
+    if (finalCase && !hasActiveDispute(c)) {
+      return res.status(400).json({ error: "Completed cases cannot be released outside dispute resolution." });
+    }
     if (!c.escrowIntentId) return res.status(400).json({ error: "No funded escrow" });
 
-    const pi = await stripe.paymentIntents.retrieve(c.escrowIntentId);
+    let pi;
+    try {
+      pi = await stripe.paymentIntents.retrieve(c.escrowIntentId);
+    } catch (err) {
+      console.error("[payments] payout intent lookup failed", err?.message || err);
+      return res.status(502).json({ error: "Unable to verify escrow funding." });
+    }
     if (pi.status !== "succeeded") return res.status(400).json({ error: "Escrow not captured yet" });
 
     if (!c.paralegal || !c.paralegal.stripeAccountId) {
       return res.status(400).json({ error: "Paralegal not onboarded for payouts" });
     }
-    if (!c.paralegal.stripeOnboarded) {
+    if (!c.paralegal.stripeOnboarded || !c.paralegal.stripePayoutsEnabled) {
       const refreshed = await ensureStripeOnboarded(c.paralegal);
       if (!refreshed) {
         return res.status(400).json({ error: "Paralegal must complete Stripe Connect onboarding before payouts" });
@@ -1296,17 +1698,43 @@ router.post(
     c.feeParalegalAmount = feeP;
     const payout = Math.max(0, base - feeP);
 
-    const transfer = await stripe.transfers.create({
-      amount: payout,
-      currency: c.currency || "usd",
-      destination: c.paralegal.stripeAccountId,
-      transfer_group: `case_${c._id.toString()}`,
-      metadata: { caseId: c._id.toString(), paralegalId: c.paralegal._id.toString() },
-    });
+    let transfer;
+    try {
+      transfer = await stripe.transfers.create({
+        amount: payout,
+        currency: c.currency || "usd",
+        destination: c.paralegal.stripeAccountId,
+        transfer_group: `case_${c._id.toString()}`,
+        metadata: { caseId: c._id.toString(), paralegalId: c.paralegal._id.toString() },
+      });
+    } catch (err) {
+      console.error("[payments] payout transfer failed", err?.message || err);
+      const message = stripe.sanitizeStripeError(
+        err,
+        "We couldn't release funds right now. Please try again shortly."
+      );
+      return res.status(400).json({ error: message });
+    }
 
     c.payoutTransferId = transfer.id;
     c.paidOutAt = new Date();
     await c.save();
+
+    await Payout.updateOne(
+      { caseId: c._id },
+      {
+        $setOnInsert: {
+          paralegalId: c.paralegal._id || c.paralegalId,
+          caseId: c._id,
+          amountPaid: payout,
+          transferId: transfer.id,
+        },
+      },
+      { upsert: true }
+    ).catch((err) => {
+      if (err?.code === 11000) return null;
+      throw err;
+    });
 
     await AuditLog.logFromReq(req, "payment.payout.transfer", {
       targetType: "payment",
@@ -1318,17 +1746,17 @@ router.post(
     try {
       const payoutDisplay = `$${(payout / 100).toFixed(2)}`;
       const link = `case-detail.html?caseId=${encodeURIComponent(c._id)}`;
-      await notifyUser(
-        c.paralegal._id,
-        "payout_released",
-        {
-          caseId: c._id,
-          caseTitle: c.title || "Case",
-          amount: payoutDisplay,
-          link,
-        },
-        { actorUserId: req.user.id }
-      );
+      const paralegalId = c.paralegal?._id || c.paralegalId || c.paralegal;
+      const payload = {
+        caseId: c._id,
+        caseTitle: c.title || "Case",
+        amount: payoutDisplay,
+        link,
+      };
+      const alreadySent = await hasCaseNotification(paralegalId, "payout_released", c, payload);
+      if (!alreadySent) {
+        await notifyUser(paralegalId, "payout_released", payload, { actorUserId: req.user.id });
+      }
     } catch (err) {
       console.warn("[payments] payout notification failed", err?.message || err);
     }
@@ -1345,8 +1773,13 @@ router.post(
   "/refund/:caseId",
   requireRole("admin"),
   asyncHandler(async (req, res) => {
-    const c = await Case.findById(req.params.caseId);
+    const c = await Case.findById(req.params.caseId).select(
+      "status paymentReleased escrowIntentId terminationStatus disputes"
+    );
     if (!c) return res.status(404).json({ error: "Case not found" });
+    if (!hasResolvedDispute(c)) {
+      return res.status(400).json({ error: "Refunds require admin-approved dispute resolution." });
+    }
     if (!c.escrowIntentId) return res.status(400).json({ error: "No funded escrow" });
 
     const refund = await stripe.refunds.create({ payment_intent: c.escrowIntentId });
@@ -1488,6 +1921,79 @@ router.get(
     );
     const total = items.reduce((sum, entry) => sum + entry.amountDue, 0);
     res.json({ items, total });
+  })
+);
+
+router.get(
+  "/receipt/attorney/:caseId",
+  requireRole("attorney"),
+  asyncHandler(async (req, res) => {
+    const doc = await Case.findById(req.params.caseId)
+      .select(
+        "title lockedTotalAmount totalAmount feeAttorneyAmount feeAttorneyPct paymentIntentId escrowIntentId payoutTransferId paidOutAt completedAt updatedAt attorney attorneyId attorneyNameSnapshot"
+      )
+      .populate("attorney", "firstName lastName email role")
+      .lean();
+    if (!doc) return res.status(404).json({ error: "Case not found" });
+    const attorneyId = doc.attorney?._id || doc.attorneyId || doc.attorney;
+    if (String(attorneyId) !== String(req.user.id)) {
+      return res.status(403).json({ error: "Only the case attorney can access this receipt." });
+    }
+    const forceRegen = ["1", "true", "yes"].includes(String(req.query?.regen || "").toLowerCase());
+    const paymentMethodLabel = await resolvePaymentMethodLabel(doc);
+    const payload = buildAttorneyReceiptPayload(doc, paymentMethodLabel);
+    const key = getReceiptKey(doc._id, "attorney");
+    const filename = safeReceiptFilename(doc.title, "receipt");
+    if (!forceRegen) {
+      const streamed = await tryStreamReceipt(res, key, filename);
+      if (streamed) return;
+    }
+    const pdfBuffer = await buildReceiptPdfBuffer(payload);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(pdfBuffer);
+    if (S3_BUCKET) {
+      uploadPdfToS3({ key, buffer: pdfBuffer }).catch((err) => {
+        console.warn("[payments] receipt upload failed", err?.message || err);
+      });
+    }
+  })
+);
+
+router.get(
+  "/receipt/paralegal/:caseId",
+  requireRole("paralegal"),
+  asyncHandler(async (req, res) => {
+    const doc = await Case.findById(req.params.caseId)
+      .select(
+        "title lockedTotalAmount totalAmount feeAttorneyAmount feeAttorneyPct payoutTransferId paidOutAt completedAt updatedAt paralegal paralegalId paralegalNameSnapshot attorney attorneyId attorneyNameSnapshot"
+      )
+      .populate("paralegal", "firstName lastName email role")
+      .populate("attorney", "firstName lastName email role")
+      .lean();
+    if (!doc) return res.status(404).json({ error: "Case not found" });
+    const paralegalId = doc.paralegal?._id || doc.paralegalId || doc.paralegal;
+    if (String(paralegalId) !== String(req.user.id)) {
+      return res.status(403).json({ error: "Only the assigned paralegal can access this receipt." });
+    }
+    const forceRegen = ["1", "true", "yes"].includes(String(req.query?.regen || "").toLowerCase());
+    const payoutDoc = await Payout.findOne({ caseId: doc._id }).select("amountPaid transferId").lean();
+    const payload = buildParalegalReceiptPayload(doc, payoutDoc);
+    const key = getReceiptKey(doc._id, "paralegal");
+    const filename = safeReceiptFilename(doc.title, "payout-receipt");
+    if (!forceRegen) {
+      const streamed = await tryStreamReceipt(res, key, filename);
+      if (streamed) return;
+    }
+    const pdfBuffer = await buildReceiptPdfBuffer(payload);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(pdfBuffer);
+    if (S3_BUCKET) {
+      uploadPdfToS3({ key, buffer: pdfBuffer }).catch((err) => {
+        console.warn("[payments] payout receipt upload failed", err?.message || err);
+      });
+    }
   })
 );
 

@@ -4,7 +4,15 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
-const csrfProtection = (_req, _res, next) => next();
+
+// CSRF (enabled in production or when ENABLE_CSRF=true)
+const noop = (_req, _res, next) => next();
+let csrfProtection = noop;
+const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+if (REQUIRE_CSRF) {
+  const csrf = require("csurf");
+  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
+}
 
 const Task = require("../models/Task");
 

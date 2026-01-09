@@ -214,6 +214,8 @@ const userSchema = new Schema(
     stripeCustomerId: { type: String, default: null, index: true },
     stripeAccountId: { type: String, default: null, index: true }, // for Connect payouts
     stripeOnboarded: { type: Boolean, default: false },
+    stripeChargesEnabled: { type: Boolean, default: false },
+    stripePayoutsEnabled: { type: Boolean, default: false },
 
     // Notifications
     notifications: { type: notificationPrefsSchema, default: () => ({}) },
@@ -223,6 +225,11 @@ const userSchema = new Schema(
         type: String,
         enum: ["light", "dark", "mountain", "mountain-dark"],
         default: "mountain",
+      },
+      fontSize: {
+        type: String,
+        enum: ["xs", "sm", "md", "lg", "xl"],
+        default: "md",
       },
     },
     pushSubscription: { type: Object, default: null },

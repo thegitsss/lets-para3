@@ -8,6 +8,7 @@ const auth = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const applicationsRouter = require("./applications");
 const { cleanTitle, cleanText, cleanBudget } = require("../utils/sanitize");
+const { getBlockedUserIds } = require("../utils/blocks");
 const createApplicationForJob = applicationsRouter?.createApplicationForJob;
 const PRACTICE_AREAS = [
   "administrative law",
@@ -132,7 +133,9 @@ function normalizeId(source) {
 
 function shapeListing({ job = null, caseDoc = null }) {
   const totalAmount = typeof caseDoc?.totalAmount === "number" ? caseDoc.totalAmount : null;
-  const budgetFromCase = totalAmount != null ? Math.round(totalAmount / 100) : null;
+  const lockedTotalAmount = typeof caseDoc?.lockedTotalAmount === "number" ? caseDoc.lockedTotalAmount : null;
+  const amountForCase = lockedTotalAmount != null ? lockedTotalAmount : totalAmount;
+  const budgetFromCase = amountForCase != null ? Math.round(amountForCase / 100) : null;
   const attorneySource = job?.attorneyId || caseDoc?.attorney || null;
   const normalizedAttorneyId =
     normalizeId(job?.attorneyId) || normalizeId(caseDoc?.attorneyId) || normalizeId(caseDoc?.attorney);
@@ -148,6 +151,7 @@ function shapeListing({ job = null, caseDoc = null }) {
     shortDescription: job?.shortDescription || caseDoc?.briefSummary || "",
     description: job?.description || caseDoc?.details || "",
     totalAmount,
+    lockedTotalAmount,
     budget: typeof job?.budget === "number" ? job.budget : budgetFromCase,
     currency: caseDoc?.currency || "usd",
     state: caseDoc?.state || caseDoc?.locationState || "",
@@ -164,18 +168,27 @@ function shapeListing({ job = null, caseDoc = null }) {
 // GET /jobs/open — paralegals view available jobs
 router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req, res) => {
   try {
+    const blockedIds = await getBlockedUserIds(req.user.id);
+    const jobFilter = { status: "open" };
+    const caseFilter = {
+      archived: { $ne: true },
+      status: { $nin: ["assigned", "in progress", "in progress", "completed", "cancelled", "closed"] },
+    };
+    if (blockedIds.length) {
+      jobFilter.attorneyId = { $nin: blockedIds };
+      caseFilter.attorney = { $nin: blockedIds };
+      caseFilter.attorneyId = { $nin: blockedIds };
+    }
+
     const [jobs, cases] = await Promise.all([
-      Job.find({ status: "open" })
+      Job.find(jobFilter)
         .populate({
           path: "attorneyId",
           select: "firstName lastName lawFirm firmName profileImage avatarURL",
         })
         .lean(),
-      Case.find({
-        archived: { $ne: true },
-        status: { $nin: ["assigned", "in progress", "in progress", "completed", "cancelled", "closed"] },
-      })
-        .select("title practiceArea details briefSummary totalAmount currency state locationState status applicants attorney attorneyId jobId createdAt")
+      Case.find(caseFilter)
+        .select("title practiceArea details briefSummary totalAmount lockedTotalAmount currency state locationState status applicants attorney attorneyId jobId createdAt")
         .populate({
           path: "attorney",
           select: "firstName lastName lawFirm firmName profileImage avatarURL",
@@ -204,10 +217,29 @@ router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req,
       const key = String(caseDoc._id);
       const job = jobByCaseId.get(key) || null;
       if (job) jobByCaseId.delete(key);
+      if (!job) return;
       shapedCases.push(shapeListing({ job, caseDoc }));
     });
 
-    res.json([...shapedCases, ...orphanJobs]);
+    const items = [...shapedCases, ...orphanJobs];
+    if (items.length) {
+      const jobIds = items.map((item) => item.jobId).filter(Boolean);
+      if (jobIds.length) {
+        const apps = await Application.find({
+          paralegalId: req.user._id || req.user.id,
+          jobId: { $in: jobIds },
+        })
+          .select("jobId createdAt")
+          .lean();
+        const appliedMap = new Map(apps.map((app) => [String(app.jobId), app.createdAt]));
+        items.forEach((item) => {
+          const appliedAt = appliedMap.get(String(item.jobId || ""));
+          if (appliedAt) item.appliedAt = appliedAt;
+        });
+      }
+    }
+
+    res.json(items);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

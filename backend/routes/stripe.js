@@ -12,11 +12,12 @@ const CONNECT_RETURN_URL =
   process.env.STRIPE_CONNECT_RETURN_URL || process.env.FRONTEND_URL || "https://www.lets-paraconnect.com/profile-settings.html";
 
 // ----------------------------------------
-// Optional CSRF (enable via ENABLE_CSRF=true)
+// CSRF (enabled in production or when ENABLE_CSRF=true)
 // ----------------------------------------
 const noop = (_req, _res, next) => next();
 let csrfProtection = noop;
-if (process.env.ENABLE_CSRF === "true") {
+const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+if (REQUIRE_CSRF) {
   const csrf = require("csurf");
   csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
 }
@@ -51,6 +52,8 @@ router.post(
         });
         user.stripeAccountId = account.id;
         user.stripeOnboarded = false;
+        user.stripeChargesEnabled = false;
+        user.stripePayoutsEnabled = false;
       }
 
       const link = await stripe.accountLinks.create({

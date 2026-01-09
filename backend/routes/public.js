@@ -7,16 +7,19 @@ const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 
 const User = require("../models/User");
+const verifyToken = require("../utils/verifyToken");
 const sendEmail = require("../utils/email");
 const { logAction } = require("../utils/audit");
+const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // ----------------------------------------
-// Optional CSRF (enable via ENABLE_CSRF=true)
+// CSRF (enabled in production or when ENABLE_CSRF=true)
 // ----------------------------------------
 const noop = (_req, _res, next) => next();
 let csrfProtection = noop;
-if (process.env.ENABLE_CSRF === "true") {
+const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+if (REQUIRE_CSRF) {
   const csrf = require("csurf");
   csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
 }
@@ -281,6 +284,7 @@ router.get(
 // ----------------------------------------
 router.get(
   "/paralegals",
+  verifyToken.optional,
   asyncHandler(async (req, res) => {
     const page = clamp(parseInt(req.query.page, 10) || 1, 1, 10_000);
     const limit = clamp(parseInt(req.query.limit, 10) || 12, 1, 50);
@@ -297,6 +301,12 @@ router.get(
     const sortKey = typeof req.query.sort === "string" ? req.query.sort.trim().toLowerCase() : "recent";
 
     const filter = { role: "paralegal", status: "approved" };
+    if (String(req.user?.role || "").toLowerCase() === "attorney") {
+      const blockedIds = await getBlockedUserIds(req.user.id);
+      if (blockedIds.length) {
+        filter._id = { $nin: blockedIds };
+      }
+    }
     if (search) {
       const rx = new RegExp(escapeRegex(search), "i");
       filter.$or = [
@@ -360,12 +370,17 @@ router.get(
 
 router.get(
   "/paralegals/:id",
+  verifyToken.optional,
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     if (!isObjId(id)) return res.status(400).json({ error: "Invalid paralegal id" });
     const doc = await User.findById(id).select(PUBLIC_PAR_FIELDS).lean();
     if (!doc || doc.role !== "paralegal" || doc.status !== "approved") {
       return res.status(404).json({ error: "Paralegal not found" });
+    }
+    if (String(req.user?.role || "").toLowerCase() === "attorney") {
+      const blocked = await isBlockedBetween(req.user.id, doc._id);
+      if (blocked) return res.status(403).json({ error: BLOCKED_MESSAGE });
     }
     res.json(serializeParalegal(doc));
   })

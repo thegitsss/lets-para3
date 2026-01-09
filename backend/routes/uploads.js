@@ -14,13 +14,15 @@ const CaseFile = require("../models/CaseFile");
 const User = require("../models/User");
 const { logAction } = require("../utils/audit");
 const { notifyUser } = require("../utils/notifyUser");
+const { normalizeCaseStatus, canUseWorkspace } = require("../utils/caseState");
 
 // ----------------------------------------
-// Optional CSRF (enable via ENABLE_CSRF=true)
+// CSRF (enabled in production or when ENABLE_CSRF=true)
 // ----------------------------------------
 const noop = (_req, _res, next) => next();
 let csrfProtection = noop;
-if (process.env.ENABLE_CSRF === "true") {
+const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+if (REQUIRE_CSRF) {
   const csrf = require("csurf");
   csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
 }
@@ -191,10 +193,13 @@ router.post(
       if (!caseId || !isObjId(caseId)) {
         return res.status(400).json({ msg: "caseId is required" });
       }
-      const caseDoc = await Case.findById(caseId).select("escrowStatus escrowIntentId");
+      const caseDoc = await Case.findById(caseId).select("escrowStatus escrowIntentId status paralegal paralegalId");
       const escrowStatus = String(caseDoc?.escrowStatus || "").toLowerCase();
       if (escrowStatus !== "funded") {
         return res.status(403).json({ msg: "Work begins once payment is secured." });
+      }
+      if (!canUseWorkspace(caseDoc)) {
+        return res.status(403).json({ msg: "Uploads unlock once the case is funded and in progress." });
       }
 
       if (!contentType || typeof contentType !== "string") {
@@ -257,6 +262,28 @@ router.post(
 // Temporary stub for legacy attachment probes
 router.post("/attach", (_req, res) => {
   res.json({ ok: true });
+});
+
+/**
+ * GET /api/uploads/view?key=<s3key>
+ * Redirects to a short-lived signed URL after auth checks.
+ */
+router.get("/view", async (req, res) => {
+  try {
+    if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
+    const key = normalizeKeyPath(req.query.key);
+    if (!key) return res.status(400).json({ msg: "Missing key" });
+
+    const allowed = await ensureKeyAccess(req, key, req.query.caseId);
+    if (!allowed) return res.status(403).json({ msg: "Forbidden" });
+
+    const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+    const url = await getSignedUrl(s3, getCmd, { expiresIn: 60 });
+    res.redirect(url);
+  } catch (e) {
+    console.error("[uploads] view error", e);
+    res.status(500).json({ msg: "view error" });
+  }
 });
 
 /**
@@ -505,6 +532,7 @@ router.post(
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
     const { caseDoc } = await loadCaseForUser(req, req.params.caseId);
+    if (!assertWorkspaceReady(caseDoc, res)) return;
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
     if (!req.file) return res.status(400).json({ msg: "File is required" });
     if (req.file.size > MAX_CASE_FILE_BYTES) {
@@ -578,6 +606,7 @@ router.get(
   ensureCaseParticipant(),
   asyncHandler(async (req, res) => {
     const { caseDoc } = await loadCaseForUser(req, req.params.caseId);
+    if (!assertWorkspaceReady(caseDoc, res)) return;
     const files = await CaseFile.find({ caseId: caseDoc._id }).sort({ createdAt: -1 }).lean();
     res.json({ files: files.map(serializeCaseFile) });
   })
@@ -588,6 +617,7 @@ router.get(
   ensureCaseParticipant(),
   asyncHandler(async (req, res) => {
     const { caseDoc } = await loadCaseForUser(req, req.params.caseId);
+    if (!assertWorkspaceReady(caseDoc, res)) return;
     if (!isObjId(req.params.fileId)) {
       return res.status(400).json({ msg: "Invalid file id" });
     }
@@ -642,13 +672,39 @@ function requireCaseAccessInline(req, res, next, param) {
   return mw(req, res, next);
 }
 
+function assertWorkspaceReady(caseDoc, res) {
+  const hasParalegal = !!(caseDoc?.paralegal || caseDoc?.paralegalId);
+  if (!hasParalegal) {
+    res.status(403).json({ msg: "Workspace unlocks after a paralegal is hired." });
+    return false;
+  }
+  const escrowFunded =
+    !!caseDoc?.escrowIntentId && String(caseDoc?.escrowStatus || "").toLowerCase() === "funded";
+  if (!escrowFunded) {
+    res.status(403).json({ msg: "Work begins once payment is secured." });
+    return false;
+  }
+  if (!canUseWorkspace(caseDoc)) {
+    const status = normalizeCaseStatus(caseDoc?.status);
+    const closedStatuses = ["completed", "closed", "cancelled", "disputed"];
+    const msg = closedStatuses.includes(status)
+      ? "Uploads are closed for this case."
+      : "Uploads unlock once the case is funded and in progress.";
+    res.status(403).json({ msg });
+    return false;
+  }
+  return true;
+}
+
 async function loadCaseForUser(req, caseId) {
   if (!isObjId(caseId)) {
     const error = new Error("Invalid case id");
     error.statusCode = 400;
     throw error;
   }
-  const doc = await Case.findById(caseId).select("_id attorney attorneyId paralegal paralegalId title");
+  const doc = await Case.findById(caseId).select(
+    "_id attorney attorneyId paralegal paralegalId title escrowIntentId escrowStatus status"
+  );
   if (!doc) {
     const error = new Error("Case not found");
     error.statusCode = 404;

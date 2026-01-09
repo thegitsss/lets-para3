@@ -10,13 +10,16 @@ const User = require("../models/User");
 const AuditLog = require("../models/AuditLog"); // match filename
 const { notifyUser } = require("../utils/notifyUser");
 const { containsProfanity, maskProfanity } = require("../utils/badWords");
+const { CASE_STATE, normalizeCaseStatus, canUseWorkspace } = require("../utils/caseState");
+const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
 
 // ----------------------------------------
-// Optional CSRF (toggle via ENABLE_CSRF=true)
+// CSRF (enabled in production or when ENABLE_CSRF=true)
 // ----------------------------------------
 const noop = (_req, _res, next) => next();
 let csrfProtection = noop;
-if (process.env.ENABLE_CSRF === "true") {
+const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+if (REQUIRE_CSRF) {
   const csrf = require("csurf");
   csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
 }
@@ -39,6 +42,51 @@ function buildCaseAccessFilter(user) {
   if (!user) return {};
   if (user.role === "admin") return {};
   return { $or: [{ attorney: user.id }, { paralegal: user.id }] };
+}
+
+const FUNDED_WORKSPACE_FILTER = {
+  escrowStatus: "funded",
+  escrowIntentId: { $exists: true, $ne: null },
+  status: {
+    $in: [
+      CASE_STATE.FUNDED_IN_PROGRESS,
+      "in progress",
+      "in_progress",
+      "active",
+      "awaiting_documents",
+      "reviewing",
+    ],
+  },
+  $or: [
+    { paralegal: { $exists: true, $ne: null } },
+    { paralegalId: { $exists: true, $ne: null } },
+  ],
+};
+
+function buildBlockedCaseClause(user, blockedIds) {
+  if (!blockedIds.length) return null;
+  const role = String(user?.role || "").toLowerCase();
+  if (role === "attorney") {
+    return { $and: [{ paralegal: { $nin: blockedIds } }, { paralegalId: { $nin: blockedIds } }] };
+  }
+  if (role === "paralegal") {
+    return { $and: [{ attorney: { $nin: blockedIds } }, { attorneyId: { $nin: blockedIds } }] };
+  }
+  return null;
+}
+
+async function buildMessagingCaseFilter(user) {
+  const clauses = [FUNDED_WORKSPACE_FILTER];
+  const base = buildCaseAccessFilter(user);
+  if (base && Object.keys(base).length) clauses.unshift(base);
+  const role = String(user?.role || "").toLowerCase();
+  const blockedIds = ["attorney", "paralegal"].includes(role)
+    ? await getBlockedUserIds(user.id)
+    : [];
+  const blockClause = buildBlockedCaseClause(user, blockedIds);
+  if (blockClause) clauses.push(blockClause);
+  if (clauses.length === 1) return clauses[0];
+  return { $and: clauses };
 }
 
 function toObjectId(value) {
@@ -107,17 +155,20 @@ function assertMessagingOpen(req, res) {
     return res.status(400).json({ error: "Case not loaded" });
   }
   const escrowStatus = String(caseDoc.escrowStatus || "").toLowerCase();
-  const escrowFunded = !!caseDoc.escrowIntentId;
-  const status = String(caseDoc.status || "").toLowerCase();
+  const escrowFunded = !!caseDoc.escrowIntentId && escrowStatus === "funded";
+  const status = normalizeCaseStatus(caseDoc.status);
   const hasParalegal = caseDoc.paralegal || caseDoc.paralegalId;
   if (!hasParalegal) {
     return res.status(403).json({ error: "Messaging is available after hire" });
   }
-  if (!escrowFunded || escrowStatus !== "funded") {
+  if (!escrowFunded) {
     return res.status(403).json({ error: "Work begins once payment is secured." });
   }
-  if (["completed", "closed", "cancelled"].includes(status)) {
-    return res.status(403).json({ error: "Messaging is closed for completed cases" });
+  if (!canUseWorkspace(caseDoc, { viewerId: req.user?.id })) {
+    if (["completed", "closed", "cancelled", "disputed"].includes(status)) {
+      return res.status(403).json({ error: "Messaging is closed for this case." });
+    }
+    return res.status(403).json({ error: "Messaging unlocks once the case is funded and in progress." });
   }
   return null;
 }
@@ -137,7 +188,7 @@ router.use(requireRole("admin", "attorney", "paralegal"));
 router.get(
   "/unread-count",
   asyncHandler(async (req, res) => {
-    const caseFilter = buildCaseAccessFilter(req.user);
+    const caseFilter = await buildMessagingCaseFilter(req.user);
     const caseDocs = await Case.find(caseFilter).select("_id").lean();
     if (!caseDocs.length) {
       return res.json({ count: 0 });
@@ -158,7 +209,7 @@ router.get(
 router.get(
   "/summary",
   asyncHandler(async (req, res) => {
-    const filter = buildCaseAccessFilter(req.user);
+    const filter = await buildMessagingCaseFilter(req.user);
     const caseDocs = await Case.find(filter).select("_id title").lean();
     if (!caseDocs.length) {
       return res.json({ items: [] });
@@ -196,7 +247,7 @@ router.get(
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const skip = (page - 1) * limit;
 
-    const caseFilter = buildCaseAccessFilter(req.user);
+    const caseFilter = await buildMessagingCaseFilter(req.user);
     if (q.trim()) caseFilter.title = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
 
     const [caseItems, totalCases] = await Promise.all([
@@ -256,7 +307,27 @@ router.get(
 );
 
 // Case-scoped routes (require participant access)
-router.use("/:caseId", ensureCaseParticipant());
+async function ensureNotBlockedForCase(req, res, next) {
+  try {
+    const role = String(req.user?.role || "").toLowerCase();
+    if (!["attorney", "paralegal"].includes(role)) return next();
+    const caseDoc = req.case;
+    if (!caseDoc) return next();
+    const otherId =
+      role === "attorney"
+        ? caseDoc.paralegal || caseDoc.paralegalId || caseDoc.pendingParalegalId
+        : caseDoc.attorney || caseDoc.attorneyId;
+    if (!otherId) return next();
+    if (await isBlockedBetween(req.user.id, otherId)) {
+      return res.status(403).json({ error: BLOCKED_MESSAGE });
+    }
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+}
+
+router.use("/:caseId", ensureCaseParticipant(), ensureNotBlockedForCase);
 
 /**
  * GET /api/messages/:caseId?before=&after=&limit=&threadRoot=
@@ -269,6 +340,8 @@ router.use("/:caseId", ensureCaseParticipant());
 router.get(
   "/:caseId",
   asyncHandler(async (req, res) => {
+    const closed = assertMessagingOpen(req, res);
+    if (closed) return;
     const { caseId } = req.params;
     const items = await Message.find({ caseId, deleted: { $ne: true } })
       .sort({ createdAt: 1 })

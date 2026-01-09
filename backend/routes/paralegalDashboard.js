@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const router = express.Router();
 
 const auth = require("../utils/verifyToken");
@@ -6,30 +7,60 @@ const requireRole = require("../middleware/requireRole");
 const Job = require("../models/Job");
 const Application = require("../models/Application");
 const Case = require("../models/Case");
-
-let Payment = null;
-try {
-  Payment = require("../models/Payment");
-} catch (e) {
-  // Payment not required yet; ignore
-}
+const Payout = require("../models/Payout");
 
 /**
- * Optional helper: compute paralegal earnings
+ * Optional helper: compute paralegal earnings based on completed payouts
  */
 async function getParalegalEarnings(paralegalId) {
-  if (!Payment) return 0;
-
   try {
-    const payments = await Payment.find({
-      paralegalId,
-      status: "released",
-    });
-
-    return payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const paralegalMatch = mongoose.Types.ObjectId.isValid(paralegalId)
+      ? new mongoose.Types.ObjectId(paralegalId)
+      : paralegalId;
+    const totals = await Payout.aggregate([
+      { $match: { paralegalId: paralegalMatch } },
+      {
+        $lookup: {
+          from: "cases",
+          localField: "caseId",
+          foreignField: "_id",
+          as: "caseDoc",
+        },
+      },
+      { $unwind: "$caseDoc" },
+      {
+        $match: {
+          $or: [
+            { "caseDoc.paymentReleased": true },
+            { "caseDoc.status": { $in: ["completed", "closed"] } },
+          ],
+        },
+      },
+      {
+        $facet: {
+          month: [
+            { $match: { createdAt: { $gte: startOfMonth, $lte: now } } },
+            { $group: { _id: null, total: { $sum: "$amountPaid" } } },
+          ],
+          last30: [
+            { $match: { createdAt: { $gte: last30, $lte: now } } },
+            { $group: { _id: null, total: { $sum: "$amountPaid" } } },
+          ],
+        },
+      },
+    ]);
+    const monthTotal = totals[0]?.month?.[0]?.total || 0;
+    const last30Total = totals[0]?.last30?.[0]?.total || 0;
+    return {
+      month: monthTotal / 100,
+      last30: last30Total / 100,
+    };
   } catch (err) {
     console.error("Error computing paralegal earnings:", err);
-    return 0;
+    return { month: 0, last30: 0 };
   }
 }
 
@@ -74,7 +105,7 @@ router.get("/", auth, requireRole(["paralegal"]), async (req, res) => {
     const [
       activeCasesCount,
       pendingApplicationsCount,
-      totalEarnings,
+      earningsTotals,
     ] = await Promise.all([
       activeCases.length,
       Application.countDocuments({
@@ -87,7 +118,8 @@ router.get("/", auth, requireRole(["paralegal"]), async (req, res) => {
     const metrics = {
       activeCases: activeCasesCount,
       pendingApplications: pendingApplicationsCount,
-      earnings: totalEarnings, // always 0 unless Payment model exists
+      earnings: earningsTotals.month,
+      earningsLast30Days: earningsTotals.last30,
     };
 
     // 5. Shape response for frontend

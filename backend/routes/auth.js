@@ -26,7 +26,8 @@ const AUTH_COOKIE_OPTIONS = {
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
-const resumeUpload = multer({
+const MAX_CERT_FILE_BYTES = 10 * 1024 * 1024;
+const registrationUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_RESUME_FILE_BYTES },
 });
@@ -154,7 +155,11 @@ async function verifyRecaptcha(token, expectedAction) {
 // ----------------------------------------
 router.post(
   "/register",
-  resumeUpload.single("resume"),
+  registrationUpload.fields([
+    { name: "resume", maxCount: 1 },
+    { name: "resumeFile", maxCount: 1 },
+    { name: "certificateFile", maxCount: 1 },
+  ]),
   asyncHandler(async (req, res) => {
     const bypassList = (process.env.DEV_BYPASS_EMAILS || "")
       .split(",")
@@ -173,6 +178,7 @@ router.post(
       resumeURL,
       certificateURL,
       captchaToken,
+      recaptchaToken,
       termsAccepted,
       phoneNumber,
       barState,
@@ -181,15 +187,16 @@ router.post(
     const normalizedEmail = String(email || "").toLowerCase().trim();
     const bypassCaptcha = normalizedEmail && bypassList.includes(normalizedEmail);
 
+    const resolvedCaptchaToken = captchaToken || recaptchaToken;
     if (!bypassCaptcha && captchaEnabled && process.env.NODE_ENV === "production") {
       const recaptchaSecret = process.env.RECAPTCHA_SECRET || "";
-      if (!captchaToken || !recaptchaSecret) {
+      if (!resolvedCaptchaToken || !recaptchaSecret) {
         return res.status(400).json({ error: "Captcha verification failed" });
       }
       try {
         const params = new URLSearchParams();
         params.append("secret", recaptchaSecret);
-        params.append("response", captchaToken);
+        params.append("response", resolvedCaptchaToken);
         const { data } = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);
         console.log("[signup] recaptcha verify", { success: !!data?.success, score: data?.score, email: normalizedEmail });
         if (!data?.success) {
@@ -199,13 +206,13 @@ router.post(
         console.warn("[signup] recaptcha verification error", err?.message || err);
         return res.status(400).json({ error: "Captcha verification failed" });
       }
-    } else if (captchaToken) {
+    } else if (resolvedCaptchaToken) {
       const recaptchaSecret = process.env.RECAPTCHA_SECRET || "";
       if (recaptchaSecret) {
         try {
           const params = new URLSearchParams();
           params.append("secret", recaptchaSecret);
-          params.append("response", captchaToken);
+          params.append("response", resolvedCaptchaToken);
           const { data } = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);
           console.log("[signup] recaptcha verify (bypass)", { success: !!data?.success, score: data?.score, email: normalizedEmail });
         } catch (err) {
@@ -238,29 +245,56 @@ router.post(
         .json({ msg: "Password must be at least 8 characters." });
     }
 
+    const normalizedBarState =
+      typeof barState === "string" ? barState.trim().toUpperCase() : "";
+    const normalizedBarNumber = String(barNumber || "").trim();
+    if (roleLc === "attorney") {
+      if (!normalizedBarNumber) {
+        return res.status(400).json({ msg: "State Bar Number is required for attorneys." });
+      }
+      if (!normalizedBarState) {
+        return res.status(400).json({ msg: "Bar State is required for attorneys." });
+      }
+      if (!/^[A-Z]{2}$/.test(normalizedBarState)) {
+        return res.status(400).json({ msg: "Bar State must be a valid 2-letter code." });
+      }
+    }
+
+    const resumeFile = req.files?.resume?.[0] || req.files?.resumeFile?.[0] || null;
+    const certificateFile = req.files?.certificateFile?.[0] || null;
+
     // Paralegals must attach a PDF resume at signup
-    if (roleLc === "paralegal" && !req.file) {
+    if (roleLc === "paralegal" && !resumeFile) {
       return res.status(400).json({ msg: "Résumé file is required for paralegal registration." });
     }
 
     const existing = await User.findOne({ email: String(email).toLowerCase() });
     if (existing) return res.status(400).json({ msg: "User already exists" });
 
-    if (roleLc === "paralegal" && req.file) {
-      if (req.file.mimetype !== "application/pdf") {
+    if (roleLc === "paralegal" && resumeFile) {
+      if (resumeFile.mimetype !== "application/pdf") {
         return res.status(400).json({ msg: "Résumé must be a PDF" });
       }
-      if (req.file.size > MAX_RESUME_FILE_BYTES) {
+      if (resumeFile.size > MAX_RESUME_FILE_BYTES) {
         return res.status(400).json({ msg: "Résumé exceeds maximum allowed size (10 MB)." });
       }
       if (!BUCKET) {
         return res.status(500).json({ msg: "Resume upload unavailable. Please try again later." });
       }
     }
+    if (roleLc === "paralegal" && certificateFile) {
+      if (certificateFile.mimetype !== "application/pdf") {
+        return res.status(400).json({ msg: "Certificate must be a PDF" });
+      }
+      if (certificateFile.size > MAX_CERT_FILE_BYTES) {
+        return res.status(400).json({ msg: "Certificate exceeds maximum allowed size (10 MB)." });
+      }
+      if (!BUCKET) {
+        return res.status(500).json({ msg: "Certificate upload unavailable. Please try again later." });
+      }
+    }
 
     // Let the model hash the password (pre-save hook)
-    const normalizedBarState =
-      typeof barState === "string" ? barState.trim().toUpperCase() : "";
 
     const user = new User({
       firstName: safeFirst,
@@ -283,19 +317,33 @@ router.post(
     }
 
     // Upload resume (paralegal) before saving
-    if (roleLc === "paralegal" && req.file) {
+    if (roleLc === "paralegal" && resumeFile) {
       const key = `paralegal-resumes/${safeSegment(user._id)}/resume.pdf`;
       const putParams = {
         Bucket: BUCKET,
         Key: key,
-        Body: req.file.buffer,
+        Body: resumeFile.buffer,
         ContentType: "application/pdf",
-        ContentLength: req.file.size,
+        ContentLength: resumeFile.size,
         ACL: "private",
         ...sseParams(),
       };
       await s3.send(new PutObjectCommand(putParams));
       user.resumeURL = key;
+    }
+    if (roleLc === "paralegal" && certificateFile) {
+      const key = `paralegal-certificates/${safeSegment(user._id)}/certificate.pdf`;
+      const putParams = {
+        Bucket: BUCKET,
+        Key: key,
+        Body: certificateFile.buffer,
+        ContentType: "application/pdf",
+        ContentLength: certificateFile.size,
+        ACL: "private",
+        ...sseParams(),
+      };
+      await s3.send(new PutObjectCommand(putParams));
+      user.certificateURL = key;
     }
 
     await user.save();
@@ -311,7 +359,7 @@ router.post(
         user.email,
         "Registration received",
         `Thank you for submitting your application to be part of Let’s-ParaConnect. Your application is now under review. Please expect to see an update within 24-48 business hours.\n\nRespectfully,\nThe Let’s-ParaConnect Verification Division${
-          process.env.APP_BASE_URL ? `\n\nYou can verify your email here (optional): ${verifyUrl}` : ""
+          process.env.APP_BASE_URL ? `` : ""
         }`
       );
     } catch (_) {}
@@ -550,6 +598,9 @@ router.get(
             theme:
               (u.preferences && typeof u.preferences === "object" && u.preferences.theme) ||
               "mountain",
+            fontSize:
+              (u.preferences && typeof u.preferences === "object" && u.preferences.fontSize) ||
+              "md",
           },
         },
       });

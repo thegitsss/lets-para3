@@ -9,6 +9,7 @@ const auth = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
 const stripe = require("../utils/stripe");
+const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
 
 function sanitizeMessage(value, { min = 0, max = 2000 } = {}) {
   if (typeof value !== "string") return "";
@@ -19,34 +20,38 @@ function sanitizeMessage(value, { min = 0, max = 2000 } = {}) {
 
 async function ensureStripeOnboardedUser(userDoc) {
   if (!userDoc?.stripeAccountId) return false;
-  if (userDoc.stripeOnboarded) return true;
+  if (userDoc.stripeOnboarded && userDoc.stripePayoutsEnabled) return true;
   try {
     const account = await stripe.accounts.retrieve(userDoc.stripeAccountId);
     const submitted = !!account?.details_submitted;
-    if (submitted) {
-      userDoc.stripeOnboarded = true;
-      await userDoc.save();
-      return true;
-    }
+    const chargesEnabled = !!account?.charges_enabled;
+    const payoutsEnabled = !!account?.payouts_enabled;
+    userDoc.stripeChargesEnabled = chargesEnabled;
+    userDoc.stripePayoutsEnabled = payoutsEnabled;
+    userDoc.stripeOnboarded = submitted && payoutsEnabled;
+    await userDoc.save();
+    return userDoc.stripeOnboarded;
   } catch (err) {
     console.warn("[applications] stripe onboarding status check failed", err?.message || err);
   }
   return false;
 }
 
-async function getCaseApplicationsForAttorney(attorneyId) {
+async function getCaseApplicationsForAttorney(attorneyId, blockedSet = null) {
   const cases = await Case.find({
     attorneyId,
     "applicants.0": { $exists: true },
   })
-    .select("title practiceArea totalAmount currency applicants createdAt")
+    .select("title practiceArea totalAmount lockedTotalAmount currency applicants createdAt")
     .populate("applicants.paralegalId", "firstName lastName email role profileImage avatarURL")
     .lean();
 
   const entries = [];
   cases.forEach((caseDoc) => {
-    const budget =
-      typeof caseDoc.totalAmount === "number" ? Math.round(caseDoc.totalAmount / 100) : null;
+    const amountCents = Number.isFinite(caseDoc.lockedTotalAmount)
+      ? caseDoc.lockedTotalAmount
+      : caseDoc.totalAmount;
+    const budget = typeof amountCents === "number" ? Math.round(amountCents / 100) : null;
     const caseId = String(caseDoc._id || "");
     const jobTitle = caseDoc.title || "Case";
     const practiceArea = caseDoc.practiceArea || "";
@@ -54,6 +59,9 @@ async function getCaseApplicationsForAttorney(attorneyId) {
     (caseDoc.applicants || []).forEach((applicant) => {
       const paralegal = applicant?.paralegalId || null;
       const paralegalId = paralegal?._id || applicant?.paralegalId || "";
+      if (blockedSet && paralegalId && blockedSet.has(String(paralegalId))) {
+        return;
+      }
       entries.push({
         id: `case:${caseId}:${paralegalId || "unknown"}`,
         jobId: null,
@@ -94,6 +102,12 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     err.status = 404;
     throw err;
   }
+  const attorneyId = job.attorneyId?._id || job.attorneyId || null;
+  if (attorneyId && (await isBlockedBetween(user._id, attorneyId))) {
+    const err = new Error(BLOCKED_MESSAGE);
+    err.status = 403;
+    throw err;
+  }
   if (job.status !== "open") {
     const err = new Error("Applications are closed for this job");
     err.status = 400;
@@ -115,7 +129,7 @@ async function createApplicationForJob(jobId, user, coverLetter) {
   }
 
   const applicant = await User.findById(user._id).select(
-    "firstName lastName role stripeAccountId stripeOnboarded resumeURL linkedInURL availability availabilityDetails location languages specialties yearsExperience bio profileImage avatarURL"
+    "firstName lastName role stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled resumeURL linkedInURL availability availabilityDetails location languages specialties yearsExperience bio profileImage avatarURL"
   );
   if (!applicant) {
     const err = new Error("Unable to load your profile details.");
@@ -127,7 +141,7 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     err.status = 403;
     throw err;
   }
-  if (!applicant.stripeOnboarded) {
+  if (!applicant.stripeOnboarded || !applicant.stripePayoutsEnabled) {
     const refreshed = await ensureStripeOnboardedUser(applicant);
     if (!refreshed) {
       const err = new Error("Complete Stripe onboarding before applying to jobs.");
@@ -194,7 +208,13 @@ router.get("/for-job/:jobId", auth, requireApproved, requireRole("admin", "attor
       return res.status(403).json({ error: "Unauthorized" });
     }
 
-    const apps = await Application.find({ jobId: req.params.jobId }).populate(
+    const blockedIds =
+      req.user.role === "attorney" ? await getBlockedUserIds(req.user._id || req.user.id) : [];
+    const appFilter = { jobId: req.params.jobId };
+    if (blockedIds.length) {
+      appFilter.paralegalId = { $nin: blockedIds };
+    }
+    const apps = await Application.find(appFilter).populate(
       "paralegalId",
       "firstName lastName email role"
     );
@@ -209,11 +229,17 @@ router.get("/for-job/:jobId", auth, requireApproved, requireRole("admin", "attor
 router.get("/my-postings", auth, requireApproved, requireRole("attorney"), async (req, res) => {
   try {
     const jobs = await Job.find({ attorneyId: req.user._id }).select("_id title practiceArea budget caseId");
-    const caseApps = await getCaseApplicationsForAttorney(req.user._id);
+    const blockedIds = await getBlockedUserIds(req.user._id || req.user.id);
+    const blockedSet = blockedIds.length ? new Set(blockedIds.map((id) => String(id))) : null;
+    const caseApps = await getCaseApplicationsForAttorney(req.user._id, blockedSet);
     if (!jobs.length && !caseApps.length) return res.json([]);
     const jobIds = jobs.map((j) => j._id);
     const jobById = new Map(jobs.map((j) => [String(j._id), j]));
-    const apps = await Application.find({ jobId: { $in: jobIds } })
+    const appFilter = { jobId: { $in: jobIds } };
+    if (blockedIds.length) {
+      appFilter.paralegalId = { $nin: blockedIds };
+    }
+    const apps = await Application.find(appFilter)
       .populate("paralegalId", "firstName lastName email role profileImage avatarURL")
       .sort({ createdAt: -1 })
       .lean();

@@ -12,6 +12,7 @@
     "dev": "nodemon index.js",
     "dev:debug": "nodemon --inspect=0.0.0.0:9229 index.js",
     "seed:admin": "node scripts/seedAdmin.js",
+    "backup:db": "node scripts/backup-db.js",
     "health": "node -e \"console.log('ok')\"",
     "postinstall": "npm prune --production=false || true"
   },
@@ -35,6 +36,7 @@
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
     "nodemailer": "^6.9.15",
+    "puppeteer": "^24.34.0",
     "stripe": "^18.4.0",
     "uuid": "^9.0.1",
     "web-push": "^3.6.2"

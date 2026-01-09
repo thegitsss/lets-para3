@@ -143,13 +143,22 @@ router.post("/", async (req, res) => {
           if (!c.escrowIntentId) c.escrowIntentId = pi.id;
           if (!c.paymentIntentId) c.paymentIntentId = pi.id;
           if (!c.currency) c.currency = pi.currency || c.currency || "usd";
-          if (!c.totalAmount || c.totalAmount <= 0) c.totalAmount = pi.amount || c.totalAmount || 0;
-          if (!c.lockedTotalAmount) c.lockedTotalAmount = c.totalAmount;
-          if (!c.escrowStatus || c.escrowStatus !== "funded") c.escrowStatus = "funded";
+          if (c.lockedTotalAmount == null && (!c.totalAmount || c.totalAmount <= 0)) {
+            c.totalAmount = pi.amount || c.totalAmount || 0;
+          }
+          if (c.lockedTotalAmount == null) c.lockedTotalAmount = c.totalAmount;
+          const { transferable } = stripe.isTransferablePaymentIntent(pi, { caseId: c._id });
+          if (!c.escrowStatus || c.escrowStatus !== "funded") {
+            if (transferable) {
+              c.escrowStatus = "funded";
+            } else if (!wasFunded) {
+              c.escrowStatus = c.escrowStatus || "awaiting_funding";
+            }
+          }
           c.paymentStatus = "succeeded";
           const hasParalegal = !!(c.paralegal || c.paralegalId);
           const status = String(c.status || "").toLowerCase();
-          if (hasParalegal && ["awaiting_funding", "assigned", "open"].includes(status)) {
+          if (transferable && hasParalegal && ["awaiting_funding", "assigned", "open"].includes(status)) {
             if (typeof c.canTransitionTo === "function" && c.canTransitionTo("in_progress")) {
               c.transitionTo("in_progress");
             } else {
@@ -158,7 +167,7 @@ router.post("/", async (req, res) => {
           }
           await c.save();
 
-          if (!wasFunded && hasParalegal) {
+          if (!wasFunded && transferable && hasParalegal) {
             const paralegalId = c.paralegal?._id || c.paralegalId || c.paralegal;
             if (paralegalId) {
               try {

@@ -25,7 +25,6 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 app.use(
   helmet({
@@ -100,6 +99,7 @@ const publicRouter = require("./routes/public");
 const accountRouter = require("./routes/account");
 const stripeRouter = require("./routes/stripe");
 const notificationRouter = require("./routes/notifications");
+const blocksRouter = require("./routes/blocks");
 const { startPurgeWorker } = require("./services/caseLifecycle");
 
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }), paymentsWebhookHandler);
@@ -124,6 +124,7 @@ app.use("/api/users", usersRouter);
 app.use("/api/account", accountRouter);
 app.use("/api/stripe", stripeRouter);
 app.use("/api/notifications", notificationRouter);
+app.use("/api/blocks", blocksRouter);
 app.use("/api/verify", verificationRouter);
 app.use("/api/public", publicRouter);
 app.use("/public", publicRouter);

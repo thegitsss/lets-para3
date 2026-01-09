@@ -15,13 +15,14 @@ const sendEmail = require("../utils/email");
 const { sendWelcomePacket } = sendEmail;
 
 // -----------------------------------------
-// Optional CSRF (enable via ENABLE_CSRF=true)
+// CSRF (enabled in production or when ENABLE_CSRF=true)
 // -----------------------------------------
 const noop = (_req, _res, next) => next();
 let csrfProtection = noop;
-if (process.env.ENABLE_CSRF === "true") {
-const csrf = require("csurf");
-csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
+const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+if (REQUIRE_CSRF) {
+  const csrf = require("csurf");
+  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
 }
 
 const APP_BASE_URL = (process.env.APP_BASE_URL || "").replace(/\/$/, "");
@@ -82,6 +83,14 @@ return mongoose.isValidObjectId(id);
 
 const CASE_AMOUNT_EXPR = { $ifNull: ["$lockedTotalAmount", "$totalAmount"] };
 
+function toFileViewUrl(value) {
+const raw = String(value || "").trim();
+if (!raw) return raw;
+if (/^https?:\/\//i.test(raw)) return raw;
+if (raw.startsWith("/api/uploads/view")) return raw;
+return `/api/uploads/view?key=${encodeURIComponent(raw)}`;
+}
+
 function buildApprovedCasePipeline(match = {}) {
 const baseMatch = Object.assign({}, match);
 return [
@@ -120,8 +129,8 @@ lastLoginAt, lockedUntil, failedLogins, audit, createdAt, updatedAt,
 specialties, jurisdictions, skills, yearsExperience, languages,
 avatarURL, timezone, location, kycStatus, stripeCustomerId, stripeAccountId,
 barNumber,
-resumeURL,
-certificateURL,
+resumeURL: toFileViewUrl(resumeURL),
+certificateURL: toFileViewUrl(certificateURL),
 practiceAreas,
 experience,
 education,
@@ -522,7 +531,11 @@ asyncHandler(async (_req, res) => {
     .select("firstName lastName email linkedInURL certificateURL yearsExperience createdAt")
 .sort({ createdAt: 1 })
 .lean();
-res.json({ items: pending });
+const items = pending.map((item) => ({
+  ...item,
+  certificateURL: toFileViewUrl(item.certificateURL),
+}));
+res.json({ items });
 })
 );
 
@@ -1233,34 +1246,6 @@ const user = await User.findById(id);
 if (!user) return res.status(404).json({ msg: "User not found" });
 const updated = await applyUserDecision(req, user, "denied", req.body?.note);
 res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
-}));
-
-// Send approval email without changing status (admin test helper)
-router.post("/email/approval-test", csrfProtection, asyncHandler(async (req, res) => {
-const { userId, email } = req.body || {};
-let user = null;
-if (userId && isObjId(userId)) {
-  user = await User.findById(userId);
-} else if (typeof email === "string" && email.trim()) {
-  user = await User.findOne({ email: String(email).toLowerCase().trim() });
-}
-if (!user) return res.status(404).json({ msg: "User not found" });
-const inlineLogoPath = path.join(__dirname, "../../frontend/Cleanfav.png");
-await sendEmail(
-  user.email,
-  APPROVAL_EMAIL_SUBJECT,
-  buildApprovalEmailHtml(user, { logoUrl: "cid:cleanfav-logo" }),
-  {
-    attachments: [
-      {
-        filename: "Cleanfav.png",
-        path: inlineLogoPath,
-        cid: "cleanfav-logo",
-      },
-    ],
-  }
-);
-res.json({ ok: true });
 }));
 
 // Preview approval email HTML in-browser (admin-only)
