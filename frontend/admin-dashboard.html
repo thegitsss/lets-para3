@@ -1160,7 +1160,7 @@ scales:{
 y:{beginAtZero:true,title:{display:true,text:"Users"}},
 y1:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"Growth %"}}}
 }
-}));
+});
 
 /* -------- Escrow Charts -------- */
 pushChart(document.getElementById("escrowReportChart"), {
@@ -1177,7 +1177,7 @@ fill:true
 }]
 },
 options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
-}));
+});
 
 pushChart(document.getElementById("dailyLoginChart"), {
 type:"line",
@@ -1193,15 +1193,17 @@ fill:true
 }]
 },
 options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
-}));
+});
 
 /* -------- Escrow Details Modal Logic -------- */
 const escrowModal = document.getElementById("escrowDetails");
 const escrowCloseBtn = escrowModal?.querySelector("[data-escrow-close]");
 function openEscrowDetails(){
-  if (!escrowModal) return;
-  escrowModal.classList.remove("hidden");
-  escrowModal.setAttribute("aria-hidden","false");
+  if (!escrowModal || !escrowModal.classList.contains("hidden")) return;
+  requestAnimationFrame(() => {
+    escrowModal.classList.remove("hidden");
+    escrowModal.setAttribute("aria-hidden","false");
+  });
 }
 function closeEscrowDetails(){
   if (!escrowModal) return;
@@ -1263,7 +1265,7 @@ y:{beginAtZero:true,title:{display:true,text:"Revenue ($)"}},
 y1:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"Margin %"}}
 }
 }
-}));
+});
 
 pushChart(document.getElementById("revExpenseChart"),{
 type:"doughnut",
@@ -1275,7 +1277,7 @@ backgroundColor:["#b6a47a","#f4d03f","#95a5a6","#1abc9c"]
 }]
 },
 options:{plugins:{legend:{position:"bottom"}}}
-}));
+});
 
 /* -------- Accounting Download -------- */
 function downloadCSV(){
@@ -2680,6 +2682,7 @@ loadDeletedUsers();
 loadAuditLogs();
 window.renderPendingUsers = renderPendingUsers;
 window.updatePendingCount = updatePendingCount;
+window.loadPendingUsers = loadPendingUsers;
 </script>
 <script type="module" src="assets/scripts/admin-dashboard.js"></script>
 </body>

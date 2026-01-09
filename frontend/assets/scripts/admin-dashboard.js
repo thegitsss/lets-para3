@@ -1,7 +1,5 @@
 import { secureFetch, fetchCSRF } from "./auth.js";
 
-const REFRESH_INTERVAL_MS = 60_000;
-
 const chartCache = {
 userLine: null,
 combo: null,
@@ -11,9 +9,10 @@ expense: null,
   escrowReport: null,
 };
 
-let analyticsTimer;
 let analyticsInFlight = false;
 let latestAnalytics = null;
+let lastAnalyticsRenderAt = 0;
+const ANALYTICS_COOLDOWN_MS = 30_000;
 const removedUserIds = new Set();
 let recentUsersCache = [];
 
@@ -107,12 +106,6 @@ updateText("#metricAttorneys", formatNumber(userMetrics.totalAttorneys));
 updateText("#metricParalegals", formatNumber(userMetrics.totalParalegals));
 updateText("#metricPending", formatNumber(userMetrics.pendingApprovals));
 updateText("#metricSuspended", formatNumber(userMetrics.suspendedUsers));
-
-const pendingLabel = document.getElementById("pendingUsersCountLabel");
-if (pendingLabel) {
-const pendingCount = Number(userMetrics.pendingApprovals) || 0;
-pendingLabel.textContent = `${pendingCount.toLocaleString()} pending user${pendingCount === 1 ? "" : "s"}`;
-}
 
 populateQuickStats(userMetrics, caseMetrics, escrowMetrics);
 
@@ -375,6 +368,7 @@ list.innerHTML = "";
 
 function applyAnalyticsPayload(data) {
 latestAnalytics = data;
+lastAnalyticsRenderAt = Date.now();
 populateMetrics(data);
 populateCharts(data);
 populateExpenseChart(data);
@@ -388,10 +382,29 @@ populateNewUsers(data);
 }
 
 async function hydrateAnalytics() {
+const now = Date.now();
+if (latestAnalytics && now - lastAnalyticsRenderAt < ANALYTICS_COOLDOWN_MS) {
+return latestAnalytics;
+}
 const data = await loadAnalytics();
 if (!data) return null;
 applyAnalyticsPayload(data);
 return data;
+}
+
+function destroyCharts() {
+cacheCharts();
+Object.keys(chartCache).forEach((key) => {
+const chart = chartCache[key];
+if (chart?.destroy) {
+try {
+chart.destroy();
+} catch (err) {
+console.warn("Failed to destroy chart", err);
+}
+}
+chartCache[key] = null;
+});
 }
 
 window.deactivateUser = deactivateUser;
@@ -546,27 +559,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 const user = await bootAdminDashboard();
 if (!user) return;
 
-const data = await loadAnalytics();
+const data = await hydrateAnalytics();
 if (!data) return;
+});
 
-applyAnalyticsPayload(data);
-if (analyticsTimer) clearInterval(analyticsTimer);
-const startAnalytics = () => {
-if (analyticsTimer) clearInterval(analyticsTimer);
-analyticsTimer = setInterval(hydrateAnalytics, REFRESH_INTERVAL_MS);
-};
-const stopAnalytics = () => {
-if (analyticsTimer) clearInterval(analyticsTimer);
-analyticsTimer = null;
-};
 document.addEventListener("visibilitychange", () => {
 if (document.hidden) {
-stopAnalytics();
-} else {
-startAnalytics();
+destroyCharts();
 }
-});
-startAnalytics();
 });
 
 document.addEventListener("click", async (evt) => {
@@ -604,6 +604,10 @@ if (!id) return;
 try {
 await secureFetch(`/api/admin/approve/${encodeURIComponent(id)}`, { method: "POST" });
 await loadPendingParalegals();
+await hydrateAnalytics();
+if (typeof window.loadPendingUsers === "function") {
+await window.loadPendingUsers();
+}
 } catch (err) {
 console.error("Failed to approve paralegal", err);
 }
@@ -615,6 +619,10 @@ if (!id) return;
 try {
 await secureFetch(`/api/admin/reject/${encodeURIComponent(id)}`, { method: "POST" });
 await loadPendingParalegals();
+await hydrateAnalytics();
+if (typeof window.loadPendingUsers === "function") {
+await window.loadPendingUsers();
+}
 } catch (err) {
 console.error("Failed to reject paralegal", err);
 }
