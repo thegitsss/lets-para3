@@ -223,19 +223,6 @@ function buildApplicationSubmissionEmailHtml(user, opts = {}) {
             </td>
           </tr>
           <tr>
-            <td align="center" style="padding:24px 32px 16px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td bgcolor="#ffbd59" style="border-radius:999px;">
-                    <a href="${LOGIN_URL}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
-                      Login
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
             <td align="center" style="padding:8px 32px 16px;">
               <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
