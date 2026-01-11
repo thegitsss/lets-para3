@@ -21,23 +21,6 @@
   <script src="assets/scripts/utils/session.js"></script>
 
   <style>
-    .skip-link {
-      position: absolute;
-      left: 12px;
-      top: -40px;
-      background: #1a2230;
-      color: #ffffff;
-      padding: 8px 12px;
-      border-radius: 6px;
-      text-decoration: none;
-      z-index: 10000;
-      font-size: 14px;
-    }
-
-    .skip-link:focus {
-      top: 12px;
-    }
-
     .gold{color:#b4975a;}
     :root {
       --bg: #f5f5f5;
@@ -446,6 +429,7 @@
       display: flex;
       justify-content: center;
       align-items: center;
+      width: 100%;
     }
 
     .hero-photo {
@@ -475,17 +459,22 @@
       font-size: 3rem;
       font-weight: 300;
       letter-spacing: 0.6px;
+      text-align: center;
     }
 
     #roleLine {
       font-size: 1.05rem;
       color: var(--muted);
+      text-align: center;
     }
 
     #bioCopy {
       font-size: 1rem;
       color: var(--ink);
       max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: center;
     }
 
     .hero-meta-row {
@@ -495,6 +484,7 @@
       font-size: 0.9rem;
       color: var(--muted);
       flex-wrap: wrap;
+      justify-content: center;
     }
 
     .hero-meta-pill {
@@ -506,6 +496,9 @@
       background: transparent;
       border: none;
       text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.08);
+      justify-content: center;
+      text-align: center;
+      width: 100%;
     }
 
     .hero-meta-link,
@@ -533,11 +526,20 @@
       text-decoration: underline;
     }
 
+    #joinedMeta,
+    #credentialMeta {
+      justify-content: center;
+      text-align: center;
+      width: 100%;
+    }
+
     .profile-layout {
       display: grid;
       grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.6fr);
       gap: 24px;
       align-items: start;
+      text-align: center;
+      justify-items: center;
     }
 
     .profile-sidebar,
@@ -545,6 +547,7 @@
       display: flex;
       flex-direction: column;
       gap: 38px;
+      align-items: center;
     }
 
     .profile-sidebar {
@@ -560,58 +563,112 @@
       display: flex;
       flex-direction: column;
       gap: 28px;
+      align-items: center;
     }
 
     .profile-meta-stack {
       display: flex;
       flex-direction: column;
       gap: 10px;
+      align-items: center;
+      text-align: center;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     .profile-meta-columns {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(2, max-content);
       gap: 10px 24px;
+      justify-items: center;
+      text-align: center;
+      justify-content: center;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     .meta-column {
       display: flex;
       flex-direction: column;
       gap: 10px;
+      align-items: center;
+      text-align: center;
+      width: max-content;
+      max-width: 100%;
     }
 
     .meta-column.has-meta-icon .profile-docs-stack {
-      padding-left: 20px;
+      padding-left: 0;
     }
 
     .profile-docs-stack {
       display: flex;
       flex-direction: column;
       gap: 8px;
+      align-items: center;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .profile-section,
+    .education-section,
+    .experience-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: 100%;
     }
 
     .profile-header {
       display: flex;
       flex-direction: column;
       gap: 32px;
+      align-items: center;
+      text-align: center;
+      align-self: center;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     .profile-header-main {
       display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
       gap: 24px;
+      text-align: center;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .profile-identity {
+      text-align: center;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     .profile-header-actions {
       display: flex;
       flex-direction: column;
       gap: 24px;
-      align-items: flex-end;
+      align-items: center;
     }
 
     .profile-header-actions .hero-cta-row {
-      justify-content: flex-end;
+      justify-content: center;
     }
 
     .profile-role-row {
@@ -619,6 +676,11 @@
       flex-wrap: wrap;
       gap: 10px;
       align-items: center;
+      justify-content: center;
+      width: max-content;
+      max-width: 100%;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     .profile-sidebar .hero-photo-shell {
@@ -642,6 +704,7 @@
       gap: 12px;
       margin-top: 8px;
       flex-wrap: wrap;
+      justify-content: center;
     }
 
     .hero-cta-row button {
@@ -712,6 +775,7 @@
       margin-bottom: 6px;
       padding-bottom: 6px;
       border-bottom: 1px solid var(--line);
+      text-align: center;
     }
 
     .card-title {
@@ -719,6 +783,7 @@
       font-size: 1.2rem;
       font-weight: 300;
       margin-bottom: 2px;
+      text-align: center;
     }
 
     .chip-cloud,
@@ -727,10 +792,12 @@
       flex-wrap: wrap;
       gap: 8px;
       margin-top: 10px;
+      justify-content: center;
     }
 
     #languagesList {
       gap: 0;
+      justify-content: center;
     }
 
     #languagesList .chip {
@@ -745,6 +812,11 @@
     }
 
     .chip-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      width: 100%;
       margin-top: 10px;
     }
 
@@ -781,18 +853,21 @@
       flex-direction: column;
       gap: 10px;
       margin: 10px 0 6px;
+      align-items: center;
     }
 
     .timeline-item {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
       gap: 8px;
       padding: 8px 10px;
       border: 1px solid var(--line);
       border-radius: 12px;
       background: #fff;
       transition: none;
+      text-align: center;
     }
 
     .timeline-role {
@@ -802,7 +877,7 @@
     .timeline-dates {
       color: var(--muted);
       font-size: 0.9rem;
-      white-space: nowrap;
+      white-space: normal;
     }
 
     .edu-inline {
@@ -810,6 +885,7 @@
       flex-wrap: wrap;
       gap: 8px;
       margin-top: 8px;
+      justify-content: center;
     }
 
     .edu-pill {
@@ -839,6 +915,8 @@
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
+      justify-content: center;
+      width: 100%;
     }
 
     .doc-chip {
@@ -853,6 +931,15 @@
       color: var(--accent);
       font-size: 0.9rem;
       text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.08);
+      justify-content: center;
+      width: 100%;
+    }
+
+    #certificateLink,
+    #resumeLink {
+      justify-content: center;
+      text-align: center;
+      width: 100%;
     }
 
     .languages-empty {
@@ -1028,12 +1115,20 @@
     }
 
     @media (max-width: 960px) {
+      html,
+      body {
+        width: 100%;
+        overflow-x: hidden;
+      }
+
       .page-shell {
         padding: 32px 20px 80px;
       }
 
       .profile-layout {
         grid-template-columns: 1fr;
+        display: flex;
+        flex-direction: column;
       }
 
       .profile-photo-block,
@@ -1047,7 +1142,8 @@
       }
 
       .profile-meta-columns {
-        grid-template-columns: 1fr;
+        grid-template-columns: max-content;
+        justify-content: center;
       }
 
       .profile-header-main {
@@ -1075,11 +1171,35 @@
       .profile-role-row {
         justify-content: center;
       }
+
+      .profile-sidebar,
+      .profile-main,
+      .profile-photo-block {
+        display: contents;
+      }
+
+      .hero-photo-shell {
+        order: 1;
+        margin-bottom: 18px;
+      }
+
+      .profile-header {
+        order: 2;
+      }
+
+      .profile-meta-stack {
+        order: 3;
+        margin-top: 14px;
+      }
+
+      .profile-section {
+        order: 4;
+        margin-top: 28px;
+      }
     }
   </style>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to main content</a>
     <div class="bg-hero-mountain" aria-hidden="true"></div>
   <div class="page-shell" id="main" role="main" tabindex="-1">
     <div class="topbar">
@@ -1203,7 +1323,6 @@
         <section class="profile-header" aria-label="Paralegal profile">
           <div class="profile-header-main">
             <div class="profile-identity">
-              <div class="hero-eyebrow">Paralegal profile</div>
               <h1 id="profileName">Natalie Testing</h1>
               <div class="profile-role-row">
                 <span id="roleLine">5 years experience • elite paralegal professional</span>

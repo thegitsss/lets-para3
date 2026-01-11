@@ -4,16 +4,20 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
+const path = require("path");
 const axios = require("axios");
 const { URLSearchParams } = require("url");
 const multer = require("multer");
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 
 const User = require("../models/User");
+const Notification = require("../models/Notification");
 const AuditLog = require("../models/AuditLog"); // audit trail hooks
 const sendEmail = require("../utils/email");
 
 const IS_PROD = process.env.PROD === "true";
+const EMAIL_BASE_URL = (process.env.EMAIL_BASE_URL || "").replace(/\/+$/, "");
+const ASSET_BASE_URL = EMAIL_BASE_URL || "https://www.lets-paraconnect.com";
 const COOKIE_BASE_OPTIONS = {
   httpOnly: true,
   secure: true,
@@ -62,6 +66,113 @@ function safeSegment(value) {
     .replace(/-+/g, "-");
 }
 
+function buildUnsubscribeToken(user) {
+  if (!user?._id || !process.env.JWT_SECRET) return "";
+  const payload = {
+    purpose: "unsubscribe",
+    uid: String(user._id),
+  };
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "180d" });
+}
+
+function buildResetPasswordEmailHtml(user, resetUrl, opts = {}) {
+  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
+  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
+  const token = buildUnsubscribeToken(user);
+  const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
+  const unsubscribeLine = unsubscribeUrl
+    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe</a>`
+    : "Unsubscribe";
+
+  return `
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td align="center" style="padding:24px 24px 8px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding-right:12px;">
+                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
+                  </td>
+                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
+                    Let's-ParaConnect
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 24px 20px;">
+              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 32px 0;">
+              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:34px;letter-spacing:0.06em;color:#6e6e6e;">
+                Reset your password
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:16px 32px 0;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.08em;color:#1f1f1f;line-height:1.6;">
+                We received a request to reset your password. Use this
+                <a href="${resetUrl}" style="color:#1f1f1f;text-decoration:underline;">link</a>
+                to choose a new one. This link expires in 30 minutes.
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:24px 32px 16px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td bgcolor="#ffbd59" style="border-radius:999px;">
+                    <a href="${resetUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
+                      Reset password
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 32px 16px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td height="1" style="background:#bfc3c8;line-height:1px;font-size:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:0 32px 28px;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
+                If you did not request a password reset, you can ignore this email and your password will stay the same.
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td bgcolor="#070300" style="padding:26px 32px;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;color:#f6f5f1;letter-spacing:-0.01em;">
+                Need help?
+              </div>
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#f6f5f1;line-height:1.4;margin-top:8px;">
+                Email us at <a href="mailto:support@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">support@lets-paraconnect.com</a>
+              </div>
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
+                No longer want to receive these emails? ${unsubscribeLine}
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  `;
+}
+
 // ----------------------------------------
 // Helpers
 // ----------------------------------------
@@ -73,6 +184,32 @@ const DISABLED_ACCOUNT_MSG = "This account has been disabled.";
 const BOT_NAME_GIBBERISH = /^[bcdfghjklmnpqrstvwxyz]{6,}$/;
 const BOT_REPEATED = /(.)\1{3,}/;
 const BOT_FORBIDDEN_CHARS = /[{}[\]|\\^<>]/;
+const PARA_WELCOME_TITLE = "Welcome to Let's-ParaConnect";
+const PARA_WELCOME_BODY =
+  "You're part of our early access group. We're onboarding paralegals first so profiles and payouts are fully ready as attorneys join. " +
+  "Opportunities will begin appearing soon. In the meantime, feel free to complete your profile and upload credentials - you'll be notified as jobs open up.";
+
+async function ensureParalegalWelcomeNotification(user) {
+  if (!user) return;
+  const role = String(user.role || "").toLowerCase();
+  if (role !== "paralegal") return;
+  const existing = await Notification.findOne({
+    userId: user._id,
+    type: "paralegal_welcome",
+  }).select("_id");
+  if (existing) return;
+  const message = `${PARA_WELCOME_TITLE}. ${PARA_WELCOME_BODY}`;
+  await Notification.create({
+    userId: user._id,
+    userRole: user.role || "",
+    type: "paralegal_welcome",
+    message,
+    payload: { title: PARA_WELCOME_TITLE, body: PARA_WELCOME_BODY },
+    read: false,
+    isRead: false,
+    createdAt: new Date(),
+  });
+}
 
 function signAccess(user) {
   const approved = String(user.status || "").toLowerCase() === "approved";
@@ -451,6 +588,13 @@ router.post(
     const token = signAccess(user);
     res.cookie("token", token, AUTH_COOKIE_OPTIONS);
     await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
+    if (isFirstLogin) {
+      try {
+        await ensureParalegalWelcomeNotification(user);
+      } catch (err) {
+        console.warn("[auth] welcome notification failed", err?.message || err);
+      }
+    }
 
     return res.json({
       success: true,
@@ -508,6 +652,13 @@ router.post(
     const token = signAccess(user);
     res.cookie("token", token, AUTH_COOKIE_OPTIONS);
     await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
+    if (isFirstLogin) {
+      try {
+        await ensureParalegalWelcomeNotification(user);
+      } catch (err) {
+        console.warn("[auth] welcome notification failed", err?.message || err);
+      }
+    }
 
     res.json({
       success: true,
@@ -562,6 +713,13 @@ router.post(
     const token = signAccess(user);
     res.cookie("token", token, AUTH_COOKIE_OPTIONS);
     await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
+    if (isFirstLogin) {
+      try {
+        await ensureParalegalWelcomeNotification(user);
+      } catch (err) {
+        console.warn("[auth] welcome notification failed", err?.message || err);
+      }
+    }
 
     res.json({
       success: true,
@@ -722,9 +880,22 @@ router.post(
       { purpose: "reset-password", uid: user._id.toString() },
       { minutes: 30, secretEnv: "JWT_SECRET" }
     );
-    const resetUrl = `${process.env.APP_BASE_URL || ""}/reset-password?token=${resetToken}`;
+    const baseUrl = (process.env.APP_BASE_URL || "").replace(/\/+$/, "");
+    const resetUrl = `${baseUrl}/reset-password.html?token=${resetToken}`;
     try {
-      await sendEmail(user.email, "Reset your password", `Use this link to reset your password: ${resetUrl}\nThis link expires in 30 minutes.`);
+      const inlineLogoPath = path.join(__dirname, "../../frontend/Cleanfav.png");
+      const html = buildResetPasswordEmailHtml(user, resetUrl, { logoUrl: "cid:cleanfav-logo" });
+      const text = `Reset your password using this link: ${resetUrl}\nThis link expires in 30 minutes.`;
+      await sendEmail(user.email, "Reset your password", html, {
+        text,
+        attachments: [
+          {
+            filename: "Cleanfav.png",
+            path: inlineLogoPath,
+            cid: "cleanfav-logo",
+          },
+        ],
+      });
     } catch (_) {}
 
     await AuditLog.logFromReq(req, "auth.password.reset.request", {

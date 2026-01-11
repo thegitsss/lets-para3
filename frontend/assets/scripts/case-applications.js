@@ -67,9 +67,8 @@ function renderCase(data) {
   }
 
   const hasParalegal = !!(data?.paralegal || data?.paralegalId);
-  const pendingParalegal = !!data?.pendingParalegalId;
   const isOpenCase = statusKey === "open";
-  state.canHire = isOpenCase && !hasParalegal && !pendingParalegal && !data?.readOnly;
+  state.canHire = isOpenCase && !hasParalegal && !data?.readOnly;
 
   if (hasParalegal) {
     const hiredName = resolveParalegalName(data);

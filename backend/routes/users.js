@@ -802,6 +802,12 @@ router.get(
   asyncHandler(async (req, res) => {
     const { userId } = req.params;
     if (!isObjId(userId)) return res.status(400).json({ error: "Invalid userId" });
+    if (String(req.user?.role || "").toLowerCase() === "paralegal") {
+      const selfId = String(req.user?.id || req.user?._id || "");
+      if (!selfId || selfId !== String(userId)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    }
 
     const u = await User.findById(userId).select(SAFE_PUBLIC_SELECT).lean();
     if (!u) return res.status(404).json({ error: "User not found" });
@@ -829,7 +835,7 @@ const PARALEGAL_SELECT = `${SAFE_PUBLIC_SELECT} role status email`;
 
 paralegalRouter.get(
   "/",
-  requireRole("paralegal", "attorney", "admin"),
+  requireRole("attorney", "admin"),
   asyncHandler(async (req, res) => {
     const { filter, sortOpt, page, limit } = parseParalegalFilters(req.query);
     if (String(req.user.role || "").toLowerCase() === "attorney") {
@@ -860,6 +866,12 @@ paralegalRouter.get(
   asyncHandler(async (req, res) => {
     const targetId = resolveParalegalId(req.params.paralegalId, req.user.id);
     if (!isObjId(targetId)) return res.status(400).json({ error: "Invalid paralegal id" });
+    if (String(req.user?.role || "").toLowerCase() === "paralegal") {
+      const selfId = String(req.user?.id || req.user?._id || "");
+      if (!selfId || selfId !== String(targetId)) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    }
 
     const profile = await User.findById(targetId).select(PARALEGAL_SELECT);
     if (!profile) return res.status(404).json({ error: "Paralegal not found" });

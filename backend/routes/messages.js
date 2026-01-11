@@ -315,7 +315,7 @@ async function ensureNotBlockedForCase(req, res, next) {
     if (!caseDoc) return next();
     const otherId =
       role === "attorney"
-        ? caseDoc.paralegal || caseDoc.paralegalId || caseDoc.pendingParalegalId
+        ? caseDoc.paralegal || caseDoc.paralegalId
         : caseDoc.attorney || caseDoc.attorneyId;
     if (!otherId) return next();
     if (await isBlockedBetween(req.user.id, otherId)) {

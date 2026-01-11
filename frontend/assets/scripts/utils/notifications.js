@@ -121,9 +121,13 @@ function formatNotificationBody(item = {}) {
     case "case_invite":
       return `You've been invited to "${payload.caseTitle || "a case"}"`;
     case "case_invite_response":
-      return payload.response === "accepted"
-        ? `${payload.paralegalName || "Paralegal"} accepted your invitation`
-        : `${payload.paralegalName || "Paralegal"} declined your invitation`;
+      if (payload.response === "accepted") {
+        return `${payload.paralegalName || "Paralegal"} accepted your invitation`;
+      }
+      if (payload.response === "filled") {
+        return `The position for "${payload.caseTitle || "this case"}" has been filled.`;
+      }
+      return `${payload.paralegalName || "Paralegal"} declined your invitation`;
     case "case_update":
       return payload.summary || `Case "${payload.caseTitle || "update"}" has changed.`;
     case "application_submitted":
@@ -184,10 +188,10 @@ function closeAllNotificationPanels() {
 }
 
 function totalUnread() {
-  const centerTotal = centers.reduce((sum, center) => {
+  if (!centers.length) return lastKnownUnread || 0;
+  return centers.reduce((sum, center) => {
     return sum + getUnreadCount(center.notifications || []);
   }, 0);
-  return centerTotal || lastKnownUnread || 0;
 }
 
 ensureNotificationStyles();

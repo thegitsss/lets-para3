@@ -82,6 +82,8 @@ const selectors = {
   inviteCloseBtn: document.getElementById('inviteCloseBtn'),
   inviteAcceptBtn: document.getElementById('inviteAcceptBtn'),
   inviteDeclineBtn: document.getElementById('inviteDeclineBtn'),
+  welcomeNotice: document.getElementById('paralegalWelcomeNotice'),
+  welcomeNoticeDismiss: document.getElementById('dismissWelcomeNotice'),
 };
 
 const appliedFilters = {
@@ -412,8 +414,9 @@ function renderInvites(invites = []) {
       invite.attorney?.name ||
       [invite.attorney?.firstName, invite.attorney?.lastName].filter(Boolean).join(' ').trim() ||
       'Attorney';
-    const invitedAt = invite.pendingParalegalInvitedAt
-      ? `Invited ${new Date(invite.pendingParalegalInvitedAt).toLocaleDateString()}`
+    const inviteDateValue = invite.inviteInvitedAt || invite.pendingParalegalInvitedAt;
+    const invitedAt = inviteDateValue
+      ? `Invited ${new Date(inviteDateValue).toLocaleDateString()}`
       : '';
     subInfo.textContent = [attorneyName, invitedAt].filter(Boolean).join(' · ');
     headerBody.appendChild(titleEl);
@@ -691,8 +694,9 @@ function openInviteOverlay(invite) {
     invite?.rate ||
     '';
   const postedOn = invite?.createdAt ? new Date(invite.createdAt).toLocaleDateString() : '';
-  const invitedAt = invite?.pendingParalegalInvitedAt
-    ? `Invited ${new Date(invite.pendingParalegalInvitedAt).toLocaleDateString()}`
+  const inviteDateValue = invite?.inviteInvitedAt || invite?.pendingParalegalInvitedAt;
+  const invitedAt = inviteDateValue
+    ? `Invited ${new Date(inviteDateValue).toLocaleDateString()}`
     : '';
   const brief =
     invite?.briefSummary ||
@@ -785,6 +789,53 @@ function updateWelcomeGreeting(user) {
   const userFlag = user?.isFirstLogin;
   const isFirstLogin = typeof storedFlag === "boolean" ? storedFlag : Boolean(userFlag);
   greetingEl.textContent = isFirstLogin ? "Welcome" : "Welcome back";
+}
+
+function getWelcomeDismissKey(user) {
+  const id = String(user?.id || user?._id || "").trim();
+  return id ? `lpc_paralegal_welcome_dismissed_${id}` : "lpc_paralegal_welcome_dismissed";
+}
+
+function hasDismissedWelcome(user) {
+  const key = getWelcomeDismissKey(user);
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markWelcomeDismissed(user) {
+  const key = getWelcomeDismissKey(user);
+  try {
+    localStorage.setItem(key, "1");
+  } catch {}
+}
+
+function applyParalegalWelcomeNotice(user) {
+  const notice = selectors.welcomeNotice;
+  const dismissBtn = selectors.welcomeNoticeDismiss;
+  if (!notice || !dismissBtn) return;
+
+  const stored = getStoredUserSnapshot();
+  const role = String((user?.role || stored?.role || "")).toLowerCase();
+  if (role !== "paralegal") {
+    notice.classList.add("hidden");
+    return;
+  }
+  const storedFlag = stored?.isFirstLogin;
+  const userFlag = user?.isFirstLogin;
+  const isFirstLogin = typeof storedFlag === "boolean" ? storedFlag : Boolean(userFlag);
+  const dismissed = hasDismissedWelcome(user || stored);
+  notice.classList.toggle("hidden", !isFirstLogin || dismissed);
+
+  if (!dismissBtn.dataset.bound) {
+    dismissBtn.dataset.bound = "true";
+    dismissBtn.addEventListener("click", () => {
+      notice.classList.add("hidden");
+      markWelcomeDismissed(user || stored);
+    });
+  }
 }
 
 function updateProfile(profile = {}) {
@@ -1431,6 +1482,7 @@ async function initDashboard() {
     ]);
     const viewer = profile || {};
     updateProfile(viewer);
+    applyParalegalWelcomeNotice(viewer);
     updateStats({
       activeCases: dashboard?.metrics?.activeCases,
       unreadMessages: unreadCount,
@@ -1466,6 +1518,7 @@ async function bootParalegalDashboard() {
   if (!user) return;
   applyRoleVisibility(user);
   updateProfile(user || {});
+  applyParalegalWelcomeNotice(user || {});
   window.hydrateParalegalCluster?.(user || {});
   window.initNotificationCenters?.();
   if (window.state) {

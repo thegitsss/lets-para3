@@ -1328,7 +1328,14 @@ router.patch(
       });
     }
     if (!isAdmin) {
-      if (c.paralegalId || c.pendingParalegalId) {
+      const hasPendingInvites =
+        Array.isArray(c.invites) &&
+        c.invites.some(
+          (invite) =>
+            invite?.paralegalId &&
+            String(invite.status || "pending").toLowerCase() === "pending"
+        );
+      if (c.paralegalId || c.pendingParalegalId || hasPendingInvites) {
         return res.status(403).json({
           error: "Escrow amount is locked and cannot be modified.",
         });

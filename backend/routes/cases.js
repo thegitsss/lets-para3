@@ -362,12 +362,121 @@ function shapeInternalNote(note) {
   };
 }
 
+const INVITE_STATUSES = new Set(["pending", "accepted", "declined", "expired"]);
+
+function normalizeInviteStatus(value) {
+  const key = String(value || "").toLowerCase();
+  return INVITE_STATUSES.has(key) ? key : "pending";
+}
+
+function listCaseInvites(caseDoc, { includeLegacy = true } = {}) {
+  const invites = Array.isArray(caseDoc?.invites) ? caseDoc.invites : [];
+  const normalized = invites
+    .map((invite) => ({
+      paralegalId: invite?.paralegalId ? String(invite.paralegalId) : "",
+      status: normalizeInviteStatus(invite?.status),
+      invitedAt: invite?.invitedAt || null,
+      respondedAt: invite?.respondedAt || null,
+    }))
+    .filter((invite) => invite.paralegalId);
+
+  if (!normalized.length && includeLegacy && caseDoc?.pendingParalegalId) {
+    normalized.push({
+      paralegalId: String(caseDoc.pendingParalegalId),
+      status: "pending",
+      invitedAt: caseDoc.pendingParalegalInvitedAt || null,
+      respondedAt: null,
+    });
+  }
+  return normalized;
+}
+
+function hasPendingInvites(caseDoc) {
+  return listCaseInvites(caseDoc).some((invite) => invite.status === "pending");
+}
+
+function findInviteIndex(caseDoc, paralegalId) {
+  if (!Array.isArray(caseDoc.invites)) {
+    caseDoc.invites = [];
+  }
+  const target = String(paralegalId || "");
+  return caseDoc.invites.findIndex((invite) => String(invite.paralegalId) === target);
+}
+
+function upsertInvite(caseDoc, paralegalId, { status = "pending", invitedAt = new Date(), respondedAt = null } = {}) {
+  const idx = findInviteIndex(caseDoc, paralegalId);
+  const payload = {
+    paralegalId,
+    status: normalizeInviteStatus(status),
+    invitedAt: invitedAt || new Date(),
+    respondedAt: respondedAt || null,
+  };
+  if (idx >= 0) {
+    caseDoc.invites[idx] = { ...caseDoc.invites[idx], ...payload };
+    return caseDoc.invites[idx];
+  }
+  caseDoc.invites.push(payload);
+  return caseDoc.invites[caseDoc.invites.length - 1];
+}
+
+function markOtherInvites(caseDoc, excludeParalegalId, status = "declined") {
+  if (!Array.isArray(caseDoc.invites)) return;
+  const target = String(excludeParalegalId || "");
+  const normalizedStatus = normalizeInviteStatus(status);
+  caseDoc.invites.forEach((invite) => {
+    if (String(invite.paralegalId) !== target && normalizeInviteStatus(invite.status) === "pending") {
+      invite.status = normalizedStatus;
+      invite.respondedAt = new Date();
+    }
+  });
+}
+
+function expirePendingInvites(caseDoc) {
+  if (!Array.isArray(caseDoc.invites)) return;
+  caseDoc.invites.forEach((invite) => {
+    if (normalizeInviteStatus(invite.status) === "pending") {
+      invite.status = "expired";
+      invite.respondedAt = new Date();
+    }
+  });
+}
+
+function syncLegacyPendingFields(caseDoc) {
+  if (!Array.isArray(caseDoc.invites) || !caseDoc.invites.length) return;
+  const pending = caseDoc.invites
+    .filter((invite) => normalizeInviteStatus(invite.status) === "pending")
+    .sort((a, b) => {
+      const aTime = a.invitedAt ? new Date(a.invitedAt).getTime() : 0;
+      const bTime = b.invitedAt ? new Date(b.invitedAt).getTime() : 0;
+      return aTime - bTime;
+    });
+  const first = pending[0] || null;
+  caseDoc.pendingParalegalId = first ? first.paralegalId : null;
+  caseDoc.pendingParalegalInvitedAt = first ? first.invitedAt || null : null;
+}
+
+function seedLegacyInvite(caseDoc) {
+  if (!caseDoc?.pendingParalegalId) return;
+  if (!Array.isArray(caseDoc.invites)) caseDoc.invites = [];
+  const pendingId = String(caseDoc.pendingParalegalId);
+  const exists = caseDoc.invites.some((invite) => String(invite.paralegalId) === pendingId);
+  if (!exists) {
+    caseDoc.invites.push({
+      paralegalId: caseDoc.pendingParalegalId,
+      status: "pending",
+      invitedAt: caseDoc.pendingParalegalInvitedAt || new Date(),
+      respondedAt: null,
+    });
+  }
+}
+
 function caseSummary(doc, { includeFiles = false } = {}) {
   const paralegal = summarizeUser(doc.paralegal || doc.paralegalId);
   const pendingParalegal = summarizeUser(doc.pendingParalegal || doc.pendingParalegalId);
   const attorney = summarizeUser(doc.attorney || doc.attorneyId);
   const stateValue = doc.state || doc.locationState || "";
   const normalizedStatus = normalizeCaseStatusValue(doc.status);
+  const invites = listCaseInvites(doc);
   const summary = {
     _id: doc._id,
     id: String(doc._id),
@@ -396,6 +505,7 @@ function caseSummary(doc, { includeFiles = false } = {}) {
     pendingParalegalId:
       pendingParalegal?.id || (doc.pendingParalegalId ? String(doc.pendingParalegalId) : null),
     pendingParalegalInvitedAt: doc.pendingParalegalInvitedAt || null,
+    invites,
     hiredAt: doc.hiredAt || null,
     completedAt: doc.completedAt || null,
     briefSummary: doc.briefSummary || "",
@@ -816,17 +926,25 @@ router.post(
       return res.status(400).json({ error: "A paralegal is already assigned to this case" });
     }
 
-    caseDoc.pendingParalegalId = paralegal._id;
-    caseDoc.pendingParalegalInvitedAt = new Date();
+    seedLegacyInvite(caseDoc);
+    const existingInvite = listCaseInvites(caseDoc).find(
+      (invite) => String(invite.paralegalId) === String(paralegal._id)
+    );
+    if (existingInvite) {
+      if (existingInvite.status === "pending") {
+        return res.status(400).json({ error: "An invitation is already pending for this paralegal." });
+      }
+      if (existingInvite.status === "accepted") {
+        return res.status(400).json({ error: "This paralegal has already accepted." });
+      }
+    }
+
+    upsertInvite(caseDoc, paralegal._id, { status: "pending", invitedAt: new Date(), respondedAt: null });
+    syncLegacyPendingFields(caseDoc);
     if (caseDoc.lockedTotalAmount == null) {
       caseDoc.lockedTotalAmount = caseDoc.totalAmount;
       caseDoc.amountLockedAt = new Date();
     }
-    caseDoc.paralegal = null;
-    caseDoc.paralegalId = null;
-    caseDoc.hiredAt = null;
-    caseDoc.escrowStatus = "awaiting_funding";
-    if (caseDoc.status === "open") caseDoc.status = "assigned";
     await caseDoc.save();
 
     const inviterName = formatPersonName(req.user) || "An attorney";
@@ -864,22 +982,32 @@ router.post(
     if (isFinalCaseDoc(caseDoc)) {
       return res.status(400).json({ error: "Completed cases cannot be modified." });
     }
-    const pendingId = caseDoc.pendingParalegalId ? String(caseDoc.pendingParalegalId) : "";
-    if (!pendingId) return res.status(400).json({ error: "No pending invitation for this case" });
-    if (role !== "admin" && pendingId !== String(req.user.id)) {
-      return res.status(403).json({ error: "You are not the invited paralegal" });
-    }
-
     const attorneyId = caseDoc.attorneyId || caseDoc.attorney;
     const paralegalId = role === "admin" && req.body?.paralegalId && isObjId(req.body.paralegalId)
       ? req.body.paralegalId
       : req.user.id;
+    seedLegacyInvite(caseDoc);
+    const inviteRecord = listCaseInvites(caseDoc).find(
+      (invite) => String(invite.paralegalId) === String(paralegalId)
+    );
+    if (!inviteRecord || inviteRecord.status !== "pending") {
+      return res.status(400).json({ error: "No pending invitation for this paralegal." });
+    }
+    if (role !== "admin" && String(paralegalId) !== String(req.user.id)) {
+      return res.status(403).json({ error: "You are not the invited paralegal" });
+    }
+    if (caseDoc.paralegalId && String(caseDoc.paralegalId) !== String(paralegalId)) {
+      return res.status(400).json({ error: "This case is already assigned to another paralegal." });
+    }
     const paralegalProfile = await User.findById(paralegalId).select(
       "firstName lastName stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled"
     );
     const paralegalName = formatPersonName(paralegalProfile) || "Paralegal";
 
     if (decision === "accept") {
+      const otherInvitees = listCaseInvites(caseDoc)
+        .filter((invite) => invite.status === "pending" && String(invite.paralegalId) !== String(paralegalId))
+        .map((invite) => invite.paralegalId);
       if (attorneyId && (await isBlockedBetween(attorneyId, paralegalId))) {
         return res.status(403).json({ error: BLOCKED_MESSAGE });
       }
@@ -898,8 +1026,9 @@ router.post(
       }
       caseDoc.paralegal = paralegalId;
       caseDoc.paralegalId = paralegalId;
-      caseDoc.pendingParalegalId = null;
-      caseDoc.pendingParalegalInvitedAt = null;
+      upsertInvite(caseDoc, paralegalId, { status: "accepted", respondedAt: new Date() });
+      markOtherInvites(caseDoc, paralegalId, "declined");
+      syncLegacyPendingFields(caseDoc);
       caseDoc.hiredAt = new Date();
       caseDoc.escrowStatus = "awaiting_funding";
       caseDoc.paralegalNameSnapshot = formatPersonName(paralegalProfile);
@@ -937,13 +1066,30 @@ router.post(
         },
         { actorUserId: paralegalId }
       );
+      await Promise.all(
+        otherInvitees.map((inviteeId) =>
+          sendCaseNotification(
+            inviteeId,
+            "case_invite_response",
+            caseDoc,
+            {
+              response: "filled",
+              paralegalId,
+              paralegalName,
+            },
+            { actorUserId: paralegalId }
+          )
+        )
+      );
     } else {
-      caseDoc.pendingParalegalId = null;
-      caseDoc.pendingParalegalInvitedAt = null;
-      caseDoc.escrowStatus = null;
-      caseDoc.status = "open";
+      upsertInvite(caseDoc, paralegalId, { status: "declined", respondedAt: new Date() });
+      syncLegacyPendingFields(caseDoc);
+      if (!caseDoc.paralegalId && !hasPendingInvites(caseDoc)) {
+        caseDoc.escrowStatus = null;
+        caseDoc.status = "open";
+      }
       if (Array.isArray(caseDoc.applicants)) {
-        const existing = caseDoc.applicants.find((app) => String(app.paralegalId) === pendingId);
+        const existing = caseDoc.applicants.find((app) => String(app.paralegalId) === String(paralegalId));
         if (existing) existing.status = "rejected";
       }
       await caseDoc.save();
@@ -953,7 +1099,7 @@ router.post(
         caseDoc,
         {
           response: "declined",
-          paralegalId: pendingId,
+          paralegalId,
           paralegalName,
         },
         { actorUserId: paralegalId }
@@ -964,7 +1110,7 @@ router.post(
         caseDoc,
         {
           response: "declined",
-          paralegalId: pendingId,
+          paralegalId,
           paralegalName,
         },
         { actorUserId: paralegalId }
@@ -977,24 +1123,34 @@ router.post(
 
 router.get(
   "/:caseId/invites",
-  requireCaseAccess("caseId", { project: "pendingParalegalId pendingParalegalInvitedAt attorney attorneyId" }),
+  requireCaseAccess("caseId", { project: "invites pendingParalegalId pendingParalegalInvitedAt attorney attorneyId" }),
   asyncHandler(async (req, res) => {
     if (!req.acl?.isAttorney && req.user.role !== "admin") {
       return res.status(403).json({ error: "Only attorneys can view invited paralegals." });
     }
-    await req.case.populate("pendingParalegalId", "firstName lastName email role avatarURL profileImage");
-    const pending = req.case.pendingParalegalId;
-    if (!pending) {
+    seedLegacyInvite(req.case);
+    const inviteList = listCaseInvites(req.case);
+    if (!inviteList.length) {
       return res.json({ invites: [] });
     }
-    return res.json({
-      invites: [
-        {
-          paralegal: summarizeUser(pending),
-          invitedAt: req.case.pendingParalegalInvitedAt || null,
-        },
-      ],
-    });
+    const inviteIds = inviteList.map((invite) => invite.paralegalId).filter(Boolean);
+    const profiles = await User.find({ _id: { $in: inviteIds } })
+      .select("firstName lastName email role avatarURL profileImage")
+      .lean();
+    const profileMap = new Map(profiles.map((profile) => [String(profile._id), profile]));
+    const invites = inviteList
+      .map((invite) => ({
+        paralegal: summarizeUser(profileMap.get(String(invite.paralegalId))) || { id: invite.paralegalId },
+        status: invite.status,
+        invitedAt: invite.invitedAt || null,
+        respondedAt: invite.respondedAt || null,
+      }))
+      .sort((a, b) => {
+        const aTime = a.invitedAt ? new Date(a.invitedAt).getTime() : 0;
+        const bTime = b.invitedAt ? new Date(b.invitedAt).getTime() : 0;
+        return bTime - aTime;
+      });
+    return res.json({ invites });
   })
 );
 
@@ -1270,7 +1426,7 @@ router.get(
       .sort({ updatedAt: -1 })
       .limit(limit)
       .select(
-        "title details practiceArea status escrowStatus deadline zoomLink paymentReleased escrowIntentId applicants files jobId createdAt updatedAt attorney attorneyId paralegal paralegalId pendingParalegalId pendingParalegalInvitedAt hiredAt completedAt briefSummary archived downloadUrl internalNotes totalAmount lockedTotalAmount currency"
+        "title details practiceArea status escrowStatus deadline zoomLink paymentReleased escrowIntentId applicants files jobId createdAt updatedAt attorney attorneyId paralegal paralegalId pendingParalegalId pendingParalegalInvitedAt invites hiredAt completedAt briefSummary archived downloadUrl internalNotes totalAmount lockedTotalAmount currency"
       )
       .populate("paralegalId", "firstName lastName email role avatarURL")
       .populate("attorneyId", "firstName lastName email role avatarURL")
@@ -1297,7 +1453,7 @@ router.get(
       .sort({ updatedAt: -1 })
       .limit(limit)
       .select(
-        "title practiceArea status escrowStatus deadline zoomLink paymentReleased escrowIntentId jobId createdAt updatedAt attorney attorneyId paralegal paralegalId pendingParalegalId pendingParalegalInvitedAt"
+        "title practiceArea status escrowStatus deadline zoomLink paymentReleased escrowIntentId jobId createdAt updatedAt attorney attorneyId paralegal paralegalId pendingParalegalId pendingParalegalInvitedAt invites"
       )
       .populate("attorney", "firstName lastName email role avatarURL")
       .populate("attorneyId", "firstName lastName email role avatarURL")
@@ -1316,8 +1472,11 @@ router.get(
   asyncHandler(async (req, res) => {
     const limit = clamp(parseInt(req.query.limit, 10) || 50, 1, 200);
     const filter = {
-      pendingParalegalId: req.user.id,
       archived: { $ne: true },
+      $or: [
+        { "invites.paralegalId": req.user.id, "invites.status": "pending" },
+        { pendingParalegalId: req.user.id },
+      ],
     };
     const blockedIds = await getBlockedUserIds(req.user.id);
     if (blockedIds.length) {
@@ -1328,14 +1487,24 @@ router.get(
       .sort({ updatedAt: -1 })
       .limit(limit)
       .select(
-        "title practiceArea status escrowStatus deadline zoomLink paymentReleased escrowIntentId jobId createdAt updatedAt attorney attorneyId pendingParalegalId pendingParalegalInvitedAt"
+        "title practiceArea status escrowStatus deadline zoomLink paymentReleased escrowIntentId jobId createdAt updatedAt attorney attorneyId pendingParalegalId pendingParalegalInvitedAt invites"
       )
       .populate("attorney", "firstName lastName email role avatarURL")
       .populate("attorneyId", "firstName lastName email role avatarURL")
-      .populate("pendingParalegalId", "firstName lastName email role avatarURL")
       .lean();
 
-    res.json({ items: docs.map((doc) => caseSummary(doc)) });
+    const items = docs.map((doc) => {
+      const summary = caseSummary(doc);
+      const invite = listCaseInvites(doc).find(
+        (entry) => entry.status === "pending" && String(entry.paralegalId) === String(req.user.id)
+      );
+      if (invite) {
+        summary.inviteStatus = invite.status;
+        summary.inviteInvitedAt = invite.invitedAt || null;
+      }
+      return summary;
+    });
+    res.json({ items });
   })
 );
 
@@ -1345,7 +1514,6 @@ router.get(
   asyncHandler(async (req, res) => {
     const filter = {
       status: "open",
-      pendingParalegalId: null,
       paralegalId: null,
       archived: { $ne: true },
     };
@@ -1457,7 +1625,10 @@ router.get(
 router.patch(
   "/:caseId",
   csrfProtection,
-  requireCaseAccess("caseId", { project: "title details practiceArea totalAmount lockedTotalAmount currency status briefSummary" }),
+  requireCaseAccess(
+    "caseId",
+    { project: "title details practiceArea totalAmount lockedTotalAmount currency status briefSummary invites pendingParalegalId pendingParalegalInvitedAt" }
+  ),
   asyncHandler(async (req, res) => {
     const isAdmin = !!req.acl?.isAdmin;
     if (!req.acl?.isAttorney && !isAdmin) {
@@ -1472,7 +1643,7 @@ router.patch(
     }
     const statusKey = String(doc.status || "").toLowerCase();
     if (!isAdmin) {
-      if (doc.paralegalId || doc.pendingParalegalId) {
+      if (doc.paralegalId || hasPendingInvites(doc)) {
         return res.status(403).json({
           error: "Compensation is locked once a paralegal is invited or hired.",
         });
@@ -1536,7 +1707,7 @@ router.patch(
         return res.status(400).json({ error: "Budget must be greater than $0." });
       }
       if (cents > 0) {
-        if (!doc.paralegalId && !doc.pendingParalegalId) {
+        if (!doc.paralegalId && !hasPendingInvites(doc)) {
           doc.totalAmount = cents;
           touched = true;
         }
@@ -1697,8 +1868,10 @@ router.post(
       doc.paralegalAccessRevokedAt = new Date();
       doc.paralegal = null;
       doc.paralegalId = null;
+      expirePendingInvites(doc);
       doc.pendingParalegalId = null;
       doc.pendingParalegalInvitedAt = null;
+      syncLegacyPendingFields(doc);
     }
 
     await doc.save();
@@ -2082,8 +2255,21 @@ router.post(
       return res.status(400).json({ error: "This case is archived." });
     }
 
-    caseDoc.pendingParalegalId = invitee._id;
-    caseDoc.pendingParalegalInvitedAt = new Date();
+    seedLegacyInvite(caseDoc);
+    const existingInvite = listCaseInvites(caseDoc).find(
+      (invite) => String(invite.paralegalId) === String(invitee._id)
+    );
+    if (existingInvite) {
+      if (existingInvite.status === "pending") {
+        return res.status(400).json({ error: "An invitation is already pending for this paralegal." });
+      }
+      if (existingInvite.status === "accepted") {
+        return res.status(400).json({ error: "This paralegal has already accepted." });
+      }
+    }
+
+    upsertInvite(caseDoc, invitee._id, { status: "pending", invitedAt: new Date(), respondedAt: null });
+    syncLegacyPendingFields(caseDoc);
     if (caseDoc.lockedTotalAmount == null) {
       caseDoc.lockedTotalAmount = caseDoc.totalAmount;
       caseDoc.amountLockedAt = new Date();
@@ -2138,6 +2324,14 @@ router.post(
       return res.status(403).json({ error: BLOCKED_MESSAGE });
     }
 
+    seedLegacyInvite(caseDoc);
+    const inviteRecord = listCaseInvites(caseDoc).find(
+      (invite) => invite.status === "pending" && String(invite.paralegalId) === String(req.user.id)
+    );
+    if (!inviteRecord) {
+      return res.status(400).json({ error: "No pending invitation for this case." });
+    }
+
     const paralegal = await User.findById(req.user.id).select(
       "firstName lastName stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled"
     );
@@ -2150,19 +2344,18 @@ router.post(
         return res.status(403).json({ error: "Complete Stripe onboarding before accepting invitations." });
       }
     }
-    // Ensure pending fields align before assignment
-    caseDoc.pendingParalegalId = req.user.id;
-    if (!caseDoc.pendingParalegalInvitedAt) {
-      caseDoc.pendingParalegalInvitedAt = new Date();
-    }
     if (caseDoc.lockedTotalAmount == null) {
       caseDoc.lockedTotalAmount = caseDoc.totalAmount;
       caseDoc.amountLockedAt = new Date();
     }
     caseDoc.paralegal = req.user.id;
     caseDoc.paralegalId = req.user.id;
-    caseDoc.pendingParalegalId = null;
-    caseDoc.pendingParalegalInvitedAt = null;
+    const otherInvitees = listCaseInvites(caseDoc)
+      .filter((invite) => invite.status === "pending" && String(invite.paralegalId) !== String(req.user.id))
+      .map((invite) => invite.paralegalId);
+    upsertInvite(caseDoc, req.user.id, { status: "accepted", respondedAt: new Date() });
+    markOtherInvites(caseDoc, req.user.id, "declined");
+    syncLegacyPendingFields(caseDoc);
     caseDoc.hiredAt = new Date();
     caseDoc.escrowStatus = "awaiting_funding";
     caseDoc.paralegalNameSnapshot = formatPersonName(paralegal);
@@ -2223,6 +2416,21 @@ router.post(
       },
       { actorUserId: req.user.id }
     );
+    await Promise.all(
+      otherInvitees.map((inviteeId) =>
+        sendCaseNotification(
+          inviteeId,
+          "case_invite_response",
+          caseDoc,
+          {
+            response: "filled",
+            paralegalId: req.user.id,
+            paralegalName: formatPersonName(paralegal),
+          },
+          { actorUserId: req.user.id }
+        )
+      )
+    );
 
     res.json({ success: true });
   })
@@ -2243,20 +2451,16 @@ router.post(
     if (isFinalCaseDoc(caseDoc)) {
       return res.status(400).json({ error: "Completed cases cannot be modified." });
     }
-    const pendingMatches =
-      caseDoc.pendingParalegalId && String(caseDoc.pendingParalegalId) === String(req.user.id);
-    const invitedApplicant =
-      Array.isArray(caseDoc.applicants) &&
-      caseDoc.applicants.some(
-        (app) =>
-          app?.paralegalId &&
-          String(app.paralegalId) === String(req.user.id) &&
-          (!app.status || app.status === "invited" || app.status === "pending")
-      );
+    seedLegacyInvite(caseDoc);
+    const inviteRecord = listCaseInvites(caseDoc).find(
+      (invite) => invite.status === "pending" && String(invite.paralegalId) === String(req.user.id)
+    );
+    if (!inviteRecord) {
+      return res.status(400).json({ error: "No pending invitation for this case." });
+    }
     const paralegal = await User.findById(req.user.id).select("firstName lastName");
-    // Clear any pending invite slots for this case
-    caseDoc.pendingParalegalId = null;
-    caseDoc.pendingParalegalInvitedAt = null;
+    upsertInvite(caseDoc, req.user.id, { status: "declined", respondedAt: new Date() });
+    syncLegacyPendingFields(caseDoc);
     if (Array.isArray(caseDoc.applicants) && caseDoc.applicants.length) {
       caseDoc.applicants.forEach((app) => {
         if (app?.paralegalId && String(app.paralegalId) === String(req.user.id)) {
@@ -2264,8 +2468,9 @@ router.post(
         }
       });
     }
-    if (!caseDoc.paralegalId && caseDoc.status === "assigned") {
+    if (!caseDoc.paralegalId && !hasPendingInvites(caseDoc)) {
       caseDoc.status = "open";
+      caseDoc.escrowStatus = null;
     }
     await caseDoc.save();
 
@@ -2344,8 +2549,10 @@ router.post(
     caseDoc.paralegalId = null;
     caseDoc.paralegalNameSnapshot = "";
     caseDoc.hiredAt = null;
+    expirePendingInvites(caseDoc);
     caseDoc.pendingParalegalId = null;
     caseDoc.pendingParalegalInvitedAt = null;
+    syncLegacyPendingFields(caseDoc);
     caseDoc.escrowStatus = null;
     caseDoc.escrowIntentId = null;
     caseDoc.paymentIntentId = null;
@@ -2443,10 +2650,21 @@ router.post(
     const escrowFunded =
       !!selectedCase.escrowIntentId && String(selectedCase.escrowStatus || "").toLowerCase() === "funded";
 
+    seedLegacyInvite(selectedCase);
+    const pendingInvitees = listCaseInvites(selectedCase)
+      .filter((invite) => invite.status === "pending" && String(invite.paralegalId) !== String(paralegalId))
+      .map((invite) => invite.paralegalId);
+    const existingInvite = listCaseInvites(selectedCase).find(
+      (invite) => String(invite.paralegalId) === String(paralegalId)
+    );
+
     selectedCase.paralegal = paralegalId;
     selectedCase.paralegalId = paralegalId;
-    selectedCase.pendingParalegalId = null;
-    selectedCase.pendingParalegalInvitedAt = null;
+    if (existingInvite) {
+      upsertInvite(selectedCase, paralegalId, { status: "accepted", respondedAt: new Date() });
+    }
+    markOtherInvites(selectedCase, paralegalId, "declined");
+    syncLegacyPendingFields(selectedCase);
     if (selectedCase.lockedTotalAmount == null) {
       selectedCase.lockedTotalAmount = selectedCase.totalAmount;
       selectedCase.amountLockedAt = new Date();
@@ -2512,6 +2730,22 @@ router.post(
       { path: "paralegal", select: "firstName lastName email role avatarURL" },
       { path: "attorney", select: "firstName lastName email role avatarURL" },
     ]);
+
+    await Promise.all(
+      pendingInvitees.map((inviteeId) =>
+        sendCaseNotification(
+          inviteeId,
+          "case_invite_response",
+          selectedCase,
+          {
+            response: "filled",
+            paralegalId,
+            paralegalName: formatPersonName(paralegal),
+          },
+          { actorUserId: req.user.id }
+        )
+      )
+    );
 
     if (jobId) {
       try {

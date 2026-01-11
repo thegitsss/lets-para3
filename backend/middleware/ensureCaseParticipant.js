@@ -17,7 +17,7 @@ async function evaluateCaseParticipant(req, caseId) {
   }
 
   const caseDoc = await Case.findById(caseId).select(
-    "_id title status escrowStatus escrowIntentId paymentReleased attorney attorneyId paralegal paralegalId pendingParalegalId readOnly"
+    "_id title status escrowStatus escrowIntentId paymentReleased attorney attorneyId paralegal paralegalId pendingParalegalId invites readOnly"
   );
   if (!caseDoc) {
     const err = new Error("Case not found");
@@ -38,7 +38,15 @@ async function evaluateCaseParticipant(req, caseId) {
   const isParalegal =
     (caseDoc.paralegal && String(caseDoc.paralegal) === uid) ||
     (caseDoc.paralegalId && String(caseDoc.paralegalId) === uid);
-  const isPendingParalegal = caseDoc.pendingParalegalId && String(caseDoc.pendingParalegalId) === uid;
+  const isPendingParalegal =
+    (caseDoc.pendingParalegalId && String(caseDoc.pendingParalegalId) === uid) ||
+    (Array.isArray(caseDoc.invites) &&
+      caseDoc.invites.some(
+        (invite) =>
+          invite?.paralegalId &&
+          String(invite.paralegalId) === uid &&
+          String(invite.status || "pending").toLowerCase() === "pending"
+      ));
 
   if (!isAttorney && !isParalegal) {
     if (isPendingParalegal && String(req.method || "").toUpperCase() === "GET") {

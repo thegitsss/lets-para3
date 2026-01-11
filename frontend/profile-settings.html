@@ -93,6 +93,35 @@
       color: var(--sidebar-text);
     }
 
+    .sidebar-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      position: relative;
+      z-index: 2100;
+    }
+
+    .sidebar-toggle-icon {
+      width: 28px;
+      height: 28px;
+      display: block;
+    }
+
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 1900;
+    }
+
     .sidebar::before {
       content: "";
       position: absolute;
@@ -1049,12 +1078,16 @@ input[type="number"],
       resize: vertical;
     }
 
-    #yearsExperienceInput {
-      max-width: 220px;
-      text-align: center;
-      font-weight: 400;
-      letter-spacing: 0.02em;
-    }
+	    #yearsExperienceInput {
+	      max-width: 220px;
+	      text-align: center;
+	      font-weight: 400;
+	      letter-spacing: 0.02em;
+	    }
+	
+	    .years-experience-sep {
+	      display: none;
+	    }
 
     #yearsExperienceInput::-webkit-inner-spin-button,
     #yearsExperienceInput::-webkit-outer-spin-button {
@@ -1325,6 +1358,7 @@ input[type="number"],
       font-weight: 300;
       letter-spacing: 0.6px;
       width: 100%;
+      text-align: center;
     }
 
     #paralegalSettings .bio-input {
@@ -1504,6 +1538,11 @@ input[type="number"],
       width: 100%;
     }
 
+    #paralegalSettings #firstNameInput,
+    #paralegalSettings #lastNameInput {
+      text-align: center;
+    }
+
     #paralegalSettings .btn-row {
       justify-content: flex-end;
     }
@@ -1619,6 +1658,28 @@ input[type="number"],
 
       #paralegalSettings .paralegal-doc-row {
         grid-template-columns: 1fr;
+      }
+
+      #paralegalSettings .years-experience-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        flex-wrap: nowrap;
+      }
+
+      #paralegalSettings .years-experience-row label {
+        white-space: nowrap;
+      }
+
+      #paralegalSettings #yearsExperienceInput {
+        width: 64px;
+        min-width: 64px;
+      }
+
+      #paralegalSettings .years-experience-sep {
+        display: inline;
+        color: var(--muted);
       }
     }
 
@@ -1807,9 +1868,66 @@ input[type="number"],
 }
 
 @media (max-width: 960px) {
+  html,
+  body {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
   body {
     flex-direction: column;
   }
+  body.paralegal-flat .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 260px;
+    height: 100vh;
+    border-right: none;
+    border-bottom: none;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 24px;
+    padding: 24px 18px 24px;
+    padding-top: 72px;
+    transform: translateX(-110%);
+    transition: transform 0.25s ease;
+    z-index: 2000;
+    box-shadow: 18px 0 40px rgba(0, 0, 0, 0.18);
+  }
+
+  body.paralegal-flat.nav-open .sidebar {
+    transform: translateX(0);
+  }
+
+  body.paralegal-flat.nav-open .sidebar-backdrop {
+    display: block;
+  }
+
+  body.paralegal-flat .sidebar-toggle {
+    display: inline-flex;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+  }
+
+  body.paralegal-flat .settings-nav {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  body.paralegal-flat .settings-nav button {
+    flex: initial;
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+  }
+
+  body.paralegal-flat .settings-item {
+    padding: 10px 14px;
+    font-size: 0.95rem;
+  }
+
       .sidebar {
         position: relative;
         width: 100%;
@@ -1819,15 +1937,23 @@ input[type="number"],
         flex-direction: row;
         flex-wrap: wrap;
         gap: 12px;
+        padding: 16px 12px;
       }
       .settings-nav {
         flex-direction: row;
         flex-wrap: wrap;
         flex: 1;
+        gap: 8px;
       }
       .settings-nav button {
         flex: 1 1 120px;
         text-align: center;
+        padding: 8px 10px;
+        font-size: 0.95rem;
+      }
+      .settings-item {
+        padding: 8px 10px;
+        font-size: 0.95rem;
       }
       .content {
         padding: 28px 20px 60px;
@@ -1841,7 +1967,10 @@ input[type="number"],
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
-  <aside class="sidebar">
+  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
+    <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
+  </button>
+  <aside class="sidebar" id="sidebarNav">
     <div class="logo">Let’s-ParaConnect</div>
     <nav class="settings-nav" aria-label="Settings navigation">
       <button id="navProfile" class="settings-item active" data-target="profileSection">Profile</button>
@@ -1851,6 +1980,7 @@ input[type="number"],
     </nav>
     <a class="btn btn-outline btn-light" id="dashboardReturnLink" href="dashboard-attorney.html" style="margin-top:auto;">Return to Dashboard</a>
   </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
   <main id="main" tabindex="-1" class="content">
     <div class="topbar" data-attorney-header></div>
@@ -2008,10 +2138,13 @@ input[type="number"],
                       <label class="hero-meta-pill" for="linkedInInput">LinkedIn</label>
                       <input type="url" id="linkedInInput" name="linkedInURL" placeholder="https://www.linkedin.com/in/username" />
                     </div>
-                    <div class="meta-column">
-                      <label class="hero-meta-pill" for="yearsExperienceInput">Years of Experience</label>
-                      <input type="number" id="yearsExperienceInput" min="0" placeholder="e.g., 5" />
-                    </div>
+	                    <div class="meta-column">
+	                      <div class="years-experience-row">
+	                        <label class="hero-meta-pill" for="yearsExperienceInput">Years of Experience</label>
+	                        <span class="years-experience-sep" aria-hidden="true">-</span>
+	                        <input type="number" id="yearsExperienceInput" min="0" placeholder="e.g., 5" />
+	                      </div>
+	                    </div>
                   </div>
                 </div>
               </div>
@@ -2410,6 +2543,35 @@ Legal Assistant at..."></textarea>
         window.location.href = "login.html";
       });
     });
+  </script>
+  <script>
+    (function initSidebarToggle() {
+      const sidebarToggle = document.getElementById('sidebarToggle');
+      const sidebarNav = document.getElementById('sidebarNav');
+      const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+      if (!sidebarToggle || !sidebarNav || !sidebarBackdrop) return;
+      const closeSidebar = () => {
+        document.body.classList.remove('nav-open');
+        sidebarToggle.setAttribute('aria-expanded', 'false');
+      };
+      const openSidebar = () => {
+        document.body.classList.add('nav-open');
+        sidebarToggle.setAttribute('aria-expanded', 'true');
+      };
+      sidebarToggle.addEventListener('click', () => {
+        if (document.body.classList.contains('nav-open')) closeSidebar();
+        else openSidebar();
+      });
+      sidebarBackdrop.addEventListener('click', closeSidebar);
+      sidebarNav.addEventListener('click', (event) => {
+        if (event.target.closest('a') || event.target.closest('button')) {
+          closeSidebar();
+        }
+      });
+      window.addEventListener('resize', () => {
+        if (window.innerWidth > 960) closeSidebar();
+      });
+    })();
   </script>
 </body>
 </html>

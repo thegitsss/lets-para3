@@ -2539,11 +2539,18 @@ function matchesCaseSearch(item, term) {
 
 function renderCaseRow(item, filterKey = "active") {
   let client = item.paralegal?.name || item.paralegalNameSnapshot || "Awaiting hire";
-  if (!item.paralegal && item.pendingParalegal) {
-    const pendingName =
-      item.pendingParalegal.name ||
-      [item.pendingParalegal.firstName, item.pendingParalegal.lastName].filter(Boolean).join(" ").trim();
-    client = `${pendingName || "Invitation"} (Invitation Sent)`;
+  const pendingInvites = Array.isArray(item.invites)
+    ? item.invites.filter((invite) => String(invite?.status || "pending").toLowerCase() === "pending")
+    : [];
+  if (!item.paralegal && pendingInvites.length) {
+    if (pendingInvites.length === 1 && item.pendingParalegal) {
+      const pendingName =
+        item.pendingParalegal.name ||
+        [item.pendingParalegal.firstName, item.pendingParalegal.lastName].filter(Boolean).join(" ").trim();
+      client = `${pendingName || "Invitation"} (Invitation Sent)`;
+    } else {
+      client = `Invitations Sent (${pendingInvites.length})`;
+    }
   } else if (!item.paralegal && item.pendingParalegalId) {
     client = "Invitation Sent";
   }
@@ -2598,7 +2605,12 @@ function renderCaseMenu(item) {
   const isFinal = isFinalCase(item);
   const canViewWorkspace = isWorkspaceEligibleCase(item);
   const statusKey = String(item.status || "").toLowerCase();
-  const hasPendingInvite = !!(item.pendingParalegal || item.pendingParalegalId);
+  const pendingInviteCount = Array.isArray(item.invites)
+    ? item.invites.filter((invite) => String(invite?.status || "pending").toLowerCase() === "pending").length
+    : 0;
+  const hasInvites =
+    (Array.isArray(item.invites) && item.invites.length > 0) ||
+    !!(item.pendingParalegal || item.pendingParalegalId);
   if (item.localDraft) {
     return `
     <div class="case-actions" data-case-id="${item.id}">
@@ -2621,7 +2633,7 @@ function renderCaseMenu(item) {
       `<button type="button" class="menu-item" data-case-action="details" data-case-id="${item.id}">View Details</button>`
     );
   }
-  if (statusKey === "assigned" && hasPendingInvite) {
+  if (hasInvites) {
     parts.push(
       `<button type="button" class="menu-item" data-case-action="view-invited" data-case-id="${item.id}">View Invited Paralegals</button>`
     );
@@ -3020,6 +3032,12 @@ function formatInvitedDate(value) {
   return formatted && formatted !== "—" ? `Invited ${formatted}` : "Invitation date unavailable";
 }
 
+function formatInviteStatus(value) {
+  const status = String(value || "").trim();
+  if (!status) return "";
+  return titleCaseWords(status.replace(/_/g, " "));
+}
+
 function getInviteDisplayName(profile = {}) {
   const name =
     profile.name ||
@@ -3058,21 +3076,24 @@ async function fetchInviteDetails(caseId) {
       profile: invite?.paralegal || {},
       id: invite?.paralegal?.id || invite?.paralegal?._id || "",
       invitedAt: invite?.invitedAt || null,
+      respondedAt: invite?.respondedAt || null,
+      status: invite?.status || "",
     }));
   } catch {
     return null;
   }
 }
 
-function hydrateInviteEntry(entry, invite) {
-  if (!entry || !invite) return;
-  if (invite.profile && typeof invite.profile === "object") {
-    entry.pendingParalegal = invite.profile;
-    entry.pendingParalegalId = invite.profile.id || invite.profile._id || entry.pendingParalegalId;
-  }
-  if (invite.invitedAt) {
-    entry.pendingParalegalInvitedAt = invite.invitedAt;
-  }
+function hydrateInviteEntry(entry, invitees = []) {
+  if (!entry || !Array.isArray(invitees)) return;
+  entry.invites = invitees
+    .filter((invite) => invite?.id)
+    .map((invite) => ({
+      paralegalId: invite.id,
+      status: invite.status || "pending",
+      invitedAt: invite.invitedAt || null,
+      respondedAt: invite.respondedAt || null,
+    }));
 }
 
 async function openCaseInvites(caseId) {
@@ -3099,8 +3120,16 @@ async function openCaseInvites(caseId) {
     entry = state.caseLookup.get(String(caseId));
   }
 
-  let invitees = [];
-  if (entry?.pendingParalegal || entry?.pendingParalegalId) {
+  let invitees = Array.isArray(entry?.invites)
+    ? entry.invites.map((invite) => ({
+        profile: invite?.profile || {},
+        id: invite?.paralegalId || "",
+        invitedAt: invite?.invitedAt || null,
+        respondedAt: invite?.respondedAt || null,
+        status: invite?.status || "pending",
+      }))
+    : [];
+  if (!invitees.length && (entry?.pendingParalegal || entry?.pendingParalegalId)) {
     const pendingProfile =
       entry.pendingParalegal && typeof entry.pendingParalegal === "object" ? entry.pendingParalegal : null;
     const pendingId =
@@ -3109,9 +3138,11 @@ async function openCaseInvites(caseId) {
       pendingProfile?._id ||
       (typeof entry.pendingParalegal === "string" ? entry.pendingParalegal : "");
     invitees.push({
-      profile: pendingProfile,
+      profile: pendingProfile || {},
       id: pendingId,
       invitedAt: entry.pendingParalegalInvitedAt,
+      respondedAt: null,
+      status: "pending",
     });
   }
 
@@ -3119,7 +3150,7 @@ async function openCaseInvites(caseId) {
     const fresh = await fetchInviteDetails(caseId);
     if (Array.isArray(fresh) && fresh.length) {
       invitees = fresh;
-      hydrateInviteEntry(entry, fresh[0]);
+      hydrateInviteEntry(entry, fresh);
     }
   }
 
@@ -3136,12 +3167,14 @@ async function openCaseInvites(caseId) {
     const name = getInviteDisplayName(profile);
     const avatar = profile.profileImage || profile.avatarURL || INVITE_AVATAR_FALLBACK;
     const link = buildParalegalProfileUrl(id);
+    const statusLabel = formatInviteStatus(invite.status);
     itemsHtml.push(`
       <div class="case-invite-item">
         <img src="${sanitize(avatar)}" alt="${sanitize(name)} profile photo" />
         <div class="case-invite-meta">
           ${link ? `<a href="${sanitize(link)}">${sanitize(name)}</a>` : `<span>${sanitize(name)}</span>`}
           <span class="case-invite-date">${sanitize(formatInvitedDate(invite.invitedAt))}</span>
+          ${statusLabel ? `<span class="case-invite-date">${sanitize(statusLabel)}</span>` : ""}
         </div>
       </div>
     `);

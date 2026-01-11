@@ -119,6 +119,16 @@ const applicantSchema = new Schema(
   { _id: false }
 );
 
+const inviteSchema = new Schema(
+  {
+    paralegalId: { type: Types.ObjectId, ref: "User", required: true, index: true },
+    status: { type: String, enum: ["pending", "accepted", "declined", "expired"], default: "pending", index: true },
+    invitedAt: { type: Date, default: Date.now },
+    respondedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 /** ----------------------------------------
  * Main Case Schema
  * -----------------------------------------*/
@@ -132,6 +142,7 @@ const caseSchema = new Schema(
     paralegalId: { type: Types.ObjectId, ref: "User", default: null, index: true }, // alias for compatibility
     pendingParalegalId: { type: Types.ObjectId, ref: "User", default: null, index: true },
     pendingParalegalInvitedAt: { type: Date, default: null },
+    invites: [inviteSchema],
 
     // Core
     title: { type: String, required: true, trim: true, index: true, maxlength: 300 },
@@ -241,6 +252,7 @@ caseSchema.index({ attorneyId: 1, createdAt: -1 });
 caseSchema.index({ paralegal: 1, createdAt: -1 });
 caseSchema.index({ paralegalId: 1, createdAt: -1 });
 caseSchema.index({ pendingParalegalId: 1, createdAt: -1 });
+caseSchema.index({ "invites.paralegalId": 1, "invites.status": 1, createdAt: -1 });
 caseSchema.index({ status: 1, createdAt: -1 });
 caseSchema.index({ "applicants.paralegalId": 1, createdAt: -1 }); // helpful when showing "my applications"
 
@@ -270,6 +282,14 @@ caseSchema.pre("validate", function (next) {
     for (const a of this.applicants) {
       const key = String(a.paralegalId);
       if (key && seen.has(key)) return next(new Error("Duplicate applicant for the same paralegalId."));
+      if (key) seen.add(key);
+    }
+  }
+  if (Array.isArray(this.invites) && this.invites.length > 1) {
+    const seen = new Set();
+    for (const invite of this.invites) {
+      const key = String(invite.paralegalId);
+      if (key && seen.has(key)) return next(new Error("Duplicate invite for the same paralegalId."));
       if (key) seen.add(key);
     }
   }

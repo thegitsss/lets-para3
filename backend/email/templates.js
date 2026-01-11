@@ -137,6 +137,9 @@ function formatRecentLabel(item = {}) {
     case "case_update":
       return `Update on ${payload.caseTitle || "a case"}`;
     case "case_invite_response":
+      if (payload.response === "filled") {
+        return `Invitation filled for ${payload.caseTitle || "a case"}`;
+      }
       return `Invite ${payload.response || ""} by ${payload.paralegalName || "paralegal"}`;
     case "resume_uploaded":
       return "Resume uploaded";

@@ -81,6 +81,10 @@ function normalizeId(val) {
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
+  if (state.viewerRole === "paralegal") {
+    window.location.replace("dashboard-paralegal.html");
+    return;
+  }
   syncAuthButtons();
   initStateDropdown();
   initSpecialtyDropdown();
@@ -539,12 +543,20 @@ function renderCaseOptions() {
   );
   const options = availableCases.map((c) => {
     const caseId = c.id || c._id;
-    const pendingId = normalizeId(c.pendingParalegalId) || normalizeId(c.pendingParalegal);
+    const inviteEntries = Array.isArray(c.invites) ? c.invites : [];
+    const matchingInvite = inviteEntries.find(
+      (invite) => normalizeId(invite?.paralegalId) && String(normalizeId(invite.paralegalId)) === targetId
+    );
+    const inviteStatus = String(matchingInvite?.status || "").toLowerCase();
     const assignedId = normalizeId(c.paralegalId) || normalizeId(c.paralegal);
-    const invited = targetId && String(pendingId || "") === targetId;
+    const invited = targetId && (inviteStatus === "pending" || inviteStatus === "accepted");
     const assigned = targetId && String(assignedId || "") === targetId;
     const disabled = invited || assigned;
-    const statusLabel = invited ? "Invitation already sent to this paralegal" : assigned ? "Paralegal already assigned" : "";
+    const statusLabel = invited
+      ? "Invitation already sent to this paralegal"
+      : assigned
+      ? "Paralegal already assigned"
+      : "";
     return { caseId, title: c.title || "Untitled matter", disabled, statusLabel };
   });
   const hasSelectable = options.some((opt) => !opt.disabled);
@@ -573,9 +585,13 @@ async function sendInquiry() {
   const targetId = normalizeId(activeParalegal) || normalizeId(activeParalegal?.paralegal) || normalizeId(activeParalegal?.user) || normalizeId(activeParalegal?.person);
   const caseMeta = availableCases.find((c) => String(c.id || c._id) === String(selected.value));
   if (caseMeta && targetId) {
-    const pendingId = normalizeId(caseMeta.pendingParalegalId) || normalizeId(caseMeta.pendingParalegal);
+    const inviteEntries = Array.isArray(caseMeta.invites) ? caseMeta.invites : [];
+    const matchingInvite = inviteEntries.find(
+      (invite) => normalizeId(invite?.paralegalId) && String(normalizeId(invite.paralegalId)) === targetId
+    );
+    const inviteStatus = String(matchingInvite?.status || "").toLowerCase();
     const assignedId = normalizeId(caseMeta.paralegalId) || normalizeId(caseMeta.paralegal);
-    if (String(pendingId) === targetId) {
+    if (inviteStatus === "pending" || inviteStatus === "accepted") {
       showToast("Invitation already sent to this paralegal for this case.", "err");
       return;
     }

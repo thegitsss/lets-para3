@@ -329,6 +329,15 @@ async function init() {
   if (state.paralegalId && state.viewerId && state.paralegalId === state.viewerId) {
     state.viewingSelf = true;
   }
+  if (
+    state.viewerRole === "paralegal" &&
+    state.paralegalId &&
+    state.viewerId &&
+    state.paralegalId !== state.viewerId
+  ) {
+    window.location.replace("dashboard-paralegal.html");
+    return;
+  }
 
   toggleSkeleton(true);
   await loadProfile();
@@ -1415,8 +1424,7 @@ async function loadAttorneyCases() {
     state.openCases = items.filter((item) => {
       const archived = Boolean(item.archived);
       const assigned = Boolean(item.paralegal || item.paralegalId);
-      const pending = Boolean(item.pendingParalegalId);
-      return !archived && !assigned && !pending;
+      return !archived && !assigned;
     });
   } catch (err) {
     console.warn("Unable to load open cases", err);

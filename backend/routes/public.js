@@ -286,6 +286,9 @@ router.get(
   "/paralegals",
   verifyToken.optional,
   asyncHandler(async (req, res) => {
+    if (String(req.user?.role || "").toLowerCase() === "paralegal") {
+      return res.status(403).json({ error: "Paralegals cannot view other paralegals." });
+    }
     const page = clamp(parseInt(req.query.page, 10) || 1, 1, 10_000);
     const limit = clamp(parseInt(req.query.limit, 10) || 12, 1, 50);
     const search =
@@ -372,6 +375,9 @@ router.get(
   "/paralegals/:id",
   verifyToken.optional,
   asyncHandler(async (req, res) => {
+    if (String(req.user?.role || "").toLowerCase() === "paralegal") {
+      return res.status(403).json({ error: "Paralegals cannot view other paralegals." });
+    }
     const { id } = req.params;
     if (!isObjId(id)) return res.status(400).json({ error: "Invalid paralegal id" });
     const doc = await User.findById(id).select(PUBLIC_PAR_FIELDS).lean();

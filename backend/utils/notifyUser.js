@@ -114,6 +114,8 @@ function emailTemplate(type, payload) {
             ? `<p>${payload.paralegalName || "The invited paralegal"} accepted your invitation${
                 payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>.` : "."
               }</p>`
+            : payload.response === "filled"
+            ? `<p>The position for <strong>${payload.caseTitle || "this case"}</strong> has been filled.</p>`
             : `<p>${payload.paralegalName || "The invited paralegal"} declined your invitation${
                 payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>.` : "."
               }</p>`

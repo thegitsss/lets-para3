@@ -14,6 +14,22 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
+  const toggleButtons = document.querySelectorAll(".toggle-password");
+  toggleButtons.forEach((button) => {
+    const targetId = button.getAttribute("data-target");
+    const field = targetId ? document.getElementById(targetId) : null;
+    if (!field) return;
+    button.setAttribute("aria-pressed", "false");
+    button.setAttribute("aria-label", "Show password");
+    button.addEventListener("click", () => {
+      const isHidden = field.type === "password";
+      field.type = isHidden ? "text" : "password";
+      button.textContent = isHidden ? "hide" : "show";
+      button.setAttribute("aria-pressed", String(isHidden));
+      button.setAttribute("aria-label", isHidden ? "Hide password" : "Show password");
+    });
+  });
+
   async function fetchCsrfToken() {
     try {
       const res = await fetch("/api/csrf", { credentials: "include" });
@@ -75,7 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
         scheduleReset();
         restoreButton = false;
         setTimeout(() => {
-          window.location.href = "/frontend/login.html"; // or modal open
+          window.location.href = "login.html";
         }, 3000);
       } else {
         message.textContent = data.error || "❌ Error resetting password.";

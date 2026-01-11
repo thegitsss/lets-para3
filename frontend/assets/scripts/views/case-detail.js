@@ -124,16 +124,25 @@ function draw(root, data, escapeHTML, caseId, session, hasPaymentMethod) {
     [data?.paralegal?.firstName, data?.paralegal?.lastName].filter(Boolean).join(" ").trim() ||
     data?.paralegalNameSnapshot ||
     "Paralegal";
-  const pendingParalegalId = data?.pendingParalegalId || data?.pendingParalegal?._id || data?.pendingParalegal?.id;
+  const pendingParalegalId =
+    data?.pendingParalegalId || data?.pendingParalegal?._id || data?.pendingParalegal?.id;
   const pendingParalegalName =
     data?.pendingParalegal?.name ||
     [data?.pendingParalegal?.firstName, data?.pendingParalegal?.lastName].filter(Boolean).join(" ").trim();
+  const pendingInvites = Array.isArray(data?.invites)
+    ? data.invites.filter((invite) => String(invite?.status || "pending").toLowerCase() === "pending")
+    : [];
+  const pendingInviteCount =
+    pendingInvites.length || (pendingParalegalId ? 1 : 0);
+  const viewerInvite = pendingInvites.find(
+    (invite) => viewerId && String(invite?.paralegalId) === String(viewerId)
+  );
   const viewerIsInvited =
     !isFinal &&
     viewerRole === "paralegal" &&
-    pendingParalegalId &&
     viewerId &&
-    String(pendingParalegalId) === String(viewerId);
+    (viewerInvite ||
+      (pendingParalegalId && String(pendingParalegalId) === String(viewerId)));
   const readOnly = !!data?.readOnly;
   const purgeAt = data?.purgeScheduledFor ? new Date(data.purgeScheduledFor) : null;
   const alreadyApplied = applicants.some((applicant) => {
@@ -166,7 +175,6 @@ function draw(root, data, escapeHTML, caseId, session, hasPaymentMethod) {
     (isOwner || isAdmin) &&
     isOpenCase &&
     !paralegalOnCase &&
-    !pendingParalegalId &&
     !data?.paymentReleased &&
     !readOnly &&
     !isFinal;
@@ -176,7 +184,6 @@ function draw(root, data, escapeHTML, caseId, session, hasPaymentMethod) {
     isOpenCase &&
     !paralegalOnCase &&
     !alreadyApplied &&
-    !pendingParalegalId &&
     !data?.paymentReleased &&
     !isFinal;
 
@@ -242,8 +249,6 @@ function draw(root, data, escapeHTML, caseId, session, hasPaymentMethod) {
         note = "You already applied to this case. We’ll let the attorney know.";
       } else if (paralegalOnCase) {
         note = "An attorney has already hired a paralegal for this case.";
-      } else if (pendingParalegalId) {
-        note = "An invitation to another paralegal is pending.";
       } else if (data?.paymentReleased) {
         note = "This case has been completed.";
       } else if (statusRaw.toLowerCase() !== "open") {
@@ -317,10 +322,12 @@ function draw(root, data, escapeHTML, caseId, session, hasPaymentMethod) {
       <div class="case-status-pill">${escapeHTML(statusLabel)}</div>
       ${fundingNotice}
       ${
-        pendingParalegalId
-          ? `<div class="notice">Invitation sent to ${escapeHTML(
-              pendingParalegalName || "a paralegal"
-            )}. Awaiting response.</div>`
+        pendingInviteCount
+          ? `<div class="notice">${
+              pendingInviteCount === 1 && pendingParalegalName
+                ? `Invitation sent to ${escapeHTML(pendingParalegalName)}. Awaiting response.`
+                : `Invitations pending (${pendingInviteCount}). Awaiting responses.`
+            }</div>`
           : ""
       }
 

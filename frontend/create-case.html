@@ -1686,8 +1686,12 @@
         fields.comp.value = amountCents ? Math.round(amountCents / 100) : "";
       }
       const hasParalegal = !!(caseData.paralegal || caseData.paralegalId);
+      const hasPendingInvites = Array.isArray(caseData.invites)
+        ? caseData.invites.some((invite) => String(invite?.status || "pending").toLowerCase() === "pending")
+        : false;
       const hasPendingParalegal = !!(caseData.pendingParalegal || caseData.pendingParalegalId);
-      const isLocked = caseData.lockedTotalAmount != null || hasParalegal || hasPendingParalegal;
+      const isLocked =
+        caseData.lockedTotalAmount != null || hasParalegal || hasPendingInvites || hasPendingParalegal;
       setCompLocked(isLocked);
       if (fields.experience && caseData.experience) {
         setSelectValue(fields.experience, caseData.experience);
