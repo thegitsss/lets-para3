@@ -18,6 +18,7 @@ const sendEmail = require("../utils/email");
 const IS_PROD = process.env.PROD === "true";
 const EMAIL_BASE_URL = (process.env.EMAIL_BASE_URL || "").replace(/\/+$/, "");
 const ASSET_BASE_URL = EMAIL_BASE_URL || "https://www.lets-paraconnect.com";
+const LOGIN_URL = `${ASSET_BASE_URL}/login.html`;
 const COOKIE_BASE_OPTIONS = {
   httpOnly: true,
   secure: true,
@@ -173,6 +174,104 @@ function buildResetPasswordEmailHtml(user, resetUrl, opts = {}) {
   `;
 }
 
+function buildApplicationSubmissionEmailHtml(user, opts = {}) {
+  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
+  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
+  const token = buildUnsubscribeToken(user);
+  const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
+  const unsubscribeLine = unsubscribeUrl
+    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe</a>`
+    : "Unsubscribe";
+
+  return `
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td align="center" style="padding:24px 24px 8px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding-right:12px;">
+                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
+                  </td>
+                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
+                    Let's-ParaConnect
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 24px 20px;">
+              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 32px 0;">
+              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:34px;letter-spacing:0.06em;color:#6e6e6e;">
+                Application received
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:16px 32px 0;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.08em;color:#1f1f1f;line-height:1.6;">
+                Thank you for applying to Let’s-ParaConnect. Our verification team is reviewing your credentials,
+                and we’ll email you as soon as the review is complete.
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:24px 32px 16px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td bgcolor="#ffbd59" style="border-radius:999px;">
+                    <a href="${LOGIN_URL}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
+                      Login
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 32px 16px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td height="1" style="background:#bfc3c8;line-height:1px;font-size:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:0 32px 28px;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
+                We’re onboarding paralegals first to ensure profiles and payouts are fully ready as attorneys join.
+                If you have questions, reply to this email and our team will help.
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td bgcolor="#070300" style="padding:26px 32px;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;color:#f6f5f1;letter-spacing:-0.01em;">
+                Need help?
+              </div>
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#f6f5f1;line-height:1.4;margin-top:8px;">
+                Email us at <a href="mailto:support@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">support@lets-paraconnect.com</a>
+              </div>
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
+                No longer want to receive these emails? ${unsubscribeLine}
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  `;
+}
+
 // ----------------------------------------
 // Helpers
 // ----------------------------------------
@@ -198,7 +297,7 @@ async function ensureParalegalWelcomeNotification(user) {
     type: "paralegal_welcome",
   }).select("_id");
   if (existing) return;
-  const message = `${PARA_WELCOME_TITLE}. ${PARA_WELCOME_BODY}`;
+  const message = `${PARA_WELCOME_TITLE} ${PARA_WELCOME_BODY}`;
   await Notification.create({
     userId: user._id,
     userRole: user.role || "",
@@ -504,13 +603,17 @@ router.post(
         { minutes: 60, secretEnv: "JWT_SECRET" }
       );
       const verifyUrl = `${process.env.APP_BASE_URL || ""}/verify-email?token=${verifyToken}`;
-      await sendEmail(
-        user.email,
-        "Registration received",
-        `Thank you for submitting your application to be part of Let’s-ParaConnect. Your application is now under review. Please expect to see an update within 24-48 business hours.\n\nRespectfully,\nThe Let’s-ParaConnect Verification Division${
-          process.env.APP_BASE_URL ? `` : ""
-        }`
-      );
+      const inlineLogoPath = path.join(__dirname, "../../frontend/Cleanfav.png");
+      const html = buildApplicationSubmissionEmailHtml(user, { logoUrl: "cid:cleanfav-logo" });
+      await sendEmail(user.email, "Registration received", html, {
+        attachments: [
+          {
+            filename: "Cleanfav.png",
+            path: inlineLogoPath,
+            cid: "cleanfav-logo",
+          },
+        ],
+      });
     } catch (_) {}
 
     await AuditLog.logFromReq(req, "auth.register", {
@@ -588,7 +691,9 @@ router.post(
       return res.status(400).json({ msg: "Invalid credentials" });
     }
 
-    const isFirstLogin = !user.lastLoginAt;
+    const lastLoginAt = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
+    const approvedAt = user.approvedAt ? new Date(user.approvedAt) : null;
+    const isFirstLogin = !lastLoginAt || (approvedAt && lastLoginAt < approvedAt);
     user.recordLoginSuccess();
     await user.save();
     const token = signAccess(user);
@@ -649,7 +754,9 @@ router.post(
       return res.status(403).json({ error: "Account pending approval" });
     }
 
-    const isFirstLogin = !user.lastLoginAt;
+    const lastLoginAt = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
+    const approvedAt = user.approvedAt ? new Date(user.approvedAt) : null;
+    const isFirstLogin = !lastLoginAt || (approvedAt && lastLoginAt < approvedAt);
     user.twoFactorTempCode = null;
     user.twoFactorExpiresAt = null;
     user.recordLoginSuccess();
@@ -709,7 +816,9 @@ router.post(
       return res.status(400).json({ error: "Invalid backup code." });
     }
 
-    const isFirstLogin = !user.lastLoginAt;
+    const lastLoginAt = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
+    const approvedAt = user.approvedAt ? new Date(user.approvedAt) : null;
+    const isFirstLogin = !lastLoginAt || (approvedAt && lastLoginAt < approvedAt);
     user.twoFactorBackupCodes.splice(index, 1);
     user.twoFactorTempCode = null;
     user.twoFactorExpiresAt = null;

@@ -538,10 +538,34 @@ function applyUserToHeader(user = {}) {
   if (avatarEl) avatarEl.src = avatar;
   if (roleEl) roleEl.textContent = roleLabel;
   if (heading) heading.textContent = current.firstName || heading.textContent;
+  updateWelcomeGreeting(current);
   if (current.profileImage) {
     const avatarNode = document.querySelector("#user-avatar");
     if (avatarNode) avatarNode.src = current.profileImage;
   }
+}
+
+function getStoredUserSnapshot() {
+  if (typeof window.getStoredUser === "function") {
+    const stored = window.getStoredUser();
+    if (stored && typeof stored.isFirstLogin === "boolean") return stored;
+  }
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function updateWelcomeGreeting(user) {
+  const greetingEl = document.getElementById("welcomeGreeting");
+  if (!greetingEl) return;
+  const stored = getStoredUserSnapshot();
+  const storedFlag = stored?.isFirstLogin;
+  const userFlag = user?.isFirstLogin;
+  const isFirstLogin = typeof storedFlag === "boolean" ? storedFlag : Boolean(userFlag);
+  greetingEl.textContent = isFirstLogin ? "Welcome" : "Welcome back";
 }
 
 function handleStoredUserUpdate(event) {

@@ -21,9 +21,10 @@ const { sendWelcomePacket } = sendEmail;
 const noop = (_req, _res, next) => next();
 let csrfProtection = noop;
 const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+const CSRF_SECURE = process.env.NODE_ENV === "production";
 if (REQUIRE_CSRF) {
   const csrf = require("csurf");
-  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
+  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: CSRF_SECURE } });
 }
 
 const APP_BASE_URL = (process.env.APP_BASE_URL || "").replace(/\/$/, "");

@@ -31,6 +31,20 @@ function ensureNotificationStyles() {
     .notif-actions .notif-clear{border-color:rgba(0,0,0,0.2);color:var(--ink,#1a1a1a);}
     .notif-actions .notif-clear:hover{background:transparent;box-shadow:none;color:var(--ink,#1a1a1a);}
     .notif-actions .notif-markall:disabled{opacity:0.5;cursor:default;}
+    @media (max-width: 600px){
+      .notification-dropdown,
+      [data-notification-panel],
+      .notifications-panel{
+        position:fixed !important;
+        left:12px !important;
+        right:12px !important;
+        top:64px !important;
+        width:auto !important;
+        max-width:calc(100vw - 24px) !important;
+      }
+      [data-notification-list]{max-height:50vh;}
+      .notif-actions.notif-actions-header{flex-wrap:wrap;justify-content:flex-end;gap:6px;}
+    }
   `;
   document.head.appendChild(style);
 }
@@ -78,6 +92,16 @@ function getNotificationAvatar(item = {}, actorName = "") {
 }
 
 function formatNotificationMessage(item = {}) {
+  if (item.type === "paralegal_welcome") {
+    const title = String(item.payload?.title || "").trim();
+    const body = String(item.payload?.body || "").trim();
+    if (title && body) {
+      return `${title} ${body}`;
+    }
+    if (item.message) {
+      return item.message.replace(/\.\./g, ".");
+    }
+  }
   if (item.message) return item.message;
   if (item.type === "message" && item.actorFirstName) {
     return `${item.actorFirstName} sent you a message.`;
