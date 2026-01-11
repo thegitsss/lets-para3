@@ -129,6 +129,15 @@ let applicationModalBound = false;
 let appliedPreviewBound = false;
 let appliedQueryHandled = false;
 
+function escapeHTML(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function notifyStripeGate(message = STRIPE_GATE_MESSAGE) {
   const toastHelper = window.toastUtils;
   if (toastHelper?.show && selectors.toastBanner) {
@@ -555,13 +564,13 @@ function renderAssignedCases(items = []) {
         const statusLabel = formatStatusLabel(statusValue).replace(/\s+/g, ' ').trim() || 'Active';
         const statusKey = statusValue.toLowerCase().replace(/\s+/g, '_');
         const canWithdraw = !funded && statusKey === 'awaiting_funding';
-        return `
+      return `
       <div class="case-item" data-id="${c._id}">
-        <div class="case-title">${c.title || 'Untitled Case'}</div>
+        <div class="case-title">${escapeHTML(c.title || 'Untitled Case')}</div>
         <div class="case-meta">
-          <span>${c.caseNumber || ''}</span>
-          <span>Attorney: ${c.attorneyName || ''}</span>
-          <span>Status: ${statusLabel}</span>
+          <span>${escapeHTML(c.caseNumber || '')}</span>
+          <span>Attorney: ${escapeHTML(c.attorneyName || '')}</span>
+          <span>Status: ${escapeHTML(statusLabel)}</span>
         </div>
         <div class="case-actions">
           <button class="open-case-btn" data-id="${c._id}"${disabledAttr}>${buttonLabel}</button>
@@ -609,7 +618,7 @@ async function withdrawFromCase(caseId, button) {
 function renderAssignedCasesError(message = 'Unable to load assigned cases.') {
   const list = selectors.assignedCasesList;
   if (!list) return;
-  list.innerHTML = `<p>${message}</p>`;
+  list.innerHTML = `<p>${escapeHTML(message)}</p>`;
 }
 
 function handleCaseAction(action, title) {
@@ -650,7 +659,7 @@ function attachUIHandlers() {
       if (unreadMessageCount < 1) return;
       const caseId = latestMessageThread?.id || latestMessageThread?._id || '';
       if (!caseId) return;
-      window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}#messages`;
+      window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}#case-messages`;
     });
   }
   document.addEventListener('keydown', (event) => {

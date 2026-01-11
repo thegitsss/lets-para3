@@ -195,7 +195,11 @@ router.post(
         `${message}\n\n` +
         `----\nIP: ${req.ip || ""}\nUA: ${req.headers["user-agent"] || ""}\n`;
 
-      const to = process.env.CONTACT_INBOX || process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
+      const to =
+        process.env.CONTACT_INBOX ||
+        process.env.SMTP_FROM_EMAIL ||
+        process.env.SMTP_USER ||
+        "support@lets-paraconnect.com";
       if (!to) {
         // Don't fail user submissions if email isn't configured—just acknowledge.
         console.warn("[contact] No CONTACT_INBOX/SMTP configured; skipping email send.");

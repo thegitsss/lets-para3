@@ -370,6 +370,37 @@
       text-align: center;
     }
 
+    .sidebar-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      z-index: 2100;
+    }
+
+    .sidebar-toggle-icon {
+      width: 28px;
+      height: 28px;
+      display: block;
+    }
+
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 1900;
+    }
+
     .case-main {
       flex: 1;
       padding: 32px;
@@ -1468,9 +1499,58 @@
       }
 
       .sidebar {
-        width: 100%;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 260px;
+        height: 100vh;
         border-right: none;
-        border-bottom: 1px solid var(--app-border);
+        border-bottom: none;
+        padding-top: 72px;
+        transform: translateX(-110%);
+        transition: transform 0.25s ease;
+        z-index: 2000;
+        box-shadow: 18px 0 40px rgba(0, 0, 0, 0.18);
+      }
+
+      body.nav-open .sidebar {
+        transform: translateX(0);
+      }
+
+      body.nav-open .sidebar-backdrop {
+        display: block;
+      }
+
+      .sidebar-toggle {
+        display: inline-flex;
+      }
+
+      .case-main {
+        padding: 28px 20px 60px;
+        max-width: 100%;
+        overflow-x: hidden;
+      }
+
+      img,
+      svg,
+      video,
+      iframe,
+      table {
+        max-width: 100%;
+        height: auto;
+      }
+
+      .case-thread-title,
+      .case-thread-subtitle,
+      .case-message,
+      .case-subtext,
+      .case-overview-panel,
+      .case-overview-note,
+      .case-workspace,
+      .case-overview-card {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }
     }
 
@@ -1509,9 +1589,12 @@
 </head>
 <body>
   <a href="#case-messages" class="skip-link">Skip to case messages</a>
+  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
+    <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
+  </button>
 
   <div class="case-shell">
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebarNav">
       <div class="logo">Dashboard</div>
       <nav aria-label="Attorney navigation" data-visible="attorney">
         <a href="dashboard-attorney.html#home" data-view-target="home">Home</a>
@@ -1544,6 +1627,7 @@
         <div class="sidebar-footer">&copy; Let&#8217;s-ParaConnect 2025</div>
       </div>
     </aside>
+    <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
     <main class="case-main" role="main">
       <div class="case-topbar">
@@ -1720,5 +1804,35 @@
   </div>
   <script type="module" src="assets/scripts/utils/notifications.js"></script>
   <script type="module" src="assets/scripts/case-detail.js"></script>
+  <script>
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarNav = document.getElementById('sidebarNav');
+    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    const closeSidebar = () => {
+      document.body.classList.remove('nav-open');
+      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
+    };
+    const openSidebar = () => {
+      document.body.classList.add('nav-open');
+      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'true');
+    };
+    if (sidebarToggle) {
+      sidebarToggle.addEventListener('click', () => {
+        if (document.body.classList.contains('nav-open')) closeSidebar();
+        else openSidebar();
+      });
+    }
+    if (sidebarBackdrop) {
+      sidebarBackdrop.addEventListener('click', closeSidebar);
+    }
+    if (sidebarNav) {
+      sidebarNav.addEventListener('click', (event) => {
+        if (event.target && event.target.tagName === 'A') closeSidebar();
+      });
+    }
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 960) closeSidebar();
+    });
+  </script>
 </body>
 </html>

@@ -115,9 +115,23 @@
 
   function redirectToLogin() {
     if (hasRedirected) return;
+    if (isLoginPage()) return;
     hasRedirected = true;
     try {
       window.location.href = "login.html";
+    } catch (_) {}
+  }
+
+  function isLoginPage() {
+    if (typeof window === "undefined") return false;
+    const path = String(window.location?.pathname || "").toLowerCase();
+    const href = String(window.location?.href || "").toLowerCase();
+    return path.endsWith("/login.html") || path.endsWith("login.html") || href.includes("login.html");
+  }
+
+  function clearServerSession() {
+    try {
+      fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     } catch (_) {}
   }
 
@@ -129,6 +143,7 @@
 
   function handleDisabledAccount(message) {
     rememberDisabled(message);
+    clearServerSession();
     invalidateAndRedirect();
   }
 

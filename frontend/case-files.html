@@ -104,6 +104,34 @@
     body.theme-mountain nav a.active,body.theme-mountain nav a:hover,
     body.theme-mountain-dark nav a.active,body.theme-mountain-dark nav a:hover{background:rgba(255,255,255,0.18);}
     .sidebar-footer{font-size:.7rem;color:var(--muted);text-align:center;}
+    .sidebar-toggle{
+      display:none;
+      align-items:center;
+      justify-content:center;
+      width:42px;
+      height:42px;
+      border-radius:12px;
+      border:none;
+      background:transparent;
+      padding:0;
+      cursor:pointer;
+      position:fixed;
+      top:14px;
+      left:14px;
+      z-index:2100;
+    }
+    .sidebar-toggle-icon{
+      width:28px;
+      height:28px;
+      display:block;
+    }
+    .sidebar-backdrop{
+      display:none;
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,0.35);
+      z-index:1900;
+    }
     body.theme-mountain .sidebar,
     body.theme-mountain-dark .sidebar{background:url('hero-mountain.jpg') center/cover no-repeat;}
     body.theme-mountain .sidebar::before,
@@ -247,12 +275,58 @@
     .info-banner strong{font-family:var(--font-serif);font-weight:400;}
     .info-banner a{color:var(--accent);}
 
-    @media(max-width:900px){
-      .role-shell{flex-direction:column;overflow:auto;}
-      .sidebar{width:100%;flex-direction:column;align-items:center;gap:12px;}
-    .sidebar nav{width:100%;flex-direction:row;flex-wrap:wrap;justify-content:center;}
-    .sidebar nav a{flex:1 1 120px;text-align:center;}
-    .main{padding:24px;}
+    @media (max-width: 1024px){
+      body{
+        flex-direction:column;
+      }
+      .role-shell{
+        flex-direction:column;
+        min-height:100vh;
+      }
+      .sidebar{
+        position:fixed;
+        top:0;
+        left:0;
+        width:260px;
+        height:100vh;
+        border-right:none;
+        padding-top:72px;
+        transform:translateX(-110%);
+        transition:transform .25s ease;
+        z-index:2000;
+        box-shadow:18px 0 40px rgba(0,0,0,0.18);
+      }
+      body.nav-open .sidebar{
+        transform:translateX(0);
+      }
+      body.nav-open .sidebar-backdrop{
+        display:block;
+      }
+      .sidebar-toggle{
+        display:inline-flex;
+      }
+      .main{padding:28px 20px 60px;}
+      .main{
+        max-width:100%;
+        overflow-x:hidden;
+      }
+      img,
+      svg,
+      video,
+      iframe,
+      table{
+        max-width:100%;
+        height:auto;
+      }
+      .case-card,
+      .case-subinfo,
+      .filters,
+      .case-switcher,
+      .info-banner{
+        min-width:0;
+        overflow-wrap:anywhere;
+        word-break:break-word;
+      }
     }
 
     .sidebar-link{
@@ -298,8 +372,12 @@
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
+  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-expanded="false">
+    <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
+  </button>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <div id="paralegalCaseFiles" class="role-shell hidden">
-    <aside class="sidebar">
+    <aside class="sidebar" id="paralegalSidebar">
       <div class="logo">Dashboard</div>
       <nav>
         <a href="dashboard-paralegal.html">Home</a>
@@ -334,7 +412,7 @@
   </div>
 
   <div id="attorneyCaseFiles" class="role-shell hidden">
-    <aside class="sidebar">
+    <aside class="sidebar" id="attorneySidebar">
       <div class="logo">Dashboard</div>
       <nav>
         <a href="dashboard-attorney.html">Home</a>
@@ -468,6 +546,49 @@
         return "attorney";
       }
     }
+  </script>
+  <script>
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    const getActiveSidebar = () => document.querySelector('.role-shell:not(.hidden) .sidebar');
+    const syncControls = () => {
+      const sidebar = getActiveSidebar();
+      if (sidebarToggle && sidebar?.id) {
+        sidebarToggle.setAttribute('aria-controls', sidebar.id);
+      }
+    };
+    const closeSidebar = () => {
+      document.body.classList.remove('nav-open');
+      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
+    };
+    const openSidebar = () => {
+      syncControls();
+      document.body.classList.add('nav-open');
+      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'true');
+    };
+    if (sidebarToggle) {
+      sidebarToggle.addEventListener('click', () => {
+        if (document.body.classList.contains('nav-open')) closeSidebar();
+        else openSidebar();
+      });
+    }
+    if (sidebarBackdrop) {
+      sidebarBackdrop.addEventListener('click', closeSidebar);
+    }
+    document.addEventListener('click', (event) => {
+      const sidebar = getActiveSidebar();
+      if (!sidebar) return;
+      if (event.target && event.target.tagName === 'A' && sidebar.contains(event.target)) {
+        closeSidebar();
+      }
+    });
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 960) closeSidebar();
+    });
+    document.addEventListener('DOMContentLoaded', () => {
+      syncControls();
+      setTimeout(syncControls, 600);
+    });
   </script>
 </body>
 </html>

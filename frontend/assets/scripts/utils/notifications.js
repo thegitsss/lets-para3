@@ -22,33 +22,59 @@ function ensureNotificationStyles() {
     .notif-dismiss{background:transparent;border:none;color:var(--muted,#7a7a7a);font-size:0.9rem;cursor:pointer;padding:6px;border-radius:8px;align-self:flex-start;flex-shrink:0;}
     .notif-dismiss:hover{background:rgba(0,0,0,0.06);color:var(--ink,#1a1a1a);}
     .notif-time{color:var(--muted,#6b7280);}
+    .notif-header{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+    .notif-header-title{flex:1;}
     .notif-actions{display:flex;gap:8px;justify-content:flex-end;padding:10px 12px;border-top:1px solid rgba(0,0,0,0.08);background:transparent;}
-    .notif-actions .notif-markall{border:1px solid var(--line, rgba(0,0,0,0.12));background:transparent;color:var(--ink,#1a1a1a);padding:6px 10px;text-align:center;font-size:0.82rem;font-weight:400;border-radius:10px;cursor:pointer;box-shadow:none;}
-    .notif-actions .notif-markall:hover{background:transparent;box-shadow:none;}
-    .notif-actions .notif-clear{color:var(--accent,#b6a47a);border-color:rgba(182,164,122,0.55);}
-    .notif-actions .notif-clear:hover{background:transparent;box-shadow:none;}
+    .notif-actions.notif-actions-header{padding:0;border-top:none;background:transparent;margin-left:auto;}
+    .notif-actions .notif-markall{border:1px solid rgba(0,0,0,0.2);background:transparent;color:var(--ink,#1a1a1a);padding:4px 8px;text-align:center;font-size:0.78rem;font-weight:400;border-radius:4px;cursor:pointer;box-shadow:none;}
+    .notif-actions .notif-markall:hover{background:transparent;box-shadow:none;color:var(--ink,#1a1a1a);}
+    .notif-actions .notif-clear{border-color:rgba(0,0,0,0.2);color:var(--ink,#1a1a1a);}
+    .notif-actions .notif-clear:hover{background:transparent;box-shadow:none;color:var(--ink,#1a1a1a);}
     .notif-actions .notif-markall:disabled{opacity:0.5;cursor:default;}
   `;
   document.head.appendChild(style);
 }
 
 function normalizeNotification(item = {}) {
-  const isRead = item.isRead ?? item.read ?? false;
-  return { ...item, isRead, read: isRead };
+  const hasRead = typeof item.read === "boolean";
+  const hasIsRead = typeof item.isRead === "boolean";
+  const read = hasRead ? item.read : hasIsRead ? item.isRead : false;
+  return { ...item, isRead: read, read };
 }
 
 function isNotificationRead(item = {}) {
-  return item?.isRead ?? item?.read ?? false;
+  return item?.read === true;
 }
 
 function getUnreadCount(list = []) {
-  return list.filter((item) => !isNotificationRead(item)).length;
+  return list.filter((item) => item?.read === false).length;
 }
 
 function getAvatarFallback(name = "") {
   const letter = (name || "?").trim().charAt(0).toUpperCase() || "?";
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="32" fill="#eef1f7"/><text x="50%" y="56%" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#5c6477">${letter}</text></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+const ADMIN_NOTIFICATION_IMAGE = "/hero-mountain.jpg";
+const ADMIN_TITLE_HINT = "welcome to let's-paraconnect";
+
+function isAdminNotification(item = {}) {
+  const actorName = String(item.actorFirstName || "").trim().toLowerCase();
+  const payloadRole = String(item.payload?.actorRole || item.payload?.fromRole || "").trim().toLowerCase();
+  const fromName = String(item.payload?.fromName || "").trim().toLowerCase();
+  if (actorName === "admin" || payloadRole === "admin" || fromName === "admin") return true;
+  const message = String(item.message || item.payload?.message || "").trim().toLowerCase();
+  const title = String(item.payload?.title || "").trim().toLowerCase();
+  if (message.includes(ADMIN_TITLE_HINT) || title.includes(ADMIN_TITLE_HINT)) return true;
+  const type = String(item.type || "").trim().toLowerCase();
+  return type === "paralegal_welcome";
+}
+
+function getNotificationAvatar(item = {}, actorName = "") {
+  if (item.actorProfileImage) return item.actorProfileImage;
+  if (isAdminNotification(item)) return ADMIN_NOTIFICATION_IMAGE;
+  return getAvatarFallback(actorName);
 }
 
 function formatNotificationMessage(item = {}) {
@@ -189,9 +215,15 @@ function closeAllNotificationPanels() {
 
 function totalUnread() {
   if (!centers.length) return lastKnownUnread || 0;
-  return centers.reduce((sum, center) => {
-    return sum + getUnreadCount(center.notifications || []);
-  }, 0);
+  const ids = new Set();
+  centers.forEach((center, centerIndex) => {
+    (center.notifications || []).forEach((item, itemIndex) => {
+      if (item?.read !== false) return;
+      const id = item?._id || item?.id;
+      ids.add(id ? String(id) : `${centerIndex}-${itemIndex}`);
+    });
+  });
+  return ids.size;
 }
 
 ensureNotificationStyles();
@@ -256,15 +288,29 @@ function createCenter(root) {
     clearBtn.textContent = "Clear All";
     clearBtn.setAttribute("data-notification-clear", "true");
   }
+  const header = panel?.querySelector(".notif-header") || null;
   let actionsWrap = panel?.querySelector(".notif-actions") || null;
   if (panel && !actionsWrap && (markBtn || clearBtn)) {
     actionsWrap = document.createElement("div");
     actionsWrap.className = "notif-actions";
-    panel.appendChild(actionsWrap);
   }
   if (actionsWrap) {
     if (markBtn) actionsWrap.appendChild(markBtn);
     if (clearBtn) actionsWrap.appendChild(clearBtn);
+    if (header) {
+      let titleEl = header.querySelector(".notif-header-title");
+      if (!titleEl) {
+        titleEl = document.createElement("span");
+        titleEl.className = "notif-header-title";
+        titleEl.textContent = header.textContent.trim();
+        header.textContent = "";
+        header.appendChild(titleEl);
+      }
+      actionsWrap.classList.add("notif-actions-header");
+      header.appendChild(actionsWrap);
+    } else if (panel && !panel.contains(actionsWrap)) {
+      panel.appendChild(actionsWrap);
+    }
   } else if (clearBtn && panel) {
     panel.appendChild(clearBtn);
   }
@@ -357,6 +403,7 @@ async function fetchNotifications(center, options = {}) {
 }
 
 function renderNotifications(center) {
+  center.unread = getUnreadCount(center.notifications || []);
   updateBadge(center, center.unread);
   if (!center.list || !center.empty) {
     const totalIfMissing = totalUnread();
@@ -381,24 +428,22 @@ function renderNotifications(center) {
 
 function renderEmpty(center, text) {
   if (center) {
-    center.unread = 0;
+    center.unread = getUnreadCount(center.notifications || []);
   }
   if (center.empty) {
     center.empty.style.display = "block";
     center.empty.textContent = text;
   }
   if (center.list) center.list.innerHTML = "";
-  updateBadge(center, 0);
-  const total = totalUnread();
-  lastKnownUnread = total;
-  syncNotificationBadges(total);
+  updateBadge(center, getUnreadCount(center?.notifications || []));
+  syncNotificationBadges(totalUnread());
 }
 
 function updateBadge(center, count) {
   if (!center.badge) return;
-  const value = count > 9 ? "9+" : String(count || 0);
-  center.badge.textContent = value;
-  center.badge.classList.toggle("show", count > 0);
+  const value = Math.max(0, Number(count) || 0);
+  center.badge.textContent = String(value);
+  center.badge.classList.toggle("show", value > 0);
 }
 
 async function markNotificationsRead(center) {
@@ -411,11 +456,9 @@ async function markNotificationsRead(center) {
     });
     centers.forEach((c) => {
       c.notifications = (c.notifications || []).map((item) => ({ ...item, read: true, isRead: true }));
-      c.unread = 0;
-      updateBadge(c, 0);
-      if (c !== center) {
-        renderNotifications(c);
-      }
+      c.unread = getUnreadCount(c.notifications);
+      updateBadge(c, c.unread);
+      if (c !== center) renderNotifications(c);
     });
     renderNotifications(center);
   } catch (err) {
@@ -437,19 +480,18 @@ async function clearNotifications(center) {
     });
     centers.forEach((c) => {
       c.notifications = [];
-      c.unread = 0;
+      c.unread = getUnreadCount(c.notifications);
       renderEmpty(c, "You're all caught up.");
     });
-    const total = totalUnread();
-    lastKnownUnread = total;
-    syncNotificationBadges(total);
+    syncNotificationBadges(totalUnread());
   } catch (err) {
     console.warn("[notifications] clear all failed", err);
   }
 }
 
-async function dismissNotification(center, id) {
+async function dismissNotification(center, id, options = {}) {
   if (!id) return false;
+  const store = Array.isArray(options.store) ? options.store : null;
   try {
     await secureFetch(`/api/notifications/${encodeURIComponent(id)}`, {
       method: "DELETE",
@@ -459,6 +501,12 @@ async function dismissNotification(center, id) {
     console.warn("[notifications] dismiss failed", err);
   }
   const targetId = String(id);
+  if (store) {
+    const updated = store.filter((item) => String(item._id || item.id) !== targetId);
+    if (updated.length !== store.length) {
+      store.splice(0, store.length, ...updated);
+    }
+  }
   centers.forEach((c) => {
     const before = (c.notifications || []).length;
     c.notifications = (c.notifications || []).filter(
@@ -471,12 +519,14 @@ async function dismissNotification(center, id) {
     }
   });
   if (!centers.length) {
-    const remaining = document.querySelectorAll("[data-notification-list] .notif-item.unread").length;
-    syncNotificationBadges(remaining);
+    if (store) {
+      syncNotificationBadges(getUnreadCount(store));
+    } else {
+      syncNotificationBadges(lastKnownUnread || 0);
+    }
     return true;
   }
-  const total = totalUnread();
-  syncNotificationBadges(total);
+  syncNotificationBadges(totalUnread());
   return true;
 }
 
@@ -687,8 +737,12 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
 
   const avatar = document.createElement("img");
   avatar.className = "notif-avatar";
-  avatar.src = normalized.actorProfileImage || getAvatarFallback(actorName);
-  avatar.alt = actorName ? `${actorName}'s profile photo` : "Notification";
+  avatar.src = getNotificationAvatar(normalized, actorName);
+  avatar.alt = actorName
+    ? `${actorName}'s profile photo`
+    : isAdminNotification(normalized)
+    ? "Admin notification"
+    : "Notification";
   avatar.loading = "lazy";
 
   const dot = document.createElement("span");
@@ -721,7 +775,7 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
   dismiss.textContent = "x";
   dismiss.addEventListener("click", async (event) => {
     event.stopPropagation();
-    const ok = await dismissNotification(center, normalized._id || normalized.id);
+    const ok = await dismissNotification(center, normalized._id || normalized.id, options);
     if (!center && ok) {
       wrapper.remove();
       if (onDismiss) onDismiss();
@@ -759,9 +813,21 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
           });
           const total = totalUnread();
           syncNotificationBadges(total);
+        } else if (Array.isArray(options.store)) {
+          const targetId = String(id);
+          const store = options.store;
+          let touched = false;
+          const updated = store.map((entry) => {
+            if (String(entry._id || entry.id) !== targetId) return entry;
+            touched = true;
+            return { ...entry, isRead: true, read: true };
+          });
+          if (touched) {
+            store.splice(0, store.length, ...updated);
+            syncNotificationBadges(getUnreadCount(store));
+          }
         } else {
-          const remaining = document.querySelectorAll("[data-notification-list] .notif-item.unread").length;
-          syncNotificationBadges(remaining);
+          syncNotificationBadges(lastKnownUnread || 0);
         }
       }
     }
@@ -777,6 +843,7 @@ function renderNotificationList(listEl, emptyEl, items = []) {
   if (!listEl) return;
   listEl.innerHTML = "";
   const normalized = (Array.isArray(items) ? items : []).map(normalizeNotification);
+  syncNotificationBadges(getUnreadCount(normalized));
   if (!normalized.length) {
     if (emptyEl) {
       emptyEl.style.display = "block";
@@ -790,6 +857,7 @@ function renderNotificationList(listEl, emptyEl, items = []) {
   normalized.forEach((item) =>
     listEl.appendChild(
       buildNotificationNode(item, null, {
+        store: normalized,
         onDismiss: () => {
           if (!listEl.children.length && emptyEl) {
             emptyEl.style.display = "block";
@@ -802,8 +870,8 @@ function renderNotificationList(listEl, emptyEl, items = []) {
 }
 
 function syncNotificationBadges(unreadCount) {
-  lastKnownUnread = unreadCount;
-  const label = unreadCount > 9 ? "9+" : unreadCount > 0 ? String(unreadCount) : "";
+  lastKnownUnread = Math.max(0, Number(unreadCount) || 0);
+  const label = lastKnownUnread > 0 ? String(lastKnownUnread) : "";
   document.querySelectorAll("[data-notification-toggle]").forEach((toggle) => {
     if (label) {
       toggle.dataset.count = label;

@@ -184,10 +184,10 @@ const DISABLED_ACCOUNT_MSG = "This account has been disabled.";
 const BOT_NAME_GIBBERISH = /^[bcdfghjklmnpqrstvwxyz]{6,}$/;
 const BOT_REPEATED = /(.)\1{3,}/;
 const BOT_FORBIDDEN_CHARS = /[{}[\]|\\^<>]/;
-const PARA_WELCOME_TITLE = "Welcome to Let's-ParaConnect";
+const PARA_WELCOME_TITLE = "Welcome to Let's-ParaConnect - we're excited to have you.";
 const PARA_WELCOME_BODY =
-  "You're part of our early access group. We're onboarding paralegals first so profiles and payouts are fully ready as attorneys join. " +
-  "Opportunities will begin appearing soon. In the meantime, feel free to complete your profile and upload credentials - you'll be notified as jobs open up.";
+  "We're currently onboarding qualified paralegals as we prepare the platform for attorneys. " +
+  "Opportunities will begin appearing as attorney onboarding expands. In the meantime, feel free to complete your profile and upload credentials — we’ll notify you as jobs become available.";
 
 async function ensureParalegalWelcomeNotification(user) {
   if (!user) return;
@@ -405,8 +405,14 @@ router.post(
       return res.status(400).json({ msg: "Résumé file is required for paralegal registration." });
     }
 
-    const existing = await User.findOne({ email: String(email).toLowerCase() });
-    if (existing) return res.status(400).json({ msg: "User already exists" });
+    const existing = await User.findOne({ email: normalizedEmail });
+    if (existing) {
+      if (existing.deleted) {
+        await User.deleteOne({ _id: existing._id, deleted: true });
+      } else {
+        return res.status(400).json({ msg: "User already exists" });
+      }
+    }
 
     if (roleLc === "paralegal" && resumeFile) {
       if (resumeFile.mimetype !== "application/pdf") {

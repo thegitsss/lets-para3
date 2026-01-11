@@ -1,6 +1,15 @@
 import { secureFetch } from "./auth.js";
 import { loadUserHeaderInfo } from "./auth.js";
 
+function escapeHTML(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   await window.checkSession("paralegal");
   await loadUserHeaderInfo();
@@ -9,10 +18,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 async function loadInvitationsList() {
   const section = document.getElementById("invitationList");
+  if (!section) return;
   section.innerHTML = "";
 
   const res = await secureFetch("/api/cases/invited-to");
-  const { items = [] } = await res.json();
+  if (!res.ok) {
+    let message = "Unable to load invitations.";
+    try {
+      const data = await res.json().catch(() => ({}));
+      message = data?.error || data?.msg || message;
+    } catch {}
+    section.innerHTML = `<p class="pending-empty">${escapeHTML(message)}</p>`;
+    return;
+  }
+  const { items = [] } = await res.json().catch(() => ({}));
 
   if (!items.length) {
     section.innerHTML = "<p class=\"pending-empty\">No invitations yet.</p>";
@@ -27,8 +46,8 @@ async function loadInvitationsList() {
     section.innerHTML += `
       <div class="invite-card">
         <div class="invite-main">
-          <div class="invite-title">${inv.title || "Untitled case"}</div>
-          <div class="invite-meta">Attorney: ${attorneyName}</div>
+          <div class="invite-title">${escapeHTML(inv.title || "Untitled case")}</div>
+          <div class="invite-meta">Attorney: ${escapeHTML(attorneyName)}</div>
         </div>
         <div class="invite-actions">
           <button class="btn primary acceptBtn" data-id="${inv._id}">Accept</button>

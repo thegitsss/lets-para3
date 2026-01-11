@@ -15,6 +15,7 @@
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
+  <script src="assets/scripts/utils/session.js"></script>
   <style>
     .skip-link {
       position: absolute;
@@ -120,6 +121,37 @@
       text-align:center;
     }
 
+    .sidebar-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      position: fixed;
+      top: 14px;
+      left: 14px;
+      z-index: 2100;
+    }
+
+    .sidebar-toggle-icon {
+      width: 28px;
+      height: 28px;
+      display: block;
+    }
+
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 1900;
+    }
+
     main {
       flex: 1;
       padding: 60px 40px;
@@ -214,13 +246,87 @@
   text-decoration: none;
   font-weight: 200;
 }
+
+  @media (max-width: 1024px) {
+    body {
+      flex-direction: column;
+    }
+
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 260px;
+      height: 100vh;
+      border-right: none;
+      padding-top: 72px;
+      transform: translateX(-110%);
+      transition: transform 0.25s ease;
+      z-index: 2000;
+      box-shadow: 18px 0 40px rgba(0, 0, 0, 0.18);
+    }
+
+    body.nav-open .sidebar {
+      transform: translateX(0);
+    }
+
+    body.nav-open .sidebar-backdrop {
+      display: block;
+    }
+
+    .sidebar-toggle {
+      display: inline-flex;
+    }
+
+    main {
+      padding: 96px 20px 60px;
+      max-width: 100%;
+      margin: 0;
+    }
+  }
+
+  @media (max-width: 720px) {
+    h1 {
+      font-size: 1.9rem;
+      margin-bottom: 18px;
+    }
+
+    h2 {
+      margin-top: 32px;
+    }
+
+    section {
+      padding-bottom: 18px;
+      margin-bottom: 24px;
+    }
+
+    p,
+    ul {
+      margin-bottom: 14px;
+    }
+
+    main {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
+    p,
+    li,
+    a {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+  }
   </style>
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
-  <aside class="sidebar">
+  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
+    <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
+  </button>
+  <aside class="sidebar" id="sidebarNav">
     <div class="logo">Dashboard</div>
-    <nav>
+    <nav id="helpNav" aria-label="Primary">
       <a href="dashboard-attorney.html">Home</a>
       <a href="active-cases.html">Cases &amp; Files</a>
       <a href="billing-attorney.html">Escrow</a>
@@ -229,6 +335,7 @@
     <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
     <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s‑ParaConnect 2025</a></div>
   </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <main id="main" tabindex="-1" aria-labelledby="help-title">
     <h1 id="help-title">Help &amp; Support</h1>
     <p class="muted">Browse common questions about accounts, cases, messaging, and payouts.</p>
@@ -260,14 +367,17 @@
       <p>Funds remain in escrow until the attorney marks the work complete or a dispute is resolved.</p>
 
       <h3>Release &amp; payout</h3>
-      <p>Once approved, a Stripe Transfer is created to your Stripe Connect account using the same transfer group.</p>
+      <p>Once approved, a Stripe Transfer is sent to your Stripe Connect account.</p>
       <p>Payouts usually settle within 2–3 business days, depending on the receiving bank.</p>
-      <div class="callout"><strong>Note:</strong> If you haven’t finished Stripe Connect onboarding, funds stay on hold until KYC is complete.</div>
+      <div class="callout"><strong>Note:</strong> If you haven’t finished Stripe Connect onboarding, funds stay on hold until their Stripe account is complete.</div>
 
       <h3>Fees, taxes, and refunds</h3>
       <ul>
-        <li>Platform fees display in the case flow and are deducted automatically.</li>
-        <li>Stripe processing fees apply to each charge and payout.</li>
+        <li>Platform fees are displayed in the case flow and are deducted automatically.</li>
+        <li>All Stripe fees are paid for and covered by Let's-ParaConnect except in cases involving a dispute resulting in refund or partial refund.</li>
+        <li>Let's-ParaConnect charges a 15% platform fee to attorneys during the funding of escrow and is reflected on the receipt after job completion.</li>
+        <li>Let's-ParaConnect charges a 15% platform fee to paralegals that is automatically deducted out of the funds released by escrow after job completion.</li>
+        <li>Let's-ParaConnect does not have subscription fees.</li>
         <li>Users are responsible for their own taxes. Stripe may collect additional forms when required.</li>
         <li>Refunds can be processed before release. After release, refunds are handled between the client and paralegal unless otherwise required.</li>
         <li>If a payment is reversed (chargeback), future payouts may be withheld or offset.</li>
@@ -277,11 +387,12 @@
       <ul>
         <li>Attorneys should review deliverables promptly and request revisions before release.</li>
         <li>Open an in-platform dispute prior to release if the work doesn’t meet the agreed scope.</li>
+        <li>Stripe fees will be deducted from refunded costs and will be adjusted accordingly if the refund is partial.</li>
       </ul>
       <div class="callout"><strong>Reminder:</strong> After funds are released, reversing a payout is limited and often requires both parties’ agreement.</div>
 
       <h3>FAQ</h3>
-      <p><strong>Do you store card data?</strong> No. All sensitive payment information lives with Stripe; we retain only the Stripe IDs needed to link funding and payout.</p>
+      <p><strong>Do you store card data?</strong> No. All sensitive payment information is saved with Stripe directly; we retain only the Stripe IDs needed to link funding and payout.</p>
       <p><strong>What if a Paralegal hasn’t completed Connect?</strong> They’ll be prompted to finish onboarding, and funds remain on hold until they complete KYC.</p>
       <p><strong>Can I pay hourly?</strong> Version 1 focuses on flat-fee jobs to keep billing simple. Hourly support is on the roadmap.</p>
       <p><strong>How long do payouts take?</strong> After release, Stripe typically pays out within 1–3 business days depending on bank and country.</p>
@@ -295,13 +406,84 @@
   </main>
   <script>
     const logoutBtn = document.getElementById('logoutBtn');
+    const nav = document.getElementById('helpNav');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarNav = document.getElementById('sidebarNav');
+    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+    const closeSidebar = () => {
+      document.body.classList.remove('nav-open');
+      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
+    };
+    const openSidebar = () => {
+      document.body.classList.add('nav-open');
+      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'true');
+    };
     if (logoutBtn) {
-      logoutBtn.addEventListener('click', () => {
+      logoutBtn.addEventListener('click', async (event) => {
+        event.preventDefault();
+        try {
+          await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+        } catch {}
         localStorage.clear();
         sessionStorage.clear();
         window.location.href = 'index.html';
       });
     }
+    if (nav && window.checkSession) {
+      const navItems = {
+        attorney: [
+          { href: 'dashboard-attorney.html', label: 'Home' },
+          { href: 'active-cases.html', label: 'Cases & Files' },
+          { href: 'billing-attorney.html', label: 'Escrow' },
+          { href: 'help.html', label: 'Help', active: true },
+        ],
+        paralegal: [
+          { href: 'dashboard-paralegal.html', label: 'Home' },
+          { href: 'dashboard-paralegal.html#cases', label: 'Cases and Applications' },
+          { href: 'profile-settings.html', label: 'Profile Settings' },
+          { href: 'help.html', label: 'Help', active: true },
+        ],
+        admin: [
+          { href: 'admin-dashboard.html', label: 'Admin Dashboard' },
+          { href: 'help.html', label: 'Help', active: true },
+        ],
+      };
+
+      const renderNav = (role) => {
+        const items = navItems[role] || navItems.attorney;
+        nav.innerHTML = items
+          .map((item) => {
+            const activeClass = item.active ? ' class="active"' : '';
+            return `<a href="${item.href}"${activeClass}>${item.label}</a>`;
+          })
+          .join('');
+      };
+
+      (async () => {
+        try {
+          const session = await window.checkSession(undefined, { redirectOnFail: false });
+          const role = String(session?.role || session?.user?.role || '').toLowerCase();
+          if (role) renderNav(role);
+        } catch {}
+      })();
+    }
+    if (sidebarToggle) {
+      sidebarToggle.addEventListener('click', () => {
+        if (document.body.classList.contains('nav-open')) closeSidebar();
+        else openSidebar();
+      });
+    }
+    if (sidebarBackdrop) {
+      sidebarBackdrop.addEventListener('click', closeSidebar);
+    }
+    if (sidebarNav) {
+      sidebarNav.addEventListener('click', (event) => {
+        if (event.target && event.target.tagName === 'A') closeSidebar();
+      });
+    }
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 960) closeSidebar();
+    });
   </script>
 </body>
 </html>

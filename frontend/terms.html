@@ -183,7 +183,7 @@
       <h2>3) Jobs, Escrow & Payments (Stripe)</h2>
       <p>The Platform uses Stripe to process and disburse funds:</p>
       <ol class="alpha">
-        <li><strong>Funding Escrow.</strong> When an Attorney posts a flat-fee job, payment is authorized via Stripe Checkout or a Stripe <code class="small">payment_intent</code>. Funds are charged and held for that job (“Escrow”). We store Stripe IDs (e.g., <code class="small">checkout.session</code>, <code class="small">payment_intent</code>) and set a shared <code class="small">transfer_group</code> to link later payout.</li>
+        <li><strong>Funding Escrow.</strong> When an Attorney posts a flat-fee job, payment is authorized via Stripe Checkout. Funds are charged and held for that job (“Escrow”). We store Stripe IDs and set a shared transfer to link later payout.</li>
         <li><strong>Release & Payout.</strong> On Attorney approval/marking complete, we create a Stripe <em>Transfer</em> to the Paralegal’s Stripe Connect account (less applicable platform fees) using the same <code class="small">transfer_group</code>. If the Paralegal hasn’t completed Connect onboarding, payout is delayed until completion.</li>
         <li><strong>Payment Model.</strong> Jobs are flat-fee by default unless expressly offered otherwise in the posting flow.</li>
         <li><strong>Currency & Timing.</strong> Charges are processed in the currency shown at checkout (typically USD). Stripe processing and banking timelines apply.</li>
@@ -205,6 +205,7 @@
       <h2>5) Fees, Taxes & Chargebacks</h2>
       <ul>
         <li><strong>Service/Platform Fees.</strong> Fees are shown in the posting/acceptance flow and may vary by job or account. We may change fees prospectively.</li>
+        <li><strong>Stripe Processing Fees.</strong> Let’s‑ParaConnect covers Stripe processing fees except in cases involving a dispute, refund, or reversal, where those fees may be deducted or offset.</li>
         <li><strong>Taxes.</strong> Each user is responsible for applicable taxes (e.g., income, sales/use, VAT/GST). Stripe/Connect may collect tax details for payouts.</li>
         <li><strong>Chargebacks & Reversals.</strong> If a payment is reversed, we may debit, withhold, or offset amounts against your balance or future payouts.</li>
         <li><strong>Refunds.</strong> Before release, we may process full/partial refunds in our discretion or as required by law/Stripe. After release, refunds are between users unless otherwise required.</li>

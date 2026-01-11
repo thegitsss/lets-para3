@@ -132,6 +132,30 @@
       background: var(--ink);
       color: white;
     }
+
+    .form-status {
+      font-size: 14px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      display: none;
+    }
+
+    .form-status.show {
+      display: block;
+    }
+
+    .form-status.success {
+      background: #f2f7f3;
+      border-color: #c7e6d1;
+      color: #1f5a35;
+    }
+
+    .form-status.error {
+      background: #fff4f4;
+      border-color: #f2c9c9;
+      color: #8b1f1f;
+    }
     @media (max-width: 768px) {
 
       .actions {
@@ -175,6 +199,7 @@
     <p class="muted">Questions, partnerships, or support—send us a note and we’ll get back to you shortly.</p>
 
     <form id="contactForm" novalidate>
+      <input type="text" id="hp" name="hp" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;" />
       <div class="field-group">
         <div class="field">
           <label for="name">Full name</label>
@@ -211,6 +236,7 @@
         <button type="reset" class="btn">Clear Form</button>
         <button type="submit" class="btn primary">Submit Message</button>
       </div>
+      <div id="formStatus" class="form-status" role="status" aria-live="polite"></div>
     </form>
   </main>
 
@@ -230,5 +256,77 @@
   </div>
 </footer>
 <script type="module" src="assets/scripts/hero-parallax.js"></script>
+<script>
+  const form = document.getElementById('contactForm');
+  const statusEl = document.getElementById('formStatus');
+  const submitBtn = form?.querySelector('button[type="submit"]');
+
+  async function fetchCsrfToken() {
+    try {
+      const res = await fetch('/api/csrf', { credentials: 'include' });
+      if (!res.ok) return '';
+      const data = await res.json().catch(() => ({}));
+      return data?.csrfToken || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function setStatus(message, type) {
+    if (!statusEl) return;
+    statusEl.textContent = message;
+    statusEl.classList.remove('success', 'error', 'show');
+    if (type) statusEl.classList.add(type, 'show');
+  }
+
+  if (form) {
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+      }
+
+      const formData = new FormData(form);
+      const payload = Object.fromEntries(formData.entries());
+      const originalLabel = submitBtn?.textContent || 'Submit Message';
+
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending...';
+      }
+      setStatus('Sending your message...', '');
+
+      try {
+        const csrfToken = await fetchCsrfToken();
+        const res = await fetch('/api/public/contact', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+          },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.ok) {
+          setStatus('Message sent. We will get back to you shortly.', 'success');
+          form.reset();
+        } else {
+          const msg = data?.msg || 'We could not send your message. Please try again.';
+          setStatus(msg, 'error');
+        }
+      } catch {
+        setStatus('Unable to send message. Please check your connection and try again.', 'error');
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalLabel;
+        }
+      }
+    });
+  }
+</script>
 </body>
 </html>

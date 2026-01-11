@@ -115,6 +115,37 @@ nav a.active,nav a:hover{background:rgba(0,0,0,0.04);}
   position:relative;
 }
 
+.sidebar-toggle{
+  display:none;
+  align-items:center;
+  justify-content:center;
+  width:42px;
+  height:42px;
+  border-radius:12px;
+  border:none;
+  background:transparent;
+  padding:0;
+  cursor:pointer;
+  position:fixed;
+  top:14px;
+  left:14px;
+  z-index:2100;
+}
+
+.sidebar-toggle-icon{
+  width:28px;
+  height:28px;
+  display:block;
+}
+
+.sidebar-backdrop{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.35);
+  z-index:1900;
+}
+
 /* Weather widget footer */
 #weatherSidebar{
   display:none;
@@ -503,11 +534,58 @@ nav a.active {background:rgba(0,0,0,0.04);}
   border-radius:999px;
   font-size:.9rem;
 }
-@media (max-width: 980px){
-  body{flex-direction:column;height:auto;overflow:auto;}
-  .sidebar{width:100%;height:auto;position:relative;}
-  .main{padding:28px;}
+@media (max-width: 1024px){
+  body{
+    flex-direction:column;
+    height:auto;
+  }
+  .sidebar{
+    position:fixed;
+    top:0;
+    left:0;
+    width:260px;
+    height:100vh;
+    border-right:none;
+    padding-top:72px;
+    transform:translateX(-110%);
+    transition:transform .25s ease;
+    z-index:2000;
+    box-shadow:18px 0 40px rgba(0,0,0,0.18);
+  }
+  body.nav-open .sidebar{
+    transform:translateX(0);
+  }
+  body.nav-open .sidebar-backdrop{
+    display:block;
+  }
+  .sidebar-toggle{
+    display:inline-flex;
+  }
+  .main{padding:28px 20px 60px;}
   .page-header{flex-direction:column;align-items:flex-start;}
+
+  .main{
+    max-width:100%;
+    overflow-x:hidden;
+  }
+
+  img,
+  svg,
+  video,
+  iframe,
+  table{
+    max-width:100%;
+    height:auto;
+  }
+
+  .invite-card,
+  .invite-meta,
+  .notif-body,
+  .notif-item{
+    min-width:0;
+    overflow-wrap:anywhere;
+    word-break:break-word;
+  }
 }
 @media (max-width: 720px){
   .invite-card{flex-direction:column;align-items:flex-start;}
@@ -523,7 +601,10 @@ nav a.active {background:rgba(0,0,0,0.04);}
 
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
-<aside class="sidebar">
+<button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
+  <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
+</button>
+<aside class="sidebar" id="sidebarNav">
   <div class="logo">Paralegal Panel</div>
   <nav>
     <a href="dashboard-paralegal.html" class="sideNavItem" data-target="paraProfileCard">Overview</a>
@@ -536,6 +617,7 @@ nav a.active {background:rgba(0,0,0,0.04);}
   <div id="weatherSidebar">Stay current</div>
   <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
 </aside>
+<div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
 <main id="main" tabindex="-1" class="main">
   <header class="page-header">
@@ -650,6 +732,36 @@ nav a.active {background:rgba(0,0,0,0.04);}
       if (event.key === 'Escape') closePanels();
     });
   })();
+</script>
+<script>
+  const sidebarToggle = document.getElementById('sidebarToggle');
+  const sidebarNav = document.getElementById('sidebarNav');
+  const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+  const closeSidebar = () => {
+    document.body.classList.remove('nav-open');
+    if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
+  };
+  const openSidebar = () => {
+    document.body.classList.add('nav-open');
+    if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'true');
+  };
+  if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', () => {
+      if (document.body.classList.contains('nav-open')) closeSidebar();
+      else openSidebar();
+    });
+  }
+  if (sidebarBackdrop) {
+    sidebarBackdrop.addEventListener('click', closeSidebar);
+  }
+  if (sidebarNav) {
+    sidebarNav.addEventListener('click', (event) => {
+      if (event.target && event.target.tagName === 'A') closeSidebar();
+    });
+  }
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 960) closeSidebar();
+  });
 </script>
 </body>
 </html>
