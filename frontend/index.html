@@ -395,6 +395,162 @@
   text-decoration: none;
 }
 
+    .dashboard-preview {
+      position: relative;
+      background: #ffffff;
+      overflow: hidden;
+      padding-top: 150px;
+      padding-bottom: 420px;
+    }
+    .dashboard-preview__parallax-bg {
+      position: absolute;
+      inset: -20% 0;
+      background: #ffffff;
+      pointer-events: none;
+      will-change: transform;
+      transform: translateY(0);
+    }
+    .dashboard-preview .wrap {
+      position: relative;
+      z-index: 1;
+    }
+    .dashboard-preview__header {
+      text-align: center;
+      margin-bottom: 140px;
+    }
+    .dashboard-preview__eyebrow {
+      font-family: 'Sarabun', sans-serif;
+      font-size: 0.75rem;
+      letter-spacing: 0.34em;
+      text-transform: uppercase;
+      color: #887244;
+      margin: 0 0 12px;
+    }
+    .dashboard-preview__header h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: clamp(26px, 4vw, 44px);
+      margin: 0 0 12px;
+      color: #111;
+    }
+    .dashboard-preview__header p {
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      color: #555;
+      max-width: 62ch;
+      margin: 0 auto;
+    }
+    .dashboard-preview__main {
+      display: grid;
+      gap: 28px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      align-items: stretch;
+      margin-bottom: 28px;
+    }
+    .dashboard-shot {
+      margin: 0;
+      background: #ffffff;
+      border: 1px solid rgba(10,15,20,0.08);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 18px 40px rgba(10,15,20,0.08);
+      transition: transform 0.35s var(--e1), box-shadow 0.35s var(--e1);
+      display: flex;
+      flex-direction: column;
+      transform: translateY(var(--preview-parallax, 0px));
+    }
+    .dashboard-shot--feature img {
+      aspect-ratio: 16 / 10;
+    }
+    .dashboard-shot img {
+      width: 100%;
+      object-fit: cover;
+      display: block;
+      background: #f4f2ec;
+    }
+    .dashboard-shot--feature img {
+      cursor: zoom-in;
+    }
+    .dashboard-shot figcaption {
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      color: #1a2230;
+      padding: 14px 18px 18px;
+      letter-spacing: 0.02em;
+    }
+    .image-lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 15, 20, 0.78);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      z-index: 9999;
+      padding: 24px;
+    }
+    .image-lightbox.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .image-lightbox img {
+      max-width: min(1400px, 96vw);
+      max-height: 92vh;
+      width: auto;
+      height: auto;
+      border-radius: 16px;
+      background: #ffffff;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+      transition: transform 0.25s ease;
+      touch-action: pan-y;
+    }
+    .image-lightbox button {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #f8f9fa;
+      width: 46px;
+      height: 46px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+    .image-lightbox button:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+    .image-lightbox .lightbox-prev,
+    .image-lightbox .lightbox-next {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .image-lightbox .lightbox-prev {
+      left: 24px;
+    }
+    .image-lightbox .lightbox-next {
+      right: 24px;
+    }
+    body.lightbox-open {
+      overflow: hidden;
+    }
+    @media (max-width: 768px) {
+      .image-lightbox .lightbox-prev,
+      .image-lightbox .lightbox-next {
+        display: none;
+      }
+    }
+    .dashboard-shot:hover {
+      transform: translateY(calc(var(--preview-parallax, 0px) - 6px));
+      box-shadow: 0 26px 60px rgba(10,15,20,0.12);
+    }
+    .dashboard-shot--feature:hover {
+      transform: translateY(var(--preview-parallax, 0px));
+      box-shadow: 0 18px 40px rgba(10,15,20,0.08);
+    }
+
     .card .read {
       margin-top: 14px;
       display: inline-block;
@@ -666,7 +822,7 @@
   background-color: #ffffff;
   position: relative;
   z-index: 500;
-  padding: 4rem 0;
+  padding: 6rem 0 4rem;
   margin: 0;
 }
 
@@ -688,6 +844,77 @@
   max-width: none;
   margin: 0 auto;
   text-align: center;
+}
+.who-text + .who-text {
+  margin-top: 18px;
+}
+.who-text-more {
+  display: block;
+}
+.who-expand {
+  display: none;
+  margin-top: 18px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(26, 34, 48, 0.2);
+  background: transparent;
+  color: #1a2230;
+  font-family: "Sarabun", sans-serif;
+  font-weight: 200;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.who-expand:hover {
+  background: rgba(26, 34, 48, 0.06);
+}
+@keyframes whoChunkFade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    color: #ffffff;
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    color: #555;
+    filter: blur(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .who-text-more {
+    display: none;
+  }
+  .who-body.is-expanded .who-text-more {
+    display: block;
+    margin-top: 18px;
+  }
+  .who-body.is-expanded .who-chunk {
+    display: block;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: whoChunkFade 1.2s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+    animation-delay: var(--chunk-delay, 0ms);
+    margin-top: 18px;
+  }
+  .who-body.is-expanded .who-chunk:first-of-type {
+    margin-top: 0;
+  }
+  .who-expand {
+    display: inline-flex;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .who-body.is-expanded .who-chunk {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
 }
 
   html {
@@ -759,10 +986,39 @@
 
   <section id="who-we-are" class="who-wrapper">
     <h2 class="who-title">Who We Are</h2>
-    <p class="who-text">
-      Let’s-ParaConnect is a modern legal-tech marketplace that brings attorneys and vetted paralegals together for flexible, project-based support.
-      We’re focused on making collaboration efficient, intuitive, and effortless from start to finish.
-    </p>
+    <div class="who-body" id="whoText">
+      <p class="who-text">
+        Let’s-ParaConnect was created to modernize legal services. We believe attorneys deserve a more efficient and dependable way to find reliable, high-quality paralegal assistance — and paralegals deserve meaningful, flexible work without unnecessary complexity or delay.
+      </p>
+      <p class="who-text who-text-more who-chunk" style="--chunk-delay: 0ms;">
+        Our platform is designed around clarity, trust, and ease. From posting a request to completing a project, every step is intuitive, secure, and transparent — so that legal professionals can focus on the work itself, not the logistics behind it. Let’s-ParaConnect makes collaboration feel seamless, professional, and refreshingly straightforward. All paralegals admitted to Let’s-ParaConnect are fully vetted, eliminating the need for a traditional, time-consuming interview process.
+      </p>
+      <p class="who-text who-text-more who-chunk" style="--chunk-delay: 180ms;">
+        Our platform brings both sides together in a secure, purpose-built workspace designed for real legal workflows. From escrow-backed payments to role-specific dashboards, everything is built to remove friction and restore confidence in collaboration. The result is a smarter, cleaner way to get legal work done. By combining thoughtful design with practical legal workflows, we reduce administrative friction and create a more intuitive experience for both attorneys and paralegals — from initial engagement through project completion.
+      </p>
+    </div>
+    <button type="button" class="who-expand" aria-expanded="false" aria-controls="whoText">Expand</button>
+  </section>
+
+  <section class="section dashboard-preview" id="dashboard-preview">
+    <div class="dashboard-preview__parallax-bg" aria-hidden="true"></div>
+    <div class="wrap">
+      <div class="dashboard-preview__header">
+        <p class="dashboard-preview__eyebrow">Dashboard preview</p>
+        <h2>See the workspace before you sign in</h2>
+        <p>Preview the dashboard as an attorney and as a paralegal used to manage cases, track tasks, and stay aligned.</p>
+      </div>
+      <div class="dashboard-preview__main">
+        <figure class="dashboard-shot dashboard-shot--feature">
+          <img src="Attorney%20Dashboard%20Example.png" alt="Attorney dashboard example showing case metrics and summary cards" loading="lazy" class="dashboard-preview-zoom" />
+          <figcaption>Attorney dashboard example</figcaption>
+        </figure>
+        <figure class="dashboard-shot dashboard-shot--feature">
+          <img src="Paralegal%20Dash%20Example.png" alt="Paralegal dashboard example showing assignments and case progress" loading="lazy" class="dashboard-preview-zoom" />
+          <figcaption>Paralegal dashboard example</figcaption>
+        </figure>
+      </div>
+    </div>
   </section>
   <!-- ✅ Insert this block directly after your closing </section> for the hero slider -->
 <!-- Parallax Container -->
@@ -916,6 +1172,20 @@
     <div class="region">United States</div>
   </div>
 </footer>
+
+  <div class="image-lightbox" id="imageLightbox" aria-hidden="true">
+    <button type="button" class="lightbox-prev" aria-label="Previous image">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M15 18l-6-6 6-6"/>
+      </svg>
+    </button>
+    <img src="" alt="" />
+    <button type="button" class="lightbox-next" aria-label="Next image">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 6l6 6-6 6"/>
+      </svg>
+    </button>
+  </div>
 
   <script defer>
     window.initHeroSlider = function initHeroSlider() {
@@ -1747,6 +2017,236 @@ updateHeaderAppearance();
       if (typeof initFadeIns === "function") {
         initFadeIns();
       }
+    });
+  });
+</script>
+
+<script defer>
+  document.addEventListener("DOMContentLoaded", () => {
+    const lightbox = document.getElementById("imageLightbox");
+    if (!lightbox) return;
+    const lightboxImg = lightbox.querySelector("img");
+    if (!lightboxImg) return;
+    const prevButton = lightbox.querySelector(".lightbox-prev");
+    const nextButton = lightbox.querySelector(".lightbox-next");
+    const zoomImages = Array.from(document.querySelectorAll(".dashboard-preview-zoom"));
+    let currentIndex = -1;
+
+    const pauseMotion = () => {
+      if (window.lenis && typeof window.lenis.stop === "function") {
+        window.lenis.stop();
+      }
+      if (window.ScrollTrigger && typeof window.ScrollTrigger.getAll === "function") {
+        window.ScrollTrigger.getAll().forEach((trigger) => trigger.disable(false));
+      }
+    };
+
+    const resumeMotion = () => {
+      if (window.lenis && typeof window.lenis.start === "function") {
+        window.lenis.start();
+      }
+      if (window.ScrollTrigger && typeof window.ScrollTrigger.getAll === "function") {
+        window.ScrollTrigger.getAll().forEach((trigger) => trigger.enable(false));
+        if (typeof window.ScrollTrigger.refresh === "function") {
+          window.ScrollTrigger.refresh();
+        }
+      }
+    };
+
+    const showIndex = (index) => {
+      if (!zoomImages.length) return;
+      currentIndex = (index + zoomImages.length) % zoomImages.length;
+      const img = zoomImages[currentIndex];
+      lightboxImg.src = img.src;
+      lightboxImg.alt = img.alt || "Dashboard preview";
+    };
+
+    const openLightbox = (img) => {
+      const startIndex = zoomImages.indexOf(img);
+      showIndex(startIndex >= 0 ? startIndex : 0);
+      lightboxImg.style.transform = "translateX(0)";
+      lightboxImg.style.transition = "transform 0.25s ease";
+      lightbox.classList.add("open");
+      lightbox.setAttribute("aria-hidden", "false");
+      document.body.classList.add("lightbox-open");
+      pauseMotion();
+    };
+
+    const closeLightbox = () => {
+      lightbox.classList.remove("open");
+      lightbox.setAttribute("aria-hidden", "true");
+      document.body.classList.remove("lightbox-open");
+      lightboxImg.src = "";
+      lightboxImg.style.transform = "translateX(0)";
+      currentIndex = -1;
+      resumeMotion();
+    };
+
+    document.querySelectorAll(".dashboard-preview-zoom").forEach((img) => {
+      img.addEventListener("click", () => openLightbox(img));
+    });
+
+    if (prevButton) {
+      prevButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        showIndex(currentIndex - 1);
+      });
+    }
+
+    if (nextButton) {
+      nextButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        showIndex(currentIndex + 1);
+      });
+    }
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let dragDeltaX = 0;
+    let dragDeltaY = 0;
+    let isDragging = false;
+    let isHorizontal = null;
+    let suppressClick = false;
+    const swipeThreshold = 60;
+
+    const endDrag = () => {
+      if (!isDragging) return;
+      lightboxImg.style.transition = "transform 0.25s ease";
+      if (isHorizontal && Math.abs(dragDeltaX) > swipeThreshold) {
+        if (dragDeltaX < 0) {
+          showIndex(currentIndex + 1);
+        } else {
+          showIndex(currentIndex - 1);
+        }
+      }
+      lightboxImg.style.transform = "translateX(0)";
+      isDragging = false;
+      isHorizontal = null;
+      if (suppressClick) {
+        setTimeout(() => {
+          suppressClick = false;
+        }, 0);
+      }
+    };
+
+    lightboxImg.addEventListener("click", (event) => {
+      if (suppressClick) {
+        event.stopPropagation();
+        return;
+      }
+      event.stopPropagation();
+      showIndex(currentIndex + 1);
+    });
+
+    lightboxImg.addEventListener("touchstart", (event) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      dragDeltaX = 0;
+      dragDeltaY = 0;
+      isDragging = true;
+      isHorizontal = null;
+      suppressClick = false;
+      lightboxImg.style.transition = "none";
+    }, { passive: true });
+
+    lightboxImg.addEventListener("touchmove", (event) => {
+      if (!isDragging) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      dragDeltaX = touch.clientX - touchStartX;
+      dragDeltaY = touch.clientY - touchStartY;
+      if (isHorizontal === null) {
+        if (Math.abs(dragDeltaX) > 6 || Math.abs(dragDeltaY) > 6) {
+          isHorizontal = Math.abs(dragDeltaX) > Math.abs(dragDeltaY);
+        }
+      }
+      if (!isHorizontal) return;
+      event.preventDefault();
+      lightboxImg.style.transform = `translateX(${dragDeltaX}px)`;
+      if (Math.abs(dragDeltaX) > 8) {
+        suppressClick = true;
+      }
+    }, { passive: false });
+
+    lightboxImg.addEventListener("touchend", () => {
+      endDrag();
+    }, { passive: true });
+
+    lightboxImg.addEventListener("touchcancel", () => {
+      endDrag();
+    }, { passive: true });
+
+    lightbox.addEventListener("click", (event) => {
+      if (event.target === lightbox) {
+        closeLightbox();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (!lightbox.classList.contains("open")) return;
+      if (event.key === "Escape") {
+        closeLightbox();
+      }
+      if (event.key === "ArrowRight") {
+        showIndex(currentIndex + 1);
+      }
+      if (event.key === "ArrowLeft") {
+        showIndex(currentIndex - 1);
+      }
+    });
+  });
+</script>
+
+<script defer>
+  (function () {
+    const section = document.getElementById("dashboard-preview");
+    if (!section) return;
+    const bg = section.querySelector(".dashboard-preview__parallax-bg");
+    const cards = Array.from(section.querySelectorAll(".dashboard-shot"));
+
+    const updatePreviewParallax = () => {
+      const rect = section.getBoundingClientRect();
+      const viewport = window.innerHeight || 0;
+      const total = rect.height + viewport;
+      if (!total) return;
+      const progress = (viewport - rect.top) / total;
+      const clamped = Math.max(0, Math.min(1, progress));
+      const bgOffset = (clamped - 0.5) * 140;
+      const cardOffset = (clamped - 0.5) * 70;
+
+      if (bg) {
+        bg.style.transform = `translateY(${bgOffset}px)`;
+      }
+
+      cards.forEach((card) => {
+        card.style.setProperty("--preview-parallax", `${cardOffset}px`);
+      });
+    };
+
+    if (typeof registerScrollHandler === "function") {
+      registerScrollHandler(updatePreviewParallax);
+    }
+    window.addEventListener("resize", updatePreviewParallax);
+    updatePreviewParallax();
+  })();
+</script>
+
+<script defer>
+  document.addEventListener("DOMContentLoaded", () => {
+    const whoText = document.getElementById("whoText");
+    const toggle = document.querySelector(".who-expand");
+    if (!whoText || !toggle) return;
+
+    const updateToggle = (expanded) => {
+      toggle.textContent = expanded ? "Collapse" : "Expand";
+      toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    };
+
+    toggle.addEventListener("click", () => {
+      const expanded = whoText.classList.toggle("is-expanded");
+      updateToggle(expanded);
     });
   });
 </script>
