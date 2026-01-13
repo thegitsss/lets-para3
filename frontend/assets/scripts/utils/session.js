@@ -6,6 +6,7 @@
   let cachedUser = null;
   let sessionPromise = null;
   let cachedSessionToken = null;
+  let lastSessionFailure = null;
   const LEGACY_TOKEN_KEYS = ["lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"];
   const VALID_THEMES = ["light", "dark", "mountain", "mountain-dark"];
   const FONT_SIZE_MAP = {
@@ -15,6 +16,7 @@
     lg: "17px",
     xl: "20px"
   };
+  const MOUNTAIN_BG = "#f3f5f9";
   let currentTheme = null;
   let currentFontSize = null;
 
@@ -57,7 +59,33 @@
       );
     }
     currentTheme = normalized;
+    applyThemeOverrides(normalized);
     return normalized;
+  }
+
+  function applyThemeOverrides(theme) {
+    const apply = () => {
+      const body = document.body;
+      const root = document.documentElement;
+      if (!body || !root) return;
+      if (theme === "mountain") {
+        body.style.setProperty("--bg", MOUNTAIN_BG);
+        root.style.setProperty("--bg", MOUNTAIN_BG);
+        body.style.setProperty("--app-background", MOUNTAIN_BG);
+        root.style.setProperty("--app-background", MOUNTAIN_BG);
+      } else {
+        body.style.removeProperty("--bg");
+        root.style.removeProperty("--bg");
+        body.style.removeProperty("--app-background");
+        root.style.removeProperty("--app-background");
+      }
+    };
+
+    if (document.body) {
+      apply();
+    } else {
+      document.addEventListener("DOMContentLoaded", apply, { once: true });
+    }
   }
 
   function applyThemePreference(theme) {
@@ -147,6 +175,10 @@
     invalidateAndRedirect();
   }
 
+  function shouldPreserveStoredSession() {
+    return lastSessionFailure === "network" || lastSessionFailure === "server";
+  }
+
   async function fetchSession(force = false) {
     if (force) sessionPromise = null;
     if (!sessionPromise) {
@@ -157,36 +189,49 @@
             const message = payload?.error || payload?.msg;
             if (message === DISABLED_ERROR) {
               handleDisabledAccount(message);
+              lastSessionFailure = "disabled";
               return null;
             }
-            if (res.status === 401) return null;
+            if (res.status === 401) {
+              lastSessionFailure = "unauthorized";
+              return null;
+            }
+            lastSessionFailure = "server";
             return payload?.user || null;
           }
+          lastSessionFailure = null;
           return payload?.user || null;
         })
-        .catch(() => null)
+        .catch(() => {
+          lastSessionFailure = "network";
+          return null;
+        })
         .then((user) => {
-          cachedUser = user;
-          syncStoredUser(user);
-          applyThemeFromUser(user);
-          applyFontSizeFromUser(user);
+          let resolvedUser = user;
+          if (!resolvedUser && shouldPreserveStoredSession()) {
+            resolvedUser = readStoredUserRaw();
+          }
+          cachedUser = resolvedUser;
+          syncStoredUser(resolvedUser);
+          applyThemeFromUser(resolvedUser);
+          applyFontSizeFromUser(resolvedUser);
           if (typeof document !== "undefined") {
             if (document.readyState === "loading") {
-              document.addEventListener("DOMContentLoaded", () => injectBetaFooter(user), { once: true });
+              document.addEventListener("DOMContentLoaded", () => injectBetaFooter(resolvedUser), { once: true });
             } else {
-              injectBetaFooter(user);
+              injectBetaFooter(resolvedUser);
             }
           }
           try {
-            if (user?.avatarURL) {
-              localStorage.setItem("avatarURL", user.avatarURL);
+            if (resolvedUser?.avatarURL) {
+              localStorage.setItem("avatarURL", resolvedUser.avatarURL);
             }
             const avatarNodes = document.querySelectorAll("[data-avatar]");
             avatarNodes.forEach((el) => {
-              if (el) el.src = user?.avatarURL || "assets/default-avatar.png";
+              if (el) el.src = resolvedUser?.avatarURL || "assets/default-avatar.png";
             });
           } catch (_) {}
-          return user;
+          return resolvedUser;
         });
     }
     return sessionPromise;

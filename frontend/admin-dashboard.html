@@ -107,6 +107,35 @@ text-align:center;
 position:relative;
 }
 
+.sidebar-toggle{
+display:none;
+align-items:center;
+justify-content:center;
+width:42px;
+height:42px;
+border-radius:12px;
+border:none;
+background:transparent;
+padding:0;
+cursor:pointer;
+position:relative;
+z-index:2100;
+}
+
+.sidebar-toggle-icon{
+width:28px;
+height:28px;
+display:block;
+}
+
+.sidebar-backdrop{
+display:none;
+position:fixed;
+inset:0;
+background:rgba(0,0,0,0.35);
+z-index:1900;
+}
+
 /* Weather widget footer */
 #weatherSidebar{
 position:absolute;
@@ -288,12 +317,152 @@ font-size:.95rem;
 #pendingUserModal .details-content{max-width:900px;}
 #pendingUserModal .details-table td:first-child{width:200px;font-weight:300;}
 #pendingUserModal .details-table td:last-child{white-space:pre-line;}
+
+@media (max-width: 1024px){
+body{flex-direction:column;}
+.main{overflow-x:hidden;}
+.main #section-user-management{
+display:flex;
+flex-direction:column;
+}
+.main #section-user-management > header{order:1;}
+.main #section-user-management #pendingUsersPanel{order:2;}
+.main #section-user-management .lower-grid{order:3;}
+.main #section-user-management #approvalEmailTestPanel{order:4;}
+.main #section-user-management .dashboard-grid{order:5;}
+.main #section-user-management #deletedUsersPanel{order:6;}
+.metrics,
+.dashboard-grid,
+.lower-grid,
+.grid-two,
+.grid-four,
+.grid,
+.stats-cards,
+.escrow-summary,
+.quick-stats,
+.sales-box{
+grid-template-columns:1fr;
+}
+.panel.new-users{min-width:0;width:100%;}
+.chart-card,
+.panel,
+.metric,
+.card{min-width:0;}
+.search{width:100%;max-width:100%;}
+table{table-layout:fixed;width:100%;}
+th,td{word-break:break-word;}
+.pending-users-table th,
+.pending-users-table td{
+word-break:normal;
+overflow-wrap:anywhere;
+hyphens:none;
+}
+.pending-users-table{
+table-layout:auto;
+}
+.pending-users-table th{
+font-size:.85rem;
+letter-spacing:.02em;
+}
+.pending-users-table td{
+font-size:.9rem;
+}
+.pending-users-table .actions .btn{
+white-space:nowrap;
+padding:.4rem .6rem;
+}
+.pending-users-table .status{
+white-space:nowrap;
+}
+#pendingUsersPanel .pending-users-table thead{
+display:none;
+}
+#pendingUsersPanel .pending-users-table,
+#pendingUsersPanel .pending-users-table tbody,
+#pendingUsersPanel .pending-users-table tr{
+display:block;
+width:100%;
+}
+#pendingUsersPanel .pending-users-table tr{
+border-bottom:1px solid var(--line);
+padding:12px 0;
+}
+#pendingUsersPanel .pending-users-table td{
+display:flex;
+justify-content:space-between;
+gap:12px;
+padding:6px 0;
+border-bottom:none;
+}
+#pendingUsersPanel .pending-users-table td::before{
+content:attr(data-label);
+color:var(--muted);
+font-size:.8rem;
+letter-spacing:.02em;
+}
+#pendingUsersPanel .pending-users-table td.actions{
+justify-content:flex-start;
+gap:8px;
+}
+#pendingUsersPanel .pending-users-table td.actions::before{
+content:"Actions";
+}
+#pendingUsersPanel .pending-users-table td.actions .btn{
+padding:1px 4px;
+font-size:.7rem;
+line-height:1.1;
+border-radius:4px;
+}
+.pending-controls,
+.test-email-row{flex-direction:column;align-items:stretch;}
+.pending-controls .search,
+.test-email-row .search{min-width:0;width:100%;}
+.sidebar{
+position:fixed;
+top:0;
+left:0;
+width:260px;
+height:100vh;
+border-right:none;
+border-bottom:none;
+flex-direction:column;
+flex-wrap:nowrap;
+gap:24px;
+padding:24px 18px;
+padding-top:72px;
+transform:translateX(-110%);
+transition:transform .25s ease;
+z-index:2000;
+box-shadow:18px 0 40px rgba(0,0,0,0.18);
+}
+body.nav-open .sidebar{transform:translateX(0);}
+body.nav-open .sidebar-backdrop{display:block;}
+.sidebar-toggle{
+display:inline-flex;
+position:fixed;
+top:14px;
+left:14px;
+}
+nav{
+flex-direction:column;
+gap:12px;
+}
+nav a{
+width:100%;
+text-align:left;
+padding:10px 14px;
+font-size:.95rem;
+}
+}
 </style>
 </head>
 
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
-<aside class="sidebar">
+  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
+    <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
+  </button>
+<aside class="sidebar" id="sidebarNav">
 <div class="logo">Admin Panel</div>
 <nav>
 <a href="#" class="active" data-section="overview">Overview</a>
@@ -308,6 +477,7 @@ font-size:.95rem;
 <div id="weatherSidebar">Loading weather…</div>
 <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
 </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
 <main id="main" tabindex="-1" class="main">
 
@@ -401,45 +571,9 @@ font-size:.95rem;
 <header>
 <div class="header-top">
 <h1>User Management</h1>
-<div class="date-picker">
-<span>August 1 – August 31, 2025</span>
-<i class="calendar-icon">📅</i>
-</div>
 </div>
 <p>Analyze user registrations, activity, and sales performance over time.</p>
 </header>
-
-<!-- Chart + Cards -->
-<div class="dashboard-grid">
-<div class="chart-card">
-<div class="chart-header">
-<h2>Registration Trends</h2>
-<select id="userMgmtView">
-<option>Show By Month</option>
-<option>Show By Week</option>
-</select>
-</div>
-<canvas id="userMgmtComboChart" height="150"></canvas>
-</div>
-
-<div class="stats-cards">
-<div class="metric pink"><h3>Attorneys</h3><p id="metricAttorneys">0</p></div>
-<div class="metric blue"><h3>Paralegals</h3><p id="metricParalegals">0</p></div>
-<div class="metric purple"><h3>Pending Approvals</h3><p id="metricPending">0</p></div>
-<div class="metric teal"><h3>Suspended Users</h3><p id="metricSuspended">0</p></div>
-</div>
-</div>
-
-<!-- Lower section -->
-<div class="lower-grid">
-<div class="panel new-users">
-<h2>New Users</h2>
-<input type="text" placeholder="Search…" class="search" aria-label="Search" />
-<ul class="user-list" id="newUsersList">
-<li style="color:var(--muted)">Loading…</li>
-</ul>
-</div>
-</div>
 
 <div class="panel" id="pendingUsersPanel">
 <div class="panel-header">
@@ -474,6 +608,37 @@ font-size:.95rem;
 </div>
 </div>
 
+<!-- Chart + Cards -->
+<div class="dashboard-grid">
+<div class="chart-card">
+<div class="chart-header">
+<h2>Registration Trends</h2>
+<select id="userMgmtView">
+<option>Show By Month</option>
+<option>Show By Week</option>
+</select>
+</div>
+<canvas id="userMgmtComboChart" height="150"></canvas>
+</div>
+
+<div class="stats-cards">
+<div class="metric pink"><h3>Attorneys</h3><p id="metricAttorneys">0</p></div>
+<div class="metric blue"><h3>Paralegals</h3><p id="metricParalegals">0</p></div>
+<div class="metric purple"><h3>Pending Approvals</h3><p id="metricPending">0</p></div>
+</div>
+</div>
+
+<!-- Lower section -->
+<div class="lower-grid">
+<div class="panel new-users">
+<h2>New Users</h2>
+<input type="text" placeholder="Search…" class="search" aria-label="Search" />
+<ul class="user-list" id="newUsersList">
+<li style="color:var(--muted)">Loading…</li>
+</ul>
+</div>
+</div>
+
 <div class="panel" id="approvalEmailTestPanel">
 <div class="panel-header">
 <h2>Approval Email Test</h2>
@@ -482,41 +647,6 @@ font-size:.95rem;
 <div class="test-email-row">
 <input type="email" id="approvalTestEmail" class="search" placeholder="Email address" aria-label="Approval email test address" />
 <button class="btn secondary" type="button" id="approvalTestSendBtn">Send Approval Email</button>
-</div>
-</div>
-
-<div class="panel" id="suspendedUsersPanel">
-<div class="panel-header">
-<h2>Suspended Users</h2>
-<p id="suspendedUsersCountLabel" class="pending-count">0 suspended users</p>
-</div>
-<div class="pending-controls">
-<input type="search" id="suspendedSearch" class="search" placeholder="Search name or email…" aria-label="Search suspended users" />
-<select id="suspendedRoleFilter" aria-label="Filter by role">
-<option value="all">All Roles</option>
-<option value="attorney">Attorneys</option>
-<option value="paralegal">Paralegals</option>
-</select>
-<button class="btn secondary" type="button" id="refreshSuspendedUsers">Refresh</button>
-<button class="btn danger" type="button" id="removeSuspendedSelected">Remove Selected</button>
-<button class="btn secondary" type="button" id="restoreSuspendedSelected">Restore Selected</button>
-</div>
-<div class="table-wrap">
-<table class="pending-users-table">
-<thead>
-<tr>
-<th><input type="checkbox" id="suspendedSelectAll" aria-label="Select all suspended users"></th>
-<th>Name</th>
-<th>Role</th>
-<th>Email</th>
-<th>Updated</th>
-<th>Status</th>
-</tr>
-</thead>
-<tbody id="suspendedUsersBody">
-<tr><td colspan="6" class="pending-empty">Loading suspended users…</td></tr>
-</tbody>
-</table>
 </div>
 </div>
 
@@ -931,12 +1061,43 @@ const adminSession = window.checkSession('admin');
 const navLinks=document.querySelectorAll("nav a");
 const sections=document.querySelectorAll(".section");
 const logoutButton=document.getElementById("logoutBtn");
+const sidebarToggle=document.getElementById("sidebarToggle");
+const sidebarNav=document.getElementById("sidebarNav");
+const sidebarBackdrop=document.getElementById("sidebarBackdrop");
 const ACTIVE_SECTION_KEY="adminActiveSection";
 const SCROLL_POS_KEY="adminScrollY";
 const refreshCharts=()=>{
 if(!window.dashboardCharts?.length) return;
 window.dashboardCharts.forEach(chart=>chart.resize());
 };
+
+const closeSidebar=()=>{
+document.body.classList.remove("nav-open");
+if(sidebarToggle) sidebarToggle.setAttribute("aria-expanded","false");
+};
+const openSidebar=()=>{
+document.body.classList.add("nav-open");
+if(sidebarToggle) sidebarToggle.setAttribute("aria-expanded","true");
+};
+if(sidebarToggle){
+sidebarToggle.addEventListener("click",()=>{
+if(document.body.classList.contains("nav-open")) closeSidebar();
+else openSidebar();
+});
+}
+if(sidebarBackdrop){
+sidebarBackdrop.addEventListener("click",closeSidebar);
+}
+if(sidebarNav){
+sidebarNav.addEventListener("click",(event)=>{
+if(event.target.closest("a")||event.target.closest("button")){
+closeSidebar();
+}
+});
+}
+window.addEventListener("resize",()=>{
+if(window.innerWidth>1024) closeSidebar();
+});
 
 function activateSection(sectionName){
 if(!sectionName) return;
@@ -1700,14 +1861,6 @@ const pendingCountLabel = document.getElementById('pendingUsersCountLabel');
 const pendingSearch = document.getElementById('pendingSearch');
 const pendingRoleFilter = document.getElementById('pendingRoleFilter');
 const refreshPendingBtn = document.getElementById('refreshPendingUsers');
-const suspendedTableBody = document.getElementById('suspendedUsersBody');
-const suspendedCountLabel = document.getElementById('suspendedUsersCountLabel');
-const suspendedSearch = document.getElementById('suspendedSearch');
-const suspendedRoleFilter = document.getElementById('suspendedRoleFilter');
-const refreshSuspendedBtn = document.getElementById('refreshSuspendedUsers');
-const removeSuspendedBtn = document.getElementById('removeSuspendedSelected');
-const restoreSuspendedBtn = document.getElementById('restoreSuspendedSelected');
-const suspendedSelectAll = document.getElementById('suspendedSelectAll');
 const deletedTableBody = document.getElementById('deletedUsersBody');
 const deletedCountLabel = document.getElementById('deletedUsersCountLabel');
 const deletedSearch = document.getElementById('deletedSearch');
@@ -1736,8 +1889,6 @@ const approvalTestSendBtn = document.getElementById('approvalTestSendBtn');
 let pendingUsers = [];
 let pendingRequestId = 0;
 let activeUserId = null;
-let suspendedUsers = [];
-let suspendedRequestId = 0;
 let deletedUsers = [];
 let deletedRequestId = 0;
 let auditLogs = [];
@@ -1849,13 +2000,6 @@ count === 1 ? '1 pending user' : `${count} pending users`;
 }
 };
 
-const updateSuspendedCount = (count = 0) => {
-if (suspendedCountLabel) {
-suspendedCountLabel.textContent =
-count === 1 ? '1 suspended user' : `${count} suspended users`;
-}
-};
-
 const updateDeletedCount = (count = 0) => {
 if (deletedCountLabel) {
 deletedCountLabel.textContent =
@@ -1874,12 +2018,6 @@ const setPendingLoading = (loading) => {
 if (!refreshPendingBtn) return;
 refreshPendingBtn.disabled = loading;
 refreshPendingBtn.textContent = loading ? 'Refreshing…' : 'Refresh';
-};
-
-const setSuspendedLoading = (loading) => {
-if (!refreshSuspendedBtn) return;
-refreshSuspendedBtn.disabled = loading;
-refreshSuspendedBtn.textContent = loading ? 'Refreshing…' : 'Refresh';
 };
 
 const setDeletedLoading = (loading) => {
@@ -1915,15 +2053,19 @@ const tr = document.createElement('tr');
 
 const nameTd = document.createElement('td');
 nameTd.textContent = displayName(user);
+nameTd.setAttribute('data-label', 'Name');
 
 const roleTd = document.createElement('td');
 roleTd.textContent = toTitle(user.role);
+roleTd.setAttribute('data-label', 'Role');
 
 const emailTd = document.createElement('td');
 emailTd.textContent = user.email || '—';
+emailTd.setAttribute('data-label', 'Email');
 
 const submittedTd = document.createElement('td');
 submittedTd.textContent = formatDate(user.createdAt);
+submittedTd.setAttribute('data-label', 'Submitted');
 
 const statusTd = document.createElement('td');
 const badge = document.createElement('span');
@@ -1931,6 +2073,7 @@ const statusValue = (user.status || 'pending').toLowerCase();
 badge.className = `status ${statusValue}`;
 badge.textContent = toTitle(statusValue);
 statusTd.appendChild(badge);
+statusTd.setAttribute('data-label', 'Status');
 
 const actionsTd = document.createElement('td');
 actionsTd.className = 'actions';
@@ -1946,59 +2089,13 @@ removeBtn.className = 'btn danger';
 removeBtn.textContent = 'Remove';
 removeBtn.addEventListener('click', () => deactivateUser(String(user.id || user._id || '')));
 actionsTd.appendChild(removeBtn);
+actionsTd.setAttribute('data-label', 'Actions');
 
 [nameTd, roleTd, emailTd, submittedTd, statusTd, actionsTd].forEach((td) =>
 tr.appendChild(td)
 );
 pendingTableBody.appendChild(tr);
 });
-};
-
-const renderSuspendedUsers = () => {
-if (!suspendedTableBody) return;
-if (!suspendedUsers.length) {
-suspendedTableBody.innerHTML =
-'<tr><td colspan="6" class="pending-empty">No suspended users found.</td></tr>';
-if (suspendedSelectAll) suspendedSelectAll.checked = false;
-return;
-}
-suspendedTableBody.innerHTML = '';
-suspendedUsers.forEach((user) => {
-const tr = document.createElement('tr');
-
-const selectTd = document.createElement('td');
-const checkbox = document.createElement('input');
-checkbox.type = 'checkbox';
-checkbox.className = 'suspended-select';
-checkbox.dataset.userId = String(user.id || user._id || '');
-selectTd.appendChild(checkbox);
-
-const nameTd = document.createElement('td');
-nameTd.textContent = displayName(user);
-
-const roleTd = document.createElement('td');
-roleTd.textContent = toTitle(user.role);
-
-const emailTd = document.createElement('td');
-emailTd.textContent = user.email || '—';
-
-const updatedTd = document.createElement('td');
-updatedTd.textContent = formatDate(user.updatedAt || user.createdAt);
-
-const statusTd = document.createElement('td');
-const badge = document.createElement('span');
-const statusValue = (user.status || 'denied').toLowerCase();
-const isSuspended = statusValue === 'denied' || statusValue === 'rejected';
-badge.className = `status ${isSuspended ? 'pending' : statusValue}`;
-badge.textContent = isSuspended ? 'Suspended' : toTitle(statusValue);
-statusTd.appendChild(badge);
-
-[selectTd, nameTd, roleTd, emailTd, updatedTd, statusTd].forEach((td) =>
-tr.appendChild(td)
-);
-suspendedTableBody.appendChild(tr);
-});
-if (suspendedSelectAll) suspendedSelectAll.checked = false;
 };
 
 const renderDeletedUsers = () => {
@@ -2317,39 +2414,6 @@ if (requestId === pendingRequestId) setPendingLoading(false);
 }
 };
 
-const loadSuspendedUsers = async () => {
-if (!suspendedTableBody) return;
-const requestId = ++suspendedRequestId;
-setSuspendedLoading(true);
-suspendedTableBody.innerHTML =
-'<tr><td colspan="6" class="pending-empty">Loading suspended users…</td></tr>';
-const params = new URLSearchParams({ status: 'suspended', limit: '50' });
-const roleValue = (suspendedRoleFilter?.value || '').toLowerCase();
-if (roleValue && roleValue !== 'all') params.set('role', roleValue);
-const query = suspendedSearch?.value.trim();
-if (query) params.set('q', query);
-
-try {
-const res = await secureFetch(`/api/admin/pending-users?${params.toString()}`, {
-headers: { Accept: 'application/json' },
-});
-const data = res.ok ? await res.json() : { users: [] };
-if (requestId !== suspendedRequestId) return;
-suspendedUsers = Array.isArray(data.users) ? data.users : [];
-renderSuspendedUsers();
-updateSuspendedCount(
-typeof data.total === 'number' ? data.total : suspendedUsers.length
-);
-} catch (err) {
-if (requestId !== suspendedRequestId) return;
-suspendedUsers = [];
-updateSuspendedCount(0);
-suspendedTableBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${err?.message || 'Unable to load suspended users.'}</td></tr>`;
-} finally {
-if (requestId === suspendedRequestId) setSuspendedLoading(false);
-}
-};
-
 const loadDeletedUsers = async () => {
 if (!deletedTableBody) return;
 const requestId = ++deletedRequestId;
@@ -2429,9 +2493,6 @@ timeout = setTimeout(() => fn.apply(null, args), wait);
 pendingRoleFilter?.addEventListener('change', () => loadPendingUsers());
 refreshPendingBtn?.addEventListener('click', () => loadPendingUsers());
 pendingSearch?.addEventListener('input', debounce(() => loadPendingUsers()));
-suspendedRoleFilter?.addEventListener('change', () => loadSuspendedUsers());
-refreshSuspendedBtn?.addEventListener('click', () => loadSuspendedUsers());
-suspendedSearch?.addEventListener('input', debounce(() => loadSuspendedUsers()));
 deletedRoleFilter?.addEventListener('change', () => loadDeletedUsers());
 refreshDeletedBtn?.addEventListener('click', () => loadDeletedUsers());
 deletedSearch?.addEventListener('input', debounce(() => loadDeletedUsers()));
@@ -2439,103 +2500,12 @@ auditRoleFilter?.addEventListener('change', () => loadAuditLogs());
 auditTargetFilter?.addEventListener('change', () => loadAuditLogs());
 refreshAuditLogsBtn?.addEventListener('click', () => loadAuditLogs());
 auditSearch?.addEventListener('input', debounce(() => loadAuditLogs()));
-if (suspendedSelectAll) {
-suspendedSelectAll.addEventListener('change', () => {
-const checked = suspendedSelectAll.checked;
-document.querySelectorAll('.suspended-select').forEach((input) => {
-input.checked = checked;
-});
-});
-}
 if (deletedSelectAll) {
 deletedSelectAll.addEventListener('change', () => {
 const checked = deletedSelectAll.checked;
 document.querySelectorAll('.deleted-select').forEach((input) => {
 input.checked = checked;
 });
-});
-}
-if (removeSuspendedBtn) {
-removeSuspendedBtn.addEventListener('click', async () => {
-const selected = Array.from(document.querySelectorAll('.suspended-select:checked'))
-  .map((input) => input.dataset.userId)
-  .filter(Boolean);
-if (!selected.length) {
-showToast('Select at least one user to remove.', 'err');
-return;
-}
-const confirmed = window.confirm(`Remove ${selected.length} suspended user${selected.length === 1 ? '' : 's'}?`);
-if (!confirmed) return;
-removeSuspendedBtn.disabled = true;
-const originalLabel = removeSuspendedBtn.textContent || 'Remove Selected';
-removeSuspendedBtn.textContent = 'Removing…';
-try {
-await fetchCSRF?.();
-const results = await Promise.allSettled(
-selected.map((userId) =>
-secureFetch(`/api/admin/users/${encodeURIComponent(userId)}/delete`, {
-method: 'POST',
-body: {},
-headers: { Accept: 'application/json' },
-})
-)
-);
-const failed = results.filter((r) => r.status === 'rejected');
-if (failed.length) {
-showToast(`Removed ${selected.length - failed.length}. ${failed.length} failed.`, 'err');
-} else {
-showToast('Removed selected users.', 'info');
-}
-await loadSuspendedUsers();
-await loadDeletedUsers();
-} catch (err) {
-showToast(err?.message || 'Unable to remove users.', 'err');
-} finally {
-removeSuspendedBtn.disabled = false;
-removeSuspendedBtn.textContent = originalLabel;
-if (suspendedSelectAll) suspendedSelectAll.checked = false;
-}
-});
-}
-if (restoreSuspendedBtn) {
-restoreSuspendedBtn.addEventListener('click', async () => {
-const selected = Array.from(document.querySelectorAll('.suspended-select:checked'))
-  .map((input) => input.dataset.userId)
-  .filter(Boolean);
-if (!selected.length) {
-showToast('Select at least one user to restore.', 'err');
-return;
-}
-const confirmed = window.confirm(`Restore ${selected.length} user${selected.length === 1 ? '' : 's'}?`);
-if (!confirmed) return;
-restoreSuspendedBtn.disabled = true;
-const originalLabel = restoreSuspendedBtn.textContent || 'Restore Selected';
-restoreSuspendedBtn.textContent = 'Restoring…';
-try {
-await fetchCSRF?.();
-const results = await Promise.allSettled(
-selected.map((userId) =>
-secureFetch(`/api/admin/users/${encodeURIComponent(userId)}/approve`, {
-method: 'POST',
-body: {},
-headers: { Accept: 'application/json' },
-})
-)
-);
-const failed = results.filter((r) => r.status === 'rejected');
-if (failed.length) {
-showToast(`Restored ${selected.length - failed.length}. ${failed.length} failed.`, 'err');
-} else {
-showToast('Restored selected users.', 'info');
-}
-await loadSuspendedUsers();
-} catch (err) {
-showToast(err?.message || 'Unable to restore users.', 'err');
-} finally {
-restoreSuspendedBtn.disabled = false;
-restoreSuspendedBtn.textContent = originalLabel;
-if (suspendedSelectAll) suspendedSelectAll.checked = false;
-}
 });
 }
 if (purgeDeletedBtn) {
@@ -2665,7 +2635,6 @@ tasks.push(
 loadFinanceCards(),
 loadAdminPosts(),
 loadPendingUsers(),
-loadSuspendedUsers(),
 loadDeletedUsers(),
 loadAuditLogs()
 );
@@ -2683,7 +2652,6 @@ softRefreshAdmin();
 startSoftRefresh();
 
 loadPendingUsers();
-loadSuspendedUsers();
 loadDeletedUsers();
 loadAuditLogs();
 window.renderPendingUsers = renderPendingUsers;

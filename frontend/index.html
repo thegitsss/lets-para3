@@ -1136,7 +1136,7 @@
     </div>
   </div>
   <p class="pricing-note">
-    A standard 15% platform fee applies to attorney payments. Paralegals always see their take-home earnings upfront.
+    A standard 21% platform fee applies to attorney payments, and an 18% platform fee is deducted from paralegal payouts. Paralegals always see their take-home earnings upfront.
   </p>
 </section>
 
@@ -1555,7 +1555,7 @@ updateHeaderAppearance();
   will-change: transform, opacity;
   transition: transform 0.6s ease-out, opacity 0.6s ease-out;
   width: 100%;
-  height: 340px;
+  height: 460px;
   display: flex;
   text-align: left;
   position: relative;
@@ -1663,7 +1663,7 @@ updateHeaderAppearance();
   .how-it-works-bg .card {
     margin: 0;
     padding: 1.75rem 1.5rem;
-    height: 360px;
+    height: 480px;
     box-shadow: 0 24px 80px rgba(10,15,20,0.12);
   }
 
@@ -1688,17 +1688,21 @@ updateHeaderAppearance();
   .how-it-works-bg .card {
     padding: 1.5rem 1.35rem;
     margin: 0 auto;
-    height: 340px;
+    height: 440px;
   }
 }
 
 @media (max-width: 768px) {
   .card-scroll-area {
-    overflow-y: scroll !important;
+    overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin !important;
     scrollbar-color: #d1d1d1 transparent !important;
     scrollbar-gutter: stable both-edges;
+  }
+
+  .card-scroll-area[data-section="post-job"] {
+    overflow-y: hidden !important;
   }
 
   .card-scroll-area::-webkit-scrollbar {

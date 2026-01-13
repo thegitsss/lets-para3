@@ -262,13 +262,19 @@ button[type="submit"]:focus-visible {
       font-weight: 200;
     }
 
-    .cancel-login {
+.cancel-login {
   display: inline-block;
   margin-top: 1.5rem;
       color: #475569;
       text-decoration: none;
       font-weight: 300;
       font-size: 0.95rem;
+    }
+
+    @media (max-width: 768px) {
+      .login-title {
+        display: none;
+      }
     }
 
   </style>
@@ -283,7 +289,7 @@ button[type="submit"]:focus-visible {
 <h1>
   <a href="index.html" class="brand">Let’s ParaConnect</a>
 </h1>
-<h2>Login to Let’s-ParaConnect</h2>
+<h2 class="login-title">Login to Let’s-ParaConnect</h2>
 
         <form id="loginForm">
           <label for="email">Enter e-mail</label>

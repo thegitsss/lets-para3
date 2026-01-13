@@ -26,15 +26,26 @@ function parseCents(amount) {
   return Number.isFinite(n) ? n : 0;
 }
 
+const DEFAULT_ATTORNEY_FEE_PCT = Number(
+  process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 21
+);
+const DEFAULT_PARALEGAL_FEE_PCT = Number(
+  process.env.PLATFORM_FEE_PARALEGAL_PERCENT || process.env.PLATFORM_FEE_PERCENT || 18
+);
+
 /**
  * Calculate fee snapshots given total amount in cents.
  * Returns integers (cents): { feeAttorneyAmount, feeParalegalAmount, payout }
  */
-function calculateFees(totalAmount, feeAttorneyPct = 15, feeParalegalPct = 15) {
+function calculateFees(
+  totalAmount,
+  feeAttorneyPct = DEFAULT_ATTORNEY_FEE_PCT,
+  feeParalegalPct = DEFAULT_PARALEGAL_FEE_PCT
+) {
   const total = parseCents(totalAmount);
   const feeA = Math.round((total * (Number(feeAttorneyPct) || 0)) / 100);
   const feeP = Math.round((total * (Number(feeParalegalPct) || 0)) / 100);
-  const payout = Math.max(0, total - feeA - feeP);
+  const payout = Math.max(0, total - feeP);
   return { feeAttorneyAmount: feeA, feeParalegalAmount: feeP, payout };
 }
 

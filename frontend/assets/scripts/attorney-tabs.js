@@ -13,7 +13,7 @@ const REQUIRED_ROLES = Array.isArray(ROLE_SPEC)
   : ["attorney"];
 const HEADER_ONLY_ROUTES = {
   paralegal: new Set(["overview", "case-files", "profile-settings"]),
-  attorney: new Set(["create-case"]),
+  attorney: new Set(["create-case", "profile-settings"]),
 };
 const STATUS_LABELS = {
   pending_review: "Pending Review",
@@ -271,8 +271,10 @@ function ensureHeaderStyles() {
   body.theme-mountain .lpc-shared-header .user-chip span{color:#6b6b6b}
   .lpc-shared-header .profile-dropdown{position:absolute;right:0;top:calc(100% + 10px);background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:16px;box-shadow:0 18px 30px rgba(0,0,0,0.12);display:none;flex-direction:column;min-width:200px;z-index:9999;pointer-events:auto;overflow:visible}
   .lpc-shared-header .profile-dropdown.show{display:flex;pointer-events:auto;overflow:visible}
-  .lpc-shared-header .profile-dropdown button{background:none;border:none;padding:.85rem 1.1rem;text-align:left;font-size:.92rem;cursor:pointer}
-  .lpc-shared-header .profile-dropdown button:hover{background:rgba(0,0,0,0.04)}
+  .lpc-shared-header .profile-dropdown button,
+  .lpc-shared-header .profile-dropdown a{background:none;border:none;padding:.85rem 1.1rem;text-align:left;font-size:.92rem;cursor:pointer;color:inherit;text-decoration:none;display:block}
+  .lpc-shared-header .profile-dropdown button:hover,
+  .lpc-shared-header .profile-dropdown a:hover{background:rgba(0,0,0,0.04)}
   .lpc-shared-header .notifications-panel{position:absolute;top:72px;right:0;width:340px;background:var(--panel,#fff);border-radius:14px;border:1px solid var(--line,rgba(0,0,0,0.08));box-shadow:0 24px 48px rgba(0,0,0,0.15);padding:0;opacity:0;pointer-events:none;transform:translateY(-10px);transition:opacity .2s ease,transform .2s ease;z-index:30;display:flex;flex-direction:column}
   .lpc-shared-header .notifications-panel.show{opacity:1;pointer-events:auto;transform:translateY(0)}
   .lpc-shared-header .notifications-panel.hidden{display:none}
@@ -401,7 +403,7 @@ async function initHeader(options = {}) {
             <span id="headerRole">Member</span>
           </div>
           <div class="profile-dropdown" id="profileDropdown" aria-hidden="true">
-            <button type="button" data-account-settings>Account Settings</button>
+            <a href="profile-settings.html" data-account-settings>Account Settings</a>
             <button type="button" data-logout onclick="window.logoutUser?.(event)">Log Out</button>
           </div>
         </div>

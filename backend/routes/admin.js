@@ -436,11 +436,10 @@ const ACTIVE_CASE_STATUSES = [
   "in_progress",
 ];
 
-const [roleAggregation, pendingApprovals, suspendedUsers, recentUsersRaw, monthlyRegistrationsRaw, caseAggregation, escrowAggregation, revenueAggregation] =
+const [roleAggregation, pendingApprovals, recentUsersRaw, monthlyRegistrationsRaw, caseAggregation, escrowAggregation, revenueAggregation] =
 await Promise.all([
 User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
 User.countDocuments(PENDING_USER_MATCH),
-User.countDocuments({ status: { $in: ["denied", "rejected"] }, deleted: { $ne: true } }),
 User.find(ACTIVE_USER_MATCH)
 .sort({ createdAt: -1 })
 .limit(10)
@@ -498,7 +497,6 @@ totalUsers,
 attorneys: roleMap.attorney || 0,
 paralegals: roleMap.paralegal || 0,
 pendingApprovals,
-suspendedUsers,
 escrowHeld,
 activeCases,
 completedCases,
@@ -660,7 +658,6 @@ const LEDGER_LIMIT = 20;
 const [
 roleAggregation,
 pendingApprovalsCount,
-suspendedUsersCount,
 registrationsAgg,
 escrowHeldAgg,
 escrowReleasedAgg,
@@ -685,7 +682,6 @@ recentUsersRaw,
 ] = await Promise.all([
 User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
 User.countDocuments(PENDING_USER_MATCH),
-User.countDocuments({ status: { $in: ["denied", "rejected"] }, deleted: { $ne: true } }),
 User.aggregate([
 { $match: { ...ACTIVE_USER_MATCH, createdAt: { $gte: startWindow } } },
 { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } },
@@ -810,8 +806,6 @@ return acc;
 }, {});
 const totalUsers = Object.values(roleMap).reduce((sum, value) => sum + value, 0);
 const pendingApprovals = Number(pendingApprovalsCount) || 0;
-const suspendedUsers = Number(suspendedUsersCount) || 0;
-
 const registrationsByMonth = registrationsAgg.map((entry) => ({
 month: formatMonthFromGroup(entry),
 count: entry.count,
@@ -822,7 +816,6 @@ totalUsers,
 totalAttorneys: roleMap.attorney || 0,
 totalParalegals: roleMap.paralegal || 0,
 pendingApprovals,
-suspendedUsers,
 registrationsByMonth,
 };
 
@@ -1016,7 +1009,7 @@ const { skip, limit, page } = parsePagination(req, { defaultLimit: 25 });
 const filter = {};
 const rawStatus = String(status || "").trim().toLowerCase();
 if (rawStatus === "deleted") {
-filter.deleted = true;
+filter.$or = [{ deleted: true }, { status: { $in: ["denied", "rejected", "suspended"] } }];
 } else {
 if (String(req.query?.includeDeleted || "").toLowerCase() !== "true") {
 filter.deleted = { $ne: true };

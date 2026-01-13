@@ -19,12 +19,14 @@ const IS_PROD = process.env.PROD === "true";
 const EMAIL_BASE_URL = (process.env.EMAIL_BASE_URL || "").replace(/\/+$/, "");
 const ASSET_BASE_URL = EMAIL_BASE_URL || "https://www.lets-paraconnect.com";
 const LOGIN_URL = `${ASSET_BASE_URL}/login.html`;
+const COOKIE_DOMAIN =
+  IS_PROD && process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {};
 const COOKIE_BASE_OPTIONS = {
   httpOnly: true,
-  secure: true,
-  sameSite: "none",
+  secure: IS_PROD,
+  sameSite: IS_PROD ? "none" : "lax",
   path: "/",
-  ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
+  ...COOKIE_DOMAIN,
 };
 const AUTH_COOKIE_OPTIONS = {
   ...COOKIE_BASE_OPTIONS,
@@ -894,13 +896,7 @@ router.get(
 // POST /api/auth/logout
 // ----------------------------------------
 router.post("/logout", (_req, res) => {
-  res.clearCookie("token", {
-    httpOnly: true,
-    secure: true,
-    sameSite: "none",
-    path: "/",
-    ...(process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {}),
-  });
+  res.clearCookie("token", { ...COOKIE_BASE_OPTIONS });
   res.json({ success: true });
 });
 

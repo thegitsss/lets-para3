@@ -105,7 +105,6 @@ updateText("#escrowTotal", formatCurrency(escrowMetrics.totalEscrowHeld));
 updateText("#metricAttorneys", formatNumber(userMetrics.totalAttorneys));
 updateText("#metricParalegals", formatNumber(userMetrics.totalParalegals));
 updateText("#metricPending", formatNumber(userMetrics.pendingApprovals));
-updateText("#metricSuspended", formatNumber(userMetrics.suspendedUsers));
 
 populateQuickStats(userMetrics, caseMetrics, escrowMetrics);
 
@@ -415,7 +414,7 @@ function filterActiveUsers(users = []) {
     const id = String(user.id || user._id || "").trim();
     if (removedUserIds.has(id)) return false;
     const status = String(user.status || "").toLowerCase();
-    if (status === "denied" || status === "suspended") return false;
+    if (status === "denied") return false;
     return true;
   });
 }

@@ -29,6 +29,12 @@ const APPLICANT_STATUS = ["pending", "accepted", "rejected"];
 const FILE_STATUS = ["pending_review", "approved", "attorney_revision"];
 
 const ZOOM_REGEX = /^https:\/\/.*zoom\.us\/[^\s]+$/i;
+const DEFAULT_ATTORNEY_FEE_PCT = Number(
+  process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 21
+);
+const DEFAULT_PARALEGAL_FEE_PCT = Number(
+  process.env.PLATFORM_FEE_PARALEGAL_PERCENT || process.env.PLATFORM_FEE_PERCENT || 18
+);
 
 function cents(n) {
   if (n == null) return 0;
@@ -219,8 +225,8 @@ const caseSchema = new Schema(
     paymentStatus: { type: String, default: "pending", trim: true },
 
     // Platform fee snapshots (computed at funding time)
-    feeAttorneyPct: { type: Number, default: 15, min: 0, max: 100 }, // %
-    feeParalegalPct: { type: Number, default: 15, min: 0, max: 100 }, // %
+    feeAttorneyPct: { type: Number, default: DEFAULT_ATTORNEY_FEE_PCT, min: 0, max: 100 }, // %
+    feeParalegalPct: { type: Number, default: DEFAULT_PARALEGAL_FEE_PCT, min: 0, max: 100 }, // %
     feeAttorneyAmount: { type: Number, default: 0, min: 0 }, // cents
     feeParalegalAmount: { type: Number, default: 0, min: 0 }, // cents
 

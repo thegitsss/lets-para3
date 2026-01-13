@@ -340,6 +340,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- STRIPE CONNECT ---
   const connectStripeBtn = document.getElementById("connectStripeBtn");
   const stripeStatus = document.getElementById("stripeStatus");
+  const cachedRole = String(getCachedUser()?.role || "").toLowerCase();
+  const isParalegal = cachedRole === "paralegal";
 
   const updateStripeStatus = (data = {}) => {
     const connected = !!data.details_submitted && !!data.payouts_enabled;
@@ -370,6 +372,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   async function refreshStripeStatus() {
+    if (!isParalegal) return;
     if (!connectStripeBtn && !stripeStatus) return;
     if (stripeStatus) stripeStatus.textContent = "Checking Stripe status…";
     try {
@@ -389,6 +392,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (connectStripeBtn) {
     connectStripeBtn.addEventListener("click", async () => {
+      if (!isParalegal) return;
       if (connectStripeBtn.disabled) return;
       connectStripeBtn.disabled = true;
       connectStripeBtn.textContent = "Connecting…";
@@ -411,6 +415,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
     refreshStripeStatus();
+    if (!isParalegal) {
+      connectStripeBtn.disabled = true;
+      connectStripeBtn.setAttribute("aria-disabled", "true");
+    }
+  } else if (!isParalegal && stripeStatus) {
+    stripeStatus.textContent = "";
   }
 });
 
@@ -1703,6 +1713,10 @@ function applyUnifiedRoleStyling(user = {}) {
     title.textContent = role === "paralegal" ? "Account Settings" : "Account Settings";
   }
   document.body.classList.toggle("paralegal-flat", isParalegal);
+  document.body.classList.toggle("attorney-classic", role === "attorney");
+  if (eyebrow) {
+    eyebrow.style.display = role === "attorney" ? "none" : "";
+  }
 
   document.querySelectorAll("[data-paralegal-only]").forEach((el) => {
     if (el.dataset.forceVisible !== undefined) {

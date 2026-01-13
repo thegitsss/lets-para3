@@ -67,7 +67,12 @@ const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
 }, {});
 const IN_PROGRESS_STATUS = "in progress";
 const LEGACY_IN_PROGRESS_STATUS = "in progress";
-const PLATFORM_FEE_PERCENT = Number(process.env.PLATFORM_FEE_PERCENT || 15);
+const PLATFORM_FEE_ATTORNEY_PERCENT = Number(
+  process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 21
+);
+const PLATFORM_FEE_PARALEGAL_PERCENT = Number(
+  process.env.PLATFORM_FEE_PARALEGAL_PERCENT || process.env.PLATFORM_FEE_PERCENT || 18
+);
 const WORK_STARTED_STATUSES = new Set([
   "active",
   "awaiting_documents",
@@ -164,18 +169,44 @@ async function resolvePaymentMethodLabel(caseDoc) {
   return "Card on file";
 }
 
+function resolveAttorneyFeePct(doc = {}) {
+  return typeof doc.feeAttorneyPct === "number" && Number.isFinite(doc.feeAttorneyPct)
+    ? doc.feeAttorneyPct
+    : PLATFORM_FEE_ATTORNEY_PERCENT;
+}
+
+function resolveParalegalFeePct(doc = {}) {
+  return typeof doc.feeParalegalPct === "number" && Number.isFinite(doc.feeParalegalPct)
+    ? doc.feeParalegalPct
+    : PLATFORM_FEE_PARALEGAL_PERCENT;
+}
+
+function computeAttorneyFeeAmount(baseAmount, doc = {}) {
+  if (Number.isFinite(doc.feeAttorneyAmount) && doc.feeAttorneyAmount >= 0) {
+    return doc.feeAttorneyAmount;
+  }
+  return Math.max(0, Math.round(baseAmount * (resolveAttorneyFeePct(doc) / 100)));
+}
+
+function computeParalegalFeeAmount(baseAmount, doc = {}) {
+  if (Number.isFinite(doc.feeParalegalAmount) && doc.feeParalegalAmount >= 0) {
+    return doc.feeParalegalAmount;
+  }
+  return Math.max(0, Math.round(baseAmount * (resolveParalegalFeePct(doc) / 100)));
+}
+
 async function generateReceiptDocuments(caseDoc, { payoutAmount, paymentMethodLabel } = {}) {
   if (!caseDoc?._id) return;
   const baseAmount = Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
-  const platformFee =
-    Number.isFinite(caseDoc.feeAttorneyAmount) && caseDoc.feeAttorneyAmount >= 0
-      ? caseDoc.feeAttorneyAmount
-      : Math.max(0, Math.round(baseAmount * (PLATFORM_FEE_PERCENT / 100)));
+  const attorneyFee = computeAttorneyFeeAmount(baseAmount, caseDoc);
+  const paralegalFee = computeParalegalFeeAmount(baseAmount, caseDoc);
   const payout =
     Number.isFinite(payoutAmount) && payoutAmount >= 0
       ? payoutAmount
-      : Math.max(0, baseAmount - platformFee);
+      : Math.max(0, baseAmount - paralegalFee);
   const issuedAt = caseDoc.completedAt || caseDoc.paidOutAt || new Date();
+  const attorneyPct = resolveAttorneyFeePct(caseDoc);
+  const paralegalPct = resolveParalegalFeePct(caseDoc);
 
   const attorneyName =
     caseDoc.attorneyNameSnapshot ||
@@ -197,10 +228,10 @@ async function generateReceiptDocuments(caseDoc, { payoutAmount, paymentMethodLa
     caseTitle: caseDoc.title || "Case",
     lineItems: [
       { label: "Case fee", value: formatCurrency(baseAmount) },
-      { label: `Platform fee (${PLATFORM_FEE_PERCENT}%)`, value: formatCurrency(platformFee) },
+      { label: `Platform fee (${attorneyPct}%)`, value: formatCurrency(attorneyFee) },
     ],
     totalLabel: "Total paid",
-    totalAmount: formatCurrency(baseAmount + platformFee),
+    totalAmount: formatCurrency(baseAmount + attorneyFee),
     paymentMethod: paymentMethodLabel || "Card on file",
     paymentStatus: "Paid in full",
   };
@@ -215,7 +246,7 @@ async function generateReceiptDocuments(caseDoc, { payoutAmount, paymentMethodLa
     caseTitle: caseDoc.title || "Case",
     lineItems: [
       { label: "Gross amount", value: formatCurrency(baseAmount) },
-      { label: `Platform fee (${PLATFORM_FEE_PERCENT}%)`, value: formatCurrency(platformFee) },
+      { label: `Platform fee (${paralegalPct}%)`, value: formatCurrency(paralegalFee) },
     ],
     totalLabel: "Net paid",
     totalAmount: formatCurrency(payout),
@@ -722,8 +753,9 @@ async function ensureFundsReleased(req, caseDoc) {
   if (!Number.isFinite(budgetCents) || budgetCents <= 0) {
     throw new Error("Case total amount is invalid.");
   }
-  const feeAmount = Math.max(0, Math.round(budgetCents * (PLATFORM_FEE_PERCENT / 100)));
-  const payout = Math.max(0, budgetCents - feeAmount);
+  const attorneyFee = computeAttorneyFeeAmount(budgetCents, caseDoc);
+  const paralegalFee = computeParalegalFeeAmount(budgetCents, caseDoc);
+  const payout = Math.max(0, budgetCents - paralegalFee);
   if (payout <= 0) {
     throw new Error("Calculated payout must be positive.");
   }
@@ -763,11 +795,10 @@ async function ensureFundsReleased(req, caseDoc) {
   caseDoc.paidOutAt = completedAt;
   caseDoc.completedAt = caseDoc.completedAt || completedAt;
   caseDoc.briefSummary = `${caseDoc.title} – ${paralegalName} – completed ${completedAt.toISOString().split("T")[0]}`;
-  const attorneyFee = Number.isFinite(caseDoc.feeAttorneyAmount) ? caseDoc.feeAttorneyAmount : feeAmount;
-  if (!Number.isFinite(caseDoc.feeAttorneyPct)) caseDoc.feeAttorneyPct = PLATFORM_FEE_PERCENT;
+  if (!Number.isFinite(caseDoc.feeAttorneyPct)) caseDoc.feeAttorneyPct = resolveAttorneyFeePct(caseDoc);
   if (!Number.isFinite(caseDoc.feeAttorneyAmount)) caseDoc.feeAttorneyAmount = attorneyFee;
-  caseDoc.feeParalegalPct = PLATFORM_FEE_PERCENT;
-  caseDoc.feeParalegalAmount = feeAmount;
+  if (!Number.isFinite(caseDoc.feeParalegalPct)) caseDoc.feeParalegalPct = resolveParalegalFeePct(caseDoc);
+  if (!Number.isFinite(caseDoc.feeParalegalAmount)) caseDoc.feeParalegalAmount = paralegalFee;
 
   const attorneyObjectId = caseDoc.attorney?._id || caseDoc.attorneyId || caseDoc.attorney;
   const paralegalObjectId = paralegal._id || caseDoc.paralegalId || caseDoc.paralegal;
@@ -797,7 +828,7 @@ async function ensureFundsReleased(req, caseDoc) {
           caseId: caseDoc._id,
           attorneyId: attorneyObjectId,
           paralegalId: paralegalObjectId,
-          feeAmount: Math.max(0, (caseDoc.feeAttorneyAmount || 0) + feeAmount),
+          feeAmount: Math.max(0, (caseDoc.feeAttorneyAmount || attorneyFee || 0) + (paralegalFee || 0)),
         }).catch((err) => {
           if (err?.code === 11000) return null;
           throw err;
@@ -822,7 +853,7 @@ async function ensureFundsReleased(req, caseDoc) {
 
   try {
     const completedDateStr = completedAt.toLocaleDateString("en-US");
-    const feeDisplay = `$${(feeAmount / 100).toFixed(2)}`;
+    const feeDisplay = `$${(paralegalFee / 100).toFixed(2)}`;
     const totalDisplay = `$${(budgetCents / 100).toFixed(2)}`;
     if (caseDoc.attorney?.email) {
       const attorneyName = `${caseDoc.attorney.firstName || ""} ${caseDoc.attorney.lastName || ""}`.trim() || "there";
@@ -841,7 +872,7 @@ async function ensureFundsReleased(req, caseDoc) {
         "Your payout is complete",
         `<p>Hi ${paraName},</p>
          <p>Your payout for "<strong>${caseDoc.title}</strong>" is complete.</p>
-         <p>Job amount (escrow): ${totalDisplay}<br/>Platform fee (15%) deducted: ${feeDisplay}<br/>Payout: <strong>${payoutDisplay}</strong></p>`
+         <p>Job amount (escrow): ${totalDisplay}<br/>Platform fee (${resolveParalegalFeePct(caseDoc)}%) deducted: ${feeDisplay}<br/>Payout: <strong>${payoutDisplay}</strong></p>`
       );
     }
   } catch (err) {
@@ -852,7 +883,7 @@ async function ensureFundsReleased(req, caseDoc) {
     targetType: "case",
     targetId: caseDoc._id,
     caseId: caseDoc._id,
-    meta: { payout, feeAmount, transferId: transfer.id },
+    meta: { payout, feeParalegalAmount: paralegalFee, transferId: transfer.id },
   });
 
   return { payout, transferId: transfer.id };
@@ -2646,7 +2677,8 @@ router.post(
     const attorney = await User.findById(req.user.id).select("firstName lastName email role stripeCustomerId");
     if (!attorney) return res.status(404).json({ error: "Attorney not found" });
 
-    const platformFee = Math.max(0, Math.round(budgetCents * (PLATFORM_FEE_PERCENT / 100)));
+    const attorneyFee = Math.max(0, Math.round(budgetCents * (resolveAttorneyFeePct(selectedCase) / 100)));
+    const paralegalFee = Math.max(0, Math.round(budgetCents * (resolveParalegalFeePct(selectedCase) / 100)));
     const escrowFunded =
       !!selectedCase.escrowIntentId && String(selectedCase.escrowStatus || "").toLowerCase() === "funded";
 
@@ -2689,10 +2721,10 @@ router.post(
         selectedCase.status = "awaiting_funding";
       }
     }
-    selectedCase.feeAttorneyPct = PLATFORM_FEE_PERCENT;
-    selectedCase.feeAttorneyAmount = platformFee;
-    selectedCase.feeParalegalPct = PLATFORM_FEE_PERCENT;
-    selectedCase.feeParalegalAmount = Math.max(0, Math.round(budgetCents * (PLATFORM_FEE_PERCENT / 100)));
+    selectedCase.feeAttorneyPct = resolveAttorneyFeePct(selectedCase);
+    selectedCase.feeAttorneyAmount = attorneyFee;
+    selectedCase.feeParalegalPct = resolveParalegalFeePct(selectedCase);
+    selectedCase.feeParalegalAmount = paralegalFee;
     let hiredWasApplicant = false;
     const rejectedApplicantIds = new Set();
     if (Array.isArray(selectedCase.applicants) && selectedCase.applicants.length) {
