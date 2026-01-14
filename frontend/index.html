@@ -1788,22 +1788,99 @@ updateHeaderAppearance();
       trigger: ".parallax-section"
     });
 
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
+    const hasCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+    const isTouchOnly = hasCoarsePointer && !hasFinePointer;
+    const isSmallScreen = window.innerWidth <= 768;
+    if (prefersReducedMotion.matches || isTouchOnly || isSmallScreen) return;
+
+    const enableSmoothWheelFallback = () => {
+      const state = {
+        target: window.scrollY || 0,
+        current: window.scrollY || 0,
+        max: Math.max(0, document.documentElement.scrollHeight - window.innerHeight),
+        active: false,
+        rafId: null,
+        enabled: true,
+      };
+
+      const updateMax = () => {
+        state.max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      };
+
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+      const syncScroll = () => {
+        if (state.active) return;
+        state.current = window.scrollY || 0;
+        state.target = state.current;
+      };
+
+      const animate = () => {
+        if (!state.active || !state.enabled) return;
+        const delta = state.target - state.current;
+        state.current += delta * 0.12;
+        if (Math.abs(delta) < 0.5) {
+          state.current = state.target;
+          window.scrollTo(0, state.current);
+          state.active = false;
+          return;
+        }
+        window.scrollTo(0, state.current);
+        if (typeof ScrollTrigger !== 'undefined') ScrollTrigger.update();
+        state.rafId = requestAnimationFrame(animate);
+      };
+
+      const onWheel = (event) => {
+        if (!state.enabled) return;
+        if (event.ctrlKey) return;
+        if (event.deltaMode === 0 && Math.abs(event.deltaY) < 40) return;
+        event.preventDefault();
+        updateMax();
+        let delta = event.deltaY;
+        if (event.deltaMode === 1) delta *= 48;
+        if (event.deltaMode === 2) delta *= window.innerHeight * 0.9;
+        state.target = clamp(state.target + delta, 0, state.max);
+        if (!state.active) {
+          state.active = true;
+          state.rafId = requestAnimationFrame(animate);
+        }
+      };
+
+      const start = () => {
+        if (state.enabled) return;
+        state.enabled = true;
+        syncScroll();
+      };
+
+      const stop = () => {
+        state.enabled = false;
+        state.active = false;
+        if (state.rafId) cancelAnimationFrame(state.rafId);
+        state.rafId = null;
+      };
+
+      window.addEventListener('wheel', onWheel, { passive: false });
+      window.addEventListener('resize', updateMax);
+      window.addEventListener('scroll', syncScroll, { passive: true });
+
+      return { start, stop };
+    };
+
     if (typeof LocomotiveScroll !== 'undefined') {
-      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-      const hasFinePointer = window.matchMedia('(pointer: fine)').matches;
-      const hasCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
-      const isTouchOnly = hasCoarsePointer && !hasFinePointer;
-      const isSmallScreen = window.innerWidth <= 768;
-      if (prefersReducedMotion.matches || isTouchOnly || isSmallScreen) return;
 
       const locomotiveScroll = new LocomotiveScroll({
         lenisOptions: {
-          duration: 2,
+          duration: 1.2,
           easing: (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
           direction: 'vertical',
           smooth: true,
+          smoothWheel: true,
           smoothTouch: false,
-          touchMultiplier: 1.5,
+          touchMultiplier: 1.2,
+          wheelMultiplier: 1.1,
+          normalizeWheel: true,
         },
       });
 
@@ -1834,6 +1911,12 @@ updateHeaderAppearance();
       }
       window.lenis = lenis;
       window.locomotiveScroll = locomotiveScroll;
+    } else {
+      const fallback = enableSmoothWheelFallback();
+      window.lenis = {
+        start: fallback.start,
+        stop: fallback.stop,
+      };
     }
   };
 </script>

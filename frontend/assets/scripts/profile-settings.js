@@ -89,6 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const themePreviewButtons = document.querySelectorAll("[data-theme-preview]");
   const emailToggle = document.getElementById("emailNotificationsToggle");
   const fontSizeSelect = document.getElementById("fontSizePreference");
+  const hideProfileToggle = document.getElementById("paralegalHideProfile");
   statePreferenceSelect = document.getElementById("statePreference");
 
   const updateThemePreview = (value) => {
@@ -233,6 +234,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const resolvedSize = prefs.fontSize || fontSizeSelect.value || "md";
         applyFontSizeSelection(resolvedSize, { skipPersist: true });
       }
+      if (hideProfileToggle) hideProfileToggle.checked = !!prefs.hideProfile;
       const stateValue = prefs.state || currentUser?.location || currentUser?.state || "";
       if (statePreferenceSelect) {
         setStatePreferenceValue(stateValue);
@@ -521,6 +523,7 @@ let attorneyPrefsBound = false;
 let attorneySaveBound = false;
 let paralegalPrefsBound = false;
 let paralegalEditBound = false;
+let paralegalVisibilityBound = false;
 let activeParalegalSection = null;
 
 const FIELD_OF_LAW_OPTIONS = [
@@ -708,6 +711,8 @@ function initParalegalSettings(user = {}) {
   initParalegalSectionEditing();
   hydrateParalegalNotificationPrefs(user);
   bindParalegalNotificationToggles();
+  hydrateParalegalVisibilityPref(user);
+  bindParalegalVisibilityToggle();
   renderLanguageEditor(user.languages || []);
   try { loadCertificate(user); } catch {}
   try { loadResume(user); } catch {}
@@ -1323,6 +1328,32 @@ function bindParalegalNotificationToggles() {
   paralegalPrefsBound = true;
 }
 
+function bindParalegalVisibilityToggle() {
+  if (paralegalVisibilityBound) return;
+  const input = document.getElementById("paralegalHideProfile");
+  if (!input) return;
+  input.addEventListener("change", async () => {
+    const checked = input.checked;
+    try {
+      const prefs = await saveProfileVisibility(checked);
+      if (currentUser) {
+        currentUser.preferences = {
+          ...(currentUser.preferences || {}),
+          hideProfile: prefs?.hideProfile ?? checked
+        };
+        persistSession({ user: currentUser });
+        window.updateSessionUser?.(currentUser);
+      }
+      showToast(checked ? "Profile hidden" : "Profile visible", "ok");
+    } catch (err) {
+      console.error("Unable to update profile visibility", err);
+      input.checked = !checked;
+      showToast("Unable to update profile visibility right now.", "err");
+    }
+  });
+  paralegalVisibilityBound = true;
+}
+
 function hydrateAttorneyNotificationPrefs(user = {}) {
   const prefs = user.notificationPrefs || {};
   const emailToggle = document.getElementById("attorneyEmailNotifications");
@@ -1351,6 +1382,15 @@ function hydrateParalegalNotificationPrefs(user = {}) {
     emailMessages: prefs.emailMessages !== false,
     emailCase: prefs.emailCase !== false
   };
+}
+
+function hydrateParalegalVisibilityPref(user = {}) {
+  const toggle = document.getElementById("paralegalHideProfile");
+  if (!toggle) return;
+  const hidden = user?.preferences && typeof user.preferences === "object"
+    ? user.preferences.hideProfile
+    : false;
+  toggle.checked = !!hidden;
 }
 
 function collectAttorneyPayload() {
@@ -1451,6 +1491,18 @@ async function saveNotificationPref(key, value) {
     const errPayload = await res.json().catch(() => ({}));
     throw new Error(errPayload?.error || "Preference update failed");
   }
+}
+
+async function saveProfileVisibility(value) {
+  const res = await secureFetch("/api/account/preferences", {
+    method: "POST",
+    body: { hideProfile: !!value }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || "Preference update failed");
+  }
+  return data?.preferences || {};
 }
 
 function normalizeLanguageEntry(entry) {

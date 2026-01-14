@@ -46,10 +46,6 @@ const elements = {
   clearFilters: document.getElementById("clearFilters"),
 };
 
-const viewer = getCachedUser();
-const viewerRole = String(viewer?.role || "").toLowerCase();
-let authBlockerTimer = null;
-
 const state = {
   page: 1,
   limit: 15,
@@ -61,10 +57,10 @@ const state = {
     location: "",
     specialties: selectedSpecialties,
   },
-  viewer,
-  viewerRole,
-  isLoggedIn: Boolean(viewer),
-  canInvite: viewerRole === "attorney",
+  viewer: null,
+  viewerRole: "",
+  isLoggedIn: false,
+  canInvite: false,
 };
 
 let availableCases = [];
@@ -81,10 +77,7 @@ function normalizeId(val) {
 document.addEventListener("DOMContentLoaded", init);
 
 async function init() {
-  if (state.viewerRole === "paralegal") {
-    window.location.replace("dashboard-paralegal.html");
-    return;
-  }
+  await hydrateViewer();
   syncAuthButtons();
   initStateDropdown();
   initSpecialtyDropdown();
@@ -92,18 +85,30 @@ async function init() {
   bindFilterMenuToggle();
   bindFilterButtons();
   bindModalEvents();
-  bindPublicGuards();
 
   if (state.canInvite) {
     await loadCases();
   } else {
     renderCaseOptions();
-    if (!authBlockerTimer) {
-      authBlockerTimer = window.setTimeout(() => gatePublicAccess(), 10_000);
-    }
   }
 
   await loadParalegals();
+}
+
+async function hydrateViewer() {
+  let user = null;
+  let role = "";
+  if (typeof window.getSessionData === "function") {
+    try {
+      const session = await window.getSessionData();
+      user = session?.user || null;
+      role = session?.role || "";
+    } catch {}
+  }
+  state.viewer = user;
+  state.viewerRole = String(role || "").toLowerCase();
+  state.isLoggedIn = Boolean(user);
+  state.canInvite = state.viewerRole === "attorney";
 }
 
 function syncAuthButtons() {
@@ -200,43 +205,6 @@ function syncFiltersFromInputs() {
   state.filters.location = elements.stateInput?.value?.trim() || "";
 }
 
-function gatePublicAccess() {
-  if (state.isLoggedIn) return;
-  if (document.querySelector(".auth-blocker")) return;
-  const blocker = document.createElement("div");
-  blocker.className = "auth-blocker";
-  blocker.innerHTML = `
-    <div class="auth-blocker__card">
-      <h2>Members only</h2>
-      <p>Please log in to view paralegal profiles.</p>
-      <div class="auth-blocker__actions">
-        <a class="btn primary" href="login.html">Log In</a>
-        <a class="btn secondary" href="signup.html">Create Account</a>
-      </div>
-    </div>
-  `;
-  const root = document.body;
-  root.appendChild(blocker);
-  const previousOverflow = root.style.overflow;
-  root.style.overflow = "hidden";
-  const disableClicks = (e) => {
-    if (!blocker.contains(e.target)) {
-      e.preventDefault();
-      e.stopPropagation();
-      return false;
-    }
-    return true;
-  };
-  document.addEventListener("click", disableClicks, true);
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") window.location.href = "login.html";
-  });
-  blocker.addEventListener("transitionend", () => {
-    // no-op placeholder for future animations
-  });
-  blocker.dataset.cleanup = "true";
-  blocker.dataset.prevOverflow = previousOverflow;
-}
 
 function bindModalEvents() {
   elements.cancelInquire?.addEventListener("click", closeInquireModal);
@@ -255,19 +223,6 @@ function bindModalEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeInquireModal();
   });
-}
-
-function bindPublicGuards() {
-  if (state.isLoggedIn) return;
-  const blocker = (event) => {
-    if (event.target?.closest(".auth-blocker")) return;
-    const actionable = event.target?.closest("a, button, [role='button'], input, textarea, select, label");
-    if (!actionable) return;
-    event.preventDefault();
-    event.stopPropagation();
-    return false;
-  };
-  document.addEventListener("click", blocker, true);
 }
 
 function initStateDropdown() {
@@ -349,9 +304,9 @@ async function loadParalegals() {
   }
 
   try {
-    const res = await fetch(`/api/public/paralegals?${params.toString()}`, {
+    const res = await fetch(`/public/paralegals?${params.toString()}`, {
       headers: { Accept: "application/json" },
-      credentials: "include",
+      credentials: state.isLoggedIn ? "include" : "omit",
     });
     const data = await res.json();
     if (!res.ok) {
@@ -633,18 +588,6 @@ function handleContactClick(paralegalId) {
     return;
   }
   window.location.href = buildParalegalProfileUrl(paralegalId);
-}
-
-function getCachedUser() {
-  if (typeof window.getStoredUser === "function") {
-    const stored = window.getStoredUser();
-    if (stored) return stored;
-  }
-  try {
-    const raw = localStorage.getItem("lpc_user");
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return null;
 }
 
 function formatExperience(years) {

@@ -1,6 +1,7 @@
 // backend/models/User.js
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const argon2 = require("argon2");
 
 const { Schema, Types } = mongoose;
 
@@ -71,6 +72,23 @@ const writingSampleSchema = new Schema(
   },
   { _id: false }
 );
+
+const ARGON2_OPTIONS = {
+  type: argon2.argon2id,
+  memoryCost: 19456,
+  timeCost: 2,
+  parallelism: 1,
+};
+const BCRYPT_PREFIX = /^\$2[aby]?\$/;
+const ARGON2_PREFIX = /^\$argon2(id|i|d)\$/;
+
+function isBcryptHash(value) {
+  return typeof value === "string" && BCRYPT_PREFIX.test(value);
+}
+
+function isArgon2Hash(value) {
+  return typeof value === "string" && ARGON2_PREFIX.test(value);
+}
 
 const experienceEntrySchema = new Schema(
   {
@@ -236,6 +254,7 @@ const userSchema = new Schema(
         enum: ["xs", "sm", "md", "lg", "xl"],
         default: "md",
       },
+      hideProfile: { type: Boolean, default: false },
     },
     pushSubscription: { type: Object, default: null },
     digestFrequency: { type: String, enum: ["off", "daily", "weekly"], default: "daily" },
@@ -319,9 +338,14 @@ userSchema.pre("validate", function (next) {
 // Hash password on create/update
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
-  const salt = await bcrypt.genSalt(12);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
+  const raw = this.password;
+  if (isArgon2Hash(raw) || isBcryptHash(raw)) return next();
+  try {
+    this.password = await argon2.hash(String(raw || ""), ARGON2_OPTIONS);
+    return next();
+  } catch (err) {
+    return next(err);
+  }
 });
 
 /** ----------------------------------------
@@ -329,7 +353,18 @@ userSchema.pre("save", async function (next) {
  * -----------------------------------------*/
 userSchema.methods.comparePassword = async function (plain) {
   // password field is select:false by default; ensure it's loaded when calling this
-  return bcrypt.compare(plain, this.password);
+  const hash = this.password;
+  if (!hash || !plain) return false;
+  const candidate = String(plain);
+  if (isArgon2Hash(hash)) {
+    return argon2.verify(hash, candidate);
+  }
+  if (isBcryptHash(hash)) {
+    const ok = await bcrypt.compare(candidate, hash);
+    if (ok) this._passwordNeedsRehash = true;
+    return ok;
+  }
+  return false;
 };
 
 userSchema.methods.recordLoginSuccess = function () {

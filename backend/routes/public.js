@@ -290,9 +290,6 @@ router.get(
   "/paralegals",
   verifyToken.optional,
   asyncHandler(async (req, res) => {
-    if (String(req.user?.role || "").toLowerCase() === "paralegal") {
-      return res.status(403).json({ error: "Paralegals cannot view other paralegals." });
-    }
     const page = clamp(parseInt(req.query.page, 10) || 1, 1, 10_000);
     const limit = clamp(parseInt(req.query.limit, 10) || 12, 1, 50);
     const search =
@@ -308,6 +305,7 @@ router.get(
     const sortKey = typeof req.query.sort === "string" ? req.query.sort.trim().toLowerCase() : "recent";
 
     const filter = { role: "paralegal", status: "approved" };
+    filter["preferences.hideProfile"] = { $ne: true };
     if (String(req.user?.role || "").toLowerCase() === "attorney") {
       const blockedIds = await getBlockedUserIds(req.user.id);
       if (blockedIds.length) {
@@ -379,13 +377,17 @@ router.get(
   "/paralegals/:id",
   verifyToken.optional,
   asyncHandler(async (req, res) => {
-    if (String(req.user?.role || "").toLowerCase() === "paralegal") {
-      return res.status(403).json({ error: "Paralegals cannot view other paralegals." });
-    }
     const { id } = req.params;
     if (!isObjId(id)) return res.status(400).json({ error: "Invalid paralegal id" });
-    const doc = await User.findById(id).select(PUBLIC_PAR_FIELDS).lean();
-    if (!doc || doc.role !== "paralegal" || doc.status !== "approved") {
+    const doc = await User.findOne({
+      _id: id,
+      role: "paralegal",
+      status: "approved",
+      "preferences.hideProfile": { $ne: true },
+    })
+      .select(PUBLIC_PAR_FIELDS)
+      .lean();
+    if (!doc) {
       return res.status(404).json({ error: "Paralegal not found" });
     }
     if (String(req.user?.role || "").toLowerCase() === "attorney") {

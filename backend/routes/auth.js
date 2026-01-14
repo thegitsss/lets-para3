@@ -674,10 +674,14 @@ router.post(
       return res.status(403).json({ msg });
     }
 
-    const ok = await bcrypt.compare(String(password), user.password);
+    const ok = await user.comparePassword(String(password));
     if (!ok) {
       await AuditLog.logFromReq(req, "auth.login.fail", { targetType: "user", targetId: user._id });
       return res.status(400).json({ msg: "Invalid credentials" });
+    }
+
+    if (user._passwordNeedsRehash) {
+      user.password = String(password);
     }
 
     const lastLoginAt = user.lastLoginAt ? new Date(user.lastLoginAt) : null;

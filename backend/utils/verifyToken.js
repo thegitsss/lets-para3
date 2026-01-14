@@ -138,11 +138,13 @@ function makeVerifier(required = true) {
 
     const payload = verifyTokenString(token);
     if (!payload) {
+      if (!required) return next();
       return res.status(403).json({ msg: "Invalid token" });
     }
 
     const user = shapeUser(payload);
     if (!user.id) {
+      if (!required) return next();
       // Must have a stable subject identifier
       return res.status(403).json({ msg: "Invalid token" });
     }

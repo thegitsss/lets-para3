@@ -192,6 +192,9 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
       fontSize:
         (src.preferences && typeof src.preferences === "object" && src.preferences.fontSize) ||
         "md",
+      hideProfile:
+        (src.preferences && typeof src.preferences === "object" && src.preferences.hideProfile) ||
+        false,
     },
   };
   if (includeEmail) {
@@ -811,7 +814,13 @@ router.get(
 
     const u = await User.findById(userId).select(SAFE_PUBLIC_SELECT).lean();
     if (!u) return res.status(404).json({ error: "User not found" });
-    if (String(req.user?.role || "").toLowerCase() === "attorney") {
+    const requesterRole = String(req.user?.role || "").toLowerCase();
+    const isOwner = String(req.user?.id || req.user?._id || "") === String(u._id);
+    const isAdmin = requesterRole === "admin";
+    if (u.role === "paralegal" && u.preferences?.hideProfile && !isOwner && !isAdmin) {
+      return res.status(404).json({ error: "Profile not available" });
+    }
+    if (requesterRole === "attorney") {
       const blocked = await isBlockedBetween(req.user.id, u._id);
       if (blocked) return res.status(403).json({ error: BLOCKED_MESSAGE });
     }
@@ -838,6 +847,10 @@ paralegalRouter.get(
   requireRole("attorney", "admin"),
   asyncHandler(async (req, res) => {
     const { filter, sortOpt, page, limit } = parseParalegalFilters(req.query);
+    const isAdmin = String(req.user.role || "").toLowerCase() === "admin";
+    if (!isAdmin) {
+      filter["preferences.hideProfile"] = { $ne: true };
+    }
     if (String(req.user.role || "").toLowerCase() === "attorney") {
       const blockedIds = await getBlockedUserIds(req.user.id);
       if (blockedIds.length) {
@@ -875,6 +888,12 @@ paralegalRouter.get(
 
     const profile = await User.findById(targetId).select(PARALEGAL_SELECT);
     if (!profile) return res.status(404).json({ error: "Paralegal not found" });
+    const requesterRole = String(req.user.role || "").toLowerCase();
+    const isOwner = String(profile._id) === String(req.user.id);
+    const isAdmin = requesterRole === "admin";
+    if (profile.role === "paralegal" && profile.preferences?.hideProfile && !isOwner && !isAdmin) {
+      return res.status(404).json({ error: "Paralegal not found" });
+    }
     if (String(req.user.role || "").toLowerCase() === "attorney") {
       const blocked = await isBlockedBetween(req.user.id, profile._id);
       if (blocked) return res.status(403).json({ error: BLOCKED_MESSAGE });
@@ -882,7 +901,6 @@ paralegalRouter.get(
     if (profile.role !== "paralegal" && String(profile._id) !== String(req.user.id) && req.user.role !== "admin") {
       return res.status(404).json({ error: "Paralegal not found" });
     }
-    const isOwner = String(profile._id) === String(req.user.id);
     if (
       profile.role === "paralegal" &&
       profile.status !== "approved" &&

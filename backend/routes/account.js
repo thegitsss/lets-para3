@@ -55,6 +55,9 @@ router.get(
       fontSize:
         (user.preferences && typeof user.preferences === "object" && user.preferences.fontSize) ||
         "md",
+      hideProfile:
+        (user.preferences && typeof user.preferences === "object" && user.preferences.hideProfile) ||
+        false,
       state: user.location || user.state || "",
     });
   })
@@ -63,7 +66,7 @@ router.get(
 router.post(
   "/preferences",
   asyncHandler(async (req, res) => {
-    const { email, theme, state, fontSize } = req.body || {};
+    const { email, theme, state, fontSize, hideProfile } = req.body || {};
     const user = await User.findById(req.user.id).select("notificationPrefs preferences location");
     if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -72,10 +75,12 @@ router.post(
         ? user.notificationPrefs.toObject()
         : user.notificationPrefs || {};
 
-    user.notificationPrefs = {
-      ...current,
-      email: !!email,
-    };
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, "email")) {
+      user.notificationPrefs = {
+        ...current,
+        email: !!email,
+      };
+    }
 
     const normalizedTheme =
       typeof theme === "string" && ["light", "dark", "mountain", "mountain-dark"].includes(theme.toLowerCase())
@@ -85,13 +90,15 @@ router.post(
       typeof fontSize === "string" && ["xs", "sm", "md", "lg", "xl"].includes(fontSize.toLowerCase())
         ? fontSize.toLowerCase()
         : null;
-    if (normalizedTheme || normalizedFontSize) {
+    const normalizedHideProfile = typeof hideProfile === "boolean" ? hideProfile : null;
+    if (normalizedTheme || normalizedFontSize || normalizedHideProfile !== null) {
       user.preferences = {
         ...(typeof user.preferences?.toObject === "function"
           ? user.preferences.toObject()
           : user.preferences || {}),
         ...(normalizedTheme ? { theme: normalizedTheme } : {}),
         ...(normalizedFontSize ? { fontSize: normalizedFontSize } : {}),
+        ...(normalizedHideProfile !== null ? { hideProfile: normalizedHideProfile } : {}),
       };
     }
 
@@ -109,9 +116,13 @@ router.post(
     res.json({
       success: true,
       preferences: {
-        email: !!email,
+        email: user.notificationPrefs?.email !== false,
         theme: normalizedTheme || user.preferences?.theme || "mountain",
         fontSize: normalizedFontSize || user.preferences?.fontSize || "md",
+        hideProfile:
+          normalizedHideProfile !== null
+            ? normalizedHideProfile
+            : user.preferences?.hideProfile || false,
       },
       state: user.location || "",
     });
