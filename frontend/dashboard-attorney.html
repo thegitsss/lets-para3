@@ -432,8 +432,9 @@
 
     .summary {
       display: flex;
-      gap: 2rem;
-      margin-bottom: 2rem;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
     }
 
     .info-box {
@@ -442,7 +443,8 @@
       border-radius: var(--radius);
       padding: 1rem 1.25rem;
       font-size: 0.95rem;
-      flex: 1;
+      flex: 1 1 220px;
+      min-width: 220px;
     }
     .message-box {
       cursor:pointer;
@@ -452,6 +454,135 @@
       background:rgba(182,164,122,0.08);
       border-color:var(--accent);
       transform:scale(1.02);
+    }
+
+    .today-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .today-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      min-height: 120px;
+    }
+
+    .today-label {
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .today-value {
+      font-size: 1.6rem;
+      font-weight: 300;
+    }
+
+    .today-sub {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .today-link {
+      margin-top: auto;
+      font-size: 0.85rem;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .today-link:hover {
+      text-decoration: underline;
+    }
+
+    .action-queue {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .queue-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+
+    .queue-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding-bottom: 0.85rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .queue-item:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .queue-title {
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+    }
+
+    .queue-meta {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .queue-action {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      border-radius: 999px;
+      padding: 0.4rem 1rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .queue-action:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .home-tabs {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .home-tab {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.45rem 1.2rem;
+      font-size: 0.9rem;
+      background: var(--panel);
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .home-tab.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .home-panel[hidden] {
+      display: none;
     }
 
     .section-title {
@@ -2116,76 +2247,132 @@
         <p id="activeCasesHeading"></p>
       </header>
 
-      <section class="summary">
-        <div class="info-box" id="attorneyActiveCases" data-metric="activeCases"></div>
-        <div class="info-box message-box" id="messageBox">
-          <div>
-            <span id="messageCount"></span> message<span id="plural"></span>
-          </div>
-          <div id="messageSnippet" style="margin-top:.3rem;color:var(--muted);font-size:.85rem;"></div>
+      <section class="today-strip">
+        <div class="today-card">
+          <div class="today-label">Unfunded escrows</div>
+          <div class="today-value" data-today="unfunded">0</div>
+          <div class="today-sub">Matters awaiting funding</div>
+          <a class="today-link" href="#cases" data-view-target="cases">Review cases</a>
         </div>
-        <div class="info-box" id="attorneyOverdueTasks" data-metric="overdueTasks"></div>
-        <div class="info-box" id="attorneyEscrowTotal" data-metric="escrowTotal"></div>
+        <div class="today-card">
+          <div class="today-label">Pending reviews</div>
+          <div class="today-value" data-today="pendingReviews">0</div>
+          <div class="today-sub">Submissions awaiting review</div>
+          <a class="today-link" href="#cases" data-view-target="cases">Open case files</a>
+        </div>
+        <div class="today-card message-box" id="messageBox" role="button" tabindex="0">
+          <div class="today-label">Unread messages</div>
+          <div class="today-value"><span id="messageCount">0</span> <span id="plural">waiting</span></div>
+          <div class="today-sub" id="messageSnippet">No unread messages.</div>
+        </div>
+        <div class="today-card">
+          <div class="today-label">New applications</div>
+          <div class="today-value" data-today="applications">0</div>
+          <div class="today-sub">Applications awaiting review</div>
+          <a class="today-link" href="#applicationsSection">View applications</a>
+        </div>
       </section>
 
-      <section class="deadlines">
-        <div class="section-title">Upcoming Deadlines</div>
-        <div id="deadlineList">
-          <div class="info-line" id="attorneyDeadlinesEmpty" style="color:var(--muted);" hidden>No upcoming deadlines.</div>
+      <section class="action-queue">
+        <div class="section-title">Action Queue</div>
+        <div class="queue-list">
+          <div class="queue-item">
+            <div>
+              <div class="queue-title">Fund escrow</div>
+              <div class="queue-meta"><span data-queue="unfunded">0</span> matters awaiting funding</div>
+            </div>
+            <a class="queue-action" href="#cases" data-view-target="cases">Review</a>
+          </div>
+          <div class="queue-item">
+            <div>
+              <div class="queue-title">Review submissions</div>
+              <div class="queue-meta"><span data-queue="pendingReviews">0</span> matters need review</div>
+            </div>
+            <a class="queue-action" href="#cases" data-view-target="cases">Open files</a>
+          </div>
+          <div class="queue-item">
+            <div>
+              <div class="queue-title">Review applications</div>
+              <div class="queue-meta"><span data-queue="applications">0</span> new applicants</div>
+            </div>
+            <a class="queue-action" href="#cases" data-view-target="cases">View</a>
+          </div>
         </div>
       </section>
 
-      <div class="side-by-side-panels">
-        <section id="latestMessagePreview">
-          <div class="section-title">Unread Messages</div>
-          <div class="info-line">
-            <strong id="messagePreviewSender"></strong>
-            <span id="messagePreviewText"></span>
-            <a id="messagePreviewLink" href="#" style="color:var(--accent);font-weight:500;">View</a>
-          </div>
-        </section>
-        <section>
-          <div class="section-title">Invoices &amp; Receipts</div>
-          <div id="escrowDetails">
-            <div class="info-line" id="attorneyEscrowEmpty" hidden>&bull; Escrow metrics unavailable.</div>
-          </div>
-        </section>
+      <div class="home-tabs" role="tablist" aria-label="Dashboard views">
+        <button type="button" class="home-tab active" data-home-tab="cases" aria-controls="homeCasesPanel" aria-selected="true">Cases</button>
+        <button type="button" class="home-tab" data-home-tab="activity" aria-controls="homeActivityPanel" aria-selected="false">Activity</button>
       </div>
 
-      <section class="quick-actions">
-        <div class="section-title">Quick Actions</div>
-        <button type="button" data-quick-link="create-case">Create New Request</button>
-        <button type="button" data-quick-link="browse-paralegals">Browse Paralegals</button>
-      </section>
+      <section class="home-panel" data-home-panel="cases" id="homeCasesPanel">
+        <section class="summary case-snapshot">
+          <div class="info-box" id="attorneyActiveCases" data-metric="activeCases"></div>
+          <div class="info-box" id="attorneyOverdueTasks" data-metric="overdueTasks"></div>
+          <div class="info-box" id="attorneyEscrowTotal" data-metric="escrowTotal"></div>
+        </section>
 
-      <section class="case-list" id="caseCards">
-        <div class="case-card" id="attorneyCasesEmpty" hidden>
-          <div class="case-header">
-            <div>
-              <h2>No active cases</h2>
-              <div class="case-subinfo">Your upcoming assignments will appear here.</div>
+        <section class="quick-actions">
+          <div class="section-title">Quick Actions</div>
+          <button type="button" data-quick-link="create-case">Create New Request</button>
+          <button type="button" data-quick-link="browse-paralegals">Browse Paralegals</button>
+        </section>
+
+        <section class="case-list" id="caseCards">
+          <div class="case-card" id="attorneyCasesEmpty" hidden>
+            <div class="case-header">
+              <div>
+                <h2>No active cases</h2>
+                <div class="case-subinfo">Your upcoming assignments will appear here.</div>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <div class="section-title applications-title">Applications</div>
-      <section class="case-list" id="applicationsSection">
-        <div class="case-card empty-state">
-          <div class="case-header">
-            <div>
-              <h2>No applications yet</h2>
-              <div class="case-subinfo">Paralegal applications to your postings will appear here.</div>
+        <div class="section-title applications-title">Applications</div>
+        <section class="case-list" id="applicationsSection">
+          <div class="case-card empty-state">
+            <div class="case-header">
+              <div>
+                <h2>No applications yet</h2>
+                <div class="case-subinfo">Paralegal applications to your postings will appear here.</div>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
       </section>
 
-      <section class="completed-section">
-        <h2 class="section-title">Completed Jobs</h2>
-        <div id="completedJobsList" class="completed-jobs-list">
-          <p class="info-line" id="attorneyCompletedEmpty" style="color:var(--muted);" hidden>No completed jobs yet.</p>
+      <section class="home-panel" data-home-panel="activity" id="homeActivityPanel" hidden>
+        <section class="deadlines">
+          <div class="section-title">Upcoming Deadlines</div>
+          <div id="deadlineList">
+            <div class="info-line" id="attorneyDeadlinesEmpty" style="color:var(--muted);" hidden>No upcoming deadlines.</div>
+          </div>
+        </section>
+
+        <div class="side-by-side-panels">
+          <section id="latestMessagePreview">
+            <div class="section-title">Unread Messages</div>
+            <div class="info-line">
+              <strong id="messagePreviewSender"></strong>
+              <span id="messagePreviewText"></span>
+              <a id="messagePreviewLink" href="#" style="color:var(--accent);font-weight:500;">View</a>
+            </div>
+          </section>
+          <section>
+            <div class="section-title">Invoices &amp; Receipts</div>
+            <div id="escrowDetails">
+              <div class="info-line" id="attorneyEscrowEmpty" hidden>&bull; Escrow metrics unavailable.</div>
+            </div>
+          </section>
         </div>
+
+        <section class="completed-section">
+          <h2 class="section-title">Completed Jobs</h2>
+          <div id="completedJobsList" class="completed-jobs-list">
+            <p class="info-line" id="attorneyCompletedEmpty" style="color:var(--muted);" hidden>No completed jobs yet.</p>
+          </div>
+        </section>
       </section>
     </section>
 

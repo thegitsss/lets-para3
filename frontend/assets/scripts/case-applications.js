@@ -10,9 +10,11 @@ const state = {
   caseId: "",
   canHire: false,
   hasPaymentMethod: true,
+  caseAmountCents: 0,
+  caseCurrency: "USD",
 };
 
-const PENDING_HIRE_KEY = "lpc_pending_hire_funding";
+const PLATFORM_FEE_PCT = 21;
 
 init();
 
@@ -55,6 +57,8 @@ function renderCase(data) {
   const budgetCents = Number.isFinite(data?.lockedTotalAmount)
     ? data.lockedTotalAmount
     : Number(data?.totalAmount) || 0;
+  state.caseAmountCents = budgetCents;
+  state.caseCurrency = data?.currency || "USD";
   const budget = budgetCents ? formatCurrency(budgetCents / 100) : "—";
   const practice = data?.practiceArea || "General";
   const escrowFunded =
@@ -75,7 +79,7 @@ function renderCase(data) {
     setNotice(
       escrowFunded
         ? `${hiredName} has been hired. Escrow is funded and work can begin.`
-        : `${hiredName} has been hired. Fund escrow to start work.`,
+        : `${hiredName} has been hired. Escrow funding is pending.`,
       "success"
     );
   } else if (!isOpenCase) {
@@ -127,7 +131,7 @@ function buildApplicantMarkup(applicant) {
   const showHire = state.canHire && paralegalId;
   const paymentBlocked = showHire && !state.hasPaymentMethod;
   const hireDisabledAttr = paymentBlocked
-    ? ' disabled aria-disabled="true" title="Add a payment method to fund escrow."'
+    ? ' disabled aria-disabled="true" title="Add a payment method to hire."'
     : "";
 
   const snapshot = applicant?.profileSnapshot && typeof applicant.profileSnapshot === "object"
@@ -202,7 +206,7 @@ function buildApplicantMarkup(applicant) {
         }
         ${
           paymentBlocked
-            ? `<div class="applicant-meta">Payment method required to fund escrow.</div>
+            ? `<div class="applicant-meta">Payment method required to hire.</div>
               <a class="btn" href="dashboard-attorney.html#billing">Add payment method</a>`
             : ""
         }
@@ -216,15 +220,42 @@ function bindApplicantActions() {
     const hireBtn = event.target.closest("[data-hire-paralegal]");
     if (hireBtn) {
       if (!state.hasPaymentMethod) {
-        setNotice("Add a payment method to fund escrow before hiring.", "error");
+        setNotice("Add a payment method to hire before hiring.", "error");
         return;
       }
       const paralegalId = hireBtn.dataset.paralegalId || "";
       const paralegalName = hireBtn.dataset.paralegalName || "Paralegal";
       if (!paralegalId || !state.caseId) return;
-      const confirmed = await openHireConfirmModal(paralegalName);
-      if (!confirmed) return;
-      hireParalegal(state.caseId, paralegalId, paralegalName, hireBtn);
+      const amountCents = Number(state.caseAmountCents || 0);
+      if (!Number.isFinite(amountCents) || amountCents <= 0) {
+        setNotice("Escrow amount is unavailable for this case.", "error");
+        return;
+      }
+      openHireConfirmModal({
+        paralegalName,
+        amountCents,
+        feePct: PLATFORM_FEE_PCT,
+        continueHref: `case-detail.html?caseId=${encodeURIComponent(state.caseId)}`,
+        onConfirm: async () => {
+          const originalText = hireBtn?.textContent || "Hire";
+          if (hireBtn) {
+            hireBtn.dataset.btnText = originalText;
+            hireBtn.textContent = "Processing...";
+            hireBtn.setAttribute("disabled", "disabled");
+          }
+          try {
+            await hireParalegal(state.caseId, paralegalId);
+            setNotice(`${paralegalName} has been hired. Escrow funded.`, "success");
+          } catch (err) {
+            if (hireBtn) {
+              hireBtn.removeAttribute("disabled");
+              hireBtn.textContent = hireBtn.dataset.btnText || "Hire";
+              delete hireBtn.dataset.btnText;
+            }
+            throw err;
+          }
+        },
+      });
       return;
     }
     const docLink = event.target.closest("a[data-doc-key]");
@@ -253,20 +284,12 @@ async function openDocument(key) {
   }
 }
 
-async function hireParalegal(caseId, paralegalId, paralegalName, button) {
+async function hireParalegal(caseId, paralegalId) {
   if (!caseId || !paralegalId) {
-    setNotice("Missing case or paralegal identifier.", "error");
-    return;
+    throw new Error("Missing case or paralegal identifier.");
   }
   if (!state.hasPaymentMethod) {
-    setNotice("Add a payment method to fund escrow before hiring.", "error");
-    return;
-  }
-  const originalText = button?.textContent || "Hire";
-  if (button) {
-    button.dataset.btnText = originalText;
-    button.textContent = "Processing...";
-    button.setAttribute("disabled", "disabled");
+    throw new Error("Add a payment method to hire.");
   }
 
   const postHire = async () => {
@@ -287,43 +310,9 @@ async function hireParalegal(caseId, paralegalId, paralegalName, button) {
     return { res, payload };
   };
 
-  try {
-    const { res, payload } = await postHire();
-    if (!res.ok) throw new Error(payload?.error || "Unable to hire paralegal.");
-    const escrowStatus = String(payload?.escrowStatus || "").toLowerCase();
-    const funded = escrowStatus === "funded";
-    const displayName = paralegalName || "Paralegal";
-    const hasPaymentMethod = await hasDefaultPaymentMethod();
-    if (!funded && !hasPaymentMethod) {
-      const message = `Add a payment method to hire '${displayName}'`;
-      storePendingHire({ caseId, paralegalName: displayName, message });
-      setNotice(`${displayName} has been hired. Redirecting to Billing...`, "success");
-      setTimeout(() => {
-        window.location.href = "dashboard-attorney.html#billing";
-      }, 400);
-      return;
-    }
-    setNotice(
-      funded
-        ? `${displayName} has been hired. Escrow funded. Opening workspace...`
-        : `${displayName} has been hired. Redirecting to fund escrow...`,
-      "success"
-    );
-    const target = funded
-      ? `case-detail.html?caseId=${encodeURIComponent(caseId)}`
-      : `fund-escrow.html?caseId=${encodeURIComponent(caseId)}`;
-    setTimeout(() => {
-      window.location.href = target;
-    }, 400);
-  } catch (err) {
-    setNotice(err?.message || "Unable to hire paralegal.", "error");
-  } finally {
-    if (button) {
-      button.removeAttribute("disabled");
-      button.textContent = button.dataset.btnText || "Hire";
-      delete button.dataset.btnText;
-    }
-  }
+  const { res, payload } = await postHire();
+  if (!res.ok) throw new Error(payload?.error || "Unable to hire paralegal.");
+  return payload;
 }
 
 async function hasDefaultPaymentMethod() {
@@ -336,21 +325,6 @@ async function hasDefaultPaymentMethod() {
     return !!payload?.paymentMethod;
   } catch {
     return false;
-  }
-}
-
-function storePendingHire(payload) {
-  if (!payload?.caseId) return;
-  const data = {
-    caseId: String(payload.caseId),
-    paralegalName: payload.paralegalName || "",
-    message: payload.message || "",
-    fundUrl: `fund-escrow.html?caseId=${encodeURIComponent(payload.caseId)}`,
-  };
-  try {
-    localStorage.setItem(PENDING_HIRE_KEY, JSON.stringify(data));
-  } catch {
-    /* ignore */
   }
 }
 
@@ -377,47 +351,110 @@ function ensureHireModalStyles() {
     .hire-confirm-overlay{position:fixed;inset:0;background:rgba(17,24,39,.45);display:flex;align-items:center;justify-content:center;z-index:1500}
     .hire-confirm-modal{background:#fff;border-radius:16px;padding:24px;max-width:520px;width:92%;box-shadow:0 24px 50px rgba(0,0,0,.2);display:grid;gap:12px}
     .hire-confirm-title{font-weight:600;font-size:1.2rem}
+    .hire-confirm-summary{border:1px solid rgba(15,23,42,.08);border-radius:12px;padding:12px 14px;display:grid;gap:8px}
+    .hire-confirm-row{display:flex;justify-content:space-between;gap:16px;font-size:0.95rem}
+    .hire-confirm-row strong{font-weight:600}
+    .hire-confirm-total{font-weight:600}
+    .hire-confirm-error{border:1px solid rgba(185,28,28,.4);background:rgba(254,242,242,.9);color:#991b1b;border-radius:10px;padding:8px 10px;font-size:0.9rem}
+    .hire-confirm-success{border:1px solid rgba(22,163,74,.35);background:rgba(240,253,244,.9);color:#166534;border-radius:10px;padding:8px 10px;font-size:0.9rem}
     .hire-confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
   `;
   document.head.appendChild(style);
 }
 
-function openHireConfirmModal(paralegalName) {
-  return new Promise((resolve) => {
-    ensureHireModalStyles();
-    const safeName = escapeHTML(paralegalName || "Paralegal");
-    const overlay = document.createElement("div");
-    overlay.className = "hire-confirm-overlay";
-    overlay.innerHTML = `
-      <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
-        <div class="hire-confirm-title" id="hireConfirmTitle">Confirm Hire</div>
-        <p>You’re about to hire '${safeName}' for this case.</p>
-        <p>Once hired, this case will move forward and escrow funding will be required to begin work.</p>
-        <p>You’ll be able to review progress and release funds only after approving completed work.</p>
-        <div class="hire-confirm-actions">
-          <button class="btn ghost" type="button" data-hire-cancel>Cancel</button>
-          <button class="btn primary" type="button" data-hire-confirm>Confirm Hire</button>
+function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref, onConfirm }) {
+  ensureHireModalStyles();
+  const safeName = escapeHTML(paralegalName || "Paralegal");
+  const feeRate = Number(feePct || 0);
+  const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
+  const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
+  const overlay = document.createElement("div");
+  overlay.className = "hire-confirm-overlay";
+  overlay.innerHTML = `
+    <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
+      <div class="hire-confirm-title" id="hireConfirmTitle">Confirm Hire</div>
+      <p>You’re about to hire '${safeName}'. This will fund escrow immediately.</p>
+      <div class="hire-confirm-summary">
+        <div class="hire-confirm-row">
+          <span>Locked case amount</span>
+          <strong>${escapeHTML(formatCurrency(Number(amountCents || 0) / 100))}</strong>
+        </div>
+        <div class="hire-confirm-row">
+          <span>Platform fee (${feeRate}%)</span>
+          <strong>${escapeHTML(formatCurrency(feeCents / 100))}</strong>
+        </div>
+        <div class="hire-confirm-row hire-confirm-total">
+          <span>Total charge</span>
+          <strong>${escapeHTML(formatCurrency(totalCents / 100))}</strong>
         </div>
       </div>
-    `;
-    const close = (confirmed) => {
-      overlay.remove();
-      resolve(confirmed);
-    };
-    overlay.addEventListener("click", (event) => {
-      if (event.target === overlay) close(false);
-    });
-    overlay.querySelector("[data-hire-cancel]")?.addEventListener("click", () => close(false));
-    overlay.querySelector("[data-hire-confirm]")?.addEventListener("click", () => close(true));
-    document.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key === "Escape") close(false);
-      },
-      { once: true }
-    );
-    document.body.appendChild(overlay);
+      <div class="hire-confirm-error" data-hire-error hidden></div>
+      <div class="hire-confirm-success" data-hire-success hidden>Escrow funded. Work can begin.</div>
+      <div class="hire-confirm-actions" data-hire-actions>
+        <button class="btn ghost" type="button" data-hire-cancel>Cancel</button>
+        <button class="btn primary" type="button" data-hire-confirm>Confirm &amp; Hire</button>
+      </div>
+      <div class="hire-confirm-actions" data-hire-continue hidden>
+        <a class="btn primary" href="${escapeAttribute(continueHref || "#")}">Continue to case</a>
+      </div>
+    </div>
+  `;
+  const errorEl = overlay.querySelector("[data-hire-error]");
+  const successEl = overlay.querySelector("[data-hire-success]");
+  const actionsEl = overlay.querySelector("[data-hire-actions]");
+  const continueEl = overlay.querySelector("[data-hire-continue]");
+  const confirmBtn = overlay.querySelector("[data-hire-confirm]");
+  const cancelBtn = overlay.querySelector("[data-hire-cancel]");
+
+  const close = () => overlay.remove();
+  const setLoading = (isLoading) => {
+    if (confirmBtn) {
+      confirmBtn.disabled = isLoading;
+      confirmBtn.textContent = isLoading ? "Charging..." : "Confirm & Hire";
+    }
+    if (cancelBtn) cancelBtn.disabled = isLoading;
+  };
+  const showError = (message) => {
+    if (!errorEl) return;
+    if (!message) {
+      errorEl.hidden = true;
+      errorEl.textContent = "";
+      return;
+    }
+    errorEl.textContent = message;
+    errorEl.hidden = false;
+  };
+  const showSuccess = () => {
+    if (successEl) successEl.hidden = false;
+    if (actionsEl) actionsEl.hidden = true;
+    if (continueEl) continueEl.hidden = false;
+  };
+
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay && !confirmBtn?.disabled) close();
   });
+  cancelBtn?.addEventListener("click", () => {
+    if (!confirmBtn?.disabled) close();
+  });
+  confirmBtn?.addEventListener("click", async () => {
+    showError("");
+    setLoading(true);
+    try {
+      await onConfirm?.();
+      showSuccess();
+    } catch (err) {
+      showError(err?.message || "Unable to hire paralegal.");
+      setLoading(false);
+    }
+  });
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key === "Escape" && !confirmBtn?.disabled) close();
+    },
+    { once: true }
+  );
+  document.body.appendChild(overlay);
 }
 
 function formatCaseStatus(statusRaw, { hasParalegal = false, escrowFunded = false } = {}) {

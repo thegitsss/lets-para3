@@ -23,7 +23,7 @@ const STATUS_LABELS = {
 const CASE_VIEW_FILTERS = ["active", "draft", "archived", "inquiries"];
 const CASE_FILE_MAX_BYTES = 20 * 1024 * 1024;
 const LOCAL_DRAFTS_KEY = "attorneyLocalDraftCases";
-const PENDING_HIRE_KEY = "lpc_pending_hire_funding";
+const PLATFORM_FEE_PCT = 21;
 const FUNDED_WORKSPACE_STATUSES = new Set([
   "funded_in_progress",
   "in progress",
@@ -40,6 +40,14 @@ function getProfileImageUrl(user = {}) {
 const INVITE_AVATAR_FALLBACK = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
   "<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'><defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'><stop offset='0%' stop-color='#f4f4f5'/><stop offset='100%' stop-color='#e5e7eb'/></linearGradient></defs><rect width='96' height='96' rx='48' fill='url(#g)'/><circle cx='48' cy='38' r='18' fill='#d1d5db'/><path d='M20 84c6-18 22-28 28-28s22 10 28 28' fill='none' stroke='#cbd5e1' stroke-width='6' stroke-linecap='round'/></svg>"
 )}`;
+
+const overviewSignals = {
+  unreadCount: 0,
+  unfundedCount: 0,
+  pendingReviewCount: 0,
+  overdueCount: 0,
+  applicationsCount: 0,
+};
 
 const state = {
   user: null,
@@ -108,6 +116,7 @@ let openCaseMenuTrigger = null;
 let caseMenuKeydownBound = false;
 let chatMenuWrapper = null;
 let applicationsActionsBound = false;
+let homeTabsBound = false;
 
 function repositionOpenCaseMenu() {
   if (!openCaseMenu) return;
@@ -658,11 +667,18 @@ async function initOverviewPage() {
     messageBox.addEventListener("click", () => {
       goToMessages(state.latestThreadCaseId);
     });
+    messageBox.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        goToMessages(state.latestThreadCaseId);
+      }
+    });
   }
 
   function updateMessageBubble(count = 0) {
     if (messageCountSpan) messageCountSpan.textContent = String(count);
     if (pluralSpan) pluralSpan.textContent = count === 1 ? " waiting" : "s waiting";
+    updateOverviewSignals({ unreadCount: count });
   }
 
   updateMessageBubble(0);
@@ -725,6 +741,7 @@ async function initOverviewPage() {
         eligibleCaseIds,
       });
       renderApplications(apps || [], hasPaymentMethod);
+      updateOverviewSignals(buildOverviewSignals({ cases: state.cases, apps, overdueCount }));
     } catch (err) {
       console.warn("Overview hydration failed", err);
       if (deadlineList) deadlineList.innerHTML = `<div class="info-line" style="color:var(--muted);">Unable to load deadlines.</div>`;
@@ -732,6 +749,7 @@ async function initOverviewPage() {
   }
 
   setupDashboardViewRouter();
+  initHomeTabs();
 }
 
 function setupDashboardViewRouter() {
@@ -5135,6 +5153,113 @@ function updateMetrics(metrics = {}, overdueCount = 0) {
   });
 }
 
+function filterApplicationsForDisplay(apps = []) {
+  return apps.filter((app) => {
+    if (!app?.caseId) return true;
+    const caseEntry = state.caseLookup.get(String(app.caseId));
+    if (!caseEntry) return false;
+    const statusKey = normalizeCaseStatus(caseEntry?.status);
+    if (statusKey === "completed") return false;
+    if (caseEntry?.archived === true) return false;
+    if (caseEntry?.paymentReleased === true) return false;
+    return true;
+  });
+}
+
+function buildOverviewSignals({ cases = [], apps = [], overdueCount = 0 } = {}) {
+  const reviewCaseIds = new Set();
+  let unfundedCount = 0;
+
+  (cases || []).forEach((caseItem) => {
+    const statusKey = normalizeCaseStatus(caseItem?.status);
+    const hasParalegal = !!(caseItem?.paralegal || caseItem?.paralegalId);
+    const escrowFunded = String(caseItem?.escrowStatus || "").toLowerCase() === "funded";
+    const awaitingFunding =
+      statusKey === "awaiting_funding" || (hasParalegal && !escrowFunded && statusKey !== "open");
+    if (awaitingFunding) unfundedCount += 1;
+
+    const caseId = String(caseItem?.id || caseItem?._id || caseItem?.caseId || "");
+    if (statusKey === "reviewing") reviewCaseIds.add(caseId || String(reviewCaseIds.size));
+    (caseItem?.files || []).forEach((file) => {
+      const fileStatus = String(file?.status || "").toLowerCase();
+      if (fileStatus === "pending_review") {
+        reviewCaseIds.add(caseId || String(reviewCaseIds.size));
+      }
+    });
+  });
+
+  const pendingApplications = filterApplicationsForDisplay(Array.isArray(apps) ? apps : []).filter((app) => {
+    const status = String(app?.status || "").toLowerCase();
+    return !status || status === "submitted" || status === "pending";
+  }).length;
+
+  return {
+    unfundedCount,
+    pendingReviewCount: reviewCaseIds.size,
+    overdueCount,
+    applicationsCount: pendingApplications,
+  };
+}
+
+function updateOverviewSignals(partial = {}) {
+  Object.assign(overviewSignals, partial);
+  const todayMap = {
+    unfunded: overviewSignals.unfundedCount,
+    pendingReviews: overviewSignals.pendingReviewCount,
+    overdue: overviewSignals.overdueCount,
+    applications: overviewSignals.applicationsCount,
+  };
+  document.querySelectorAll("[data-today]").forEach((el) => {
+    const key = el.dataset.today;
+    if (key && Object.prototype.hasOwnProperty.call(todayMap, key)) {
+      el.textContent = String(todayMap[key]);
+    }
+  });
+
+  const queueMap = {
+    unfunded: overviewSignals.unfundedCount,
+    pendingReviews: overviewSignals.pendingReviewCount,
+    applications: overviewSignals.applicationsCount,
+  };
+  document.querySelectorAll("[data-queue]").forEach((el) => {
+    const key = el.dataset.queue;
+    if (key && Object.prototype.hasOwnProperty.call(queueMap, key)) {
+      el.textContent = String(queueMap[key]);
+    }
+  });
+}
+
+function initHomeTabs() {
+  if (homeTabsBound) return;
+  const tabs = Array.from(document.querySelectorAll("[data-home-tab]"));
+  const panels = Array.from(document.querySelectorAll("[data-home-panel]"));
+  if (!tabs.length || !panels.length) return;
+  homeTabsBound = true;
+  const panelMap = new Map(panels.map((panel) => [panel.dataset.homePanel, panel]));
+
+  const activate = (key) => {
+    tabs.forEach((tab) => {
+      const isActive = tab.dataset.homeTab === key;
+      tab.classList.toggle("active", isActive);
+      tab.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+    panelMap.forEach((panel, panelKey) => {
+      panel.hidden = panelKey !== key;
+    });
+  };
+
+  const defaultKey =
+    tabs.find((tab) => tab.classList.contains("active"))?.dataset.homeTab || tabs[0].dataset.homeTab;
+  activate(defaultKey);
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const key = tab.dataset.homeTab;
+      if (key) activate(key);
+    });
+  });
+}
+
 function renderDeadlines(container, events = []) {
   if (!container) return;
   if (!events.length) {
@@ -5202,16 +5327,7 @@ function renderEscrowPanel(container, metrics = {}) {
 function renderApplications(apps = [], hasPaymentMethod = true) {
   const container = document.getElementById("applicationsSection");
   if (!container) return;
-  const filteredApps = apps.filter((app) => {
-    if (!app?.caseId) return true;
-    const caseEntry = state.caseLookup.get(String(app.caseId));
-    if (!caseEntry) return false;
-    const statusKey = normalizeCaseStatus(caseEntry?.status);
-    if (statusKey === "completed") return false;
-    if (caseEntry?.archived === true) return false;
-    if (caseEntry?.paymentReleased === true) return false;
-    return true;
-  });
+  const filteredApps = filterApplicationsForDisplay(apps);
   if (!filteredApps.length) {
     container.innerHTML = `
       <div class="case-card empty-state">
@@ -5251,12 +5367,12 @@ function renderApplications(apps = [], hasPaymentMethod = true) {
       const paymentBlocked = hasPaymentMethod === false;
       const showPaymentGate = paymentBlocked && canHire;
       const hireDisabledAttr = showPaymentGate
-        ? ' disabled aria-disabled="true" title="Add a payment method to fund escrow."'
+        ? ' disabled aria-disabled="true" title="Add a payment method to hire."'
         : "";
       const disabledAttr = hasCaseId ? "" : ' disabled aria-disabled="true" title="Case unavailable."';
       const cover = app.coverLetter ? sanitize(app.coverLetter.slice(0, 200)) : "";
       const paymentHelper = showPaymentGate
-        ? `<div class="case-subinfo">Payment method required to fund escrow.</div>`
+        ? `<div class="case-subinfo">Payment method required to hire.</div>`
         : "";
       const paymentCta = showPaymentGate
         ? `<a class="chip" href="dashboard-attorney.html#billing">Add payment method</a>`
@@ -5328,56 +5444,44 @@ async function handleHireFromApplications({ caseId, paralegalId, paralegalName, 
   const paymentReady = await hasDefaultPaymentMethod();
   if (!paymentReady) {
     state.billing.hasPaymentMethod = false;
-    notifyCases("Add a payment method to fund escrow before hiring.", "error");
+    notifyCases("Add a payment method to hire before hiring.", "error");
     return;
   }
-  const confirmed = window.confirm(`Hire '${paralegalName}' for this case?`);
-  if (!confirmed) return;
-  const originalText = button?.textContent || "Hire";
-  if (button) {
-    button.textContent = "Processing...";
-    button.setAttribute("disabled", "disabled");
+  let caseDetails;
+  try {
+    caseDetails = await getCaseForHire(caseId);
+  } catch (err) {
+    notifyCases(err?.message || "Unable to load case details.", "error");
+    return;
+  }
+  const amountCents = Number(caseDetails?.lockedTotalAmount ?? caseDetails?.totalAmount ?? 0);
+  if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    notifyCases("Escrow amount is unavailable for this case.", "error");
+    return;
   }
 
-  try {
-    const res = await secureFetch(
-      `/api/cases/${encodeURIComponent(caseId)}/hire/${encodeURIComponent(paralegalId)}`,
-      { method: "POST", body: {} }
-    );
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(payload?.error || "Unable to hire paralegal.");
-    const escrowStatus = String(payload?.escrowStatus || "").toLowerCase();
-    const funded = escrowStatus === "funded";
-    const hasPaymentMethod = await hasDefaultPaymentMethod();
-    if (!funded && !hasPaymentMethod) {
-      const message = `Add a payment method to hire '${paralegalName}'`;
-      storePendingHire({ caseId, paralegalName, message });
-      notifyCases(`${paralegalName} has been hired. Redirecting to Billing...`, "success");
-      setTimeout(() => {
-        window.location.href = "dashboard-attorney.html#billing";
-      }, 400);
-      return;
-    }
-    notifyCases(
-      funded
-        ? `${paralegalName} has been hired. Escrow funded. Opening workspace...`
-        : `${paralegalName} has been hired. Redirecting to fund escrow...`,
-      "success"
-    );
-    const target = funded
-      ? `case-detail.html?caseId=${encodeURIComponent(caseId)}`
-      : `fund-escrow.html?caseId=${encodeURIComponent(caseId)}`;
-    setTimeout(() => {
-      window.location.href = target;
-    }, 400);
-  } catch (err) {
-    notifyCases(err?.message || "Unable to hire paralegal.", "error");
-  } finally {
-    if (button) {
-      button.removeAttribute("disabled");
-      button.textContent = originalText;
-    }
-  }
+  openHireConfirmModal({
+    paralegalName,
+    amountCents,
+    feePct: PLATFORM_FEE_PCT,
+    continueHref: `case-detail.html?caseId=${encodeURIComponent(caseId)}`,
+    onConfirm: async () => {
+      const originalText = button?.textContent || "Hire";
+      if (button) {
+        button.textContent = "Processing...";
+        button.setAttribute("disabled", "disabled");
+      }
+      try {
+        await hireParalegal(caseId, paralegalId);
+      } catch (err) {
+        if (button) {
+          button.removeAttribute("disabled");
+          button.textContent = originalText;
+        }
+        throw err;
+      }
+    },
+  });
 }
 
 async function hasDefaultPaymentMethod() {
@@ -5393,19 +5497,139 @@ async function hasDefaultPaymentMethod() {
   }
 }
 
-function storePendingHire(payload) {
-  if (!payload?.caseId) return;
-  const data = {
-    caseId: String(payload.caseId),
-    paralegalName: payload.paralegalName || "",
-    message: payload.message || "",
-    fundUrl: `fund-escrow.html?caseId=${encodeURIComponent(payload.caseId)}`,
-  };
-  try {
-    localStorage.setItem(PENDING_HIRE_KEY, JSON.stringify(data));
-  } catch {
-    /* ignore */
+async function getCaseForHire(caseId) {
+  const existing = state.caseLookup.get(String(caseId));
+  if (existing) return existing;
+  const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, { headers: { Accept: "application/json" } });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload?.error || "Unable to load case details.");
   }
+  return payload;
+}
+
+async function hireParalegal(caseId, paralegalId) {
+  const res = await secureFetch(
+    `/api/cases/${encodeURIComponent(caseId)}/hire/${encodeURIComponent(paralegalId)}`,
+    { method: "POST", body: {} }
+  );
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(payload?.error || "Unable to hire paralegal.");
+  return payload;
+}
+
+function ensureHireModalStyles() {
+  if (document.getElementById("hire-confirm-styles")) return;
+  const style = document.createElement("style");
+  style.id = "hire-confirm-styles";
+  style.textContent = `
+    .hire-confirm-overlay{position:fixed;inset:0;background:rgba(15,23,42,.4);display:flex;align-items:center;justify-content:center;z-index:1500}
+    .hire-confirm-modal{background:#fff;border-radius:16px;padding:24px;max-width:520px;width:92%;box-shadow:0 24px 50px rgba(0,0,0,.2);display:grid;gap:12px}
+    .hire-confirm-title{font-weight:600;font-size:1.2rem}
+    .hire-confirm-summary{border:1px solid rgba(15,23,42,.08);border-radius:12px;padding:12px 14px;display:grid;gap:8px}
+    .hire-confirm-row{display:flex;justify-content:space-between;gap:16px;font-size:0.95rem}
+    .hire-confirm-row strong{font-weight:600}
+    .hire-confirm-total{font-weight:600}
+    .hire-confirm-error{border:1px solid rgba(185,28,28,.4);background:rgba(254,242,242,.9);color:#991b1b;border-radius:10px;padding:8px 10px;font-size:0.9rem}
+    .hire-confirm-success{border:1px solid rgba(22,163,74,.35);background:rgba(240,253,244,.9);color:#166534;border-radius:10px;padding:8px 10px;font-size:0.9rem}
+    .hire-confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:4px;flex-wrap:wrap}
+  `;
+  document.head.appendChild(style);
+}
+
+function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref, onConfirm }) {
+  ensureHireModalStyles();
+  const safeName = sanitize(paralegalName || "Paralegal");
+  const feeRate = Number(feePct || 0);
+  const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
+  const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
+  const overlay = document.createElement("div");
+  overlay.className = "hire-confirm-overlay";
+  overlay.innerHTML = `
+    <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
+      <div class="hire-confirm-title" id="hireConfirmTitle">Confirm Hire</div>
+      <p>You’re about to hire '${safeName}'. This will fund escrow immediately.</p>
+      <div class="hire-confirm-summary">
+        <div class="hire-confirm-row">
+          <span>Locked case amount</span>
+          <strong>${sanitize(formatCurrency(amountCents))}</strong>
+        </div>
+        <div class="hire-confirm-row">
+          <span>Platform fee (${feeRate}%)</span>
+          <strong>${sanitize(formatCurrency(feeCents))}</strong>
+        </div>
+        <div class="hire-confirm-row hire-confirm-total">
+          <span>Total charge</span>
+          <strong>${sanitize(formatCurrency(totalCents))}</strong>
+        </div>
+      </div>
+      <div class="hire-confirm-error" data-hire-error hidden></div>
+      <div class="hire-confirm-success" data-hire-success hidden>Escrow funded. Work can begin.</div>
+      <div class="hire-confirm-actions" data-hire-actions>
+        <button class="btn secondary" type="button" data-hire-cancel>Cancel</button>
+        <button class="btn primary" type="button" data-hire-confirm>Confirm &amp; Hire</button>
+      </div>
+      <div class="hire-confirm-actions" data-hire-continue hidden>
+        <a class="btn primary" href="${sanitize(continueHref || "#")}">Continue to case</a>
+      </div>
+    </div>
+  `;
+  const errorEl = overlay.querySelector("[data-hire-error]");
+  const successEl = overlay.querySelector("[data-hire-success]");
+  const actionsEl = overlay.querySelector("[data-hire-actions]");
+  const continueEl = overlay.querySelector("[data-hire-continue]");
+  const confirmBtn = overlay.querySelector("[data-hire-confirm]");
+  const cancelBtn = overlay.querySelector("[data-hire-cancel]");
+
+  const close = () => overlay.remove();
+  const setLoading = (isLoading) => {
+    if (confirmBtn) {
+      confirmBtn.disabled = isLoading;
+      confirmBtn.textContent = isLoading ? "Charging..." : "Confirm & Hire";
+    }
+    if (cancelBtn) cancelBtn.disabled = isLoading;
+  };
+  const showError = (message) => {
+    if (!errorEl) return;
+    if (!message) {
+      errorEl.hidden = true;
+      errorEl.textContent = "";
+      return;
+    }
+    errorEl.textContent = message;
+    errorEl.hidden = false;
+  };
+  const showSuccess = () => {
+    if (successEl) successEl.hidden = false;
+    if (actionsEl) actionsEl.hidden = true;
+    if (continueEl) continueEl.hidden = false;
+  };
+
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay && !confirmBtn?.disabled) close();
+  });
+  cancelBtn?.addEventListener("click", () => {
+    if (!confirmBtn?.disabled) close();
+  });
+  confirmBtn?.addEventListener("click", async () => {
+    showError("");
+    setLoading(true);
+    try {
+      await onConfirm?.();
+      showSuccess();
+    } catch (err) {
+      showError(err?.message || "Unable to hire paralegal.");
+      setLoading(false);
+    }
+  });
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key === "Escape" && !confirmBtn?.disabled) close();
+    },
+    { once: true }
+  );
+  document.body.appendChild(overlay);
 }
 
 function renderCaseCards(container, cases = []) {

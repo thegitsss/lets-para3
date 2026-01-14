@@ -1658,7 +1658,7 @@ router.patch(
   csrfProtection,
   requireCaseAccess(
     "caseId",
-    { project: "title details practiceArea totalAmount lockedTotalAmount currency status briefSummary invites pendingParalegalId pendingParalegalInvitedAt" }
+    { project: "title details practiceArea totalAmount lockedTotalAmount currency status briefSummary invites pendingParalegalId pendingParalegalInvitedAt applicants" }
   ),
   asyncHandler(async (req, res) => {
     const isAdmin = !!req.acl?.isAdmin;
@@ -1673,10 +1673,11 @@ router.patch(
       return res.status(403).json({ error: "Escrow amount is locked and cannot be modified." });
     }
     const statusKey = String(doc.status || "").toLowerCase();
+    const hasApplicants = Array.isArray(doc.applicants) && doc.applicants.length > 0;
     if (!isAdmin) {
-      if (doc.paralegalId || hasPendingInvites(doc)) {
+      if (doc.paralegalId || hasPendingInvites(doc) || hasApplicants) {
         return res.status(403).json({
-          error: "Compensation is locked once a paralegal is invited or hired.",
+          error: "Compensation is locked once a paralegal is invited, applies, or is hired.",
         });
       }
       if (!["open", "draft"].includes(statusKey)) {
@@ -2679,8 +2680,65 @@ router.post(
 
     const attorneyFee = Math.max(0, Math.round(budgetCents * (resolveAttorneyFeePct(selectedCase) / 100)));
     const paralegalFee = Math.max(0, Math.round(budgetCents * (resolveParalegalFeePct(selectedCase) / 100)));
-    const escrowFunded =
-      !!selectedCase.escrowIntentId && String(selectedCase.escrowStatus || "").toLowerCase() === "funded";
+    const totalCharge = Math.round(budgetCents + attorneyFee);
+
+    if (!attorney.email) {
+      return res.status(400).json({ error: "Attorney email is required to charge escrow." });
+    }
+
+    const customerId = await ensureStripeCustomer(attorney);
+    const defaultPaymentMethodId = await fetchDefaultPaymentMethodId(customerId);
+    if (!defaultPaymentMethodId) {
+      return res.status(400).json({ error: "Add a payment method before hiring." });
+    }
+
+    if (selectedCase.escrowIntentId) {
+      try {
+        const existing = await stripe.paymentIntents.retrieve(selectedCase.escrowIntentId);
+        if (existing && !["succeeded", "canceled"].includes(existing.status)) {
+          await stripe.paymentIntents.cancel(existing.id);
+        }
+      } catch (err) {
+        console.warn("[case-hire] Unable to cancel existing escrow intent", err?.message || err);
+      }
+    }
+
+    let paymentIntent;
+    try {
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: totalCharge,
+        currency: selectedCase.currency || "usd",
+        customer: customerId,
+        payment_method: defaultPaymentMethodId,
+        off_session: true,
+        confirm: true,
+        receipt_email: attorney.email,
+        transfer_group: stripe.caseTransferGroup
+          ? stripe.caseTransferGroup(selectedCase._id)
+          : `case_${selectedCase._id.toString()}`,
+        metadata: {
+          caseId: String(selectedCase._id),
+          attorneyId: String(attorney._id),
+          paralegalId: String(paralegal._id),
+        },
+        description: buildCaseChargeDescription(selectedCase, paralegal),
+      });
+    } catch (err) {
+      const message = stripe.sanitizeStripeError(
+        err,
+        "Unable to charge the card on file. Please try again or update your payment method."
+      );
+      return res.status(402).json({ error: message });
+    }
+
+    if (!paymentIntent || paymentIntent.status !== "succeeded") {
+      try {
+        if (paymentIntent?.id) await stripe.paymentIntents.cancel(paymentIntent.id);
+      } catch (err) {
+        console.warn("[case-hire] Unable to cancel failed escrow intent", err?.message || err);
+      }
+      return res.status(402).json({ error: "Unable to charge the card on file. Please try again." });
+    }
 
     seedLegacyInvite(selectedCase);
     const pendingInvitees = listCaseInvites(selectedCase)
@@ -2703,23 +2761,15 @@ router.post(
     }
     selectedCase.hiredAt = new Date();
     selectedCase.paralegalNameSnapshot = formatPersonName(paralegal);
-    if (!selectedCase.paymentIntentId && selectedCase.escrowIntentId) {
-      selectedCase.paymentIntentId = selectedCase.escrowIntentId;
-    }
-    if (escrowFunded) {
-      selectedCase.escrowStatus = "funded";
-      if (typeof selectedCase.canTransitionTo === "function" && selectedCase.canTransitionTo(IN_PROGRESS_STATUS)) {
-        selectedCase.transitionTo(IN_PROGRESS_STATUS);
-      } else {
-        selectedCase.status = IN_PROGRESS_STATUS;
-      }
+    selectedCase.paymentIntentId = paymentIntent.id;
+    selectedCase.escrowIntentId = paymentIntent.id;
+    selectedCase.paymentStatus = paymentIntent.status || selectedCase.paymentStatus || "succeeded";
+    selectedCase.escrowStatus = "funded";
+    selectedCase.currency = paymentIntent.currency || selectedCase.currency || "usd";
+    if (typeof selectedCase.canTransitionTo === "function" && selectedCase.canTransitionTo(IN_PROGRESS_STATUS)) {
+      selectedCase.transitionTo(IN_PROGRESS_STATUS);
     } else {
-      selectedCase.escrowStatus = "awaiting_funding";
-      if (typeof selectedCase.canTransitionTo === "function" && selectedCase.canTransitionTo("awaiting_funding")) {
-        selectedCase.transitionTo("awaiting_funding");
-      } else {
-        selectedCase.status = "awaiting_funding";
-      }
+      selectedCase.status = IN_PROGRESS_STATUS;
     }
     selectedCase.feeAttorneyPct = resolveAttorneyFeePct(selectedCase);
     selectedCase.feeAttorneyAmount = attorneyFee;
@@ -2757,7 +2807,16 @@ router.post(
       });
     }
 
-    await selectedCase.save();
+    try {
+      await selectedCase.save();
+    } catch (err) {
+      try {
+        await stripe.refunds.create({ payment_intent: paymentIntent.id });
+      } catch (refundErr) {
+        console.error("[case-hire] Unable to refund after save failure", refundErr?.message || refundErr);
+      }
+      return res.status(500).json({ error: "Unable to finalize hire. Please try again." });
+    }
     await selectedCase.populate([
       { path: "paralegal", select: "firstName lastName email role avatarURL" },
       { path: "attorney", select: "firstName lastName email role avatarURL" },
@@ -2819,23 +2878,13 @@ router.post(
           )
         );
       }
-      if (escrowFunded) {
-        await sendCaseNotification(
-          paralegalId,
-          "case_work_ready",
-          selectedCase,
-          { link },
-          { actorUserId: req.user.id }
-        );
-      } else {
-        await sendCaseNotification(
-          paralegalId,
-          "case_awaiting_funding",
-          selectedCase,
-          { link },
-          { actorUserId: req.user.id }
-        );
-      }
+      await sendCaseNotification(
+        paralegalId,
+        "case_work_ready",
+        selectedCase,
+        { link },
+        { actorUserId: req.user.id }
+      );
     } catch {}
 
     res.json(caseSummary(selectedCase));
