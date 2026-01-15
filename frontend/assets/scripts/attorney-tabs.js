@@ -63,7 +63,6 @@ const state = {
   uploadSelection: null,
   caseFilter: "all",
   tasks: [],
-  tasksPromise: null,
   latestThreadId: null,
   latestThreadCaseId: null,
   billing: {
@@ -978,7 +977,6 @@ function goToMessages(caseId) {
 async function initBillingPage() {
   const postedBody = document.getElementById("postedJobsBody");
   const activeBody = document.getElementById("activeEscrowsBody");
-  const completedBody = document.getElementById("completedPaymentsBody");
   const editModal = document.getElementById("editJobModal");
   const editForm = document.getElementById("editJobForm");
   const toastHelper = window.toastUtils;
@@ -2653,9 +2651,6 @@ function renderCaseMenu(item) {
   const isFinal = isFinalCase(item);
   const canViewWorkspace = isWorkspaceEligibleCase(item);
   const statusKey = String(item.status || "").toLowerCase();
-  const pendingInviteCount = Array.isArray(item.invites)
-    ? item.invites.filter((invite) => String(invite?.status || "pending").toLowerCase() === "pending").length
-    : 0;
   const hasInvites =
     (Array.isArray(item.invites) && item.invites.length > 0) ||
     !!(item.pendingParalegal || item.pendingParalegalId);
@@ -5639,8 +5634,17 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
 function renderCaseCards(container, cases = []) {
   if (!container) return;
   if (!cases.length) {
-    container.innerHTML = "";
-    container.hidden = true;
+    container.hidden = false;
+    container.innerHTML = `
+      <div class="case-card empty-state">
+        <div class="case-header">
+          <div>
+            <h2>No active cases</h2>
+            <div class="case-subinfo">Your upcoming assignments will appear here.</div>
+          </div>
+        </div>
+      </div>
+    `;
     return;
   }
   container.hidden = false;

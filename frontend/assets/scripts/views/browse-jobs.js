@@ -20,8 +20,6 @@ const attorneyPreviewCache = new Map();
 const urlParams = new URLSearchParams(window.location.search);
 const explicitCaseId = (urlParams.get("caseId") || urlParams.get("caseID") || urlParams.get("case_id") || "").trim();
 const idParam = (urlParams.get("id") || "").trim();
-let previewCaseId = explicitCaseId;
-let previewMode = Boolean(previewCaseId);
 
 let allJobs = [];
 let filteredJobs = [];
@@ -106,34 +104,46 @@ async function resolveViewerRole() {
 
 async function ensureSession() {
   if (sessionReady) return true;
-  if (!previewMode && idParam) {
-    const role = await resolveViewerRole();
-    if (role && role !== "paralegal") {
-      previewMode = true;
-      previewCaseId = idParam;
-      viewerRole = role;
-    }
-  }
-  if (previewMode) {
-    sessionReady = true;
-    viewerRole = viewerRole || "";
-    viewerId = readStoredUserId();
-    allowApply = false;
-    return true;
-  }
+  let session = null;
   try {
-    let session = null;
     if (typeof window.checkSession === "function") {
-      session = await window.checkSession("paralegal");
+      session = await window.checkSession("paralegal", { redirectOnFail: false });
     }
     viewerRole = String(session?.role || session?.user?.role || "").toLowerCase();
     viewerId = String(session?.user?.id || session?.user?._id || session?.id || session?._id || readStoredUserId());
     allowApply = viewerRole === "paralegal";
     sessionReady = true;
-    return previewMode ? true : !!session;
+    if (!allowApply) {
+      redirectNonParalegal(viewerRole);
+      return false;
+    }
+    if (document.body) {
+      document.body.classList.remove("auth-guarded");
+    }
+    return !!session;
   } catch (err) {
     console.warn("Paralegal session required", err);
+    const storedRole = await resolveViewerRole();
+    if (storedRole && storedRole !== "paralegal") {
+      redirectNonParalegal(storedRole);
+      return false;
+    }
+    window.location.href = "login.html";
     return false;
+  }
+}
+
+function redirectNonParalegal(role) {
+  const normalized = String(role || "").toLowerCase();
+  if (!normalized || normalized === "paralegal") return;
+  if (typeof window.redirectUserDashboard === "function") {
+    window.redirectUserDashboard(normalized);
+    return;
+  }
+  if (normalized === "admin") {
+    window.location.href = "admin-dashboard.html";
+  } else {
+    window.location.href = "dashboard-attorney.html";
   }
 }
 
@@ -492,10 +502,6 @@ function renderJobs() {
 // Fetch jobs
 async function fetchJobs() {
   if (!sessionReady) return;
-  if (previewMode) {
-    await fetchPreviewCase();
-    return;
-  }
   try {
     const res = await fetch("/api/jobs/open", {
       headers: { Accept: "application/json" },
@@ -539,70 +545,6 @@ async function fetchJobs() {
   }
 }
 
-async function fetchPreviewCase() {
-  if (!previewCaseId) return;
-  try {
-    const res = await fetch(`/api/cases/${encodeURIComponent(previewCaseId)}`, {
-      headers: { Accept: "application/json" },
-      credentials: "include",
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.error || "Unable to load case details.");
-    }
-    const job = mapCaseToJob(data);
-    allJobs = [job];
-    filteredJobs = [job];
-    expandedJobId = getJobUniqueId(job) || "";
-    populateFilters();
-    applySort();
-    renderJobs();
-  } catch (err) {
-    console.error("Failed to load case preview", err);
-    allJobs = [];
-    filteredJobs = [];
-    renderJobs();
-    if (jobsGrid) {
-      const error = document.createElement("p");
-      error.className = "area";
-      error.style.textAlign = "center";
-      error.textContent = err?.message || "Unable to load case details.";
-      jobsGrid.appendChild(error);
-    }
-  }
-}
-
-function mapCaseToJob(caseData = {}) {
-  const totalAmount = typeof caseData.totalAmount === "number" ? caseData.totalAmount : null;
-  const lockedTotalAmount = typeof caseData.lockedTotalAmount === "number" ? caseData.lockedTotalAmount : null;
-  const amountForCase = lockedTotalAmount != null ? lockedTotalAmount : totalAmount;
-  const budgetFromCase = amountForCase != null ? Math.round(amountForCase / 100) : null;
-  const attorney = caseData.attorney || caseData.attorneyId || null;
-  const attorneyId =
-    (attorney && (attorney._id || attorney.id)) ||
-    caseData.attorneyId ||
-    caseData.attorney ||
-    null;
-  return {
-    id: caseData._id || caseData.id,
-    caseId: caseData._id || caseData.id,
-    jobId: caseData.jobId || caseData.job || null,
-    title: caseData.title || "Untitled Case",
-    practiceArea: caseData.practiceArea || "",
-    briefSummary: caseData.briefSummary || "",
-    shortDescription: caseData.briefSummary || "",
-    description: caseData.details || caseData.description || "",
-    totalAmount,
-    lockedTotalAmount,
-    budget: typeof budgetFromCase === "number" ? budgetFromCase : null,
-    currency: caseData.currency || "usd",
-    createdAt: caseData.createdAt || null,
-    state: caseData.state || caseData.locationState || "",
-    locationState: caseData.locationState || caseData.state || "",
-    attorneyId,
-    attorney,
-  };
-}
 
 ensureSession().then(async (ready) => {
   if (!ready) return;

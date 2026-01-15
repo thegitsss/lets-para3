@@ -14,24 +14,34 @@ const User = require("../models/User");
 const Notification = require("../models/Notification");
 const AuditLog = require("../models/AuditLog"); // audit trail hooks
 const sendEmail = require("../utils/email");
+const { getAppSettings } = require("../utils/appSettings");
 
-const IS_PROD = process.env.PROD === "true";
+const IS_PROD = process.env.NODE_ENV === "production" || process.env.PROD === "true";
 const EMAIL_BASE_URL = (process.env.EMAIL_BASE_URL || "").replace(/\/+$/, "");
 const ASSET_BASE_URL = EMAIL_BASE_URL || "https://www.lets-paraconnect.com";
 const LOGIN_URL = `${ASSET_BASE_URL}/login.html`;
-const COOKIE_DOMAIN =
-  IS_PROD && process.env.COOKIE_DOMAIN ? { domain: process.env.COOKIE_DOMAIN } : {};
-const COOKIE_BASE_OPTIONS = {
-  httpOnly: true,
-  secure: IS_PROD,
-  sameSite: IS_PROD ? "none" : "lax",
-  path: "/",
-  ...COOKIE_DOMAIN,
-};
-const AUTH_COOKIE_OPTIONS = {
-  ...COOKIE_BASE_OPTIONS,
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-};
+function resolveCookieDomain(req) {
+  if (!IS_PROD || !process.env.COOKIE_DOMAIN) return {};
+  const domain = process.env.COOKIE_DOMAIN;
+  const normalized = domain.replace(/^\./, "");
+  if (req?.hostname && normalized && !req.hostname.endsWith(normalized)) return {};
+  return { domain };
+}
+
+function buildAuthCookieOptions(req, { maxAge } = {}) {
+  const forwardedProto = String(req?.headers?.["x-forwarded-proto"] || "").split(",")[0].trim();
+  const isSecureRequest = Boolean(req?.secure) || forwardedProto === "https";
+  const sameSite = isSecureRequest ? "none" : "lax";
+  const secure = IS_PROD ? isSecureRequest : false;
+  return {
+    httpOnly: true,
+    secure,
+    sameSite,
+    path: "/",
+    ...resolveCookieDomain(req),
+    ...(typeof maxAge === "number" ? { maxAge } : {}),
+  };
+}
 const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_CERT_FILE_BYTES = 10 * 1024 * 1024;
 const registrationUpload = multer({
@@ -267,6 +277,7 @@ function buildApplicationSubmissionEmailHtml(user, opts = {}) {
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 const TWO_HOURS = "2h";
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const FIFTEEN_MIN = 15 * 60 * 1000;
 const DISABLED_ACCOUNT_MSG = "This account has been disabled.";
 const BOT_NAME_GIBBERISH = /^[bcdfghjklmnpqrstvwxyz]{6,}$/;
@@ -408,6 +419,14 @@ router.post(
       barState,
       yearsExperience,
     } = req.body || {};
+
+    const settings = await getAppSettings();
+    if (settings?.maintenanceMode) {
+      return res.status(503).json({ msg: "Signups are temporarily unavailable during maintenance." });
+    }
+    if (settings?.allowSignups === false) {
+      return res.status(403).json({ msg: "Signups are temporarily paused." });
+    }
 
     const normalizedEmail = String(email || "").toLowerCase().trim();
     const bypassCaptcha = normalizedEmail && bypassList.includes(normalizedEmail);
@@ -664,6 +683,11 @@ router.post(
       return res.status(403).json({ error: DISABLED_ACCOUNT_MSG, msg: DISABLED_ACCOUNT_MSG });
     }
 
+    const settings = await getAppSettings();
+    if (settings?.maintenanceMode && String(user.role || "").toLowerCase() !== "admin") {
+      return res.status(503).json({ msg: "The platform is in maintenance mode. Please try again soon." });
+    }
+
     const status = user.status || "pending";
     const approvedFlag = status === "approved";
     if (!approvedFlag) {
@@ -690,7 +714,7 @@ router.post(
     user.recordLoginSuccess();
     await user.save();
     const token = signAccess(user);
-    res.cookie("token", token, AUTH_COOKIE_OPTIONS);
+    res.cookie("token", token, buildAuthCookieOptions(req, { maxAge: TWO_HOURS_MS }));
     await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
     if (isFirstLogin) {
       try {
@@ -756,7 +780,7 @@ router.post(
     await user.save();
 
     const token = signAccess(user);
-    res.cookie("token", token, AUTH_COOKIE_OPTIONS);
+    res.cookie("token", token, buildAuthCookieOptions(req, { maxAge: TWO_HOURS_MS }));
     await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
     if (isFirstLogin) {
       try {
@@ -819,7 +843,7 @@ router.post(
     await user.save();
 
     const token = signAccess(user);
-    res.cookie("token", token, AUTH_COOKIE_OPTIONS);
+    res.cookie("token", token, buildAuthCookieOptions(req, { maxAge: TWO_HOURS_MS }));
     await AuditLog.logFromReq(req, "auth.login.success", { targetType: "user", targetId: user._id });
     if (isFirstLogin) {
       try {
@@ -899,8 +923,8 @@ router.get(
 // LOGOUT (stateless JWT – client deletes token)
 // POST /api/auth/logout
 // ----------------------------------------
-router.post("/logout", (_req, res) => {
-  res.clearCookie("token", { ...COOKIE_BASE_OPTIONS });
+router.post("/logout", (req, res) => {
+  res.clearCookie("token", buildAuthCookieOptions(req));
   res.json({ success: true });
 });
 

@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <script>
+    document.documentElement.classList.add("js");
+  </script>
   <link href="assets/styles/styles.css" rel="stylesheet" />  
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -12,8 +17,6 @@
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
 
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&display=swap" rel="stylesheet">
   <style>
     .gold{color:#b4975a;}
     :root {
@@ -80,6 +83,9 @@
   text-decoration: none;
   text-transform: none;
 
+}
+.brand .accent-apostrophe {
+  color: #b4975a;
 }
     .header-inner {
       width: min(1200px, 92vw);
@@ -761,7 +767,7 @@
         </ul>
       </nav>
       <a class="brand" href="index.html">
-        Let’s-ParaConnect
+        Let<span class="accent-apostrophe">’</span>s-ParaConnect
       </a>
       <div class="header-actions">
         <a class="pill signup-pill" href="signup.html" id="signupAction">Sign Up</a>
@@ -928,13 +934,18 @@
   }
 
   .section {
+    opacity: 1;
+    transform: none;
+  }
+
+  html.js .section {
     opacity: 0;
     transform: translateY(60px);
     transition: opacity 0.8s ease-out, transform 0.8s ease-out;
     will-change: opacity, transform;
   }
 
-  .section.visible {
+  html.js .section.visible {
     opacity: 1;
     transform: translateY(0);
   }
@@ -2102,6 +2113,9 @@ updateHeaderAppearance();
     if (typeof initHeroSlider === "function") {
       initHeroSlider();
     }
+    if (typeof initFadeIns === "function") {
+      initFadeIns();
+    }
 
     window.addEventListener("load", () => {
       try {
@@ -2119,9 +2133,6 @@ updateHeaderAppearance();
         }
       }
 
-      if (typeof initFadeIns === "function") {
-        initFadeIns();
-      }
     });
   });
 </script>

@@ -1048,28 +1048,64 @@ function hydrateAttorneyProfileForm(user = {}) {
   updateAttorneyAvatarPreview(user);
 }
 
+function loadAvatarPreview({ preview, frame, initials, url, fallbackText = "" } = {}) {
+  if (!preview) {
+    if (initials && fallbackText) initials.textContent = fallbackText;
+    return;
+  }
+
+  if (!url) {
+    preview.hidden = true;
+    preview.classList.remove("is-loaded");
+    preview.removeAttribute("src");
+    frame?.classList.remove("has-photo");
+    if (initials) {
+      initials.style.display = "flex";
+      if (fallbackText) initials.textContent = fallbackText;
+    }
+    return;
+  }
+
+  preview.hidden = false;
+  preview.classList.remove("is-loaded");
+  frame?.classList.remove("has-photo");
+
+  const markLoaded = () => {
+    preview.classList.add("is-loaded");
+    frame?.classList.add("has-photo");
+    if (initials) initials.style.display = "none";
+  };
+
+  const handleError = () => {
+    preview.hidden = true;
+    preview.classList.remove("is-loaded");
+    frame?.classList.remove("has-photo");
+    if (initials) {
+      initials.style.display = "flex";
+      if (fallbackText) initials.textContent = fallbackText;
+    }
+  };
+
+  preview.addEventListener("load", markLoaded, { once: true });
+  preview.addEventListener("error", handleError, { once: true });
+  preview.src = url;
+  if (preview.complete && preview.naturalWidth > 0) {
+    markLoaded();
+  }
+}
+
 function updateAttorneyAvatarPreview(user = {}) {
   const preview = document.getElementById("attorneyAvatarPreview");
   const initials = document.getElementById("attorneyAvatarInitials");
   const frame = document.getElementById("attorneyAvatarFrame");
   const avatarUrl = user.profileImage || user.avatarURL || settingsState.profileImage || "";
-  if (preview) {
-    if (avatarUrl) {
-      preview.src = avatarUrl;
-      preview.hidden = false;
-      frame?.classList.add("has-photo");
-      if (initials) initials.style.display = "none";
-    } else {
-      preview.hidden = true;
-      frame?.classList.remove("has-photo");
-      if (initials) {
-        initials.style.display = "flex";
-        initials.textContent = getAttorneyInitials(user);
-      }
-    }
-  } else if (initials) {
-    initials.textContent = getAttorneyInitials(user);
-  }
+  loadAvatarPreview({
+    preview,
+    frame,
+    initials,
+    url: avatarUrl,
+    fallbackText: getAttorneyInitials(user),
+  });
 }
 
 function bindAttorneySaveButton() {
@@ -1803,15 +1839,21 @@ function applyAvatar(user) {
   if (header) header.src = cacheBusted;
 
   const preview = document.getElementById("avatarPreview");
-  if (preview) {
-    preview.src = cacheBusted;
-    preview.style.objectPosition = "center center";
-  }
   const attorneyPreview = document.getElementById("attorneyAvatarPreview");
-  if (attorneyPreview) {
-    attorneyPreview.src = cacheBusted;
-    attorneyPreview.hidden = false;
-  }
+  loadAvatarPreview({
+    preview,
+    frame: document.getElementById("avatarFrame"),
+    initials: document.getElementById("avatarInitials"),
+    url: cacheBusted,
+    fallbackText: document.getElementById("avatarInitials")?.textContent || "",
+  });
+  loadAvatarPreview({
+    preview: attorneyPreview,
+    frame: document.getElementById("attorneyAvatarFrame"),
+    initials: document.getElementById("attorneyAvatarInitials"),
+    url: cacheBusted,
+    fallbackText: document.getElementById("attorneyAvatarInitials")?.textContent || "",
+  });
 
   const cluster = document.getElementById("clusterAvatar");
   if (cluster) cluster.src = cacheBusted;
@@ -1820,14 +1862,6 @@ function applyAvatar(user) {
     el.src = cacheBusted;
   });
 
-  const frame = document.getElementById("avatarFrame");
-  const initials = document.getElementById("avatarInitials");
-  if (frame) frame.classList.add("has-photo");
-  if (initials) initials.style.display = "none";
-  const attorneyFrame = document.getElementById("attorneyAvatarFrame");
-  const attorneyInitials = document.getElementById("attorneyAvatarInitials");
-  if (attorneyFrame) attorneyFrame.classList.add("has-photo");
-  if (attorneyInitials) attorneyInitials.style.display = "none";
 }
 
 function renderFallback(sectionId, title) {

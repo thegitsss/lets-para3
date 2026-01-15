@@ -14,6 +14,7 @@ const Notification = require("../models/Notification");
 const { purgeAttorneyAccount } = require("../services/userDeletion");
 const sendEmail = require("../utils/email");
 const { sendWelcomePacket } = sendEmail;
+const { getAppSettings, normalizeTaxRate, serializeAppSettings } = require("../utils/appSettings");
 
 // -----------------------------------------
 // CSRF (enabled in production or when ENABLE_CSRF=true)
@@ -417,6 +418,41 @@ return user;
 // All admin routes are protected & admin-only
 router.use(verifyToken, requireApproved, requireRole("admin"));
 
+router.get(
+  "/settings",
+  asyncHandler(async (_req, res) => {
+    const settings = await getAppSettings();
+    res.json({ settings: serializeAppSettings(settings) });
+  })
+);
+
+router.put(
+  "/settings",
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const settings = await getAppSettings();
+    const updates = req.body || {};
+
+    if (typeof updates.allowSignups === "boolean") {
+      settings.allowSignups = updates.allowSignups;
+    }
+    if (typeof updates.maintenanceMode === "boolean") {
+      settings.maintenanceMode = updates.maintenanceMode;
+    }
+    if (typeof updates.supportEmail === "string") {
+      settings.supportEmail = updates.supportEmail.trim();
+    }
+    const normalizedTaxRate = normalizeTaxRate(updates.taxRate);
+    if (normalizedTaxRate !== null) {
+      settings.taxRate = normalizedTaxRate;
+    }
+    settings.updatedBy = req.user.id;
+    await settings.save();
+
+    res.json({ settings: serializeAppSettings(settings) });
+  })
+);
+
 const ACTIVE_USER_MATCH = {
   status: "approved",
   disabled: { $ne: true },
@@ -656,6 +692,7 @@ const COMPLETED_CASE_STATUSES = ["completed", "closed"];
 const LEDGER_LIMIT = 20;
 
 const [
+settings,
 roleAggregation,
 pendingApprovalsCount,
 registrationsAgg,
@@ -680,6 +717,7 @@ feeLedgerDocs,
 upcomingPayoutCases,
 recentUsersRaw,
 ] = await Promise.all([
+getAppSettings(),
 User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
 User.countDocuments(PENDING_USER_MATCH),
 User.aggregate([
@@ -957,11 +995,16 @@ operationalCosts,
 payoutTotal: payoutSummary.total,
 payoutCount: payoutSummary.count || 0,
 };
+const normalizedTaxRate = normalizeTaxRate(settings?.taxRate);
+const taxRate = normalizedTaxRate !== null ? normalizedTaxRate : 0.22;
+const taxableBase = platformFeesCollected - operationalCosts;
+const estimatedTax = Math.max(0, Math.round(taxableBase * taxRate));
 const taxSummary = {
 grossEarnings: platformFeesCollected,
 deductibleExpenses: operationalCosts + payoutSummary.total,
-estimatedTax: Math.max(0, Math.round((platformFeesCollected - operationalCosts) * 0.22)),
-taxOwed: Math.max(0, Math.round((platformFeesCollected - operationalCosts) * 0.22)),
+estimatedTax,
+taxOwed: estimatedTax,
+taxRate,
 nextFilingDeadline: formatFilingDeadline(),
 };
 

@@ -66,6 +66,10 @@ const state = {
 let availableCases = [];
 let activeParalegal = null;
 const toast = window.toastUtils;
+const AUTH_LOCK_CLASS = "auth-locked";
+const AUTH_BLOCKER_READY_CLASS = "auth-blocker-ready";
+const AUTH_BLOCKER_DELAY_MS = 10000;
+let authBlockerTimer = null;
 
 function normalizeId(val) {
   if (!val) return "";
@@ -79,6 +83,7 @@ document.addEventListener("DOMContentLoaded", init);
 async function init() {
   await hydrateViewer();
   syncAuthButtons();
+  toggleAuthBlocker();
   initStateDropdown();
   initSpecialtyDropdown();
   bindFilterEvents();
@@ -126,6 +131,33 @@ function syncAuthButtons() {
   } else {
     if (logoutBtn) logoutBtn.style.display = "none";
     if (signInLink) signInLink.style.display = "inline-flex";
+  }
+}
+
+function toggleAuthBlocker() {
+  const blocker = document.getElementById("authBlocker");
+  if (!blocker || !document.body) return;
+  if (state.isLoggedIn) {
+    document.body.classList.remove(AUTH_LOCK_CLASS);
+    document.body.classList.remove(AUTH_BLOCKER_READY_CLASS);
+    blocker.setAttribute("aria-hidden", "true");
+    if (authBlockerTimer) {
+      clearTimeout(authBlockerTimer);
+      authBlockerTimer = null;
+    }
+  } else {
+    document.body.classList.add(AUTH_LOCK_CLASS);
+    document.body.classList.remove(AUTH_BLOCKER_READY_CLASS);
+    blocker.setAttribute("aria-hidden", "true");
+    if (authBlockerTimer) {
+      clearTimeout(authBlockerTimer);
+    }
+    authBlockerTimer = setTimeout(() => {
+      if (!state.isLoggedIn && document.body) {
+        document.body.classList.add(AUTH_BLOCKER_READY_CLASS);
+        blocker.setAttribute("aria-hidden", "false");
+      }
+    }, AUTH_BLOCKER_DELAY_MS);
   }
 }
 

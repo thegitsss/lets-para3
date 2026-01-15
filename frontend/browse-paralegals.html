@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Browse Paralegals – Let’s-ParaConnect</title>
@@ -9,7 +11,6 @@
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300&family=Sarabun:wght@200;400&display=swap" rel="stylesheet" />
   <link href="assets/styles/styles.css" rel="stylesheet" />
   <link href="assets/styles/hero-pages.css" rel="stylesheet" />
   <script src="assets/scripts/utils/session.js"></script>
@@ -219,10 +220,34 @@
       position: fixed;
       inset: 0;
       background: rgba(15, 23, 42, 0.6);
-      display: grid;
+      display: none;
       place-items: center;
       z-index: 2000;
       padding: 1rem;
+    }
+
+    body.auth-locked.auth-blocker-ready .auth-blocker {
+      display: grid;
+    }
+
+    body.auth-locked .site-header,
+    body.auth-locked .jobs-shell,
+    body.auth-locked footer {
+      pointer-events: none;
+      user-select: none;
+    }
+
+    body.auth-locked a,
+    body.auth-locked button,
+    body.auth-locked input,
+    body.auth-locked select,
+    body.auth-locked textarea {
+      pointer-events: none;
+    }
+
+    body.auth-locked .auth-blocker a,
+    body.auth-locked .auth-blocker button {
+      pointer-events: auto;
     }
 
     .auth-blocker__card {
@@ -852,7 +877,7 @@
     }
   </style>
 </head>
-<body class="browse-jobs-page browse-paralegals-page">
+<body class="browse-jobs-page browse-paralegals-page" data-public-page="true">
   <a class="skip-link" href="#main">Skip to main content</a>
   <header class="site-header">
     <div class="header-inner">
@@ -943,6 +968,17 @@
       </section>
     </div>
   </main>
+
+  <div class="auth-blocker" id="authBlocker" aria-hidden="true">
+    <div class="auth-blocker__card" role="dialog" aria-labelledby="authBlockerTitle">
+      <h2 id="authBlockerTitle">Create an account to interact</h2>
+      <p>Sign in to filter, open profiles, or send inquiries.</p>
+      <div class="auth-blocker__actions">
+        <a class="btn primary" href="login.html">Log In</a>
+        <a class="btn secondary" href="signup.html">Create Account</a>
+      </div>
+    </div>
+  </div>
 
   <div class="modal-overlay" id="inquireModal">
     <div class="inquire-modal">

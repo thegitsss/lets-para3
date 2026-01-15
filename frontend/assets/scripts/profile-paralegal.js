@@ -224,17 +224,6 @@ async function fetchPublicProfileSnapshot() {
   }
 }
 
-const LANGUAGE_RING_MAP = {
-  native: 1,
-  "native / bilingual": 1,
-  bilingual: 1,
-  fluent: 1,
-  professional: 0.7,
-  conversational: 0.55,
-  intermediate: 0.5,
-  basic: 0.35,
-};
-
 const toast = window.toastUtils;
 
 function applyRoleVisibility(user) {

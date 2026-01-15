@@ -1,10 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="preload" as="font" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" type="font/woff2" crossorigin />
+  <link rel="preload" as="font" href="assets/fonts/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2" type="font/woff2" crossorigin />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Account Settings – Let’s-ParaConnect</title>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200;400;600&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
   <script src="assets/scripts/utils/session.js"></script>
   <script src="assets/scripts/auth.js" type="module"></script>
   <style>
@@ -70,6 +73,7 @@
       font-family: var(--font-sans);
       font-weight: 200;
       line-height: 1.15;
+      font-synthesis: none;
       background: var(--bg);
       color: var(--ink);
       min-height: 100vh;
@@ -224,6 +228,44 @@
       position: relative;
       z-index: 3;
       pointer-events: auto;
+      min-height: 72px;
+    }
+    .topbar .lpc-shared-header {
+      margin-bottom: 0;
+      align-items: center;
+    }
+    .header-skeleton {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .skeleton-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(90deg, #e9edf3 0%, #f5f7fb 50%, #e9edf3 100%);
+      background-size: 200% 100%;
+      animation: skeletonShimmer 1.4s ease infinite;
+    }
+    .skeleton-line {
+      height: 12px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #e9edf3 0%, #f5f7fb 50%, #e9edf3 100%);
+      background-size: 200% 100%;
+      animation: skeletonShimmer 1.4s ease infinite;
+    }
+    .skeleton-line.short { width: 40%; }
+    .skeleton-line.medium { width: 60%; }
+    .skeleton-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 120px;
+    }
+    @keyframes skeletonShimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
     }
 
     .unified-header {
@@ -595,11 +637,16 @@ form {
       height: 100%;
       object-fit: cover;
       object-position: center center !important;
-      display: none;
+      display: block;
+      opacity: 0;
+      transform: scale(1.02);
+      transition: opacity 0.25s ease, transform 0.35s ease;
     }
 
-    .avatar-frame.has-photo img {
-      display: block;
+    .avatar-frame.has-photo img,
+    .avatar-frame img.is-loaded {
+      opacity: 1;
+      transform: scale(1);
     }
 
     .avatar-frame span {
@@ -2248,7 +2295,15 @@ input[type="number"],
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
   <main id="main" tabindex="-1" class="content">
-    <div class="topbar" data-attorney-header></div>
+    <div class="topbar" data-attorney-header>
+      <div class="header-skeleton" aria-hidden="true">
+        <div class="skeleton-circle"></div>
+        <div class="skeleton-stack">
+          <div class="skeleton-line short"></div>
+          <div class="skeleton-line medium"></div>
+        </div>
+      </div>
+    </div>
     <section class="unified-header" aria-label="Attorney header">
       <div class="title-block">
         <p class="eyebrow">Account</p>

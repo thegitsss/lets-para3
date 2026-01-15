@@ -3,8 +3,7 @@ import { secureFetch, requireAuth, persistSession } from "./auth.js";
 const state = {
   viewer: null,
   profile: null,
-  targetId: "",
-  viewingSelf: true
+  jobContextId: ""
 };
 
 const elements = {
@@ -29,9 +28,6 @@ const elements = {
   avatarShell: document.getElementById("avatarShell"),
   avatarFallback: document.getElementById("avatarFallback")
 };
-
-const PENDING_ACCESS_MESSAGE =
-  "Your account is pending admin approval. Profiles open up once an administrator approves your access.";
 
 function hasProfileAccess(user = {}) {
   const role = String(user.role || "").toLowerCase();
@@ -76,9 +72,6 @@ async function init() {
   bindEditButton();
 
   if (profileAttorneyId) {
-    state.targetId = profileAttorneyId;
-    state.viewingSelf = false;
-
     try {
       if (!state.viewer) {
         try {

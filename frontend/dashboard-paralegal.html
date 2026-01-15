@@ -1,11 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="preload" as="font" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" type="font/woff2" crossorigin />
+  <link rel="preload" as="font" href="assets/fonts/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2" type="font/woff2" crossorigin />
+  <script>
+    document.documentElement.classList.add("js");
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Paralegal Dashboard – Let’s-ParaConnect</title>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
-<script src="assets/scripts/utils/session.js"></script>
+<script defer src="assets/scripts/utils/session.js"></script>
   <style>
     .skip-link {
       position: absolute;
@@ -49,6 +55,7 @@
     body {
       font-family: var(--font-sans);
       font-weight: 200;
+      font-synthesis: none;
       background: var(--bg);
       color: var(--ink);
       display: flex;
@@ -244,6 +251,15 @@
       padding: 40px;
       overflow-y: auto;
     }
+    html.js .main {
+      opacity: 0.85;
+      transform: translateY(4px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+    html.js body.is-ready .main {
+      opacity: 1;
+      transform: none;
+    }
 
     .dashboard-view {
       display: none;
@@ -271,9 +287,27 @@
       align-items: center;
       margin-bottom: 2rem;
       gap: 1.5rem;
+      min-height: 72px;
       position: relative;
       z-index: 3;
       pointer-events: auto;
+    }
+    .topbar .lpc-shared-header {
+      margin-bottom: 0;
+    }
+    .header-skeleton {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .skeleton-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(90deg, #e9edf3 0%, #f5f7fb 50%, #e9edf3 100%);
+      background-size: 200% 100%;
+      animation: skeletonShimmer 1.4s ease infinite;
     }
 
     .profile-header-controls {
@@ -380,6 +414,32 @@
       gap: 1.5rem;
       margin-bottom: 2rem;
       flex-wrap: wrap;
+    }
+
+    .skeleton-line {
+      height: 12px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #e9edf3 0%, #f5f7fb 50%, #e9edf3 100%);
+      background-size: 200% 100%;
+      animation: skeletonShimmer 1.4s ease infinite;
+    }
+    .skeleton-line.short { width: 40%; }
+    .skeleton-line.medium { width: 60%; }
+    .skeleton-line.long { width: 80%; }
+    .skeleton-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .skeleton-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1rem;
+      background: var(--panel);
+    }
+    @keyframes skeletonShimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
     }
 
     .info-box {
@@ -1842,48 +1902,12 @@
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <main id="main" tabindex="-1" class="main">
     <div class="topbar" data-attorney-header>
-      <div class="profile-header-controls" data-notification-center>
-        <div class="notification-wrapper">
-          <button class="notification-icon" type="button" aria-label="View notifications" data-notification-toggle id="notificationToggle" aria-expanded="false">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
-              <path d="M13.73 21a2 2 0 01-3.46 0"></path>
-            </svg>
-            <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
-          </button>
-          <div
-            class="notification-dropdown"
-            id="notificationDropdown"
-            style="
-              display: none;
-              width: 320px;
-              background: #fff;
-              border-radius: 12px;
-              box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-              padding: 16px;
-            "
-          >
-            <div style="font-weight: 600; margin-bottom: 8px;">
-              Notifications
-            </div>
-
-            <div id="notificationList" style="font-size: 14px; color: #555;">
-              No new notifications.
-            </div>
-          </div>
-          <div id="notificationPanel" class="notif-panel hidden" data-notification-panel>
-            <div class="notif-header">Notifications</div>
-            <div class="notif-body" id="notifList" data-notification-list></div>
-            <div class="notif-empty" data-notification-empty>No new notifications.</div>
-          </div>
+      <div class="header-skeleton" aria-hidden="true">
+        <div class="skeleton-circle"></div>
+        <div class="skeleton-stack">
+          <div class="skeleton-line short"></div>
+          <div class="skeleton-line medium"></div>
         </div>
-        <a class="user-chip" href="/dashboard-paralegal.html" aria-label="Go to dashboard">
-          <img id="clusterAvatar" class="nav-profile-photo" src="https://via.placeholder.com/64x64.png?text=PL" alt="Profile" />
-          <div>
-            <strong id="clusterName">Paralegal</strong>
-            <span id="clusterRole">Member</span>
-          </div>
-        </a>
       </div>
     </div>
 
@@ -1904,19 +1928,25 @@
 
       <section class="summary">
         <div class="info-box">
-          <div class="info-value" data-field="activeCases">0</div>
+          <div class="info-value" data-field="activeCases">
+            <span class="skeleton-line short"></span>
+          </div>
           <div class="info-label">active cases</div>
         </div>
         <div class="info-box message-box" id="messageBox">
-          <div class="info-value" id="messageCount" data-field="unreadMessages">0</div>
+          <div class="info-value" id="messageCount" data-field="unreadMessages">
+            <span class="skeleton-line short"></span>
+          </div>
           <div class="info-label">message<span id="plural">s waiting</span></div>
         </div>
         <div class="info-box">
-          <div class="info-value" data-field="nextDeadline">--</div>
+          <div class="info-value" data-field="nextDeadline">
+            <span class="skeleton-line medium"></span>
+          </div>
           <div class="info-label">next deadline</div>
         </div>
         <div class="info-box">
-          <div class="info-value">$<span data-field="monthEarnings">0</span></div>
+          <div class="info-value">$<span data-field="monthEarnings"><span class="skeleton-line short"></span></span></div>
           <div class="info-label">earned this month</div>
         </div>
       </section>
@@ -1937,15 +1967,12 @@
 
       <div class="side-by-side-panels case-panels">
         <section class="case-list" id="inviteList">
-          <div class="case-card empty-state">
+          <div class="case-card skeleton-card" aria-hidden="true">
             <div class="case-header">
-              <div>
-                <h2>No invitations yet</h2>
-                <div class="case-subinfo">Case invites will appear here.</div>
+              <div class="skeleton-stack">
+                <div class="skeleton-line long"></div>
+                <div class="skeleton-line medium"></div>
               </div>
-            </div>
-            <div class="case-actions">
-              <a class="open-case-btn" href="browse-jobs.html">Browse new postings and apply</a>
             </div>
           </div>
         </section>
@@ -1959,11 +1986,11 @@
       </div>
 
       <section class="case-list" id="assignmentList">
-        <div class="case-card empty-state">
+        <div class="case-card skeleton-card" aria-hidden="true">
           <div class="case-header">
-            <div>
-              <h2>No active assignments</h2>
-              <div class="case-subinfo">New invitations will appear here.</div>
+            <div class="skeleton-stack">
+              <div class="skeleton-line long"></div>
+              <div class="skeleton-line medium"></div>
             </div>
           </div>
         </div>
@@ -2093,6 +2120,16 @@
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
   <script type="module" src="assets/scripts/utils/notifications.js"></script>
   <script src="assets/scripts/utils/toast.js"></script>
+  <script>
+    (function markReady() {
+      const apply = () => document.body.classList.add("is-ready");
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", apply, { once: true });
+      } else {
+        apply();
+      }
+    })();
+  </script>
   <script>
     // Ensure notification dropdown binds even if modules load after DOM ready
     (function ensureNotificationsInit() {
@@ -2406,45 +2443,47 @@
     </div>
   </div>
   <script>
-    window.checkSession('paralegal');
-    const sidebarToggle = document.getElementById('sidebarToggle');
-    const sidebarNav = document.getElementById('sidebarNav');
-    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
-    const logoutBtn = document.getElementById('logoutBtn');
-    const closeSidebar = () => {
-      document.body.classList.remove('nav-open');
-      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
-    };
-    const openSidebar = () => {
-      document.body.classList.add('nav-open');
-      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'true');
-    };
-    if (sidebarToggle) {
-      sidebarToggle.addEventListener('click', () => {
-        if (document.body.classList.contains('nav-open')) closeSidebar();
-        else openSidebar();
+    document.addEventListener('DOMContentLoaded', () => {
+      window.checkSession('paralegal');
+      const sidebarToggle = document.getElementById('sidebarToggle');
+      const sidebarNav = document.getElementById('sidebarNav');
+      const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const closeSidebar = () => {
+        document.body.classList.remove('nav-open');
+        if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
+      };
+      const openSidebar = () => {
+        document.body.classList.add('nav-open');
+        if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'true');
+      };
+      if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', () => {
+          if (document.body.classList.contains('nav-open')) closeSidebar();
+          else openSidebar();
+        });
+      }
+      if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener('click', closeSidebar);
+      }
+      if (sidebarNav) {
+        sidebarNav.addEventListener('click', (event) => {
+          if (event.target.closest('a') || event.target.closest('button')) {
+            closeSidebar();
+          }
+        });
+      }
+      window.addEventListener('resize', () => {
+        if (window.innerWidth > 960) closeSidebar();
       });
-    }
-    if (sidebarBackdrop) {
-      sidebarBackdrop.addEventListener('click', closeSidebar);
-    }
-    if (sidebarNav) {
-      sidebarNav.addEventListener('click', (event) => {
-        if (event.target.closest('a') || event.target.closest('button')) {
-          closeSidebar();
-        }
-      });
-    }
-    window.addEventListener('resize', () => {
-      if (window.innerWidth > 960) closeSidebar();
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+          localStorage.clear();
+          sessionStorage.clear();
+          window.location.href = 'index.html';
+        });
+      }
     });
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', () => {
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.href = 'index.html';
-      });
-    }
   </script>
 </body>
 </html>

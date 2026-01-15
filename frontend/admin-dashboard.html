@@ -1,12 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
+<script>
+document.documentElement.classList.add("js");
+</script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Admin Dashboard – Let’s-ParaConnect</title>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&family=Cormorant+Garamond:wght@300;600&display=swap" rel="stylesheet" />
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="assets/scripts/utils/session.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script defer src="assets/scripts/utils/session.js"></script>
 <script type="module" src="assets/scripts/auth.js"></script>
 <style>
     .skip-link {
@@ -46,6 +50,27 @@ display:flex;
 height:100vh;
 overflow:hidden;
 }
+body.is-loading .metric,
+body.is-loading .chart-card,
+body.is-loading .panel{
+position:relative;
+overflow:hidden;
+}
+body.is-loading .metric::after,
+body.is-loading .chart-card::after,
+body.is-loading .panel::after{
+content:"";
+position:absolute;
+inset:0;
+background:linear-gradient(90deg,#e9edf3 0%,#f5f7fb 50%,#e9edf3 100%);
+background-size:200% 100%;
+animation:skeletonShimmer 1.4s ease infinite;
+border-radius:inherit;
+}
+body.is-loading .metric>*,
+body.is-loading .chart-card>*,
+body.is-loading .panel>*{visibility:hidden;}
+@keyframes skeletonShimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
 
 /* Sidebar */
 .sidebar{
@@ -155,6 +180,15 @@ flex:1;
 padding:40px;
 overflow-y:auto;
 }
+html.js .main{
+opacity:0.85;
+transform:translateY(4px);
+transition:opacity .35s ease, transform .35s ease;
+}
+html.js body.is-ready .main{
+opacity:1;
+transform:none;
+}
 header h1{
 font-family:var(--font-serif);
 font-weight:300;
@@ -244,6 +278,13 @@ font-weight:300;
 .btn.danger{background:#ffebeb;color:#c0392b;border:1px solid #f8d7da;}
 .btn.danger:hover{background:#c0392b;color:#fff;}
 .input-field{width:100%;padding:.6rem .8rem;margin-bottom:1rem;border:1px solid var(--line);border-radius:6px;font-family:var(--font-sans);}
+.settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.5rem;margin-top:1.5rem;}
+.settings-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-top:.6rem;}
+.settings-toggle{display:flex;align-items:center;gap:.6rem;font-weight:400;}
+.settings-help{font-size:.85rem;color:var(--muted);margin:.4rem 0 0;}
+.settings-actions{display:flex;align-items:center;gap:1rem;margin-top:1.5rem;}
+.settings-meta{margin-top:.5rem;}
+.muted{color:var(--muted);font-size:.9rem;}
 .search{width:260px;padding:.5rem .75rem;border:1px solid var(--line);border-radius:6px;}
 .grid-four{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1.5rem;}
 .ledger-table{width:100%;border-collapse:collapse;}
@@ -457,7 +498,7 @@ font-size:.95rem;
 </style>
 </head>
 
-<body>
+<body class="is-loading">
   <a class="skip-link" href="#main">Skip to main content</a>
   <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
     <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
@@ -837,7 +878,7 @@ font-size:.95rem;
 <li><strong>Estimated Tax Owed (22%):</strong> $6,615.00</li>
 <li><strong>Next Filing Deadline:</strong> April 15 2026</li>
 </ul>
-<button class="btn secondary">Generate Tax Report</button>
+<button class="btn secondary" id="taxReportBtn" type="button">Generate Tax Report</button>
 </div>
 
 <div class="panel">
@@ -1023,6 +1064,44 @@ font-size:.95rem;
 <section id="section-settings" class="section">
 <h2>Settings</h2>
 <p>Manage site preferences, API keys, and notifications.</p>
+<div class="settings-grid">
+  <div class="panel">
+    <h3>Platform Controls</h3>
+    <div class="settings-row">
+      <label class="settings-toggle" for="settingAllowSignups">
+        <input type="checkbox" id="settingAllowSignups">
+        <span>Allow new signups</span>
+      </label>
+    </div>
+    <p class="settings-help">Turn off to pause new account registrations.</p>
+    <div class="settings-row">
+      <label class="settings-toggle" for="settingMaintenanceMode">
+        <input type="checkbox" id="settingMaintenanceMode">
+        <span>Maintenance mode</span>
+      </label>
+    </div>
+    <p class="settings-help">When enabled, only admins can log in.</p>
+  </div>
+  <div class="panel">
+    <h3>Finance Defaults</h3>
+    <label for="settingTaxRate">Estimated tax rate (%)</label>
+    <input type="number" id="settingTaxRate" class="input-field" min="0" max="50" step="0.1" placeholder="22">
+    <p class="settings-help">Updates the Tax Summary calculation on this dashboard.</p>
+  </div>
+  <div class="panel">
+    <h3>Support Contact</h3>
+    <label for="settingSupportEmail">Support email</label>
+    <input type="email" id="settingSupportEmail" class="input-field" placeholder="support@lets-paraconnect.com">
+    <p class="settings-help">Used in admin communications and alerts.</p>
+    <div class="settings-meta">
+      <span id="settingsUpdatedAt" class="muted"></span>
+    </div>
+  </div>
+</div>
+<div class="settings-actions">
+  <button class="btn primary" type="button" id="saveAdminSettings">Save Settings</button>
+  <span id="settingsStatus" class="muted"></span>
+</div>
 </section>
 
 </main>
@@ -1057,7 +1136,8 @@ nav a.active {background:rgba(255,255,255,0.25);}
 
 <script src="assets/scripts/utils/toast.js"></script>
 <script>
-const adminSession = window.checkSession('admin');
+document.addEventListener("DOMContentLoaded", () => {
+void window.checkSession('admin');
 const navLinks=document.querySelectorAll("nav a");
 const sections=document.querySelectorAll(".section");
 const logoutButton=document.getElementById("logoutBtn");
@@ -1220,7 +1300,7 @@ logoutButton.textContent=defaultLabel;
 document.querySelector(".sidebar-footer")?.addEventListener("click",()=>{
 window.location.href="index.html";
 });
-
+});
 </script>
 
 
@@ -1839,8 +1919,10 @@ pendingReviewCard?.addEventListener("click",()=>focusPostsSection("pending"));
 flaggedCard?.addEventListener("click",()=>focusPostsSection("flagged"));
 postsTableState.apply();
 
-loadAdminPosts();
-loadFinanceCards();
+Promise.all([loadAdminPosts(), loadFinanceCards()]).finally(() => {
+document.body.classList.remove("is-loading");
+document.body.classList.add("is-ready");
+});
 /* -------- Pause & Report -------- */
 function pauseReportActivity(id){
 const r=prompt(`Enter reason for pausing Case #${id||'Unknown'}:`); 

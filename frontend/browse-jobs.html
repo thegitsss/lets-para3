@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Browse Jobs – Let’s-ParaConnect</title>
@@ -9,7 +11,6 @@
   <link rel="shortcut icon" href="/favicon.ico" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300&family=Sarabun:wght@200;400&display=swap" rel="stylesheet" />
   <link href="assets/styles/styles.css" rel="stylesheet" />
   <link href="assets/styles/hero-pages.css" rel="stylesheet" />
   <script src="assets/scripts/utils/session.js"></script>
@@ -20,6 +21,12 @@
       color: #1a2230;
       background: #ffffff !important;
       margin: 0;
+    }
+
+    body.auth-guarded .site-header,
+    body.auth-guarded .jobs-shell,
+    body.auth-guarded footer {
+      visibility: hidden;
     }
 
     .site-header {
@@ -541,7 +548,7 @@
     }
   </style>
 </head>
-<body class="browse-jobs-page">
+<body class="browse-jobs-page auth-guarded">
   <a class="skip-link" href="#main">Skip to main content</a>
   <header class="site-header">
     <div class="header-inner">

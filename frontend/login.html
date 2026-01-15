@@ -1,6 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="preload" as="font" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" type="font/woff2" crossorigin />
+  <link rel="preload" as="font" href="assets/fonts/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2" type="font/woff2" crossorigin />
+  <script>
+    (function applyStoredPreferences() {
+      const FONT_SIZE_MAP = {
+        xs: "14px",
+        sm: "15px",
+        md: "16px",
+        lg: "17px",
+        xl: "20px",
+      };
+      try {
+        const raw = localStorage.getItem("lpc_user");
+        if (!raw) return;
+        const user = JSON.parse(raw);
+        const prefs = user && user.preferences ? user.preferences : {};
+        const fontKey = String(prefs.fontSize || "").toLowerCase();
+        const size = FONT_SIZE_MAP[fontKey];
+        if (size) {
+          document.documentElement.style.fontSize = size;
+        }
+        const theme = String(prefs.theme || "").toLowerCase();
+        const validThemes = {
+          light: true,
+          dark: true,
+          mountain: true,
+          "mountain-dark": true,
+        };
+        if (validThemes[theme]) {
+          const classes = theme === "mountain-dark" ? ["theme-mountain-dark", "theme-dark"] : [`theme-${theme}`];
+          classes.forEach((cls) => document.documentElement.classList.add(cls));
+          if (document.body) {
+            classes.forEach((cls) => document.body.classList.add(cls));
+          } else {
+            document.addEventListener(
+              "DOMContentLoaded",
+              () => {
+                classes.forEach((cls) => document.body.classList.add(cls));
+              },
+              { once: true }
+            );
+          }
+        }
+      } catch (_) {}
+    })();
+  </script>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -17,8 +65,6 @@
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@200&display=swap" rel="stylesheet">
   <script>
     window.RECAPTCHA_SITE_KEY = "6Lfmq1orAAAAAEfFBDqDFpXtHMGld5aesRFjvIEM";
   </script>
@@ -28,6 +74,7 @@
     html, body {
       margin: 0;
       padding: 0;
+      font-synthesis: none;
       background-color: #ffffff;
       background-image: url('hero-mountain.jpg');
       background-size: cover;

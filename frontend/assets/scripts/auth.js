@@ -241,12 +241,15 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   try { await fetchCSRF(); } catch {}
 
-  try {
-    const r = await fetch("/api/users/me", { credentials: "include" });
-    const me = r.ok ? await r.json() : null;
-    if (me?.role) applyRoleVisibility(me.role);
-  } catch {
-    // non-fatal for public/unauthenticated pages
+  const isPublicPage = document.body?.dataset?.publicPage === "true";
+  if (!isPublicPage) {
+    try {
+      const r = await fetch("/api/users/me", { credentials: "include" });
+      const me = r.ok ? await r.json() : null;
+      if (me?.role) applyRoleVisibility(me.role);
+    } catch {
+      // non-fatal for public/unauthenticated pages
+    }
   }
 
   wireLogoutButton();

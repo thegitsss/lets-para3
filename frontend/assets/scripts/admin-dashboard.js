@@ -12,6 +12,8 @@ expense: null,
 let analyticsInFlight = false;
 let latestAnalytics = null;
 let lastAnalyticsRenderAt = 0;
+let adminSettingsCache = null;
+let settingsBound = false;
 const ANALYTICS_COOLDOWN_MS = 30_000;
 const removedUserIds = new Set();
 let recentUsersCache = [];
@@ -77,6 +79,189 @@ if (!value) return "";
 const date = new Date(value);
 if (Number.isNaN(date.getTime())) return value;
 return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function clampNumber(value, min, max) {
+const num = Number(value);
+if (!Number.isFinite(num)) return null;
+return Math.min(max, Math.max(min, num));
+}
+
+function formatTaxRatePercent(rate) {
+if (!Number.isFinite(Number(rate))) return "";
+const percent = Number(rate) * 100;
+return percent % 1 === 0 ? String(percent) : percent.toFixed(1);
+}
+
+function setSettingsStatus(message = "") {
+const status = document.getElementById("settingsStatus");
+if (status) status.textContent = message;
+}
+
+function applySettingsToForm(settings = {}) {
+const allowInput = document.getElementById("settingAllowSignups");
+if (allowInput) allowInput.checked = settings.allowSignups !== false;
+const maintenanceInput = document.getElementById("settingMaintenanceMode");
+if (maintenanceInput) maintenanceInput.checked = !!settings.maintenanceMode;
+const emailInput = document.getElementById("settingSupportEmail");
+if (emailInput) emailInput.value = settings.supportEmail || "";
+const taxInput = document.getElementById("settingTaxRate");
+if (taxInput) taxInput.value = formatTaxRatePercent(settings.taxRate);
+const updatedLabel = document.getElementById("settingsUpdatedAt");
+if (updatedLabel) {
+const updated = settings.updatedAt ? formatDate(settings.updatedAt) : "";
+updatedLabel.textContent = updated ? `Last updated ${updated}` : "";
+}
+}
+
+async function loadAdminSettings() {
+try {
+const res = await secureFetch("/api/admin/settings", {
+headers: { Accept: "application/json" },
+});
+const data = await res.json().catch(() => ({}));
+if (!res.ok) {
+throw new Error(data?.error || data?.msg || "Unable to load settings.");
+}
+const settings = data.settings || data;
+adminSettingsCache = settings;
+applySettingsToForm(settings);
+setSettingsStatus("");
+return settings;
+} catch (err) {
+console.error("Failed to load admin settings", err);
+showToast(err?.message || "Unable to load settings.", "err");
+setSettingsStatus("Unable to load settings.");
+return null;
+}
+}
+
+function readSettingsFromForm() {
+const allowInput = document.getElementById("settingAllowSignups");
+const maintenanceInput = document.getElementById("settingMaintenanceMode");
+const emailInput = document.getElementById("settingSupportEmail");
+const taxInput = document.getElementById("settingTaxRate");
+
+const payload = {
+allowSignups: !!allowInput?.checked,
+maintenanceMode: !!maintenanceInput?.checked,
+supportEmail: emailInput ? emailInput.value.trim() : "",
+};
+if (taxInput) {
+const normalized = clampNumber(taxInput.value, 0, 50);
+if (normalized !== null) {
+payload.taxRate = normalized / 100;
+}
+}
+return payload;
+}
+
+async function saveAdminSettings() {
+const saveBtn = document.getElementById("saveAdminSettings");
+const original = saveBtn?.textContent || "Save Settings";
+if (saveBtn) {
+saveBtn.disabled = true;
+saveBtn.textContent = "Saving...";
+}
+setSettingsStatus("");
+try {
+const payload = readSettingsFromForm();
+const res = await secureFetch("/api/admin/settings", {
+method: "PUT",
+body: payload,
+});
+const data = await res.json().catch(() => ({}));
+if (!res.ok) {
+throw new Error(data?.error || data?.msg || "Unable to save settings.");
+}
+const settings = data.settings || data;
+adminSettingsCache = settings;
+applySettingsToForm(settings);
+showToast("Settings saved.", "ok");
+setSettingsStatus("Saved.");
+await hydrateAnalytics();
+return settings;
+} catch (err) {
+console.error("Failed to save settings", err);
+showToast(err?.message || "Unable to save settings.", "err");
+setSettingsStatus("Save failed.");
+return null;
+} finally {
+if (saveBtn) {
+saveBtn.disabled = false;
+saveBtn.textContent = original;
+}
+}
+}
+
+function bindSettingsActions() {
+if (settingsBound) return;
+const saveBtn = document.getElementById("saveAdminSettings");
+if (saveBtn) {
+saveBtn.addEventListener("click", () => {
+saveAdminSettings();
+});
+}
+settingsBound = true;
+}
+
+function formatReportDate(value = new Date()) {
+const date = value instanceof Date ? value : new Date(value);
+if (Number.isNaN(date.getTime())) return "";
+return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function csvEscape(value) {
+const normalized = String(value ?? "").replace(/\r?\n/g, " ").trim();
+return `"${normalized.replace(/"/g, "\"\"")}"`;
+}
+
+function buildTaxReportRows(data) {
+const { taxSummary = {}, ledger = [] } = data || {};
+const reportDate = formatReportDate(new Date());
+const rows = [
+["Lets-ParaConnect Tax Report"],
+["Generated", reportDate || formatDate(new Date())],
+[],
+["Tax Summary"],
+["Gross Earnings", formatCurrency(taxSummary.grossEarnings)],
+["Deductible Expenses", formatCurrency(taxSummary.deductibleExpenses)],
+["Estimated Tax Owed (22%)", formatCurrency(taxSummary.estimatedTax)],
+["Next Filing Deadline", taxSummary.nextFilingDeadline || "—"],
+];
+
+if (Array.isArray(ledger) && ledger.length) {
+rows.push([]);
+rows.push(["Ledger Entries"]);
+rows.push(["Date", "Category", "Description", "Amount", "Type", "Status"]);
+ledger.forEach((entry) => {
+rows.push([
+formatDate(entry.date),
+entry.category || "—",
+entry.description || "—",
+formatCurrency(entry.amount),
+toTitle(entry.type || "income"),
+toTitle(entry.status || "pending"),
+]);
+});
+}
+
+return rows;
+}
+
+function downloadTaxReport(data) {
+const rows = buildTaxReportRows(data);
+const csv = rows
+.map((row) => (row.length ? row.map(csvEscape).join(",") : ""))
+.join("\n");
+const blob = new Blob([csv], { type: "text/csv" });
+const url = URL.createObjectURL(blob);
+const a = document.createElement("a");
+const stamp = new Date().toISOString().split("T")[0];
+a.href = url;
+a.download = `LetsParaConnect_TaxReport_${stamp}.csv`;
+a.click();
+URL.revokeObjectURL(url);
 }
 
 function formatMonthLabel(value) {
@@ -216,9 +401,10 @@ const list = document.querySelector(".tax-summary");
 if (!list) return;
 const { taxSummary = {} } = data || {};
 const items = list.querySelectorAll("li");
+const taxRateLabel = formatTaxRatePercent(taxSummary.taxRate) || "22";
 if (items[0]) items[0].innerHTML = `<strong>Gross Earnings:</strong> ${formatCurrency(taxSummary.grossEarnings)}`;
 if (items[1]) items[1].innerHTML = `<strong>Deductible Expenses:</strong> ${formatCurrency(taxSummary.deductibleExpenses)}`;
-if (items[2]) items[2].innerHTML = `<strong>Estimated Tax Owed (22%):</strong> ${formatCurrency(taxSummary.estimatedTax)}`;
+if (items[2]) items[2].innerHTML = `<strong>Estimated Tax Owed (${taxRateLabel}%):</strong> ${formatCurrency(taxSummary.estimatedTax)}`;
 if (items[3]) items[3].innerHTML = `<strong>Next Filing Deadline:</strong> ${taxSummary.nextFilingDeadline || "—"}`;
 }
 
@@ -558,8 +744,29 @@ document.addEventListener("DOMContentLoaded", async () => {
 const user = await bootAdminDashboard();
 if (!user) return;
 
-const data = await hydrateAnalytics();
-if (!data) return;
+bindSettingsActions();
+await loadAdminSettings();
+await hydrateAnalytics();
+
+const taxReportBtn = document.getElementById("taxReportBtn");
+if (taxReportBtn) {
+taxReportBtn.addEventListener("click", async () => {
+const originalLabel = taxReportBtn.textContent || "Generate Tax Report";
+taxReportBtn.disabled = true;
+taxReportBtn.textContent = "Generating...";
+try {
+const payload = latestAnalytics || (await hydrateAnalytics());
+if (!payload) throw new Error("Unable to load tax summary.");
+downloadTaxReport(payload);
+showToast("Tax report generated.", "ok");
+} catch (err) {
+showToast(err?.message || "Unable to generate tax report.", "err");
+} finally {
+taxReportBtn.disabled = false;
+taxReportBtn.textContent = originalLabel;
+}
+});
+}
 });
 
 document.addEventListener("visibilitychange", () => {
