@@ -92,6 +92,8 @@ const elements = {
   skillsCard: document.getElementById("skillsCard"),
   skillsSection: document.getElementById("skillsSection"),
   practiceSection: document.getElementById("practiceSection"),
+  bestForCard: document.getElementById("bestForCard"),
+  bestForList: document.getElementById("bestForList"),
   experienceSection: document.getElementById("experienceSection"),
   educationSection: document.getElementById("educationSection"),
   languagesRow: document.getElementById("languagesRow"),
@@ -831,6 +833,7 @@ function renderProfile(profile) {
     (Array.isArray(profile.practiceAreas) && profile.practiceAreas.length ? profile.practiceAreas : null) ||
     (Array.isArray(profile.specialties) && profile.specialties.length ? profile.specialties : null);
   const { hasSkills, hasPractice } = renderSkillsAndPractice(skillValues, practiceValues);
+  renderBestFor(profile.bestFor);
   const hasExperience = renderExperience(profile.experience);
   const hasEducation = renderEducation(profile.education);
   renderFunFacts(profile.about, profile.writingSamples);
@@ -1181,10 +1184,31 @@ function renderSkillsAndPractice(skills = [], practices = []) {
   return { hasSkills, hasPractice };
 }
 
+function renderBestFor(entries) {
+  if (!elements.bestForList) return false;
+  elements.bestForList.innerHTML = "";
+  const list = Array.isArray(entries)
+    ? entries.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+  if (!list.length) {
+    if (elements.bestForCard) elements.bestForCard.classList.add("hidden");
+    return false;
+  }
+  list.slice(0, 6).forEach((item) => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    elements.bestForList.appendChild(li);
+  });
+  if (elements.bestForCard) elements.bestForCard.classList.remove("hidden");
+  return true;
+}
+
 function renderExperience(entries) {
   if (!elements.experienceList) return false;
   elements.experienceList.innerHTML = "";
-  const list = Array.isArray(entries) ? entries.filter((item) => item && (item.title || item.years)) : [];
+  const list = Array.isArray(entries)
+    ? entries.filter((item) => item && (item.title || item.years || item.description))
+    : [];
   if (!list.length) {
     if (elements.experienceSection) {
       elements.experienceSection.classList.add("hidden");
@@ -1197,17 +1221,25 @@ function renderExperience(entries) {
   list.slice(0, 5).forEach((item) => {
     const block = document.createElement("div");
     block.className = "timeline-item";
-    const title = document.createElement("div");
-    title.className = "timeline-role";
-    title.textContent = item.title || "Role";
-    const dates = document.createElement("div");
-    dates.className = "timeline-dates";
-    dates.textContent = item.years || item.timeline || formatExperienceRange(item) || "Dates not provided";
-    block.appendChild(title);
-    block.appendChild(dates);
+    const label = document.createElement("div");
+    label.className = "experience-line";
+    const title = String(item.title || "").trim();
+    const detail = pickExperienceDetail(item);
+    const years = String(item.years || item.timeline || formatExperienceRange(item) || "").trim();
+    const base = [title || "Paralegal", detail].filter(Boolean).join(" · ");
+    label.textContent = years ? `${base} (${years})` : base;
+    block.appendChild(label);
     elements.experienceList.appendChild(block);
   });
   return true;
+}
+
+function pickExperienceDetail(item = {}) {
+  const raw = String(item.description || item.focus || item.summary || "").trim();
+  if (!raw) return "";
+  const firstLine = raw.split(/\n+/).map((line) => line.trim()).filter(Boolean)[0] || "";
+  if (!firstLine) return "";
+  return firstLine.length > 80 ? `${firstLine.slice(0, 77)}…` : firstLine;
 }
 
 function formatExperienceRange(item = {}) {
@@ -1354,7 +1386,7 @@ function updateButtonVisibility() {
   const isOwner = state.viewerRole === "paralegal" && state.viewerId && state.viewerId === state.paralegalId;
   const isAttorney = state.viewerRole === "attorney";
 
-  toggleElement(elements.editBtn, isOwner);
+  toggleElement(elements.editBtn, false);
   updateInviteButtonState();
   if (!isAttorney) closeInviteModal();
 }

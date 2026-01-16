@@ -2669,10 +2669,21 @@ router.post(
       return res.status(400).json({ error: "Escrow amount must be locked before hiring." });
     }
 
-    const paralegal = await User.findById(paralegalId).select("firstName lastName email role");
+    const paralegal = await User.findById(paralegalId).select(
+      "firstName lastName email role stripeAccountId stripeOnboarded stripePayoutsEnabled"
+    );
     if (!paralegal) return res.status(404).json({ error: "Paralegal not found" });
     if (await isBlockedBetween(attorneyOnCase, paralegal._id)) {
       return res.status(403).json({ error: BLOCKED_MESSAGE });
+    }
+    if (!paralegal.stripeAccountId) {
+      return res.status(403).json({ error: "Connect Stripe before hiring a paralegal." });
+    }
+    if (!paralegal.stripeOnboarded || !paralegal.stripePayoutsEnabled) {
+      const refreshed = await ensureStripeOnboardedUser(paralegal);
+      if (!refreshed) {
+        return res.status(403).json({ error: "Complete Stripe onboarding before hiring a paralegal." });
+      }
     }
 
     const attorney = await User.findById(req.user.id).select("firstName lastName email role stripeCustomerId");

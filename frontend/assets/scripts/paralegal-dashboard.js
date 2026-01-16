@@ -302,7 +302,7 @@ function renderAssignments(assignments = []) {
         <div class="case-header">
           <div>
             <h2>No active assignments</h2>
-            <div class="case-subinfo">New invitations will appear here.</div>
+            <div class="case-subinfo">Active assignments will appear here.</div>
           </div>
         </div>
       </div>
@@ -399,7 +399,7 @@ function renderInvites(invites = []) {
           </div>
         </div>
         <div class="case-actions">
-          <a class="open-case-btn" href="browse-jobs.html">Browse new postings and apply</a>
+          <a class="open-case-btn" href="help.html#cases">Learn how invites work</a>
         </div>
       </div>
     `;
@@ -474,7 +474,7 @@ function renderInvites(invites = []) {
 
   const footer = document.createElement('div');
   footer.className = 'info-line';
-  footer.innerHTML = '<a href="browse-jobs.html" class="card-link">Browse new postings →</a>';
+  footer.innerHTML = '<a href="browse-jobs.html" class="card-link">Browse postings →</a>';
   container.appendChild(footer);
   applyStripeGateToApplyActions();
 }
@@ -548,7 +548,7 @@ function renderAssignedCases(items = []) {
       <div class="dashboard-card full-width" id="recommendedPostingsCard">
         <h3 class="card-title">Recommended for You</h3>
         <ul class="recommendations-list"></ul>
-        <a href="browse-jobs.html" class="card-link">Browse all postings →</a>
+        <a href="browse-jobs.html" class="card-link">Refine filters →</a>
       </div>
     `;
     void loadRecommendedJobs(viewerProfile || {});
@@ -857,10 +857,7 @@ function updateProfile(profile = {}) {
       .trim()
       .split(/\s+/)[0] ||
     'Paralegal';
-  setField('name', composedName);
-  if (selectors.nameHeading) {
-    selectors.nameHeading.textContent = firstName;
-  }
+  setField('name', firstName);
   updateWelcomeGreeting(profile);
   const avatarUrl = getAvatarUrl(profile);
   document.querySelectorAll('[data-avatar]').forEach((node) => {

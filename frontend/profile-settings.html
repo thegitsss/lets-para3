@@ -8,6 +8,29 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Account Settings – Let’s-ParaConnect</title>
+  <script>
+    (function () {
+      const root = document.documentElement;
+      try {
+        const raw = localStorage.getItem("lpc_user");
+        if (!raw) return;
+        const user = JSON.parse(raw);
+        const theme = String(user?.preferences?.theme || "").toLowerCase();
+        const classes = [];
+        if (theme === "mountain-dark") {
+          classes.push("theme-mountain-dark", "theme-dark");
+        } else if (theme === "dark" || theme === "mountain" || theme === "light") {
+          classes.push(`theme-${theme}`);
+        }
+        classes.forEach((value) => root.classList.add(value));
+        if (theme === "dark" || theme === "mountain-dark") {
+          root.style.backgroundColor = "#0f172a";
+          root.style.color = "#f4f6fb";
+          root.style.setProperty("--bg", "#0f172a");
+        }
+      } catch (_) {}
+    })();
+  </script>
   <script src="assets/scripts/utils/session.js"></script>
   <script src="assets/scripts/auth.js" type="module"></script>
   <style>
@@ -28,6 +51,19 @@
       top: 12px;
     }
 
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      clip-path: inset(50%);
+      border: 0;
+      white-space: nowrap;
+    }
+
     .gold{color:#b4975a;}
     :root {
       --bg: #ffffff;
@@ -46,6 +82,8 @@
       --font-sans: 'Sarabun', sans-serif;
     }
 
+    html.theme-dark,
+    html.theme-dark body,
     body.theme-dark {
       --bg: #0f172a;
       --sidebar-bg: #1c2333;
@@ -214,21 +252,30 @@
 
     .content {
       flex: 1;
-      padding: 40px;
+      padding: 28px 40px 40px;
       overflow-y: auto;
       background: var(--bg);
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      margin-bottom: 18px;
     }
 
     .topbar {
       display: flex;
       justify-content: flex-end;
-      margin-bottom: 6px;
+      margin-bottom: 0;
       align-items: center;
       gap: 1.5rem;
       position: relative;
       z-index: 3;
       pointer-events: auto;
-      min-height: 72px;
+      min-height: 0;
+      flex: 0 0 auto;
     }
     .topbar .lpc-shared-header {
       margin-bottom: 0;
@@ -272,8 +319,9 @@
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-bottom: 18px;
+      margin-bottom: 0;
       position: relative;
+      flex: 1 1 auto;
     }
 
 
@@ -321,7 +369,6 @@
       padding: 28px;
       margin-bottom: 28px;
       display: none;
-      animation: fadeIn 0.25s ease forwards;
       color: var(--ink);
     }
 
@@ -490,10 +537,15 @@
     }
 
     #securitySection {
+      margin-top: 24px;
       margin-bottom: 28px;
     }
 
     #securitySection .settings-block:first-child {
+      margin-top: 0;
+    }
+
+    #securitySection .security-column .settings-block:first-child {
       margin-top: 0;
     }
 
@@ -517,10 +569,258 @@
     #securitySection .btn {
       align-self: flex-start;
       margin-top: 4px;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-weight: 300;
+      padding: 8px 18px;
     }
 
     #securitySection input[type="password"] {
-      max-width: 320px;
+      max-width: 100%;
+    }
+
+    #securitySection .security-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      gap: 24px;
+    }
+
+    #securitySection .security-column {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    #securitySection .security-column + .security-column {
+      border-left: 1px solid var(--line);
+      padding-left: 24px;
+    }
+
+    #securitySection .security-column .settings-block {
+      margin-top: 0;
+    }
+
+    #securitySection .security-card-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #securitySection .security-card-title h3 {
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    #securitySection .security-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    #securitySection .password-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    #securitySection .field-group {
+      position: relative;
+      max-width: 100%;
+    }
+
+    #securitySection .field-group input {
+      width: 100%;
+      padding-right: 42px;
+    }
+
+    #securitySection .toggle-visibility {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    #securitySection .toggle-visibility svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+    }
+
+    #securitySection .session-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    #securitySection .session-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    #securitySection .session-row:first-child {
+      border-top: none;
+      padding-top: 0;
+    }
+
+    #securitySection .session-device {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #securitySection .session-device-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 500;
+      color: var(--muted);
+      background: #fff;
+      font-size: 0.85rem;
+    }
+
+    #securitySection .session-meta {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    #securitySection .session-status {
+      font-size: 0.85rem;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    #securitySection .session-action {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    #securitySection .session-action:disabled {
+      cursor: not-allowed;
+      opacity: 0.4;
+    }
+
+    #securitySection .session-action svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+    }
+
+    #securitySection .two-factor-hero {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, rgba(182, 164, 122, 0.08), rgba(0, 0, 0, 0));
+    }
+
+    #securitySection .two-factor-hero svg {
+      width: 130px;
+      height: 90px;
+      color: var(--muted);
+    }
+
+    #securitySection .two-factor-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    #securitySection .two-factor-option:first-of-type {
+      border-top: none;
+      padding-top: 0;
+    }
+
+    #securitySection .two-factor-details {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    #securitySection .two-factor-details h4 {
+      margin: 0 0 4px;
+      font-size: 0.95rem;
+    }
+
+    #securitySection .two-factor-badge {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-left: 6px;
+    }
+
+    #securitySection .two-factor-details p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    #securitySection .two-factor-status {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    #securitySection .two-factor-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #securitySection .two-factor-codes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      padding: 14px;
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.02);
+      font-size: 0.9rem;
+    }
+
+    #securitySection .two-factor-codes code {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      text-align: center;
+      font-family: "SF Mono", "Menlo", "Consolas", monospace;
+      font-size: 0.85rem;
+      letter-spacing: 0.08em;
+    }
+
+    #securitySection .security-extras {
+      margin-top: 24px;
+      display: grid;
+      gap: 20px;
     }
 
     body.paralegal-flat #securitySection {
@@ -545,6 +845,30 @@
     body.paralegal-flat #securitySection .settings-block:last-child {
       border-bottom: none;
       padding-bottom: 0;
+    }
+
+    @media (max-width: 960px) {
+      #securitySection .security-grid {
+        grid-template-columns: 1fr;
+      }
+
+      #securitySection .password-grid {
+        grid-template-columns: 1fr;
+      }
+
+      #securitySection .security-column + .security-column {
+        border-left: none;
+        padding-left: 0;
+      }
+
+      #securitySection .session-row {
+        grid-template-columns: 1fr;
+        text-align: left;
+      }
+
+      #securitySection .session-status {
+        text-align: left;
+      }
     }
 
     .settings-block {
@@ -699,10 +1023,10 @@ label {
       gap: 12px;
     }
 
-    .language-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
+    #paralegalSettings .language-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr) auto;
+      gap: 12px;
       align-items: center;
     }
 
@@ -754,14 +1078,13 @@ label {
       min-width: 110px;
     }
 
-    .language-row .language-name {
-      flex: 1 1 200px;
-      min-width: 160px;
+    #paralegalSettings .language-row .language-name,
+    #paralegalSettings .language-row .language-level {
+      width: 100%;
+      min-width: 0;
     }
 
     .language-row .language-level {
-      flex: 1 1 180px;
-      min-width: 150px;
       border-radius: 12px;
       border: 1px solid var(--line);
       padding: 10px 36px 10px 14px;
@@ -784,13 +1107,42 @@ label {
       box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.25);
     }
 
-    .language-row .remove-language {
-      border: none;
-      background: none;
-      color: var(--danger);
+    #paralegalSettings .language-row .remove-language {
+      justify-self: end;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
       cursor: pointer;
-      font-size: 0.9rem;
-      padding: 6px 10px;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 6px 12px;
+      border-radius: 999px;
+      transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+    }
+
+    #paralegalSettings .language-row .remove-language:hover {
+      color: var(--danger);
+      border-color: rgba(192, 57, 43, 0.45);
+      background: rgba(192, 57, 43, 0.08);
+    }
+
+    #paralegalSettings #addLanguageBtn {
+      align-self: center;
+      color: var(--muted);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      padding: 8px 18px;
+      margin-left: auto;
+      margin-right: auto;
+      margin-top: 12px;
+    }
+
+    #paralegalSettings #addLanguageBtn:hover {
+      color: var(--ink);
+      border-color: rgba(182, 164, 122, 0.55);
+      background: rgba(182, 164, 122, 0.08);
     }
 
     .education-row .remove-education {
@@ -1243,8 +1595,20 @@ input[type="number"],
       --paralegal-radius: 8px;
     }
 
-    body.paralegal-flat .unified-header {
+    body.paralegal-flat .content {
+      padding-top: 24px;
+    }
+
+    body.paralegal-flat .topbar .header-skeleton {
+      display: none;
+    }
+
+    body.paralegal-flat .page-header {
       margin-bottom: 8px;
+    }
+
+    body.paralegal-flat #accountSettingsTitle {
+      display: none;
     }
 
     #paralegalSettings {
@@ -1347,22 +1711,84 @@ input[type="number"],
       gap: 12px;
     }
 
-    #paralegalSettings .experience-date-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 12px;
-      margin-top: 12px;
+    #paralegalSettings .experience-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 8px;
     }
 
-    #paralegalSettings .experience-date-field {
+    #paralegalSettings .experience-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr) 28px;
+      gap: 12px;
+      align-items: end;
+    }
+
+    #paralegalSettings .experience-row label {
       display: flex;
       flex-direction: column;
       gap: 6px;
-    }
-
-    #paralegalSettings .experience-date-field label {
       font-size: 0.85rem;
       color: var(--muted);
+    }
+
+    #paralegalSettings .experience-row input {
+      font-size: 0.95rem;
+    }
+
+    #paralegalSettings .experience-remove-btn {
+      width: 28px;
+      height: 28px;
+      justify-self: center;
+      align-self: center;
+      border-radius: 0;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--font-serif);
+      font-size: 1.4rem;
+      font-weight: 600;
+      line-height: 1;
+      cursor: pointer;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75), 0 -1px 1px rgba(15, 23, 42, 0.2);
+      transition: color 0.2s ease, text-shadow 0.2s ease;
+    }
+
+    #paralegalSettings .experience-remove-btn:hover:not(:disabled) {
+      color: var(--accent);
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85), 0 -1px 1px rgba(15, 23, 42, 0.3);
+    }
+
+    #paralegalSettings #addExperienceRow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 2px;
+      width: 28px;
+      height: 28px;
+      margin-left: auto;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      color: #2b2b2b;
+      font-family: var(--font-serif);
+      font-size: 1.5rem;
+      font-weight: 600;
+      line-height: 1;
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.75), 0 -1px 1px rgba(15, 23, 42, 0.2);
+      box-shadow: none;
+      transition: color 0.2s ease, text-shadow 0.2s ease;
+    }
+
+    #paralegalSettings #addExperienceRow:hover {
+      color: var(--accent);
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85), 0 -1px 1px rgba(15, 23, 42, 0.3);
+    }
+
+    #paralegalSettings .experience-remove-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
     }
 
     #paralegalSettings .profile-header {
@@ -1479,6 +1905,21 @@ input[type="number"],
       display: none;
     }
 
+    #paralegalSettings #bestForSection.is-editing .section-display {
+      display: block;
+    }
+
+    #paralegalSettings [data-edit-section].is-editing [data-section-edit="languages"] {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #paralegalSettings #languagesEditor {
+      width: 100%;
+    }
+
     #paralegalSettings .section-display-text {
       margin: 0;
       white-space: pre-line;
@@ -1486,6 +1927,54 @@ input[type="number"],
 
     #paralegalSettings .section-display-text.is-placeholder {
       color: var(--muted);
+    }
+
+    #paralegalSettings #languagesDisplay {
+      line-height: 1.8;
+    }
+
+    #paralegalSettings #skillsDisplay,
+    #paralegalSettings #experienceDisplay {
+      line-height: 1.8;
+    }
+
+    #paralegalSettings .best-for-list {
+      margin: 0;
+      padding-left: 18px;
+      white-space: normal;
+    }
+
+    #paralegalSettings .best-for-list li {
+      margin: 0;
+      min-height: 1.2em;
+    }
+
+    #paralegalSettings .best-for-list li + li {
+      margin-top: 10px;
+    }
+
+    #paralegalSettings #bestForSection .best-for-list li::marker {
+      font-size: 0.75em;
+    }
+
+    #paralegalSettings #bestForSection .best-for-body {
+      position: relative;
+    }
+
+    #paralegalSettings #bestForSection.is-editing .best-for-list {
+      cursor: text;
+    }
+
+    #paralegalSettings #bestForSection .best-for-list li[contenteditable="true"]:focus {
+      outline: none;
+    }
+
+    #paralegalSettings #bestForSection.is-editing .best-for-list {
+      color: var(--muted);
+    }
+
+    #paralegalSettings #bestForSection.is-editing .best-for-list.is-typing {
+      color: var(--ink);
     }
 
     #paralegalSettings #documentsSection:not(.is-editing) .paralegal-doc-actions {
@@ -1588,6 +2077,31 @@ input[type="number"],
     #paralegalSettings #firstNameInput,
     #paralegalSettings #lastNameInput {
       text-align: center;
+    }
+
+    #paralegalSettings .years-experience-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+      text-align: center;
+    }
+
+    #paralegalSettings .years-experience-row label {
+      white-space: nowrap;
+    }
+
+    #paralegalSettings #yearsExperienceInput {
+      width: 64px;
+      min-width: 64px;
+      text-align: center;
+    }
+
+    #paralegalSettings .years-experience-sep {
+      display: none;
+      color: var(--muted);
     }
 
     #paralegalSettings .btn-row {
@@ -1707,26 +2221,12 @@ input[type="number"],
         grid-template-columns: 1fr;
       }
 
-      #paralegalSettings .years-experience-row {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        flex-wrap: nowrap;
+      #paralegalSettings .experience-row {
+        grid-template-columns: 1fr;
       }
 
-      #paralegalSettings .years-experience-row label {
-        white-space: nowrap;
-      }
-
-      #paralegalSettings #yearsExperienceInput {
-        width: 64px;
-        min-width: 64px;
-      }
-
-      #paralegalSettings .years-experience-sep {
-        display: inline;
-        color: var(--muted);
+      #paralegalSettings .experience-remove-btn {
+        width: 40px;
       }
     }
 
@@ -1927,7 +2427,7 @@ input[type="number"],
       box-shadow: none;
     }
 
-    body.attorney-classic .unified-header {
+    body.attorney-classic .page-header {
       margin-bottom: 28px;
     }
 
@@ -2151,16 +2651,6 @@ input[type="number"],
       border: 1px solid var(--attorney-line);
     }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-      to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
 
 @media (max-width: 900px) {
   .attorney-grid {
@@ -2295,22 +2785,24 @@ input[type="number"],
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
   <main id="main" tabindex="-1" class="content">
-    <div class="topbar" data-attorney-header>
-      <div class="header-skeleton" aria-hidden="true">
-        <div class="skeleton-circle"></div>
-        <div class="skeleton-stack">
-          <div class="skeleton-line short"></div>
-          <div class="skeleton-line medium"></div>
+    <div class="page-header">
+      <section class="unified-header" aria-label="Attorney header">
+        <div class="title-block">
+          <p class="eyebrow">Account</p>
+          <h1 id="accountSettingsTitle">Account Settings</h1>
+          <p id="accountSettingsSubtitle">Keep your LPC profile accurate, stay secure, and control how we notify you.</p>
+        </div>
+      </section>
+      <div class="topbar" data-attorney-header>
+        <div class="header-skeleton" aria-hidden="true">
+          <div class="skeleton-circle"></div>
+          <div class="skeleton-stack">
+            <div class="skeleton-line short"></div>
+            <div class="skeleton-line medium"></div>
+          </div>
         </div>
       </div>
     </div>
-    <section class="unified-header" aria-label="Attorney header">
-      <div class="title-block">
-        <p class="eyebrow">Account</p>
-        <h1 id="accountSettingsTitle">Account Settings</h1>
-        <p id="accountSettingsSubtitle">Keep your LPC profile accurate, stay secure, and control how we notify you.</p>
-      </div>
-    </section>
 
     <div id="settingsContent">
       <section class="settings-panel settings-section active" id="profileSection">
@@ -2545,9 +3037,6 @@ input[type="number"],
                       <input type="text" id="firstNameInput" name="firstName" autocomplete="given-name" required />
                       <input type="text" id="lastNameInput" name="lastName" autocomplete="family-name" required />
                     </div>
-                    <div class="profile-role-row">
-                      <span id="roleLine"></span>
-                    </div>
                     <div class="profile-section section-editable" id="bioSection" data-edit-section="bio">
                       <div class="section-header">
                         <span class="card-header-label">Bio</span>
@@ -2570,6 +3059,23 @@ input[type="number"],
                 </div>
               </section>
 
+              <article class="profile-section section-editable" id="bestForSection" data-edit-section="bestFor">
+                <div class="section-header">
+                  <span class="card-header-label">Best For</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="bestFor" aria-label="Edit best for" aria-pressed="false">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M3 14.5V17h2.5l7.4-7.4-2.5-2.5L3 14.5z" fill="currentColor"/>
+                      <path d="M14.7 2.8l2.5 2.5 1-1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1 1z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="best-for-body">
+                  <div class="section-display" data-section-display="bestFor">
+                    <ul id="bestForDisplay" class="section-display-text best-for-list" aria-label="Best For list"></ul>
+                  </div>
+                </div>
+              </article>
+
               <article class="profile-section section-editable" id="experienceCard" data-edit-section="experience">
                 <div class="section-header">
                   <span class="card-header-label">Experience</span>
@@ -2584,19 +3090,8 @@ input[type="number"],
                   <p id="experienceDisplay" class="section-display-text"></p>
                 </div>
                 <div class="section-edit" data-section-edit="experience">
-                  <textarea id="experienceInput" placeholder="Paralegal at Smith & Co. (2020–2023)
-Legal Assistant at..."></textarea>
-                  <div class="experience-date-row">
-                    <div class="experience-date-field">
-                      <label for="experienceStartDate">Start date</label>
-                      <input type="month" id="experienceStartDate" />
-                    </div>
-                    <div class="experience-date-field">
-                      <label for="experienceEndDate">End date</label>
-                      <input type="month" id="experienceEndDate" />
-                    </div>
-                  </div>
-                  <p class="muted" style="font-size:0.85rem;margin-top:6px;">Optional. Applies to the first experience entry.</p>
+                  <div class="experience-rows" id="experienceRows"></div>
+                  <button type="button" class="btn btn-outline" id="addExperienceRow" aria-label="Add law firm" title="Add law firm">+</button>
                 </div>
               </article>
 
@@ -2635,30 +3130,150 @@ Legal Assistant at..."></textarea>
     </section>
 
     <section id="securitySection" class="settings-section">
-      <!-- Password -->
-      <div class="settings-block">
-        <h3>Change Password</h3>
-        <label>New Password</label>
-        <input type="password" id="newPassword" autocomplete="new-password">
+      <div class="security-grid">
+        <div class="security-column">
+          <div class="settings-block">
+            <h3>Payouts Setup</h3>
+            <p>Connect your Stripe account to receive payouts.</p>
+            <button id="connectStripeBtn" class="btn btn-primary">Connect Stripe Account →</button>
+            <p id="stripeStatus" class="muted"></p>
+          </div>
 
-        <label>Confirm Password</label>
-        <input type="password" id="confirmPassword" autocomplete="new-password">
+          <div class="settings-block security-card">
+            <div class="security-card-title">
+              <span class="security-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20">
+                  <path fill="currentColor" d="M10 1.5c2.8 0 5 2.2 5 5v2h1.2c.7 0 1.3.6 1.3 1.3v7.9c0 .7-.6 1.3-1.3 1.3H3.8c-.7 0-1.3-.6-1.3-1.3V9.8c0-.7.6-1.3 1.3-1.3H5V6.5c0-2.8 2.2-5 5-5zm-3 7h6V6.5c0-1.7-1.3-3-3-3s-3 1.3-3 3v2z"/>
+                </svg>
+              </span>
+              <h3>Change Password</h3>
+            </div>
+            <label for="currentPassword">Current password</label>
+            <div class="field-group">
+              <input type="password" id="currentPassword" autocomplete="current-password" placeholder="Enter current password">
+              <button type="button" class="toggle-visibility" data-toggle-password="currentPassword" aria-label="Show current password">
+                <svg viewBox="0 0 24 24">
+                  <path fill="currentColor" d="M12 5c5.5 0 9.6 3.9 11 7-1.4 3.1-5.5 7-11 7S2.4 15.1 1 12c1.4-3.1 5.5-7 11-7zm0 2c-4.3 0-7.7 2.8-9 5 1.3 2.2 4.7 5 9 5s7.7-2.8 9-5c-1.3-2.2-4.7-5-9-5zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6z"/>
+                </svg>
+              </button>
+            </div>
+            <div class="password-grid">
+              <div>
+                <label for="newPassword">New password</label>
+                <div class="field-group">
+                  <input type="password" id="newPassword" autocomplete="new-password" placeholder="Enter new password">
+                  <button type="button" class="toggle-visibility" data-toggle-password="newPassword" aria-label="Show new password">
+                    <svg viewBox="0 0 24 24">
+                      <path fill="currentColor" d="M12 5c5.5 0 9.6 3.9 11 7-1.4 3.1-5.5 7-11 7S2.4 15.1 1 12c1.4-3.1 5.5-7 11-7zm0 2c-4.3 0-7.7 2.8-9 5 1.3 2.2 4.7 5 9 5s7.7-2.8 9-5c-1.3-2.2-4.7-5-9-5zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6z"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label for="confirmPassword">Confirm password</label>
+                <div class="field-group">
+                  <input type="password" id="confirmPassword" autocomplete="new-password" placeholder="Confirm new password">
+                  <button type="button" class="toggle-visibility" data-toggle-password="confirmPassword" aria-label="Show confirm password">
+                    <svg viewBox="0 0 24 24">
+                      <path fill="currentColor" d="M12 5c5.5 0 9.6 3.9 11 7-1.4 3.1-5.5 7-11 7S2.4 15.1 1 12c1.4-3.1 5.5-7 11-7zm0 2c-4.3 0-7.7 2.8-9 5 1.3 2.2 4.7 5 9 5s7.7-2.8 9-5c-1.3-2.2-4.7-5-9-5zm0 2.2a2.8 2.8 0 1 1 0 5.6 2.8 2.8 0 0 1 0-5.6z"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <button id="savePasswordBtn" class="btn btn-primary">Save Password</button>
+          </div>
 
-        <button id="savePasswordBtn" class="btn btn-primary">Save Password</button>
+          <div class="settings-block security-card">
+            <div class="security-card-title">
+              <span class="security-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20">
+                  <path fill="currentColor" d="M10 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm0 1.6a6.4 6.4 0 1 0 0 12.8A6.4 6.4 0 0 0 10 3.6zm-.8 3h1.6v4.1l2.8 1.7-.8 1.2-3.6-2.2V6.6z"/>
+                </svg>
+              </span>
+              <h3>Session History</h3>
+            </div>
+            <div id="sessionHistoryList" class="session-list">
+              <p class="muted">Loading sessions...</p>
+            </div>
+          </div>
+
+          <div class="settings-block security-card">
+            <h3>Delete My Account</h3>
+            <p class="muted">Permanently delete your account and all associated data. This action cannot be undone.</p>
+            <button class="btn danger-btn" type="button" data-delete-account>Delete</button>
+          </div>
+        </div>
+
+        <div class="security-column">
+          <div class="settings-block security-card" id="twoFactorSection">
+            <div class="security-card-title">
+              <span class="security-icon" aria-hidden="true">
+                <svg viewBox="0 0 20 20">
+                  <path fill="currentColor" d="M10 1.5l6.5 2.6v5.2c0 4-2.7 7.6-6.5 8.7-3.8-1.1-6.5-4.7-6.5-8.7V4.1L10 1.5zm0 2.1L5.1 5.1v4.2c0 3 2 5.7 4.9 6.6 2.9-.9 4.9-3.6 4.9-6.6V5.1L10 3.6z"/>
+                </svg>
+              </span>
+              <h3>Setup 2-Step Verification</h3>
+            </div>
+            <div class="two-factor-hero" aria-hidden="true">
+              <svg viewBox="0 0 180 120">
+                <rect x="10" y="28" width="160" height="64" rx="12" fill="currentColor" opacity="0.08"></rect>
+                <rect x="26" y="40" width="90" height="10" rx="5" fill="currentColor" opacity="0.18"></rect>
+                <rect x="26" y="58" width="70" height="10" rx="5" fill="currentColor" opacity="0.18"></rect>
+                <path d="M90 24l40 16v32c0 24-16 46-40 54-24-8-40-30-40-54V40l40-16z" fill="currentColor" opacity="0.2"></path>
+                <rect x="78" y="60" width="24" height="24" rx="6" fill="#fff"></rect>
+                <path d="M90 58c6 0 10 5 10 10v6H80v-6c0-5 4-10 10-10z" fill="#fff"></path>
+              </svg>
+            </div>
+            <div class="two-factor-option">
+              <div class="two-factor-details">
+                <span class="security-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20">
+                    <path fill="currentColor" d="M10 1.5l6.5 2.6v5.2c0 4-2.7 7.6-6.5 8.7-3.8-1.1-6.5-4.7-6.5-8.7V4.1L10 1.5zm0 2.1L5.1 5.1v4.2c0 3 2 5.7 4.9 6.6 2.9-.9 4.9-3.6 4.9-6.6V5.1L10 3.6z"/>
+                  </svg>
+                </span>
+                <div>
+                  <h4>Authenticator app <span class="two-factor-badge">Coming soon</span></h4>
+                  <p>Use an authenticator app to generate verification codes.</p>
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" class="two-factor-toggle" data-two-factor-method="authenticator" aria-label="Enable authenticator app" disabled aria-disabled="true">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="two-factor-option">
+              <div class="two-factor-details">
+                <span class="security-icon" aria-hidden="true">
+                  <svg viewBox="0 0 20 20">
+                    <path fill="currentColor" d="M4 3.5h12a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1zm0 2v8h12v-8H4zm2 10h8v1H6v-1z"/>
+                  </svg>
+                </span>
+                <div>
+                  <h4>Phone number <span class="two-factor-badge">Coming soon</span></h4>
+                  <p>Set up SMS verification.</p>
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" class="two-factor-toggle" data-two-factor-method="sms" aria-label="Enable phone verification" disabled aria-disabled="true">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="two-factor-actions">
+              <button type="button" class="btn btn-outline" id="twoFactorBackupBtn" disabled aria-disabled="true">Get backup codes</button>
+              <span class="two-factor-status" id="twoFactorStatus">Checking status...</span>
+            </div>
+            <div class="two-factor-codes hidden" id="twoFactorCodes" aria-live="polite"></div>
+            <p class="muted hidden" id="twoFactorHint">Store these backup codes somewhere safe. Each code can be used once.</p>
+          </div>
+        </div>
       </div>
 
-      <!-- Blocked Users -->
-      <div class="settings-block">
-        <h3>Blocked Users</h3>
-        <div id="blockedUsersList">Loading…</div>
-      </div>
-
-      <!-- Payouts / Stripe -->
-      <div class="settings-block">
-        <h3>Payouts Setup</h3>
-        <p>Connect your Stripe account to receive payouts.</p>
-        <button id="connectStripeBtn" class="btn btn-primary">Connect Stripe Account →</button>
-        <p id="stripeStatus" class="muted"></p>
+      <div class="security-extras">
+        <div class="settings-block">
+          <h3>Blocked Users</h3>
+          <div id="blockedUsersList">Loading…</div>
+        </div>
       </div>
     </section>
 
@@ -2826,7 +3441,7 @@ Legal Assistant at..."></textarea>
     <section class="settings-panel settings-section danger-panel" id="deleteSection">
       <h2>Delete Account</h2>
       <p>This action cannot be undone.</p>
-      <button id="deleteAccountBtn" class="btn danger-btn" type="button">Delete My Account</button>
+      <button id="deleteAccountBtn" class="btn danger-btn" type="button" data-delete-account>Delete My Account</button>
     </section>
     </div>
   </main>

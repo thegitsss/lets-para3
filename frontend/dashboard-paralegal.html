@@ -6,7 +6,28 @@
   <link rel="preload" as="font" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" type="font/woff2" crossorigin />
   <link rel="preload" as="font" href="assets/fonts/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2" type="font/woff2" crossorigin />
   <script>
-    document.documentElement.classList.add("js");
+    (function () {
+      const root = document.documentElement;
+      root.classList.add("js");
+      try {
+        const raw = localStorage.getItem("lpc_user");
+        if (!raw) return;
+        const user = JSON.parse(raw);
+        const theme = String(user?.preferences?.theme || "").toLowerCase();
+        const classes = [];
+        if (theme === "mountain-dark") {
+          classes.push("theme-mountain-dark", "theme-dark");
+        } else if (theme === "dark" || theme === "mountain" || theme === "light") {
+          classes.push(`theme-${theme}`);
+        }
+        classes.forEach((value) => root.classList.add(value));
+        if (theme === "dark" || theme === "mountain-dark") {
+          root.style.backgroundColor = "#0f172a";
+          root.style.color = "#f4f6fb";
+          root.style.setProperty("--bg", "#0f172a");
+        }
+      } catch (_) {}
+    })();
   </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -263,22 +284,10 @@
 
     .dashboard-view {
       display: none;
-      animation: fadeIn 0.25s ease;
     }
 
     .dashboard-view.is-active {
       display: block;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(6px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
     }
 
     .topbar {
@@ -494,26 +503,31 @@
     }
 
     body.theme-mountain .sidebar,
-    body.theme-mountain-dark .sidebar {
+    body.theme-mountain-dark .sidebar,
+    html.theme-mountain-dark .sidebar {
       background: url('hero-mountain.jpg') center/cover no-repeat;
     }
 
     body.theme-mountain .sidebar::before,
-    body.theme-mountain-dark .sidebar::before {
+    body.theme-mountain-dark .sidebar::before,
+    html.theme-mountain-dark .sidebar::before {
       background: rgba(0, 0, 0, 0.45);
     }
 
     body.theme-mountain .sidebar > *,
-    body.theme-mountain-dark .sidebar > * {
+    body.theme-mountain-dark .sidebar > *,
+    html.theme-mountain-dark .sidebar > * {
       position: relative;
       z-index: 1;
     }
 
+    html.theme-dark,
+    html.theme-dark body,
     body.theme-dark {
       --bg: #0f172a;
       --sidebar-bg: #1c2333;
       --panel: #151b29;
-      --ink: #f5f6fb;
+      --ink: #f4f6fb;
       --muted: #9aa7c4;
       --line: rgba(255, 255, 255, 0.08);
       --sidebar-text: #f8fbff;
@@ -532,19 +546,23 @@
     }
 
     body.theme-mountain nav a,
-    body.theme-mountain-dark nav a {
+    body.theme-mountain-dark nav a,
+    html.theme-mountain-dark nav a {
       color: #fff;
     }
 
     body.theme-mountain nav a.active,
     body.theme-mountain nav a:hover,
     body.theme-mountain-dark nav a.active,
-    body.theme-mountain-dark nav a:hover {
+    body.theme-mountain-dark nav a:hover,
+    html.theme-mountain-dark nav a.active,
+    html.theme-mountain-dark nav a:hover {
       background: rgba(255, 255, 255, 0.18);
     }
 
     body.theme-mountain .sidebar-link,
-    body.theme-mountain-dark .sidebar-link {
+    body.theme-mountain-dark .sidebar-link,
+    html.theme-mountain-dark .sidebar-link {
       color: #fff;
     }
 
@@ -553,7 +571,9 @@
     body.theme-mountain .sidebar-link:focus,
     body.theme-dark .sidebar-link:focus,
     body.theme-mountain-dark .sidebar-link:hover,
-    body.theme-mountain-dark .sidebar-link:focus {
+    body.theme-mountain-dark .sidebar-link:focus,
+    html.theme-mountain-dark .sidebar-link:hover,
+    html.theme-mountain-dark .sidebar-link:focus {
       color: #fff;
     }
 
@@ -1881,6 +1901,84 @@
       background: var(--panel);
     }
 
+    /* Premium polish */
+    :root {
+      --shadow-sm: 0 10px 24px rgba(15, 23, 42, 0.08);
+      --shadow-md: 0 18px 45px rgba(15, 23, 42, 0.12);
+      --shadow-lg: 0 28px 70px rgba(15, 23, 42, 0.16);
+      --focus-ring: 0 0 0 3px rgba(182, 164, 122, 0.25);
+      --accent-strong: #a48957;
+      --main-bg: linear-gradient(180deg, rgba(252, 251, 248, 0.92) 0%, #ffffff 55%);
+    }
+
+    body {
+      line-height: 1.6;
+    }
+
+    .main {
+      background: var(--main-bg);
+    }
+
+    body.theme-dark {
+      --main-bg: linear-gradient(180deg, rgba(15, 19, 31, 0.98) 0%, rgba(12, 16, 27, 1) 60%);
+    }
+
+    body.theme-mountain {
+      --main-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 246, 241, 0.98) 60%);
+    }
+
+    body.theme-mountain-dark {
+      --main-bg: linear-gradient(180deg, rgba(16, 20, 33, 0.96) 0%, rgba(12, 15, 25, 1) 60%);
+    }
+
+    body:not(.theme-dark) .info-box,
+    body:not(.theme-dark) .case-card,
+    body:not(.theme-dark) .dashboard-card,
+    body:not(.theme-dark) .panel,
+    body:not(.theme-dark) .side-by-side-panels > section {
+      border-color: rgba(15, 23, 42, 0.08);
+      box-shadow: var(--shadow-sm);
+    }
+
+    body.theme-dark .info-box,
+    body.theme-dark .case-card,
+    body.theme-dark .dashboard-card,
+    body.theme-dark .panel,
+    body.theme-dark .side-by-side-panels > section {
+      box-shadow: var(--shadow-sm);
+    }
+
+    .case-card,
+    .dashboard-card {
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+
+    .case-card:hover,
+    .dashboard-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    body:not(.theme-dark) .notification-icon,
+    body:not(.theme-dark) .user-chip {
+      border-color: rgba(15, 23, 42, 0.12);
+      box-shadow: var(--shadow-sm);
+    }
+
+    body.theme-dark .notification-icon,
+    body.theme-dark .user-chip {
+      box-shadow: var(--shadow-sm);
+    }
+
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
   </style>
 </head>
 <body>
@@ -1914,7 +2012,7 @@
     <div id="paralegalHomeView" class="dashboard-view is-active">
       <header>
         <h1><span id="welcomeGreeting">Welcome back</span>, <span id="user-name-heading" data-field="name">Taylor</span></h1>
-        <p><span data-field="welcomeSubheading">You have 0 active assignments</span></p>
+        <p><span data-field="welcomeSubheading"></span></p>
       </header>
 
       <div id="paralegalWelcomeNotice" class="welcome-notice hidden" role="status" aria-live="polite">
@@ -1962,7 +2060,7 @@
 
       <section class="quick-actions">
         <div class="section-title">Quick Actions</div>
-        <button type="button" data-action="browse">Browse new postings</button>
+        <button type="button" data-action="browse">Browse postings</button>
       </section>
 
       <div class="side-by-side-panels case-panels">
@@ -1980,7 +2078,7 @@
           <div class="dashboard-card full-width" id="recommendedPostingsCard">
             <h3 class="card-title">Recommended for You</h3>
             <ul class="recommendations-list"></ul>
-            <a href="browse-jobs.html" class="card-link">Browse all postings →</a>
+            <a href="browse-jobs.html" class="card-link">Refine filters →</a>
           </div>
         </section>
       </div>
@@ -2160,7 +2258,12 @@
           if (!raw) return;
           const user = JSON.parse(raw);
           if (!user || typeof user !== 'object') return;
-          const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.name || '';
+          const name =
+            String(user.firstName || '').trim() ||
+            String(user.name || '')
+              .trim()
+              .split(/\s+/)[0] ||
+            '';
           if (name) {
             document.querySelectorAll('[data-field="name"]').forEach((el) => {
               el.textContent = name;

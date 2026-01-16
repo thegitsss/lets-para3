@@ -203,6 +203,7 @@ const userSchema = new Schema(
     collaborationStyle: { type: String, default: "", trim: true, maxlength: 500 },
 
     // Expertise (improves browse/search)
+    bestFor: { type: [String], default: [], set: uniqueStrings },
     specialties: { type: [String], default: [], set: uniqueStrings },
     jurisdictions: { type: [String], default: [], set: uniqueStrings },
     skills: { type: [String], default: [], set: uniqueStrings },
@@ -226,6 +227,13 @@ const userSchema = new Schema(
       default: () => ({}),
     },
     twoFactorEnabled: { type: Boolean, default: false },
+    twoFactorMethod: {
+      type: String,
+      enum: ["authenticator", "sms", "email"],
+      default: "email",
+    },
+    twoFactorTempCode: { type: String, default: null, select: false },
+    twoFactorExpiresAt: { type: Date, default: null },
     twoFactorBackupCodes: { type: [String], default: [] },
     blockedUsers: {
       type: [{ type: Types.ObjectId, ref: "User" }],

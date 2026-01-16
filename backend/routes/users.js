@@ -130,7 +130,7 @@ const parseParalegalFilters = (query = {}) => {
 };
 
 const SAFE_PUBLIC_SELECT =
-  "_id firstName lastName avatarURL profileImage location specialties practiceAreas skills experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt languages writingSamples status";
+  "_id firstName lastName avatarURL profileImage location specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt languages writingSamples status";
 const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email phoneNumber`;
 const FILE_PUBLIC_BASE =
   (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
@@ -166,6 +166,7 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
     specialties: Array.isArray(src.specialties) ? src.specialties : [],
     practiceAreas: Array.isArray(src.practiceAreas) ? src.practiceAreas : [],
     skills: Array.isArray(src.skills) ? src.skills : [],
+    bestFor: Array.isArray(src.bestFor) ? src.bestFor : [],
     yearsExperience:
       typeof src.yearsExperience === "number" ? src.yearsExperience : 0,
     linkedInURL: src.linkedInURL || "",
@@ -583,6 +584,9 @@ router.patch(
       if (rawSkills !== undefined) {
         me.skills = cleanList(rawSkills);
       }
+      if (body.bestFor !== undefined) {
+        me.bestFor = cleanList(body.bestFor);
+      }
       if (body.experience !== undefined) {
         me.experience = cleanCollection(body.experience, [
           ["title", 300],
@@ -947,6 +951,7 @@ paralegalRouter.post(
     }
     if (body.practiceAreas !== undefined) paralegal.practiceAreas = cleanList(body.practiceAreas);
     if (body.skills !== undefined) paralegal.skills = cleanList(body.skills);
+    if (body.bestFor !== undefined) paralegal.bestFor = cleanList(body.bestFor);
     paralegal.experience = cleanCollection(body.experience, [
       ["title", 300],
       ["years", 120],

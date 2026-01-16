@@ -17,6 +17,7 @@ const sendEmail = require("../utils/email");
 const { getAppSettings } = require("../utils/appSettings");
 
 const IS_PROD = process.env.NODE_ENV === "production" || process.env.PROD === "true";
+const TWO_FACTOR_ENABLED = String(process.env.ENABLE_TWO_FACTOR || "").toLowerCase() === "true";
 const EMAIL_BASE_URL = (process.env.EMAIL_BASE_URL || "").replace(/\/+$/, "");
 const ASSET_BASE_URL = EMAIL_BASE_URL || "https://www.lets-paraconnect.com";
 const LOGIN_URL = `${ASSET_BASE_URL}/login.html`;
@@ -183,6 +184,19 @@ function buildResetPasswordEmailHtml(user, resetUrl, opts = {}) {
       </td>
     </tr>
   </table>
+  `;
+}
+
+function buildTwoFactorEmailHtml(user, code) {
+  const name = user?.firstName ? String(user.firstName).trim() : "there";
+  return `
+    <div style="font-family: Arial, sans-serif; color: #111;">
+      <p>Hi ${name},</p>
+      <p>Your verification code is:</p>
+      <p style="font-size: 24px; letter-spacing: 4px; font-weight: bold;">${code}</p>
+      <p>This code expires in 15 minutes.</p>
+      <p>If you did not attempt to sign in, you can ignore this email.</p>
+    </div>
   `;
 }
 
@@ -643,8 +657,9 @@ router.post(
   asyncHandler(async (req, res) => {
     const { email, password } = req.body || {};
     const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY || process.env.RECAPTCHA_SECRET || "";
+    const enforceRecaptcha = String(process.env.RECAPTCHA_ENFORCED || "true").toLowerCase() === "true";
 
-    if (IS_PROD && recaptchaSecret) {
+    if (IS_PROD && recaptchaSecret && enforceRecaptcha) {
       let recaptchaToken = req.body?.recaptcha;
       if (!recaptchaToken && req.body?.recaptchaToken) {
         recaptchaToken = req.body.recaptchaToken;
@@ -708,6 +723,41 @@ router.post(
       user.password = String(password);
     }
 
+    if (user.twoFactorEnabled && !TWO_FACTOR_ENABLED) {
+      user.twoFactorEnabled = false;
+      user.twoFactorMethod = "email";
+      user.twoFactorTempCode = null;
+      user.twoFactorExpiresAt = null;
+      user.twoFactorBackupCodes = [];
+      await user.save();
+    }
+
+    if (user.twoFactorEnabled && TWO_FACTOR_ENABLED) {
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const hashed = await bcrypt.hash(code, 10);
+      user.twoFactorTempCode = hashed;
+      user.twoFactorExpiresAt = new Date(Date.now() + FIFTEEN_MIN);
+      await user.save();
+
+      try {
+        const html = buildTwoFactorEmailHtml(user, code);
+        const text = `Your verification code is ${code}. This code expires in 15 minutes.`;
+        await sendEmail(user.email, "Your verification code", html, { text });
+      } catch (err) {
+        console.error("[2fa] email failed", err?.message || err);
+        user.twoFactorTempCode = null;
+        user.twoFactorExpiresAt = null;
+        await user.save();
+        return res.status(500).json({ msg: "Unable to send verification code." });
+      }
+
+      return res.json({
+        twoFactorRequired: true,
+        method: user.twoFactorMethod || "email",
+        email: user.email,
+      });
+    }
+
     const lastLoginAt = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
     const approvedAt = user.approvedAt ? new Date(user.approvedAt) : null;
     const isFirstLogin = !lastLoginAt || (approvedAt && lastLoginAt < approvedAt);
@@ -744,12 +794,16 @@ router.post(
 router.post(
   "/2fa-verify",
   asyncHandler(async (req, res) => {
+    if (!TWO_FACTOR_ENABLED) {
+      return res.status(400).json({ error: "Two-step verification is currently disabled." });
+    }
     const { email, code } = req.body || {};
     if (!isEmail(email) || !code) {
       return res.status(400).json({ error: "Invalid 2FA attempt." });
     }
 
-    const user = await User.findOne({ email: String(email).toLowerCase() });
+    const user = await User.findOne({ email: String(email).toLowerCase() })
+      .select("+twoFactorTempCode +twoFactorExpiresAt");
     if (!user || !user.twoFactorEnabled) {
       return res.status(400).json({ error: "Invalid 2FA attempt." });
     }
@@ -810,6 +864,9 @@ router.post(
 router.post(
   "/2fa-backup",
   asyncHandler(async (req, res) => {
+    if (!TWO_FACTOR_ENABLED) {
+      return res.status(400).json({ error: "Two-step verification is currently disabled." });
+    }
     const { email, code } = req.body || {};
     if (!isEmail(email) || !code) {
       return res.status(400).json({ error: "Invalid request." });

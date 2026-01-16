@@ -43,6 +43,13 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  const helpBtn = document.getElementById("navHelp");
+  if (helpBtn) {
+    helpBtn.addEventListener("click", () => {
+      window.location.href = "help.html";
+    });
+  }
+
   const initialNav = document.querySelector(".settings-item.active");
   const initialSectionId = initialNav && navItems[initialNav.id]
     ? navItems[initialNav.id]
@@ -65,25 +72,52 @@ document.addEventListener("DOMContentLoaded", () => {
   const passwordBtn = document.getElementById("savePasswordBtn");
   if (passwordBtn) {
     passwordBtn.addEventListener("click", async () => {
+      const currentPass = document.getElementById("currentPassword")?.value || "";
       const newPass = document.getElementById("newPassword")?.value || "";
       const confirm = document.getElementById("confirmPassword")?.value || "";
 
+      if (!currentPass) {
+        alert("Enter your current password.");
+        return;
+      }
       if (newPass !== confirm) {
         alert("Passwords do not match!");
         return;
       }
+      if (String(newPass).length < 8) {
+        alert("Password must be at least 8 characters.");
+        return;
+      }
 
-      const res = await fetch("/api/account/update-password", {
+      const res = await secureFetch("/api/account/update-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ password: newPass })
+        body: { currentPassword: currentPass, newPassword: newPass }
       });
 
       const data = await res.json().catch(() => ({}));
-      alert(data.msg || "Password updated!");
+      if (!res.ok) {
+        alert(data?.error || "Unable to update password.");
+        return;
+      }
+      alert("Password updated!");
+      const currentInput = document.getElementById("currentPassword");
+      const newInput = document.getElementById("newPassword");
+      const confirmInput = document.getElementById("confirmPassword");
+      if (currentInput) currentInput.value = "";
+      if (newInput) newInput.value = "";
+      if (confirmInput) confirmInput.value = "";
     });
   }
+
+  document.querySelectorAll("[data-toggle-password]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const inputId = btn.getAttribute("data-toggle-password");
+      if (!inputId) return;
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      input.type = input.type === "password" ? "text" : "password";
+    });
+  });
 
   const themeSelect = document.getElementById("themePreference");
   const themePreviewButtons = document.querySelectorAll("[data-theme-preview]");
@@ -203,6 +237,11 @@ document.addEventListener("DOMContentLoaded", () => {
       updateRoleLineFromExperience();
     });
   }
+  const bestForList = document.getElementById("bestForDisplay");
+  if (bestForList) {
+    bestForList.addEventListener("keydown", handleBestForListKeydown);
+    bestForList.addEventListener("input", handleBestForListInput);
+  }
 
   async function loadPreferences() {
     try {
@@ -283,20 +322,289 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  const deleteBtn = document.getElementById("deleteAccountBtn");
-  if (deleteBtn) {
-    deleteBtn.addEventListener("click", async () => {
-      if (!confirm("Are you sure? This action cannot be undone.")) return;
+  const deleteButtons = document.querySelectorAll("[data-delete-account]");
+  if (deleteButtons.length) {
+    deleteButtons.forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const confirmed = window.confirm(
+          "Delete your account and all data? This is permanent and cannot be undone."
+        );
+        if (!confirmed) return;
 
-      const res = await secureFetch("/api/account/delete", { method: "DELETE" });
+        const res = await secureFetch("/api/account/delete", { method: "DELETE" });
 
-      if (res.ok) {
-        window.location.href = "/goodbye.html";
-      } else {
-        alert("Error deleting account.");
+        if (res.ok) {
+          window.location.href = "/goodbye.html";
+        } else {
+          alert("Error deleting account.");
+        }
+      });
+    });
+  }
+
+  // --- TWO-STEP VERIFICATION ---
+  const twoFactorStatus = document.getElementById("twoFactorStatus");
+  const twoFactorBackupBtn = document.getElementById("twoFactorBackupBtn");
+  const twoFactorCodes = document.getElementById("twoFactorCodes");
+  const twoFactorHint = document.getElementById("twoFactorHint");
+  const twoFactorToggles = Array.from(document.querySelectorAll(".two-factor-toggle"));
+  let twoFactorUpdating = false;
+
+  const twoFactorLabels = {
+    authenticator: "Authenticator app",
+    sms: "Phone number",
+    email: "Email",
+  };
+
+  const resetTwoFactorCodes = () => {
+    if (twoFactorCodes) {
+      twoFactorCodes.innerHTML = "";
+      twoFactorCodes.classList.add("hidden");
+    }
+    twoFactorHint?.classList.add("hidden");
+  };
+
+  const setTwoFactorUI = ({ enabled = false, hasBackupCodes = false, method = "email" } = {}) => {
+    const availableMethods = new Set(
+      twoFactorToggles.filter((toggle) => !toggle.disabled).map((toggle) => toggle.dataset.twoFactorMethod)
+    );
+    const normalizedMethod = availableMethods.has(method) ? method : "email";
+    const activeMethod = enabled ? normalizedMethod : "";
+    twoFactorToggles.forEach((toggle) => {
+      toggle.checked = enabled && toggle.dataset.twoFactorMethod === activeMethod;
+    });
+    if (twoFactorStatus) {
+      const label = twoFactorLabels[normalizedMethod] || "2-step verification";
+      twoFactorStatus.textContent = enabled ? `Enabled - ${label}` : "Disabled";
+    }
+    if (twoFactorBackupBtn) {
+      twoFactorBackupBtn.disabled = !enabled;
+      twoFactorBackupBtn.setAttribute("aria-disabled", String(!enabled));
+    }
+    if (!enabled || !hasBackupCodes) {
+      resetTwoFactorCodes();
+    }
+  };
+
+  async function loadTwoFactorStatus() {
+    if (!twoFactorToggles.length && !twoFactorBackupBtn) return;
+    try {
+      const res = await secureFetch("/api/account/2fa");
+      if (!res.ok) throw new Error("Unable to load 2FA status");
+      const data = await res.json();
+      if (data?.disabled) {
+        twoFactorToggles.forEach((toggle) => {
+          toggle.checked = false;
+          toggle.disabled = true;
+          toggle.setAttribute("aria-disabled", "true");
+        });
+        if (twoFactorStatus) twoFactorStatus.textContent = "Temporarily unavailable";
+        if (twoFactorBackupBtn) {
+          twoFactorBackupBtn.disabled = true;
+          twoFactorBackupBtn.setAttribute("aria-disabled", "true");
+        }
+        resetTwoFactorCodes();
+        return;
+      }
+      setTwoFactorUI({
+        enabled: !!data?.enabled,
+        hasBackupCodes: !!data?.hasBackupCodes,
+        method: data?.method || "email",
+      });
+    } catch (err) {
+      if (twoFactorStatus) twoFactorStatus.textContent = "Status unavailable";
+      if (twoFactorBackupBtn) {
+        twoFactorBackupBtn.disabled = true;
+        twoFactorBackupBtn.setAttribute("aria-disabled", "true");
+      }
+    }
+  }
+
+  const updateTwoFactor = async (enabled, method) => {
+    const res = await secureFetch("/api/account/2fa-toggle", {
+      method: "POST",
+      body: { enabled, method },
+    });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      throw new Error(payload?.error || "Unable to update 2-step verification.");
+    }
+  };
+
+  if (twoFactorToggles.length) {
+    twoFactorToggles.forEach((toggle) => {
+      toggle.addEventListener("change", async () => {
+        if (twoFactorUpdating) return;
+        const method = toggle.dataset.twoFactorMethod || "email";
+        const enabled = toggle.checked;
+        if (enabled) {
+          twoFactorToggles.forEach((other) => {
+            if (other !== toggle) other.checked = false;
+          });
+        }
+        const anyEnabled = twoFactorToggles.some((item) => item.checked);
+        const activeToggle = twoFactorToggles.find((item) => item.checked);
+        const activeMethod = activeToggle?.dataset.twoFactorMethod || method;
+        const finalEnabled = enabled ? true : anyEnabled;
+
+        if (twoFactorStatus) {
+          twoFactorStatus.textContent = finalEnabled ? "Saving..." : "Disabling...";
+        }
+        if (twoFactorBackupBtn) twoFactorBackupBtn.disabled = true;
+
+        twoFactorUpdating = true;
+        try {
+          await updateTwoFactor(finalEnabled, activeMethod);
+          await loadTwoFactorStatus();
+        } catch (err) {
+          alert(err?.message || "Unable to update 2-step verification.");
+          await loadTwoFactorStatus();
+        } finally {
+          twoFactorUpdating = false;
+        }
+      });
+    });
+  }
+
+  if (twoFactorBackupBtn) {
+    twoFactorBackupBtn.addEventListener("click", async () => {
+      if (twoFactorBackupBtn.disabled) return;
+      twoFactorBackupBtn.disabled = true;
+      twoFactorBackupBtn.textContent = "Generating...";
+      try {
+        const res = await secureFetch("/api/account/2fa-backup-codes", { method: "POST" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || "Unable to generate backup codes");
+        if (twoFactorCodes) {
+          twoFactorCodes.innerHTML = "";
+          (data?.codes || []).forEach((code) => {
+            const chip = document.createElement("code");
+            chip.textContent = code;
+            twoFactorCodes.appendChild(chip);
+          });
+          twoFactorCodes.classList.remove("hidden");
+        }
+        twoFactorHint?.classList.remove("hidden");
+        if (twoFactorStatus) {
+          const active = twoFactorToggles.find((item) => item.checked);
+          const method = active?.dataset.twoFactorMethod || "email";
+          const label = twoFactorLabels[method] || "2-step verification";
+          twoFactorStatus.textContent = `Enabled - ${label}`;
+        }
+      } catch (err) {
+        alert(err?.message || "Unable to generate backup codes.");
+      } finally {
+        twoFactorBackupBtn.textContent = "Get backup codes";
+        const enabled = twoFactorToggles.some((item) => item.checked);
+        twoFactorBackupBtn.disabled = !enabled;
       }
     });
   }
+
+  loadTwoFactorStatus();
+
+  // --- SESSION HISTORY ---
+  const sessionHistoryList = document.getElementById("sessionHistoryList");
+
+  const guessDeviceLabel = (ua = "") => {
+    const lower = ua.toLowerCase();
+    let browser = "Browser";
+    if (lower.includes("edg")) browser = "Edge";
+    else if (lower.includes("chrome")) browser = "Chrome";
+    else if (lower.includes("safari") && !lower.includes("chrome")) browser = "Safari";
+    else if (lower.includes("firefox")) browser = "Firefox";
+
+    let os = "Device";
+    if (lower.includes("mac os")) os = "macOS";
+    else if (lower.includes("windows")) os = "Windows";
+    else if (lower.includes("iphone") || lower.includes("ipad")) os = "iOS";
+    else if (lower.includes("android")) os = "Android";
+    else if (lower.includes("linux")) os = "Linux";
+
+    return `${browser} on ${os}`;
+  };
+
+  const formatRelativeTime = (dateValue) => {
+    const date = dateValue ? new Date(dateValue) : null;
+    if (!date || Number.isNaN(date.getTime())) return "Unknown time";
+    const diffMs = Date.now() - date.getTime();
+    const minutes = Math.floor(diffMs / 60000);
+    if (minutes < 2) return "Just now";
+    if (minutes < 60) return `${minutes} min ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} hr${hours === 1 ? "" : "s"} ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`;
+    return date.toLocaleDateString();
+  };
+
+  const renderSessionHistory = (sessions = []) => {
+    if (!sessionHistoryList) return;
+    if (!sessions.length) {
+      sessionHistoryList.innerHTML = "<p class=\"muted\">No recent sessions.</p>";
+      return;
+    }
+    const currentUa = navigator.userAgent || "";
+    let activeIndex = sessions.findIndex((item) => item.ua && item.ua === currentUa);
+    if (activeIndex === -1) activeIndex = 0;
+
+    sessionHistoryList.innerHTML = sessions
+      .map((item, index) => {
+        const isActive = index === activeIndex;
+        const deviceLabel = guessDeviceLabel(item.ua);
+        const locationLabel = item.ip ? `IP ${item.ip}` : "Location unavailable";
+        const statusLabel = isActive ? "Active" : formatRelativeTime(item.createdAt);
+        const actionDisabled = !isActive;
+        return `
+          <div class="session-row">
+            <div class="session-device">
+              <div class="session-device-icon">${deviceLabel[0] || "D"}</div>
+              <div>
+                <div>${deviceLabel}</div>
+                <div class="session-meta">${locationLabel}</div>
+              </div>
+            </div>
+            <div class="session-status">${statusLabel}</div>
+            <button class="session-action" type="button" data-session-action="logout" ${actionDisabled ? "disabled" : ""} aria-label="Sign out of this session">
+              <svg viewBox="0 0 20 20">
+                <path fill="currentColor" d="M6.5 3.5h7a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-7v-1.6h6.4v-7.8H6.5V3.5zm3.4 2.8 3.1 3.1-3.1 3.1-1.1-1.1 1.2-1.2H2.5V8.6h7.1L8.4 7.4l1.1-1.1z"/>
+              </svg>
+            </button>
+          </div>
+        `;
+      })
+      .join("");
+
+    sessionHistoryList.querySelectorAll("[data-session-action=\"logout\"]").forEach((btn) => {
+      if (btn.disabled) return;
+      btn.addEventListener("click", async () => {
+        const confirmed = window.confirm("Sign out of this device?");
+        if (!confirmed) return;
+        try {
+          await secureFetch("/api/auth/logout", { method: "POST" });
+        } catch {}
+        try {
+          window.clearStoredSession?.();
+          localStorage.removeItem("lpc_user");
+        } catch {}
+        window.location.href = "login.html";
+      });
+    });
+  };
+
+  async function loadSessionHistory() {
+    if (!sessionHistoryList) return;
+    try {
+      const res = await secureFetch("/api/account/sessions");
+      if (!res.ok) throw new Error("Unable to load sessions");
+      const data = await res.json().catch(() => ({}));
+      renderSessionHistory(Array.isArray(data?.sessions) ? data.sessions : []);
+    } catch (err) {
+      sessionHistoryList.innerHTML = "<p class=\"muted\">Unable to load sessions.</p>";
+    }
+  }
+
+  loadSessionHistory();
 
   // --- BLOCKED USERS ---
   async function loadBlockedUsers() {
@@ -506,7 +814,6 @@ let settingsState = {
   removeResume: false,
   removeCertificate: false,
   removeWritingSample: false,
-  experienceDatesTouched: false,
   bio: "",
   education: [],
   awards: [],
@@ -677,7 +984,6 @@ function seedSettingsState(user = {}) {
     sms: false,
     ...(user.notificationPrefs || {})
   };
-  settingsState.experienceDatesTouched = false;
   settingsState.practiceDescription = user.practiceDescription || user.bio || "";
   const freq = typeof user.digestFrequency === "string" ? user.digestFrequency : "off";
   settingsState.digestFrequency = ["off", "daily", "weekly"].includes(freq) ? freq : "off";
@@ -780,109 +1086,132 @@ function updateRoleLineFromExperience() {
   roleLine.textContent = "Experience details pending";
 }
 
-const EXPERIENCE_MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const EXPERIENCE_MONTH_MAP = EXPERIENCE_MONTH_LABELS.reduce((acc, label, index) => {
-  const key = label.toLowerCase();
-  acc[key] = String(index + 1).padStart(2, "0");
-  return acc;
-}, {});
+const BEST_FOR_SUGGESTIONS = [
+  "Ongoing litigation support",
+  "Family law matters",
+  "Document drafting and research",
+  "Client-facing case management"
+];
 
-function formatExperienceMonth(value) {
-  if (!value) return "";
-  const [year, month] = String(value).split("-");
-  const monthIndex = Number(month) - 1;
-  if (!year || Number.isNaN(monthIndex) || monthIndex < 0 || monthIndex > 11) return "";
-  return `${EXPERIENCE_MONTH_LABELS[monthIndex]} ${year}`;
+const EXPERIENCE_TITLE = "Paralegal";
+
+function normalizeExperienceEntry(entry = {}) {
+  const rawFirm = String(entry.description || entry.firm || entry.title || "").trim();
+  const firm = rawFirm.replace(/^(paralegal|legal assistant)\s+at\s+/i, "").trim();
+  const dates = String(entry.years || entry.dates || "").trim();
+  return { firm, dates };
 }
 
-function formatExperienceDateRange(startValue, endValue) {
-  const startLabel = formatExperienceMonth(startValue);
-  const endLabel = formatExperienceMonth(endValue);
-  if (startLabel && endLabel) return `${startLabel} - ${endLabel}`;
-  if (startLabel) return `${startLabel} - Present`;
-  return endLabel ? `Through ${endLabel}` : "";
+function createExperienceRow(entry = {}) {
+  const { firm, dates } = normalizeExperienceEntry(entry);
+  const row = document.createElement("div");
+  row.className = "experience-row";
+
+  const firmLabel = document.createElement("label");
+  const firmText = document.createElement("span");
+  firmText.textContent = "Law firm";
+  const firmInput = document.createElement("input");
+  firmInput.type = "text";
+  firmInput.className = "experience-firm-input";
+  firmInput.placeholder = "Smith & Co.";
+  firmInput.value = firm;
+  firmLabel.appendChild(firmText);
+  firmLabel.appendChild(firmInput);
+
+  const datesLabel = document.createElement("label");
+  const datesText = document.createElement("span");
+  datesText.textContent = "Dates";
+  const datesInput = document.createElement("input");
+  datesInput.type = "text";
+  datesInput.className = "experience-dates-input";
+  datesInput.placeholder = "2020–2024";
+  datesInput.value = dates;
+  datesLabel.appendChild(datesText);
+  datesLabel.appendChild(datesInput);
+
+  row.appendChild(firmLabel);
+  row.appendChild(datesLabel);
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "experience-remove-btn";
+  removeBtn.textContent = "–";
+  removeBtn.setAttribute("aria-label", "Remove experience");
+  removeBtn.addEventListener("click", () => {
+    const container = row.parentElement;
+    row.remove();
+    if (container && !container.querySelector(".experience-row")) {
+      container.appendChild(createExperienceRow());
+    }
+    updateExperienceRemoveButtons(container);
+  });
+  row.appendChild(removeBtn);
+  return row;
 }
 
-function parseExperienceYearsLabel(value = "") {
-  const cleaned = String(value || "").trim().replace(/[–—]/g, "-");
-  if (!cleaned) return { start: "", end: "" };
-  const monthToken = "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)";
-  const rangeRe = new RegExp(`^${monthToken}\\s+(\\d{4})\\s*-\\s*${monthToken}\\s+(\\d{4})$`, "i");
-  const presentRe = new RegExp(`^${monthToken}\\s+(\\d{4})\\s*-\\s*Present$`, "i");
-  const throughRe = new RegExp(`^Through\\s+${monthToken}\\s+(\\d{4})$`, "i");
-  let match = cleaned.match(rangeRe);
-  if (match) {
-    const startMonth = EXPERIENCE_MONTH_MAP[match[1].toLowerCase()] || "";
-    const endMonth = EXPERIENCE_MONTH_MAP[match[3].toLowerCase()] || "";
-    return {
-      start: startMonth ? `${match[2]}-${startMonth}` : "",
-      end: endMonth ? `${match[4]}-${endMonth}` : "",
-    };
-  }
-  match = cleaned.match(presentRe);
-  if (match) {
-    const startMonth = EXPERIENCE_MONTH_MAP[match[1].toLowerCase()] || "";
-    return {
-      start: startMonth ? `${match[2]}-${startMonth}` : "",
-      end: "",
-    };
-  }
-  match = cleaned.match(throughRe);
-  if (match) {
-    const endMonth = EXPERIENCE_MONTH_MAP[match[1].toLowerCase()] || "";
-    return {
-      start: "",
-      end: endMonth ? `${match[2]}-${endMonth}` : "",
-    };
-  }
-  return { start: "", end: "" };
+function renderExperienceRows(entries = []) {
+  const container = document.getElementById("experienceRows");
+  if (!container) return;
+  container.innerHTML = "";
+  const list = Array.isArray(entries) && entries.length ? entries : [{}];
+  list.forEach((entry) => {
+    container.appendChild(createExperienceRow(entry));
+  });
+  updateExperienceRemoveButtons(container);
 }
 
-function applyExperienceDatesToTextarea() {
-  const experienceInput = document.getElementById("experienceInput");
-  const startInput = document.getElementById("experienceStartDate");
-  const endInput = document.getElementById("experienceEndDate");
-  if (!experienceInput || !startInput || !endInput) return;
-  const rangeLabel = formatExperienceDateRange(startInput.value, endInput.value);
-  const blocks = experienceInput.value.split(/\n\s*\n/);
-  if (!blocks.length) return;
-  const firstBlock = blocks[0] || "";
-  if (!firstBlock.trim()) return;
-  const lines = firstBlock.split("\n");
-  const header = lines[0] || "";
-  const title = header.split("—")[0].trim();
-  if (!title && !rangeLabel) return;
-  lines[0] = rangeLabel ? (title ? `${title} — ${rangeLabel}` : rangeLabel) : title;
-  blocks[0] = lines.join("\n").trim();
-  experienceInput.value = blocks.join("\n\n");
+function bindExperienceAddButton() {
+  const container = document.getElementById("experienceRows");
+  const addBtn = document.getElementById("addExperienceRow");
+  if (!container || !addBtn) return;
+  if (addBtn.dataset.bound === "true") return;
+  addBtn.addEventListener("click", () => {
+    container.appendChild(createExperienceRow());
+    updateExperienceRemoveButtons(container);
+  });
+  addBtn.dataset.bound = "true";
 }
 
-function hydrateExperienceDateInputs(entries = []) {
-  const startInput = document.getElementById("experienceStartDate");
-  const endInput = document.getElementById("experienceEndDate");
-  if (!startInput || !endInput) return;
-  startInput.value = "";
-  endInput.value = "";
-  if (!Array.isArray(entries) || !entries.length) return;
-  const yearsLabel = entries[0]?.years || "";
-  const parsed = parseExperienceYearsLabel(yearsLabel);
-  if (parsed.start) startInput.value = parsed.start;
-  if (parsed.end) endInput.value = parsed.end;
+function updateExperienceRemoveButtons(container) {
+  if (!container) return;
+  const rows = [...container.querySelectorAll(".experience-row")];
+  const canRemove = rows.length > 1;
+  rows.forEach((row) => {
+    const btn = row.querySelector(".experience-remove-btn");
+    if (!btn) return;
+    btn.disabled = !canRemove;
+  });
 }
 
-function bindExperienceDateInputs() {
-  const startInput = document.getElementById("experienceStartDate");
-  const endInput = document.getElementById("experienceEndDate");
-  if (!startInput || !endInput) return;
-  if (startInput.dataset.bound === "true" || endInput.dataset.bound === "true") return;
-  const markTouched = () => {
-    settingsState.experienceDatesTouched = true;
-    applyExperienceDatesToTextarea();
-  };
-  startInput.addEventListener("change", markTouched);
-  endInput.addEventListener("change", markTouched);
-  startInput.dataset.bound = "true";
-  endInput.dataset.bound = "true";
+function collectExperienceRows() {
+  const container = document.getElementById("experienceRows");
+  if (!container) return [];
+  const rows = [...container.querySelectorAll(".experience-row")];
+  return rows
+    .map((row) => {
+      const firm = row.querySelector(".experience-firm-input")?.value.trim() || "";
+      const dates = row.querySelector(".experience-dates-input")?.value.trim() || "";
+      if (!firm && !dates) return null;
+      return { firm, dates };
+    })
+    .filter(Boolean);
+}
+
+function formatExperienceDisplayLine(entry = {}) {
+  const firm = String(entry.firm || "").trim();
+  const dates = String(entry.dates || "").trim();
+  if (!firm && !dates) return "";
+  const base = firm ? `${EXPERIENCE_TITLE} · ${firm}` : EXPERIENCE_TITLE;
+  return dates ? `${base} (${dates})` : base;
+}
+
+function buildExperienceEntriesForSave(entries = []) {
+  return entries
+    .map((entry) => ({
+      title: EXPERIENCE_TITLE,
+      description: entry.firm || "",
+      years: entry.dates || ""
+    }))
+    .filter((entry) => entry.description || entry.years);
 }
 
 function setSectionDisplayText(element, value, fallback) {
@@ -897,11 +1226,158 @@ function setSectionDisplayText(element, value, fallback) {
   }
 }
 
+function setSectionDisplayList(element, items = [], fallbackItems = []) {
+  if (!element) return;
+  const cleanItems = Array.isArray(items) ? items.filter(Boolean) : [];
+  const useItems = cleanItems.length ? cleanItems : fallbackItems;
+  element.innerHTML = "";
+  useItems.forEach((item) => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    element.appendChild(li);
+  });
+  element.classList.toggle("is-placeholder", !cleanItems.length);
+}
+
 function parseCommaList(value) {
   return String(value || "")
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function sanitizeBestForEntry(value) {
+  return String(value || "").replace(/^\s*[•*-]\s*/, "").trim();
+}
+
+function collectBestForEntries() {
+  const list = document.getElementById("bestForDisplay");
+  if (!list) return [];
+  if (list.dataset.mode === "placeholder") return [];
+  return Array.from(list.querySelectorAll("li"))
+    .map((item) => sanitizeBestForEntry(item.textContent))
+    .filter(Boolean);
+}
+
+function createBestForListItem(text = "") {
+  const li = document.createElement("li");
+  li.textContent = text;
+  li.contentEditable = "true";
+  li.spellcheck = false;
+  li.tabIndex = 0;
+  return li;
+}
+
+function renderBestForList(entries = [], { editable = false } = {}) {
+  const list = document.getElementById("bestForDisplay");
+  if (!list) return;
+  const hasEntries = Array.isArray(entries) && entries.length > 0;
+  list.innerHTML = "";
+
+  if (editable) {
+    const editItems = hasEntries ? entries : [""];
+    editItems.forEach((item) => list.appendChild(createBestForListItem(item)));
+    list.dataset.mode = "edit";
+    list.classList.remove("is-placeholder");
+    return;
+  }
+
+  const items = hasEntries ? entries : BEST_FOR_SUGGESTIONS;
+  items.forEach((item) => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    list.appendChild(li);
+  });
+  list.dataset.mode = hasEntries ? "data" : "placeholder";
+  list.classList.toggle("is-placeholder", !hasEntries);
+}
+
+function focusBestForItem(item, toEnd = false) {
+  if (!item) return;
+  item.focus();
+  const range = document.createRange();
+  range.selectNodeContents(item);
+  range.collapse(!toEnd);
+  const selection = window.getSelection();
+  if (!selection) return;
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function handleBestForListKeydown(event) {
+  const section = document.getElementById("bestForSection");
+  if (!section?.classList.contains("is-editing")) return;
+  const target = event.target;
+  const element = target && target.nodeType === 3 ? target.parentElement : target;
+  if (!element || typeof element.closest !== "function") return;
+  const item = element.closest("li");
+  if (!item) return;
+
+  if (event.key === "Enter") {
+    event.preventDefault();
+    const nextItem = createBestForListItem("");
+    item.insertAdjacentElement("afterend", nextItem);
+    focusBestForItem(nextItem);
+    return;
+  }
+
+  if (event.key === "Backspace") {
+    const text = sanitizeBestForEntry(item.textContent);
+    if (!text) {
+      const items = item.parentElement?.querySelectorAll("li") || [];
+      if (items.length > 1) {
+        event.preventDefault();
+        const focusTarget = item.previousElementSibling || item.nextElementSibling;
+        item.remove();
+        focusBestForItem(focusTarget, true);
+        return;
+      }
+      event.preventDefault();
+      item.textContent = "";
+      focusBestForItem(item);
+    }
+  }
+
+  if (event.key === "Delete") {
+    const text = sanitizeBestForEntry(item.textContent);
+    if (!text) {
+      const items = item.parentElement?.querySelectorAll("li") || [];
+      if (items.length > 1) {
+        event.preventDefault();
+        const focusTarget = item.nextElementSibling || item.previousElementSibling;
+        item.remove();
+        focusBestForItem(focusTarget, false);
+        return;
+      }
+    }
+  }
+}
+
+function handleBestForListInput() {
+  const list = document.getElementById("bestForDisplay");
+  if (!list || list.dataset.mode !== "edit") return;
+  const items = list.querySelectorAll("li");
+  if (!items.length) {
+    list.appendChild(createBestForListItem(""));
+  }
+  const hasText = collectBestForEntries().length > 0;
+  list.classList.toggle("is-typing", hasText);
+}
+
+function updateBestForEditingState() {
+  const section = document.getElementById("bestForSection");
+  if (!section) return;
+  if (section.classList.contains("is-editing")) {
+    const entries = collectBestForEntries();
+    renderBestForList(entries, { editable: true });
+    const list = document.getElementById("bestForDisplay");
+    if (list) list.classList.toggle("is-typing", entries.length > 0);
+    const items = document.getElementById("bestForDisplay")?.querySelectorAll("li");
+    const lastItem = items && items.length ? items[items.length - 1] : null;
+    focusBestForItem(lastItem, true);
+  } else {
+    renderBestForList(collectBestForEntries(), { editable: false });
+  }
 }
 
 function formatEducationEntry(entry = {}) {
@@ -931,10 +1407,13 @@ function refreshParalegalSectionDisplays() {
   setSectionDisplayText(bioDisplay, bioInput?.value || "", "No bio provided.");
 
   const experienceDisplay = document.getElementById("experienceDisplay");
-  const experienceInput = document.getElementById("experienceInput");
+  const experienceRows = collectExperienceRows();
+  const experienceLines = experienceRows
+    .map((entry) => formatExperienceDisplayLine(entry))
+    .filter(Boolean);
   setSectionDisplayText(
     experienceDisplay,
-    experienceInput?.value || "",
+    experienceLines.join("\n"),
     "No experience added yet."
   );
 
@@ -994,6 +1473,7 @@ function setActiveParalegalSection(sectionKey) {
     const toggle = section.querySelector(".section-edit-toggle");
     if (toggle) toggle.setAttribute("aria-pressed", isActive ? "true" : "false");
   });
+  updateBestForEditingState();
   activeParalegalSection = sectionKey || null;
   refreshParalegalSectionDisplays();
 }
@@ -1795,10 +2275,16 @@ function applyUnifiedRoleStyling(user = {}) {
   const isParalegal = role === "paralegal";
   const eyebrow = document.querySelector(".unified-header .eyebrow");
   const title = document.querySelector(".unified-header h1");
+  const sidebarLogo = document.querySelector(".sidebar .logo");
 
   if (eyebrow) eyebrow.textContent = "Account";
   if (title) {
     title.textContent = role === "paralegal" ? "Account Settings" : "Account Settings";
+  }
+  if (sidebarLogo) {
+    const defaultText = sidebarLogo.dataset.defaultText || sidebarLogo.textContent;
+    if (!sidebarLogo.dataset.defaultText) sidebarLogo.dataset.defaultText = defaultText;
+    sidebarLogo.textContent = isParalegal ? "Account Settings" : defaultText;
   }
   document.body.classList.toggle("paralegal-flat", isParalegal);
   document.body.classList.toggle("attorney-classic", role === "attorney");
@@ -1915,7 +2401,6 @@ async function loadSettings() {
 
     if (currentUser?.role === "paralegal") {
       if (titleEl) titleEl.textContent = "Paralegal Account Settings";
-      if (subtitleEl) subtitleEl.textContent = "Keep your LPC profile up-to-date.";
     }
 
     if (currentUser?.role === "attorney") {
@@ -1955,16 +2440,8 @@ async function loadSettings() {
       const skillsInput = document.getElementById("skillsInput");
       const skillValues = user.highlightedSkills || user.skills || [];
       if (skillsInput) skillsInput.value = skillValues.join(", ");
-      const experienceInput = document.getElementById("experienceInput");
-      if (experienceInput) {
-        experienceInput.value = (user.experience || [])
-          .map((e) => `${e.title || ""} — ${e.years || ""}\n${e.description || ""}`.trim())
-          .filter(Boolean)
-          .join("\n\n");
-        const experiences = Array.isArray(user.experience) ? user.experience : [];
-        hydrateExperienceDateInputs(experiences);
-        bindExperienceDateInputs();
-      }
+      renderExperienceRows(Array.isArray(user.experience) ? user.experience : []);
+      bindExperienceAddButton();
       renderEducationEditor(user.education || []);
       renderLanguageEditor(user.languages || []);
       updateRoleLineFromExperience();
@@ -2028,20 +2505,9 @@ function hydrateProfileForm(user = {}) {
         ? user.skills
         : [];
     if (skillsInput) skillsInput.value = skillsSource.join(", ");
-    const experienceInput = document.getElementById("experienceInput");
-    if (experienceInput) {
-      const experiences = Array.isArray(user.experience) ? user.experience : [];
-      experienceInput.value = experiences
-        .map((entry = {}) => {
-          const header = [entry.title, entry.years].filter(Boolean).join(" — ");
-          const details = entry.description ? `\n${entry.description}` : "";
-          return `${header}${details}`.trim();
-        })
-        .filter(Boolean)
-        .join("\n\n");
-      hydrateExperienceDateInputs(experiences);
-      bindExperienceDateInputs();
-    }
+    renderBestForList(Array.isArray(user.bestFor) ? user.bestFor : [], { editable: false });
+    renderExperienceRows(Array.isArray(user.experience) ? user.experience : []);
+    bindExperienceAddButton();
     renderEducationEditor(user.education || []);
     renderLanguageEditor(user.languages || []);
     updateRoleLineFromExperience();
@@ -2613,7 +3079,6 @@ async function saveSettings() {
   const yearsExperienceInput = document.getElementById("yearsExperienceInput");
   const practiceAreasInput = document.getElementById("practiceAreasInput");
   const skillsInput = document.getElementById("skillsInput");
-  const experienceInput = document.getElementById("experienceInput");
   const resumeKeyInput = document.getElementById("resumeKeyInput");
   const certificateKeyInput = document.getElementById("certificateKeyInput");
   const writingSampleKeyInput = document.getElementById("writingSampleKeyInput");
@@ -2646,34 +3111,9 @@ async function saveSettings() {
         .map((s) => s.trim())
         .filter(Boolean)
     : [];
+  body.bestFor = collectBestForEntries();
   body.skills = body.highlightedSkills;
-  body.experience = experienceInput
-    ? experienceInput.value
-        .split(/\n\s*\n/)
-        .map((block) => block.trim())
-        .filter(Boolean)
-        .map((block) => {
-          const [header, ...rest] = block.split("\n");
-          const [titlePart = "", yearsPart = ""] = (header || "").split("—").map((s) => s.trim());
-          const description = rest.join("\n").trim();
-          return {
-            title: titlePart || header || "",
-            years: yearsPart,
-            description
-          };
-        })
-        .filter((entry) => entry.title || entry.description)
-        .filter((entry) => entry.title || entry.description)
-    : [];
-  const experienceStartInput = document.getElementById("experienceStartDate");
-  const experienceEndInput = document.getElementById("experienceEndDate");
-  if (settingsState.experienceDatesTouched && Array.isArray(body.experience) && body.experience.length) {
-    const rangeLabel = formatExperienceDateRange(
-      experienceStartInput?.value || "",
-      experienceEndInput?.value || ""
-    );
-    body.experience[0].years = rangeLabel || "";
-  }
+  body.experience = buildExperienceEntriesForSave(collectExperienceRows());
   body.education = collectEducationFromEditor();
   const resumeKeyValue = resumeKeyInput?.value || settingsState.pendingResumeKey || "";
   if (settingsState.removeResume) {
@@ -2729,7 +3169,6 @@ async function saveSettings() {
   settingsState.pendingResumeKey = "";
   settingsState.pendingCertificateKey = "";
   settingsState.pendingWritingSampleKey = "";
-  settingsState.experienceDatesTouched = false;
   settingsState.removeResume = false;
   settingsState.removeCertificate = false;
   settingsState.removeWritingSample = false;

@@ -42,6 +42,22 @@ let countdownTimer = null;
 let hasPaymentMethodOnFile = true;
 let currentViewerRole = "";
 const PLATFORM_FEE_PCT = 21;
+const DEFAULT_HIRE_ERROR = "Unable to hire paralegal.";
+
+function formatHireErrorMessage(message) {
+  if (!message || typeof message !== "string") return DEFAULT_HIRE_ERROR;
+  const normalized = message.toLowerCase();
+  if (normalized.includes("stripe") && normalized.includes("connect")) {
+    return "This paralegal must connect Stripe before you can hire them.";
+  }
+  if (
+    normalized.includes("stripe") &&
+    (normalized.includes("onboard") || normalized.includes("onboarding") || normalized.includes("payout"))
+  ) {
+    return "This paralegal must complete Stripe onboarding before you can hire them.";
+  }
+  return message;
+}
 
 export async function render(el, { escapeHTML, params: routeParams } = {}) {
   ensureStyles();
@@ -921,7 +937,7 @@ async function hireParalegal(caseId, paralegalId, paralegalName, button) {
     );
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(payload?.error || "Unable to hire paralegal.");
+      throw new Error(payload?.error || DEFAULT_HIRE_ERROR);
     }
     const escrowStatus = String(payload?.escrowStatus || "").toLowerCase();
     const funded = escrowStatus === "funded";
@@ -949,7 +965,7 @@ async function hireParalegal(caseId, paralegalId, paralegalName, button) {
       window.location.href = target;
     }, 400);
   } catch (err) {
-    notify(err?.message || "Unable to hire paralegal.", "error");
+    notify(formatHireErrorMessage(err?.message), "error");
   } finally {
     if (button) {
       button.removeAttribute("disabled");
@@ -1348,7 +1364,7 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
       await onConfirm?.();
       showSuccess();
     } catch (err) {
-      showError(err?.message || "Unable to hire paralegal.");
+      showError(formatHireErrorMessage(err?.message));
       setLoading(false);
     }
   });
@@ -1433,13 +1449,13 @@ document.addEventListener("DOMContentLoaded", () => {
             btn.disabled = false;
             btn.textContent = btn.dataset.btnText || "Hire & Start Work";
             delete btn.dataset.btnText;
-            throw new Error(payload?.error || "Unable to hire paralegal.");
+            throw new Error(payload?.error || DEFAULT_HIRE_ERROR);
           }
         },
       });
     } catch (err) {
       console.error("Hire request failed:", err);
-      notify(err?.message || "Unable to hire paralegal.", "error");
+      notify(formatHireErrorMessage(err?.message), "error");
     }
   });
 });

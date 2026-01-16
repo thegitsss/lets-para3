@@ -304,6 +304,34 @@ button[type="submit"]:focus-visible {
   font-weight: 200;
 }
 
+    .hidden {
+      display: none !important;
+    }
+
+    .two-factor-panel {
+      margin-top: 12px;
+    }
+
+    .two-factor-note {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 16px;
+    }
+
+    .link-button {
+      background: none;
+      border: none;
+      padding: 0;
+      color: var(--gold);
+      font-size: 0.95rem;
+      font-weight: 200;
+      cursor: pointer;
+    }
+
+    .link-button:hover {
+      text-decoration: underline;
+    }
+
     .previewing {
       color: #6b7280; /* muted tone */
       font-weight: 200;
@@ -338,30 +366,48 @@ button[type="submit"]:focus-visible {
 </h1>
 <h2 class="login-title">Login to Let’s-ParaConnect</h2>
 
-        <form id="loginForm">
-          <label for="email">Enter e-mail</label>
-          <input id="email" name="email" type="email" placeholder="you@example.com" required />
+        <div id="loginPanel">
+          <form id="loginForm">
+            <label for="email">Enter e-mail</label>
+            <input id="email" name="email" type="email" placeholder="you@example.com" required />
 
-          <label for="password">Enter your password</label>
-          <div class="pw-wrap">
-            <input id="password" name="password" type="password" placeholder="••••••••" required />
-            <button type="button" class="show-toggle" aria-pressed="false">Show</button>
+            <label for="password">Enter your password</label>
+            <div class="pw-wrap">
+              <input id="password" name="password" type="password" placeholder="••••••••" required />
+              <button type="button" class="show-toggle" aria-pressed="false">Show</button>
+            </div>
+
+            <button type="submit" class="login-btn">Log In</button>
+
+  <div class="login-actions">
+    <p>
+      <a href="forgot-password.html" class="forgot">Forgot password?</a>
+    </p>
+  <a href="index.html" class="cancel-login">← Cancel Log In</a>
+  </div>
+
+            <div class="extra-links">
+              Don't have an account? <a href="signup.html">Sign up</a>
+            </div>
+
+          </form>
+        </div>
+
+        <div id="twoFactorPanel" class="two-factor-panel hidden">
+          <h2>Verify your sign-in</h2>
+          <p class="two-factor-note" id="twoFactorMessage">Enter the verification code we just sent you.</p>
+          <form id="twoFactorForm">
+            <label for="twoFactorCode">Verification code</label>
+            <input id="twoFactorCode" name="twoFactorCode" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="6-digit code" required />
+            <button type="submit" class="login-btn" id="twoFactorVerifyBtn">Verify</button>
+          </form>
+          <div class="login-actions">
+            <p>
+              <button type="button" class="link-button" id="twoFactorBackupToggle">Use a backup code</button>
+            </p>
+            <button type="button" class="link-button" id="twoFactorBackBtn">Back to login</button>
           </div>
-
-          <button type="submit" class="login-btn">Log In</button>
-
-<div class="login-actions">
-  <p>
-    <a href="forgot-password.html" class="forgot">Forgot password?</a>
-  </p>
-<a href="index.html" class="cancel-login">← Cancel Log In</a>
-</div>
-
-          <div class="extra-links">
-            Don't have an account? <a href="signup.html">Sign up</a>
-          </div>
-
-        </form>
+        </div>
       </div>
     </div>
 

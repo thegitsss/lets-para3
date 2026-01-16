@@ -5507,13 +5507,30 @@ async function getCaseForHire(caseId) {
   return payload;
 }
 
+const DEFAULT_HIRE_ERROR = "Unable to hire paralegal.";
+
+function formatHireErrorMessage(message) {
+  if (!message || typeof message !== "string") return DEFAULT_HIRE_ERROR;
+  const normalized = message.toLowerCase();
+  if (normalized.includes("stripe") && normalized.includes("connect")) {
+    return "This paralegal must connect Stripe before you can hire them.";
+  }
+  if (
+    normalized.includes("stripe") &&
+    (normalized.includes("onboard") || normalized.includes("onboarding") || normalized.includes("payout"))
+  ) {
+    return "This paralegal must complete Stripe onboarding before you can hire them.";
+  }
+  return message;
+}
+
 async function hireParalegal(caseId, paralegalId) {
   const res = await secureFetch(
     `/api/cases/${encodeURIComponent(caseId)}/hire/${encodeURIComponent(paralegalId)}`,
     { method: "POST", body: {} }
   );
   const payload = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(payload?.error || "Unable to hire paralegal.");
+  if (!res.ok) throw new Error(payload?.error || DEFAULT_HIRE_ERROR);
   return payload;
 }
 
@@ -5617,7 +5634,7 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
       await onConfirm?.();
       showSuccess();
     } catch (err) {
-      showError(err?.message || "Unable to hire paralegal.");
+      showError(formatHireErrorMessage(err?.message));
       setLoading(false);
     }
   });

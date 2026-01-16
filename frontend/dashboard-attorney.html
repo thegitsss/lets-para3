@@ -2278,6 +2278,103 @@
         gap:1rem;
       }
     }
+
+    /* Premium polish */
+    :root {
+      --shadow-sm: 0 10px 24px rgba(15, 23, 42, 0.08);
+      --shadow-md: 0 18px 45px rgba(15, 23, 42, 0.12);
+      --shadow-lg: 0 28px 70px rgba(15, 23, 42, 0.16);
+      --focus-ring: 0 0 0 3px rgba(182, 164, 122, 0.25);
+      --accent-strong: #a48957;
+      --main-bg: linear-gradient(180deg, rgba(252, 251, 248, 0.92) 0%, #ffffff 55%);
+    }
+
+    body {
+      line-height: 1.6;
+    }
+
+    .main {
+      background: var(--main-bg);
+    }
+
+    body.theme-dark {
+      --main-bg: linear-gradient(180deg, rgba(15, 19, 31, 0.98) 0%, rgba(12, 16, 27, 1) 60%);
+    }
+
+    body.theme-mountain {
+      --main-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 246, 241, 0.98) 60%);
+    }
+
+    body.theme-mountain-dark {
+      --main-bg: linear-gradient(180deg, rgba(16, 20, 33, 0.96) 0%, rgba(12, 15, 25, 1) 60%);
+    }
+
+    body:not(.theme-dark) .info-box,
+    body:not(.theme-dark) .case-card,
+    body:not(.theme-dark) .dashboard-card,
+    body:not(.theme-dark) .panel,
+    body:not(.theme-dark) .side-by-side-panels > section {
+      border-color: rgba(15, 23, 42, 0.08);
+      box-shadow: var(--shadow-sm);
+    }
+
+    body.theme-dark .info-box,
+    body.theme-dark .case-card,
+    body.theme-dark .dashboard-card,
+    body.theme-dark .panel,
+    body.theme-dark .side-by-side-panels > section {
+      box-shadow: var(--shadow-sm);
+    }
+
+    .case-card,
+    .dashboard-card {
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+
+    .case-card:hover,
+    .dashboard-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    body:not(.theme-dark) .notification-icon,
+    body:not(.theme-dark) .user-chip {
+      border-color: rgba(15, 23, 42, 0.12);
+      box-shadow: var(--shadow-sm);
+    }
+
+    body.theme-dark .notification-icon,
+    body.theme-dark .user-chip {
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn,
+    .case-actions button,
+    .btn-group button,
+    .view-cases .add-btn,
+    .archived-bulk-actions .pill-btn,
+    .avatar-actions button {
+      transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+
+    .btn:hover,
+    .case-actions button:hover,
+    .btn-group button:hover,
+    .view-cases .add-btn:hover,
+    .archived-bulk-actions .pill-btn:hover:not([disabled]),
+    .avatar-actions button:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
   </style>
 </head>
 <body>
