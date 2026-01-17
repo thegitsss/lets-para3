@@ -675,6 +675,7 @@ router.post(
         const verifyRes = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);
         const verifyData = verifyRes?.data;
         if (!verifyData?.success) {
+          console.warn("[recaptcha] login verify failed", verifyData?.["error-codes"] || verifyData);
           return res.status(400).json({ error: "Recaptcha verification failed" });
         }
       } catch (err) {
