@@ -1,8 +1,58 @@
 const API_BASE = "/api";
 const RECAPTCHA_SITE_KEY = window.RECAPTCHA_SITE_KEY || "";
+const RECAPTCHA_SOURCES = [
+  `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(RECAPTCHA_SITE_KEY)}`,
+  `https://www.recaptcha.net/recaptcha/api.js?render=${encodeURIComponent(RECAPTCHA_SITE_KEY)}`,
+];
+let recaptchaLoadPromise = null;
 
-function getRecaptchaToken(action) {
-  if (!RECAPTCHA_SITE_KEY || !window.grecaptcha) return Promise.resolve("");
+function ensureRecaptchaLoaded() {
+  if (!RECAPTCHA_SITE_KEY) return Promise.resolve(false);
+  if (window.grecaptcha) return Promise.resolve(true);
+  if (recaptchaLoadPromise) return recaptchaLoadPromise;
+
+  recaptchaLoadPromise = new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    const attemptLoad = (index) => {
+      if (settled) return;
+      if (index >= RECAPTCHA_SOURCES.length) {
+        finish(false);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = RECAPTCHA_SOURCES[index];
+      script.async = true;
+      script.defer = true;
+      script.onload = () => finish(!!window.grecaptcha);
+      script.onerror = () => attemptLoad(index + 1);
+      document.head.appendChild(script);
+    };
+
+    const existing = document.querySelector('script[src*="recaptcha/api.js"]');
+    if (existing) {
+      existing.addEventListener("load", () => finish(!!window.grecaptcha), { once: true });
+      existing.addEventListener("error", () => attemptLoad(1), { once: true });
+      setTimeout(() => {
+        if (!window.grecaptcha) attemptLoad(1);
+      }, 1200);
+      return;
+    }
+
+    attemptLoad(0);
+  });
+
+  return recaptchaLoadPromise;
+}
+
+async function getRecaptchaToken(action) {
+  if (!RECAPTCHA_SITE_KEY) return "";
+  await ensureRecaptchaLoaded();
+  if (!window.grecaptcha) return "";
   return new Promise((resolve) => {
     try {
       window.grecaptcha.ready(() => {
