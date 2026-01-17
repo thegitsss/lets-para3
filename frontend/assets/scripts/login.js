@@ -1,6 +1,8 @@
 const API_BASE = "/api";
 const RECAPTCHA_SITE_KEY = window.RECAPTCHA_SITE_KEY || "";
 const RECAPTCHA_SOURCES = [
+  `https://www.google.com/recaptcha/enterprise.js?render=${encodeURIComponent(RECAPTCHA_SITE_KEY)}`,
+  `https://www.recaptcha.net/recaptcha/enterprise.js?render=${encodeURIComponent(RECAPTCHA_SITE_KEY)}`,
   `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(RECAPTCHA_SITE_KEY)}`,
   `https://www.recaptcha.net/recaptcha/api.js?render=${encodeURIComponent(RECAPTCHA_SITE_KEY)}`,
 ];
@@ -53,10 +55,11 @@ async function getRecaptchaToken(action) {
   if (!RECAPTCHA_SITE_KEY) return "";
   await ensureRecaptchaLoaded();
   if (!window.grecaptcha) return "";
+  const client = window.grecaptcha.enterprise || window.grecaptcha;
   return new Promise((resolve) => {
     try {
-      window.grecaptcha.ready(() => {
-        window.grecaptcha
+      client.ready(() => {
+        client
           .execute(RECAPTCHA_SITE_KEY, { action })
           .then((token) => resolve(token))
           .catch(() => resolve(""));
