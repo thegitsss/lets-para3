@@ -657,9 +657,8 @@ router.post(
   asyncHandler(async (req, res) => {
     const { email, password } = req.body || {};
     const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY || process.env.RECAPTCHA_SECRET || "";
-    const enforceRecaptcha = String(process.env.RECAPTCHA_ENFORCED || "true").toLowerCase() === "true";
 
-    if (IS_PROD && recaptchaSecret && enforceRecaptcha) {
+    if (IS_PROD && recaptchaSecret) {
       let recaptchaToken = req.body?.recaptcha;
       if (!recaptchaToken && req.body?.recaptchaToken) {
         recaptchaToken = req.body.recaptchaToken;
@@ -675,7 +674,6 @@ router.post(
         const verifyRes = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);
         const verifyData = verifyRes?.data;
         if (!verifyData?.success) {
-          console.warn("[recaptcha] login verify failed", verifyData?.["error-codes"] || verifyData);
           return res.status(400).json({ error: "Recaptcha verification failed" });
         }
       } catch (err) {
