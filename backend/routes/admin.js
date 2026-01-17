@@ -313,10 +313,13 @@ function buildDenialEmailHtml(user, opts = {}) {
             <td align="center" style="padding:16px 40px 28px;">
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;">
                 Hi ${friendlyName},<br><br>
-                Your application to join Let's-ParaConnect has been reviewed and was unfortunately not approved.
-                Our team reviews every submission carefully, and you can reply to this email if you believe we missed
-                important information.<br><br>
-                Thank you for your interest in the community.
+                Thank you for your interest in joining Let's-ParaConnect.<br><br>
+                Your application has been reviewed and was not approved at this time. Currently, we are only accepting
+                paralegals who have a minimum of one year of professional paralegal experience and who are based in the
+                United States.<br><br>
+                Our team reviews every submission carefully, and if you believe we may have missed important
+                information in your application, you're welcome to reply to this email.<br><br>
+                Thank you again for your interest in the community.
               </div>
             </td>
           </tr>

@@ -208,8 +208,10 @@ function sendAcceptedEmail(lastName) {
 
 function sendNotAcceptedEmail(lastName) {
   return buildVerificationEmail(lastName, [
-    "Thank you for your interest in Let’s-ParaConnect. After reviewing your submission, we are unable to extend an invitation at this time.",
-    "You are welcome to reapply in the future if circumstances change.",
+    "Thank you for your interest in joining Let’s-ParaConnect.",
+    "Your application has been reviewed and was not approved at this time. Currently, we are only accepting paralegals who have a minimum of one year of professional paralegal experience and who are based in the United States.",
+    "Our team reviews every submission carefully, and if you believe we may have missed important information in your application, you’re welcome to reply to this email.",
+    "Thank you again for your interest in the community.",
   ]);
 }
 
