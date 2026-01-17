@@ -18,10 +18,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="preload" as="image" href="hero-mountain.jpg" />
   <link href="assets/styles/styles.css" rel="stylesheet" />
-  <script>
-    window.RECAPTCHA_SITE_KEY = "6Lfmq1orAAAAAEfFBDqDFpXtHMGld5aesRFjvIEM";
-  </script>
-  <script src="https://www.google.com/recaptcha/api.js?render=6Lfmq1orAAAAAEfFBDqDFpXtHMGld5aesRFjvIEM" defer></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
     <style>
     .gold{color:var(--gold);}
@@ -322,6 +319,10 @@
       text-decoration: underline;
     }
 
+    .turnstile-wrap {
+      margin: 12px 0 8px;
+    }
+
     .prelaunch-note {
       color: var(--muted);
       margin-bottom: 1.25rem;
@@ -479,6 +480,10 @@
               </span>
             </label>
 
+            <div class="turnstile-wrap">
+              <div class="cf-turnstile" data-sitekey=0x4AAAAAACND61mi1ZgPWRsA></div>
+            </div>
+
             <button id="submitBtn" class="btn" type="submit">Create Account</button>
             <div class="extra-links">
               <p>Already have an account? <a href="login.html">Log in</a></p>
@@ -498,21 +503,9 @@
       .then(d => window.__CSRF__ = d.csrfToken)
       .catch(() => {});
 
-    const SITE_KEY = window.RECAPTCHA_SITE_KEY || "";
-    function getRecaptchaToken(action) {
-      if (!SITE_KEY || !window.grecaptcha) return Promise.resolve("");
-      return new Promise((resolve) => {
-        try {
-          window.grecaptcha.ready(() => {
-            window.grecaptcha
-              .execute(SITE_KEY, { action })
-              .then((token) => resolve(token))
-              .catch(() => resolve(""));
-          });
-        } catch {
-          resolve("");
-        }
-      });
+    function getTurnstileToken(formEl) {
+      const input = formEl?.querySelector('input[name="cf-turnstile-response"]');
+      return input?.value?.trim() || "";
     }
 
     const btnA = document.getElementById('btnA');
@@ -865,8 +858,11 @@
           if (paralegalExperience) formData.append('yearsExperience', paralegalExperience);
         }
 
-        const recaptchaToken = await getRecaptchaToken('signup');
-        if (recaptchaToken) formData.append('captchaToken', recaptchaToken);
+        const turnstileToken = getTurnstileToken(form);
+        if (!turnstileToken) {
+          throw new Error('Complete the verification before signing up.');
+        }
+        formData.append('turnstileToken', turnstileToken);
 
         const headers = {};
         if (window.__CSRF__) headers['X-CSRF-Token'] = window.__CSRF__;
@@ -897,6 +893,9 @@
         }
       } catch (err) {
         console.error(err);
+        if (window.turnstile?.reset) {
+          window.turnstile.reset();
+        }
         say(err.message || 'Network error. Please try again.', 'err');
       } finally {
         if (shouldRestoreButton && submitBtn) {

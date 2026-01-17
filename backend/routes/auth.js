@@ -366,35 +366,24 @@ function looksLikeBot({ first = "", last = "", email = "" }) {
   return false;
 }
 
-async function verifyRecaptcha(token, expectedAction) {
-  const secret = process.env.RECAPTCHA_SECRET || "";
-  if (!secret) return true;
-  const enforceRecaptcha = String(process.env.RECAPTCHA_ENFORCED || "false").toLowerCase() === "true";
+async function verifyTurnstile(token, remoteIp) {
+  const secret = process.env.TURNSTILE_SECRET || "";
+  if (!secret) {
+    return { success: false, errorCodes: ["missing-secret"] };
+  }
   if (!token) {
-    console.warn("[recaptcha] missing token");
-    return !enforceRecaptcha;
+    return { success: false, errorCodes: ["missing-token"] };
   }
   try {
     const params = new URLSearchParams();
     params.append("secret", secret);
     params.append("response", token);
-    const { data } = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);
-    if (!data?.success) {
-      console.warn("[recaptcha] verification failed", data?.["error-codes"]);
-      return !enforceRecaptcha;
-    }
-    if (expectedAction && data.action && data.action !== expectedAction) {
-      console.warn("[recaptcha] action mismatch", data.action, "expected", expectedAction);
-      return !enforceRecaptcha;
-    }
-    if (typeof data.score === "number" && data.score < 0.3) {
-      console.warn("[recaptcha] low score", data.score);
-      return !enforceRecaptcha;
-    }
-    return true;
+    if (remoteIp) params.append("remoteip", remoteIp);
+    const { data } = await axios.post("https://challenges.cloudflare.com/turnstile/v0/siteverify", params);
+    return data || { success: false };
   } catch (err) {
-    console.error("[recaptcha] verify error", err?.message || err);
-    return !enforceRecaptcha;
+    console.error("[turnstile] verify error", err?.message || err);
+    return { success: false, errorCodes: ["verify-error"] };
   }
 }
 
@@ -414,7 +403,7 @@ router.post(
       .split(",")
       .map((entry) => entry.trim().toLowerCase())
       .filter(Boolean);
-    const captchaEnabled = String(process.env.CAPTCHA_ENABLED || "false").toLowerCase() === "true";
+    const enforceTurnstile = String(process.env.TURNSTILE_ENFORCED || "true").toLowerCase() === "true";
     const {
       firstName,
       lastName,
@@ -426,6 +415,7 @@ router.post(
       lawFirm,
       resumeURL,
       certificateURL,
+      turnstileToken,
       captchaToken,
       recaptchaToken,
       termsAccepted,
@@ -445,37 +435,20 @@ router.post(
     const normalizedEmail = String(email || "").toLowerCase().trim();
     const bypassCaptcha = normalizedEmail && bypassList.includes(normalizedEmail);
 
-    const resolvedCaptchaToken = captchaToken || recaptchaToken;
-    if (!bypassCaptcha && captchaEnabled && process.env.NODE_ENV === "production") {
-      const recaptchaSecret = process.env.RECAPTCHA_SECRET || "";
-      if (!resolvedCaptchaToken || !recaptchaSecret) {
-        return res.status(400).json({ error: "Captcha verification failed" });
+    const resolvedTurnstileToken =
+      turnstileToken ||
+      req.body?.["cf-turnstile-response"] ||
+      req.body?.cfTurnstileResponse ||
+      captchaToken ||
+      recaptchaToken;
+    if (!bypassCaptcha && enforceTurnstile && process.env.NODE_ENV === "production") {
+      if (!resolvedTurnstileToken || !process.env.TURNSTILE_SECRET) {
+        return res.status(400).json({ error: "Turnstile verification failed" });
       }
-      try {
-        const params = new URLSearchParams();
-        params.append("secret", recaptchaSecret);
-        params.append("response", resolvedCaptchaToken);
-        const { data } = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);
-        console.log("[signup] recaptcha verify", { success: !!data?.success, score: data?.score, email: normalizedEmail });
-        if (!data?.success) {
-          return res.status(400).json({ error: "Captcha verification failed" });
-        }
-      } catch (err) {
-        console.warn("[signup] recaptcha verification error", err?.message || err);
-        return res.status(400).json({ error: "Captcha verification failed" });
-      }
-    } else if (resolvedCaptchaToken) {
-      const recaptchaSecret = process.env.RECAPTCHA_SECRET || "";
-      if (recaptchaSecret) {
-        try {
-          const params = new URLSearchParams();
-          params.append("secret", recaptchaSecret);
-          params.append("response", resolvedCaptchaToken);
-          const { data } = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);
-          console.log("[signup] recaptcha verify (bypass)", { success: !!data?.success, score: data?.score, email: normalizedEmail });
-        } catch (err) {
-          console.warn("[signup] recaptcha soft-check failed (bypass)", err?.message || err);
-        }
+      const verification = await verifyTurnstile(resolvedTurnstileToken, req.ip);
+      if (!verification?.success) {
+        console.warn("[turnstile] signup verify failed", verification?.["error-codes"] || verification?.errorCodes);
+        return res.status(400).json({ error: "Turnstile verification failed" });
       }
     }
 
@@ -656,29 +629,27 @@ router.post(
   "/login",
   asyncHandler(async (req, res) => {
     const { email, password } = req.body || {};
-    const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY || process.env.RECAPTCHA_SECRET || "";
+    const enforceTurnstile = String(process.env.TURNSTILE_ENFORCED || "true").toLowerCase() === "true";
 
-    if (IS_PROD && recaptchaSecret) {
-      let recaptchaToken = req.body?.recaptcha;
-      if (!recaptchaToken && req.body?.recaptchaToken) {
-        recaptchaToken = req.body.recaptchaToken;
+    if (IS_PROD && enforceTurnstile) {
+      const turnstileToken =
+        req.body?.turnstileToken ||
+        req.body?.["cf-turnstile-response"] ||
+        req.body?.cfTurnstileResponse ||
+        req.body?.recaptchaToken ||
+        req.body?.recaptcha ||
+        "";
+      if (!process.env.TURNSTILE_SECRET) {
+        return res.status(500).json({ error: "Turnstile is not configured." });
       }
-      if (!recaptchaToken) {
-        return res.status(400).json({ error: "Recaptcha verification failed" });
+      if (!turnstileToken) {
+        return res.status(400).json({ error: "Turnstile verification failed" });
       }
 
-      try {
-        const params = new URLSearchParams();
-        params.append("secret", recaptchaSecret);
-        params.append("response", recaptchaToken);
-        const verifyRes = await axios.post("https://www.google.com/recaptcha/api/siteverify", params);
-        const verifyData = verifyRes?.data;
-        if (!verifyData?.success) {
-          return res.status(400).json({ error: "Recaptcha verification failed" });
-        }
-      } catch (err) {
-        console.error("[recaptcha]", err?.message || err);
-        return res.status(400).json({ error: "Recaptcha verification failed" });
+      const verification = await verifyTurnstile(turnstileToken, req.ip);
+      if (!verification?.success) {
+        console.warn("[turnstile] login verify failed", verification?.["error-codes"] || verification?.errorCodes);
+        return res.status(400).json({ error: "Turnstile verification failed" });
       }
     }
 

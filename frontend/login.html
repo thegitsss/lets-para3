@@ -65,10 +65,7 @@
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
-  <script>
-    window.RECAPTCHA_SITE_KEY = "6Lfmq1orAAAAAEfFBDqDFpXtHMGld5aesRFjvIEM";
-  </script>
-  <script src="https://www.google.com/recaptcha/api.js?render=6Lfmq1orAAAAAEfFBDqDFpXtHMGld5aesRFjvIEM" defer></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <style>
     .gold{color:var(--gold);}
     html, body {
@@ -337,13 +334,19 @@ button[type="submit"]:focus-visible {
       font-weight: 200;
     }
 
-.cancel-login {
+  .cancel-login {
   display: inline-block;
   margin-top: 1.5rem;
       color: #475569;
       text-decoration: none;
       font-weight: 300;
       font-size: 0.95rem;
+    }
+
+    .turnstile-wrap {
+      margin: 16px 0 8px;
+      display: flex;
+      justify-content: flex-start;
     }
 
     @media (max-width: 768px) {
@@ -375,6 +378,10 @@ button[type="submit"]:focus-visible {
             <div class="pw-wrap">
               <input id="password" name="password" type="password" placeholder="••••••••" required />
               <button type="button" class="show-toggle" aria-pressed="false">Show</button>
+            </div>
+
+            <div class="turnstile-wrap">
+              <div class="cf-turnstile" data-sitekey=0x4AAAAAACND61mi1ZgPWRsA></div>
             </div>
 
             <button type="submit" class="login-btn">Log In</button>

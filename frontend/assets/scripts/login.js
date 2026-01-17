@@ -1,20 +1,8 @@
 const API_BASE = "/api";
-const RECAPTCHA_SITE_KEY = window.RECAPTCHA_SITE_KEY || "";
 
-function getRecaptchaToken(action) {
-  if (!RECAPTCHA_SITE_KEY || !window.grecaptcha) return Promise.resolve("");
-  return new Promise((resolve) => {
-    try {
-      window.grecaptcha.ready(() => {
-        window.grecaptcha
-          .execute(RECAPTCHA_SITE_KEY, { action })
-          .then((token) => resolve(token))
-          .catch(() => resolve(""));
-      });
-    } catch {
-      resolve("");
-    }
-  });
+function getTurnstileToken(form) {
+  const input = form?.querySelector('input[name="cf-turnstile-response"]');
+  return input?.value?.trim() || "";
 }
 
 const clearLocalSession = () => {
@@ -135,7 +123,16 @@ if (!skipInit) {
         loginButton.textContent = "Logging in…";
       }
       const csrfToken = await fetchCsrfToken();
-      const recaptchaToken = await getRecaptchaToken("login");
+      const turnstileToken = getTurnstileToken(loginForm);
+      if (!turnstileToken) {
+        const msg = "Complete the verification before logging in.";
+        if (toastHelper) {
+          toastHelper.show(msg, { targetId: "toastBanner", type: "err" });
+        } else {
+          alert(msg);
+        }
+        return;
+      }
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: {
@@ -143,7 +140,7 @@ if (!skipInit) {
           ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
         },
         credentials: "include",
-        body: JSON.stringify({ email, password, recaptchaToken }),
+        body: JSON.stringify({ email, password, turnstileToken }),
       });
 
       let data = {};
@@ -154,6 +151,9 @@ if (!skipInit) {
       if (!res.ok) {
         clearLocalSession();
         const msg = data?.error || data?.msg || data?.message || "Login failed";
+        if (window.turnstile?.reset) {
+          window.turnstile.reset();
+        }
         if (toastHelper) {
           toastHelper.show(msg, { targetId: "toastBanner", type: "err" });
         } else {
