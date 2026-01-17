@@ -101,8 +101,15 @@ const experienceEntrySchema = new Schema(
 
 const educationEntrySchema = new Schema(
   {
-    degree: { type: String, trim: true, maxlength: 200 },
     school: { type: String, trim: true, maxlength: 200 },
+    degree: { type: String, trim: true, maxlength: 200 },
+    fieldOfStudy: { type: String, trim: true, maxlength: 200 },
+    grade: { type: String, trim: true, maxlength: 120 },
+    activities: { type: String, trim: true, maxlength: 1000 },
+    startMonth: { type: String, trim: true, maxlength: 20 },
+    startYear: { type: String, trim: true, maxlength: 10 },
+    endMonth: { type: String, trim: true, maxlength: 20 },
+    endYear: { type: String, trim: true, maxlength: 10 },
   },
   { _id: false }
 );
@@ -206,6 +213,7 @@ const userSchema = new Schema(
     bestFor: { type: [String], default: [], set: uniqueStrings },
     specialties: { type: [String], default: [], set: uniqueStrings },
     jurisdictions: { type: [String], default: [], set: uniqueStrings },
+    stateExperience: { type: [String], default: [], set: uniqueStrings },
     skills: { type: [String], default: [], set: uniqueStrings },
     yearsExperience: { type: Number, min: 0, max: 80, default: 0 },
     languages: { type: [languageEntrySchema], default: [], set: sanitizeLanguageEntries },

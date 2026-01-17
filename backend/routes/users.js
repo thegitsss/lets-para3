@@ -130,7 +130,7 @@ const parseParalegalFilters = (query = {}) => {
 };
 
 const SAFE_PUBLIC_SELECT =
-  "_id firstName lastName avatarURL profileImage location specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt languages writingSamples status";
+  "_id firstName lastName avatarURL profileImage location specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt languages writingSamples status stateExperience";
 const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email phoneNumber`;
 const FILE_PUBLIC_BASE =
   (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
@@ -167,6 +167,7 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
     practiceAreas: Array.isArray(src.practiceAreas) ? src.practiceAreas : [],
     skills: Array.isArray(src.skills) ? src.skills : [],
     bestFor: Array.isArray(src.bestFor) ? src.bestFor : [],
+    stateExperience: Array.isArray(src.stateExperience) ? src.stateExperience : [],
     yearsExperience:
       typeof src.yearsExperience === "number" ? src.yearsExperience : 0,
     linkedInURL: src.linkedInURL || "",
@@ -534,11 +535,22 @@ router.patch(
     const availabilityStr = normalizeAvailability(availability);
     if (availabilityStr) me.availability = availabilityStr;
 
-    if (typeof avatarURL === "string" && isURL(avatarURL)) {
-      me.avatarURL = avatarURL;
+    if (avatarURL !== undefined) {
+      const trimmedAvatar = typeof avatarURL === "string" ? avatarURL.trim() : "";
+      if (!trimmedAvatar) {
+        me.avatarURL = "";
+      } else if (isURL(trimmedAvatar)) {
+        me.avatarURL = trimmedAvatar;
+      }
     }
-    if (typeof profileImage === "string" && profileImage.trim()) {
-      me.profileImage = profileImage.trim();
+    if (profileImage !== undefined) {
+      const trimmedImage = typeof profileImage === "string" ? profileImage.trim() : "";
+      if (!trimmedImage) {
+        me.profileImage = null;
+        me.avatarURL = "";
+      } else if (typeof profileImage === "string") {
+        me.profileImage = trimmedImage;
+      }
     }
     if (typeof timezone === "string" && timezone.length <= 64) {
       me.timezone = timezone;
@@ -587,6 +599,9 @@ router.patch(
       if (body.bestFor !== undefined) {
         me.bestFor = cleanList(body.bestFor);
       }
+      if (body.stateExperience !== undefined) {
+        me.stateExperience = cleanList(body.stateExperience);
+      }
       if (body.experience !== undefined) {
         me.experience = cleanCollection(body.experience, [
           ["title", 300],
@@ -597,7 +612,14 @@ router.patch(
       if (body.education !== undefined) {
         me.education = cleanCollection(body.education, [
           ["degree", 200],
-          ["school", 200]
+          ["school", 200],
+          ["fieldOfStudy", 200],
+          ["grade", 120],
+          ["activities", 1000],
+          ["startMonth", 20],
+          ["startYear", 10],
+          ["endMonth", 20],
+          ["endYear", 10]
         ]);
       }
       if (body.yearsExperience !== undefined) {

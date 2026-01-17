@@ -47,7 +47,7 @@
     body {
       font-family: var(--font-sans);
       font-weight: 200;
-      background: var(--bg);
+      background: transparent;
       color: var(--ink);
       min-height: 100vh;
       line-height: 1.7;
@@ -57,11 +57,10 @@
       position: fixed;
       inset: 0;
       background:
-        linear-gradient(to bottom, rgba(255,255,255,0.94), rgba(255,255,255,0.88), rgba(255,255,255,0.94)),
+        linear-gradient(to bottom, rgba(255,255,255,0.6), rgba(255,255,255,0.72)),
         url('hero-mountain.jpg') center/cover no-repeat;
-      filter: blur(4px) brightness(1.55) saturate(0.2);
-      opacity: 0.48;
-      transform: scale(1.05);
+      opacity: 1;
+      transform: scale(1.01);
       z-index: 0;
       pointer-events: none;
     }
@@ -78,18 +77,21 @@
     }
 
     .page-shell {
-      max-width: 1350px;
+      max-width: 1120px;
+      min-height: 100vh;
       margin: 0 auto;
-      padding: 24px 32px 48px;
+      padding: 28px 36px 52px;
       position: relative;
-      z-index: 2;
+      z-index: 12;
+      background: #fff;
+      box-shadow: 0 40px 90px rgba(15, 23, 42, 0.25);
     }
 
     .topbar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 24px;
+      margin-bottom: 18px;
       gap: 16px;
       position: relative;
       z-index: 200;
@@ -568,6 +570,7 @@
       font-weight: 300;
       letter-spacing: 0.6px;
       text-align: center;
+      margin-bottom: 12px;
     }
 
     #roleLine {
@@ -583,6 +586,7 @@
       margin-left: auto;
       margin-right: auto;
       text-align: center;
+      margin-top: 10px;
     }
 
     .hero-meta-row {
@@ -644,7 +648,7 @@
     .profile-layout {
       display: grid;
       grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.6fr);
-      gap: 24px;
+      gap: 16px;
       align-items: start;
       text-align: center;
       justify-items: center;
@@ -654,30 +658,30 @@
     .profile-main {
       display: flex;
       flex-direction: column;
-      gap: 38px;
+      gap: 22px;
       align-items: center;
     }
 
     .profile-sidebar {
-      padding-right: 24px;
+      padding-right: 18px;
       border-right: 1px solid var(--line);
     }
 
     .profile-main {
-      padding-left: 24px;
+      padding-left: 18px;
     }
 
     .profile-photo-block {
       display: flex;
       flex-direction: column;
-      gap: 28px;
+      gap: 16px;
       align-items: center;
     }
 
     .profile-meta-stack {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 6px;
       align-items: center;
       text-align: center;
       width: max-content;
@@ -689,7 +693,7 @@
     .profile-meta-columns {
       display: grid;
       grid-template-columns: repeat(2, max-content);
-      gap: 10px 24px;
+      gap: 6px 16px;
       justify-items: center;
       text-align: center;
       justify-content: center;
@@ -737,7 +741,7 @@
     .profile-header {
       display: flex;
       flex-direction: column;
-      gap: 32px;
+      gap: 18px;
       align-items: center;
       text-align: center;
       align-self: center;
@@ -752,7 +756,7 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      gap: 24px;
+      gap: 12px;
       text-align: center;
       width: max-content;
       max-width: 100%;
@@ -919,6 +923,22 @@
       color: var(--muted);
     }
 
+    #practiceList {
+      gap: 0;
+      justify-content: center;
+    }
+
+    #practiceList .chip {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    #practiceList .chip:not(:last-child)::after {
+      content: "·";
+      margin: 0 10px;
+      color: var(--muted);
+    }
+
     .chip-section {
       display: flex;
       flex-direction: column;
@@ -949,8 +969,7 @@
     }
 
     .chip:hover,
-    .timeline-item:hover,
-    .edu-pill:hover {
+    .timeline-item:hover {
       transform: none;
       box-shadow: none;
       background: transparent;
@@ -996,22 +1015,45 @@
       font-size: 0.75em;
     }
 
-    .edu-inline {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 8px;
-      justify-content: center;
+    .profile-duo {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 28px;
+      width: 100%;
+      max-width: 720px;
+      margin: 6px auto 0;
     }
 
-    .edu-pill {
-      padding: 0;
-      border-radius: 0;
-      border: none;
-      background: transparent;
+    .edu-inline {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 8px;
+      align-items: center;
+    }
+
+    .edu-entry {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .edu-title {
+      font-size: 0.98rem;
+      font-weight: 400;
+      color: var(--ink);
+      letter-spacing: 0.01em;
+    }
+
+    .edu-sub {
       font-size: 0.9rem;
-      transition: none;
-      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.08);
+      color: var(--muted);
+    }
+
+    .edu-meta {
+      font-size: 0.85rem;
+      color: var(--muted);
     }
 
     .inline-row {
@@ -1240,6 +1282,7 @@
       .page-shell {
         padding: 28px 20px 70px;
         padding-top: 88px;
+        box-shadow: none;
       }
 
       .mobile-sidebar {
@@ -1262,6 +1305,11 @@
         grid-template-columns: 1fr;
         display: flex;
         flex-direction: column;
+      }
+
+      .profile-duo {
+        grid-template-columns: 1fr;
+        gap: 18px;
       }
 
       .profile-photo-block,
@@ -1471,14 +1519,15 @@
           </div>
         </article>
 
+        <article class="profile-section hidden" id="stateExperienceRow">
+          <div class="card-header-label" style="text-align:center;">State Experience</div>
+          <div class="chip-row" id="stateExperienceList"></div>
+        </article>
+
         <article class="profile-section" id="skillsCard">
           <div class="chip-section" id="skillsSection">
             <span class="card-header-label" style="text-align:center; width:100%;">Skills</span>
             <div id="skillsList" class="chip-cloud"></div>
-          </div>
-          <div class="chip-section" id="practiceSection">
-            <span class="card-header-label" style="text-align:center; width:100%;">Focus Areas</span>
-            <div id="practiceList" class="chip-cloud"></div>
           </div>
         </article>
 
@@ -1499,10 +1548,10 @@
         <section class="profile-header" aria-label="Paralegal profile">
           <div class="profile-header-main">
             <div class="profile-identity">
-              <h1 id="profileName">Natalie Testing</h1>
+              <h1 id="profileName"></h1>
               <div class="profile-role-row">
-                <span id="roleLine">5 years experience • elite paralegal professional</span>
-                <span class="status-chip" id="statusChip">Available now</span>
+                <span id="roleLine"></span>
+                <span class="status-chip" id="statusChip"></span>
               </div>
               <p id="bioCopy" class="hidden">Hello, pleased to meet you.</p>
             </div>
@@ -1524,10 +1573,16 @@
           </div>
         </section>
 
-        <article class="profile-section hidden" id="bestForCard">
-          <div class="card-header-label" style="text-align:center;">Best For</div>
-          <ul id="bestForList" class="best-for-list"></ul>
-        </article>
+        <div class="profile-duo" id="bestForFocusRow">
+          <article class="profile-section hidden" id="bestForCard">
+            <div class="card-header-label" style="text-align:center;">Best For</div>
+            <ul id="bestForList" class="best-for-list"></ul>
+          </article>
+          <article class="profile-section" id="practiceSection">
+            <div class="card-header-label" style="text-align:center;">Focus Areas</div>
+            <div id="practiceList" class="chip-cloud"></div>
+          </article>
+        </div>
 
         <article class="profile-section" id="experienceCard">
           <div class="experience-section" id="experienceSection">

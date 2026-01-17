@@ -20,18 +20,10 @@ async function persistDocumentField(field, value) {
 }
 
 const PLACEHOLDER_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-  `<svg xmlns='http://www.w3.org/2000/svg' width='280' height='280' viewBox='0 0 280 280'>
-    <defs>
-      <linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'>
-        <stop offset='0%' stop-color='#f4f6fa'/>
-        <stop offset='100%' stop-color='#e6e9ef'/>
-      </linearGradient>
-    </defs>
-    <rect width='280' height='280' rx='36' fill='url(#grad)'/>
-    <path d='M70 200c10-38 42-66 70-66s60 28 70 66' fill='none' stroke='#c9cfda' stroke-width='12' stroke-linecap='round'/>
-    <circle cx='140' cy='120' r='54' fill='#d4dae6'/>
-    <circle cx='140' cy='112' r='48' fill='url(#grad)'/>
-    <text x='50%' y='55%' font-family='Sarabun, Arial, sans-serif' font-size='52' font-weight='600' fill='#3a4553' text-anchor='middle' dominant-baseline='middle'>LPC</text>
+  `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>
+    <rect width='220' height='220' rx='110' fill='#f1f5f9'/>
+    <circle cx='110' cy='90' r='46' fill='#cbd5e1'/>
+    <path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/>
   </svg>`
 )}`;
 
@@ -97,11 +89,13 @@ const elements = {
   experienceSection: document.getElementById("experienceSection"),
   educationSection: document.getElementById("educationSection"),
   languagesRow: document.getElementById("languagesRow"),
+  stateExperienceRow: document.getElementById("stateExperienceRow"),
   funFactsCard: document.getElementById("funFactsCard"),
   funFactsCopy: document.getElementById("funFactsCopy"),
   attorneyCard: document.getElementById("attorneyHighlightsCard"),
   attorneyHighlights: document.getElementById("attorneyHighlights"),
   languagesList: document.getElementById("languagesList"),
+  stateExperienceList: document.getElementById("stateExperienceList"),
   inviteModal: document.getElementById("inviteModal"),
   inviteCaseSelect: document.getElementById("inviteCaseSelect"),
   sendInviteBtn: document.getElementById("sendInviteBtn"),
@@ -826,6 +820,7 @@ function renderProfile(profile) {
   renderStatus(profile);
   renderMetadata(profile);
   const hasLanguages = renderLanguages(profile.languages || []);
+  renderStateExperience(profile.stateExperience || profile.jurisdictions || []);
   const skillValues =
     (Array.isArray(profile.skills) && profile.skills.length ? profile.skills : null) ||
     (Array.isArray(profile.highlightedSkills) && profile.highlightedSkills.length ? profile.highlightedSkills : null);
@@ -1044,6 +1039,29 @@ function renderLanguages(languages = []) {
   return true;
 }
 
+function renderStateExperience(entries = []) {
+  const container = elements.stateExperienceList;
+  if (!container) return false;
+  container.innerHTML = "";
+  const list = Array.isArray(entries)
+    ? entries.map((item) => String(item || "").trim()).filter(Boolean)
+    : typeof entries === "string"
+    ? entries.split(",").map((item) => item.trim()).filter(Boolean)
+    : [];
+  const hasStates = list.length > 0;
+  if (elements.stateExperienceRow) {
+    elements.stateExperienceRow.classList.toggle("hidden", !hasStates);
+  }
+  if (!hasStates) return false;
+  list.slice(0, 12).forEach((stateLabel) => {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.textContent = stateLabel;
+    container.appendChild(chip);
+  });
+  return true;
+}
+
 function renderMetaLine(el, iconKey, text, href) {
   if (!el) return;
   el.classList.remove("skeleton-block");
@@ -1179,7 +1197,7 @@ function renderSkillsAndPractice(skills = [], practices = []) {
     elements.practiceSection.classList.toggle("hidden", !hasPractice);
   }
   if (elements.skillsCard) {
-    elements.skillsCard.classList.toggle("hidden", !hasSkills && !hasPractice);
+    elements.skillsCard.classList.toggle("hidden", !hasSkills);
   }
   return { hasSkills, hasPractice };
 }
@@ -1258,10 +1276,20 @@ function formatExperienceRange(item = {}) {
   return endLabel ? `Through ${endLabel}` : "";
 }
 
+function formatEducationRange(item = {}) {
+  const startParts = [item.startMonth, item.startYear].filter(Boolean).join(" ");
+  const endParts = [item.endMonth, item.endYear].filter(Boolean).join(" ");
+  if (startParts && endParts) return `${startParts} – ${endParts}`;
+  if (startParts) return startParts;
+  return endParts || "";
+}
+
 function renderEducation(entries) {
   if (!elements.educationList) return false;
   elements.educationList.innerHTML = "";
-  const list = Array.isArray(entries) ? entries.filter((item) => item && (item.degree || item.school)) : [];
+  const list = Array.isArray(entries)
+    ? entries.filter((item) => item && (item.degree || item.school || item.fieldOfStudy || item.grade || item.activities))
+    : [];
   if (!list.length) {
     if (elements.educationSection) {
       elements.educationSection.classList.add("hidden");
@@ -1278,11 +1306,39 @@ function renderEducation(entries) {
     elements.educationCard.classList.remove("hidden");
   }
   list.slice(0, 5).forEach((item) => {
-    const pill = document.createElement("span");
-    pill.className = "edu-pill";
-    const parts = [item.degree, item.school].filter(Boolean).join(" • ");
-    pill.textContent = parts || "Education detail";
-    elements.educationList.appendChild(pill);
+    const entry = document.createElement("div");
+    entry.className = "edu-entry";
+
+    const title = document.createElement("div");
+    title.className = "edu-title";
+    const titleParts = [item.degree, item.fieldOfStudy].filter(Boolean);
+    title.textContent = titleParts.length ? titleParts.join(", ") : item.school || "Education";
+    entry.appendChild(title);
+
+    const range = formatEducationRange(item);
+    const subParts = [item.school, range].filter(Boolean);
+    if (subParts.length) {
+      const sub = document.createElement("div");
+      sub.className = "edu-sub";
+      sub.textContent = subParts.join(" • ");
+      entry.appendChild(sub);
+    }
+
+    if (item.grade) {
+      const grade = document.createElement("div");
+      grade.className = "edu-meta";
+      grade.textContent = `Grade: ${item.grade}`;
+      entry.appendChild(grade);
+    }
+
+    if (item.activities) {
+      const activities = document.createElement("div");
+      activities.className = "edu-meta";
+      activities.textContent = `Activities: ${item.activities}`;
+      entry.appendChild(activities);
+    }
+
+    elements.educationList.appendChild(entry);
   });
   return true;
 }

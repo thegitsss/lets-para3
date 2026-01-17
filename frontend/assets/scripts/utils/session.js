@@ -211,10 +211,12 @@
           if (!resolvedUser && shouldPreserveStoredSession()) {
             resolvedUser = readStoredUserRaw();
           }
-          cachedUser = resolvedUser;
-          syncStoredUser(resolvedUser);
-          applyThemeFromUser(resolvedUser);
-          applyFontSizeFromUser(resolvedUser);
+          const storedSnapshot = readStoredUserRaw();
+          const mergedUser = mergeStoredUser(storedSnapshot, resolvedUser);
+          cachedUser = mergedUser;
+          syncStoredUser(mergedUser);
+          applyThemeFromUser(mergedUser);
+          applyFontSizeFromUser(mergedUser);
           if (typeof document !== "undefined") {
             if (document.readyState === "loading") {
               document.addEventListener("DOMContentLoaded", () => injectBetaFooter(resolvedUser), { once: true });
@@ -434,6 +436,19 @@
 
   function normalizeRole(user) {
     return String(user?.role || "").toLowerCase();
+  }
+
+  function mergeStoredUser(stored, serverUser) {
+    if (!stored) return serverUser;
+    if (!serverUser) return stored;
+    const merged = { ...stored, ...serverUser };
+    if (stored.preferences || serverUser.preferences) {
+      merged.preferences = { ...(stored.preferences || {}), ...(serverUser.preferences || {}) };
+    }
+    if (typeof serverUser.isFirstLogin !== "boolean" && typeof stored.isFirstLogin === "boolean") {
+      merged.isFirstLogin = stored.isFirstLogin;
+    }
+    return merged;
   }
 
   function persistStoredUser(user) {

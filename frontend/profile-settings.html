@@ -8,6 +8,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Account Settings – Let’s-ParaConnect</title>
+
   <script>
     (function () {
       const root = document.documentElement;
@@ -1078,6 +1079,195 @@ label {
       min-width: 110px;
     }
 
+    .education-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10, 15, 25, 0.6);
+      display: none;
+      z-index: 13000;
+    }
+
+    .education-modal-overlay.is-active {
+      display: block;
+    }
+
+    .education-modal {
+      position: fixed;
+      inset: 0;
+      margin: auto;
+      width: min(720px, 92vw);
+      max-height: 86vh;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 30px 60px rgba(15, 23, 42, 0.3);
+      display: none;
+      z-index: 13001;
+      overflow: hidden;
+    }
+
+    .education-modal.is-active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .education-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .education-modal-header h3 {
+      font-family: var(--font-serif);
+      font-size: 1.4rem;
+      margin: 0;
+      color: var(--navy);
+      font-weight: 500;
+    }
+
+    .education-modal-close {
+      border: none;
+      background: transparent;
+      color: #8a94a6;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+
+    .education-modal-body {
+      padding: 18px 22px 8px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .education-entry {
+      padding: 16px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #fbfbfd;
+    }
+
+    .education-entry-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .education-entry-title {
+      font-weight: 500;
+      color: var(--navy);
+      margin: 0;
+    }
+
+    .education-entry-remove {
+      border: none;
+      background: transparent;
+      color: #d14343;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .education-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px 16px;
+    }
+
+    .education-form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .education-form-row label {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .education-form-row input,
+    .education-form-row select,
+    .education-form-row textarea {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: #ffffff;
+    }
+
+    .education-form-row textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+
+    .education-date-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .education-form-span {
+      grid-column: 1 / -1;
+    }
+
+    .education-modal-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 22px 20px;
+      border-top: 1px solid var(--line);
+    }
+
+    .education-modal-actions .btn {
+      min-width: 120px;
+    }
+
+    body.theme-dark .education-modal,
+    body.theme-mountain-dark .education-modal {
+      background: #151b29;
+      color: var(--ink);
+      box-shadow: 0 26px 60px rgba(4, 6, 12, 0.7);
+    }
+
+    body.theme-dark .education-modal-overlay,
+    body.theme-mountain-dark .education-modal-overlay {
+      background: rgba(5, 8, 14, 0.72);
+    }
+
+    body.theme-dark .education-modal-header,
+    body.theme-mountain-dark .education-modal-header {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    body.theme-dark .education-modal-header h3,
+    body.theme-mountain-dark .education-modal-header h3 {
+      color: var(--ink);
+    }
+
+    body.theme-dark .education-modal-close,
+    body.theme-mountain-dark .education-modal-close {
+      color: var(--muted);
+    }
+
+    body.theme-dark .education-entry,
+    body.theme-mountain-dark .education-entry {
+      background: rgba(12, 16, 24, 0.9);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
+    body.theme-dark .education-entry-title,
+    body.theme-mountain-dark .education-entry-title {
+      color: var(--ink);
+    }
+
+    body.theme-dark .education-modal-actions,
+    body.theme-mountain-dark .education-modal-actions {
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
     #paralegalSettings .language-row .language-name,
     #paralegalSettings .language-row .language-level {
       width: 100%;
@@ -1661,6 +1851,19 @@ input[type="number"],
       align-items: center;
     }
 
+    #paralegalSettings .avatar-actions {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      margin-top: -12px;
+    }
+
+    #paralegalSettings .avatar-remove-btn {
+      padding: 6px 14px;
+      font-size: 0.85rem;
+    }
+
     #paralegalSettings .hero-photo-shell {
       display: flex;
       justify-content: center;
@@ -2178,6 +2381,130 @@ input[type="number"],
     #paralegalSettings textarea:disabled,
     #paralegalSettings select:disabled {
       background-image: none;
+    }
+
+    .profile-tour-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      z-index: 12000;
+      pointer-events: none;
+      --spot-x: 0px;
+      --spot-y: 0px;
+      --spot-w: 0px;
+      --spot-h: 0px;
+    }
+
+    .profile-tour-overlay.is-active {
+      display: block;
+    }
+
+    .profile-tour-overlay::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 15, 25, 0.6);
+    }
+
+    .profile-tour-overlay.spotlight::before {
+      background: transparent;
+    }
+
+    .profile-tour-overlay.spotlight::after {
+      content: "";
+      position: absolute;
+      left: var(--spot-x);
+      top: var(--spot-y);
+      width: var(--spot-w);
+      height: var(--spot-h);
+      border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(10, 15, 25, 0.6);
+    }
+
+    .profile-tour-tooltip {
+      position: fixed;
+      max-width: 280px;
+      background: #ffffff;
+      border-radius: 14px;
+      padding: 16px 18px 14px;
+      box-shadow: 0 18px 38px rgba(15, 23, 42, 0.25);
+      display: none;
+      z-index: 12001;
+      pointer-events: auto;
+    }
+
+    .profile-tour-tooltip.is-active {
+      display: block;
+    }
+
+    .profile-tour-tooltip::after {
+      content: "";
+      position: absolute;
+      top: var(--arrow-top, 18px);
+      border-width: 8px;
+      border-style: solid;
+    }
+
+    .profile-tour-tooltip.arrow-left::after {
+      left: -8px;
+      border-color: transparent #ffffff transparent transparent;
+    }
+
+    .profile-tour-tooltip.arrow-right::after {
+      right: -8px;
+      border-color: transparent transparent transparent #ffffff;
+    }
+
+    .profile-tour-title {
+      font-size: 1.02rem;
+      font-weight: 500;
+      color: var(--navy);
+      margin: 0 0 6px;
+    }
+
+    .profile-tour-text {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+
+    .profile-tour-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .profile-tour-btn {
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--navy);
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-weight: 300;
+      cursor: pointer;
+    }
+
+    .profile-tour-btn.primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: transparent;
+    }
+
+    .profile-tour-close {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      border: none;
+      background: transparent;
+      color: #8a94a6;
+      font-size: 1.1rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .profile-tour-close:hover {
+      color: #4b5563;
     }
 
     @media (max-width: 960px) {
@@ -2942,6 +3269,9 @@ input[type="number"],
                   </div>
                 </div>
                 <input type="file" id="avatarInput" accept="image/*" hidden />
+                <div class="avatar-actions">
+                  <button type="button" class="btn btn-outline avatar-remove-btn hidden" id="removeAvatarBtn">Remove photo</button>
+                </div>
                 <div class="profile-meta-stack">
                   <div class="profile-meta-columns">
                     <div class="meta-column">
@@ -3021,6 +3351,24 @@ input[type="number"],
                 <div class="section-edit" data-section-edit="languages">
                   <div id="languagesEditor" class="language-editor"></div>
                   <button type="button" class="btn btn-outline" id="addLanguageBtn">Add language</button>
+                </div>
+              </article>
+
+              <article class="profile-section section-editable" id="stateExperienceCard" data-edit-section="stateExperience">
+                <div class="section-header">
+                  <span class="card-header-label">State Experience</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="stateExperience" aria-label="Edit state experience" aria-pressed="false">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M3 14.5V17h2.5l7.4-7.4-2.5-2.5L3 14.5z" fill="currentColor"/>
+                      <path d="M14.7 2.8l2.5 2.5 1-1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1 1z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="section-display" data-section-display="stateExperience">
+                  <p id="stateExperienceDisplay" class="section-display-text"></p>
+                </div>
+                <div class="section-edit" data-section-edit="stateExperience">
+                  <input type="text" id="stateExperienceInput" placeholder="CA, NY, TX" />
                 </div>
               </article>
             </aside>
@@ -3456,6 +3804,33 @@ input[type="number"],
         <button class="btn btn-outline" type="button" id="cancelDeleteBtn">Cancel</button>
         <button class="btn danger-btn" type="button" id="confirmDeleteBtn">Delete account</button>
       </div>
+    </div>
+  </div>
+
+  <div class="education-modal-overlay" id="educationModalOverlay" aria-hidden="true"></div>
+  <div class="education-modal" id="educationModal" role="dialog" aria-modal="true" aria-labelledby="educationModalTitle">
+    <div class="education-modal-header">
+      <h3 id="educationModalTitle">Edit education</h3>
+      <button type="button" class="education-modal-close" id="educationModalClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="education-modal-body">
+      <div id="educationModalList"></div>
+      <button type="button" class="btn btn-outline" id="educationModalAdd">Add another education</button>
+    </div>
+    <div class="education-modal-actions">
+      <button type="button" class="btn btn-outline" id="educationModalCancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="educationModalSave">Save</button>
+    </div>
+  </div>
+
+  <div class="profile-tour-overlay" id="profileTourOverlay" aria-hidden="true"></div>
+  <div class="profile-tour-tooltip" id="profileTourTooltip" role="dialog" aria-live="polite">
+    <button type="button" class="profile-tour-close" id="profileTourCloseBtn" aria-label="Close tour">&times;</button>
+    <div class="profile-tour-title" id="profileTourTitle"></div>
+    <p class="profile-tour-text" id="profileTourText"></p>
+    <div class="profile-tour-actions">
+      <button type="button" class="profile-tour-btn" id="profileTourBackBtn">Back</button>
+      <button type="button" class="profile-tour-btn primary" id="profileTourNextBtn">Next</button>
     </div>
   </div>
 

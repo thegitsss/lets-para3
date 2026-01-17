@@ -84,6 +84,196 @@
       overflow: hidden;
     }
 
+    #user-name-heading::before {
+      content: ", ";
+    }
+
+    #user-name-heading:empty::before {
+      content: "";
+    }
+
+    .tour-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      z-index: 12000;
+      pointer-events: none;
+      --spot-x: 0px;
+      --spot-y: 0px;
+      --spot-w: 0px;
+      --spot-h: 0px;
+    }
+
+    .tour-overlay.is-active {
+      display: block;
+    }
+
+    .tour-overlay::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 15, 25, 0.6);
+    }
+
+    .tour-overlay.spotlight::before {
+      background: transparent;
+    }
+
+    .tour-overlay.spotlight::after {
+      content: "";
+      position: absolute;
+      left: var(--spot-x);
+      top: var(--spot-y);
+      width: var(--spot-w);
+      height: var(--spot-h);
+      border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(10, 15, 25, 0.6);
+    }
+
+    .tour-modal {
+      width: min(420px, 92vw);
+      background: #ffffff;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+      text-align: center;
+      position: relative;
+      display: none;
+      z-index: 12001;
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .tour-modal.is-active {
+      display: block;
+    }
+
+    .tour-hero {
+      height: 150px;
+      background-image: url("hero-mountain.jpg");
+      background-size: cover;
+      background-position: center;
+    }
+
+    .tour-content {
+      padding: 22px 26px 28px;
+    }
+
+    .tour-title {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      color: var(--navy);
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .tour-text {
+      color: var(--muted);
+      font-size: 0.98rem;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .tour-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .tour-btn {
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--navy);
+      padding: 10px 20px;
+      border-radius: 999px;
+      font-weight: 300;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .tour-btn.primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: transparent;
+      box-shadow: 0 12px 24px rgba(182, 164, 122, 0.35);
+    }
+
+    .tour-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .tour-btn.ghost {
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .tour-tooltip {
+      position: fixed;
+      max-width: 240px;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 16px 35px rgba(15, 23, 42, 0.25);
+      display: none;
+      z-index: 12001;
+    }
+
+    .tour-tooltip.is-active {
+      display: block;
+    }
+
+    .tour-tooltip::after {
+      content: "";
+      position: absolute;
+      left: -8px;
+      top: var(--arrow-top, 18px);
+      border-width: 8px;
+      border-style: solid;
+      border-color: transparent #ffffff transparent transparent;
+    }
+
+    .tour-tooltip p {
+      margin: 0 0 10px;
+      color: var(--navy);
+      font-weight: 400;
+    }
+
+    .tour-step-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .tour-highlight {
+      position: relative;
+      z-index: 12002;
+      color: #f8fafc;
+      text-shadow: 0 6px 18px rgba(15, 23, 42, 0.6);
+    }
+
+    .sidebar nav a.tour-highlight {
+      color: #f8fafc !important;
+    }
+
+    .tour-close {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      border: none;
+      background: transparent;
+      color: #8a94a6;
+      font-size: 1.1rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .tour-close:hover {
+      color: #4b5563;
+    }
+
     .sidebar {
       width: 240px;
       background: var(--sidebar-bg);
@@ -1991,7 +2181,7 @@
     <nav>
       <a href="#home" class="active" data-view-link="home">Home</a>
       <a href="#cases" data-view-link="cases">Cases and Applications</a>
-      <a href="profile-settings.html">Profile Settings</a>
+      <a href="profile-settings.html" id="profileSettingsLink">Profile Settings</a>
       <a href="help.html">Help</a>
     </nav>
     <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
@@ -2011,7 +2201,7 @@
 
     <div id="paralegalHomeView" class="dashboard-view is-active">
       <header>
-        <h1><span id="welcomeGreeting">Welcome back</span>, <span id="user-name-heading" data-field="name">Taylor</span></h1>
+        <h1><span id="welcomeGreeting">Welcome</span><span id="user-name-heading" data-field="name"></span></h1>
         <p><span data-field="welcomeSubheading"></span></p>
       </header>
 
@@ -2157,6 +2347,28 @@
           </div>
         </div>
       </section>
+    </div>
+    <div class="tour-overlay" id="paralegalTourOverlay" aria-hidden="true"></div>
+    <div class="tour-modal" id="paralegalTourModal" role="dialog" aria-modal="true" aria-labelledby="tourTitle" aria-describedby="tourText">
+      <button type="button" class="tour-close" id="tourCloseBtn" aria-label="Close tour">×</button>
+      <div class="tour-hero" role="presentation"></div>
+      <div class="tour-content">
+        <div class="tour-title" id="tourTitle">Welcome to Let’s-ParaConnect</div>
+        <p class="tour-text" id="tourText">
+          You’re about to take a short tour of your new dashboard. We’ll start by setting up your profile.
+        </p>
+        <div class="tour-actions">
+          <button type="button" class="tour-btn primary" id="startTourBtn">Let’s start</button>
+        </div>
+      </div>
+    </div>
+    <div class="tour-tooltip" id="profileTourTooltip" role="dialog" aria-live="polite">
+      <button type="button" class="tour-close" id="tourTooltipCloseBtn" aria-label="Close tour">×</button>
+      <p>Set up your profile here.</p>
+      <div class="tour-step-actions">
+        <button type="button" class="tour-btn ghost" id="tourBackBtn">Back</button>
+        <button type="button" class="tour-btn primary" id="tourNextBtn">Next</button>
+      </div>
     </div>
   </main>
   <template id="assignmentCardTemplate">

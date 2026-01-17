@@ -1,6 +1,14 @@
 import { secureFetch, persistSession, getStoredSession } from "./auth.js";
 import { STRIPE_GATE_MESSAGE } from "./utils/stripe-connect.js";
 
+const DEFAULT_AVATAR_DATA = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+  `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>
+    <rect width='220' height='220' rx='110' fill='#f1f5f9'/>
+    <circle cx='110' cy='90' r='46' fill='#cbd5e1'/>
+    <path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/>
+  </svg>`
+)}`;
+
 document.addEventListener("DOMContentLoaded", () => {
   const navItems = {
     navProfile: "profileSection",
@@ -818,6 +826,7 @@ let settingsState = {
   education: [],
   awards: [],
   highlightedSkills: [],
+  stateExperience: [],
   linkedInURL: "",
   notificationPrefs: { email: true, emailMessages: true, emailCase: true, sms: false },
   digestFrequency: "off",
@@ -935,6 +944,15 @@ const languagesEditor = document.getElementById("languagesEditor");
 const addLanguageBtn = document.getElementById("addLanguageBtn");
 const educationEditor = document.getElementById("educationEditor");
 const addEducationBtn = document.getElementById("addEducationBtn");
+const educationModalOverlay = document.getElementById("educationModalOverlay");
+const educationModal = document.getElementById("educationModal");
+const educationModalList = document.getElementById("educationModalList");
+const educationModalAdd = document.getElementById("educationModalAdd");
+const educationModalSave = document.getElementById("educationModalSave");
+const educationModalCancel = document.getElementById("educationModalCancel");
+const educationModalClose = document.getElementById("educationModalClose");
+let educationModalBound = false;
+let educationModalOpen = false;
 
 if (addLanguageBtn && languagesEditor) {
   addLanguageBtn.addEventListener("click", () => addLanguageRow());
@@ -976,6 +994,7 @@ function seedSettingsState(user = {}) {
   settingsState.education = user.education || [];
   settingsState.awards = user.awards || [];
   settingsState.highlightedSkills = user.highlightedSkills || user.skills || [];
+  settingsState.stateExperience = user.stateExperience || [];
   settingsState.linkedInURL = user.linkedInURL || "";
   settingsState.notificationPrefs = {
     email: true,
@@ -1015,6 +1034,7 @@ function initParalegalSettings(user = {}) {
   hydrateProfileForm(user);
   seedSettingsState(user);
   initParalegalSectionEditing();
+  bindEducationModal();
   hydrateParalegalNotificationPrefs(user);
   bindParalegalNotificationToggles();
   hydrateParalegalVisibilityPref(user);
@@ -1030,6 +1050,161 @@ function initParalegalSettings(user = {}) {
   try { loadLinkedIn(user); } catch {}
   try { loadNotifications(user); } catch {}
   syncCluster(user);
+  setTimeout(() => initParalegalProfileTour(user), 300);
+}
+
+let profileTourInitialized = false;
+
+function getProfileTourKey(user) {
+  const id = String(user?.id || user?._id || "").trim();
+  return id ? `lpc_paralegal_profile_tour_${id}` : "";
+}
+
+function hasCompletedProfileTour(user) {
+  const key = getProfileTourKey(user);
+  if (!key) return false;
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markProfileTourCompleted(user) {
+  const key = getProfileTourKey(user);
+  if (!key) return;
+  try {
+    localStorage.setItem(key, "1");
+  } catch {}
+}
+
+function initParalegalProfileTour(user = {}) {
+  if (profileTourInitialized) return;
+  profileTourInitialized = true;
+  if (String(user?.role || "").toLowerCase() !== "paralegal") return;
+
+  const overlay = document.getElementById("profileTourOverlay");
+  const tooltip = document.getElementById("profileTourTooltip");
+  const titleEl = document.getElementById("profileTourTitle");
+  const textEl = document.getElementById("profileTourText");
+  const closeBtn = document.getElementById("profileTourCloseBtn");
+  const backBtn = document.getElementById("profileTourBackBtn");
+  const nextBtn = document.getElementById("profileTourNextBtn");
+  if (!overlay || !tooltip || !titleEl || !textEl || !closeBtn || !backBtn || !nextBtn) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const forceTour = params.get("tour") === "1";
+  if (!forceTour && hasCompletedProfileTour(user)) return;
+
+  const steps = [
+    {
+      id: "educationCard",
+      title: "Education",
+      text: "List where you attended school and any legal training or certifications.",
+    },
+    {
+      id: "bioSection",
+      title: "Bio",
+      text: "Share a short overview of your background, specialties, and the types of matters you support.",
+    },
+    {
+      id: "languagesRow",
+      title: "Languages",
+      text: "List the languages you know and select your experience level.",
+    },
+    {
+      id: "profileSaveBtn",
+      title: "Save changes",
+      text: "Save your updates so your profile stays current.",
+    },
+    {
+      id: "previewProfileBtn",
+      title: "View profile",
+      text: "Preview the profile attorneys will see. We are in pre-launch, so attorneys are not onboarded yet. You will be emailed when onboarding begins.",
+    },
+  ];
+
+  let activeIndex = 0;
+
+  const clearTour = () => {
+    overlay.classList.remove("is-active", "spotlight");
+    overlay.setAttribute("aria-hidden", "true");
+    tooltip.classList.remove("is-active", "arrow-left", "arrow-right");
+    markProfileTourCompleted(user);
+    if (forceTour) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  };
+
+  const positionTooltip = (target) => {
+    const rect = target.getBoundingClientRect();
+    const tipRect = tooltip.getBoundingClientRect();
+    let left = rect.right + 16;
+    let arrowClass = "arrow-left";
+    if (left + tipRect.width > window.innerWidth - 16) {
+      left = rect.left - tipRect.width - 16;
+      arrowClass = "arrow-right";
+    }
+    const top = Math.max(
+      12,
+      Math.min(window.innerHeight - tipRect.height - 12, rect.top + rect.height / 2 - tipRect.height / 2)
+    );
+    tooltip.style.left = `${Math.max(12, left)}px`;
+    tooltip.style.top = `${top}px`;
+    tooltip.classList.remove("arrow-left", "arrow-right");
+    tooltip.classList.add(arrowClass);
+    const arrowTop = Math.max(16, Math.min(tipRect.height - 20, rect.top + rect.height / 2 - top - 8));
+    tooltip.style.setProperty("--arrow-top", `${arrowTop}px`);
+  };
+
+  const positionSpotlight = (target) => {
+    const rect = target.getBoundingClientRect();
+    const padding = 10;
+    overlay.style.setProperty("--spot-x", `${rect.left - padding}px`);
+    overlay.style.setProperty("--spot-y", `${rect.top - padding}px`);
+    overlay.style.setProperty("--spot-w", `${rect.width + padding * 2}px`);
+    overlay.style.setProperty("--spot-h", `${rect.height + padding * 2}px`);
+  };
+
+  const showStep = (index) => {
+    const step = steps[index];
+    if (!step) {
+      clearTour();
+      return;
+    }
+    const target = document.getElementById(step.id);
+    if (!target) {
+      showStep(index + 1);
+      return;
+    }
+    activeIndex = index;
+    titleEl.textContent = step.title;
+    textEl.textContent = step.text;
+    backBtn.style.visibility = index === 0 ? "hidden" : "visible";
+    backBtn.disabled = index === 0;
+    nextBtn.textContent = index === steps.length - 1 ? "Finish" : "Next";
+    overlay.classList.add("is-active", "spotlight");
+    overlay.setAttribute("aria-hidden", "false");
+    tooltip.classList.add("is-active");
+    requestAnimationFrame(() => {
+      positionSpotlight(target);
+      positionTooltip(target);
+    });
+  };
+
+  closeBtn.addEventListener("click", clearTour);
+  backBtn.addEventListener("click", () => showStep(activeIndex - 1));
+  nextBtn.addEventListener("click", () => {
+    if (activeIndex >= steps.length - 1) {
+      clearTour();
+    } else {
+      showStep(activeIndex + 1);
+    }
+  });
+
+  window.addEventListener("resize", () => showStep(activeIndex));
+
+  showStep(0);
 }
 
 function showParalegalSettings() {
@@ -1382,7 +1557,8 @@ function updateBestForEditingState() {
 
 function formatEducationEntry(entry = {}) {
   const pieces = [];
-  if (entry.degree) pieces.push(entry.degree);
+  const titleBits = [entry.degree, entry.fieldOfStudy].filter(Boolean);
+  if (titleBits.length) pieces.push(titleBits.join(", "));
   if (entry.school) pieces.push(entry.school);
   const startParts = [entry.startMonth, entry.startYear].filter(Boolean).join(" ");
   const endParts = [entry.endMonth, entry.endYear].filter(Boolean).join(" ");
@@ -1430,6 +1606,17 @@ function refreshParalegalSectionDisplays() {
       skillsDisplay,
       lines.join("\n"),
       "No skills or focus areas listed."
+    );
+  }
+
+  const stateExperienceDisplay = document.getElementById("stateExperienceDisplay");
+  const stateExperienceInput = document.getElementById("stateExperienceInput");
+  if (stateExperienceDisplay) {
+    const states = parseCommaList(stateExperienceInput?.value || "");
+    setSectionDisplayText(
+      stateExperienceDisplay,
+      states.join(", "),
+      "No state experience listed."
     );
   }
 
@@ -1489,6 +1676,11 @@ function initParalegalSectionEditing() {
       toggle.addEventListener("click", () => {
         const targetKey = toggle.dataset.editToggle;
         if (!targetKey) return;
+        if (targetKey === "education") {
+          setActiveParalegalSection(null);
+          openEducationModal();
+          return;
+        }
         const nextKey = activeParalegalSection === targetKey ? null : targetKey;
         setActiveParalegalSection(nextKey);
       });
@@ -1533,18 +1725,7 @@ function loadAvatarPreview({ preview, frame, initials, url, fallbackText = "" } 
     if (initials && fallbackText) initials.textContent = fallbackText;
     return;
   }
-
-  if (!url) {
-    preview.hidden = true;
-    preview.classList.remove("is-loaded");
-    preview.removeAttribute("src");
-    frame?.classList.remove("has-photo");
-    if (initials) {
-      initials.style.display = "flex";
-      if (fallbackText) initials.textContent = fallbackText;
-    }
-    return;
-  }
+  const resolvedUrl = url || DEFAULT_AVATAR_DATA;
 
   preview.hidden = false;
   preview.classList.remove("is-loaded");
@@ -1568,7 +1749,7 @@ function loadAvatarPreview({ preview, frame, initials, url, fallbackText = "" } 
 
   preview.addEventListener("load", markLoaded, { once: true });
   preview.addEventListener("error", handleError, { once: true });
-  preview.src = url;
+  preview.src = resolvedUrl;
   if (preview.complete && preview.naturalWidth > 0) {
     markLoaded();
   }
@@ -2038,7 +2219,10 @@ function normalizeEducationEntry(entry) {
       startYear: "",
       endMonth: "",
       endYear: "",
-      degree: ""
+      degree: "",
+      fieldOfStudy: "",
+      grade: "",
+      activities: ""
     };
   }
   if (typeof entry === "string") {
@@ -2048,7 +2232,10 @@ function normalizeEducationEntry(entry) {
       startYear: "",
       endMonth: "",
       endYear: "",
-      degree: ""
+      degree: "",
+      fieldOfStudy: "",
+      grade: "",
+      activities: ""
     };
   }
   return {
@@ -2057,7 +2244,10 @@ function normalizeEducationEntry(entry) {
     startYear: entry.startYear || entry.beginYear || "",
     endMonth: entry.endMonth || entry.finishMonth || "",
     endYear: entry.endYear || entry.finishYear || "",
-    degree: entry.degree || ""
+    degree: entry.degree || "",
+    fieldOfStudy: entry.fieldOfStudy || entry.field || "",
+    grade: entry.grade || "",
+    activities: entry.activities || entry.activitiesAndSocieties || ""
   };
 }
 
@@ -2104,7 +2294,11 @@ function createEducationMonthSelect(value, placeholderLabel) {
   EDUCATION_MONTH_OPTIONS.forEach((opt) => {
     const option = document.createElement("option");
     option.value = opt.value;
-    option.textContent = opt.label || placeholderLabel;
+    if (!opt.value && placeholderLabel) {
+      option.textContent = placeholderLabel;
+    } else {
+      option.textContent = opt.label || placeholderLabel || "";
+    }
     select.appendChild(option);
   });
   select.value = value || "";
@@ -2116,6 +2310,9 @@ function addEducationRow(entry = {}) {
   const row = document.createElement("div");
   row.className = "education-row";
   row.dataset.degree = entry.degree || "";
+  row.dataset.fieldOfStudy = entry.fieldOfStudy || "";
+  row.dataset.grade = entry.grade || "";
+  row.dataset.activities = entry.activities || "";
 
   const schoolInput = document.createElement("input");
   schoolInput.type = "text";
@@ -2199,7 +2396,10 @@ function collectEducationFromEditor() {
       const endMonth = row.querySelector(".education-end-month")?.value || "";
       const endYear = row.querySelector(".education-end-year")?.value || "";
       const degree = row.dataset.degree || "";
-      if (!school && !startYear && !endYear && !startMonth && !endMonth) {
+      const fieldOfStudy = row.dataset.fieldOfStudy || "";
+      const grade = row.dataset.grade || "";
+      const activities = row.dataset.activities || "";
+      if (!school && !startYear && !endYear && !startMonth && !endMonth && !degree && !fieldOfStudy && !grade && !activities) {
         return null;
       }
       const entry = {
@@ -2210,9 +2410,243 @@ function collectEducationFromEditor() {
         endYear
       };
       if (degree) entry.degree = degree;
+      if (fieldOfStudy) entry.fieldOfStudy = fieldOfStudy;
+      if (grade) entry.grade = grade;
+      if (activities) entry.activities = activities;
       return entry;
     })
     .filter(Boolean);
+}
+
+function buildEducationModalField({ label, field, placeholder, value, type = "text", span = false, isTextarea = false }) {
+  const row = document.createElement("div");
+  row.className = "education-form-row";
+  if (span) row.classList.add("education-form-span");
+
+  const labelEl = document.createElement("label");
+  labelEl.textContent = label;
+
+  const input = isTextarea ? document.createElement("textarea") : document.createElement("input");
+  if (!isTextarea) input.type = type;
+  input.placeholder = placeholder || "";
+  input.value = value || "";
+  input.setAttribute("data-field", field);
+
+  row.appendChild(labelEl);
+  row.appendChild(input);
+  return row;
+}
+
+function buildEducationDateRow({ label, monthField, yearField, monthValue, yearValue }) {
+  const row = document.createElement("div");
+  row.className = "education-form-row";
+
+  const labelEl = document.createElement("label");
+  labelEl.textContent = label;
+
+  const grid = document.createElement("div");
+  grid.className = "education-date-grid";
+  const monthSelect = createEducationMonthSelect(monthValue, "Month");
+  monthSelect.setAttribute("data-field", monthField);
+  const yearInput = document.createElement("input");
+  yearInput.type = "number";
+  yearInput.placeholder = "Year";
+  yearInput.value = yearValue || "";
+  yearInput.min = "1900";
+  yearInput.max = "2100";
+  yearInput.setAttribute("data-field", yearField);
+  grid.appendChild(monthSelect);
+  grid.appendChild(yearInput);
+
+  row.appendChild(labelEl);
+  row.appendChild(grid);
+  return row;
+}
+
+function buildEducationModalEntry(entry = {}) {
+  const normalized = normalizeEducationEntry(entry);
+  const card = document.createElement("div");
+  card.className = "education-entry";
+
+  const header = document.createElement("div");
+  header.className = "education-entry-header";
+
+  const title = document.createElement("h4");
+  title.className = "education-entry-title";
+  title.textContent = "Education";
+
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "education-entry-remove";
+  removeBtn.textContent = "Remove";
+  removeBtn.setAttribute("aria-label", "Remove education");
+  removeBtn.addEventListener("click", () => {
+    card.remove();
+    updateEducationEntryTitles();
+  });
+
+  header.appendChild(title);
+  header.appendChild(removeBtn);
+  card.appendChild(header);
+
+  const grid = document.createElement("div");
+  grid.className = "education-form-grid";
+  grid.appendChild(
+    buildEducationModalField({
+      label: "School *",
+      field: "school",
+      placeholder: "Ex: Boston University",
+      value: normalized.school,
+      span: true
+    })
+  );
+  grid.appendChild(
+    buildEducationModalField({
+      label: "Degree",
+      field: "degree",
+      placeholder: "Ex: Bachelor's",
+      value: normalized.degree
+    })
+  );
+  grid.appendChild(
+    buildEducationModalField({
+      label: "Field of study",
+      field: "fieldOfStudy",
+      placeholder: "Ex: Business",
+      value: normalized.fieldOfStudy
+    })
+  );
+  grid.appendChild(
+    buildEducationDateRow({
+      label: "Start date",
+      monthField: "startMonth",
+      yearField: "startYear",
+      monthValue: normalized.startMonth,
+      yearValue: normalized.startYear
+    })
+  );
+  grid.appendChild(
+    buildEducationDateRow({
+      label: "End date (or expected)",
+      monthField: "endMonth",
+      yearField: "endYear",
+      monthValue: normalized.endMonth,
+      yearValue: normalized.endYear
+    })
+  );
+  grid.appendChild(
+    buildEducationModalField({
+      label: "Grade",
+      field: "grade",
+      placeholder: "Ex: 3.8 GPA",
+      value: normalized.grade
+    })
+  );
+  grid.appendChild(
+    buildEducationModalField({
+      label: "Activities and societies",
+      field: "activities",
+      placeholder: "Ex: Alpha Phi Omega, Marching Band, Volleyball",
+      value: normalized.activities,
+      span: true,
+      isTextarea: true
+    })
+  );
+
+  card.appendChild(grid);
+  return card;
+}
+
+function updateEducationEntryTitles() {
+  if (!educationModalList) return;
+  const entries = educationModalList.querySelectorAll(".education-entry");
+  entries.forEach((entry, index) => {
+    const title = entry.querySelector(".education-entry-title");
+    if (title) title.textContent = `Education ${index + 1}`;
+  });
+}
+
+function renderEducationModalEntries(education = []) {
+  if (!educationModalList) return;
+  educationModalList.innerHTML = "";
+  const entries =
+    Array.isArray(education) && education.length
+      ? education.map((entry) => normalizeEducationEntry(entry))
+      : [normalizeEducationEntry()];
+  entries.forEach((entry) => educationModalList.appendChild(buildEducationModalEntry(entry)));
+  updateEducationEntryTitles();
+}
+
+function collectEducationFromModal() {
+  if (!educationModalList) return settingsState.education || [];
+  const entries = [];
+  educationModalList.querySelectorAll(".education-entry").forEach((entryEl) => {
+    const data = {};
+    entryEl.querySelectorAll("[data-field]").forEach((fieldEl) => {
+      const field = fieldEl.getAttribute("data-field");
+      if (!field) return;
+      const value = typeof fieldEl.value === "string" ? fieldEl.value.trim() : "";
+      data[field] = value;
+    });
+    const hasContent = Object.values(data).some((value) => String(value || "").trim().length > 0);
+    if (hasContent) entries.push(normalizeEducationEntry(data));
+  });
+  return entries;
+}
+
+function openEducationModal() {
+  if (!educationModalOverlay || !educationModal) return;
+  bindEducationModal();
+  const current = collectEducationFromEditor();
+  const entries = current.length ? current : settingsState.education || [];
+  renderEducationModalEntries(entries);
+  educationModalOverlay.classList.add("is-active");
+  educationModalOverlay.setAttribute("aria-hidden", "false");
+  educationModal.classList.add("is-active");
+  educationModalOpen = true;
+  const firstInput = educationModalList?.querySelector("[data-field='school']");
+  if (firstInput) {
+    setTimeout(() => firstInput.focus(), 0);
+  }
+}
+
+function closeEducationModal() {
+  if (!educationModalOverlay || !educationModal) return;
+  educationModalOverlay.classList.remove("is-active");
+  educationModalOverlay.setAttribute("aria-hidden", "true");
+  educationModal.classList.remove("is-active");
+  educationModalOpen = false;
+}
+
+function bindEducationModal() {
+  if (educationModalBound) return;
+  if (!educationModalOverlay || !educationModal) return;
+  educationModalBound = true;
+
+  educationModalOverlay.addEventListener("click", (evt) => {
+    if (evt.target === educationModalOverlay) {
+      closeEducationModal();
+    }
+  });
+  educationModalClose?.addEventListener("click", closeEducationModal);
+  educationModalCancel?.addEventListener("click", closeEducationModal);
+  educationModalAdd?.addEventListener("click", () => {
+    if (!educationModalList) return;
+    educationModalList.appendChild(buildEducationModalEntry(normalizeEducationEntry()));
+    updateEducationEntryTitles();
+  });
+  educationModalSave?.addEventListener("click", () => {
+    const entries = collectEducationFromModal();
+    settingsState.education = entries;
+    renderEducationEditor(entries);
+    refreshParalegalSectionDisplays();
+    closeEducationModal();
+  });
+  document.addEventListener("keydown", (evt) => {
+    if (evt.key === "Escape" && educationModalOpen) {
+      closeEducationModal();
+    }
+  });
 }
 
 function getCachedUser() {
@@ -2318,8 +2752,11 @@ function enforceUnifiedRoleStyling(user = {}) {
 }
 
 function applyAvatar(user) {
-  if (!user?.profileImage) return;
-  const cacheBusted = `${user.profileImage}${user.profileImage.includes("?") ? "&" : "?"}t=${Date.now()}`;
+  const rawUrl = user?.profileImage || user?.avatarURL || settingsState.profileImage || "";
+  const resolvedUrl = rawUrl || DEFAULT_AVATAR_DATA;
+  const cacheBusted = rawUrl
+    ? `${rawUrl}${rawUrl.includes("?") ? "&" : "?"}t=${Date.now()}`
+    : resolvedUrl;
 
   const header = document.getElementById("headerAvatar");
   if (header) header.src = cacheBusted;
@@ -2348,6 +2785,7 @@ function applyAvatar(user) {
     el.src = cacheBusted;
   });
 
+  updateAvatarRemoveButton(user);
 }
 
 function renderFallback(sectionId, title) {
@@ -2440,6 +2878,8 @@ async function loadSettings() {
       const skillsInput = document.getElementById("skillsInput");
       const skillValues = user.highlightedSkills || user.skills || [];
       if (skillsInput) skillsInput.value = skillValues.join(", ");
+      const stateExperienceInput = document.getElementById("stateExperienceInput");
+      if (stateExperienceInput) stateExperienceInput.value = (user.stateExperience || []).join(", ");
       renderExperienceRows(Array.isArray(user.experience) ? user.experience : []);
       bindExperienceAddButton();
       renderEducationEditor(user.education || []);
@@ -2505,6 +2945,12 @@ function hydrateProfileForm(user = {}) {
         ? user.skills
         : [];
     if (skillsInput) skillsInput.value = skillsSource.join(", ");
+    const stateExperienceInput = document.getElementById("stateExperienceInput");
+    if (stateExperienceInput) {
+      stateExperienceInput.value = Array.isArray(user.stateExperience)
+        ? user.stateExperience.join(", ")
+        : "";
+    }
     renderBestForList(Array.isArray(user.bestFor) ? user.bestFor : [], { editable: false });
     renderExperienceRows(Array.isArray(user.experience) ? user.experience : []);
     bindExperienceAddButton();
@@ -3079,6 +3525,7 @@ async function saveSettings() {
   const yearsExperienceInput = document.getElementById("yearsExperienceInput");
   const practiceAreasInput = document.getElementById("practiceAreasInput");
   const skillsInput = document.getElementById("skillsInput");
+  const stateExperienceInput = document.getElementById("stateExperienceInput");
   const resumeKeyInput = document.getElementById("resumeKeyInput");
   const certificateKeyInput = document.getElementById("certificateKeyInput");
   const writingSampleKeyInput = document.getElementById("writingSampleKeyInput");
@@ -3110,6 +3557,9 @@ async function saveSettings() {
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean)
+    : [];
+  body.stateExperience = stateExperienceInput
+    ? parseCommaList(stateExperienceInput.value)
     : [];
   body.bestFor = collectBestForEntries();
   body.skills = body.highlightedSkills;
@@ -3157,6 +3607,7 @@ async function saveSettings() {
   settingsState.education = updatedUser.education || [];
   settingsState.awards = updatedUser.awards || [];
   settingsState.highlightedSkills = updatedUser.highlightedSkills || updatedUser.skills || [];
+  settingsState.stateExperience = updatedUser.stateExperience || [];
   settingsState.linkedInURL = updatedUser.linkedInURL || "";
   settingsState.notificationPrefs = {
     email: true,
@@ -3181,6 +3632,7 @@ async function saveSettings() {
   window.updateSessionUser?.(mergedUser);
 
   applyAvatar?.(updatedUser);
+  updateAvatarRemoveButton(updatedUser);
   hydrateProfileForm(updatedUser);
   renderLanguageEditor(updatedUser.languages || []);
   bootstrapProfileSettings(updatedUser);
@@ -3210,6 +3662,7 @@ const avatarUploadConfigs = [
 ];
 
 function initAvatarUploaders() {
+  bindAvatarRemoval();
   avatarUploadConfigs.forEach((config) => {
     const frame = document.getElementById(config.frameId);
     const input = document.getElementById(config.inputId);
@@ -3225,6 +3678,51 @@ function initAvatarUploaders() {
     });
 
     input.addEventListener("change", () => handleAvatarUpload(config));
+  });
+}
+
+function updateAvatarRemoveButton(user = currentUser || {}) {
+  const removeBtn = document.getElementById("removeAvatarBtn");
+  if (!removeBtn) return;
+  const rawUrl = user.profileImage || user.avatarURL || settingsState.profileImage || "";
+  removeBtn.classList.toggle("hidden", !rawUrl);
+  removeBtn.disabled = !rawUrl;
+}
+
+function bindAvatarRemoval() {
+  const removeBtn = document.getElementById("removeAvatarBtn");
+  if (!removeBtn) return;
+  if (removeBtn.dataset.bound === "true") return;
+  removeBtn.dataset.bound = "true";
+  removeBtn.addEventListener("click", async () => {
+    if (!currentUser) return;
+    const originalLabel = removeBtn.textContent;
+    removeBtn.disabled = true;
+    removeBtn.textContent = "Removing…";
+    try {
+      const res = await secureFetch("/api/users/me", {
+        method: "PATCH",
+        body: { profileImage: "", avatarURL: "" }
+      });
+      const updatedUser = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(updatedUser?.error || "Unable to remove photo");
+      }
+      const mergedUser = mergeSessionPreferences(updatedUser);
+      currentUser = mergedUser;
+      settingsState.profileImage = "";
+      persistSession({ user: mergedUser });
+      window.updateSessionUser?.(mergedUser);
+      applyAvatar(mergedUser);
+      updateAvatarRemoveButton(mergedUser);
+      showToast("Profile photo removed.", "ok");
+    } catch (err) {
+      console.error("Unable to remove profile photo", err);
+      showToast(err.message || "Unable to remove photo.", "err");
+    } finally {
+      removeBtn.textContent = originalLabel;
+      updateAvatarRemoveButton(currentUser);
+    }
   });
 }
 
@@ -3250,6 +3748,7 @@ async function handleAvatarUpload(config) {
       persistSession({ user: updatedUser });
       window.updateSessionUser?.(updatedUser);
       applyAvatar(updatedUser);
+      updateAvatarRemoveButton(updatedUser);
       showToast("Profile photo updated!", "ok");
     }
   } catch (err) {

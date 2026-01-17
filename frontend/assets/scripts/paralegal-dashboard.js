@@ -790,14 +790,47 @@ function getStoredUserSnapshot() {
   }
 }
 
+function getTourKey(user) {
+  const id = String(user?.id || user?._id || "").trim();
+  return id ? `lpc_paralegal_tour_done_${id}` : "";
+}
+
+function hasCompletedTour(user) {
+  const key = getTourKey(user);
+  if (!key) return false;
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function markTourCompleted(user) {
+  const key = getTourKey(user);
+  if (!key) return;
+  try {
+    localStorage.setItem(key, "1");
+    const raw = localStorage.getItem("lpc_user");
+    if (raw) {
+      const stored = JSON.parse(raw);
+      if (stored && typeof stored === "object") {
+        stored.isFirstLogin = false;
+        localStorage.setItem("lpc_user", JSON.stringify(stored));
+      }
+    }
+  } catch {}
+}
+
 function updateWelcomeGreeting(user) {
   const greetingEl = selectors.welcomeGreeting;
   if (!greetingEl) return;
   const stored = getStoredUserSnapshot();
-  const storedFlag = stored?.isFirstLogin;
-  const userFlag = user?.isFirstLogin;
-  const isFirstLogin = typeof storedFlag === "boolean" ? storedFlag : Boolean(userFlag);
-  greetingEl.textContent = isFirstLogin ? "Welcome" : "Welcome back";
+  const tourCompleted = hasCompletedTour(user || stored);
+  if (!tourCompleted) {
+    greetingEl.textContent = "Welcome";
+    return;
+  }
+  greetingEl.textContent = "Welcome back";
 }
 
 function getWelcomeDismissKey(user) {
@@ -845,6 +878,103 @@ function applyParalegalWelcomeNotice(user) {
       markWelcomeDismissed(user || stored);
     });
   }
+}
+
+let tourInitialized = false;
+
+function initParalegalTour(user) {
+  if (tourInitialized) return;
+  tourInitialized = true;
+
+  const overlay = document.getElementById("paralegalTourOverlay");
+  const modal = document.getElementById("paralegalTourModal");
+  const tooltip = document.getElementById("profileTourTooltip");
+  const startBtn = document.getElementById("startTourBtn");
+  const closeBtn = document.getElementById("tourCloseBtn");
+  const tooltipCloseBtn = document.getElementById("tourTooltipCloseBtn");
+  const backBtn = document.getElementById("tourBackBtn");
+  const nextBtn = document.getElementById("tourNextBtn");
+  const profileLink = document.getElementById("profileSettingsLink");
+
+  if (!overlay || !modal || !tooltip || !profileLink) return;
+
+  const shouldShow =
+    !hasCompletedTour(user) && String(user?.role || "").toLowerCase() === "paralegal";
+  if (!shouldShow) return;
+
+  const showOverlay = () => {
+    overlay.classList.add("is-active");
+    overlay.setAttribute("aria-hidden", "false");
+    profileLink.classList.add("tour-highlight");
+  };
+
+  const hideOverlay = () => {
+    overlay.classList.remove("is-active", "spotlight");
+    overlay.setAttribute("aria-hidden", "true");
+    modal.classList.remove("is-active");
+    tooltip.classList.remove("is-active");
+    profileLink.classList.remove("tour-highlight");
+  };
+
+  const positionTooltip = () => {
+    const rect = profileLink.getBoundingClientRect();
+    tooltip.classList.add("is-active");
+    const tipRect = tooltip.getBoundingClientRect();
+    const top = Math.max(12, Math.min(window.innerHeight - tipRect.height - 12, rect.top + rect.height / 2 - tipRect.height / 2));
+    const left = Math.min(window.innerWidth - tipRect.width - 12, rect.right + 16);
+    tooltip.style.top = `${top}px`;
+    tooltip.style.left = `${left}px`;
+    const arrowTop = Math.max(16, Math.min(tipRect.height - 20, rect.top + rect.height / 2 - top - 8));
+    tooltip.style.setProperty("--arrow-top", `${arrowTop}px`);
+  };
+
+  const showIntro = () => {
+    showOverlay();
+    overlay.classList.remove("spotlight");
+    modal.classList.add("is-active");
+    tooltip.classList.remove("is-active");
+  };
+
+  const showProfileStep = () => {
+    showOverlay();
+    modal.classList.remove("is-active");
+    overlay.classList.add("spotlight");
+    const rect = profileLink.getBoundingClientRect();
+    const padding = 10;
+    overlay.style.setProperty("--spot-x", `${rect.left - padding}px`);
+    overlay.style.setProperty("--spot-y", `${rect.top - padding}px`);
+    overlay.style.setProperty("--spot-w", `${rect.width + padding * 2}px`);
+    overlay.style.setProperty("--spot-h", `${rect.height + padding * 2}px`);
+    positionTooltip();
+  };
+
+  const completeTour = () => {
+    tooltip.classList.remove("is-active");
+    hideOverlay();
+    markTourCompleted(user);
+    updateWelcomeGreeting(user);
+  };
+
+  startBtn?.addEventListener("click", showProfileStep);
+  closeBtn?.addEventListener("click", completeTour);
+  tooltipCloseBtn?.addEventListener("click", completeTour);
+  backBtn?.addEventListener("click", showIntro);
+  nextBtn?.addEventListener("click", () => {
+    completeTour();
+    window.location.href = "profile-settings.html";
+  });
+  profileLink.addEventListener("click", () => {
+    if (overlay.classList.contains("is-active")) {
+      completeTour();
+    }
+  });
+  window.addEventListener("resize", () => {
+    if (overlay.classList.contains("is-active") && tooltip.classList.contains("is-active")) {
+      showProfileStep();
+    }
+  });
+
+  showIntro();
 }
 
 function updateProfile(profile = {}) {
@@ -1525,6 +1655,7 @@ async function bootParalegalDashboard() {
   applyRoleVisibility(user);
   updateProfile(user || {});
   applyParalegalWelcomeNotice(user || {});
+  initParalegalTour(user || {});
   window.hydrateParalegalCluster?.(user || {});
   window.initNotificationCenters?.();
   if (window.state) {
