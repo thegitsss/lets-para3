@@ -344,9 +344,9 @@ button[type="submit"]:focus-visible {
     }
 
     .turnstile-wrap {
-      margin: 16px 0 8px;
-      display: flex;
-      justify-content: flex-start;
+      margin: 0;
+      height: 0;
+      overflow: hidden;
     }
 
     @media (max-width: 768px) {
@@ -380,8 +380,15 @@ button[type="submit"]:focus-visible {
               <button type="button" class="show-toggle" aria-pressed="false">Show</button>
             </div>
 
-            <div class="turnstile-wrap">
-              <div class="cf-turnstile" data-sitekey=0x4AAAAAACND61mi1ZgPWRsA></div>
+            <div class="turnstile-wrap" aria-hidden="true">
+              <div
+                class="cf-turnstile"
+                data-sitekey="0x4AAAAAACND61mi1ZgPWRsA"
+                data-size="invisible"
+                data-callback="onTurnstileLoginSuccess"
+                data-error-callback="onTurnstileLoginError"
+                data-expired-callback="onTurnstileLoginExpired"
+              ></div>
             </div>
 
             <button type="submit" class="login-btn">Log In</button>

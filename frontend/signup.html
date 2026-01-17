@@ -320,7 +320,9 @@
     }
 
     .turnstile-wrap {
-      margin: 12px 0 8px;
+      margin: 0;
+      height: 0;
+      overflow: hidden;
     }
 
     .prelaunch-note {
@@ -480,8 +482,15 @@
               </span>
             </label>
 
-            <div class="turnstile-wrap">
-              <div class="cf-turnstile" data-sitekey=0x4AAAAAACND61mi1ZgPWRsA></div>
+            <div class="turnstile-wrap" aria-hidden="true">
+              <div
+                class="cf-turnstile"
+                data-sitekey="0x4AAAAAACND61mi1ZgPWRsA"
+                data-size="invisible"
+                data-callback="onTurnstileSignupSuccess"
+                data-error-callback="onTurnstileSignupError"
+                data-expired-callback="onTurnstileSignupExpired"
+              ></div>
             </div>
 
             <button id="submitBtn" class="btn" type="submit">Create Account</button>
@@ -776,6 +785,78 @@
     }
 
     const defaultSubmitText = submitBtn?.textContent || "Create Account";
+    let pendingTurnstileSignup = null;
+
+    const restoreSignupButton = (label) => {
+      if (!submitBtn) return;
+      submitBtn.disabled = false;
+      submitBtn.textContent = label || defaultSubmitText;
+    };
+
+    const startTurnstileSignup = (originalLabel) => {
+      if (pendingTurnstileSignup) return;
+      pendingTurnstileSignup = { originalLabel };
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Verifying…';
+      }
+      if (window.turnstile?.execute) {
+        if (window.turnstile.ready) {
+          window.turnstile.ready(() => window.turnstile.execute());
+        } else {
+          window.turnstile.execute();
+        }
+        return;
+      }
+      pendingTurnstileSignup = null;
+      restoreSignupButton(originalLabel);
+      say('Verification failed to load. Refresh and try again.', 'err');
+    };
+
+    window.onTurnstileSignupSuccess = (token) => {
+      const pending = pendingTurnstileSignup;
+      pendingTurnstileSignup = null;
+      if (!pending) return;
+      const finalToken = token || getTurnstileToken(form);
+      if (!finalToken) {
+        if (window.turnstile?.reset) {
+          window.turnstile.reset();
+        }
+        restoreSignupButton(pending.originalLabel);
+        say('Verification expired. Please try again.', 'err');
+        return;
+      }
+      restoreSignupButton(pending.originalLabel);
+      if (form.requestSubmit) {
+        form.requestSubmit();
+      } else {
+        form.dispatchEvent(new Event('submit', { cancelable: true }));
+      }
+    };
+
+    window.onTurnstileSignupError = () => {
+      const pending = pendingTurnstileSignup;
+      pendingTurnstileSignup = null;
+      if (window.turnstile?.reset) {
+        window.turnstile.reset();
+      }
+      if (pending) {
+        restoreSignupButton(pending.originalLabel);
+      }
+      say('Verification failed. Please try again.', 'err');
+    };
+
+    window.onTurnstileSignupExpired = () => {
+      const pending = pendingTurnstileSignup;
+      pendingTurnstileSignup = null;
+      if (window.turnstile?.reset) {
+        window.turnstile.reset();
+      }
+      if (pending) {
+        restoreSignupButton(pending.originalLabel);
+      }
+      say('Verification expired. Please try again.', 'err');
+    };
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -829,13 +910,19 @@
       }
 
       const originalText = submitBtn?.textContent || defaultSubmitText;
+      const turnstileToken = getTurnstileToken(form);
+      if (!turnstileToken) {
+        startTurnstileSignup(originalText);
+        return;
+      }
+
       let shouldRestoreButton = true;
       if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.textContent = 'Signing up…';
       }
 
-    try {
+      try {
         const formData = new FormData();
         formData.append('firstName', firstName);
         formData.append('lastName', lastName);
@@ -858,10 +945,6 @@
           if (paralegalExperience) formData.append('yearsExperience', paralegalExperience);
         }
 
-        const turnstileToken = getTurnstileToken(form);
-        if (!turnstileToken) {
-          throw new Error('Complete the verification before signing up.');
-        }
         formData.append('turnstileToken', turnstileToken);
 
         const headers = {};
