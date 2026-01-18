@@ -82,7 +82,7 @@
       margin: 0 auto;
       padding: 28px 36px 52px;
       position: relative;
-      z-index: 12;
+      z-index: 20;
       background: #fff;
       box-shadow: 0 40px 90px rgba(15, 23, 42, 0.25);
     }
@@ -781,6 +781,44 @@
 
     .profile-header-actions .hero-cta-row {
       justify-content: center;
+    }
+
+    .profile-completion {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 0 18px;
+      text-align: center;
+    }
+
+    #completeProfileBtn {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 18px;
+      background: var(--accent);
+      color: #fff;
+      font-family: var(--font-sans);
+      font-weight: 300;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform 0.2s ease, filter 0.2s ease;
+    }
+
+    #completeProfileBtn:hover:not(:disabled) {
+      filter: brightness(0.96);
+      transform: translateY(-1px);
+    }
+
+    #completeProfileBtn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+      transform: none;
     }
 
     .profile-role-row {
@@ -1500,7 +1538,6 @@
                 <span id="joinedMeta" class="hero-meta-pill">Joined date unavailable</span>
               </div>
               <div class="meta-column">
-                <span id="credentialMeta" class="hero-meta-pill">Credentials available upon request</span>
                 <div class="profile-docs-stack">
                   <a href="#" target="_blank" rel="noopener" id="certificateLink" class="doc-chip hidden">Certificate</a>
                   <a href="#" target="_blank" rel="noopener" id="resumeLink" class="doc-chip hidden">Résumé</a>

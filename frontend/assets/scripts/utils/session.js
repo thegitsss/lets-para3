@@ -16,7 +16,7 @@
     lg: "17px",
     xl: "20px"
   };
-  const MOUNTAIN_BG = "#f3f5f9";
+  const MOUNTAIN_BG = "#f8f6f1";
   let currentTheme = null;
   let currentFontSize = null;
 

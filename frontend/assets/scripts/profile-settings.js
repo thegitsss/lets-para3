@@ -351,10 +351,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- TWO-STEP VERIFICATION ---
-  const twoFactorStatus = document.getElementById("twoFactorStatus");
-  const twoFactorBackupBtn = document.getElementById("twoFactorBackupBtn");
-  const twoFactorCodes = document.getElementById("twoFactorCodes");
-  const twoFactorHint = document.getElementById("twoFactorHint");
   const twoFactorToggles = Array.from(document.querySelectorAll(".two-factor-toggle"));
   let twoFactorUpdating = false;
 
@@ -364,15 +360,7 @@ document.addEventListener("DOMContentLoaded", () => {
     email: "Email",
   };
 
-  const resetTwoFactorCodes = () => {
-    if (twoFactorCodes) {
-      twoFactorCodes.innerHTML = "";
-      twoFactorCodes.classList.add("hidden");
-    }
-    twoFactorHint?.classList.add("hidden");
-  };
-
-  const setTwoFactorUI = ({ enabled = false, hasBackupCodes = false, method = "email" } = {}) => {
+  const setTwoFactorUI = ({ enabled = false, method = "email" } = {}) => {
     const availableMethods = new Set(
       twoFactorToggles.filter((toggle) => !toggle.disabled).map((toggle) => toggle.dataset.twoFactorMethod)
     );
@@ -381,21 +369,10 @@ document.addEventListener("DOMContentLoaded", () => {
     twoFactorToggles.forEach((toggle) => {
       toggle.checked = enabled && toggle.dataset.twoFactorMethod === activeMethod;
     });
-    if (twoFactorStatus) {
-      const label = twoFactorLabels[normalizedMethod] || "2-step verification";
-      twoFactorStatus.textContent = enabled ? `Enabled - ${label}` : "Disabled";
-    }
-    if (twoFactorBackupBtn) {
-      twoFactorBackupBtn.disabled = !enabled;
-      twoFactorBackupBtn.setAttribute("aria-disabled", String(!enabled));
-    }
-    if (!enabled || !hasBackupCodes) {
-      resetTwoFactorCodes();
-    }
   };
 
   async function loadTwoFactorStatus() {
-    if (!twoFactorToggles.length && !twoFactorBackupBtn) return;
+    if (!twoFactorToggles.length) return;
     try {
       const res = await secureFetch("/api/account/2fa");
       if (!res.ok) throw new Error("Unable to load 2FA status");
@@ -406,25 +383,13 @@ document.addEventListener("DOMContentLoaded", () => {
           toggle.disabled = true;
           toggle.setAttribute("aria-disabled", "true");
         });
-        if (twoFactorStatus) twoFactorStatus.textContent = "Temporarily unavailable";
-        if (twoFactorBackupBtn) {
-          twoFactorBackupBtn.disabled = true;
-          twoFactorBackupBtn.setAttribute("aria-disabled", "true");
-        }
-        resetTwoFactorCodes();
         return;
       }
       setTwoFactorUI({
         enabled: !!data?.enabled,
-        hasBackupCodes: !!data?.hasBackupCodes,
         method: data?.method || "email",
       });
     } catch (err) {
-      if (twoFactorStatus) twoFactorStatus.textContent = "Status unavailable";
-      if (twoFactorBackupBtn) {
-        twoFactorBackupBtn.disabled = true;
-        twoFactorBackupBtn.setAttribute("aria-disabled", "true");
-      }
     }
   }
 
@@ -455,11 +420,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const activeMethod = activeToggle?.dataset.twoFactorMethod || method;
         const finalEnabled = enabled ? true : anyEnabled;
 
-        if (twoFactorStatus) {
-          twoFactorStatus.textContent = finalEnabled ? "Saving..." : "Disabling...";
-        }
-        if (twoFactorBackupBtn) twoFactorBackupBtn.disabled = true;
-
         twoFactorUpdating = true;
         try {
           await updateTwoFactor(finalEnabled, activeMethod);
@@ -471,41 +431,6 @@ document.addEventListener("DOMContentLoaded", () => {
           twoFactorUpdating = false;
         }
       });
-    });
-  }
-
-  if (twoFactorBackupBtn) {
-    twoFactorBackupBtn.addEventListener("click", async () => {
-      if (twoFactorBackupBtn.disabled) return;
-      twoFactorBackupBtn.disabled = true;
-      twoFactorBackupBtn.textContent = "Generating...";
-      try {
-        const res = await secureFetch("/api/account/2fa-backup-codes", { method: "POST" });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data?.error || "Unable to generate backup codes");
-        if (twoFactorCodes) {
-          twoFactorCodes.innerHTML = "";
-          (data?.codes || []).forEach((code) => {
-            const chip = document.createElement("code");
-            chip.textContent = code;
-            twoFactorCodes.appendChild(chip);
-          });
-          twoFactorCodes.classList.remove("hidden");
-        }
-        twoFactorHint?.classList.remove("hidden");
-        if (twoFactorStatus) {
-          const active = twoFactorToggles.find((item) => item.checked);
-          const method = active?.dataset.twoFactorMethod || "email";
-          const label = twoFactorLabels[method] || "2-step verification";
-          twoFactorStatus.textContent = `Enabled - ${label}`;
-        }
-      } catch (err) {
-        alert(err?.message || "Unable to generate backup codes.");
-      } finally {
-        twoFactorBackupBtn.textContent = "Get backup codes";
-        const enabled = twoFactorToggles.some((item) => item.checked);
-        twoFactorBackupBtn.disabled = !enabled;
-      }
     });
   }
 
@@ -3600,7 +3525,11 @@ async function saveSettings() {
   }
 
   const updatedUser = await secureFetch("/api/users/me").then((r) => r.json());
-  const mergedUser = mergeSessionPreferences(updatedUser);
+  const mergedUser = mergeSessionPreferences({
+    ...(currentUser || {}),
+    ...updatedUser,
+    role: updatedUser.role || currentUser?.role || ""
+  });
   localStorage.setItem("lpc_user", JSON.stringify(mergedUser));
   currentUser = mergedUser;
   settingsState.bio = updatedUser.bio || "";
@@ -3631,15 +3560,15 @@ async function saveSettings() {
   persistSession({ user: mergedUser });
   window.updateSessionUser?.(mergedUser);
 
-  applyAvatar?.(updatedUser);
-  updateAvatarRemoveButton(updatedUser);
-  hydrateProfileForm(updatedUser);
-  renderLanguageEditor(updatedUser.languages || []);
-  bootstrapProfileSettings(updatedUser);
-  syncCluster?.(updatedUser);
-  window.hydrateParalegalCluster?.(updatedUser);
+  applyAvatar?.(mergedUser);
+  updateAvatarRemoveButton(mergedUser);
+  hydrateProfileForm(mergedUser);
+  renderLanguageEditor(mergedUser.languages || []);
+  bootstrapProfileSettings(mergedUser);
+  syncCluster?.(mergedUser);
+  window.hydrateParalegalCluster?.(mergedUser);
   try {
-    window.dispatchEvent(new CustomEvent("lpc:user-updated", { detail: updatedUser }));
+    window.dispatchEvent(new CustomEvent("lpc:user-updated", { detail: mergedUser }));
   } catch (_) {}
   try {
     localStorage.removeItem(PREFILL_CACHE_KEY);

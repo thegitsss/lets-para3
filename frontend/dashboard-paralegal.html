@@ -25,6 +25,9 @@
           root.style.backgroundColor = "#0f172a";
           root.style.color = "#f4f6fb";
           root.style.setProperty("--bg", "#0f172a");
+        } else if (theme === "mountain") {
+          root.style.backgroundColor = "#f8f6f1";
+          root.style.setProperty("--bg", "#f8f6f1");
         }
       } catch (_) {}
     })();
@@ -693,18 +696,21 @@
     }
 
     body.theme-mountain .sidebar,
+    html.theme-mountain .sidebar,
     body.theme-mountain-dark .sidebar,
     html.theme-mountain-dark .sidebar {
       background: url('hero-mountain.jpg') center/cover no-repeat;
     }
 
     body.theme-mountain .sidebar::before,
+    html.theme-mountain .sidebar::before,
     body.theme-mountain-dark .sidebar::before,
     html.theme-mountain-dark .sidebar::before {
       background: rgba(0, 0, 0, 0.45);
     }
 
     body.theme-mountain .sidebar > *,
+    html.theme-mountain .sidebar > *,
     body.theme-mountain-dark .sidebar > *,
     html.theme-mountain-dark .sidebar > * {
       position: relative;
@@ -723,7 +729,8 @@
       --sidebar-text: #f8fbff;
     }
 
-    body.theme-mountain {
+    body.theme-mountain,
+    html.theme-mountain body {
       --bg: #f8f6f1;
       --panel: #ffffff;
       --muted: #7a736a;
@@ -736,6 +743,7 @@
     }
 
     body.theme-mountain nav a,
+    html.theme-mountain nav a,
     body.theme-mountain-dark nav a,
     html.theme-mountain-dark nav a {
       color: #fff;
@@ -743,6 +751,8 @@
 
     body.theme-mountain nav a.active,
     body.theme-mountain nav a:hover,
+    html.theme-mountain nav a.active,
+    html.theme-mountain nav a:hover,
     body.theme-mountain-dark nav a.active,
     body.theme-mountain-dark nav a:hover,
     html.theme-mountain-dark nav a.active,
@@ -751,6 +761,7 @@
     }
 
     body.theme-mountain .sidebar-link,
+    html.theme-mountain .sidebar-link,
     body.theme-mountain-dark .sidebar-link,
     html.theme-mountain-dark .sidebar-link {
       color: #fff;
@@ -759,6 +770,8 @@
     body.theme-dark .sidebar-link:hover,
     body.theme-mountain .sidebar-link:hover,
     body.theme-mountain .sidebar-link:focus,
+    html.theme-mountain .sidebar-link:hover,
+    html.theme-mountain .sidebar-link:focus,
     body.theme-dark .sidebar-link:focus,
     body.theme-mountain-dark .sidebar-link:hover,
     body.theme-mountain-dark .sidebar-link:focus,
@@ -2113,8 +2126,9 @@
       --main-bg: linear-gradient(180deg, rgba(15, 19, 31, 0.98) 0%, rgba(12, 16, 27, 1) 60%);
     }
 
-    body.theme-mountain {
-      --main-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 246, 241, 0.98) 60%);
+    body.theme-mountain,
+    html.theme-mountain body {
+      --main-bg: var(--bg);
     }
 
     body.theme-mountain-dark {

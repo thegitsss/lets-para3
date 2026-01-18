@@ -352,7 +352,7 @@ font-size:.95rem;
 .test-email-row .search{flex:1;min-width:220px;}
 .pending-count{color:var(--muted);font-size:.9rem;}
 .pending-empty{padding:1rem;text-align:center;color:var(--muted);}
-.pending-users-table td.actions{width:140px;}
+.pending-users-table td.actions{width:160px;display:flex;flex-direction:column;gap:8px;}
 .pending-users-table td.actions .btn{width:100%;}
 .pending-modal-actions{display:flex;justify-content:flex-end;gap:.75rem;margin-top:1.5rem;}
 #pendingUserModal .details-content{max-width:900px;}
@@ -444,6 +444,8 @@ letter-spacing:.02em;
 #pendingUsersPanel .pending-users-table td.actions{
 justify-content:flex-start;
 gap:8px;
+flex-direction:column;
+align-items:flex-start;
 }
 #pendingUsersPanel .pending-users-table td.actions::before{
 content:"Actions";
@@ -1121,7 +1123,6 @@ font-size:.95rem;
 <div class="pending-modal-actions">
 <button type="button" class="btn danger" id="denyUserBtn">Deny</button>
 <button type="button" class="btn primary" id="approveUserBtn">Approve</button>
-<button type="button" class="btn secondary" id="testApprovalEmailBtn">Send Approval Email</button>
 </div>
 </div>
 </div>
@@ -1964,7 +1965,6 @@ const modalDetails = document.getElementById('pendingUserDetails');
 const closeModalBtn = document.getElementById('closePendingModal');
 const approveBtn = document.getElementById('approveUserBtn');
 const denyBtn = document.getElementById('denyUserBtn');
-const testApprovalEmailBtn = document.getElementById('testApprovalEmailBtn');
 const approvalTestEmailInput = document.getElementById('approvalTestEmail');
 const approvalTestSendBtn = document.getElementById('approvalTestSendBtn');
 
@@ -2397,35 +2397,6 @@ btn.textContent = originalText;
 }
 };
 
-const sendApprovalEmailTest = async () => {
-if (!activeUserId || !testApprovalEmailBtn) return;
-const originalText = testApprovalEmailBtn.textContent;
-testApprovalEmailBtn.disabled = true;
-testApprovalEmailBtn.textContent = 'Sending…';
-try {
-await fetchCSRF();
-const res = await secureFetch('/api/admin/email/approval-test', {
-method: 'POST',
-body: { userId: activeUserId },
-});
-let payload = {};
-try {
-payload = await res.json();
-} catch (_) {
-payload = {};
-}
-if (!res.ok) {
-throw new Error(payload?.msg || payload?.error || 'Unable to send approval email.');
-}
-showToast('Approval email sent.', 'ok');
-} catch (err) {
-showToast(err?.message || 'Unable to send approval email.', 'err');
-} finally {
-testApprovalEmailBtn.disabled = false;
-testApprovalEmailBtn.textContent = originalText;
-}
-};
-
 const sendApprovalEmailTestByEmail = async () => {
 if (!approvalTestSendBtn) return;
 const email = approvalTestEmailInput?.value?.trim() || '';
@@ -2693,7 +2664,6 @@ closePendingModal();
 });
 approveBtn?.addEventListener('click', () => submitDecision('approve'));
 denyBtn?.addEventListener('click', () => submitDecision('deny'));
-testApprovalEmailBtn?.addEventListener('click', () => sendApprovalEmailTest());
 approvalTestSendBtn?.addEventListener('click', () => sendApprovalEmailTestByEmail());
 
 let softRefreshInFlight = false;

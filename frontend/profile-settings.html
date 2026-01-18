@@ -2078,6 +2078,11 @@ input[type="number"],
       border-bottom: none;
     }
 
+    #paralegalSettings .chip-section .card-header-label {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
     #paralegalSettings .section-edit-toggle {
       position: absolute;
       right: 0;
@@ -2162,6 +2167,12 @@ input[type="number"],
 
     #paralegalSettings #bestForSection .best-for-body {
       position: relative;
+    }
+
+    #paralegalSettings #bestForSection.is-editing .best-for-body {
+      max-height: 140px;
+      overflow-y: auto;
+      padding-right: 8px;
     }
 
     #paralegalSettings #bestForSection.is-editing .best-for-list {
@@ -2370,8 +2381,34 @@ input[type="number"],
     body.theme-dark #paralegalSettings input[type="password"],
     body.theme-dark #paralegalSettings input[type="number"],
     body.theme-dark #paralegalSettings textarea,
-    body.theme-dark #paralegalSettings select {
+    body.theme-dark #paralegalSettings select,
+    html.theme-dark #paralegalSettings input[type="text"],
+    html.theme-dark #paralegalSettings input[type="email"],
+    html.theme-dark #paralegalSettings input[type="tel"],
+    html.theme-dark #paralegalSettings input[type="url"],
+    html.theme-dark #paralegalSettings input[type="password"],
+    html.theme-dark #paralegalSettings input[type="number"],
+    html.theme-dark #paralegalSettings textarea,
+    html.theme-dark #paralegalSettings select {
       background-color: transparent;
+      border: none;
+      box-shadow: none;
+      color: var(--ink);
+    }
+
+    body.theme-dark #skillsInput,
+    body.theme-dark #practiceAreasInput,
+    body.theme-dark #stateExperienceInput,
+    html.theme-dark #skillsInput,
+    html.theme-dark #practiceAreasInput,
+    html.theme-dark #stateExperienceInput,
+    body.theme-mountain-dark #skillsInput,
+    body.theme-mountain-dark #practiceAreasInput,
+    body.theme-mountain-dark #stateExperienceInput,
+    html.theme-mountain-dark #skillsInput,
+    html.theme-mountain-dark #practiceAreasInput,
+    html.theme-mountain-dark #stateExperienceInput {
+      background: transparent;
       border: none;
       box-shadow: none;
       color: var(--ink);
@@ -3483,6 +3520,7 @@ input[type="number"],
           <div class="settings-block">
             <h3>Payouts Setup</h3>
             <p>Connect your Stripe account to receive payouts.</p>
+            <p class="muted"><strong>Stripe setup isn’t available yet. We’ll email you as soon as you can connect your account.</strong></p>
             <button id="connectStripeBtn" class="btn btn-primary">Connect Stripe Account →</button>
             <p id="stripeStatus" class="muted"></p>
           </div>
@@ -3607,12 +3645,6 @@ input[type="number"],
                 <span class="slider"></span>
               </label>
             </div>
-            <div class="two-factor-actions">
-              <button type="button" class="btn btn-outline" id="twoFactorBackupBtn" disabled aria-disabled="true">Get backup codes</button>
-              <span class="two-factor-status" id="twoFactorStatus">Checking status...</span>
-            </div>
-            <div class="two-factor-codes hidden" id="twoFactorCodes" aria-live="polite"></div>
-            <p class="muted hidden" id="twoFactorHint">Store these backup codes somewhere safe. Each code can be used once.</p>
           </div>
         </div>
       </div>
