@@ -368,10 +368,11 @@ flex-direction:column;
 }
 .main #section-user-management > header{order:1;}
 .main #section-user-management #pendingUsersPanel{order:2;}
-.main #section-user-management .lower-grid{order:3;}
-.main #section-user-management #approvalEmailTestPanel{order:4;}
-.main #section-user-management .dashboard-grid{order:5;}
-.main #section-user-management #deletedUsersPanel{order:6;}
+.main #section-user-management #approvedUsersPanel{order:3;}
+.main #section-user-management .lower-grid{order:4;}
+.main #section-user-management #approvalEmailTestPanel{order:5;}
+.main #section-user-management .dashboard-grid{order:6;}
+.main #section-user-management #deletedUsersPanel{order:7;}
 .metrics,
 .dashboard-grid,
 .lower-grid,
@@ -415,42 +416,52 @@ padding:.4rem .6rem;
 .pending-users-table .status{
 white-space:nowrap;
 }
-#pendingUsersPanel .pending-users-table thead{
+#pendingUsersPanel .pending-users-table thead,
+#approvedUsersPanel .pending-users-table thead{
 display:none;
 }
 #pendingUsersPanel .pending-users-table,
 #pendingUsersPanel .pending-users-table tbody,
-#pendingUsersPanel .pending-users-table tr{
+#pendingUsersPanel .pending-users-table tr,
+#approvedUsersPanel .pending-users-table,
+#approvedUsersPanel .pending-users-table tbody,
+#approvedUsersPanel .pending-users-table tr{
 display:block;
 width:100%;
 }
-#pendingUsersPanel .pending-users-table tr{
+#pendingUsersPanel .pending-users-table tr,
+#approvedUsersPanel .pending-users-table tr{
 border-bottom:1px solid var(--line);
 padding:12px 0;
 }
-#pendingUsersPanel .pending-users-table td{
+#pendingUsersPanel .pending-users-table td,
+#approvedUsersPanel .pending-users-table td{
 display:flex;
 justify-content:space-between;
 gap:12px;
 padding:6px 0;
 border-bottom:none;
 }
-#pendingUsersPanel .pending-users-table td::before{
+#pendingUsersPanel .pending-users-table td::before,
+#approvedUsersPanel .pending-users-table td::before{
 content:attr(data-label);
 color:var(--muted);
 font-size:.8rem;
 letter-spacing:.02em;
 }
-#pendingUsersPanel .pending-users-table td.actions{
+#pendingUsersPanel .pending-users-table td.actions,
+#approvedUsersPanel .pending-users-table td.actions{
 justify-content:flex-start;
 gap:8px;
 flex-direction:column;
 align-items:flex-start;
 }
-#pendingUsersPanel .pending-users-table td.actions::before{
+#pendingUsersPanel .pending-users-table td.actions::before,
+#approvedUsersPanel .pending-users-table td.actions::before{
 content:"Actions";
 }
-#pendingUsersPanel .pending-users-table td.actions .btn{
+#pendingUsersPanel .pending-users-table td.actions .btn,
+#approvedUsersPanel .pending-users-table td.actions .btn{
 padding:1px 4px;
 font-size:.7rem;
 line-height:1.1;
@@ -646,6 +657,39 @@ font-size:.95rem;
 </thead>
 <tbody id="pendingUsersBody">
 <tr><td colspan="6" class="pending-empty">Loading pending users…</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div class="panel" id="approvedUsersPanel">
+<div class="panel-header">
+<h2>Approved Users</h2>
+<p id="approvedUsersCountLabel" class="pending-count">0 approved users</p>
+</div>
+<div class="pending-controls">
+<input type="search" id="approvedSearch" class="search" placeholder="Search name, email, or specialty…" aria-label="Search approved users" />
+<select id="approvedRoleFilter" aria-label="Filter approved users by role">
+<option value="all">All Roles</option>
+<option value="attorney">Attorneys</option>
+<option value="paralegal">Paralegals</option>
+<option value="admin">Admins</option>
+</select>
+<button class="btn secondary" type="button" id="refreshApprovedUsers">Refresh</button>
+</div>
+<div class="table-wrap">
+<table class="pending-users-table">
+<thead>
+<tr>
+<th>Name</th>
+<th>Role</th>
+<th>Email</th>
+<th>Approved</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="approvedUsersBody">
+<tr><td colspan="5" class="pending-empty">Loading approved users…</td></tr>
 </tbody>
 </table>
 </div>
@@ -1944,6 +1988,11 @@ const pendingCountLabel = document.getElementById('pendingUsersCountLabel');
 const pendingSearch = document.getElementById('pendingSearch');
 const pendingRoleFilter = document.getElementById('pendingRoleFilter');
 const refreshPendingBtn = document.getElementById('refreshPendingUsers');
+const approvedTableBody = document.getElementById('approvedUsersBody');
+const approvedCountLabel = document.getElementById('approvedUsersCountLabel');
+const approvedSearch = document.getElementById('approvedSearch');
+const approvedRoleFilter = document.getElementById('approvedRoleFilter');
+const refreshApprovedBtn = document.getElementById('refreshApprovedUsers');
 const deletedTableBody = document.getElementById('deletedUsersBody');
 const deletedCountLabel = document.getElementById('deletedUsersCountLabel');
 const deletedSearch = document.getElementById('deletedSearch');
@@ -1971,6 +2020,8 @@ const approvalTestSendBtn = document.getElementById('approvalTestSendBtn');
 let pendingUsers = [];
 let pendingRequestId = 0;
 let activeUserId = null;
+let approvedUsers = [];
+let approvedRequestId = 0;
 let deletedUsers = [];
 let deletedRequestId = 0;
 let auditLogs = [];
@@ -2082,6 +2133,13 @@ count === 1 ? '1 pending user' : `${count} pending users`;
 }
 };
 
+const updateApprovedCount = (count = 0) => {
+if (approvedCountLabel) {
+approvedCountLabel.textContent =
+count === 1 ? '1 approved user' : `${count} approved users`;
+}
+};
+
 const updateDeletedCount = (count = 0) => {
 if (deletedCountLabel) {
 deletedCountLabel.textContent =
@@ -2100,6 +2158,12 @@ const setPendingLoading = (loading) => {
 if (!refreshPendingBtn) return;
 refreshPendingBtn.disabled = loading;
 refreshPendingBtn.textContent = loading ? 'Refreshing…' : 'Refresh';
+};
+
+const setApprovedLoading = (loading) => {
+if (!refreshApprovedBtn) return;
+refreshApprovedBtn.disabled = loading;
+refreshApprovedBtn.textContent = loading ? 'Refreshing…' : 'Refresh';
 };
 
 const setDeletedLoading = (loading) => {
@@ -2177,6 +2241,50 @@ actionsTd.setAttribute('data-label', 'Actions');
 tr.appendChild(td)
 );
 pendingTableBody.appendChild(tr);
+});
+};
+
+const renderApprovedUsers = () => {
+if (!approvedTableBody) return;
+if (!approvedUsers.length) {
+approvedTableBody.innerHTML =
+'<tr><td colspan="5" class="pending-empty">No approved users found.</td></tr>';
+return;
+}
+approvedTableBody.innerHTML = '';
+approvedUsers.forEach((user) => {
+const tr = document.createElement('tr');
+
+const nameTd = document.createElement('td');
+nameTd.textContent = displayName(user);
+nameTd.setAttribute('data-label', 'Name');
+
+const roleTd = document.createElement('td');
+roleTd.textContent = toTitle(user.role);
+roleTd.setAttribute('data-label', 'Role');
+
+const emailTd = document.createElement('td');
+emailTd.textContent = user.email || '—';
+emailTd.setAttribute('data-label', 'Email');
+
+const approvedTd = document.createElement('td');
+approvedTd.textContent = formatDate(user.approvedAt || user.updatedAt || user.createdAt);
+approvedTd.setAttribute('data-label', 'Approved');
+
+const actionsTd = document.createElement('td');
+actionsTd.className = 'actions';
+const viewBtn = document.createElement('button');
+viewBtn.type = 'button';
+viewBtn.className = 'btn secondary';
+viewBtn.textContent = 'View';
+viewBtn.addEventListener('click', () => openApprovedModal(user.id));
+actionsTd.appendChild(viewBtn);
+actionsTd.setAttribute('data-label', 'Actions');
+
+[nameTd, roleTd, emailTd, approvedTd, actionsTd].forEach((td) =>
+tr.appendChild(td)
+);
+approvedTableBody.appendChild(tr);
 });
 };
 
@@ -2314,8 +2422,7 @@ if (raw.startsWith('/api/uploads/view')) return raw;
 return `/api/uploads/view?key=${encodeURIComponent(raw)}`;
 };
 
-const openPendingModal = (userId) => {
-const user = pendingUsers.find((item) => String(item.id) === String(userId));
+const openUserModal = (user) => {
 if (!user || !modal || !modalDetails) return;
 activeUserId = user.id;
 modalDetails.innerHTML = '';
@@ -2349,6 +2456,18 @@ appendDetailRow('Education', richListText(user.education));
 
 modal.classList.remove('hidden');
 modal.setAttribute('aria-hidden', 'false');
+};
+
+const openPendingModal = (userId) => {
+const user = pendingUsers.find((item) => String(item.id) === String(userId));
+if (!user) return;
+openUserModal(user);
+};
+
+const openApprovedModal = (userId) => {
+const user = approvedUsers.find((item) => String(item.id) === String(userId));
+if (!user) return;
+openUserModal(user);
 };
 
 const closePendingModal = () => {
@@ -2467,6 +2586,39 @@ if (requestId === pendingRequestId) setPendingLoading(false);
 }
 };
 
+const loadApprovedUsers = async () => {
+if (!approvedTableBody) return;
+const requestId = ++approvedRequestId;
+setApprovedLoading(true);
+approvedTableBody.innerHTML =
+'<tr><td colspan="5" class="pending-empty">Loading approved users…</td></tr>';
+const params = new URLSearchParams({ status: 'approved', limit: '50' });
+const roleValue = (approvedRoleFilter?.value || '').toLowerCase();
+if (roleValue && roleValue !== 'all') params.set('role', roleValue);
+const query = approvedSearch?.value.trim();
+if (query) params.set('q', query);
+
+try {
+const res = await secureFetch(`/api/admin/pending-users?${params.toString()}`, {
+headers: { Accept: 'application/json' },
+});
+const data = res.ok ? await res.json() : { users: [] };
+if (requestId !== approvedRequestId) return;
+approvedUsers = Array.isArray(data.users) ? data.users : [];
+renderApprovedUsers();
+updateApprovedCount(
+typeof data.total === 'number' ? data.total : approvedUsers.length
+);
+} catch (err) {
+if (requestId !== approvedRequestId) return;
+approvedUsers = [];
+updateApprovedCount(0);
+approvedTableBody.innerHTML = `<tr><td colspan="5" class="pending-empty">${err?.message || 'Unable to load approved users.'}</td></tr>`;
+} finally {
+if (requestId === approvedRequestId) setApprovedLoading(false);
+}
+};
+
 const loadDeletedUsers = async () => {
 if (!deletedTableBody) return;
 const requestId = ++deletedRequestId;
@@ -2546,6 +2698,9 @@ timeout = setTimeout(() => fn.apply(null, args), wait);
 pendingRoleFilter?.addEventListener('change', () => loadPendingUsers());
 refreshPendingBtn?.addEventListener('click', () => loadPendingUsers());
 pendingSearch?.addEventListener('input', debounce(() => loadPendingUsers()));
+approvedRoleFilter?.addEventListener('change', () => loadApprovedUsers());
+refreshApprovedBtn?.addEventListener('click', () => loadApprovedUsers());
+approvedSearch?.addEventListener('input', debounce(() => loadApprovedUsers()));
 deletedRoleFilter?.addEventListener('change', () => loadDeletedUsers());
 refreshDeletedBtn?.addEventListener('click', () => loadDeletedUsers());
 deletedSearch?.addEventListener('input', debounce(() => loadDeletedUsers()));
@@ -2687,6 +2842,7 @@ tasks.push(
 loadFinanceCards(),
 loadAdminPosts(),
 loadPendingUsers(),
+loadApprovedUsers(),
 loadDeletedUsers(),
 loadAuditLogs()
 );
@@ -2704,6 +2860,7 @@ softRefreshAdmin();
 startSoftRefresh();
 
 loadPendingUsers();
+loadApprovedUsers();
 loadDeletedUsers();
 loadAuditLogs();
 window.renderPendingUsers = renderPendingUsers;
