@@ -33,7 +33,7 @@ const EMAIL_BASE_URL = (process.env.EMAIL_BASE_URL || "").replace(/\/$/, "");
 const ASSET_BASE_URL = EMAIL_BASE_URL || "https://www.lets-paraconnect.com";
 const LOGIN_URL = `${ASSET_BASE_URL}/login.html`;
 const APPROVAL_EMAIL_SUBJECT =
-"Your accout has been approved! Welcome to Let's-ParaConnect.";
+"Welcome to Let’s-ParaConnect";
 const DENIAL_EMAIL_SUBJECT =
 "Your application to join Let's-ParaConnect has been reviewed and was unfortunately not approved.";
 
@@ -205,14 +205,25 @@ function buildApprovalEmailHtml(user, opts = {}) {
           <tr>
             <td align="center" style="padding:8px 32px 0;">
               <div style="font-family:Georgia, 'Times New Roman', serif;font-size:34px;letter-spacing:0.06em;color:#6e6e6e;">
-                Your account is ready
+                Welcome to Let’s-ParaConnect
               </div>
             </td>
           </tr>
           <tr>
             <td align="center" style="padding:16px 32px 0;">
-              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.08em;color:#1f1f1f;line-height:1.6;">
-                You can now sign in to complete your profile and begin using the platform.
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.7;">
+                Hi ${user?.firstName || "there"},
+                <br><br>
+                Thank you for applying to join Let’s-ParaConnect.
+                <br><br>
+                Your application has been reviewed and approved. At this time, we’re onboarding a limited number of paralegals as we open the platform carefully and maintain a high standard across the network.
+                <br><br>
+                You now have access to complete your profile and explore the platform. Attorneys will begin posting work as onboarding continues.
+                <br><br>
+                We’re glad to have you as part of the community.
+                <br><br>
+                —<br>
+                Let’s-ParaConnect
               </div>
             </td>
           </tr>
