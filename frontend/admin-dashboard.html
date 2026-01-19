@@ -618,7 +618,7 @@ font-size:.95rem;
 <div class="panel" id="escrowPanel">
 <h2 onclick="togglePanel('escrowPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('escrowPanel');}" role="button" tabindex="0" aria-expanded="true">Escrow Overview <span>▾</span></h2>
 <div class="panel-content">
-<canvas id="escrowChart" height="120"></canvas>
+<canvas id="escrowChart" height="90"></canvas>
 <table>
 <thead><tr><th>Case</th><th>Attorney</th><th>Paralegal</th><th>Held</th><th>Status</th></tr></thead>
 <tbody id="escrowBody">
@@ -633,7 +633,7 @@ font-size:.95rem;
 <div class="panel" id="userPanel">
 <h2 onclick="togglePanel('userPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('userPanel');}" role="button" tabindex="0" aria-expanded="true">New Users Analytics <span>▾</span></h2>
 <div class="panel-content">
-<canvas id="userChart" height="120"></canvas>
+<canvas id="userChart" height="90"></canvas>
 <button class="btn primary" onclick="alert('Opening Review Queue…')">Review New Users</button>
 </div>
 </div>
@@ -641,7 +641,7 @@ font-size:.95rem;
 <!-- Revenue -->
 <div class="panel" id="revenuePanel">
 <h2 onclick="togglePanel('revenuePanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('revenuePanel');}" role="button" tabindex="0" aria-expanded="true">Revenue Reports <span>▾</span></h2>
-<div class="panel-content"><canvas id="revChart" height="120"></canvas></div>
+<div class="panel-content"><canvas id="revChart" height="90"></canvas></div>
 </div>
 
 <!-- Recent Posts -->
@@ -760,7 +760,7 @@ font-size:.95rem;
 <option>Show By Week</option>
 </select>
 </div>
-<canvas id="userMgmtComboChart" height="150"></canvas>
+<canvas id="userMgmtComboChart" height="110"></canvas>
 </div>
 
 <div class="stats-cards">
@@ -884,12 +884,12 @@ font-size:.95rem;
 <div class="grid-two">
 <div class="panel">
 <h2>Monthly Escrow Report</h2>
-<canvas id="escrowReportChart" height="120"></canvas>
+<canvas id="escrowReportChart" height="90"></canvas>
 </div>
 
 <div class="panel">
 <h2>Daily Logins (Last 10 Days)</h2>
-<canvas id="dailyLoginChart" height="120"></canvas>
+<canvas id="dailyLoginChart" height="90"></canvas>
 </div>
 </div>
 
@@ -987,12 +987,12 @@ font-size:.95rem;
 <div class="grid-two" style="margin-top:2rem;">
 <div class="panel">
 <div class="panel-header"><h2>Monthly Revenue Trends</h2><select id="revView"><option>Show by Month</option><option>Show by Quarter</option></select></div>
-<canvas id="revMainChart" height="120"></canvas>
+<canvas id="revMainChart" height="90"></canvas>
 </div>
 
 <div class="panel">
 <h2>Expense Breakdown</h2>
-<canvas id="revExpenseChart" height="120"></canvas>
+<canvas id="revExpenseChart" height="90"></canvas>
 </div>
 </div>
 
@@ -1059,12 +1059,12 @@ font-size:.95rem;
 <div class="panel">
 <h2>Posts by Category</h2>
 <div class="post-category-compact">
-<canvas id="postCategoryChart" height="120"></canvas>
+<canvas id="postCategoryChart" height="90"></canvas>
 </div>
 </div>
 <div class="panel">
 <h2>Posts by State</h2>
-<canvas id="postStateChart" height="120"></canvas>
+<canvas id="postStateChart" height="90"></canvas>
 </div>
 </div>
 
@@ -1111,7 +1111,7 @@ font-size:.95rem;
 <div class="panel">
 <h2>Content Quality Overview</h2>
 <div class="quality-chart-compact">
-<canvas id="qualityScoreChart" height="60"></canvas>
+<canvas id="qualityScoreChart" height="50"></canvas>
 </div>
 <p style="margin-top:1rem;">Average quality score for all reviewed posts this week.</p>
 </div>
