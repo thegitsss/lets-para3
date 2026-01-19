@@ -7,17 +7,10 @@ import {
 } from "./utils/stripe-connect.js";
 
 const PLACEHOLDER_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-  `<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'>
-    <defs>
-      <linearGradient id='grad' x1='0%' y1='0%' x2='100%' y2='100%'>
-        <stop offset='0%' stop-color='#f4f6fa'/>
-        <stop offset='100%' stop-color='#e6e9ef'/>
-      </linearGradient>
-    </defs>
-    <rect width='80' height='80' rx='16' fill='url(#grad)'/>
-    <circle cx='40' cy='34' r='18' fill='#d4dae6'/>
-    <path d='M18 70c4-15 17-26 22-26s18 11 22 26' fill='none' stroke='#c9cfda' stroke-width='4' stroke-linecap='round'/>
-    <text x='50%' y='52%' font-family='Sarabun, Arial, sans-serif' font-size='18' font-weight='600' fill='#3a4553' text-anchor='middle' dominant-baseline='middle'>LPC</text>
+  `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>
+    <rect width='220' height='220' rx='110' fill='#f1f5f9'/>
+    <circle cx='110' cy='90' r='46' fill='#cbd5e1'/>
+    <path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/>
   </svg>`
 )}`;
 
@@ -898,9 +891,20 @@ function initParalegalTour(user) {
 
   if (!overlay || !modal || !tooltip || !profileLink) return;
 
+  const stored = getStoredUserSnapshot();
+  const effectiveUser = user || stored || {};
+  const role = String(effectiveUser?.role || "").toLowerCase();
+  const status = String(effectiveUser?.status || "").toLowerCase();
+  const storedFlag = stored?.isFirstLogin;
+  const userFlag = effectiveUser?.isFirstLogin;
+  const isFirstLogin = typeof storedFlag === "boolean" ? storedFlag : Boolean(userFlag);
   const shouldShow =
-    !hasCompletedTour(user) && String(user?.role || "").toLowerCase() === "paralegal";
+    role === "paralegal" &&
+    (!status || status === "approved") &&
+    isFirstLogin &&
+    !hasCompletedTour(effectiveUser);
   if (!shouldShow) return;
+  markTourCompleted(effectiveUser);
 
   const showOverlay = () => {
     overlay.classList.add("is-active");

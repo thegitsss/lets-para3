@@ -2364,15 +2364,35 @@ input[type="number"],
 
     #paralegalSettings .paralegal-actions .profile-fyi-card p {
       margin: 0;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
       color: var(--ink);
       line-height: 1.5;
+      text-align: justify;
+      text-justify: inter-word;
+      hyphens: auto;
       font-family: "Cormorant Garamond", "Times New Roman", serif;
     }
 
     #paralegalSettings .paralegal-actions .profile-fyi-card .fyi-amount {
       color: var(--accent);
       font-weight: 600;
+    }
+
+    html.theme-dark #paralegalSettings .paralegal-actions .profile-fyi-card,
+    body.theme-dark #paralegalSettings .paralegal-actions .profile-fyi-card,
+    html.theme-mountain-dark #paralegalSettings .paralegal-actions .profile-fyi-card,
+    body.theme-mountain-dark #paralegalSettings .paralegal-actions .profile-fyi-card {
+      background: var(--panel);
+      border-color: var(--line);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    html.theme-dark #paralegalSettings .paralegal-actions .profile-fyi-card p,
+    body.theme-dark #paralegalSettings .paralegal-actions .profile-fyi-card p,
+    html.theme-mountain-dark #paralegalSettings .paralegal-actions .profile-fyi-card p,
+    body.theme-mountain-dark #paralegalSettings .paralegal-actions .profile-fyi-card p {
+      color: #d1d9e6;
+      font-weight: 300;
     }
 
     @media (max-width: 960px) {
@@ -2475,6 +2495,41 @@ input[type="number"],
       background: transparent;
       border: none;
       box-shadow: none;
+      color: var(--ink);
+    }
+
+    #paralegalSettings #stateExperienceInput {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 0.6rem 0.75rem;
+      line-height: 1.4;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      color: var(--ink);
+    }
+
+    #paralegalSettings .state-experience-editor {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #paralegalSettings .state-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 10px;
+      background: #eef2f8;
+      color: var(--ink);
+      font-size: 0.9rem;
+    }
+
+    body.theme-dark #paralegalSettings .state-chip,
+    html.theme-dark #paralegalSettings .state-chip,
+    body.theme-mountain-dark #paralegalSettings .state-chip,
+    html.theme-mountain-dark #paralegalSettings .state-chip {
+      background: rgba(148, 163, 184, 0.18);
       color: var(--ink);
     }
 
@@ -3474,7 +3529,17 @@ input[type="number"],
                   <p id="stateExperienceDisplay" class="section-display-text"></p>
                 </div>
                 <div class="section-edit" data-section-edit="stateExperience">
-                  <input type="text" id="stateExperienceInput" placeholder="CA, NY, TX" />
+                  <div class="state-experience-editor">
+                    <div id="stateExperienceChips" class="chip-cloud" aria-live="polite"></div>
+                    <input
+                      type="text"
+                      id="stateExperienceInput"
+                      placeholder="Type a state abbreviation (e.g., VA) and press Enter"
+                      autocomplete="off"
+                      aria-describedby="stateExperienceHelp"
+                    />
+                    <p class="muted" id="stateExperienceHelp">Add states using the two-letter abbreviation, then press Enter.</p>
+                  </div>
                 </div>
               </article>
             </aside>

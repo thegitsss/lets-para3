@@ -593,15 +593,24 @@ router.get(
   "/profile-photos",
   asyncHandler(async (req, res) => {
     const status = normalizePhotoStatus(req.query?.status) || "pending_review";
-    const filter = { role: "paralegal", deleted: { $ne: true } };
+    const filter = {
+      role: "paralegal",
+      deleted: { $ne: true },
+      status: { $ne: "denied" },
+    };
     if (status === "pending_review") {
       filter.profilePhotoStatus = "pending_review";
-      filter.pendingProfileImage = { $ne: "" };
+      filter.pendingProfileImage = { $nin: ["", null] };
     } else if (status === "rejected") {
       filter.profilePhotoStatus = "rejected";
     } else if (status === "approved") {
+      filter.status = "approved";
+      filter.profilePhotoStatus = "approved";
       filter.pendingProfileImage = { $in: ["", null] };
-      filter.$or = [{ profileImage: { $ne: "" } }, { avatarURL: { $ne: "" } }];
+      filter.$or = [
+        { profileImage: { $nin: ["", null] } },
+        { avatarURL: { $nin: ["", null] } },
+      ];
     }
     const users = await User.find(filter)
       .select("firstName lastName email profilePhotoStatus pendingProfileImage profileImage avatarURL createdAt")
@@ -1350,6 +1359,41 @@ if (!user) return res.status(404).json({ msg: "User not found" });
 
 const updated = await applyUserDecision(req, user, normalized, note);
 res.json({ ok: true, user: pickUserSafe(updated.toObject()) });
+}));
+
+router.patch("/users/:id/role", csrfProtection, asyncHandler(async (req, res) => {
+const { id } = req.params;
+const nextRole = String(req.body?.role || "").trim().toLowerCase();
+if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
+if (!["attorney", "paralegal"].includes(nextRole)) {
+  return res.status(400).json({ error: "Role must be attorney or paralegal" });
+}
+
+const user = await User.findById(id);
+if (!user) return res.status(404).json({ error: "User not found" });
+if (String(user.role || "").toLowerCase() === "admin") {
+  return res.status(400).json({ error: "Admin role cannot be changed here" });
+}
+
+const currentRole = String(user.role || "").toLowerCase();
+if (currentRole === nextRole) {
+  return res.json({ ok: true, user: pickUserSafe(user.toObject()) });
+}
+
+user.role = nextRole;
+await user.save();
+
+try {
+  await AuditLog.logFromReq(req, "admin.user.role_changed", {
+    targetType: "user",
+    targetId: user._id,
+    meta: { from: currentRole, to: nextRole },
+  });
+} catch (err) {
+  console.warn("[admin] Failed to log role change", err?.message || err);
+}
+
+res.json({ ok: true, user: pickUserSafe(user.toObject()) });
 }));
 
 /**

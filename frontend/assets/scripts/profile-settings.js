@@ -823,6 +823,64 @@ const FIELD_OF_LAW_OPTIONS = [
   "Workers’ Compensation"
 ];
 
+const STATE_CODE_TO_NAME = {
+  AL: "Alabama",
+  AK: "Alaska",
+  AZ: "Arizona",
+  AR: "Arkansas",
+  CA: "California",
+  CO: "Colorado",
+  CT: "Connecticut",
+  DE: "Delaware",
+  DC: "Washington, D.C.",
+  FL: "Florida",
+  GA: "Georgia",
+  HI: "Hawaii",
+  ID: "Idaho",
+  IL: "Illinois",
+  IN: "Indiana",
+  IA: "Iowa",
+  KS: "Kansas",
+  KY: "Kentucky",
+  LA: "Louisiana",
+  ME: "Maine",
+  MD: "Maryland",
+  MA: "Massachusetts",
+  MI: "Michigan",
+  MN: "Minnesota",
+  MS: "Mississippi",
+  MO: "Missouri",
+  MT: "Montana",
+  NE: "Nebraska",
+  NV: "Nevada",
+  NH: "New Hampshire",
+  NJ: "New Jersey",
+  NM: "New Mexico",
+  NY: "New York",
+  NC: "North Carolina",
+  ND: "North Dakota",
+  OH: "Ohio",
+  OK: "Oklahoma",
+  OR: "Oregon",
+  PA: "Pennsylvania",
+  RI: "Rhode Island",
+  SC: "South Carolina",
+  SD: "South Dakota",
+  TN: "Tennessee",
+  TX: "Texas",
+  UT: "Utah",
+  VT: "Vermont",
+  VA: "Virginia",
+  WA: "Washington",
+  WV: "West Virginia",
+  WI: "Wisconsin",
+  WY: "Wyoming",
+};
+const STATE_NAME_TO_CODE = Object.entries(STATE_CODE_TO_NAME).reduce((acc, [code, name]) => {
+  acc[String(name || "").toLowerCase().replace(/[^a-z]/g, "")] = code;
+  return acc;
+}, {});
+
 const LANGUAGE_PROFICIENCY_OPTIONS = [
   { value: "Native", label: "Native" },
   { value: "Fluent", label: "Fluent" },
@@ -1390,6 +1448,113 @@ function parseCommaList(value) {
     .filter(Boolean);
 }
 
+function normalizeStateName(value = "") {
+  return String(value || "").toLowerCase().replace(/[^a-z]/g, "");
+}
+
+function normalizeStateCode(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const upper = raw.toUpperCase().replace(/[^A-Z]/g, "");
+  if (STATE_CODE_TO_NAME[upper]) return upper;
+  const normalized = normalizeStateName(raw);
+  if (normalized === "districtofcolumbia" || normalized === "washingtondc") {
+    return "DC";
+  }
+  return STATE_NAME_TO_CODE[normalized] || "";
+}
+
+function renderStateExperienceChips(values = []) {
+  const container = document.getElementById("stateExperienceChips");
+  if (!container) return;
+  const codes = Array.isArray(values)
+    ? values.map((value) => normalizeStateCode(value)).filter(Boolean)
+    : [];
+  const unique = Array.from(new Set(codes));
+  container.innerHTML = "";
+  unique.forEach((code) => {
+    const chip = document.createElement("span");
+    chip.className = "state-chip";
+    chip.dataset.stateCode = code;
+    chip.textContent = STATE_CODE_TO_NAME[code] || code;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "chip-remove";
+    remove.setAttribute("aria-label", `Remove ${chip.textContent}`);
+    remove.textContent = "×";
+    remove.addEventListener("click", () => {
+      const updated = readStateExperienceInput().filter((value) => value !== code);
+      renderStateExperienceChips(updated);
+      refreshParalegalSectionDisplays();
+    });
+    chip.appendChild(remove);
+    container.appendChild(chip);
+  });
+}
+
+function readStateExperienceInput() {
+  const container = document.getElementById("stateExperienceChips");
+  if (container) {
+    return Array.from(container.querySelectorAll("[data-state-code]"))
+      .map((el) => String(el.dataset.stateCode || "").trim())
+      .filter(Boolean);
+  }
+  const input = document.getElementById("stateExperienceInput");
+  if (!input) return [];
+  return parseCommaList(input.value)
+    .map((value) => normalizeStateCode(value))
+    .filter(Boolean);
+}
+
+function readStateExperienceLabels() {
+  return readStateExperienceInput().map((code) => STATE_CODE_TO_NAME[code] || code);
+}
+
+function applyStateExperienceInput(values = []) {
+  const entries = Array.isArray(values)
+    ? values
+    : String(values || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+  const normalized = entries.map((entry) => normalizeStateCode(entry)).filter(Boolean);
+  renderStateExperienceChips(normalized);
+  const input = document.getElementById("stateExperienceInput");
+  if (input) input.value = "";
+}
+
+function bindStateExperienceInput() {
+  const input = document.getElementById("stateExperienceInput");
+  if (!input || input.dataset.bound === "true") return;
+  input.dataset.bound = "true";
+  input.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    const rawValue = input.value.trim();
+    if (!rawValue) return;
+    const entries = rawValue
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const existing = new Set(readStateExperienceInput());
+    let invalid = 0;
+    entries.forEach((entry) => {
+      const code = normalizeStateCode(entry);
+      if (!code) {
+        invalid += 1;
+        return;
+      }
+      existing.add(code);
+    });
+    renderStateExperienceChips(Array.from(existing));
+    input.value = "";
+    refreshParalegalSectionDisplays();
+    if (invalid) {
+      showToast("Use a valid two-letter state abbreviation (e.g., VA).", "err");
+    }
+  });
+}
+
 function sanitizeBestForEntry(value) {
   return String(value || "").replace(/^\s*[•*-]\s*/, "").trim();
 }
@@ -1579,9 +1744,8 @@ function refreshParalegalSectionDisplays() {
   }
 
   const stateExperienceDisplay = document.getElementById("stateExperienceDisplay");
-  const stateExperienceInput = document.getElementById("stateExperienceInput");
   if (stateExperienceDisplay) {
-    const states = parseCommaList(stateExperienceInput?.value || "");
+    const states = readStateExperienceLabels();
     setSectionDisplayText(
       stateExperienceDisplay,
       states.join(", "),
@@ -2847,8 +3011,8 @@ async function loadSettings() {
       const skillsInput = document.getElementById("skillsInput");
       const skillValues = user.highlightedSkills || user.skills || [];
       if (skillsInput) skillsInput.value = skillValues.join(", ");
-      const stateExperienceInput = document.getElementById("stateExperienceInput");
-      if (stateExperienceInput) stateExperienceInput.value = (user.stateExperience || []).join(", ");
+      applyStateExperienceInput(user.stateExperience || []);
+      bindStateExperienceInput();
       renderExperienceRows(Array.isArray(user.experience) ? user.experience : []);
       bindExperienceAddButton();
       renderEducationEditor(user.education || []);
@@ -2914,12 +3078,8 @@ function hydrateProfileForm(user = {}) {
         ? user.skills
         : [];
     if (skillsInput) skillsInput.value = skillsSource.join(", ");
-    const stateExperienceInput = document.getElementById("stateExperienceInput");
-    if (stateExperienceInput) {
-      stateExperienceInput.value = Array.isArray(user.stateExperience)
-        ? user.stateExperience.join(", ")
-        : "";
-    }
+    applyStateExperienceInput(user.stateExperience || []);
+    bindStateExperienceInput();
     renderBestForList(Array.isArray(user.bestFor) ? user.bestFor : [], { editable: false });
     renderExperienceRows(Array.isArray(user.experience) ? user.experience : []);
     bindExperienceAddButton();
@@ -3494,7 +3654,6 @@ async function saveSettings() {
   const yearsExperienceInput = document.getElementById("yearsExperienceInput");
   const practiceAreasInput = document.getElementById("practiceAreasInput");
   const skillsInput = document.getElementById("skillsInput");
-  const stateExperienceInput = document.getElementById("stateExperienceInput");
   const resumeKeyInput = document.getElementById("resumeKeyInput");
   const certificateKeyInput = document.getElementById("certificateKeyInput");
   const writingSampleKeyInput = document.getElementById("writingSampleKeyInput");
@@ -3527,9 +3686,7 @@ async function saveSettings() {
         .map((s) => s.trim())
         .filter(Boolean)
     : [];
-  body.stateExperience = stateExperienceInput
-    ? parseCommaList(stateExperienceInput.value)
-    : [];
+  body.stateExperience = readStateExperienceInput();
   body.bestFor = collectBestForEntries();
   body.skills = body.highlightedSkills;
   body.experience = buildExperienceEntriesForSave(collectExperienceRows());

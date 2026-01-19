@@ -221,10 +221,13 @@ background:#fff;
 .chart-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.5rem;}
 .chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;}
 .stats-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;}
-.lower-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:1.5rem;margin-top:2rem;}
+.user-approvals-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:1.5rem;align-items:start;margin-bottom:1.5rem;}
+.user-approvals-grid .panel{padding:1.2rem 1.35rem;}
+.user-approvals-grid .pending-controls{gap:.5rem;margin-bottom:.75rem;}
+.user-approvals-grid .pending-controls .search{min-width:180px;}
+.user-management-secondary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.5rem;align-items:start;margin-top:1.5rem;}
+.user-management-secondary .panel{width:100%;}
 .panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.5rem;}
-.panel.new-users{min-width:420px;}
-.panel.new-users .search{width:100%;padding:.5rem .75rem;margin-bottom:1rem;border:1px solid var(--line);border-radius:6px;}
 .user-list{list-style:none;padding:0;margin:0;} .user-list li{display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--line);}
 .user-list li .user-actions{display:flex;gap:0.35rem;}
 .user-list li .btn.danger{padding:0.3rem 0.7rem;font-size:0.85rem;}
@@ -330,6 +333,15 @@ cursor:pointer;
 .panel h2 span{font-size:1.2rem;color:var(--muted);}
 .panel-content{margin-top:1rem;display:block;transition:max-height .4s ease;}
 .panel.collapsed .panel-content{display:none;}
+#revenuePanel{
+align-self:start;
+}
+#revenuePanel .panel-content{
+margin-top:.75rem;
+}
+#revenuePanel canvas{
+display:block;
+}
 table{width:100%;border-collapse:collapse;font-size:.9rem;}
 th,td{text-align:left;padding:10px 6px;border-bottom:1px solid var(--line);}
 th{color:var(--muted);font-weight:200;}
@@ -401,12 +413,13 @@ display:flex;
 flex-direction:column;
 }
 .main #section-user-management > header{order:1;}
-.main #section-user-management #pendingUsersPanel{order:2;}
-.main #section-user-management #approvedUsersPanel{order:3;}
-.main #section-user-management .lower-grid{order:4;}
-.main #section-user-management #approvalEmailTestPanel{order:5;}
-.main #section-user-management .dashboard-grid{order:6;}
-.main #section-user-management #deletedUsersPanel{order:7;}
+.main #section-user-management .user-approvals-grid{order:2;}
+.main #section-user-management .dashboard-grid{order:3;}
+.main #section-user-management .user-management-secondary{order:4;}
+.user-approvals-grid,
+.user-management-secondary{
+grid-template-columns:1fr;
+}
 .main #section-photo-reviews{
 display:flex;
 flex-direction:column;
@@ -415,7 +428,6 @@ flex-direction:column;
 .main #section-photo-reviews #photoReviewsPanel{order:2;}
 .metrics,
 .dashboard-grid,
-.lower-grid,
 .grid-two,
 .grid-four,
 .grid,
@@ -425,7 +437,6 @@ flex-direction:column;
 .sales-box{
 grid-template-columns:1fr;
 }
-.panel.new-users{min-width:0;width:100%;}
 .chart-card,
 .panel,
 .metric,
@@ -629,15 +640,6 @@ font-size:.95rem;
 </div>
 </div>
 
-<!-- New Users -->
-<div class="panel" id="userPanel">
-<h2 onclick="togglePanel('userPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('userPanel');}" role="button" tabindex="0" aria-expanded="true">New Users Analytics <span>▾</span></h2>
-<div class="panel-content">
-<canvas id="userChart" height="90"></canvas>
-<button class="btn primary" onclick="alert('Opening Review Queue…')">Review New Users</button>
-</div>
-</div>
-
 <!-- Revenue -->
 <div class="panel" id="revenuePanel">
 <h2 onclick="togglePanel('revenuePanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('revenuePanel');}" role="button" tabindex="0" aria-expanded="true">Revenue Reports <span>▾</span></h2>
@@ -680,6 +682,7 @@ font-size:.95rem;
 <p>Analyze user registrations, activity, and sales performance over time.</p>
 </header>
 
+<div class="user-approvals-grid">
 <div class="panel" id="pendingUsersPanel">
 <div class="panel-header">
 <h2>Pending User Approvals</h2>
@@ -701,15 +704,12 @@ font-size:.95rem;
 <tr>
 <th>Name</th>
 <th>Role</th>
-<th>Email</th>
-<th>Timezone</th>
 <th>Submitted</th>
-<th>Status</th>
 <th>Actions</th>
 </tr>
 </thead>
 <tbody id="pendingUsersBody">
-<tr><td colspan="7" class="pending-empty">Loading pending users…</td></tr>
+<tr><td colspan="4" class="pending-empty">Loading pending users…</td></tr>
 </tbody>
 </table>
 </div>
@@ -749,6 +749,7 @@ font-size:.95rem;
 </table>
 </div>
 </div>
+</div>
 
 <!-- Chart + Cards -->
 <div class="dashboard-grid">
@@ -760,7 +761,7 @@ font-size:.95rem;
 <option>Show By Week</option>
 </select>
 </div>
-<canvas id="userMgmtComboChart" height="110"></canvas>
+<canvas id="userMgmtComboChart" height="70"></canvas>
 </div>
 
 <div class="stats-cards">
@@ -770,20 +771,7 @@ font-size:.95rem;
 </div>
 </div>
 
-<!-- Lower section -->
-<div class="lower-grid">
-<div class="panel new-users">
-<h2>New Users</h2>
-<div class="pending-controls">
-<input type="text" placeholder="Search…" class="search" aria-label="Search" />
-<select id="newUsersPageSelect" aria-label="New users page"></select>
-</div>
-<ul class="user-list" id="newUsersList">
-<li style="color:var(--muted)">Loading…</li>
-</ul>
-</div>
-</div>
-
+<div class="user-management-secondary">
 <div class="panel" id="approvalEmailTestPanel">
 <div class="panel-header">
 <h2>Approval Email Test</h2>
@@ -795,11 +783,12 @@ font-size:.95rem;
 </div>
 </div>
 
-<div class="panel" id="deletedUsersPanel">
+<div class="panel collapsed" id="deletedUsersPanel">
 <div class="panel-header">
-<h2>Deleted Users</h2>
+<h2 onclick="togglePanel('deletedUsersPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('deletedUsersPanel');}" role="button" tabindex="0" aria-expanded="false">Deleted Users <span>▾</span></h2>
 <p id="deletedUsersCountLabel" class="pending-count">0 deleted users</p>
 </div>
+<div class="panel-content">
 <div class="pending-controls">
 <input type="search" id="deletedSearch" class="search" placeholder="Search name or email…" aria-label="Search deleted users" />
 <select id="deletedRoleFilter" aria-label="Filter by role">
@@ -827,6 +816,8 @@ font-size:.95rem;
 <tr><td colspan="6" class="pending-empty">Loading deleted users…</td></tr>
 </tbody>
 </table>
+</div>
+</div>
 </div>
 </div>
 </section>
@@ -1266,6 +1257,8 @@ font-size:.95rem;
 <tbody id="pendingUserDetails"></tbody>
 </table>
 <div class="pending-modal-actions">
+<button type="button" class="btn secondary hidden" id="viewProfileBtn">View Profile</button>
+<button type="button" class="btn secondary hidden" id="roleToggleBtn">Change Role</button>
 <button type="button" class="btn danger" id="denyUserBtn">Deny</button>
 <button type="button" class="btn primary" id="approveUserBtn">Approve</button>
 </div>
@@ -1515,7 +1508,6 @@ incomeCountEl.textContent = "Unable to load income";
 }
 
 /* -------- Charts (0 until data) -------- */
-pushChart(document.getElementById("userChart"),{type:"line",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],borderColor:"#b6a47a",backgroundColor:"rgba(182,164,122,0.15)",fill:true,tension:.4}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
 pushChart(document.getElementById("revChart"),{type:"bar",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],backgroundColor:"#b6a47a"}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
 pushChart(document.getElementById("escrowChart"),{type:"doughnut",data:{labels:["Held","Released","Pending"],datasets:[{data:[0,0,0],backgroundColor:["#b6a47a","#e6d9b8","#dcd5c0"]}]},options:{plugins:{legend:{position:"bottom"}}}});
 
@@ -2124,6 +2116,8 @@ const modalDetails = document.getElementById('pendingUserDetails');
 const closeModalBtn = document.getElementById('closePendingModal');
 const approveBtn = document.getElementById('approveUserBtn');
 const denyBtn = document.getElementById('denyUserBtn');
+const viewProfileBtn = document.getElementById('viewProfileBtn');
+const roleToggleBtn = document.getElementById('roleToggleBtn');
 const approvalTestEmailInput = document.getElementById('approvalTestEmail');
 const approvalTestSendBtn = document.getElementById('approvalTestSendBtn');
 
@@ -2469,7 +2463,7 @@ updatePageSelect(pendingPageSelect, total, pendingPage);
 const pageItems = getPageSlice(pendingUsers, pendingPage);
 if (!total) {
 pendingTableBody.innerHTML =
-'<tr><td colspan="7" class="pending-empty">No pending applications found.</td></tr>';
+'<tr><td colspan="4" class="pending-empty">No pending applications found.</td></tr>';
 return;
 }
 pendingTableBody.innerHTML = '';
@@ -2484,25 +2478,9 @@ const roleTd = document.createElement('td');
 roleTd.textContent = toTitle(user.role);
 roleTd.setAttribute('data-label', 'Role');
 
-const emailTd = document.createElement('td');
-emailTd.textContent = user.email || '—';
-emailTd.setAttribute('data-label', 'Email');
-
-const timezoneTd = document.createElement('td');
-timezoneTd.textContent = user.timezone || '—';
-timezoneTd.setAttribute('data-label', 'Timezone');
-
 const submittedTd = document.createElement('td');
 submittedTd.textContent = formatDate(user.createdAt);
 submittedTd.setAttribute('data-label', 'Submitted');
-
-const statusTd = document.createElement('td');
-const badge = document.createElement('span');
-const statusValue = (user.status || 'pending').toLowerCase();
-badge.className = `status ${statusValue}`;
-badge.textContent = toTitle(statusValue);
-statusTd.appendChild(badge);
-statusTd.setAttribute('data-label', 'Status');
 
 const actionsTd = document.createElement('td');
 actionsTd.className = 'actions';
@@ -2520,7 +2498,7 @@ removeBtn.addEventListener('click', () => deactivateUser(String(user.id || user.
 actionsTd.appendChild(removeBtn);
 actionsTd.setAttribute('data-label', 'Actions');
 
-[nameTd, roleTd, emailTd, timezoneTd, submittedTd, statusTd, actionsTd].forEach((td) =>
+[nameTd, roleTd, submittedTd, actionsTd].forEach((td) =>
 tr.appendChild(td)
 );
 pendingTableBody.appendChild(tr);
@@ -2713,7 +2691,7 @@ if (raw.startsWith('/api/uploads/view')) return raw;
 return `/api/uploads/view?key=${encodeURIComponent(raw)}`;
 };
 
-const openUserModal = (user) => {
+const openUserModal = (user, { mode = 'pending' } = {}) => {
 if (!user || !modal || !modalDetails) return;
 activeUserId = user.id;
 modalDetails.innerHTML = '';
@@ -2746,6 +2724,31 @@ appendDetailRow('About', user.about || '—');
 appendDetailRow('Experience', richListText(user.experience));
 appendDetailRow('Education', richListText(user.education));
 
+const isApprovedView = mode === 'approved';
+if (approveBtn) approveBtn.classList.toggle('hidden', isApprovedView);
+if (denyBtn) denyBtn.classList.toggle('hidden', isApprovedView);
+if (viewProfileBtn) {
+const roleValue = String(user.role || '').toLowerCase();
+const profilePath = roleValue === 'paralegal' ? 'profile-paralegal.html' : 'profile-attorney.html';
+const profileId = user.id || user._id;
+const canView = Boolean(profileId);
+viewProfileBtn.classList.toggle('hidden', !isApprovedView || !canView);
+viewProfileBtn.onclick = () => {
+if (!profileId) return;
+window.open(`${profilePath}?id=${encodeURIComponent(profileId)}`, '_blank', 'noopener');
+};
+}
+if (roleToggleBtn) {
+const roleValue = String(user.role || '').toLowerCase();
+const canToggle = roleValue === 'attorney' || roleValue === 'paralegal';
+const nextRole = roleValue === 'paralegal' ? 'attorney' : 'paralegal';
+roleToggleBtn.classList.toggle('hidden', !isApprovedView || !canToggle);
+roleToggleBtn.textContent = nextRole === 'paralegal' ? 'Make Paralegal' : 'Make Attorney';
+roleToggleBtn.onclick = () => {
+submitRoleChange(user.id || user._id, nextRole, roleToggleBtn);
+};
+}
+
 modal.classList.remove('hidden');
 modal.setAttribute('aria-hidden', 'false');
 };
@@ -2753,13 +2756,13 @@ modal.setAttribute('aria-hidden', 'false');
 const openPendingModal = (userId) => {
 const user = pendingUsers.find((item) => String(item.id) === String(userId));
 if (!user) return;
-openUserModal(user);
+openUserModal(user, { mode: 'pending' });
 };
 
 const openApprovedModal = (userId) => {
 const user = approvedUsers.find((item) => String(item.id) === String(userId));
 if (!user) return;
-openUserModal(user);
+openUserModal(user, { mode: 'approved' });
 };
 
 const closePendingModal = () => {
@@ -2768,6 +2771,8 @@ modal.classList.add('hidden');
 modal.setAttribute('aria-hidden', 'true');
 activeUserId = null;
 if (modalDetails) modalDetails.innerHTML = '';
+if (viewProfileBtn) viewProfileBtn.classList.add('hidden');
+if (roleToggleBtn) roleToggleBtn.classList.add('hidden');
 };
 
 const submitDecision = async (action) => {
@@ -2805,6 +2810,36 @@ showToast(err?.message || 'Unable to update user.', 'err');
 } finally {
 btn.disabled = false;
 btn.textContent = originalText;
+}
+};
+
+const submitRoleChange = async (userId, nextRole, button) => {
+if (!userId || !nextRole) return;
+if (!window.confirm(`Change role to ${toTitle(nextRole)}?`)) return;
+const originalText = button?.textContent;
+if (button) {
+button.disabled = true;
+button.textContent = 'Updating…';
+}
+try {
+await fetchCSRF();
+const res = await secureFetch(`/api/admin/users/${encodeURIComponent(userId)}/role`, {
+method: 'PATCH',
+body: { role: nextRole },
+});
+const payload = await res.json().catch(() => ({}));
+if (!res.ok) {
+throw new Error(payload?.error || payload?.msg || 'Unable to update role.');
+}
+showToast(`Role updated to ${toTitle(nextRole)}.`, 'ok');
+await loadApprovedUsers();
+} catch (err) {
+showToast(err?.message || 'Unable to update role.', 'err');
+} finally {
+if (button) {
+button.disabled = false;
+button.textContent = originalText;
+}
 }
 };
 
@@ -2888,7 +2923,7 @@ if (!pendingTableBody) return;
 const requestId = ++pendingRequestId;
 setPendingLoading(true);
 pendingTableBody.innerHTML =
-'<tr><td colspan="7" class="pending-empty">Loading pending users…</td></tr>';
+'<tr><td colspan="4" class="pending-empty">Loading pending users…</td></tr>';
 const params = new URLSearchParams({ status: 'pending', limit: '50' });
 const roleValue = (pendingRoleFilter?.value || '').toLowerCase();
 if (roleValue && roleValue !== 'all') params.set('role', roleValue);
@@ -2913,7 +2948,7 @@ typeof data.total === 'number' ? data.total : pendingUsers.length
 if (requestId !== pendingRequestId) return;
 pendingUsers = [];
 updatePendingCount(0);
-pendingTableBody.innerHTML = `<tr><td colspan="7" class="pending-empty">${err?.message || 'Unable to load pending users.'}</td></tr>`;
+pendingTableBody.innerHTML = `<tr><td colspan="4" class="pending-empty">${err?.message || 'Unable to load pending users.'}</td></tr>`;
 } finally {
 if (requestId === pendingRequestId) setPendingLoading(false);
 }
