@@ -528,8 +528,17 @@ router.post(
     const publicUrl = `https://${process.env.S3_BUCKET}.s3.${process.env.S3_REGION}.amazonaws.com/${key}`;
     const user = await User.findById(ownerId);
     if (!user) return res.status(404).json({ msg: "User not found" });
-    user.profileImage = publicUrl;
-    user.avatarURL = publicUrl;
+    const role = String(user.role || "").toLowerCase();
+    const requiresReview = role === "paralegal";
+    if (requiresReview) {
+      user.pendingProfileImage = publicUrl;
+      user.profilePhotoStatus = "pending_review";
+    } else {
+      user.profileImage = publicUrl;
+      user.avatarURL = publicUrl;
+      user.pendingProfileImage = "";
+      user.profilePhotoStatus = "approved";
+    }
     await user.save();
 
     try {
@@ -538,7 +547,14 @@ router.post(
       console.warn("[uploads] profile photo upload audit failed", err?.message || err);
     }
 
-    return res.json({ success: true, url: publicUrl });
+    return res.json({
+      success: true,
+      url: publicUrl,
+      status: user.profilePhotoStatus || (requiresReview ? "pending_review" : "approved"),
+      pending: requiresReview,
+      pendingProfileImage: requiresReview ? publicUrl : "",
+      profileImage: requiresReview ? user.profileImage || "" : publicUrl,
+    });
   })
 );
 

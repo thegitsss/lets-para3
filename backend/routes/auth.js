@@ -45,6 +45,59 @@ function buildAuthCookieOptions(req, { maxAge } = {}) {
 }
 const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_CERT_FILE_BYTES = 10 * 1024 * 1024;
+const VALID_US_STATES = new Set([
+  "AL",
+  "AK",
+  "AZ",
+  "AR",
+  "CA",
+  "CO",
+  "CT",
+  "DE",
+  "DC",
+  "FL",
+  "GA",
+  "HI",
+  "ID",
+  "IL",
+  "IN",
+  "IA",
+  "KS",
+  "KY",
+  "LA",
+  "ME",
+  "MD",
+  "MA",
+  "MI",
+  "MN",
+  "MS",
+  "MO",
+  "MT",
+  "NE",
+  "NV",
+  "NH",
+  "NJ",
+  "NM",
+  "NY",
+  "NC",
+  "ND",
+  "OH",
+  "OK",
+  "OR",
+  "PA",
+  "RI",
+  "SC",
+  "SD",
+  "TN",
+  "TX",
+  "UT",
+  "VT",
+  "VA",
+  "WA",
+  "WV",
+  "WI",
+  "WY",
+]);
 const registrationUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_RESUME_FILE_BYTES },
@@ -348,6 +401,10 @@ function isEmail(v = "") {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).toLowerCase());
 }
 
+function isTypoEmailDomain(v = "") {
+  return /@[^@\s]+\.con$/i.test(String(v).trim());
+}
+
 function isObjId(id) {
   return mongoose.isValidObjectId(id);
 }
@@ -421,6 +478,8 @@ router.post(
       termsAccepted,
       phoneNumber,
       barState,
+      state,
+      timezone,
       yearsExperience,
     } = req.body || {};
 
@@ -469,7 +528,20 @@ router.post(
     if (!["attorney", "paralegal"].includes(roleLc)) {
       return res.status(400).json({ msg: "Invalid role" });
     }
+    const normalizedState =
+      typeof state === "string" ? state.trim().toUpperCase() : "";
+    if (!normalizedState) {
+      return res.status(400).json({ msg: "State is required." });
+    }
+    if (!VALID_US_STATES.has(normalizedState)) {
+      return res.status(400).json({ msg: "State must be a valid 2-letter code." });
+    }
+    const safeTimezone =
+      typeof timezone === "string" && timezone.trim().length <= 64 ? timezone.trim() : "";
     if (!isEmail(email)) return res.status(400).json({ msg: "Invalid email" });
+    if (isTypoEmailDomain(normalizedEmail)) {
+      return res.status(400).json({ msg: "Please use a .com email address (.con is a typo)." });
+    }
     if (!password || String(password).length < 8) {
       return res
         .status(400)
@@ -552,11 +624,15 @@ router.post(
       lawFirm: roleLc === "attorney" ? (String(lawFirm || "").trim() || null) : null,
       termsAccepted: true,
       phoneNumber: phoneNumber ? String(phoneNumber).trim() || null : null,
+      state: normalizedState,
+      timezone: safeTimezone || undefined,
       yearsExperience: roleLc === "paralegal" ? safeYearsExperience : undefined,
     });
 
     if (roleLc === "attorney" && normalizedBarState) {
       user.location = normalizedBarState;
+    } else if (roleLc === "paralegal" && normalizedState) {
+      user.location = normalizedState;
     }
 
     // Upload resume (paralegal) before saving
@@ -754,6 +830,9 @@ router.post(
         email: user.email,
         role: user.role,
         status: user.status,
+        state: user.state || "",
+        location: user.location || "",
+        stateExperience: Array.isArray(user.stateExperience) ? user.stateExperience : [],
         disabled: Boolean(user.disabled),
         isFirstLogin,
       },
@@ -824,6 +903,9 @@ router.post(
         email: user.email,
         role: user.role,
         status: user.status,
+        state: user.state || "",
+        location: user.location || "",
+        stateExperience: Array.isArray(user.stateExperience) ? user.stateExperience : [],
         disabled: Boolean(user.disabled),
         isFirstLogin,
       },
@@ -929,6 +1011,9 @@ router.get(
           avatarURL: u.avatarURL || null,
           profileImage: u.profileImage || null,
           status: u.status,
+          state: u.state || "",
+          location: u.location || "",
+          stateExperience: Array.isArray(u.stateExperience) ? u.stateExperience : [],
           disabled: Boolean(u.disabled),
           preferences: {
             theme:

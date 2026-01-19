@@ -27,11 +27,26 @@ const PLACEHOLDER_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponen
   </svg>`
 )}`;
 
-function getProfileImageUrl(user = {}) {
-  return user.profileImage || user.avatarURL || PLACEHOLDER_AVATAR;
+function resolveProfilePhotoStatus(user = {}) {
+  const raw = String(user.profilePhotoStatus || "").trim();
+  if (raw) return raw;
+  if (user.pendingProfileImage) return "pending_review";
+  const hasApproved = Boolean(user.profileImage || user.avatarURL);
+  return hasApproved ? "approved" : "unsubmitted";
+}
+
+function getProfileImageUrl(user = {}, { allowPending = false } = {}) {
+  const approved = user.profileImage || user.avatarURL || "";
+  if (allowPending) {
+    const pending = user.pendingProfileImage || "";
+    if (resolveProfilePhotoStatus(user) === "pending_review" && pending) {
+      return pending;
+    }
+  }
+  return approved || PLACEHOLDER_AVATAR;
 }
 function applyGlobalAvatars(user = state.profileUser || {}) {
-  const src = getProfileImageUrl(user);
+  const src = getProfileImageUrl(user, { allowPending: canEditProfile() });
   if (!src) return;
   const els = document.querySelectorAll("#user-avatar, #avatarPreview");
   els.forEach((el) => {
@@ -44,7 +59,7 @@ function applyGlobalAvatars(user = state.profileUser || {}) {
 }
 
 function applyAvatar(user = state.profileUser || {}) {
-  const src = getProfileImageUrl(user);
+  const src = getProfileImageUrl(user, { allowPending: canEditProfile() });
   if (!src) return;
   const avatar = document.getElementById("user-avatar");
   const preview = document.getElementById("profilePhotoPreview");
@@ -68,6 +83,7 @@ const elements = {
   avatarWrapper: document.querySelector("[data-avatar-wrapper]"),
   avatarImg: document.querySelector("[data-profile-avatar]"),
   avatarFallback: document.querySelector("[data-avatar-fallback]"),
+  photoReviewStatus: document.getElementById("photoReviewStatus"),
   statusChip: document.getElementById("statusChip"),
   locationMeta: document.getElementById("locationMeta"),
   credentialMeta: document.getElementById("credentialMeta"),
@@ -616,17 +632,39 @@ async function uploadProfilePhoto(file) {
     if (!res.ok) {
       throw new Error(data?.error || "Unable to upload profile photo");
     }
-    const url = data?.url || data?.profileImage || data?.location || null;
-    if (url) {
-      const snapshot = state.profileUser || { id: state.paralegalId };
-      state.profileUser = { ...snapshot, profileImage: url };
+    const status = String(data?.status || data?.profilePhotoStatus || "").trim();
+    const pendingUrl = data?.pendingProfileImage || (status === "pending_review" ? data?.url : "");
+    const approvedUrl = data?.profileImage || data?.avatarURL || (status !== "pending_review" ? data?.url : "");
+    const snapshot = state.profileUser || { id: state.paralegalId };
+
+    if (status === "pending_review") {
+      state.profileUser = {
+        ...snapshot,
+        pendingProfileImage: pendingUrl,
+        profilePhotoStatus: "pending_review",
+      };
       if (state.viewerRole === "paralegal" && state.viewerId === state.paralegalId) {
-        state.viewerUser = { ...(state.viewerUser || {}), profileImage: url };
+        state.viewerUser = {
+          ...(state.viewerUser || {}),
+          pendingProfileImage: pendingUrl,
+          profilePhotoStatus: "pending_review",
+        };
         hydrateHeader();
       }
       renderProfile(state.profileUser);
+      showToast("Photo submitted for review.", "success");
+      return;
     }
-    showToast("Profile photo updated.", "success");
+
+    if (approvedUrl) {
+      state.profileUser = { ...snapshot, profileImage: approvedUrl, avatarURL: approvedUrl, profilePhotoStatus: "approved" };
+      if (state.viewerRole === "paralegal" && state.viewerId === state.paralegalId) {
+        state.viewerUser = { ...(state.viewerUser || {}), profileImage: approvedUrl, avatarURL: approvedUrl, profilePhotoStatus: "approved" };
+        hydrateHeader();
+      }
+      renderProfile(state.profileUser);
+      showToast("Profile photo updated.", "success");
+    }
   } catch (err) {
     console.error(err);
     showToast(err.message || "Unable to upload profile photo.", "error");
@@ -661,7 +699,8 @@ function hydrateHeader() {
   if (elements.chipName) elements.chipName.textContent = formatName(state.viewerUser);
   if (elements.chipRole) elements.chipRole.textContent = prettyRole(state.viewerUser.role);
   const avatarSrc =
-    getProfileImageUrl(state.viewerUser) || buildInitialAvatar(getInitials(formatName(state.viewerUser)));
+    getProfileImageUrl(state.viewerUser, { allowPending: canEditProfile() }) ||
+    buildInitialAvatar(getInitials(formatName(state.viewerUser)));
   if (elements.chipAvatar && avatarSrc) {
     elements.chipAvatar.src = avatarSrc;
     elements.chipAvatar.alt = `${formatName(state.viewerUser)} avatar`;
@@ -778,6 +817,10 @@ async function loadProfile() {
         }
       }
     }
+    if (canEditProfile()) {
+      state.viewerUser = { ...(state.viewerUser || {}), ...state.profileUser };
+      hydrateHeader();
+    }
     applyGlobalAvatars(state.profileUser);
     applyAvatar(state.profileUser);
     renderProfile(state.profileUser);
@@ -816,7 +859,8 @@ function renderProfile(profile) {
     elements.bioCopy.classList.toggle("hidden", !hasSummary);
   }
 
-  renderAvatar(fullName, getProfileImageUrl(profile));
+  renderAvatar(fullName, getProfileImageUrl(profile, { allowPending: canEditProfile() }));
+  renderPhotoReviewStatus(profile);
   renderStatus(profile);
   renderMetadata(profile);
   const hasLanguages = renderLanguages(profile.languages || []);
@@ -883,6 +927,26 @@ function renderAvatar(name, avatarUrl) {
     previewAvatar.src = source;
   }
   elements.avatarWrapper?.classList.remove("skeleton-block");
+}
+
+function renderPhotoReviewStatus(profile = {}) {
+  const note = elements.photoReviewStatus;
+  if (!note) return;
+  if (!canEditProfile()) {
+    note.classList.add("hidden");
+    return;
+  }
+  const status = resolveProfilePhotoStatus(profile);
+  let message = "";
+  note.classList.remove("is-rejected");
+  if (status === "pending_review") {
+    message = "Photo pending review. It will appear to attorneys once approved.";
+  } else if (status === "rejected") {
+    message = "Photo rejected. Please upload a professional headshot.";
+    note.classList.add("is-rejected");
+  }
+  note.textContent = message;
+  note.classList.toggle("hidden", !message);
 }
 
 function renderStatus(profile) {

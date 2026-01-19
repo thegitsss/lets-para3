@@ -678,6 +678,22 @@
       align-items: center;
     }
 
+    .photo-review-note {
+      font-size: 0.85rem;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.6);
+      color: #8a6b2e;
+      text-align: center;
+    }
+
+    .photo-review-note.is-rejected {
+      color: #9a3412;
+      border-color: rgba(234, 88, 12, 0.35);
+      background: rgba(255, 237, 213, 0.7);
+    }
+
     .profile-meta-stack {
       display: flex;
       flex-direction: column;
@@ -1531,6 +1547,7 @@
               <img id="user-avatar" src="" alt="Profile photo" />
             </div>
           </div>
+          <div id="photoReviewStatus" class="photo-review-note hidden" role="status" aria-live="polite"></div>
           <div class="profile-meta-stack">
             <div class="profile-meta-columns">
               <div class="meta-column">
@@ -1681,36 +1698,6 @@
       }
     })();
 
-    // Direct bell toggle for notification dropdown
-    async function uploadProfilePhoto(file) {
-      const form = new FormData();
-      form.append("file", file);
-
-      const res = await fetch("/api/uploads/profile-photo", {
-        method: "POST",
-        body: form,
-        credentials: "include"
-      });
-
-      const data = await res.json();
-
-      if (data?.url) {
-        const avatar = document.getElementById("user-avatar");
-        if (avatar) avatar.src = data.url;
-        alert("Profile photo updated!");
-      } else {
-        alert(data.msg || "Upload failed");
-      }
-    }
-
-    const photoInput = document.getElementById("photoInput");
-    if (photoInput) {
-      photoInput.addEventListener("change", (e) => {
-        if (e.target.files?.length) {
-          uploadProfilePhoto(e.target.files[0]);
-        }
-      });
-    }
   </script>
   <script>
     const sidebarToggle = document.getElementById('sidebarToggle');

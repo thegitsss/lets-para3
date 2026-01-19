@@ -199,6 +199,13 @@ const userSchema = new Schema(
     },
     avatarURL: { type: String, default: "", trim: true },
     profileImage: { type: String, default: null },
+    pendingProfileImage: { type: String, default: "", trim: true },
+    profilePhotoStatus: {
+      type: String,
+      enum: ["unsubmitted", "pending_review", "approved", "rejected"],
+      default: "unsubmitted",
+      index: true,
+    },
     lawFirm: { type: String, default: "", trim: true, maxlength: 300 },
     firmWebsite: { type: String, default: "", trim: true, maxlength: 500 },
     state: { type: String, default: "", trim: true, maxlength: 120 },

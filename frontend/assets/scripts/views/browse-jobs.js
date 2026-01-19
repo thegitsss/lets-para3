@@ -40,7 +40,67 @@ let expandedJobId = "";
 let stripeConnected = false;
 let viewerRole = "";
 let allowApply = false;
+let viewerState = "";
+let viewerStateExperience = [];
+let autoStateFilterApplied = false;
 const initialJobParam = (idParam || explicitCaseId || "").trim();
+
+const STATE_NAME_MAP = {
+  AL: "Alabama",
+  AK: "Alaska",
+  AZ: "Arizona",
+  AR: "Arkansas",
+  CA: "California",
+  CO: "Colorado",
+  CT: "Connecticut",
+  DE: "Delaware",
+  DC: "District of Columbia",
+  FL: "Florida",
+  GA: "Georgia",
+  HI: "Hawaii",
+  ID: "Idaho",
+  IL: "Illinois",
+  IN: "Indiana",
+  IA: "Iowa",
+  KS: "Kansas",
+  KY: "Kentucky",
+  LA: "Louisiana",
+  ME: "Maine",
+  MD: "Maryland",
+  MA: "Massachusetts",
+  MI: "Michigan",
+  MN: "Minnesota",
+  MS: "Mississippi",
+  MO: "Missouri",
+  MT: "Montana",
+  NE: "Nebraska",
+  NV: "Nevada",
+  NH: "New Hampshire",
+  NJ: "New Jersey",
+  NM: "New Mexico",
+  NY: "New York",
+  NC: "North Carolina",
+  ND: "North Dakota",
+  OH: "Ohio",
+  OK: "Oklahoma",
+  OR: "Oregon",
+  PA: "Pennsylvania",
+  RI: "Rhode Island",
+  SC: "South Carolina",
+  SD: "South Dakota",
+  TN: "Tennessee",
+  TX: "Texas",
+  UT: "Utah",
+  VT: "Vermont",
+  VA: "Virginia",
+  WA: "Washington",
+  WV: "West Virginia",
+  WI: "Wisconsin",
+  WY: "Wyoming",
+};
+const STATE_CODE_MAP = Object.fromEntries(
+  Object.entries(STATE_NAME_MAP).map(([code, name]) => [name.toLowerCase(), code])
+);
 
 // Elements
 const filterToggle = document.getElementById("filterToggle");
@@ -84,6 +144,64 @@ function readStoredUserId() {
   }
 }
 
+function readStoredState() {
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    if (!raw) return "";
+    const user = JSON.parse(raw);
+    return String(user?.state || user?.location || "");
+  } catch {
+    return "";
+  }
+}
+
+function readStoredStateExperience() {
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    if (!raw) return [];
+    const user = JSON.parse(raw);
+    return user?.stateExperience || [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeViewerState(value) {
+  return String(value || "").trim();
+}
+
+function normalizeStateExperience(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || "").trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function resolveStateOption(rawState, options = []) {
+  const trimmed = String(rawState || "").trim();
+  if (!trimmed) return "";
+  const direct = options.find((value) => value.toLowerCase() === trimmed.toLowerCase());
+  if (direct) return direct;
+  const upper = trimmed.toUpperCase();
+  const mappedName = STATE_NAME_MAP[upper];
+  if (mappedName) {
+    const nameMatch = options.find((value) => value.toLowerCase() === mappedName.toLowerCase());
+    if (nameMatch) return nameMatch;
+  }
+  const mappedCode = STATE_CODE_MAP[trimmed.toLowerCase()];
+  if (mappedCode) {
+    const codeMatch = options.find((value) => value.toLowerCase() === mappedCode.toLowerCase());
+    if (codeMatch) return codeMatch;
+  }
+  return mappedName || mappedCode || trimmed;
+}
+
 function getAppliedStorageKey() {
   return viewerId ? `${APPLIED_STORAGE_KEY}:${viewerId}` : APPLIED_STORAGE_KEY;
 }
@@ -111,6 +229,10 @@ async function ensureSession() {
     }
     viewerRole = String(session?.role || session?.user?.role || "").toLowerCase();
     viewerId = String(session?.user?.id || session?.user?._id || session?.id || session?._id || readStoredUserId());
+    viewerState = normalizeViewerState(session?.user?.state || session?.user?.location || readStoredState());
+    viewerStateExperience = normalizeStateExperience(
+      session?.user?.stateExperience || readStoredStateExperience()
+    );
     allowApply = viewerRole === "paralegal";
     sessionReady = true;
     if (!allowApply) {
@@ -211,6 +333,17 @@ function populateFilters() {
 
   // States
   const states = [...new Set(allJobs.map((j) => getJobState(j)).filter(Boolean))];
+  const preferredState = resolveStateOption(viewerState, states);
+  if (preferredState && !states.some((value) => value.toLowerCase() === preferredState.toLowerCase())) {
+    states.push(preferredState);
+  }
+  const experienceStates = normalizeStateExperience(viewerStateExperience);
+  experienceStates.forEach((entry) => {
+    const preferred = resolveStateOption(entry, states);
+    if (preferred && !states.some((value) => value.toLowerCase() === preferred.toLowerCase())) {
+      states.push(preferred);
+    }
+  });
   stateSelect.innerHTML =
     `<option value="">Any</option>` + states.map((s) => `<option value="${s}">${s}</option>`).join("");
 
@@ -243,7 +376,8 @@ minExpSlider?.addEventListener("input", () => {
 });
 
 // Apply filters
-function applyFilters() {
+function applyFilters(options = {}) {
+  const { render = true } = options;
   const area = practiceAreaSelect?.value || "";
   const state = stateSelect?.value || "";
   const minPay = quantizePayValue(minPaySlider?.value || 0);
@@ -264,11 +398,26 @@ function applyFilters() {
   });
 
   applySort();
-  renderJobs();
-  filterMenu?.classList.remove("active");
+  if (render) {
+    renderJobs();
+    filterMenu?.classList.remove("active");
+  }
 }
 
 applyFiltersBtn?.addEventListener("click", applyFilters);
+
+function applyDefaultStateFilter() {
+  if (autoStateFilterApplied || !viewerState || !stateSelect) return false;
+  const options = Array.from(stateSelect.options || [])
+    .map((opt) => opt.value)
+    .filter(Boolean);
+  const preferred = resolveStateOption(viewerState, options);
+  if (!preferred) return false;
+  stateSelect.value = preferred;
+  autoStateFilterApplied = true;
+  applyFilters({ render: false });
+  return true;
+}
 
 // Clear filters
 function clearFilters() {
@@ -522,7 +671,10 @@ async function fetchJobs() {
     filteredJobs = [...allJobs];
 
     populateFilters();
-    applySort();
+    const autoFiltered = applyDefaultStateFilter();
+    if (!autoFiltered) {
+      applySort();
+    }
     if (initialJobParam) {
       const match = filteredJobs.find((job) => getJobUniqueId(job) === initialJobParam);
       if (match) {

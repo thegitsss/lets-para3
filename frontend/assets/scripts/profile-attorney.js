@@ -303,7 +303,7 @@ function renderProfile(profile) {
   }
 
   setText(elements.firm, profile.lawFirm || profile.firmName || "Independent attorney", "Independent attorney");
-  setText(elements.location, profile.location || formatTimezone(profile.timezone), "Location not provided");
+  setText(elements.location, profile.location, "Location not provided");
 
   const linkedIn = cleanUrl(profile.linkedInURL);
   const website = cleanUrl(profile.firmWebsite || profile.website);
@@ -539,10 +539,6 @@ function describeExperience(value) {
   return `${value} years of experience`;
 }
 
-function formatTimezone(tz) {
-  if (!tz) return "";
-  return `Timezone: ${tz}`;
-}
 
 function cleanUrl(value) {
   if (!value) return "";

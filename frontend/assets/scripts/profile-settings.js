@@ -740,6 +740,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 let settingsState = {
   profileImage: "",
+  pendingProfileImage: "",
+  profilePhotoStatus: "",
   resumeFile: null,
   pendingResumeKey: "",
   pendingCertificateKey: "",
@@ -921,6 +923,9 @@ function seedSettingsState(user = {}) {
   settingsState.highlightedSkills = user.highlightedSkills || user.skills || [];
   settingsState.stateExperience = user.stateExperience || [];
   settingsState.linkedInURL = user.linkedInURL || "";
+  settingsState.profileImage = user.profileImage || user.avatarURL || "";
+  settingsState.pendingProfileImage = user.pendingProfileImage || "";
+  settingsState.profilePhotoStatus = resolveProfilePhotoStatus(user);
   settingsState.notificationPrefs = {
     email: true,
     emailMessages: true,
@@ -931,6 +936,44 @@ function seedSettingsState(user = {}) {
   settingsState.practiceDescription = user.practiceDescription || user.bio || "";
   const freq = typeof user.digestFrequency === "string" ? user.digestFrequency : "off";
   settingsState.digestFrequency = ["off", "daily", "weekly"].includes(freq) ? freq : "off";
+}
+
+function resolveProfilePhotoStatus(user = {}) {
+  const raw = String(user.profilePhotoStatus || settingsState.profilePhotoStatus || "").trim();
+  if (raw) return raw;
+  if (user.pendingProfileImage || settingsState.pendingProfileImage) return "pending_review";
+  const hasApproved = Boolean(user.profileImage || user.avatarURL || settingsState.profileImage);
+  return hasApproved ? "approved" : "unsubmitted";
+}
+
+function resolvePendingProfileImage(user = {}) {
+  return user.pendingProfileImage || settingsState.pendingProfileImage || "";
+}
+
+function getDisplayProfileImage(user = {}, { allowPending = false } = {}) {
+  const approved = user.profileImage || user.avatarURL || settingsState.profileImage || "";
+  if (allowPending) {
+    const status = resolveProfilePhotoStatus(user);
+    const pending = resolvePendingProfileImage(user);
+    if (status === "pending_review" && pending) return pending;
+  }
+  return approved;
+}
+
+function updatePhotoReviewStatus(user = {}) {
+  const statusEl = document.getElementById("photoReviewStatus");
+  if (!statusEl) return;
+  const status = resolveProfilePhotoStatus(user);
+  statusEl.classList.remove("is-rejected");
+  let message = "";
+  if (status === "pending_review") {
+    message = "Photo pending review. It will appear to attorneys once approved.";
+  } else if (status === "rejected") {
+    message = "Photo rejected. Please upload a professional headshot.";
+    statusEl.classList.add("is-rejected");
+  }
+  statusEl.textContent = message;
+  statusEl.classList.toggle("hidden", !message);
 }
 
 function bootstrapProfileSettings(user) {
@@ -958,6 +1001,7 @@ function initParalegalSettings(user = {}) {
   showParalegalSettings();
   hydrateProfileForm(user);
   seedSettingsState(user);
+  updatePhotoReviewStatus(user);
   initParalegalSectionEditing();
   bindEducationModal();
   hydrateParalegalNotificationPrefs(user);
@@ -1684,7 +1728,7 @@ function updateAttorneyAvatarPreview(user = {}) {
   const preview = document.getElementById("attorneyAvatarPreview");
   const initials = document.getElementById("attorneyAvatarInitials");
   const frame = document.getElementById("attorneyAvatarFrame");
-  const avatarUrl = user.profileImage || user.avatarURL || settingsState.profileImage || "";
+  const avatarUrl = getDisplayProfileImage(user, { allowPending: true });
   loadAvatarPreview({
     preview,
     frame,
@@ -2048,9 +2092,6 @@ function collectAttorneyPayload() {
   if (firmWebsite) {
     payload.firmWebsite = firmWebsite;
   }
-  if (settingsState.profileImage) {
-    payload.profileImage = settingsState.profileImage;
-  }
   return payload;
 }
 
@@ -2083,6 +2124,8 @@ async function handleAttorneyProfileSave() {
     persistSession({ user: currentUser });
     window.updateSessionUser?.(currentUser);
     settingsState.profileImage = updatedUser.profileImage || settingsState.profileImage;
+    settingsState.pendingProfileImage = updatedUser.pendingProfileImage || settingsState.pendingProfileImage;
+    settingsState.profilePhotoStatus = resolveProfilePhotoStatus(updatedUser);
     settingsState.practiceDescription = updatedUser.practiceDescription || updatedUser.bio || "";
     renderAttorneyPracticeAreas(updatedUser.practiceAreas || []);
     settingsState.notificationPrefs = {
@@ -2092,6 +2135,7 @@ async function handleAttorneyProfileSave() {
       emailCase: updatedUser.notificationPrefs?.emailCase !== false
     };
     hydrateAttorneyProfileForm(updatedUser);
+    updatePhotoReviewStatus(updatedUser);
     showToast("Profile updated!", "ok");
   } catch (err) {
     console.error("Failed to save attorney profile", err);
@@ -2677,7 +2721,7 @@ function enforceUnifiedRoleStyling(user = {}) {
 }
 
 function applyAvatar(user) {
-  const rawUrl = user?.profileImage || user?.avatarURL || settingsState.profileImage || "";
+  const rawUrl = getDisplayProfileImage(user, { allowPending: true });
   const resolvedUrl = rawUrl || DEFAULT_AVATAR_DATA;
   const cacheBusted = rawUrl
     ? `${rawUrl}${rawUrl.includes("?") ? "&" : "?"}t=${Date.now()}`
@@ -2721,7 +2765,7 @@ function renderFallback(sectionId, title) {
 function syncCluster(user = {}) {
   const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.name || "Paralegal";
   const roleLabel = user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "Paralegal";
-  const avatar = user.profileImage || user.avatarURL || settingsState.profileImage || "https://via.placeholder.com/64x64.png?text=PL";
+  const avatar = getDisplayProfileImage(user, { allowPending: true }) || "https://via.placeholder.com/64x64.png?text=PL";
   const avatarEl = document.getElementById("clusterAvatar");
   if (avatarEl) avatarEl.src = avatar;
   document.querySelectorAll(".nav-profile-photo").forEach((el) => {
@@ -2827,7 +2871,7 @@ async function loadSettings() {
 
   // Store existing data
   seedSettingsState(user);
-  settingsState.profileImage = user.profileImage || user.avatarURL || "";
+  updatePhotoReviewStatus(user);
 
   // Build UI
   try { await loadCertificate(user); } catch { renderFallback("settingsCertificate", "Certificate"); }
@@ -3546,6 +3590,8 @@ async function saveSettings() {
   const newFreq = typeof updatedUser.digestFrequency === "string" ? updatedUser.digestFrequency : "off";
   settingsState.digestFrequency = ["off", "daily", "weekly"].includes(newFreq) ? newFreq : "off";
   settingsState.profileImage = updatedUser.profileImage || settingsState.profileImage;
+  settingsState.pendingProfileImage = updatedUser.pendingProfileImage || settingsState.pendingProfileImage;
+  settingsState.profilePhotoStatus = resolveProfilePhotoStatus(updatedUser);
   settingsState.pendingResumeKey = "";
   settingsState.pendingCertificateKey = "";
   settingsState.pendingWritingSampleKey = "";
@@ -3562,6 +3608,7 @@ async function saveSettings() {
 
   applyAvatar?.(mergedUser);
   updateAvatarRemoveButton(mergedUser);
+  updatePhotoReviewStatus(mergedUser);
   hydrateProfileForm(mergedUser);
   renderLanguageEditor(mergedUser.languages || []);
   bootstrapProfileSettings(mergedUser);
@@ -3614,8 +3661,10 @@ function updateAvatarRemoveButton(user = currentUser || {}) {
   const removeBtn = document.getElementById("removeAvatarBtn");
   if (!removeBtn) return;
   const rawUrl = user.profileImage || user.avatarURL || settingsState.profileImage || "";
-  removeBtn.classList.toggle("hidden", !rawUrl);
-  removeBtn.disabled = !rawUrl;
+  const pendingUrl = resolvePendingProfileImage(user);
+  const hasPhoto = Boolean(rawUrl || pendingUrl);
+  removeBtn.classList.toggle("hidden", !hasPhoto);
+  removeBtn.disabled = !hasPhoto;
 }
 
 function bindAvatarRemoval() {
@@ -3639,11 +3688,14 @@ function bindAvatarRemoval() {
       }
       const mergedUser = mergeSessionPreferences(updatedUser);
       currentUser = mergedUser;
-      settingsState.profileImage = "";
+      settingsState.profileImage = updatedUser.profileImage || "";
+      settingsState.pendingProfileImage = updatedUser.pendingProfileImage || "";
+      settingsState.profilePhotoStatus = resolveProfilePhotoStatus(updatedUser);
       persistSession({ user: mergedUser });
       window.updateSessionUser?.(mergedUser);
       applyAvatar(mergedUser);
       updateAvatarRemoveButton(mergedUser);
+      updatePhotoReviewStatus(mergedUser);
       showToast("Profile photo removed.", "ok");
     } catch (err) {
       console.error("Unable to remove profile photo", err);
@@ -3669,15 +3721,43 @@ async function handleAvatarUpload(config) {
   updateAvatarPreview(preview, frame, initials, localUrl);
 
   try {
-    const uploadedUrl = await uploadProfilePhotoFile(file);
-    if (uploadedUrl) {
-      const updatedUser = mergeSessionPreferences({ ...(currentUser || {}), profileImage: uploadedUrl });
+    const payload = await uploadProfilePhotoFile(file);
+    const status = String(payload?.status || payload?.profilePhotoStatus || "").trim();
+    const pendingUrl = payload?.pendingProfileImage || (status === "pending_review" ? payload?.url : "");
+    const approvedUrl = payload?.profileImage || payload?.avatarURL || (status !== "pending_review" ? payload?.url : "");
+
+    if (status === "pending_review") {
+      const updatedUser = mergeSessionPreferences({
+        ...(currentUser || {}),
+        pendingProfileImage: pendingUrl,
+        profilePhotoStatus: "pending_review",
+      });
       currentUser = updatedUser;
-      settingsState.profileImage = uploadedUrl;
+      settingsState.pendingProfileImage = pendingUrl || settingsState.pendingProfileImage;
+      settingsState.profilePhotoStatus = "pending_review";
       persistSession({ user: updatedUser });
       window.updateSessionUser?.(updatedUser);
       applyAvatar(updatedUser);
       updateAvatarRemoveButton(updatedUser);
+      updatePhotoReviewStatus(updatedUser);
+      showToast("Photo submitted for review.", "ok");
+    } else if (approvedUrl) {
+      const updatedUser = mergeSessionPreferences({
+        ...(currentUser || {}),
+        profileImage: approvedUrl,
+        avatarURL: approvedUrl,
+        pendingProfileImage: "",
+        profilePhotoStatus: "approved",
+      });
+      currentUser = updatedUser;
+      settingsState.profileImage = approvedUrl;
+      settingsState.pendingProfileImage = "";
+      settingsState.profilePhotoStatus = "approved";
+      persistSession({ user: updatedUser });
+      window.updateSessionUser?.(updatedUser);
+      applyAvatar(updatedUser);
+      updateAvatarRemoveButton(updatedUser);
+      updatePhotoReviewStatus(updatedUser);
       showToast("Profile photo updated!", "ok");
     }
   } catch (err) {
@@ -3713,7 +3793,7 @@ async function uploadProfilePhotoFile(file) {
   if (!res.ok) {
     throw new Error(payload?.error || "Upload failed");
   }
-  return payload?.url || payload?.profileImage || payload?.avatarURL || "";
+  return payload;
 }
 
 document.addEventListener("DOMContentLoaded", initAvatarUploaders);

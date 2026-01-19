@@ -130,7 +130,7 @@ const parseParalegalFilters = (query = {}) => {
 };
 
 const SAFE_PUBLIC_SELECT =
-  "_id firstName lastName avatarURL profileImage location specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt languages writingSamples status stateExperience";
+  "_id firstName lastName avatarURL profileImage pendingProfileImage profilePhotoStatus location specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt languages writingSamples status stateExperience";
 const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email phoneNumber`;
 const FILE_PUBLIC_BASE =
   (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
@@ -144,11 +144,14 @@ function toPublicUrl(val) {
   return FILE_PUBLIC_BASE ? `${FILE_PUBLIC_BASE}/${String(val).replace(/^\/+/, "")}` : val;
 }
 
-function serializePublicUser(user, { includeEmail = false, includeStatus = false } = {}) {
+function serializePublicUser(user, { includeEmail = false, includeStatus = false, includePhotoMeta = false } = {}) {
   if (!user) return null;
   const src = user.toObject ? user.toObject() : user;
   const profileImage = toPublicUrl(src.profileImage || "");
   const avatarURL = toPublicUrl(src.avatarURL || profileImage);
+  const rawPhotoStatus = String(src.profilePhotoStatus || "").trim();
+  const resolvedPhotoStatus =
+    rawPhotoStatus || (src.pendingProfileImage ? "pending_review" : avatarURL || profileImage ? "approved" : "unsubmitted");
   const certificateURL = toPublicUrl(src.certificateURL || "");
   const writingSampleURL = toPublicUrl(src.writingSampleURL || "");
   const resumeURL = toPublicUrl(src.resumeURL || "");
@@ -205,6 +208,10 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
   }
   if (includeStatus) {
     payload.status = src.status || "";
+  }
+  if (includePhotoMeta) {
+    payload.profilePhotoStatus = resolvedPhotoStatus;
+    payload.pendingProfileImage = toPublicUrl(src.pendingProfileImage || "");
   }
   return payload;
 }
@@ -341,7 +348,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const me = await User.findById(req.user.id).select(SAFE_SELF_SELECT).lean();
     if (!me) return res.status(404).json({ error: "Not found" });
-    const payload = serializePublicUser(me, { includeEmail: true, includeStatus: true });
+    const payload = serializePublicUser(me, { includeEmail: true, includeStatus: true, includePhotoMeta: true });
     payload.role = me.role;
     return res.json(payload);
   })
@@ -459,7 +466,8 @@ router.post(
 
 /**
  * PATCH /api/users/me
- * Body: { bio?, availability?, resumeURL?, certificateURL?, barNumber?, avatarURL?, timezone? }
+ * Body: { bio?, availability?, resumeURL?, certificateURL?, barNumber?, timezone? }
+ * Note: profile photos must be uploaded via /api/uploads/profile-photo.
  */
 router.patch(
   "/me",
@@ -535,21 +543,21 @@ router.patch(
     const availabilityStr = normalizeAvailability(availability);
     if (availabilityStr) me.availability = availabilityStr;
 
-    if (avatarURL !== undefined) {
+    if (avatarURL !== undefined || profileImage !== undefined) {
       const trimmedAvatar = typeof avatarURL === "string" ? avatarURL.trim() : "";
-      if (!trimmedAvatar) {
-        me.avatarURL = "";
-      } else if (isURL(trimmedAvatar)) {
-        me.avatarURL = trimmedAvatar;
-      }
-    }
-    if (profileImage !== undefined) {
       const trimmedImage = typeof profileImage === "string" ? profileImage.trim() : "";
-      if (!trimmedImage) {
-        me.profileImage = null;
+      const hasNewAvatar = avatarURL !== undefined && trimmedAvatar;
+      const hasNewImage = profileImage !== undefined && trimmedImage;
+      if (hasNewAvatar || hasNewImage) {
+        return res.status(400).json({ error: "Profile photos must be uploaded through the photo uploader." });
+      }
+      const wantsClear =
+        (avatarURL !== undefined && !trimmedAvatar) || (profileImage !== undefined && !trimmedImage);
+      if (wantsClear) {
         me.avatarURL = "";
-      } else if (typeof profileImage === "string") {
-        me.profileImage = trimmedImage;
+        me.profileImage = null;
+        me.pendingProfileImage = "";
+        me.profilePhotoStatus = "unsubmitted";
       }
     }
     if (typeof timezone === "string" && timezone.length <= 64) {
@@ -668,7 +676,7 @@ router.patch(
       await logAction(req, "user.me.update", { targetType: "user", targetId: me._id });
     } catch {}
 
-    return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true }));
+    return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true, includePhotoMeta: true }));
   })
 );
 
@@ -724,7 +732,7 @@ router.post(
         meta: { availability: me.availability },
       });
     } catch {}
-    return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true }));
+    return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true, includePhotoMeta: true }));
   })
 );
 
@@ -749,7 +757,7 @@ router.post(
     try {
       await logAction(req, "user.me.emailPref", { targetType: "user", targetId: me._id, meta: updates });
     } catch {}
-    return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true }));
+    return res.json(serializePublicUser(me, { includeEmail: true, includeStatus: true, includePhotoMeta: true }));
   })
 );
 
@@ -858,7 +866,7 @@ router.get(
       await logAction(req, "user.profile.view", { targetType: "user", targetId: u._id });
     } catch {}
 
-    return res.json(serializePublicUser(u));
+    return res.json(serializePublicUser(u, { includePhotoMeta: isOwner }));
   })
 );
 
@@ -940,7 +948,7 @@ paralegalRouter.get(
       await logAction(req, "paralegal.profile.view", { targetType: "user", targetId: profile._id });
     } catch {}
 
-    return res.json(serializePublicUser(profile, { includeEmail: isOwner, includeStatus: isOwner }));
+    return res.json(serializePublicUser(profile, { includeEmail: isOwner, includeStatus: isOwner, includePhotoMeta: isOwner }));
   })
 );
 
@@ -999,7 +1007,7 @@ paralegalRouter.post(
       await logAction(req, "paralegal.profile.update", { targetType: "user", targetId: paralegal._id });
     } catch {}
 
-    return res.json(serializePublicUser(paralegal, { includeEmail: isSelf, includeStatus: isSelf }));
+    return res.json(serializePublicUser(paralegal, { includeEmail: isSelf, includeStatus: isSelf, includePhotoMeta: isSelf }));
   })
 );
 
@@ -1136,7 +1144,6 @@ async function sendAttorney(attorneyId, res) {
       "location",
       "locationState",
       "state",
-      "timezone",
       "title",
     ].join(" ")
   );
@@ -1173,7 +1180,6 @@ async function sendAttorney(attorneyId, res) {
       attorney.location ||
       attorney.locationState ||
       attorney.state ||
-      attorney.timezone ||
       "",
     title: attorney.title || "Attorney",
   });

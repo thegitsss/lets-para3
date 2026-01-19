@@ -259,6 +259,7 @@ background:#fff;
 .posts-table th,.posts-table td{padding:.75rem;border-bottom:1px solid var(--line);text-align:left;}
 .status.pending{background:#fff4e5;color:#e67e22;padding:4px 8px;border-radius:6px;font-size:.8rem;}
 .status.approved{background:#e2fff7;color:#16a085;padding:4px 8px;border-radius:6px;font-size:.8rem;}
+.status.rejected{background:#fee2e2;color:#b91c1c;padding:4px 8px;border-radius:6px;font-size:.8rem;}
 .flagged-list{list-style:none;padding:0;margin:0;}
 .flagged-list li{padding:.6rem .4rem;border-bottom:1px solid var(--line);font-size:.95rem;}
 .flagged-list li:last-child{border-bottom:none;}
@@ -270,6 +271,17 @@ font-weight:200;
 #section-user-management h1,
 #section-user-management h2,
 #section-user-management h3{
+font-family:var(--font-serif);
+font-weight:300;
+}
+#section-photo-reviews,
+#section-photo-reviews *{
+font-family:var(--font-sans);
+font-weight:200;
+}
+#section-photo-reviews h1,
+#section-photo-reviews h2,
+#section-photo-reviews h3{
 font-family:var(--font-serif);
 font-weight:300;
 }
@@ -354,6 +366,28 @@ font-size:.95rem;
 .pending-empty{padding:1rem;text-align:center;color:var(--muted);}
 .pending-users-table td.actions{width:160px;display:flex;flex-direction:column;gap:8px;}
 .pending-users-table td.actions .btn{width:100%;}
+.photo-review-thumb{
+width:56px;
+height:56px;
+border-radius:50%;
+object-fit:cover;
+border:1px solid var(--line);
+background:#f3f4f6;
+display:block;
+}
+.photo-review-fallback{
+width:56px;
+height:56px;
+border-radius:50%;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:.7rem;
+color:var(--muted);
+background:#f3f4f6;
+border:1px dashed var(--line);
+}
+.photo-review-table td.photo-cell{width:90px;}
 .pending-modal-actions{display:flex;justify-content:flex-end;gap:.75rem;margin-top:1.5rem;}
 #pendingUserModal .details-content{max-width:900px;}
 #pendingUserModal .details-table td:first-child{width:200px;font-weight:300;}
@@ -373,6 +407,12 @@ flex-direction:column;
 .main #section-user-management #approvalEmailTestPanel{order:5;}
 .main #section-user-management .dashboard-grid{order:6;}
 .main #section-user-management #deletedUsersPanel{order:7;}
+.main #section-photo-reviews{
+display:flex;
+flex-direction:column;
+}
+.main #section-photo-reviews > header{order:1;}
+.main #section-photo-reviews #photoReviewsPanel{order:2;}
 .metrics,
 .dashboard-grid,
 .lower-grid,
@@ -417,12 +457,16 @@ padding:.4rem .6rem;
 white-space:nowrap;
 }
 #pendingUsersPanel .pending-users-table thead,
+#photoReviewsPanel .pending-users-table thead,
 #approvedUsersPanel .pending-users-table thead{
 display:none;
 }
 #pendingUsersPanel .pending-users-table,
 #pendingUsersPanel .pending-users-table tbody,
 #pendingUsersPanel .pending-users-table tr,
+#photoReviewsPanel .pending-users-table,
+#photoReviewsPanel .pending-users-table tbody,
+#photoReviewsPanel .pending-users-table tr,
 #approvedUsersPanel .pending-users-table,
 #approvedUsersPanel .pending-users-table tbody,
 #approvedUsersPanel .pending-users-table tr{
@@ -430,11 +474,13 @@ display:block;
 width:100%;
 }
 #pendingUsersPanel .pending-users-table tr,
+#photoReviewsPanel .pending-users-table tr,
 #approvedUsersPanel .pending-users-table tr{
 border-bottom:1px solid var(--line);
 padding:12px 0;
 }
 #pendingUsersPanel .pending-users-table td,
+#photoReviewsPanel .pending-users-table td,
 #approvedUsersPanel .pending-users-table td{
 display:flex;
 justify-content:space-between;
@@ -443,6 +489,7 @@ padding:6px 0;
 border-bottom:none;
 }
 #pendingUsersPanel .pending-users-table td::before,
+#photoReviewsPanel .pending-users-table td::before,
 #approvedUsersPanel .pending-users-table td::before{
 content:attr(data-label);
 color:var(--muted);
@@ -450,6 +497,7 @@ font-size:.8rem;
 letter-spacing:.02em;
 }
 #pendingUsersPanel .pending-users-table td.actions,
+#photoReviewsPanel .pending-users-table td.actions,
 #approvedUsersPanel .pending-users-table td.actions{
 justify-content:flex-start;
 gap:8px;
@@ -457,10 +505,12 @@ flex-direction:column;
 align-items:flex-start;
 }
 #pendingUsersPanel .pending-users-table td.actions::before,
+#photoReviewsPanel .pending-users-table td.actions::before,
 #approvedUsersPanel .pending-users-table td.actions::before{
 content:"Actions";
 }
 #pendingUsersPanel .pending-users-table td.actions .btn,
+#photoReviewsPanel .pending-users-table td.actions .btn,
 #approvedUsersPanel .pending-users-table td.actions .btn{
 padding:1px 4px;
 font-size:.7rem;
@@ -521,6 +571,7 @@ font-size:.95rem;
 <nav>
 <a href="#" class="active" data-section="overview">Overview</a>
 <a href="#" data-section="user-management">User Management</a>
+<a href="#" data-section="photo-reviews">Photo Reviews</a>
 <a href="#" data-section="escrow">Escrow</a>
 <a href="#" data-section="revenue">Revenue</a>
 <a href="#" data-section="posts">Posts</a>
@@ -641,6 +692,7 @@ font-size:.95rem;
 <option value="attorney">Attorneys</option>
 <option value="paralegal">Paralegals</option>
 </select>
+<select id="pendingPageSelect" aria-label="Pending users page"></select>
 <button class="btn secondary" type="button" id="refreshPendingUsers">Refresh</button>
 </div>
 <div class="table-wrap">
@@ -650,17 +702,19 @@ font-size:.95rem;
 <th>Name</th>
 <th>Role</th>
 <th>Email</th>
+<th>Timezone</th>
 <th>Submitted</th>
 <th>Status</th>
 <th>Actions</th>
 </tr>
 </thead>
 <tbody id="pendingUsersBody">
-<tr><td colspan="6" class="pending-empty">Loading pending users…</td></tr>
+<tr><td colspan="7" class="pending-empty">Loading pending users…</td></tr>
 </tbody>
 </table>
 </div>
 </div>
+
 
 <div class="panel" id="approvedUsersPanel">
 <div class="panel-header">
@@ -675,6 +729,7 @@ font-size:.95rem;
 <option value="paralegal">Paralegals</option>
 <option value="admin">Admins</option>
 </select>
+<select id="approvedPageSelect" aria-label="Approved users page"></select>
 <button class="btn secondary" type="button" id="refreshApprovedUsers">Refresh</button>
 </div>
 <div class="table-wrap">
@@ -719,7 +774,10 @@ font-size:.95rem;
 <div class="lower-grid">
 <div class="panel new-users">
 <h2>New Users</h2>
+<div class="pending-controls">
 <input type="text" placeholder="Search…" class="search" aria-label="Search" />
+<select id="newUsersPageSelect" aria-label="New users page"></select>
+</div>
 <ul class="user-list" id="newUsersList">
 <li style="color:var(--muted)">Loading…</li>
 </ul>
@@ -749,6 +807,7 @@ font-size:.95rem;
 <option value="attorney">Attorneys</option>
 <option value="paralegal">Paralegals</option>
 </select>
+<select id="deletedPageSelect" aria-label="Deleted users page"></select>
 <button class="btn secondary" type="button" id="refreshDeletedUsers">Refresh</button>
 <button class="btn danger" type="button" id="purgeDeletedSelected">Permanently Delete Selected</button>
 </div>
@@ -766,6 +825,48 @@ font-size:.95rem;
 </thead>
 <tbody id="deletedUsersBody">
 <tr><td colspan="6" class="pending-empty">Loading deleted users…</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+
+<!-- PHOTO REVIEWS -->
+<section id="section-photo-reviews" class="section">
+<header>
+<h1>Profile Photo Reviews</h1>
+<p>Approve or reject paralegal headshots to keep the marketplace polished.</p>
+</header>
+
+<div class="panel" id="photoReviewsPanel">
+<div class="panel-header">
+<h2>Profile Photo Reviews</h2>
+<p id="photoReviewCountLabel" class="pending-count">0 pending photos</p>
+</div>
+<div class="pending-controls">
+<input type="search" id="photoReviewSearch" class="search" placeholder="Search name or email…" aria-label="Search photo reviews" />
+<select id="photoReviewStatusFilter" aria-label="Filter photo reviews by status">
+<option value="pending_review">Pending review</option>
+<option value="approved">Approved</option>
+<option value="rejected">Rejected</option>
+</select>
+<select id="photoReviewPageSelect" aria-label="Photo reviews page"></select>
+<button class="btn secondary" type="button" id="refreshPhotoReviews">Refresh</button>
+</div>
+<div class="table-wrap">
+<table class="pending-users-table photo-review-table">
+<thead>
+<tr>
+<th>Photo</th>
+<th>Name</th>
+<th>Email</th>
+<th>Submitted</th>
+<th>Status</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="photoReviewsBody">
+<tr><td colspan="6" class="pending-empty">Loading photo reviews…</td></tr>
 </tbody>
 </table>
 </div>
@@ -1988,11 +2089,19 @@ const pendingCountLabel = document.getElementById('pendingUsersCountLabel');
 const pendingSearch = document.getElementById('pendingSearch');
 const pendingRoleFilter = document.getElementById('pendingRoleFilter');
 const refreshPendingBtn = document.getElementById('refreshPendingUsers');
+const pendingPageSelect = document.getElementById('pendingPageSelect');
+const photoReviewsBody = document.getElementById('photoReviewsBody');
+const photoReviewCountLabel = document.getElementById('photoReviewCountLabel');
+const photoReviewSearch = document.getElementById('photoReviewSearch');
+const photoReviewStatusFilter = document.getElementById('photoReviewStatusFilter');
+const refreshPhotoReviewsBtn = document.getElementById('refreshPhotoReviews');
+const photoReviewPageSelect = document.getElementById('photoReviewPageSelect');
 const approvedTableBody = document.getElementById('approvedUsersBody');
 const approvedCountLabel = document.getElementById('approvedUsersCountLabel');
 const approvedSearch = document.getElementById('approvedSearch');
 const approvedRoleFilter = document.getElementById('approvedRoleFilter');
 const refreshApprovedBtn = document.getElementById('refreshApprovedUsers');
+const approvedPageSelect = document.getElementById('approvedPageSelect');
 const deletedTableBody = document.getElementById('deletedUsersBody');
 const deletedCountLabel = document.getElementById('deletedUsersCountLabel');
 const deletedSearch = document.getElementById('deletedSearch');
@@ -2000,6 +2109,7 @@ const deletedRoleFilter = document.getElementById('deletedRoleFilter');
 const refreshDeletedBtn = document.getElementById('refreshDeletedUsers');
 const purgeDeletedBtn = document.getElementById('purgeDeletedSelected');
 const deletedSelectAll = document.getElementById('deletedSelectAll');
+const deletedPageSelect = document.getElementById('deletedPageSelect');
 const auditLogsBody = document.getElementById('auditLogsBody');
 const auditLogsCountLabel = document.getElementById('auditLogsCountLabel');
 const auditSearch = document.getElementById('auditSearch');
@@ -2020,12 +2130,19 @@ const approvalTestSendBtn = document.getElementById('approvalTestSendBtn');
 let pendingUsers = [];
 let pendingRequestId = 0;
 let activeUserId = null;
+let photoReviewItems = [];
+let photoReviewRequestId = 0;
 let approvedUsers = [];
 let approvedRequestId = 0;
 let deletedUsers = [];
 let deletedRequestId = 0;
 let auditLogs = [];
 let auditRequestId = 0;
+const USERS_PAGE_SIZE = 5;
+let pendingPage = 1;
+let photoReviewPage = 1;
+let approvedPage = 1;
+let deletedPage = 1;
 
 const showToast = (message, type = 'info') => {
 if (toastHelper?.show) {
@@ -2133,6 +2250,19 @@ count === 1 ? '1 pending user' : `${count} pending users`;
 }
 };
 
+const updatePhotoReviewCount = (count = 0) => {
+if (!photoReviewCountLabel) return;
+const statusValue = (photoReviewStatusFilter?.value || 'pending_review').toLowerCase();
+const labelBase =
+statusValue === 'rejected'
+? 'rejected photo'
+: statusValue === 'approved'
+? 'approved photo'
+: 'pending photo';
+photoReviewCountLabel.textContent =
+count === 1 ? `1 ${labelBase}` : `${count} ${labelBase}s`;
+};
+
 const updateApprovedCount = (count = 0) => {
 if (approvedCountLabel) {
 approvedCountLabel.textContent =
@@ -2158,6 +2288,12 @@ const setPendingLoading = (loading) => {
 if (!refreshPendingBtn) return;
 refreshPendingBtn.disabled = loading;
 refreshPendingBtn.textContent = loading ? 'Refreshing…' : 'Refresh';
+};
+
+const setPhotoReviewLoading = (loading) => {
+if (!refreshPhotoReviewsBtn) return;
+refreshPhotoReviewsBtn.disabled = loading;
+refreshPhotoReviewsBtn.textContent = loading ? 'Refreshing…' : 'Refresh';
 };
 
 const setApprovedLoading = (loading) => {
@@ -2186,15 +2322,158 @@ user.name ||
 );
 };
 
+const getTotalPages = (total) => Math.max(1, Math.ceil(total / USERS_PAGE_SIZE));
+
+const clampPage = (page, total) => {
+const safePage = Number(page) || 1;
+const totalPages = getTotalPages(total);
+return Math.min(totalPages, Math.max(1, safePage));
+};
+
+const updatePageSelect = (select, total, page) => {
+if (!select) return;
+const totalPages = getTotalPages(total);
+select.innerHTML = '';
+for (let i = 1; i <= totalPages; i += 1) {
+const option = document.createElement('option');
+option.value = String(i);
+option.textContent = `Page ${i} of ${totalPages}`;
+select.appendChild(option);
+}
+select.value = String(page);
+select.disabled = totalPages <= 1;
+};
+
+const getPageSlice = (items = [], page = 1) => {
+const start = (page - 1) * USERS_PAGE_SIZE;
+return items.slice(start, start + USERS_PAGE_SIZE);
+};
+
+const getPhotoStatusClass = (status = '') => {
+const value = String(status || '').toLowerCase();
+if (value === 'pending_review') return 'pending';
+if (value === 'approved') return 'approved';
+if (value === 'rejected') return 'rejected';
+return 'pending';
+};
+
+const renderPhotoReviews = () => {
+if (!photoReviewsBody) return;
+const query = photoReviewSearch?.value?.trim().toLowerCase() || '';
+const items = query
+  ? photoReviewItems.filter((user) => {
+      const name = displayName(user).toLowerCase();
+      const email = String(user.email || '').toLowerCase();
+      return name.includes(query) || email.includes(query);
+    })
+  : photoReviewItems;
+
+const total = items.length;
+photoReviewPage = clampPage(photoReviewPage, total);
+updatePageSelect(photoReviewPageSelect, total, photoReviewPage);
+const pageItems = getPageSlice(items, photoReviewPage);
+if (!total) {
+photoReviewsBody.innerHTML =
+'<tr><td colspan="6" class="pending-empty">No photo reviews found.</td></tr>';
+updatePhotoReviewCount(0);
+return;
+}
+
+photoReviewsBody.innerHTML = '';
+pageItems.forEach((user) => {
+const tr = document.createElement('tr');
+const userId = user.id || user._id;
+
+const photoTd = document.createElement('td');
+photoTd.className = 'photo-cell';
+photoTd.setAttribute('data-label', 'Photo');
+const photoUrl = user.pendingProfileImage || user.profileImage || '';
+if (photoUrl) {
+const img = document.createElement('img');
+img.src = photoUrl;
+img.alt = `Pending photo for ${displayName(user)}`;
+img.className = 'photo-review-thumb';
+img.loading = 'lazy';
+photoTd.appendChild(img);
+} else {
+const fallback = document.createElement('div');
+fallback.className = 'photo-review-fallback';
+fallback.textContent = 'No photo';
+photoTd.appendChild(fallback);
+}
+
+const nameTd = document.createElement('td');
+nameTd.textContent = displayName(user);
+nameTd.setAttribute('data-label', 'Name');
+
+const emailTd = document.createElement('td');
+emailTd.textContent = user.email || '—';
+emailTd.setAttribute('data-label', 'Email');
+
+const submittedTd = document.createElement('td');
+submittedTd.textContent = formatDate(user.createdAt);
+submittedTd.setAttribute('data-label', 'Submitted');
+
+const statusTd = document.createElement('td');
+const badge = document.createElement('span');
+const statusValue = String(user.status || 'pending_review').toLowerCase();
+badge.className = `status ${getPhotoStatusClass(statusValue)}`;
+badge.textContent = toTitle(statusValue.replace(/_/g, ' '));
+statusTd.appendChild(badge);
+statusTd.setAttribute('data-label', 'Status');
+
+const actionsTd = document.createElement('td');
+actionsTd.className = 'actions';
+actionsTd.setAttribute('data-label', 'Actions');
+
+const viewBtn = document.createElement('button');
+viewBtn.type = 'button';
+viewBtn.className = 'btn secondary';
+viewBtn.textContent = 'View';
+viewBtn.disabled = !photoUrl;
+viewBtn.addEventListener('click', () => {
+if (!photoUrl) return;
+window.open(photoUrl, '_blank', 'noopener');
+});
+actionsTd.appendChild(viewBtn);
+
+const isPending = statusValue === 'pending_review';
+const canApprove = isPending && !!photoUrl;
+const canReject = (isPending || statusValue === 'approved') && !!photoUrl;
+const approveBtn = document.createElement('button');
+approveBtn.type = 'button';
+approveBtn.className = 'btn primary';
+approveBtn.textContent = 'Approve';
+approveBtn.disabled = !canApprove;
+const rejectBtn = document.createElement('button');
+rejectBtn.type = 'button';
+rejectBtn.className = 'btn danger';
+rejectBtn.textContent = 'Reject';
+rejectBtn.disabled = !canReject;
+approveBtn.addEventListener('click', () => submitPhotoReviewAction(userId, 'approve', approveBtn, [rejectBtn]));
+rejectBtn.addEventListener('click', () => submitPhotoReviewAction(userId, 'reject', rejectBtn, [approveBtn]));
+actionsTd.appendChild(approveBtn);
+actionsTd.appendChild(rejectBtn);
+
+[photoTd, nameTd, emailTd, submittedTd, statusTd, actionsTd].forEach((td) => tr.appendChild(td));
+photoReviewsBody.appendChild(tr);
+});
+updatePhotoReviewCount(total);
+};
+
 const renderPendingUsers = () => {
 if (!pendingTableBody) return;
-if (!pendingUsers.length) {
+const total = pendingUsers.length;
+pendingPage = clampPage(pendingPage, total);
+updatePageSelect(pendingPageSelect, total, pendingPage);
+const pageItems = getPageSlice(pendingUsers, pendingPage);
+if (!total) {
 pendingTableBody.innerHTML =
-'<tr><td colspan="6" class="pending-empty">No pending applications found.</td></tr>';
+'<tr><td colspan="7" class="pending-empty">No pending applications found.</td></tr>';
 return;
 }
 pendingTableBody.innerHTML = '';
-pendingUsers.forEach((user) => {
+pageItems.forEach((user) => {
 const tr = document.createElement('tr');
 
 const nameTd = document.createElement('td');
@@ -2208,6 +2487,10 @@ roleTd.setAttribute('data-label', 'Role');
 const emailTd = document.createElement('td');
 emailTd.textContent = user.email || '—';
 emailTd.setAttribute('data-label', 'Email');
+
+const timezoneTd = document.createElement('td');
+timezoneTd.textContent = user.timezone || '—';
+timezoneTd.setAttribute('data-label', 'Timezone');
 
 const submittedTd = document.createElement('td');
 submittedTd.textContent = formatDate(user.createdAt);
@@ -2237,7 +2520,7 @@ removeBtn.addEventListener('click', () => deactivateUser(String(user.id || user.
 actionsTd.appendChild(removeBtn);
 actionsTd.setAttribute('data-label', 'Actions');
 
-[nameTd, roleTd, emailTd, submittedTd, statusTd, actionsTd].forEach((td) =>
+[nameTd, roleTd, emailTd, timezoneTd, submittedTd, statusTd, actionsTd].forEach((td) =>
 tr.appendChild(td)
 );
 pendingTableBody.appendChild(tr);
@@ -2246,13 +2529,17 @@ pendingTableBody.appendChild(tr);
 
 const renderApprovedUsers = () => {
 if (!approvedTableBody) return;
-if (!approvedUsers.length) {
+const total = approvedUsers.length;
+approvedPage = clampPage(approvedPage, total);
+updatePageSelect(approvedPageSelect, total, approvedPage);
+const pageItems = getPageSlice(approvedUsers, approvedPage);
+if (!total) {
 approvedTableBody.innerHTML =
 '<tr><td colspan="5" class="pending-empty">No approved users found.</td></tr>';
 return;
 }
 approvedTableBody.innerHTML = '';
-approvedUsers.forEach((user) => {
+pageItems.forEach((user) => {
 const tr = document.createElement('tr');
 
 const nameTd = document.createElement('td');
@@ -2290,14 +2577,18 @@ approvedTableBody.appendChild(tr);
 
 const renderDeletedUsers = () => {
 if (!deletedTableBody) return;
-if (!deletedUsers.length) {
+const total = deletedUsers.length;
+deletedPage = clampPage(deletedPage, total);
+updatePageSelect(deletedPageSelect, total, deletedPage);
+const pageItems = getPageSlice(deletedUsers, deletedPage);
+if (!total) {
 deletedTableBody.innerHTML =
 '<tr><td colspan="6" class="pending-empty">No deleted users found.</td></tr>';
 if (deletedSelectAll) deletedSelectAll.checked = false;
 return;
 }
 deletedTableBody.innerHTML = '';
-deletedUsers.forEach((user) => {
+pageItems.forEach((user) => {
 const tr = document.createElement('tr');
 
 const selectTd = document.createElement('td');
@@ -2436,6 +2727,7 @@ appendDetailRow('Role', toTitle(user.role));
 appendDetailRow('Status', toTitle(user.status));
 appendDetailRow('Availability', user.availability);
 appendDetailRow('Timezone', user.timezone);
+appendDetailRow('State', user.state || user.location);
 appendDetailRow('Location', user.location);
 appendDetailRow('Bar Number', user.barNumber);
 appendDetailRow('Resume', buildFileHref(user.resumeURL), { link: true, linkLabel: 'Open' });
@@ -2516,6 +2808,47 @@ btn.textContent = originalText;
 }
 };
 
+const submitPhotoReviewAction = async (userId, action, clickedBtn, otherBtns = []) => {
+if (!userId) return;
+const isApprove = action === 'approve';
+const buttons = [clickedBtn, ...(Array.isArray(otherBtns) ? otherBtns : [otherBtns])].filter(Boolean);
+const originalText = clickedBtn?.textContent || '';
+buttons.forEach((btn) => {
+btn.disabled = true;
+});
+if (clickedBtn) {
+clickedBtn.textContent = isApprove ? 'Approving…' : 'Rejecting…';
+}
+
+try {
+await fetchCSRF();
+const res = await secureFetch(
+`/api/admin/profile-photos/${encodeURIComponent(userId)}/${isApprove ? 'approve' : 'reject'}`,
+{ method: 'POST', body: {} }
+);
+let payload = {};
+try {
+payload = await res.json();
+} catch (_) {
+payload = {};
+}
+if (!res.ok) {
+throw new Error(payload?.msg || payload?.error || 'Unable to update photo.');
+}
+showToast(isApprove ? 'Photo approved.' : 'Photo rejected.', isApprove ? 'ok' : 'info');
+await loadProfilePhotoReviews();
+} catch (err) {
+showToast(err?.message || 'Unable to update photo.', 'err');
+} finally {
+buttons.forEach((btn) => {
+btn.disabled = false;
+});
+if (clickedBtn) {
+clickedBtn.textContent = originalText || (isApprove ? 'Approve' : 'Reject');
+}
+}
+};
+
 const sendApprovalEmailTestByEmail = async () => {
 if (!approvalTestSendBtn) return;
 const email = approvalTestEmailInput?.value?.trim() || '';
@@ -2555,7 +2888,7 @@ if (!pendingTableBody) return;
 const requestId = ++pendingRequestId;
 setPendingLoading(true);
 pendingTableBody.innerHTML =
-'<tr><td colspan="6" class="pending-empty">Loading pending users…</td></tr>';
+'<tr><td colspan="7" class="pending-empty">Loading pending users…</td></tr>';
 const params = new URLSearchParams({ status: 'pending', limit: '50' });
 const roleValue = (pendingRoleFilter?.value || '').toLowerCase();
 if (roleValue && roleValue !== 'all') params.set('role', roleValue);
@@ -2580,9 +2913,38 @@ typeof data.total === 'number' ? data.total : pendingUsers.length
 if (requestId !== pendingRequestId) return;
 pendingUsers = [];
 updatePendingCount(0);
-pendingTableBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${err?.message || 'Unable to load pending users.'}</td></tr>`;
+pendingTableBody.innerHTML = `<tr><td colspan="7" class="pending-empty">${err?.message || 'Unable to load pending users.'}</td></tr>`;
 } finally {
 if (requestId === pendingRequestId) setPendingLoading(false);
+}
+};
+
+const loadProfilePhotoReviews = async () => {
+if (!photoReviewsBody) return;
+const requestId = ++photoReviewRequestId;
+setPhotoReviewLoading(true);
+photoReviewsBody.innerHTML =
+'<tr><td colspan="6" class="pending-empty">Loading photo reviews…</td></tr>';
+const params = new URLSearchParams();
+const statusValue = (photoReviewStatusFilter?.value || 'pending_review').toLowerCase();
+if (statusValue) params.set('status', statusValue);
+
+try {
+const res = await secureFetch(`/api/admin/profile-photos?${params.toString()}`, {
+headers: { Accept: 'application/json' },
+});
+const data = res.ok ? await res.json() : { items: [] };
+if (requestId !== photoReviewRequestId) return;
+photoReviewItems = Array.isArray(data.items) ? data.items : [];
+renderPhotoReviews();
+} catch (err) {
+if (requestId !== photoReviewRequestId) return;
+photoReviewItems = [];
+updatePhotoReviewCount(0);
+photoReviewsBody.innerHTML =
+`<tr><td colspan="6" class="pending-empty">${err?.message || 'Unable to load photo reviews.'}</td></tr>`;
+} finally {
+if (requestId === photoReviewRequestId) setPhotoReviewLoading(false);
 }
 };
 
@@ -2695,15 +3057,58 @@ timeout = setTimeout(() => fn.apply(null, args), wait);
 };
 };
 
-pendingRoleFilter?.addEventListener('change', () => loadPendingUsers());
+pendingRoleFilter?.addEventListener('change', () => {
+pendingPage = 1;
+loadPendingUsers();
+});
 refreshPendingBtn?.addEventListener('click', () => loadPendingUsers());
-pendingSearch?.addEventListener('input', debounce(() => loadPendingUsers()));
-approvedRoleFilter?.addEventListener('change', () => loadApprovedUsers());
+pendingSearch?.addEventListener('input', debounce(() => {
+pendingPage = 1;
+loadPendingUsers();
+}));
+pendingPageSelect?.addEventListener('change', () => {
+pendingPage = Number(pendingPageSelect.value) || 1;
+renderPendingUsers();
+});
+photoReviewStatusFilter?.addEventListener('change', () => {
+photoReviewPage = 1;
+loadProfilePhotoReviews();
+});
+refreshPhotoReviewsBtn?.addEventListener('click', () => loadProfilePhotoReviews());
+photoReviewSearch?.addEventListener('input', debounce(() => {
+photoReviewPage = 1;
+renderPhotoReviews();
+}));
+photoReviewPageSelect?.addEventListener('change', () => {
+photoReviewPage = Number(photoReviewPageSelect.value) || 1;
+renderPhotoReviews();
+});
+approvedRoleFilter?.addEventListener('change', () => {
+approvedPage = 1;
+loadApprovedUsers();
+});
 refreshApprovedBtn?.addEventListener('click', () => loadApprovedUsers());
-approvedSearch?.addEventListener('input', debounce(() => loadApprovedUsers()));
-deletedRoleFilter?.addEventListener('change', () => loadDeletedUsers());
+approvedSearch?.addEventListener('input', debounce(() => {
+approvedPage = 1;
+loadApprovedUsers();
+}));
+approvedPageSelect?.addEventListener('change', () => {
+approvedPage = Number(approvedPageSelect.value) || 1;
+renderApprovedUsers();
+});
+deletedRoleFilter?.addEventListener('change', () => {
+deletedPage = 1;
+loadDeletedUsers();
+});
 refreshDeletedBtn?.addEventListener('click', () => loadDeletedUsers());
-deletedSearch?.addEventListener('input', debounce(() => loadDeletedUsers()));
+deletedSearch?.addEventListener('input', debounce(() => {
+deletedPage = 1;
+loadDeletedUsers();
+}));
+deletedPageSelect?.addEventListener('change', () => {
+deletedPage = Number(deletedPageSelect.value) || 1;
+renderDeletedUsers();
+});
 auditRoleFilter?.addEventListener('change', () => loadAuditLogs());
 auditTargetFilter?.addEventListener('change', () => loadAuditLogs());
 refreshAuditLogsBtn?.addEventListener('click', () => loadAuditLogs());
@@ -2842,6 +3247,7 @@ tasks.push(
 loadFinanceCards(),
 loadAdminPosts(),
 loadPendingUsers(),
+loadProfilePhotoReviews(),
 loadApprovedUsers(),
 loadDeletedUsers(),
 loadAuditLogs()
@@ -2860,12 +3266,14 @@ softRefreshAdmin();
 startSoftRefresh();
 
 loadPendingUsers();
+loadProfilePhotoReviews();
 loadApprovedUsers();
 loadDeletedUsers();
 loadAuditLogs();
 window.renderPendingUsers = renderPendingUsers;
 window.updatePendingCount = updatePendingCount;
 window.loadPendingUsers = loadPendingUsers;
+window.loadProfilePhotoReviews = loadProfilePhotoReviews;
 </script>
 <script type="module" src="assets/scripts/admin-dashboard.js"></script>
 </body>

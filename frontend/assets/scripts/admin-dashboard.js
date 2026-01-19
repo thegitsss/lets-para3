@@ -17,6 +17,9 @@ let settingsBound = false;
 const ANALYTICS_COOLDOWN_MS = 30_000;
 const removedUserIds = new Set();
 let recentUsersCache = [];
+const NEW_USERS_PAGE_SIZE = 5;
+let newUsersPage = 1;
+const newUsersPageSelect = document.getElementById("newUsersPageSelect");
 
 async function loadAnalytics() {
 if (analyticsInFlight) return null;
@@ -79,6 +82,81 @@ if (!value) return "";
 const date = new Date(value);
 if (Number.isNaN(date.getTime())) return value;
 return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function getNewUsersTotalPages(total) {
+return Math.max(1, Math.ceil(total / NEW_USERS_PAGE_SIZE));
+}
+
+function clampNewUsersPage(page, total) {
+const safePage = Number(page) || 1;
+const totalPages = getNewUsersTotalPages(total);
+return Math.min(totalPages, Math.max(1, safePage));
+}
+
+function updateNewUsersPageSelect(total, page) {
+if (!newUsersPageSelect) return;
+const totalPages = getNewUsersTotalPages(total);
+newUsersPageSelect.innerHTML = "";
+for (let i = 1; i <= totalPages; i += 1) {
+const option = document.createElement("option");
+option.value = String(i);
+option.textContent = `Page ${i} of ${totalPages}`;
+newUsersPageSelect.appendChild(option);
+}
+newUsersPageSelect.value = String(page);
+newUsersPageSelect.disabled = totalPages <= 1;
+}
+
+function renderNewUsersPage() {
+const list = document.getElementById("newUsersList");
+if (!list) return;
+const users = filterActiveUsers(recentUsersCache || []);
+const total = users.length;
+newUsersPage = clampNewUsersPage(newUsersPage, total);
+updateNewUsersPageSelect(total, newUsersPage);
+const start = (newUsersPage - 1) * NEW_USERS_PAGE_SIZE;
+const pageItems = users.slice(start, start + NEW_USERS_PAGE_SIZE);
+if (!total) {
+list.innerHTML = '<li style="color:var(--muted)">No recent users found.</li>';
+return;
+}
+list.innerHTML = "";
+pageItems.forEach((user) => {
+  const li = document.createElement("li");
+  const created = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "";
+  const name = user.name || user.email || "User";
+  const role = (user.role || "user").toLowerCase();
+  const profilePath = role === "paralegal" ? "profile-paralegal" : "profile-attorney";
+  const link = document.createElement("a");
+  link.href = `${profilePath}.html?id=${encodeURIComponent(user.id || user._id || "")}`;
+  link.textContent = name;
+  link.className = "user-link";
+  const roleSpan = document.createElement("span");
+  roleSpan.textContent = user.role || "—";
+  const time = document.createElement("small");
+  time.style.display = "block";
+  time.style.color = "var(--muted)";
+  time.textContent = created;
+  const actions = document.createElement("div");
+  actions.className = "user-actions";
+  const deactivateBtn = document.createElement("button");
+  deactivateBtn.type = "button";
+  deactivateBtn.textContent = "Remove";
+  deactivateBtn.className = "btn danger";
+  deactivateBtn.dataset.userId = user.id || user._id || "";
+  deactivateBtn.addEventListener("click", () => {
+    const userId = deactivateBtn.dataset.userId;
+    if (!userId) return;
+    deactivateUser(userId, { source: "recent" });
+  });
+  actions.appendChild(deactivateBtn);
+  li.appendChild(link);
+  li.appendChild(roleSpan);
+  li.appendChild(time);
+  li.appendChild(actions);
+  list.appendChild(li);
+});
 }
 
 function clampNumber(value, min, max) {
@@ -505,49 +583,16 @@ function populateEscrowReportChart(data) {
 }
 
 function populateNewUsers(data) {
-const list = document.getElementById("newUsersList");
-if (!list) return;
 const users = filterActiveUsers(data?.recentUsers || recentUsersCache);
-if (!users.length) {
-list.innerHTML = '<li style="color:var(--muted)">No recent users found.</li>';
-return;
-}
 recentUsersCache = users;
-list.innerHTML = "";
-  users.forEach((user) => {
-    const li = document.createElement("li");
-    const created = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "";
-    const name = user.name || user.email || "User";
-    const role = (user.role || "user").toLowerCase();
-    const profilePath = role === "paralegal" ? "profile-paralegal" : "profile-attorney";
-    const link = document.createElement("a");
-    link.href = `${profilePath}.html?id=${encodeURIComponent(user.id || user._id || "")}`;
-    link.textContent = name;
-    link.className = "user-link";
-    const roleSpan = document.createElement("span");
-    roleSpan.textContent = user.role || "—";
-    const time = document.createElement("small");
-    time.style.display = "block";
-    time.style.color = "var(--muted)";
-    time.textContent = created;
-    const actions = document.createElement("div");
-    actions.className = "user-actions";
-    const deactivateBtn = document.createElement("button");
-    deactivateBtn.type = "button";
-    deactivateBtn.textContent = "Remove";
-    deactivateBtn.className = "btn danger";
-    deactivateBtn.dataset.userId = user.id || user._id || "";
-    deactivateBtn.addEventListener("click", () => {
-      const userId = deactivateBtn.dataset.userId;
-      if (!userId) return;
-      deactivateUser(userId, { source: "recent" });
-    });
-    actions.appendChild(deactivateBtn);
-    li.appendChild(link);
-    li.appendChild(roleSpan);
-    li.appendChild(time);
-    li.appendChild(actions);
-    list.appendChild(li);
+newUsersPage = 1;
+renderNewUsersPage();
+}
+
+if (newUsersPageSelect) {
+  newUsersPageSelect.addEventListener("change", () => {
+    newUsersPage = Number(newUsersPageSelect.value) || 1;
+    renderNewUsersPage();
   });
 }
 

@@ -1864,6 +1864,31 @@ input[type="number"],
       font-size: 0.85rem;
     }
 
+    #paralegalSettings .photo-guidelines {
+      max-width: 260px;
+      margin: 0;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    #paralegalSettings .photo-review-status {
+      font-size: 0.85rem;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.6);
+      color: #8a6b2e;
+      text-align: center;
+    }
+
+    #paralegalSettings .photo-review-status.is-rejected {
+      color: #9a3412;
+      border-color: rgba(234, 88, 12, 0.35);
+      background: rgba(255, 237, 213, 0.7);
+    }
+
     #paralegalSettings .hero-photo-shell {
       display: flex;
       justify-content: center;
@@ -1997,13 +2022,6 @@ input[type="number"],
     #paralegalSettings .profile-header {
       display: flex;
       flex-direction: column;
-      gap: 24px;
-    }
-
-    #paralegalSettings .profile-header-main {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
       gap: 24px;
     }
 
@@ -2320,6 +2338,52 @@ input[type="number"],
 
     #paralegalSettings .btn-row {
       justify-content: flex-end;
+    }
+
+    #paralegalSettings .paralegal-actions {
+      align-items: center;
+      gap: 18px;
+    }
+
+    #paralegalSettings .paralegal-actions .profile-fyi-card {
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: var(--paralegal-radius);
+      padding: 14px 18px;
+      max-width: 360px;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    #paralegalSettings .paralegal-actions .profile-fyi-title {
+      font-size: 0.7rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    #paralegalSettings .paralegal-actions .profile-fyi-card p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--ink);
+      line-height: 1.5;
+      font-family: "Cormorant Garamond", "Times New Roman", serif;
+    }
+
+    #paralegalSettings .paralegal-actions .profile-fyi-card .fyi-amount {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    @media (max-width: 960px) {
+      #paralegalSettings .paralegal-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      #paralegalSettings .paralegal-actions .profile-fyi-card {
+        max-width: 100%;
+      }
     }
 
     #paralegalSettings input[type="text"],
@@ -3309,6 +3373,11 @@ input[type="number"],
                 <div class="avatar-actions">
                   <button type="button" class="btn btn-outline avatar-remove-btn hidden" id="removeAvatarBtn">Remove photo</button>
                 </div>
+                <p class="photo-guidelines">
+                  Professional headshot required. Use a neutral background, business attire, and no pets or casual photos.
+                  Photos are reviewed before they appear to attorneys.
+                </p>
+                <div id="photoReviewStatus" class="photo-review-status hidden" role="status" aria-live="polite"></div>
                 <div class="profile-meta-stack">
                   <div class="profile-meta-columns">
                     <div class="meta-column">
@@ -3500,6 +3569,10 @@ input[type="number"],
           </section>
 
           <div class="btn-row paralegal-actions">
+            <aside class="profile-fyi-card" aria-label="Marketplace minimum notice">
+              <div class="profile-fyi-title">Professional Standards</div>
+              <p>Matters posted on Let’s-ParaConnect have a minimum posted amount of <span class="fyi-amount">$400</span> to ensure serious, professional legal work. Attorneys are solely responsible for selecting which paralegal they choose to work with, based on experience, fit, and profile quality. Selection is competitive.</p>
+            </aside>
             <button class="btn btn-primary" type="button" id="profileSaveBtn">Save changes</button>
             <button class="btn btn-outline" type="button" id="previewProfileBtn">
     View Profile

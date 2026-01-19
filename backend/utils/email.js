@@ -238,11 +238,33 @@ async function sendWelcomePacket(user) {
   return module.exports(email, subject, body);
 }
 
+async function sendProfilePhotoRejectedEmail(user, opts = {}) {
+  const email = user?.email;
+  if (!email) return;
+  const lastName = user?.lastName || "";
+  const baseUrl =
+    (opts.profileSettingsUrl && String(opts.profileSettingsUrl).trim()) ||
+    (process.env.EMAIL_BASE_URL || process.env.APP_BASE_URL || "https://www.lets-paraconnect.com");
+  const profileUrl = baseUrl.endsWith("/profile-settings.html")
+    ? baseUrl
+    : `${String(baseUrl).replace(/\/+$/, "")}/profile-settings.html`;
+
+  const subject = "Action required: update your profile photo";
+  const html = buildVerificationEmail(lastName, [
+    "Thank you for completing your profile. We reviewed your profile photo and it does not meet our professional headshot requirements.",
+    "Please upload a new professional headshot (neutral background, business attire, no filters, and no pets or casual photos).",
+    `Update your photo here: ${profileUrl}`,
+  ]);
+
+  return module.exports(email, subject, html);
+}
+
 module.exports.sendPendingReviewEmail = sendPendingReviewEmail;
 module.exports.sendAdditionalInfoEmail = sendAdditionalInfoEmail;
 module.exports.sendAcceptedEmail = sendAcceptedEmail;
 module.exports.sendNotAcceptedEmail = sendNotAcceptedEmail;
 module.exports.sendWelcomePacket = sendWelcomePacket;
+module.exports.sendProfilePhotoRejectedEmail = sendProfilePhotoRejectedEmail;
 
 async function sendVerificationEmail(user, code) {
   if (!user?.email) return;

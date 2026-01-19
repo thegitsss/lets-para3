@@ -13,7 +13,7 @@ const PlatformIncome = require("../models/PlatformIncome");
 const Notification = require("../models/Notification");
 const { purgeAttorneyAccount } = require("../services/userDeletion");
 const sendEmail = require("../utils/email");
-const { sendWelcomePacket } = sendEmail;
+const { sendWelcomePacket, sendProfilePhotoRejectedEmail } = sendEmail;
 const { getAppSettings, normalizeTaxRate, serializeAppSettings } = require("../utils/appSettings");
 
 // -----------------------------------------
@@ -110,9 +110,9 @@ const {
 _id, firstName, lastName, email, role, status, bio, about, availability, emailVerified,
 lastLoginAt, lockedUntil, failedLogins, audit, createdAt, updatedAt,
 specialties, jurisdictions, skills, yearsExperience, languages,
-avatarURL, timezone, location, kycStatus, stripeCustomerId, stripeAccountId,
+avatarURL, timezone, location, state, kycStatus, stripeCustomerId, stripeAccountId,
 barNumber, resumeURL, certificateURL, practiceAreas, experience, education,
-disabled,
+disabled, profileImage, pendingProfileImage, profilePhotoStatus,
 } = u;
 return {
 id: _id,
@@ -128,7 +128,10 @@ availability,
 emailVerified,
 lastLoginAt, lockedUntil, failedLogins, audit, createdAt, updatedAt,
 specialties, jurisdictions, skills, yearsExperience, languages,
-avatarURL, timezone, location, kycStatus, stripeCustomerId, stripeAccountId,
+avatarURL, timezone, location, state, kycStatus, stripeCustomerId, stripeAccountId,
+profileImage,
+pendingProfileImage,
+profilePhotoStatus,
 barNumber,
 resumeURL: toFileViewUrl(resumeURL),
 certificateURL: toFileViewUrl(certificateURL),
@@ -146,6 +149,20 @@ if (safe === "rejected") return "denied";
 if (safe === "suspended") return "denied";
 if (["pending", "approved", "denied"].includes(safe)) return safe;
 return null;
+}
+
+function normalizePhotoStatus(value) {
+  const safe = String(value || "").trim().toLowerCase();
+  if (!safe) return null;
+  if (["unsubmitted", "pending_review", "approved", "rejected"].includes(safe)) return safe;
+  return null;
+}
+
+function resolvePhotoStatus(user = {}) {
+  const raw = String(user.profilePhotoStatus || "").trim();
+  if (raw) return raw;
+  if (user.pendingProfileImage) return "pending_review";
+  return user.profileImage || user.avatarURL ? "approved" : "unsubmitted";
 }
 
 function sanitizeNote(note) {
@@ -570,6 +587,109 @@ const items = pending.map((item) => ({
 }));
 res.json({ items });
 })
+);
+
+router.get(
+  "/profile-photos",
+  asyncHandler(async (req, res) => {
+    const status = normalizePhotoStatus(req.query?.status) || "pending_review";
+    const filter = { role: "paralegal", deleted: { $ne: true } };
+    if (status === "pending_review") {
+      filter.profilePhotoStatus = "pending_review";
+      filter.pendingProfileImage = { $ne: "" };
+    } else if (status === "rejected") {
+      filter.profilePhotoStatus = "rejected";
+    } else if (status === "approved") {
+      filter.pendingProfileImage = { $in: ["", null] };
+      filter.$or = [{ profileImage: { $ne: "" } }, { avatarURL: { $ne: "" } }];
+    }
+    const users = await User.find(filter)
+      .select("firstName lastName email profilePhotoStatus pendingProfileImage profileImage avatarURL createdAt")
+      .sort({ updatedAt: -1 })
+      .lean();
+    const items = users.map((user) => ({
+      id: user._id,
+      name: formatFullName(user) || user.email || "User",
+      email: user.email || "",
+      status: resolvePhotoStatus(user),
+      pendingProfileImage: user.pendingProfileImage || "",
+      profileImage: user.profileImage || user.avatarURL || "",
+      createdAt: user.createdAt || null,
+    }));
+    res.json({ items });
+  })
+);
+
+router.post(
+  "/profile-photos/:id/approve",
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if (String(user.role || "").toLowerCase() !== "paralegal") {
+      return res.status(400).json({ error: "Only paralegal profile photos can be reviewed here" });
+    }
+    if (!user.pendingProfileImage) {
+      return res.status(400).json({ error: "No pending profile photo to approve" });
+    }
+    user.profileImage = user.pendingProfileImage;
+    user.avatarURL = user.pendingProfileImage;
+    user.pendingProfileImage = "";
+    user.profilePhotoStatus = "approved";
+    await user.save();
+    try {
+      await AuditLog.logFromReq(req, "admin.profile_photo.approved", {
+        targetType: "user",
+        targetId: user._id,
+      });
+    } catch (err) {
+      console.warn("[admin] profile photo approval audit failed", err?.message || err);
+    }
+    res.json({ ok: true, user: pickUserSafe(user.toObject()), profilePhotoStatus: user.profilePhotoStatus });
+  })
+);
+
+router.post(
+  "/profile-photos/:id/reject",
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if (String(user.role || "").toLowerCase() !== "paralegal") {
+      return res.status(400).json({ error: "Only paralegal profile photos can be reviewed here" });
+    }
+    if (user.pendingProfileImage) {
+      user.pendingProfileImage = "";
+      user.profilePhotoStatus = "rejected";
+    } else if (user.profileImage || user.avatarURL) {
+      user.profileImage = null;
+      user.avatarURL = "";
+      user.pendingProfileImage = "";
+      user.profilePhotoStatus = "rejected";
+    } else {
+      return res.status(400).json({ error: "No profile photo to reject" });
+    }
+    await user.save();
+    try {
+      await AuditLog.logFromReq(req, "admin.profile_photo.rejected", {
+        targetType: "user",
+        targetId: user._id,
+      });
+    } catch (err) {
+      console.warn("[admin] profile photo rejection audit failed", err?.message || err);
+    }
+    try {
+      const profileSettingsUrl = `${ASSET_BASE_URL}/profile-settings.html`;
+      await sendProfilePhotoRejectedEmail(user, { profileSettingsUrl });
+    } catch (err) {
+      console.warn("[admin] profile photo rejection email failed", err?.message || err);
+    }
+    res.json({ ok: true, user: pickUserSafe(user.toObject()), profilePhotoStatus: user.profilePhotoStatus });
+  })
 );
 
 router.post(
