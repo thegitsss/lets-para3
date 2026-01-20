@@ -720,7 +720,7 @@ font-size:.95rem;
 
 <div class="panel collapsed" id="approvedUsersPanel">
 <div class="panel-header">
-<h2 onclick="togglePanel('approvedUsersPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('approvedUsersPanel');}" role="button" tabindex="0" aria-expanded="false">Approved Users <span>▾</span></h2>
+<h2 role="button" tabindex="0" aria-expanded="false" data-panel-toggle="approvedUsersPanel">Approved Users <span>▾</span></h2>
 <p id="approvedUsersCountLabel" class="pending-count">0 approved users</p>
 </div>
 <div class="panel-content">
@@ -789,7 +789,7 @@ font-size:.95rem;
 
 <div class="panel collapsed" id="deletedUsersPanel">
 <div class="panel-header">
-<h2 onclick="togglePanel('deletedUsersPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('deletedUsersPanel');}" role="button" tabindex="0" aria-expanded="false">Deleted Users <span>▾</span></h2>
+<h2 role="button" tabindex="0" aria-expanded="false" data-panel-toggle="deletedUsersPanel">Deleted Users <span>▾</span></h2>
 <p id="deletedUsersCountLabel" class="pending-count">0 deleted users</p>
 </div>
 <div class="panel-content">
@@ -1268,6 +1268,7 @@ font-size:.95rem;
 <div class="pending-modal-actions">
 <button type="button" class="btn secondary hidden" id="viewProfileBtn">View Profile</button>
 <button type="button" class="btn secondary hidden" id="roleToggleBtn">Change Role</button>
+<button type="button" class="btn secondary" id="editEmailBtn">Update Email</button>
 <button type="button" class="btn danger" id="denyUserBtn">Deny</button>
 <button type="button" class="btn primary" id="approveUserBtn">Approve</button>
 </div>
@@ -1469,6 +1470,24 @@ if(id==="approvedUsersPanel"&&!panel.classList.contains('collapsed')){
 window.loadApprovedUsers?.();
 }
 }
+window.togglePanel = togglePanel;
+const bindPanelToggle = (id) => {
+const header = document.querySelector(`#${id} .panel-header h2[role="button"]`);
+if (!header || header.dataset.boundToggle === "true") return;
+header.dataset.boundToggle = "true";
+header.addEventListener("click", (event) => {
+event.preventDefault();
+togglePanel(id);
+});
+header.addEventListener("keydown", (event) => {
+if (event.key === "Enter" || event.key === " ") {
+event.preventDefault();
+togglePanel(id);
+}
+});
+};
+bindPanelToggle("approvedUsersPanel");
+bindPanelToggle("deletedUsersPanel");
 const dashboardCharts=window.dashboardCharts||(window.dashboardCharts=[]);
 if (window.Chart) {
 Chart.defaults.devicePixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -2163,12 +2182,14 @@ const approveBtn = document.getElementById('approveUserBtn');
 const denyBtn = document.getElementById('denyUserBtn');
 const viewProfileBtn = document.getElementById('viewProfileBtn');
 const roleToggleBtn = document.getElementById('roleToggleBtn');
+const editEmailBtn = document.getElementById('editEmailBtn');
 const approvalTestEmailInput = document.getElementById('approvalTestEmail');
 const approvalTestSendBtn = document.getElementById('approvalTestSendBtn');
 
 let pendingUsers = [];
 let pendingRequestId = 0;
 let activeUserId = null;
+let currentModalMode = 'pending';
 let photoReviewItems = [];
 let photoReviewRequestId = 0;
 let approvedUsers = [];
@@ -2736,9 +2757,64 @@ if (raw.startsWith('/api/uploads/view')) return raw;
 return `/api/uploads/view?key=${encodeURIComponent(raw)}`;
 };
 
+const updateUserEmailInList = (list, userId, email) => {
+if (!Array.isArray(list)) return null;
+const matchIndex = list.findIndex((item) => String(item.id || item._id) === String(userId));
+if (matchIndex === -1) return null;
+list[matchIndex] = { ...list[matchIndex], email };
+return list[matchIndex];
+};
+
+const submitEmailUpdate = async (user, mode) => {
+const userId = user?.id || user?._id;
+if (!userId) return;
+const currentEmail = String(user.email || '').trim();
+const nextEmail = window.prompt('Enter the corrected email address:', currentEmail);
+if (!nextEmail) return;
+const normalized = nextEmail.trim().toLowerCase();
+if (!normalized || normalized === currentEmail.toLowerCase()) {
+showToast('Email unchanged.', 'info');
+return;
+}
+const originalLabel = editEmailBtn?.textContent || 'Update Email';
+if (editEmailBtn) {
+editEmailBtn.disabled = true;
+editEmailBtn.textContent = 'Updating…';
+}
+try {
+await fetchCSRF();
+const res = await secureFetch(`/api/admin/users/${encodeURIComponent(userId)}/email`, {
+method: 'PATCH',
+body: { email: normalized },
+});
+const payload = await res.json().catch(() => ({}));
+if (!res.ok) {
+throw new Error(payload?.msg || payload?.error || 'Unable to update email.');
+}
+const updatedUser = payload.user || { ...user, email: normalized };
+updateUserEmailInList(pendingUsers, userId, updatedUser.email);
+updateUserEmailInList(approvedUsers, userId, updatedUser.email);
+if (mode === 'pending') {
+renderPendingUsers();
+} else if (mode === 'approved') {
+renderApprovedUsers();
+}
+showToast('Email updated.', 'ok');
+openUserModal(updatedUser, { mode });
+} catch (err) {
+showToast(err?.message || 'Unable to update email.', 'err');
+} finally {
+if (editEmailBtn) {
+editEmailBtn.disabled = false;
+editEmailBtn.textContent = originalLabel;
+}
+}
+};
+
 const openUserModal = (user, { mode = 'pending' } = {}) => {
 if (!user || !modal || !modalDetails) return;
 activeUserId = user.id;
+currentModalMode = mode;
 modalDetails.innerHTML = '';
 modalTitle.textContent = displayName(user);
 modalSubhead.textContent = `${toTitle(user.role)} • Submitted ${formatDate(
@@ -2793,6 +2869,11 @@ roleToggleBtn.onclick = () => {
 submitRoleChange(user.id || user._id, nextRole, roleToggleBtn);
 };
 }
+if (editEmailBtn) {
+const userId = user.id || user._id;
+editEmailBtn.classList.toggle('hidden', !userId);
+editEmailBtn.onclick = () => submitEmailUpdate(user, mode);
+}
 
 modal.classList.remove('hidden');
 modal.setAttribute('aria-hidden', 'false');
@@ -2818,6 +2899,7 @@ activeUserId = null;
 if (modalDetails) modalDetails.innerHTML = '';
 if (viewProfileBtn) viewProfileBtn.classList.add('hidden');
 if (roleToggleBtn) roleToggleBtn.classList.add('hidden');
+if (editEmailBtn) editEmailBtn.classList.add('hidden');
 };
 
 const submitDecision = async (action) => {
@@ -3030,7 +3112,6 @@ if (requestId === photoReviewRequestId) setPhotoReviewLoading(false);
 
 const loadApprovedUsers = async () => {
 if (!approvedTableBody) return;
-if (approvedPanel?.classList.contains('collapsed')) return;
 const requestId = ++approvedRequestId;
 setApprovedLoading(true);
 approvedTableBody.innerHTML =
@@ -3355,6 +3436,7 @@ window.renderPendingUsers = renderPendingUsers;
 window.updatePendingCount = updatePendingCount;
 window.loadPendingUsers = loadPendingUsers;
 window.loadProfilePhotoReviews = loadProfilePhotoReviews;
+window.loadApprovedUsers = loadApprovedUsers;
 </script>
 <script type="module" src="assets/scripts/admin-dashboard.js"></script>
 </body>

@@ -83,6 +83,14 @@ function isObjId(id) {
 return mongoose.isValidObjectId(id);
 }
 
+function isEmail(value = "") {
+return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).toLowerCase());
+}
+
+function isTypoEmailDomain(value = "") {
+return /@[^@\s]+\.con$/i.test(String(value).trim());
+}
+
 const CASE_AMOUNT_EXPR = { $ifNull: ["$lockedTotalAmount", "$totalAmount"] };
 
 function toFileViewUrl(value) {
@@ -1399,6 +1407,37 @@ try {
   console.warn("[admin] Failed to log role change", err?.message || err);
 }
 
+res.json({ ok: true, user: pickUserSafe(user.toObject()) });
+}));
+
+router.patch("/users/:id/email", csrfProtection, asyncHandler(async (req, res) => {
+const { id } = req.params;
+if (!isObjId(id)) return res.status(400).json({ msg: "Invalid user id" });
+const user = await User.findById(id);
+if (!user) return res.status(404).json({ msg: "User not found" });
+
+const nextEmail = String(req.body?.email || "").trim().toLowerCase();
+if (!isEmail(nextEmail)) return res.status(400).json({ msg: "Invalid email address" });
+if (isTypoEmailDomain(nextEmail)) {
+  return res.status(400).json({ msg: "Email must not end with .con" });
+}
+if (nextEmail !== user.email) {
+  const exists = await User.countDocuments({ email: nextEmail, _id: { $ne: user._id } });
+  if (exists) return res.status(409).json({ msg: "Email already in use" });
+  const previousEmail = user.email || "";
+  user.email = nextEmail;
+  user.emailVerified = false;
+  await user.save();
+  try {
+    await AuditLog.logFromReq(req, "admin.user.email_changed", {
+      targetType: "user",
+      targetId: user._id,
+      meta: { from: previousEmail, to: nextEmail },
+    });
+  } catch (err) {
+    console.warn("[admin] Failed to log email change", err?.message || err);
+  }
+}
 res.json({ ok: true, user: pickUserSafe(user.toObject()) });
 }));
 
