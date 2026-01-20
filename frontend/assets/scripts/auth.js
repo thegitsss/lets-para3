@@ -235,6 +235,20 @@ function wireLogoutButton() {
   }
 }
 
+function wireLogoutDelegation() {
+  if (window.__lpcLogoutDelegation) return;
+  window.__lpcLogoutDelegation = true;
+  document.addEventListener(
+    "click",
+    (event) => {
+      const target = event.target?.closest?.("[data-logout]");
+      if (!target) return;
+      logoutUser(event);
+    },
+    true
+  );
+}
+
 // Boot-time: add 'loaded' class, fetch CSRF, and toggle role-based UI (best-effort)
 window.addEventListener("DOMContentLoaded", async () => {
   document.body.classList.add("loaded");
@@ -253,6 +267,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 
   wireLogoutButton();
+  wireLogoutDelegation();
 });
 // === Auto-inject logged-in user's name + avatar globally ===
 export async function loadUserHeaderInfo() {

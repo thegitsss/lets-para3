@@ -148,6 +148,8 @@ function formatNotificationTitle(item = {}) {
       return "Application Update";
     case "profile_approved":
       return "Profile Approved";
+    case "profile_photo_approved":
+      return "Profile Photo Approved";
     case "resume_uploaded":
       return "Resume Updated";
     case "payout_released":
@@ -190,6 +192,8 @@ function formatNotificationBody(item = {}) {
       return "Your resume has been successfully uploaded.";
     case "profile_approved":
       return "Your profile was approved.";
+    case "profile_photo_approved":
+      return "Your profile photo was approved.";
     case "payout_released":
       return `Your payout is on the way${payload.amount ? ` (${payload.amount})` : ""}.`;
     case "case_awaiting_funding":
@@ -671,7 +675,7 @@ function resolveNotificationLink(item = {}) {
     return "browse-jobs.html";
   }
   if (jobId) return `browse-jobs.html?id=${encodeURIComponent(jobId)}`;
-  if (type === "profile_approved" || type === "resume_uploaded") {
+  if (type === "profile_approved" || type === "profile_photo_approved" || type === "resume_uploaded") {
     return "profile-settings.html";
   }
   if (type === "payout_released") {

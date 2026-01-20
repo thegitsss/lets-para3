@@ -2808,8 +2808,18 @@
       });
       if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
-          localStorage.clear();
-          sessionStorage.clear();
+          if (typeof window.logoutUser === "function") {
+            window.logoutUser();
+            return;
+          }
+          ["lpc_user", "lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"].forEach((key) => {
+            try {
+              localStorage.removeItem(key);
+            } catch {}
+            try {
+              sessionStorage.removeItem(key);
+            } catch {}
+          });
           window.location.href = 'index.html';
         });
       }

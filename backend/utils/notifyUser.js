@@ -36,6 +36,8 @@ function buildDisplayMessage(type, payload = {}) {
       return "Your resume was uploaded successfully.";
     case "profile_approved":
       return "Your profile was approved.";
+    case "profile_photo_approved":
+      return "Your profile photo was approved.";
     case "payout_released":
       return `Your payout was released${payload.amount ? ` (${payload.amount})` : ""}.`;
     case "application_submitted": {
@@ -61,21 +63,22 @@ function buildDisplayMessage(type, payload = {}) {
 
 async function resolveActorSnapshot(actorUserId) {
   if (!actorUserId) {
-    return { actorUserId: null, actorFirstName: "", actorProfileImage: "" };
+    return { actorUserId: null, actorFirstName: "", actorProfileImage: "", actorRole: "" };
   }
   try {
-    const actor = await User.findById(actorUserId).select("firstName profileImage avatarURL");
+    const actor = await User.findById(actorUserId).select("firstName profileImage avatarURL role");
     if (!actor) {
-      return { actorUserId, actorFirstName: "", actorProfileImage: "" };
+      return { actorUserId, actorFirstName: "", actorProfileImage: "", actorRole: "" };
     }
     return {
       actorUserId: actor._id,
       actorFirstName: actor.firstName || "",
       actorProfileImage: actor.profileImage || actor.avatarURL || "",
+      actorRole: actor.role || "",
     };
   } catch (err) {
     console.warn("[notifyUser] actor lookup failed", err?.message || err);
-    return { actorUserId, actorFirstName: "", actorProfileImage: "" };
+    return { actorUserId, actorFirstName: "", actorProfileImage: "", actorRole: "" };
   }
 }
 
@@ -105,6 +108,11 @@ function emailTemplate(type, payload) {
       return {
         subject: "Profile approved",
         html: "<p>Your profile has been approved. You can now access new opportunities on LPC.</p>"
+      };
+    case "profile_photo_approved":
+      return {
+        subject: "Profile photo approved",
+        html: "<p>Your profile photo was approved and is now live on your profile.</p>"
       };
     case "case_invite_response":
       return {
@@ -233,14 +241,21 @@ async function notifyUser(userId, type, payload = {}, options = {}) {
   const shouldCreateInApp = shouldCreateInAppNotification(user, type);
   let notif = null;
   if (shouldCreateInApp) {
-    const message = buildDisplayMessage(type, { ...payload, actorFirstName: actor.actorFirstName });
+    const payloadWithActor = { ...payload };
+    if (actor.actorFirstName && !payloadWithActor.actorFirstName) {
+      payloadWithActor.actorFirstName = actor.actorFirstName;
+    }
+    if (actor.actorRole && !payloadWithActor.actorRole) {
+      payloadWithActor.actorRole = actor.actorRole;
+    }
+    const message = buildDisplayMessage(type, { ...payloadWithActor });
     notif = await Notification.create({
       userId,
       userRole: user.role || "",
       type,
       message,
       link: payload.link || "",
-      payload,
+      payload: payloadWithActor,
       actorUserId: actor.actorUserId,
       actorFirstName: actor.actorFirstName,
       actorProfileImage: actor.actorProfileImage,
@@ -269,14 +284,21 @@ async function createNotification({
 }) {
   if (!userId || !type) return null;
   const actor = await resolveActorSnapshot(actorUserId);
-  const finalMessage = message || buildDisplayMessage(type, { ...payload, actorFirstName: actor.actorFirstName });
+  const payloadWithActor = { ...payload };
+  if (actor.actorFirstName && !payloadWithActor.actorFirstName) {
+    payloadWithActor.actorFirstName = actor.actorFirstName;
+  }
+  if (actor.actorRole && !payloadWithActor.actorRole) {
+    payloadWithActor.actorRole = actor.actorRole;
+  }
+  const finalMessage = message || buildDisplayMessage(type, { ...payloadWithActor });
   const notif = await Notification.create({
     userId,
     userRole,
     type,
     message: finalMessage,
     link,
-    payload: payload || {},
+    payload: payloadWithActor,
     actorUserId: actor.actorUserId,
     actorFirstName: actor.actorFirstName,
     actorProfileImage: actor.actorProfileImage,

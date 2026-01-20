@@ -14,6 +14,7 @@ const Notification = require("../models/Notification");
 const { purgeAttorneyAccount } = require("../services/userDeletion");
 const sendEmail = require("../utils/email");
 const { sendWelcomePacket, sendProfilePhotoRejectedEmail } = sendEmail;
+const { notifyUser } = require("../utils/notifyUser");
 const { getAppSettings, normalizeTaxRate, serializeAppSettings } = require("../utils/appSettings");
 
 // -----------------------------------------
@@ -655,6 +656,11 @@ router.post(
       });
     } catch (err) {
       console.warn("[admin] profile photo approval audit failed", err?.message || err);
+    }
+    try {
+      await notifyUser(user._id, "profile_photo_approved", {}, { actorUserId: req.user.id });
+    } catch (err) {
+      console.warn("[admin] notifyUser profile_photo_approved failed", err);
     }
     res.json({ ok: true, user: pickUserSafe(user.toObject()), profilePhotoStatus: user.profilePhotoStatus });
   })

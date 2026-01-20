@@ -4023,10 +4023,14 @@ input[type="number"],
       }
       // Fallback if helper is unavailable
       fetch("/api/auth/logout", { method: "POST", credentials: "include" }).finally(() => {
-        try {
-          localStorage.clear();
-          sessionStorage.clear();
-        } catch (_) {}
+        ["lpc_user", "lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"].forEach((key) => {
+          try {
+            localStorage.removeItem(key);
+          } catch (_) {}
+          try {
+            sessionStorage.removeItem(key);
+          } catch (_) {}
+        });
         window.location.href = "login.html";
       });
     });

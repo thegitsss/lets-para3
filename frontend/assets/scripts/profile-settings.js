@@ -742,6 +742,8 @@ let settingsState = {
   profileImage: "",
   pendingProfileImage: "",
   profilePhotoStatus: "",
+  stagedProfilePhotoFile: null,
+  stagedProfilePhotoUrl: "",
   resumeFile: null,
   pendingResumeKey: "",
   pendingCertificateKey: "",
@@ -1011,6 +1013,9 @@ function resolvePendingProfileImage(user = {}) {
 function getDisplayProfileImage(user = {}, { allowPending = false } = {}) {
   const approved = user.profileImage || user.avatarURL || settingsState.profileImage || "";
   if (allowPending) {
+    if (settingsState.stagedProfilePhotoUrl) {
+      return settingsState.stagedProfilePhotoUrl;
+    }
     const status = resolveProfilePhotoStatus(user);
     const pending = resolvePendingProfileImage(user);
     if (status === "pending_review" && pending) return pending;
@@ -1021,6 +1026,12 @@ function getDisplayProfileImage(user = {}, { allowPending = false } = {}) {
 function updatePhotoReviewStatus(user = {}) {
   const statusEl = document.getElementById("photoReviewStatus");
   if (!statusEl) return;
+  if (settingsState.stagedProfilePhotoFile) {
+    statusEl.classList.remove("is-rejected");
+    statusEl.textContent = "";
+    statusEl.classList.add("hidden");
+    return;
+  }
   const status = resolveProfilePhotoStatus(user);
   statusEl.classList.remove("is-rejected");
   let message = "";
@@ -1082,6 +1093,15 @@ function initParalegalSettings(user = {}) {
 
 let profileTourInitialized = false;
 
+function getStoredUserSnapshot() {
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 function getProfileTourKey(user) {
   const id = String(user?.id || user?._id || "").trim();
   return id ? `lpc_paralegal_profile_tour_${id}` : "";
@@ -1102,6 +1122,14 @@ function markProfileTourCompleted(user) {
   if (!key) return;
   try {
     localStorage.setItem(key, "1");
+    const raw = localStorage.getItem("lpc_user");
+    if (raw) {
+      const stored = JSON.parse(raw);
+      if (stored && typeof stored === "object") {
+        stored.isFirstLogin = false;
+        localStorage.setItem("lpc_user", JSON.stringify(stored));
+      }
+    }
   } catch {}
 }
 
@@ -1119,9 +1147,26 @@ function initParalegalProfileTour(user = {}) {
   const nextBtn = document.getElementById("profileTourNextBtn");
   if (!overlay || !tooltip || !titleEl || !textEl || !closeBtn || !backBtn || !nextBtn) return;
 
+  const stored = getStoredUserSnapshot();
+  const effectiveUser = user || stored || {};
+  const role = String(effectiveUser?.role || "").toLowerCase();
+  const status = String(effectiveUser?.status || "").toLowerCase();
+  const storedFlag = stored?.isFirstLogin;
+  const userFlag = effectiveUser?.isFirstLogin;
+  const isFirstLogin = typeof storedFlag === "boolean" ? storedFlag : Boolean(userFlag);
+
   const params = new URLSearchParams(window.location.search);
   const forceTour = params.get("tour") === "1";
-  if (!forceTour && hasCompletedProfileTour(user)) return;
+  const shouldShow =
+    forceTour ||
+    (role === "paralegal" &&
+      (!status || status === "approved") &&
+      isFirstLogin &&
+      !hasCompletedProfileTour(effectiveUser));
+  if (!shouldShow) return;
+  if (!forceTour) {
+    markProfileTourCompleted(effectiveUser);
+  }
 
   const steps = [
     {
@@ -2888,7 +2933,9 @@ function applyAvatar(user) {
   const rawUrl = getDisplayProfileImage(user, { allowPending: true });
   const resolvedUrl = rawUrl || DEFAULT_AVATAR_DATA;
   const cacheBusted = rawUrl
-    ? `${rawUrl}${rawUrl.includes("?") ? "&" : "?"}t=${Date.now()}`
+    ? rawUrl.startsWith("blob:") || rawUrl.startsWith("data:")
+      ? rawUrl
+      : `${rawUrl}${rawUrl.includes("?") ? "&" : "?"}t=${Date.now()}`
     : resolvedUrl;
 
   const header = document.getElementById("headerAvatar");
@@ -3644,6 +3691,7 @@ function loadNotifications(user) {
 
 async function saveSettings() {
   syncNamePartsFromFullName();
+  const stagedPhoto = !!settingsState.stagedProfilePhotoFile;
   const firstNameInput = document.getElementById("firstNameInput");
   const lastNameInput = document.getElementById("lastNameInput");
   const emailInput = document.getElementById("emailInput");
@@ -3657,6 +3705,16 @@ async function saveSettings() {
   const resumeKeyInput = document.getElementById("resumeKeyInput");
   const certificateKeyInput = document.getElementById("certificateKeyInput");
   const writingSampleKeyInput = document.getElementById("writingSampleKeyInput");
+  if (settingsState.stagedProfilePhotoFile) {
+    try {
+      const payload = await uploadProfilePhotoFile(settingsState.stagedProfilePhotoFile);
+      applyProfilePhotoUploadResult(payload, { suppressToast: true });
+    } catch (err) {
+      console.error("Unable to upload profile photo", err);
+      showToast("Unable to upload photo. Please try again.", "err");
+      return;
+    }
+  }
   const body = {
     firstName: firstNameInput ? firstNameInput.value.trim() : "",
     lastName: lastNameInput ? lastNameInput.value.trim() : "",
@@ -3777,7 +3835,10 @@ async function saveSettings() {
   try {
     localStorage.removeItem(PREFILL_CACHE_KEY);
   } catch {}
-  showToast("Settings saved!", "ok");
+  showToast(
+    stagedPhoto ? "Settings saved and profile photo submitted for review." : "Settings saved!",
+    "ok"
+  );
 }
 
 // -----------------------------
@@ -3819,9 +3880,65 @@ function updateAvatarRemoveButton(user = currentUser || {}) {
   if (!removeBtn) return;
   const rawUrl = user.profileImage || user.avatarURL || settingsState.profileImage || "";
   const pendingUrl = resolvePendingProfileImage(user);
-  const hasPhoto = Boolean(rawUrl || pendingUrl);
+  const stagedUrl = settingsState.stagedProfilePhotoUrl || "";
+  const hasPhoto = Boolean(rawUrl || pendingUrl || stagedUrl);
   removeBtn.classList.toggle("hidden", !hasPhoto);
   removeBtn.disabled = !hasPhoto;
+}
+
+function clearStagedProfilePhoto() {
+  if (settingsState.stagedProfilePhotoUrl?.startsWith("blob:")) {
+    URL.revokeObjectURL(settingsState.stagedProfilePhotoUrl);
+  }
+  settingsState.stagedProfilePhotoUrl = "";
+  settingsState.stagedProfilePhotoFile = null;
+}
+
+function applyProfilePhotoUploadResult(payload = {}, { suppressToast = false } = {}) {
+  const status = String(payload?.status || payload?.profilePhotoStatus || "").trim();
+  const pendingUrl = payload?.pendingProfileImage || (status === "pending_review" ? payload?.url : "");
+  const approvedUrl = payload?.profileImage || payload?.avatarURL || (status !== "pending_review" ? payload?.url : "");
+
+  if (status === "pending_review") {
+    const updatedUser = mergeSessionPreferences({
+      ...(currentUser || {}),
+      pendingProfileImage: pendingUrl,
+      profilePhotoStatus: "pending_review",
+    });
+    currentUser = updatedUser;
+    settingsState.pendingProfileImage = pendingUrl || settingsState.pendingProfileImage;
+    settingsState.profilePhotoStatus = "pending_review";
+    persistSession({ user: updatedUser });
+    window.updateSessionUser?.(updatedUser);
+    applyAvatar(updatedUser);
+    updateAvatarRemoveButton(updatedUser);
+    updatePhotoReviewStatus(updatedUser);
+    if (!suppressToast) {
+      showToast("Photo submitted for review.", "ok");
+    }
+  } else if (approvedUrl) {
+    const updatedUser = mergeSessionPreferences({
+      ...(currentUser || {}),
+      profileImage: approvedUrl,
+      avatarURL: approvedUrl,
+      pendingProfileImage: "",
+      profilePhotoStatus: "approved",
+    });
+    currentUser = updatedUser;
+    settingsState.profileImage = approvedUrl;
+    settingsState.pendingProfileImage = "";
+    settingsState.profilePhotoStatus = "approved";
+    persistSession({ user: updatedUser });
+    window.updateSessionUser?.(updatedUser);
+    applyAvatar(updatedUser);
+    updateAvatarRemoveButton(updatedUser);
+    updatePhotoReviewStatus(updatedUser);
+    if (!suppressToast) {
+      showToast("Profile photo updated!", "ok");
+    }
+  }
+
+  clearStagedProfilePhoto();
 }
 
 function bindAvatarRemoval() {
@@ -3830,6 +3947,13 @@ function bindAvatarRemoval() {
   if (removeBtn.dataset.bound === "true") return;
   removeBtn.dataset.bound = "true";
   removeBtn.addEventListener("click", async () => {
+    if (settingsState.stagedProfilePhotoFile) {
+      clearStagedProfilePhoto();
+      applyAvatar(currentUser || {});
+      updateAvatarRemoveButton(currentUser || {});
+      updatePhotoReviewStatus(currentUser || {});
+      return;
+    }
     if (!currentUser) return;
     const originalLabel = removeBtn.textContent;
     removeBtn.disabled = true;
@@ -3874,56 +3998,32 @@ async function handleAvatarUpload(config) {
   const file = input.files?.[0];
   if (!file) return;
 
-  const localUrl = URL.createObjectURL(file);
-  updateAvatarPreview(preview, frame, initials, localUrl);
-
-  try {
-    const payload = await uploadProfilePhotoFile(file);
-    const status = String(payload?.status || payload?.profilePhotoStatus || "").trim();
-    const pendingUrl = payload?.pendingProfileImage || (status === "pending_review" ? payload?.url : "");
-    const approvedUrl = payload?.profileImage || payload?.avatarURL || (status !== "pending_review" ? payload?.url : "");
-
-    if (status === "pending_review") {
-      const updatedUser = mergeSessionPreferences({
-        ...(currentUser || {}),
-        pendingProfileImage: pendingUrl,
-        profilePhotoStatus: "pending_review",
-      });
-      currentUser = updatedUser;
-      settingsState.pendingProfileImage = pendingUrl || settingsState.pendingProfileImage;
-      settingsState.profilePhotoStatus = "pending_review";
-      persistSession({ user: updatedUser });
-      window.updateSessionUser?.(updatedUser);
-      applyAvatar(updatedUser);
-      updateAvatarRemoveButton(updatedUser);
-      updatePhotoReviewStatus(updatedUser);
-      showToast("Photo submitted for review.", "ok");
-    } else if (approvedUrl) {
-      const updatedUser = mergeSessionPreferences({
-        ...(currentUser || {}),
-        profileImage: approvedUrl,
-        avatarURL: approvedUrl,
-        pendingProfileImage: "",
-        profilePhotoStatus: "approved",
-      });
-      currentUser = updatedUser;
-      settingsState.profileImage = approvedUrl;
-      settingsState.pendingProfileImage = "";
-      settingsState.profilePhotoStatus = "approved";
-      persistSession({ user: updatedUser });
-      window.updateSessionUser?.(updatedUser);
-      applyAvatar(updatedUser);
-      updateAvatarRemoveButton(updatedUser);
-      updatePhotoReviewStatus(updatedUser);
-      showToast("Profile photo updated!", "ok");
-    }
-  } catch (err) {
-    console.error("Unable to upload profile photo", err);
-    showToast("Unable to upload photo. Please try again.", "err");
-  } finally {
-    URL.revokeObjectURL(localUrl);
-    input.value = "";
+  if (settingsState.stagedProfilePhotoUrl?.startsWith("blob:")) {
+    URL.revokeObjectURL(settingsState.stagedProfilePhotoUrl);
   }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = typeof reader.result === "string" ? reader.result : "";
+    const previewUrl = dataUrl || URL.createObjectURL(file);
+    updateAvatarPreview(preview, frame, initials, previewUrl);
+    settingsState.stagedProfilePhotoFile = file;
+    settingsState.stagedProfilePhotoUrl = previewUrl;
+    applyAvatar(currentUser || {});
+    updateAvatarRemoveButton(currentUser || {});
+    updatePhotoReviewStatus(currentUser || {});
+  };
+  reader.onerror = () => {
+    const fallbackUrl = URL.createObjectURL(file);
+    updateAvatarPreview(preview, frame, initials, fallbackUrl);
+    settingsState.stagedProfilePhotoFile = file;
+    settingsState.stagedProfilePhotoUrl = fallbackUrl;
+    applyAvatar(currentUser || {});
+    updateAvatarRemoveButton(currentUser || {});
+    updatePhotoReviewStatus(currentUser || {});
+  };
+  reader.readAsDataURL(file);
+  input.value = "";
 }
 
 function updateAvatarPreview(preview, frame, initials, src) {
@@ -3995,9 +4095,15 @@ function handleProfilePreviewNavigation() {
 window.logoutUser = function (e) {
   if (e) e.preventDefault();
 
-  // Clear client auth
-  localStorage.clear();
-  sessionStorage.clear();
+  // Clear client auth (preserve non-auth keys like tour flags)
+  ["lpc_user", "lpc_token", "token", "auth_token", "LPC_JWT", "lpc_jwt"].forEach((key) => {
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+    try {
+      sessionStorage.removeItem(key);
+    } catch {}
+  });
 
   // Backend logout (if applicable)
   fetch("/api/auth/logout", { credentials: "include" })
