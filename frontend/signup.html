@@ -548,6 +548,10 @@
               ></div>
             </div>
 
+            <p id="paralegalAdmissionNotice" class="role-note" style="display:none;margin-top:16px;font-size:0.9rem;font-weight:200;color:var(--muted);">
+              Let’s-ParaConnect is a highly curated professional platform. Not all paralegal applications are approved. Learn more about our
+              <a href="/paralegal-admission.html" style="color:var(--gold);text-decoration:none;">Paralegal Admission Requirements</a>.
+            </p>
             <button id="submitBtn" class="btn" type="submit">Create Account</button>
             <div class="extra-links">
               <p>Already have an account? <a href="login.html">Log in</a></p>
@@ -586,6 +590,7 @@
     const msg = document.getElementById('msg');
     const submitBtn = document.getElementById('submitBtn');
     const roleFieldWrap = document.getElementById('roleFieldWrap');
+    const admissionNotice = document.getElementById('paralegalAdmissionNotice');
     const togglePw = document.getElementById('togglePw');
     const pw = document.getElementById('password');
     const stepOnePanel = document.getElementById('stepOnePanel');
@@ -682,6 +687,7 @@
 
     function setRole(r) {
       role = r;
+      if (admissionNotice) admissionNotice.style.display = r === 'paralegal' ? '' : 'none';
       [btnA, btnP].forEach(b => {
         const on = b.dataset.role === r;
         b.setAttribute('aria-pressed', on ? 'true' : 'false');

@@ -236,6 +236,8 @@ background:#fff;
 .sales-box div strong{display:block;font-size:1.3rem;color:var(--accent);}
 .sales-box div span{font-size:.85rem;color:var(--muted);}
 .grid-two {display:grid;grid-template-columns:2fr 1fr;gap:1.5rem;margin-bottom:2rem;}
+#section-escrow .escrow-chart-row{grid-template-columns:repeat(2,minmax(0,1fr));}
+#section-escrow .escrow-action-row{grid-template-columns:repeat(2,minmax(0,1fr));}
 .post-category-compact{width:50%;margin:0 auto;}
 .quality-chart-compact{width:50%;margin:0 auto;}
 .escrow-summary {display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1.5rem;}
@@ -414,7 +416,7 @@ flex-direction:column;
 }
 .main #section-user-management > header{order:1;}
 .main #section-user-management .user-approvals-grid{order:2;}
-.main #section-user-management .dashboard-grid{order:3;}
+.main #section-user-management .dashboard-grid{order:3;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));}
 .main #section-user-management .user-management-secondary{order:4;}
 .user-approvals-grid,
 .user-management-secondary{
@@ -605,7 +607,7 @@ font-size:.95rem;
 
 <div class="metrics">
 <div class="metric"><h3>Total Users</h3><p id="totalUsers">0</p></div>
-<div class="metric"><h3>Funds in Escrow</h3><p id="escrowTotal">$0</p></div>
+<div class="metric"><h3>Funds in Escrow</h3><p id="escrowTotal">—</p></div>
 <div class="metric"><h3>Active Cases</h3><p id="activeCases">0</p></div>
 <div class="metric"><h3>Pending Approvals</h3><p id="pendingUsers">0</p></div>
 </div>
@@ -613,12 +615,12 @@ font-size:.95rem;
 <div class="grid-four" style="margin-bottom:1.5rem;">
 <div class="card" id="payoutCard">
 <h3>Payouts</h3>
-<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="payoutTotal">$0</p>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="payoutTotal">—</p>
 <p class="small" id="payoutCount">0 payouts recorded</p>
 </div>
 <div class="card" id="incomeCard">
 <h3>Platform Income</h3>
-<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="incomeTotal">$0</p>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="incomeTotal">—</p>
 <p class="small" id="incomeCount">0 income records</p>
 </div>
 </div>
@@ -716,11 +718,12 @@ font-size:.95rem;
 </div>
 
 
-<div class="panel" id="approvedUsersPanel">
+<div class="panel collapsed" id="approvedUsersPanel">
 <div class="panel-header">
-<h2>Approved Users</h2>
+<h2 onclick="togglePanel('approvedUsersPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('approvedUsersPanel');}" role="button" tabindex="0" aria-expanded="false">Approved Users <span>▾</span></h2>
 <p id="approvedUsersCountLabel" class="pending-count">0 approved users</p>
 </div>
+<div class="panel-content">
 <div class="pending-controls">
 <input type="search" id="approvedSearch" class="search" placeholder="Search name, email, or specialty…" aria-label="Search approved users" />
 <select id="approvedRoleFilter" aria-label="Filter approved users by role">
@@ -747,6 +750,7 @@ font-size:.95rem;
 <tr><td colspan="5" class="pending-empty">Loading approved users…</td></tr>
 </tbody>
 </table>
+</div>
 </div>
 </div>
 </div>
@@ -872,7 +876,7 @@ font-size:.95rem;
 </header>
 
 <!-- Top Chart Row -->
-<div class="grid-two">
+<div class="grid-two escrow-chart-row">
 <div class="panel">
 <h2>Monthly Escrow Report</h2>
 <canvas id="escrowReportChart" height="90"></canvas>
@@ -886,7 +890,6 @@ font-size:.95rem;
 
 <!-- Quick Stats -->
 <div class="quick-stats">
-<div><strong>3</strong><span>Total Users</span></div>
 <div><strong>3</strong><span>Active Users</span></div>
 <div><strong>0</strong><span>Email Unverified</span></div>
 <div><strong>1</strong><span>Pending Withdrawals</span></div>
@@ -894,6 +897,7 @@ font-size:.95rem;
 <div><strong>0</strong><span>Rejected Deposits</span></div>
 </div>
 
+<div class="grid-two escrow-action-row">
 <div class="panel">
 <h2>Reconcile Case Payment</h2>
 <p class="small">Force-sync Stripe payment status for a case.</p>
@@ -905,22 +909,32 @@ font-size:.95rem;
 
 <!-- Tickets -->
 <div class="panel">
-<div class="panel-header">
 <h2>Recent Tickets</h2>
-<a href="#" class="view-all">View All</a>
+<p class="small">Escrow support requests and dispute tickets.</p>
+<button class="btn secondary" type="button" id="recentTicketsBtn">View Recent Tickets</button>
+</div>
+</div>
+
+<!-- Hidden Detail Modal -->
+<div id="recentTicketsModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="recentTicketsTitle">
+<div class="details-content">
+<div class="details-header">
+<h2 id="recentTicketsTitle">Recent Tickets</h2>
+<button class="btn secondary" data-recent-tickets-close>Close ✕</button>
 </div>
 <table class="tickets">
 <thead>
 <tr><th>Subject</th><th>Status</th></tr>
 </thead>
 <tbody>
-<tr><td><a href="#">Ticket#125950 - dfsaf</a></td><td><span class="status open">Open</span></td></tr>
-<tr><td><a href="#">Ticket#754912 - dfsaf</a></td><td><span class="status open">Open</span></td></tr>
-<tr><td><a href="#">Ticket#94883578 - fsdfsd</a></td><td><span class="status open">Open</span></td></tr>
-<tr><td><a href="#">Ticket#40031718 - In molestiae delenit</a></td><td><span class="status open">Open</span></td></tr>
-<tr><td><a href="#">Ticket#70632904 - dfg</a></td><td><span class="status open">Open</span></td></tr>
+<tr><td>Ticket#125950 - dfsaf</td><td><span class="status open">Open</span></td></tr>
+<tr><td>Ticket#754912 - dfsaf</td><td><span class="status open">Open</span></td></tr>
+<tr><td>Ticket#94883578 - fsdfsd</td><td><span class="status open">Open</span></td></tr>
+<tr><td>Ticket#40031718 - In molestiae delenit</td><td><span class="status open">Open</span></td></tr>
+<tr><td>Ticket#70632904 - dfg</td><td><span class="status open">Open</span></td></tr>
 </tbody>
 </table>
+</div>
 </div>
 
 <!-- Hidden Detail Modal -->
@@ -945,12 +959,12 @@ font-size:.95rem;
 <tr><td><strong>Buyer’s Email</strong></td><td>client@email.com</td></tr>
 <tr><td><strong>Charge Payer</strong></td><td><span class="highlight-text">Buyer(50%) - Seller(50%)</span></td></tr>
 <tr><td><strong>Status</strong></td><td>Active</td></tr>
-<tr><td><strong>Amount</strong></td><td>$30.00</td></tr>
-<tr><td><strong>Charge</strong></td><td>$4.90</td></tr>
-<tr><td><strong>Created Milestone</strong></td><td>$0.00 USD</td></tr>
-<tr><td><strong>Milestone Funded</strong></td><td>$0.00 USD</td></tr>
-<tr><td><strong>Milestone Unfunded</strong></td><td>$0.00 USD</td></tr>
-<tr><td><strong>Rest Amount</strong></td><td>$32.45 USD</td></tr>
+<tr><td><strong>Amount</strong></td><td>—</td></tr>
+<tr><td><strong>Charge</strong></td><td>—</td></tr>
+<tr><td><strong>Created Milestone</strong></td><td>—</td></tr>
+<tr><td><strong>Milestone Funded</strong></td><td>—</td></tr>
+<tr><td><strong>Milestone Unfunded</strong></td><td>—</td></tr>
+<tr><td><strong>Rest Amount</strong></td><td>—</td></tr>
 <tr><td><strong>Disputed By</strong></td><td>test12</td></tr>
 <tr><td><strong>Dispute Reason</strong></td><td>Delayed delivery</td></tr>
 </table>
@@ -968,10 +982,10 @@ font-size:.95rem;
 
 <!-- Overview Row -->
 <div class="grid-four">
-<div class="card"><h3>Total Revenue</h3><p>$42,560.00</p></div>
-<div class="card highlight"><h3>Escrow Released</h3><p>$28,430.00</p></div>
-<div class="card"><h3>Pending Payouts</h3><p>$4,120.00</p></div>
-<div class="card highlight"><h3>Platform Fees Collected</h3><p>$2,835.00</p></div>
+<div class="card"><h3>Total Revenue</h3><p>—</p></div>
+<div class="card highlight"><h3>Escrow Released</h3><p>—</p></div>
+<div class="card"><h3>Pending Payouts</h3><p>—</p></div>
+<div class="card highlight"><h3>Platform Fees Collected</h3><p>—</p></div>
 </div>
 
 <!-- Charts -->
@@ -998,10 +1012,7 @@ font-size:.95rem;
 <tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Type</th><th>Status</th></tr>
 </thead>
 <tbody id="ledgerBody">
-<tr><td>2025-11-01</td><td>Attorney Payment</td><td>Case #1245 – Contract Draft</td><td>$1,200.00</td><td>Income</td><td><span class="status open">Cleared</span></td></tr>
-<tr><td>2025-11-02</td><td>Paralegal Payout</td><td>Case #1198 – Research Support</td><td>-$350.00</td><td>Expense</td><td><span class="status open">Cleared</span></td></tr>
-<tr><td>2025-11-03</td><td>Stripe Fee</td><td>Transaction Processing</td><td>-$9.75</td><td>Expense</td><td><span class="status open">Cleared</span></td></tr>
-<tr><td>2025-11-05</td><td>Escrow Deposit</td><td>Case #1272 – Litigation Review</td><td>$2,450.00</td><td>Income</td><td><span class="status open">Pending</span></td></tr>
+<tr><td colspan="6" style="text-align:center;color:var(--muted)">No ledger entries found.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1011,9 +1022,9 @@ font-size:.95rem;
 <div class="panel">
 <h2>Tax Summary</h2>
 <ul class="tax-summary">
-<li><strong>Gross Earnings:</strong> $42,560.00</li>
-<li><strong>Deductible Expenses:</strong> $12,475.00</li>
-<li><strong>Estimated Tax Owed (22%):</strong> $6,615.00</li>
+<li><strong>Gross Earnings:</strong> —</li>
+<li><strong>Deductible Expenses:</strong> —</li>
+<li><strong>Estimated Tax Owed (22%):</strong> —</li>
 <li><strong>Next Filing Deadline:</strong> April 15 2026</li>
 </ul>
 <button class="btn secondary" id="taxReportBtn" type="button">Generate Tax Report</button>
@@ -1022,9 +1033,7 @@ font-size:.95rem;
 <div class="panel">
 <h2>Upcoming Payout Schedule</h2>
 <ul class="payout-schedule">
-<li>Nov 15 – $1,800 to Jane Smith</li>
-<li>Nov 22 – $2,100 to John Doe</li>
-<li>Dec 01 – $3,500 to Kelly Adams</li>
+<li>No payouts scheduled.</li>
 </ul>
 </div>
 </div>
@@ -1456,6 +1465,9 @@ const heading=panel.querySelector('h2[role="button"]');
 if(heading){
 heading.setAttribute('aria-expanded',String(!panel.classList.contains('collapsed')));
 }
+if(id==="approvedUsersPanel"&&!panel.classList.contains('collapsed')){
+window.loadApprovedUsers?.();
+}
 }
 const dashboardCharts=window.dashboardCharts||(window.dashboardCharts=[]);
 if (window.Chart) {
@@ -1485,8 +1497,7 @@ return fallback;
 }
 
 function formatCurrencyFromCents(value) {
-const dollars = Number(value || 0) / 100;
-return dollars.toLocaleString(undefined, { style: "currency", currency: "USD" });
+return "—";
 }
 
 async function loadFinanceCards() {
@@ -1583,6 +1594,9 @@ options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
 /* -------- Escrow Details Modal Logic -------- */
 const escrowModal = document.getElementById("escrowDetails");
 const escrowCloseBtn = escrowModal?.querySelector("[data-escrow-close]");
+const recentTicketsModal = document.getElementById("recentTicketsModal");
+const recentTicketsBtn = document.getElementById("recentTicketsBtn");
+const recentTicketsCloseBtn = recentTicketsModal?.querySelector("[data-recent-tickets-close]");
 function openEscrowDetails(){
   if (!escrowModal || !escrowModal.classList.contains("hidden")) return;
   requestAnimationFrame(() => {
@@ -1613,12 +1627,42 @@ if (escrowModal) {
     }
   });
 }
-document.querySelectorAll(".tickets tbody tr td a").forEach(a=>{
-  a.addEventListener("click",e=>{
-    e.preventDefault();
-    openEscrowDetails();
+function openRecentTicketsModal(){
+  if (!recentTicketsModal || !recentTicketsModal.classList.contains("hidden")) return;
+  requestAnimationFrame(() => {
+    recentTicketsModal.classList.remove("hidden");
+    recentTicketsModal.setAttribute("aria-hidden","false");
   });
-});
+}
+function closeRecentTicketsModal(){
+  if (!recentTicketsModal) return;
+  recentTicketsModal.classList.add("hidden");
+  recentTicketsModal.setAttribute("aria-hidden","true");
+  const content = recentTicketsModal.querySelector(".details-content");
+  if (content) content.scrollTop = 0;
+}
+if (recentTicketsBtn) {
+  recentTicketsBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    openRecentTicketsModal();
+  });
+}
+if (recentTicketsCloseBtn) {
+  recentTicketsCloseBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeRecentTicketsModal();
+  });
+}
+if (recentTicketsModal) {
+  recentTicketsModal.addEventListener("click", (e) => {
+    if (e.target === recentTicketsModal) closeRecentTicketsModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !recentTicketsModal.classList.contains("hidden")) {
+      closeRecentTicketsModal();
+    }
+  });
+}
 
 /* -------- Revenue Charts -------- */
 pushChart(document.getElementById("revMainChart"),{
@@ -1628,14 +1672,14 @@ labels:["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov"],
 datasets:[
 {
 label:"Revenue",
-data:[4200,5100,4800,5300,6200,5700,6900,7100,6800,7200,7450],
+data:[0,0,0,0,0,0,0,0,0,0,0],
 backgroundColor:"rgba(182,164,122,0.6)",
 borderRadius:6
 },
 {
 type:"line",
 label:"Profit Margin %",
-data:[18,22,20,24,26,25,27,28,30,29,31],
+data:[0,0,0,0,0,0,0,0,0,0,0],
 borderColor:"#1abc9c",
 tension:0.4,
 yAxisID:"y1",
@@ -1646,7 +1690,7 @@ fill:false
 options:{
 plugins:{legend:{position:"bottom"}},
 scales:{
-y:{beginAtZero:true,title:{display:true,text:"Revenue ($)"}},
+y:{beginAtZero:true,title:{display:true,text:"Revenue"}},
 y1:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"Margin %"}}
 }
 }
@@ -1657,7 +1701,7 @@ type:"doughnut",
 data:{
 labels:["Platform Fees","Taxes","Operational Costs","Payouts"],
 datasets:[{
-data:[2835,6615,4200,28430],
+data:[0,0,0,0],
 backgroundColor:["#b6a47a","#f4d03f","#95a5a6","#1abc9c"]
 }]
 },
@@ -2094,6 +2138,7 @@ const approvedSearch = document.getElementById('approvedSearch');
 const approvedRoleFilter = document.getElementById('approvedRoleFilter');
 const refreshApprovedBtn = document.getElementById('refreshApprovedUsers');
 const approvedPageSelect = document.getElementById('approvedPageSelect');
+const approvedPanel = document.getElementById('approvedUsersPanel');
 const deletedTableBody = document.getElementById('deletedUsersBody');
 const deletedCountLabel = document.getElementById('deletedUsersCountLabel');
 const deletedSearch = document.getElementById('deletedSearch');
@@ -2985,6 +3030,7 @@ if (requestId === photoReviewRequestId) setPhotoReviewLoading(false);
 
 const loadApprovedUsers = async () => {
 if (!approvedTableBody) return;
+if (approvedPanel?.classList.contains('collapsed')) return;
 const requestId = ++approvedRequestId;
 setApprovedLoading(true);
 approvedTableBody.innerHTML =

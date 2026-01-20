@@ -72,6 +72,27 @@
       padding-left: 20px;
     }
 
+    ul:not(.toc-list) {
+      list-style: none;
+      padding-left: 0;
+      margin-left: 0;
+    }
+
+    ul:not(.toc-list) li {
+      position: relative;
+      padding-left: 18px;
+      margin: 0.55rem 0;
+    }
+
+    ul:not(.toc-list) li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      top: 0.2em;
+      color: var(--gold);
+      font-size: 0.45em;
+    }
+
     .muted {
       color: var(--muted);
       font-size: 15px;
@@ -120,6 +141,30 @@
     .support-email-link {
       color: var(--gold);
     }
+
+    .header-logo .accent-apostrophe {
+      color: var(--gold);
+    }
+
+    .subsection-title {
+      font-size: 1.1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 400;
+      color: var(--muted);
+      margin-top: 0;
+    }
+
+    main strong {
+      font-weight: 400;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-size: 0.92em;
+    }
+
+    ul:not(.toc-list) li strong {
+      text-transform: uppercase;
+    }
   </style>
 </head>
 
@@ -134,7 +179,7 @@
       </nav>
 
       <a href="index.html" class="header-logo">
-        Let’s-ParaConnect
+        Let<span class="accent-apostrophe">’</span>s-ParaConnect
       </a>
 
       <div class="header-actions">
@@ -150,7 +195,7 @@
       <h1 id="terms-title">Terms & Conditions</h1>
     <p class="muted">Effective date: <strong>August 22, 2025</strong></p>
 
-    <p>These Terms & Conditions (“Terms”) govern your use of the Let’s‑ParaConnect platform (the “Platform”) operated by Let’s‑ParaConnect (“Company,” “we,” “us,” or “our”). By creating an account or using the Platform, you agree to these Terms and to our <a class="privacy-inline-link" href="privacy.html">Privacy Policy</a>.</p>
+    <p>These Terms & Conditions (“Terms”) govern your use of the Let’s‑ParaConnect platform (the “Platform”) operated by Let’s‑ParaConnect (“Company,” “we,” “us,” or “our”). By creating an account or using the Platform, you agree to these Terms and to our <a class="privacy-inline-link" href="privacy.html" style="text-decoration:none;">Privacy Policy</a>.</p>
 
     <p><em>We are not a law firm and do not provide legal services or legal advice.</em> The Platform enables Attorneys to engage independent Paralegals. All legal work and outcomes are solely between those users.</p>
 
@@ -172,13 +217,14 @@
       <li><a href="#contact">14. Contact</a></li>
     </ul>
 
-     <section id="eligibility" class="card">
+    <section id="eligibility" class="card">
       <h2>1) Eligibility & Accounts</h2>
       <ul>
         <li>You must be at least 18 and able to form a binding contract. Attorneys remain responsible for complying with all professional conduct rules and licensing requirements.</li>
         <li>You are responsible for the confidentiality of your credentials and for all activity on your account.</li>
         <li>We may require identity/credential verification (e.g., bar number, resume/certifications) and may approve, deny, or revoke access at our discretion.</li>
       </ul>
+      <p>Admission to Let’s-ParaConnect is selective. Paralegal admission standards are described in our <a href="/paralegal-admission.html" style="text-decoration:none;">Paralegal Admission Requirements</a>.</p>
     </section>
 
     <section id="roles" class="card">
@@ -244,7 +290,7 @@
     </section>
 
     <section class="card">
-      <h3>Off-Platform Engagement Prohibition</h3>
+      <h3 class="subsection-title">Off-Platform Engagement Prohibition</h3>
       <p>
         Attorneys and Paralegal Professionals may not collaborate outside of
         Let’s-ParaConnect without written authorization. A mandatory buyout fee
@@ -310,6 +356,8 @@
         <a href="privacy.html">Privacy Policy</a>
         <span>|</span>
         <a href="terms.html">Terms</a>
+        <span>|</span>
+        <a href="/paralegal-admission.html">Admissions</a>
         <span>|</span>
         <a href="contact.html">Contact</a>
         <span>|</span>

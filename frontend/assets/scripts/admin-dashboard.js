@@ -59,8 +59,7 @@ if (el) el.textContent = value;
 }
 
 function formatCurrency(value) {
-const dollars = Number(value || 0) / 100;
-return dollars.toLocaleString(undefined, { style: "currency", currency: "USD" });
+return "—";
 }
 
 function formatNumber(value) {

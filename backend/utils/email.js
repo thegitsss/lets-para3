@@ -207,12 +207,13 @@ function sendAcceptedEmail(lastName) {
 }
 
 function sendNotAcceptedEmail(lastName) {
-  return buildVerificationEmail(lastName, [
+  const body = buildVerificationEmail(lastName, [
     "Thank you for your interest in joining Let’s-ParaConnect.",
     "Your application has been reviewed and was not approved at this time. Currently, we are only accepting paralegals who have a minimum of one year of professional paralegal experience and who are based in the United States.",
     "Our team reviews every submission carefully, and if you believe we may have missed important information in your application, you’re welcome to reply to this email.",
     "Thank you again for your interest in the community.",
   ]);
+  return `${body}<p>For more information about our admissions process, please see our <a href="/paralegal-admission.html">Paralegal Admission Requirements</a>.</p>`;
 }
 
 async function sendWelcomePacket(user) {
