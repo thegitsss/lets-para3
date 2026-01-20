@@ -227,6 +227,7 @@ background:#fff;
 .user-approvals-grid .pending-controls .search{min-width:180px;}
 .user-management-secondary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.5rem;align-items:start;margin-top:1.5rem;}
 .user-management-secondary .panel{width:100%;}
+.mass-email-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin:.5rem 0 .75rem;}
 .panel{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.5rem;}
 .user-list{list-style:none;padding:0;margin:0;} .user-list li{display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--line);}
 .user-list li .user-actions{display:flex;gap:0.35rem;}
@@ -787,6 +788,34 @@ font-size:.95rem;
 </div>
 </div>
 
+<div class="panel" id="massEmailPanel">
+<div class="panel-header">
+<h2>Send Mass Email</h2>
+<p class="pending-count" id="massEmailCountLabel">0 users selected</p>
+</div>
+<p class="settings-help">Approved paralegals missing a profile photo.</p>
+<div class="mass-email-actions">
+<button class="btn secondary" type="button" id="massEmailAcceptanceBtn">Send Acceptance</button>
+<button class="btn secondary" type="button" id="massEmailDenialBtn">Send Denial</button>
+<button class="btn primary" type="button" id="massEmailCompleteBtn">Send Complete Profile</button>
+</div>
+<div class="table-wrap">
+<table class="pending-users-table">
+<thead>
+<tr>
+<th><input type="checkbox" id="massEmailSelectAll" aria-label="Select all users"></th>
+<th>Name</th>
+<th>Email</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody id="massEmailUsersBody">
+<tr><td colspan="4" class="pending-empty">Loading users…</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
 <div class="panel collapsed" id="deletedUsersPanel">
 <div class="panel-header">
 <h2 role="button" tabindex="0" aria-expanded="false" data-panel-toggle="deletedUsersPanel">Deleted Users <span>▾</span></h2>
@@ -1338,6 +1367,12 @@ link.classList.toggle("active",match);
 sections.forEach(section=>{
 section.classList.toggle("visible",section.id===`section-${sectionName}`);
 });
+if(sectionName==="user-management"){
+loadPendingUsers?.();
+loadApprovedUsers?.();
+loadDeletedUsers?.();
+loadMassEmailUsers?.();
+}
 requestAnimationFrame(refreshCharts);
 }
 window.activateAdminSection = activateSection;
@@ -2185,6 +2220,12 @@ const roleToggleBtn = document.getElementById('roleToggleBtn');
 const editEmailBtn = document.getElementById('editEmailBtn');
 const approvalTestEmailInput = document.getElementById('approvalTestEmail');
 const approvalTestSendBtn = document.getElementById('approvalTestSendBtn');
+const massEmailUsersBody = document.getElementById('massEmailUsersBody');
+const massEmailSelectAll = document.getElementById('massEmailSelectAll');
+const massEmailCountLabel = document.getElementById('massEmailCountLabel');
+const massEmailAcceptanceBtn = document.getElementById('massEmailAcceptanceBtn');
+const massEmailDenialBtn = document.getElementById('massEmailDenialBtn');
+const massEmailCompleteBtn = document.getElementById('massEmailCompleteBtn');
 
 let pendingUsers = [];
 let pendingRequestId = 0;
@@ -2198,6 +2239,8 @@ let deletedUsers = [];
 let deletedRequestId = 0;
 let auditLogs = [];
 let auditRequestId = 0;
+let massEmailUsers = [];
+const massEmailSelected = new Set();
 const USERS_PAGE_SIZE = 5;
 let pendingPage = 1;
 let photoReviewPage = 1;
@@ -2811,6 +2854,131 @@ editEmailBtn.textContent = originalLabel;
 }
 };
 
+const isMissingProfilePhoto = (user = {}) => {
+const status = String(user.profilePhotoStatus || '').toLowerCase();
+const hasPhoto = Boolean(user.profileImage || user.avatarURL);
+if (status === 'approved' && hasPhoto) return false;
+return !hasPhoto;
+};
+
+const updateMassEmailCount = () => {
+if (!massEmailCountLabel) return;
+const count = massEmailSelected.size;
+massEmailCountLabel.textContent = count === 1 ? '1 user selected' : `${count} users selected`;
+if (massEmailSelectAll) {
+massEmailSelectAll.checked = count > 0 && count === massEmailUsers.length;
+massEmailSelectAll.indeterminate = count > 0 && count < massEmailUsers.length;
+}
+};
+
+const renderMassEmailUsers = () => {
+if (!massEmailUsersBody) return;
+if (!massEmailUsers.length) {
+massEmailUsersBody.innerHTML =
+'<tr><td colspan="4" class="pending-empty">No matching users found.</td></tr>';
+updateMassEmailCount();
+return;
+}
+massEmailUsersBody.innerHTML = '';
+massEmailUsers.forEach((user) => {
+const tr = document.createElement('tr');
+const userId = String(user.id || user._id || '');
+
+const selectTd = document.createElement('td');
+const checkbox = document.createElement('input');
+checkbox.type = 'checkbox';
+checkbox.dataset.userId = userId;
+checkbox.checked = massEmailSelected.has(userId);
+checkbox.addEventListener('change', () => {
+if (checkbox.checked) {
+massEmailSelected.add(userId);
+} else {
+massEmailSelected.delete(userId);
+}
+updateMassEmailCount();
+});
+selectTd.appendChild(checkbox);
+
+const nameTd = document.createElement('td');
+nameTd.textContent = displayName(user);
+
+const emailTd = document.createElement('td');
+emailTd.textContent = user.email || '—';
+
+const statusTd = document.createElement('td');
+statusTd.textContent = 'Missing photo';
+
+[selectTd, nameTd, emailTd, statusTd].forEach((td) => tr.appendChild(td));
+massEmailUsersBody.appendChild(tr);
+});
+updateMassEmailCount();
+};
+
+const loadMassEmailUsers = async () => {
+if (!massEmailUsersBody) return;
+massEmailUsersBody.innerHTML =
+'<tr><td colspan="4" class="pending-empty">Loading users…</td></tr>';
+const params = new URLSearchParams({ status: 'approved', role: 'paralegal', limit: '200' });
+try {
+const res = await secureFetch(`/api/admin/pending-users?${params.toString()}`, {
+headers: { Accept: 'application/json' },
+});
+const data = res.ok ? await res.json() : { users: [] };
+massEmailUsers = Array.isArray(data.users) ? data.users.filter(isMissingProfilePhoto) : [];
+massEmailSelected.clear();
+renderMassEmailUsers();
+} catch (err) {
+massEmailUsers = [];
+massEmailSelected.clear();
+massEmailUsersBody.innerHTML =
+`<tr><td colspan="4" class="pending-empty">${err?.message || 'Unable to load users.'}</td></tr>`;
+updateMassEmailCount();
+}
+};
+
+const sendMassEmail = async (type) => {
+const selectedIds = Array.from(massEmailSelected);
+if (!selectedIds.length) {
+showToast('Select at least one user.', 'err');
+return;
+}
+if (type === 'denial') {
+const confirmed = window.confirm('Send a denial email to the selected users?');
+if (!confirmed) return;
+}
+const buttons = {
+acceptance: massEmailAcceptanceBtn,
+denial: massEmailDenialBtn,
+complete_profile: massEmailCompleteBtn,
+};
+const button = buttons[type];
+const originalLabel = button?.textContent || '';
+if (button) {
+button.disabled = true;
+button.textContent = 'Sending…';
+}
+try {
+await fetchCSRF();
+const res = await secureFetch('/api/admin/bulk-email', {
+method: 'POST',
+body: { type, userIds: selectedIds },
+});
+const payload = await res.json().catch(() => ({}));
+if (!res.ok) {
+throw new Error(payload?.msg || payload?.error || 'Unable to send email.');
+}
+const sent = payload?.sent ?? selectedIds.length;
+showToast(`Sent ${sent} email${sent === 1 ? '' : 's'}.`, 'ok');
+} catch (err) {
+showToast(err?.message || 'Unable to send email.', 'err');
+} finally {
+if (button) {
+button.disabled = false;
+button.textContent = originalLabel;
+}
+}
+};
+
 const openUserModal = (user, { mode = 'pending' } = {}) => {
 if (!user || !modal || !modalDetails) return;
 activeUserId = user.id;
@@ -3387,6 +3555,20 @@ closePendingModal();
 approveBtn?.addEventListener('click', () => submitDecision('approve'));
 denyBtn?.addEventListener('click', () => submitDecision('deny'));
 approvalTestSendBtn?.addEventListener('click', () => sendApprovalEmailTestByEmail());
+massEmailSelectAll?.addEventListener('change', () => {
+const isChecked = massEmailSelectAll.checked;
+massEmailSelected.clear();
+if (isChecked) {
+massEmailUsers.forEach((user) => {
+const id = String(user.id || user._id || '');
+if (id) massEmailSelected.add(id);
+});
+}
+renderMassEmailUsers();
+});
+massEmailAcceptanceBtn?.addEventListener('click', () => sendMassEmail('acceptance'));
+massEmailDenialBtn?.addEventListener('click', () => sendMassEmail('denial'));
+massEmailCompleteBtn?.addEventListener('click', () => sendMassEmail('complete_profile'));
 
 let softRefreshInFlight = false;
 let softRefreshTimer = null;
@@ -3411,6 +3593,7 @@ loadAdminPosts(),
 loadPendingUsers(),
 loadProfilePhotoReviews(),
 loadApprovedUsers(),
+loadMassEmailUsers(),
 loadDeletedUsers(),
 loadAuditLogs()
 );
@@ -3430,6 +3613,7 @@ startSoftRefresh();
 loadPendingUsers();
 loadProfilePhotoReviews();
 loadApprovedUsers();
+loadMassEmailUsers();
 loadDeletedUsers();
 loadAuditLogs();
 window.renderPendingUsers = renderPendingUsers;
@@ -3437,6 +3621,8 @@ window.updatePendingCount = updatePendingCount;
 window.loadPendingUsers = loadPendingUsers;
 window.loadProfilePhotoReviews = loadProfilePhotoReviews;
 window.loadApprovedUsers = loadApprovedUsers;
+window.loadDeletedUsers = loadDeletedUsers;
+window.loadMassEmailUsers = loadMassEmailUsers;
 </script>
 <script type="module" src="assets/scripts/admin-dashboard.js"></script>
 </body>

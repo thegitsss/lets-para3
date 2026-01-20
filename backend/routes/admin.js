@@ -380,6 +380,108 @@ function buildDenialEmailHtml(user, opts = {}) {
   `;
 }
 
+function buildCompleteProfileEmailHtml(user, opts = {}) {
+  const loginUrl = LOGIN_URL;
+  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
+  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
+  const token = buildUnsubscribeToken(user);
+  const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
+  const friendlyName = formatFullName(user) || "there";
+
+  const unsubscribeLine = unsubscribeUrl
+    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe</a>`
+    : "Unsubscribe";
+
+  return `
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td align="center" style="padding:24px 24px 8px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding-right:12px;">
+                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
+                  </td>
+                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
+                    Let's-ParaConnect
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 24px 20px;">
+              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 32px 0;">
+              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:30px;letter-spacing:0.04em;color:#6e6e6e;">
+                Complete your profile
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:16px 40px 0;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;">
+                Hi ${friendlyName},<br><br>
+                This is a friendly reminder to complete your profile on Let’s-ParaConnect.
+                A complete, professional profile helps attorneys find and select you more quickly.
+                Please log in and finish your profile details and photo at your earliest convenience.
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:24px 32px 16px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td bgcolor="#ffbd59" style="border-radius:999px;">
+                    <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
+                      Login
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 32px 16px;">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td height="1" style="background:#bfc3c8;line-height:1px;font-size:0;">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:0 32px 28px;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
+                If you have any questions, reply to this email and we’ll help you get set up.
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td bgcolor="#070300" style="padding:26px 32px;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;color:#f6f5f1;letter-spacing:-0.01em;">
+                Need help?
+              </div>
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#f6f5f1;line-height:1.4;margin-top:8px;">
+                Email us at <a href="mailto:support@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">support@lets-paraconnect.com</a>
+              </div>
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
+                No longer want to receive these emails? ${unsubscribeLine}
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  `;
+}
+
 async function dispatchDecisionEmail(user, status) {
 if (!user?.email) return;
 const friendlyName = formatFullName(user) || "there";
@@ -1486,6 +1588,81 @@ if (userId && isObjId(userId)) {
 if (!user) return res.status(404).send("User not found.");
 const html = buildApprovalEmailHtml(user);
 res.set("Content-Type", "text/html").send(html);
+}));
+
+router.post("/bulk-email", csrfProtection, asyncHandler(async (req, res) => {
+const { type, userIds } = req.body || {};
+const normalizedType = String(type || "").trim().toLowerCase();
+if (!["acceptance", "denial", "complete_profile"].includes(normalizedType)) {
+  return res.status(400).json({ msg: "Invalid email type" });
+}
+if (!Array.isArray(userIds) || !userIds.length) {
+  return res.status(400).json({ msg: "No users selected" });
+}
+const ids = userIds.filter(isObjId);
+if (!ids.length) {
+  return res.status(400).json({ msg: "No valid user ids" });
+}
+
+const users = await User.find({ _id: { $in: ids } }).select("firstName lastName email").lean();
+const inlineLogoPath = path.join(__dirname, "../../frontend/Cleanfav.png");
+const emailOpts = {
+  attachments: [
+    {
+      filename: "Cleanfav.png",
+      path: inlineLogoPath,
+      cid: "cleanfav-logo",
+    },
+  ],
+  throwOnError: true,
+};
+
+let sent = 0;
+let skipped = 0;
+const failures = [];
+for (const user of users) {
+  const email = user?.email;
+  if (!email) {
+    skipped += 1;
+    continue;
+  }
+  let subject = "";
+  let html = "";
+  if (normalizedType === "acceptance") {
+    subject = APPROVAL_EMAIL_SUBJECT;
+    html = buildApprovalEmailHtml(user, { logoUrl: "cid:cleanfav-logo" });
+  } else if (normalizedType === "denial") {
+    subject = DENIAL_EMAIL_SUBJECT;
+    html = buildDenialEmailHtml(user, { logoUrl: "cid:cleanfav-logo" });
+  } else if (normalizedType === "complete_profile") {
+    subject = "Complete your profile on Let’s-ParaConnect";
+    html = buildCompleteProfileEmailHtml(user, { logoUrl: "cid:cleanfav-logo" });
+  }
+  try {
+    await sendEmail(email, subject, html, emailOpts);
+    sent += 1;
+  } catch (err) {
+    failures.push({ id: user._id, email });
+  }
+}
+
+try {
+  await AuditLog.logFromReq(req, "admin.bulk_email.sent", {
+    targetType: "user",
+    targetId: null,
+    meta: {
+      type: normalizedType,
+      total: ids.length,
+      sent,
+      skipped,
+      failed: failures.length,
+    },
+  });
+} catch (err) {
+  console.warn("[admin] Failed to log bulk email", err?.message || err);
+}
+
+res.json({ ok: true, total: ids.length, sent, skipped, failed: failures.length, failures });
 }));
 
 router.post("/users/:id/delete", csrfProtection, asyncHandler(async (req, res) => {
