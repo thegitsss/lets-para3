@@ -6,6 +6,7 @@ const { requireApproved } = require("../utils/authz");
 const User = require("../models/User");
 const AuditLog = require("../models/AuditLog");
 const { purgeAttorneyAccount } = require("../services/userDeletion");
+const { hasApprovedPhoto } = require("../utils/paralegalProfile");
 
 // ----------------------------------------
 // CSRF (enabled in production or when ENABLE_CSRF=true)
@@ -68,7 +69,8 @@ router.post(
   "/preferences",
   asyncHandler(async (req, res) => {
     const { email, theme, state, fontSize, hideProfile } = req.body || {};
-    const user = await User.findById(req.user.id).select("notificationPrefs preferences location");
+    const user = await User.findById(req.user.id)
+      .select("notificationPrefs preferences location role profilePhotoStatus profileImage avatarURL");
     if (!user) return res.status(404).json({ error: "User not found" });
 
     const current =
@@ -92,6 +94,13 @@ router.post(
         ? fontSize.toLowerCase()
         : null;
     const normalizedHideProfile = typeof hideProfile === "boolean" ? hideProfile : null;
+    if (
+      normalizedHideProfile === false &&
+      String(user.role || "").toLowerCase() === "paralegal" &&
+      !hasApprovedPhoto(user)
+    ) {
+      return res.status(400).json({ error: "Preference update failed" });
+    }
     if (normalizedTheme || normalizedFontSize || normalizedHideProfile !== null) {
       user.preferences = {
         ...(typeof user.preferences?.toObject === "function"

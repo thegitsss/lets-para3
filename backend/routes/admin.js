@@ -529,10 +529,19 @@ const error = new Error("Invalid status");
 error.statusCode = 400;
 throw error;
 }
+const wasApproved = user.status === "approved";
   const cleanNote = sanitizeNote(note);
   user.status = normalized;
   if (normalized === "approved" && !user.approvedAt) {
     user.approvedAt = new Date();
+  }
+  if (!wasApproved && normalized === "approved" && String(user.role || "").toLowerCase() === "paralegal") {
+    user.preferences = {
+      ...(typeof user.preferences?.toObject === "function"
+        ? user.preferences.toObject()
+        : user.preferences || {}),
+      hideProfile: true,
+    };
   }
 if (!Array.isArray(user.audit)) user.audit = [];
 user.audit.push({
@@ -758,6 +767,12 @@ router.post(
     user.avatarURL = user.pendingProfileImage;
     user.pendingProfileImage = "";
     user.profilePhotoStatus = "approved";
+    user.preferences = {
+      ...(typeof user.preferences?.toObject === "function"
+        ? user.preferences.toObject()
+        : user.preferences || {}),
+      hideProfile: false,
+    };
     await user.save();
     try {
       await AuditLog.logFromReq(req, "admin.profile_photo.approved", {

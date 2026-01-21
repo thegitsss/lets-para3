@@ -978,6 +978,22 @@ form {
       position: absolute;
     }
 
+    .required-missing::after {
+      content: " *";
+      color: var(--danger);
+      font-weight: 600;
+    }
+
+    .avatar-frame.required-missing::after {
+      content: "*";
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      color: var(--danger);
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+
     .avatar-actions button {
       border: none;
       background: var(--accent);
@@ -1653,6 +1669,11 @@ input[type="number"],
 
     input:checked + .slider:before {
       transform: translateX(22px);
+    }
+
+    .switch input:disabled + .slider {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     input:focus,
@@ -3570,8 +3591,7 @@ input[type="number"],
                         <p id="bioDisplay" class="section-display-text"></p>
                       </div>
                       <div class="section-edit" data-section-edit="bio">
-                        <label class="hero-meta-pill" for="bioInput">Bio (optional)</label>
-                        <textarea id="bioInput" name="bio" class="bio-input"></textarea>
+                        <textarea id="bioInput" name="bio" class="bio-input" aria-label="Bio"></textarea>
                       </div>
                     </div>
                   </div>

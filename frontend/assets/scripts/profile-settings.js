@@ -769,6 +769,7 @@ let attorneySaveBound = false;
 let paralegalPrefsBound = false;
 let paralegalEditBound = false;
 let paralegalVisibilityBound = false;
+let paralegalRequiredBound = false;
 let activeParalegalSection = null;
 
 const FIELD_OF_LAW_OPTIONS = [
@@ -1045,6 +1046,80 @@ function updatePhotoReviewStatus(user = {}) {
   statusEl.classList.toggle("hidden", !message);
 }
 
+function isParalegalPhotoApproved(user = {}) {
+  return String(user.profilePhotoStatus || "").trim() === "approved";
+}
+
+function getParalegalRequiredFieldStatus() {
+  const bioInput = document.getElementById("bioInput");
+  const bioValue = bioInput?.value ?? settingsState.bio;
+  const bioOk = Boolean(String(bioValue || "").trim());
+
+  const skillsInput = document.getElementById("skillsInput");
+  const practiceInput = document.getElementById("practiceAreasInput");
+  const skills = parseCommaList(skillsInput?.value || "");
+  const focus = parseCommaList(practiceInput?.value || "");
+  const skillsFocusOk = skills.length > 0 && focus.length > 0;
+
+  const resumeKeyInput = document.getElementById("resumeKeyInput");
+  const resumeValue =
+    resumeKeyInput?.value || settingsState.pendingResumeKey || currentUser?.resumeURL || "";
+  const resumeOk = !settingsState.removeResume && Boolean(String(resumeValue || "").trim());
+
+  const pendingPhoto = settingsState.pendingProfileImage || currentUser?.pendingProfileImage || "";
+  const approvedPhoto = settingsState.profileImage || currentUser?.profileImage || currentUser?.avatarURL || "";
+  const photoOk = Boolean(settingsState.stagedProfilePhotoFile || pendingPhoto || approvedPhoto);
+
+  return {
+    bioOk,
+    skillsFocusOk,
+    resumeOk,
+    photoOk,
+  };
+}
+
+function updateRequiredFieldMarkers() {
+  if (!currentUser || String(currentUser.role || "").toLowerCase() !== "paralegal") {
+    return { ok: true };
+  }
+  const status = getParalegalRequiredFieldStatus();
+  const bioLabel = document.querySelector("#bioSection .card-header-label");
+  if (bioLabel) bioLabel.classList.toggle("required-missing", !status.bioOk);
+  const skillsLabel = document.querySelector("#skillsCard .card-header-label");
+  if (skillsLabel) skillsLabel.classList.toggle("required-missing", !status.skillsFocusOk);
+  const stateLabel = document.querySelector("#stateExperienceCard .card-header-label");
+  if (stateLabel) stateLabel.classList.remove("required-missing");
+  const resumeHeader = document.querySelector("#settingsResume h3");
+  if (resumeHeader) resumeHeader.classList.toggle("required-missing", !status.resumeOk);
+  const avatarFrame = document.getElementById("avatarFrame");
+  if (avatarFrame) avatarFrame.classList.toggle("required-missing", !status.photoOk);
+
+  const missing = [];
+  if (!status.bioOk) missing.push("Bio");
+  if (!status.skillsFocusOk) missing.push("Skills & Focus Areas");
+  if (!status.resumeOk) missing.push("Resume");
+  if (!status.photoOk) missing.push("Profile photo");
+
+  return {
+    ...status,
+    ok: status.bioOk && status.skillsFocusOk && status.resumeOk && status.photoOk,
+    missing,
+  };
+}
+
+function bindParalegalRequiredFieldWatchers() {
+  if (paralegalRequiredBound) return;
+  paralegalRequiredBound = true;
+  const bioInput = document.getElementById("bioInput");
+  if (bioInput) bioInput.addEventListener("input", updateRequiredFieldMarkers);
+  const skillsInput = document.getElementById("skillsInput");
+  if (skillsInput) skillsInput.addEventListener("input", updateRequiredFieldMarkers);
+  const practiceInput = document.getElementById("practiceAreasInput");
+  if (practiceInput) practiceInput.addEventListener("input", updateRequiredFieldMarkers);
+  const stateInput = document.getElementById("stateExperienceInput");
+  if (stateInput) stateInput.addEventListener("input", updateRequiredFieldMarkers);
+}
+
 function bootstrapProfileSettings(user) {
   enforceUnifiedRoleStyling(user);
   currentUser = user;
@@ -1077,6 +1152,8 @@ function initParalegalSettings(user = {}) {
   bindParalegalNotificationToggles();
   hydrateParalegalVisibilityPref(user);
   bindParalegalVisibilityToggle();
+  bindParalegalRequiredFieldWatchers();
+  updateRequiredFieldMarkers();
   renderLanguageEditor(user.languages || []);
   try { loadCertificate(user); } catch {}
   try { loadResume(user); } catch {}
@@ -1826,6 +1903,8 @@ function refreshParalegalSectionDisplays() {
       "No languages listed."
     );
   }
+
+  updateRequiredFieldMarkers();
 }
 
 function setActiveParalegalSection(sectionKey) {
@@ -2229,6 +2308,16 @@ function bindParalegalVisibilityToggle() {
   paralegalVisibilityBound = true;
 }
 
+function updateParalegalVisibilityLock(user = {}) {
+  const toggle = document.getElementById("paralegalHideProfile");
+  if (!toggle) return;
+  const approved = isParalegalPhotoApproved(user);
+  if (!approved) {
+    toggle.checked = true;
+  }
+  toggle.disabled = !approved;
+}
+
 function hydrateAttorneyNotificationPrefs(user = {}) {
   const prefs = user.notificationPrefs || {};
   const emailToggle = document.getElementById("attorneyEmailNotifications");
@@ -2266,6 +2355,7 @@ function hydrateParalegalVisibilityPref(user = {}) {
     ? user.preferences.hideProfile
     : false;
   toggle.checked = !!hidden;
+  updateParalegalVisibilityLock(user);
 }
 
 function collectAttorneyPayload() {
@@ -3321,6 +3411,7 @@ function loadResume(user) {
     if (status) status.textContent = "Résumé on file";
     const removeBtn = document.getElementById("removeResumeBtn");
     if (removeBtn) removeBtn.disabled = false;
+    updateRequiredFieldMarkers();
   });
 
   document.getElementById("removeResumeBtn")?.addEventListener("click", () => {
@@ -3336,7 +3427,10 @@ function loadResume(user) {
     if (status) status.textContent = "Removed. Click Save to publish the update.";
     const removeBtn = document.getElementById("removeResumeBtn");
     if (removeBtn) removeBtn.disabled = true;
+    updateRequiredFieldMarkers();
   });
+
+  updateRequiredFieldMarkers();
 }
 
 function loadWritingSample(user) {
@@ -3691,6 +3785,17 @@ function loadNotifications(user) {
 
 async function saveSettings() {
   syncNamePartsFromFullName();
+  if (String(currentUser?.role || "").toLowerCase() === "paralegal") {
+    const requiredStatus = updateRequiredFieldMarkers();
+    if (!requiredStatus.ok) {
+      const missingList =
+        Array.isArray(requiredStatus.missing) && requiredStatus.missing.length
+          ? requiredStatus.missing.join(", ")
+          : "required fields";
+      showToast(`Missing required fields: ${missingList}.`, "err");
+      return;
+    }
+  }
   const stagedPhoto = !!settingsState.stagedProfilePhotoFile;
   const firstNameInput = document.getElementById("firstNameInput");
   const lastNameInput = document.getElementById("lastNameInput");
@@ -3938,6 +4043,8 @@ function applyProfilePhotoUploadResult(payload = {}, { suppressToast = false } =
     }
   }
 
+  updateParalegalVisibilityLock(currentUser || {});
+  updateRequiredFieldMarkers();
   clearStagedProfilePhoto();
 }
 
@@ -3952,6 +4059,7 @@ function bindAvatarRemoval() {
       applyAvatar(currentUser || {});
       updateAvatarRemoveButton(currentUser || {});
       updatePhotoReviewStatus(currentUser || {});
+      updateRequiredFieldMarkers();
       return;
     }
     if (!currentUser) return;
@@ -3977,6 +4085,7 @@ function bindAvatarRemoval() {
       applyAvatar(mergedUser);
       updateAvatarRemoveButton(mergedUser);
       updatePhotoReviewStatus(mergedUser);
+      updateRequiredFieldMarkers();
       showToast("Profile photo removed.", "ok");
     } catch (err) {
       console.error("Unable to remove profile photo", err);
@@ -4012,6 +4121,7 @@ async function handleAvatarUpload(config) {
     applyAvatar(currentUser || {});
     updateAvatarRemoveButton(currentUser || {});
     updatePhotoReviewStatus(currentUser || {});
+    updateRequiredFieldMarkers();
   };
   reader.onerror = () => {
     const fallbackUrl = URL.createObjectURL(file);
@@ -4021,6 +4131,7 @@ async function handleAvatarUpload(config) {
     applyAvatar(currentUser || {});
     updateAvatarRemoveButton(currentUser || {});
     updatePhotoReviewStatus(currentUser || {});
+    updateRequiredFieldMarkers();
   };
   reader.readAsDataURL(file);
   input.value = "";

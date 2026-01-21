@@ -11,6 +11,7 @@ const verifyToken = require("../utils/verifyToken");
 const sendEmail = require("../utils/email");
 const { logAction } = require("../utils/audit");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
+const { applyPublicParalegalFilter } = require("../utils/paralegalProfile");
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // ----------------------------------------
@@ -307,6 +308,7 @@ router.get(
 
     const filter = { role: "paralegal", status: "approved" };
     filter["preferences.hideProfile"] = { $ne: true };
+    applyPublicParalegalFilter(filter);
     if (String(req.user?.role || "").toLowerCase() === "attorney") {
       const blockedIds = await getBlockedUserIds(req.user.id);
       if (blockedIds.length) {
@@ -380,12 +382,14 @@ router.get(
   asyncHandler(async (req, res) => {
     const { id } = req.params;
     if (!isObjId(id)) return res.status(400).json({ error: "Invalid paralegal id" });
-    const doc = await User.findOne({
+    const filter = {
       _id: id,
       role: "paralegal",
       status: "approved",
       "preferences.hideProfile": { $ne: true },
-    })
+    };
+    applyPublicParalegalFilter(filter);
+    const doc = await User.findOne(filter)
       .select(PUBLIC_PAR_FIELDS)
       .lean();
     if (!doc) {

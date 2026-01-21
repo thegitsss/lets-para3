@@ -15,6 +15,11 @@ const { maskProfanity } = require("../utils/badWords");
 const { logAction } = require("../utils/audit");
 const { notifyUser } = require("../utils/notifyUser");
 const {
+  applyPublicParalegalFilter,
+  hasRequiredParalegalFieldsForPublic,
+  hasRequiredParalegalFieldsForSave,
+} = require("../utils/paralegalProfile");
+const {
   BLOCKED_MESSAGE,
   getBlockedUserIds,
   isBlockedBetween,
@@ -671,6 +676,10 @@ router.patch(
       me.notificationPrefs = currentPrefs;
     }
 
+    if (me.role === "paralegal" && !hasRequiredParalegalFieldsForSave(me)) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
     await me.save();
     try {
       await logAction(req, "user.me.update", { targetType: "user", targetId: me._id });
@@ -854,6 +863,9 @@ router.get(
     if (u.role === "paralegal" && u.preferences?.hideProfile && !isOwner && !isAdmin) {
       return res.status(404).json({ error: "Profile not available" });
     }
+    if (u.role === "paralegal" && !isOwner && !isAdmin && !hasRequiredParalegalFieldsForPublic(u)) {
+      return res.status(404).json({ error: "Profile not available" });
+    }
     if (requesterRole === "attorney") {
       const blocked = await isBlockedBetween(req.user.id, u._id);
       if (blocked) return res.status(403).json({ error: BLOCKED_MESSAGE });
@@ -884,6 +896,7 @@ paralegalRouter.get(
     const isAdmin = String(req.user.role || "").toLowerCase() === "admin";
     if (!isAdmin) {
       filter["preferences.hideProfile"] = { $ne: true };
+      applyPublicParalegalFilter(filter);
     }
     if (String(req.user.role || "").toLowerCase() === "attorney") {
       const blockedIds = await getBlockedUserIds(req.user.id);
@@ -926,6 +939,9 @@ paralegalRouter.get(
     const isOwner = String(profile._id) === String(req.user.id);
     const isAdmin = requesterRole === "admin";
     if (profile.role === "paralegal" && profile.preferences?.hideProfile && !isOwner && !isAdmin) {
+      return res.status(404).json({ error: "Paralegal not found" });
+    }
+    if (profile.role === "paralegal" && !isOwner && !isAdmin && !hasRequiredParalegalFieldsForPublic(profile)) {
       return res.status(404).json({ error: "Paralegal not found" });
     }
     if (String(req.user.role || "").toLowerCase() === "attorney") {
@@ -1075,7 +1091,16 @@ router.patch(
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ error: "User not found" });
 
+    const wasApproved = user.status === "approved";
     user.status = "approved";
+    if (!wasApproved && String(user.role || "").toLowerCase() === "paralegal") {
+      user.preferences = {
+        ...(typeof user.preferences?.toObject === "function"
+          ? user.preferences.toObject()
+          : user.preferences || {}),
+        hideProfile: true,
+      };
+    }
     await user.save();
     try {
       await logAction(req, "admin.user.approve", { targetType: "user", targetId: user._id });
