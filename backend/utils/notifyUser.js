@@ -110,10 +110,65 @@ function emailTemplate(type, payload) {
         html: "<p>Your profile has been approved. You can now access new opportunities on LPC.</p>"
       };
     case "profile_photo_approved":
-      return {
-        subject: "Profile photo approved",
-        html: "<p>Your profile photo was approved and is now live on your profile.</p>"
-      };
+      return (() => {
+        const baseUrl =
+          process.env.EMAIL_BASE_URL || process.env.APP_BASE_URL || "https://www.lets-paraconnect.com";
+        const assetBase = String(baseUrl).replace(/\/+$/, "").replace(/\/profile-settings\.html$/, "");
+        const logoUrl = `${assetBase}/Cleanfav.png`;
+        const loginUrl = `${assetBase}/login.html`;
+        const html = `
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
+          <tr>
+            <td align="center" style="padding:24px 12px;">
+              <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
+                <tr>
+                  <td align="center" style="padding:24px 24px 8px;">
+                    <table cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="padding-right:12px;">
+                          <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
+                        </td>
+                        <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
+                          Let's-ParaConnect
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:8px 40px 24px;">
+                    <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;text-align:left;">
+                      Hi &mdash;<br><br>
+                      Great news — your profile photo was approved and is now live on your attorney-facing profile.<br><br>
+                      Your profile is now visible to attorneys, and you can log in anytime to make updates.<br><br>
+                      Best,<br>
+                      Let&rsquo;s-ParaConnect Team
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:8px 32px 28px;">
+                    <table cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td bgcolor="#ffbd59" style="border-radius:999px;">
+                          <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
+                            Login
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+        `;
+        return {
+          subject: "Profile photo approved",
+          html,
+        };
+      })();
     case "case_invite_response":
       return {
         subject: "Case invitation update",

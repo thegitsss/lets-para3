@@ -313,6 +313,12 @@ font-weight:300;
 .payout-schedule li:last-child,.tax-summary li:last-child{border-bottom:none;}
 .metric h3{font-family:var(--font-serif);font-weight:300;font-size:1.1rem;margin-bottom:.25rem;}
 .metric p{font-size:1.6rem;color:var(--accent);font-weight:200;}
+#section-overview .grid-four .card h3{
+font-family:var(--font-serif);
+font-weight:300;
+font-size:1.1rem;
+margin-bottom:.25rem;
+}
 
 /* Panels */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:1.5rem;margin-bottom:2rem;}
@@ -411,7 +417,7 @@ border:1px dashed var(--line);
 @media (max-width: 1024px){
 body{flex-direction:column;}
 .main{overflow-x:hidden;}
-.main #section-user-management{
+.main #section-user-management.visible{
 display:flex;
 flex-direction:column;
 }
@@ -423,7 +429,7 @@ flex-direction:column;
 .user-management-secondary{
 grid-template-columns:1fr;
 }
-.main #section-photo-reviews{
+.main #section-photo-reviews.visible{
 display:flex;
 flex-direction:column;
 }
@@ -734,6 +740,8 @@ font-size:.95rem;
 <option value="admin">Admins</option>
 </select>
 <select id="approvedPageSelect" aria-label="Approved users page"></select>
+<button class="btn secondary" type="button" id="approvedPrevPage" aria-label="Previous approved users page">&larr;</button>
+<button class="btn secondary" type="button" id="approvedNextPage" aria-label="Next approved users page">&rarr;</button>
 <button class="btn secondary" type="button" id="refreshApprovedUsers">Refresh</button>
 </div>
 <div class="table-wrap">
@@ -1367,11 +1375,16 @@ link.classList.toggle("active",match);
 sections.forEach(section=>{
 section.classList.toggle("visible",section.id===`section-${sectionName}`);
 });
+const mainContent=document.querySelector(".main");
+if(mainContent) mainContent.scrollTo({top:0,left:0,behavior:"auto"});
 if(sectionName==="user-management"){
 loadPendingUsers?.();
 loadApprovedUsers?.();
 loadDeletedUsers?.();
 loadMassEmailUsers?.();
+}
+if(sectionName==="photo-reviews"){
+window.loadProfilePhotoReviews?.();
 }
 requestAnimationFrame(refreshCharts);
 }
@@ -1399,6 +1412,15 @@ activateSection("user-management");
 setTimeout(()=>document.getElementById("pendingUsersPanel")?.scrollIntoView({behavior:"smooth",block:"start"}),60);
 });
 }
+
+const clearLoadingState=()=>{
+if(document.body.classList.contains("is-loading")){
+document.body.classList.remove("is-loading");
+document.body.classList.add("is-ready");
+}
+};
+window.addEventListener("load",clearLoadingState,{once:true});
+setTimeout(clearLoadingState,2000);
 
 const WEATHER_CACHE_KEY="adminWeatherCache";
 const WEATHER_CACHE_MS=15*60*1000;
@@ -2191,6 +2213,8 @@ const approvedCountLabel = document.getElementById('approvedUsersCountLabel');
 const approvedSearch = document.getElementById('approvedSearch');
 const approvedRoleFilter = document.getElementById('approvedRoleFilter');
 const refreshApprovedBtn = document.getElementById('refreshApprovedUsers');
+const approvedPrevPageBtn = document.getElementById('approvedPrevPage');
+const approvedNextPageBtn = document.getElementById('approvedNextPage');
 const approvedPageSelect = document.getElementById('approvedPageSelect');
 const approvedPanel = document.getElementById('approvedUsersPanel');
 const deletedTableBody = document.getElementById('deletedUsersBody');
@@ -2619,6 +2643,9 @@ if (!approvedTableBody) return;
 const total = approvedUsers.length;
 approvedPage = clampPage(approvedPage, total);
 updatePageSelect(approvedPageSelect, total, approvedPage);
+const totalPages = getTotalPages(total);
+if (approvedPrevPageBtn) approvedPrevPageBtn.disabled = approvedPage <= 1 || totalPages <= 1;
+if (approvedNextPageBtn) approvedNextPageBtn.disabled = approvedPage >= totalPages || totalPages <= 1;
 const pageItems = getPageSlice(approvedUsers, approvedPage);
 if (!total) {
 approvedTableBody.innerHTML =
@@ -3424,6 +3451,17 @@ loadApprovedUsers();
 }));
 approvedPageSelect?.addEventListener('change', () => {
 approvedPage = Number(approvedPageSelect.value) || 1;
+renderApprovedUsers();
+});
+approvedPrevPageBtn?.addEventListener('click', () => {
+if (approvedPage <= 1) return;
+approvedPage -= 1;
+renderApprovedUsers();
+});
+approvedNextPageBtn?.addEventListener('click', () => {
+const totalPages = getTotalPages(approvedUsers.length);
+if (approvedPage >= totalPages) return;
+approvedPage += 1;
 renderApprovedUsers();
 });
 deletedRoleFilter?.addEventListener('change', () => {

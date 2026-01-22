@@ -1039,7 +1039,7 @@ function updatePhotoReviewStatus(user = {}) {
   if (status === "pending_review") {
     message = "Photo pending review. It will appear to attorneys once approved.";
   } else if (status === "rejected") {
-    message = "Photo rejected. Please upload a professional headshot.";
+    message = "Please upload a new photo. We recommend using your LinkedIn photo, if applicable.";
     statusEl.classList.add("is-rejected");
   }
   statusEl.textContent = message;
