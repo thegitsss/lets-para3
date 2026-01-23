@@ -1573,7 +1573,7 @@ router.get(
     })
       .sort({ updatedAt: -1 })
       .limit(limit)
-      .select("title caseNumber status escrowStatus escrowIntentId createdAt updatedAt attorney attorneyId")
+      .select("title caseNumber status escrowStatus escrowIntentId createdAt updatedAt attorney attorneyId archived paymentReleased paralegal paralegalId")
       .populate("attorney", "firstName lastName")
       .populate("attorneyId", "firstName lastName")
       .lean();
@@ -1588,6 +1588,9 @@ router.get(
       status: doc.status,
       escrowStatus: doc.escrowStatus || null,
       escrowIntentId: doc.escrowIntentId || null,
+      archived: doc.archived,
+      paymentReleased: doc.paymentReleased,
+      paralegalId: doc.paralegalId || doc.paralegal || null,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     }));

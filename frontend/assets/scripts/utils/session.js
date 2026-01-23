@@ -394,7 +394,7 @@
     const body = encodeURIComponent(
       "What happened?\n\nWhat did you expect?\n\n(Optional) Page or feature:"
     );
-    return `mailto:support@lets-paraconnect.com?subject=${subject}&body=${body}`;
+    return `mailto:help@lets-paraconnect.com?subject=${subject}&body=${body}`;
   }
 
   function injectBetaFooter(user) {

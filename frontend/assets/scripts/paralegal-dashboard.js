@@ -6,6 +6,15 @@ import {
   STRIPE_GATE_MESSAGE,
 } from "./utils/stripe-connect.js";
 
+const FUNDED_WORKSPACE_STATUSES = new Set([
+  "funded_in_progress",
+  "in progress",
+  "in_progress",
+  "active",
+  "awaiting_documents",
+  "reviewing",
+]);
+
 const PLACEHOLDER_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
   `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>
     <rect width='220' height='220' rx='110' fill='#f1f5f9'/>
@@ -23,6 +32,42 @@ function normalizeIdCandidate(value) {
   if (typeof value === "string") return value;
   if (typeof value === "object") return value._id || value.id || value.userId || "";
   return "";
+}
+
+function getCaseId(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    return value.caseId || value.id || value._id || "";
+  }
+  return "";
+}
+
+function normalizeCaseStatus(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  const lower = trimmed.toLowerCase();
+  if (lower === "in_progress") return "in progress";
+  return lower;
+}
+
+function isWorkspaceEligibleCase(caseItem) {
+  if (!caseItem) return false;
+  if (caseItem.archived !== false) return false;
+  if (caseItem.paymentReleased !== false) return false;
+  const status = normalizeCaseStatus(caseItem?.status);
+  if (!status || !FUNDED_WORKSPACE_STATUSES.has(status)) return false;
+  const escrowFunded =
+    !!caseItem?.escrowIntentId && String(caseItem?.escrowStatus || "").toLowerCase() === "funded";
+  if (!escrowFunded) return false;
+  const hasParalegal = caseItem?.paralegal || caseItem?.paralegalId;
+  return !!hasParalegal;
+}
+
+function navigateToCase(caseId, { messages = false } = {}) {
+  if (!caseId) return;
+  const target = `case-detail.html?caseId=${encodeURIComponent(caseId)}${messages ? "#case-messages" : ""}`;
+  window.location.href = target;
 }
 
 function formatStatusLabel(value) {
@@ -289,7 +334,8 @@ function renderDeadlines(deadlines = []) {
 function renderAssignments(assignments = []) {
   const container = selectors.assignmentList;
   if (!container || !selectors.assignmentTemplate) return;
-  if (!assignments.length) {
+  const usableAssignments = assignments.filter((assignment) => assignment && assignment.caseId);
+  if (!usableAssignments.length) {
     container.innerHTML = `
       <div class="case-card empty-state">
         <div class="case-header">
@@ -304,23 +350,29 @@ function renderAssignments(assignments = []) {
   }
   container.innerHTML = '';
 
-  assignments.forEach((assignment) => {
+  usableAssignments.forEach((assignment) => {
     const node = selectors.assignmentTemplate.content.cloneNode(true);
     const card = node.querySelector('.case-card');
     const header = card.querySelector('.case-header');
     const titleEl = card.querySelector('[data-field="assignmentTitle"]');
     const metaEl = card.querySelector('[data-field="assignmentMeta"]');
     const summaryEl = card.querySelector('[data-field="assignmentSummary"]');
+    const actions = card.querySelector('.case-actions');
+    const primaryBtn = card.querySelector('[data-action="primary"]');
+    const secondaryBtn = card.querySelector('[data-action="secondary"]');
 
     const attorney = assignment.attorney ? `Lead Attorney: ${assignment.attorney}` : '';
     const due = assignment.due ? `Due: ${assignment.due}` : '';
     const statusLabel = assignment.status ? formatStatusLabel(assignment.status) : '';
     const status = statusLabel ? `Status: ${statusLabel}` : '';
     const metaParts = [attorney, due, status].filter(Boolean);
+    const caseId = assignment.caseId;
+    const eligible = isWorkspaceEligibleCase(assignment);
 
     titleEl.textContent = assignment.title || 'Case';
     metaEl.textContent = metaParts.join(' · ');
     summaryEl.textContent = assignment.summary || '';
+    if (card) card.dataset.caseId = caseId;
 
     header.setAttribute('role', 'button');
     header.setAttribute('tabindex', '0');
@@ -339,32 +391,52 @@ function renderAssignments(assignments = []) {
       }
     });
 
-    card.querySelectorAll('[data-action]').forEach((button) => {
-      const action = button.dataset.action;
-      const label = assignment.actions?.[action]?.label;
-      if (label) button.textContent = label;
-      button.addEventListener('click', (event) => {
-        event.stopPropagation();
-        handleCaseAction(button.textContent || 'Action', assignment.title);
-      });
-    });
+    if (actions) {
+      actions.hidden = !eligible;
+    }
+    if (eligible && caseId) {
+      if (primaryBtn) {
+        primaryBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          navigateToCase(caseId);
+        });
+      }
+      if (secondaryBtn) {
+        secondaryBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          navigateToCase(caseId, { messages: true });
+        });
+      }
+    }
 
     container.appendChild(node);
   });
 }
 
 function mapActiveCasesToAssignments(activeCases = []) {
-  return activeCases.map((caseItem) => ({
-    title: caseItem.jobTitle || caseItem.title || 'Case',
-    attorney: caseItem.attorneyName || '',
-    due: caseItem.dueDate
-      ? new Date(caseItem.dueDate).toLocaleDateString()
-      : caseItem.createdAt
-        ? new Date(caseItem.createdAt).toLocaleDateString()
-        : '',
-    status: caseItem.status ? formatStatusLabel(caseItem.status) : '',
-    summary: caseItem.practiceArea ? `Practice area: ${caseItem.practiceArea}` : '',
-  }));
+  return activeCases
+    .map((caseItem) => {
+      const caseId = getCaseId(caseItem);
+      if (!caseId) return null;
+      return {
+        caseId,
+        title: caseItem.jobTitle || caseItem.title || 'Case',
+        attorney: caseItem.attorneyName || '',
+        due: caseItem.dueDate
+          ? new Date(caseItem.dueDate).toLocaleDateString()
+          : caseItem.createdAt
+            ? new Date(caseItem.createdAt).toLocaleDateString()
+            : '',
+        status: caseItem.status || '',
+        summary: caseItem.practiceArea ? `Practice area: ${caseItem.practiceArea}` : '',
+        escrowStatus: caseItem.escrowStatus || null,
+        escrowIntentId: caseItem.escrowIntentId || null,
+        archived: caseItem.archived,
+        paymentReleased: caseItem.paymentReleased,
+        paralegalId: caseItem.paralegalId || caseItem.paralegal || null,
+      };
+    })
+    .filter(Boolean);
 }
 
 async function loadInvites() {
@@ -550,15 +622,16 @@ function renderAssignedCases(items = []) {
   list.innerHTML = visibleItems
     .map(
       (c) => {
-        const funded = String(c.escrowStatus || '').toLowerCase() === 'funded';
-        const buttonLabel = funded ? 'Open Case' : 'Awaiting Attorney Funding';
-        const disabledAttr = funded ? '' : ' disabled aria-disabled="true"';
+        const caseId = getCaseId(c);
+        const eligible = caseId ? isWorkspaceEligibleCase(c) : false;
+        const buttonLabel = eligible ? 'Open Case' : 'Awaiting Attorney Funding';
+        const disabledAttr = eligible ? '' : ' disabled aria-disabled="true"';
         const statusValue = String(c.status || 'Active');
         const statusLabel = formatStatusLabel(statusValue).replace(/\s+/g, ' ').trim() || 'Active';
         const statusKey = statusValue.toLowerCase().replace(/\s+/g, '_');
-        const canWithdraw = !funded && statusKey === 'awaiting_funding';
+        const canWithdraw = !!caseId && !eligible && statusKey === 'awaiting_funding';
       return `
-      <div class="case-item" data-id="${c._id}">
+      <div class="case-item" data-id="${caseId}">
         <div class="case-title">${escapeHTML(c.title || 'Untitled Case')}</div>
         <div class="case-meta">
           <span>${escapeHTML(c.caseNumber || '')}</span>
@@ -566,10 +639,10 @@ function renderAssignedCases(items = []) {
           <span>Status: ${escapeHTML(statusLabel)}</span>
         </div>
         <div class="case-actions">
-          <button class="open-case-btn" data-id="${c._id}"${disabledAttr}>${buttonLabel}</button>
+          <button class="open-case-btn" data-id="${caseId}"${disabledAttr}>${buttonLabel}</button>
           ${
             canWithdraw
-              ? `<button class="withdraw-application-btn" data-id="${c._id}">Withdraw application</button>`
+              ? `<button class="withdraw-application-btn" data-id="${caseId}">Withdraw application</button>`
               : ''
           }
         </div>

@@ -974,7 +974,7 @@ function goToMessages(caseId) {
     notifyMessages("Open an active case to view messages.", "info");
     return;
   }
-  const target = `case-detail.html?caseId=${encodeURIComponent(caseId)}#messages`;
+  const target = `case-detail.html?caseId=${encodeURIComponent(caseId)}#case-messages`;
   window.location.href = target;
 }
 // -------------------------

@@ -615,7 +615,7 @@ function jumpToMessages(caseId) {
     showToast("Open a case to view messages.", "info");
     return;
   }
-  window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}#messages`;
+  window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}#case-messages`;
 }
 
 function formatCurrency(value) {

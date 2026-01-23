@@ -658,7 +658,7 @@ function resolveNotificationLink(item = {}) {
   );
   if (caseId) {
     const base = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
-    if (type === "message") return `${base}#messages`;
+    if (type === "message") return `${base}#case-messages`;
     if (type === "case_file_uploaded") return `${base}#caseFilesSection`;
     if (type === "case_invite") return "paralegal-invitations.html";
     return base;

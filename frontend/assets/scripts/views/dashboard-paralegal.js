@@ -4,6 +4,15 @@
 import { j } from "../helpers.js";
 import { requireAuth } from "../auth.js";
 
+const FUNDED_WORKSPACE_STATUSES = new Set([
+  "funded_in_progress",
+  "in progress",
+  "in_progress",
+  "active",
+  "awaiting_documents",
+  "reviewing",
+]);
+
 let stylesInjected = false;
 
 export async function render(el, { escapeHTML, navigateTo } = {}) {
@@ -52,6 +61,8 @@ function draw(root, payload, escapeHTML) {
 
   const activeCases = (payload?.activeCases || [])
     .map((c) => {
+      const caseId = getCaseId(c);
+      const canOpen = caseId && isWorkspaceEligibleCase(c);
       const meta = [
         c.practiceArea ? `Practice: ${escapeHTML(c.practiceArea)}` : "",
         c.status ? `Status: ${escapeHTML(c.status)}` : "",
@@ -65,9 +76,9 @@ function draw(root, payload, escapeHTML) {
             <div class="case-meta">${meta || "Awaiting details."}</div>
           </div>
           ${
-            c.caseId
+            canOpen
               ? `<button class="btn ghost" data-action="open-case" data-case-id="${escapeHTML(
-                  c.caseId
+                  caseId
                 )}">Open</button>`
               : ""
           }
@@ -183,6 +194,34 @@ function formatCurrency(amount) {
     currency: "USD",
     minimumFractionDigits: 2,
   }).format(value);
+}
+
+function getCaseId(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object") return value.caseId || value.id || value._id || "";
+  return "";
+}
+
+function normalizeCaseStatus(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  const lower = trimmed.toLowerCase();
+  if (lower === "in_progress") return "in progress";
+  return lower;
+}
+
+function isWorkspaceEligibleCase(caseItem) {
+  if (!caseItem) return false;
+  if (caseItem.archived !== false) return false;
+  if (caseItem.paymentReleased !== false) return false;
+  const status = normalizeCaseStatus(caseItem?.status);
+  if (!status || !FUNDED_WORKSPACE_STATUSES.has(status)) return false;
+  const escrowFunded =
+    !!caseItem?.escrowIntentId && String(caseItem?.escrowStatus || "").toLowerCase() === "funded";
+  if (!escrowFunded) return false;
+  const hasParalegal = caseItem?.paralegal || caseItem?.paralegalId;
+  return !!hasParalegal;
 }
 
 function ensureStyles() {

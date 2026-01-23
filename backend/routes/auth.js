@@ -226,7 +226,7 @@ function buildResetPasswordEmailHtml(user, resetUrl, opts = {}) {
                 Need help?
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#f6f5f1;line-height:1.4;margin-top:8px;">
-                Email us at <a href="mailto:support@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">support@lets-paraconnect.com</a>
+                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">help@lets-paraconnect.com</a>
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
                 No longer want to receive these emails? ${unsubscribeLine}
@@ -324,7 +324,7 @@ function buildApplicationSubmissionEmailHtml(user, opts = {}) {
                 Need help?
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#f6f5f1;line-height:1.4;margin-top:8px;">
-                Email us at <a href="mailto:support@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">support@lets-paraconnect.com</a>
+                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">help@lets-paraconnect.com</a>
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
                 No longer want to receive these emails? ${unsubscribeLine}

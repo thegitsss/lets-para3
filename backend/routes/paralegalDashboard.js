@@ -134,6 +134,11 @@ router.get("/", auth, requireApproved, requireRole(["paralegal"]), async (req, r
         : null,
       status: String(c.status || "").toLowerCase() === "in_progress" ? "in progress" : c.status,
       createdAt: c.createdAt,
+      archived: c.archived,
+      paymentReleased: c.paymentReleased,
+      escrowStatus: c.escrowStatus || null,
+      escrowIntentId: c.escrowIntentId || null,
+      paralegalId: c.paralegalId || c.paralegal || null,
     }));
 
     const availableJobsSummary = availableJobs.map((j) => ({
