@@ -4332,7 +4332,16 @@ function openExistingPhotoEditor(config) {
     openPhotoCropperFromUrl(url, config, false, { originalUrl: url });
     return;
   }
-  fetch(url, { credentials: "include" })
+  let fetchOptions = undefined;
+  try {
+    const parsed = new URL(url, window.location.href);
+    if (parsed.origin === window.location.origin) {
+      fetchOptions = { credentials: "include" };
+    }
+  } catch (_) {
+    fetchOptions = { credentials: "include" };
+  }
+  fetch(url, fetchOptions)
     .then((res) => {
       if (!res.ok) throw new Error("Unable to load profile photo.");
       return res.blob();
