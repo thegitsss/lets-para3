@@ -552,6 +552,7 @@ router.patch(
     const availabilityStr = normalizeAvailability(availability);
     if (availabilityStr) me.availability = availabilityStr;
 
+    let allowMissingPhoto = false;
     if (avatarURL !== undefined || profileImage !== undefined) {
       const trimmedAvatar = typeof avatarURL === "string" ? avatarURL.trim() : "";
       const trimmedImage = typeof profileImage === "string" ? profileImage.trim() : "";
@@ -563,6 +564,7 @@ router.patch(
       const wantsClear =
         (avatarURL !== undefined && !trimmedAvatar) || (profileImage !== undefined && !trimmedImage);
       if (wantsClear) {
+        allowMissingPhoto = true;
         me.avatarURL = "";
         me.profileImage = null;
         me.profileImageOriginal = "";
@@ -682,7 +684,7 @@ router.patch(
       me.notificationPrefs = currentPrefs;
     }
 
-    if (me.role === "paralegal" && !hasRequiredParalegalFieldsForSave(me)) {
+    if (me.role === "paralegal" && !hasRequiredParalegalFieldsForSave(me, { allowMissingPhoto })) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 

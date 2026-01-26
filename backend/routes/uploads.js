@@ -77,6 +77,18 @@ function normalizeKeyPath(key) {
   return String(key || "").replace(/^\/+/, "");
 }
 
+function extractKeyFromUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw || raw.startsWith("data:") || raw.startsWith("blob:")) return "";
+  if (!/^https?:\/\//i.test(raw)) return normalizeKeyPath(raw);
+  try {
+    const parsed = new URL(raw);
+    return normalizeKeyPath(parsed.pathname);
+  } catch {
+    return "";
+  }
+}
+
 function normalizeFileName(value = "", fallback = "") {
   const cleaned = String(value || "").replace(/[\u0000-\u001F\u007F]/g, "").trim();
   if (cleaned) return cleaned.slice(0, 500);
@@ -614,6 +626,51 @@ router.post(
       profileImage: requiresReview ? user.profileImage || "" : publicUrl,
       profileImageOriginal: user.profileImageOriginal || "",
     });
+  })
+);
+
+router.get(
+  "/profile-photo/original",
+  asyncHandler(async (req, res) => {
+    if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
+    const ownerId = String(req.user?.id || req.user?._id || "").trim();
+    if (!ownerId) return res.status(400).json({ msg: "Invalid user" });
+    const user = await User.findById(ownerId).select(
+      "pendingProfileImageOriginal profileImageOriginal pendingProfileImage profileImage avatarURL"
+    );
+    if (!user) return res.status(404).json({ msg: "User not found" });
+    const candidates = [
+      user.pendingProfileImageOriginal,
+      user.profileImageOriginal,
+      user.pendingProfileImage,
+      user.profileImage,
+      user.avatarURL,
+    ]
+      .map((item) => (typeof item === "string" ? item.trim() : ""))
+      .filter(Boolean);
+    if (!candidates.length) return res.status(404).json({ msg: "Profile photo not found" });
+
+    let lastErr = null;
+    for (const candidate of candidates) {
+      const key = extractKeyFromUrl(candidate);
+      if (!key) continue;
+      try {
+        const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+        const obj = await s3.send(getCmd);
+        if (!obj?.Body) continue;
+        res.set("Content-Type", obj.ContentType || "image/jpeg");
+        if (obj.ContentLength) res.set("Content-Length", String(obj.ContentLength));
+        res.set("Cache-Control", "no-store");
+        obj.Body.pipe(res);
+        return;
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    if (lastErr) {
+      console.warn("[uploads] profile-photo/original fetch failed", lastErr?.message || lastErr);
+    }
+    return res.status(404).json({ msg: "Profile photo not found" });
   })
 );
 

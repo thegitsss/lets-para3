@@ -21,13 +21,14 @@ function hasApprovedPhoto(user = {}) {
   return status === "approved" && hasApproved;
 }
 
-function hasRequiredParalegalFieldsForSave(user = {}) {
+function hasRequiredParalegalFieldsForSave(user = {}, opts = {}) {
+  const allowMissingPhoto = Boolean(opts.allowMissingPhoto);
   return (
     hasNonEmptyString(user.bio) &&
     hasNonEmptyArray(user.skills) &&
     hasNonEmptyArray(user.practiceAreas) &&
     hasNonEmptyString(user.resumeURL) &&
-    hasUploadedPhoto(user)
+    (allowMissingPhoto || hasUploadedPhoto(user))
   );
 }
 

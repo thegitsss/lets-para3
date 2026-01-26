@@ -4319,39 +4319,72 @@ function openPhotoCropperFromUrl(url, config, isObjectUrl = false, options = {})
 
 function openExistingPhotoEditor(config) {
   const source = getOriginalPhotoSource(currentUser || {}, { allowPending: true });
-  if (!source || !source.value || source.value === DEFAULT_AVATAR_DATA) {
+  const fallbackUrl = getDisplayProfileImage(currentUser || {}, { allowPending: true });
+  const primaryUrl =
+    source && source.value && source.value !== DEFAULT_AVATAR_DATA ? source.value : fallbackUrl || "";
+
+  if (!primaryUrl || primaryUrl === DEFAULT_AVATAR_DATA) {
     showToast("Upload the original profile photo to enable editing.", "err");
     return;
   }
-  if (source.type === "file") {
+  if (source?.type === "file") {
     openPhotoCropper(source.value, config);
     return;
   }
-  const url = source.value;
-  if (url.startsWith("data:")) {
-    openPhotoCropperFromUrl(url, config, false, { originalUrl: url });
-    return;
-  }
-  let fetchOptions = undefined;
-  try {
-    const parsed = new URL(url, window.location.href);
-    if (parsed.origin === window.location.origin) {
+
+  const openFromBlob = (blob, originalUrl) => {
+    const objectUrl = URL.createObjectURL(blob);
+    openPhotoCropperFromUrl(objectUrl, config, true, { originalUrl });
+  };
+
+  const tryDirect = (targetUrl, allowFallback) => {
+    if (targetUrl.startsWith("data:")) {
+      openPhotoCropperFromUrl(targetUrl, config, false, { originalUrl: targetUrl });
+      return;
+    }
+    if (targetUrl.startsWith("blob:")) {
+      openPhotoCropperFromUrl(targetUrl, config, true, { originalUrl: targetUrl });
+      return;
+    }
+    let fetchOptions = undefined;
+    try {
+      const parsed = new URL(targetUrl, window.location.href);
+      if (parsed.origin === window.location.origin) {
+        fetchOptions = { credentials: "include" };
+      }
+    } catch (_) {
       fetchOptions = { credentials: "include" };
     }
-  } catch (_) {
-    fetchOptions = { credentials: "include" };
+    fetch(targetUrl, fetchOptions)
+      .then((res) => {
+        if (!res.ok) throw new Error("Unable to load profile photo.");
+        return res.blob();
+      })
+      .then((blob) => openFromBlob(blob, targetUrl))
+      .catch(() => {
+        if (allowFallback && fallbackUrl && fallbackUrl !== targetUrl) {
+          tryDirect(fallbackUrl, false);
+          return;
+        }
+        showToast("Unable to load the original photo. Please re-upload the image.", "err");
+      });
+  };
+
+  if (primaryUrl.startsWith("data:") || primaryUrl.startsWith("blob:")) {
+    openPhotoCropperFromUrl(primaryUrl, config, primaryUrl.startsWith("blob:"), { originalUrl: primaryUrl });
+    return;
   }
-  fetch(url, fetchOptions)
+
+  const originalUrl = source?.value || fallbackUrl || "";
+  const allowFallback = Boolean(source?.value && fallbackUrl && fallbackUrl !== primaryUrl);
+  secureFetch("/api/uploads/profile-photo/original")
     .then((res) => {
       if (!res.ok) throw new Error("Unable to load profile photo.");
       return res.blob();
     })
-    .then((blob) => {
-      const objectUrl = URL.createObjectURL(blob);
-      openPhotoCropperFromUrl(objectUrl, config, true, { originalUrl: url });
-    })
+    .then((blob) => openFromBlob(blob, originalUrl || primaryUrl))
     .catch(() => {
-      showToast("Unable to load the original photo. Please re-upload the image.", "err");
+      tryDirect(primaryUrl, allowFallback);
     });
 }
 
