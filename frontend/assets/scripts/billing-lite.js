@@ -21,6 +21,7 @@ function initBillingLite() {
   const saveCardBtn = document.getElementById("savePaymentMethodBtn");
   const cancelCardBtn = document.getElementById("cancelPaymentMethodBtn");
   const PENDING_HIRE_KEY = "lpc_pending_hire_funding";
+  const CASE_PREVIEW_STORAGE_KEY = "lpc_case_preview_id";
 
   let cachedEscrows = [];
   let openDrawerEl = null;
@@ -54,7 +55,7 @@ function bindEvents() {
     if (!btn) return;
     const caseId = btn.getAttribute("data-case-id");
     if (!caseId) return;
-    viewCase(caseId);
+    viewArchivedCase(caseId);
   });
   refreshEscrowsBtn?.addEventListener("click", () => {
     loadActiveEscrows(true, { syncAlerts: true });
@@ -78,7 +79,7 @@ function bindEvents() {
 async function loadActiveEscrows(showLoading = false, { syncAlerts = false } = {}) {
   if (!escrowTableBody) return [];
   if (showLoading) {
-    escrowTableBody.innerHTML = `<tr><td colspan="6" class="history-empty">Loading active escrows…</td></tr>`;
+    escrowTableBody.innerHTML = renderEscrowSkeletonRows();
   }
   try {
     const res = await secureFetch("/api/payments/escrow/active", { headers: { Accept: "application/json" } });
@@ -285,7 +286,7 @@ function handleGlobalClick(event) {
 
 async function loadHistory() {
   if (!historyList) return;
-  historyList.innerHTML = `<div class="history-empty">Loading payment history…</div>`;
+  historyList.innerHTML = renderHistorySkeleton();
   try {
     const res = await secureFetch("/api/payments/history", { headers: { Accept: "application/json" } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -649,9 +650,70 @@ function formatStatusLabel(status = "") {
   return safe ? safe.replace(/\b\w/g, (c) => c.toUpperCase()) : "In Progress";
 }
 
+function renderEscrowSkeletonRows(count = 3) {
+  const cell = (size) => `<div class="skeleton-line ${size}"></div>`;
+  return Array.from({ length: count })
+    .map(
+      () => `
+        <tr class="skeleton-row">
+          <td>${cell("long")}</td>
+          <td>${cell("medium")}</td>
+          <td>${cell("short")}</td>
+          <td>${cell("short")}</td>
+          <td>${cell("short")}</td>
+          <td>${cell("medium")}</td>
+        </tr>
+      `
+    )
+    .join("");
+}
+
+function renderHistorySkeleton(count = 2) {
+  const line = (size) => `<div class="skeleton-line ${size}"></div>`;
+  return Array.from({ length: count })
+    .map(
+      () => `
+        <article class="history-card">
+          <div class="history-primary">
+            ${line("long")}
+            ${line("medium")}
+            ${line("short")}
+          </div>
+          <div class="history-meta">
+            <div class="meta-item">${line("short")}</div>
+            <div class="meta-item">${line("short")}</div>
+          </div>
+          <div class="history-actions">
+            ${line("short")}
+            ${line("short")}
+          </div>
+        </article>
+      `
+    )
+    .join("");
+}
+
 function viewCase(caseId) {
   if (!caseId) return;
   window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
+}
+
+function viewArchivedCase(caseId) {
+  if (!caseId) return;
+  try {
+    sessionStorage.setItem(CASE_PREVIEW_STORAGE_KEY, String(caseId));
+  } catch {
+    /* ignore */
+  }
+  if (window.location.pathname.endsWith("dashboard-attorney.html")) {
+    if (window.location.hash !== "#cases:archived") {
+      window.location.hash = "cases:archived";
+    } else {
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    }
+    return;
+  }
+  window.location.href = `dashboard-attorney.html?previewCaseId=${encodeURIComponent(caseId)}#cases:archived`;
 }
 
 function formatDate(raw) {

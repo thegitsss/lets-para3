@@ -4,6 +4,7 @@ const router = express.Router();
 const Job = require("../models/Job");
 const Application = require("../models/Application");
 const Case = require("../models/Case");
+const User = require("../models/User");
 const auth = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const applicationsRouter = require("./applications");
@@ -65,6 +66,12 @@ router.post("/", auth, requireApproved, requireRole("attorney"), async (req, res
       }
     }
 
+    const attorneyProfile = await User.findById(req.user._id || req.user.id).select("state");
+    const attorneyState = String(attorneyProfile?.state || "").trim().toUpperCase();
+    if (!attorneyState) {
+      return res.status(400).json({ error: "Attorney profile state is required to post a job." });
+    }
+
     const title = cleanTitle(req.body.title, 150);
     if (!title || title.length < 5) {
       return res.status(400).json({ error: "Title must be at least 5 characters." });
@@ -95,6 +102,8 @@ router.post("/", auth, requireApproved, requireRole("attorney"), async (req, res
       practiceArea: practiceAreaValue,
       description,
       budget: Math.round(budget),
+      state: attorneyState,
+      locationState: attorneyState,
     });
 
     if (caseDoc && !caseDoc.jobId) {
@@ -139,6 +148,9 @@ function shapeListing({ job = null, caseDoc = null }) {
   const attorneySource = job?.attorneyId || caseDoc?.attorney || null;
   const normalizedAttorneyId =
     normalizeId(job?.attorneyId) || normalizeId(caseDoc?.attorneyId) || normalizeId(caseDoc?.attorney);
+  const jobState = job?.state || job?.locationState || "";
+  const caseState = caseDoc?.state || caseDoc?.locationState || "";
+  const resolvedState = jobState || caseState;
 
   return {
     id: caseDoc?._id || job?.caseId || job?._id,
@@ -154,8 +166,8 @@ function shapeListing({ job = null, caseDoc = null }) {
     lockedTotalAmount,
     budget: typeof job?.budget === "number" ? job.budget : budgetFromCase,
     currency: caseDoc?.currency || "usd",
-    state: caseDoc?.state || caseDoc?.locationState || "",
-    locationState: caseDoc?.locationState || caseDoc?.state || "",
+    state: resolvedState,
+    locationState: job?.locationState || job?.state || caseDoc?.locationState || caseDoc?.state || "",
     createdAt: job?.createdAt || caseDoc?.createdAt || new Date(),
     attorneyId: normalizedAttorneyId,
     attorney: buildAttorneyPreview(attorneySource),
@@ -172,7 +184,9 @@ router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req,
     const jobFilter = { status: "open" };
     const caseFilter = {
       archived: { $ne: true },
-      status: { $nin: ["assigned", "in progress", "in progress", "completed", "cancelled", "closed"] },
+      status: "open",
+      paralegal: null,
+      paralegalId: null,
     };
     if (blockedIds.length) {
       jobFilter.attorneyId = { $nin: blockedIds };

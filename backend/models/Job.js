@@ -16,6 +16,8 @@ const JobSchema = new mongoose.Schema({
   title: { type: String, required: true },
   practiceArea: { type: String, required: true },
   description: { type: String, required: true },
+  state: { type: String, trim: true, maxlength: 200, default: "" },
+  locationState: { type: String, trim: true, maxlength: 200, default: "" },
 
   budget: {
     type: Number,

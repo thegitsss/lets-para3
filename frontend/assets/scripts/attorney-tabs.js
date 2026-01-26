@@ -33,6 +33,7 @@ const FUNDED_WORKSPACE_STATUSES = new Set([
   "reviewing",
 ]);
 const TERMINAL_CASE_STATUSES = new Set(["completed", "closed", "cancelled", "canceled"]);
+const CASE_PREVIEW_STORAGE_KEY = "lpc_case_preview_id";
 const PARALEGAL_AVATAR_FALLBACK = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
   "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'><rect width='220' height='220' rx='110' fill='#f1f5f9'/><circle cx='110' cy='90' r='46' fill='#cbd5e1'/><path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/></svg>"
 )}`;
@@ -686,7 +687,10 @@ async function initOverviewPage() {
 
   function updateMessageBubble(count = 0) {
     if (messageCountSpan) messageCountSpan.textContent = String(count);
-    if (pluralSpan) pluralSpan.textContent = count === 1 ? " waiting" : "s waiting";
+    if (pluralSpan) {
+      pluralSpan.textContent = count === 1 ? " waiting" : "s waiting";
+      pluralSpan.hidden = count === 0;
+    }
     updateOverviewSignals({ unreadCount: count });
   }
 
@@ -820,6 +824,7 @@ function showDashboardView(target, { skipHash = false, caseFilter = null } = {})
     link.classList.toggle("active", view === target);
   });
   dashboardViewState.currentView = target;
+  document.documentElement.classList.remove("prefers-cases", "prefers-billing");
 
   if (!skipHash && target) {
     const normalized = `#${target}`;
@@ -2656,6 +2661,7 @@ function renderCaseMenu(item) {
   const menuId = `case-menu-${safeId || "case"}`;
   const isFinal = isFinalCase(item);
   const canViewWorkspace = isWorkspaceEligibleCase(item);
+  const hasAssigned = hasAssignedParalegal(item);
   const statusKey = String(item.status || "").toLowerCase();
   const hasInvites =
     (Array.isArray(item.invites) && item.invites.length > 0) ||
@@ -2693,12 +2699,15 @@ function renderCaseMenu(item) {
     );
   }
   if (item.archived) {
+    parts.push(
+      `<button type="button" class="menu-item" data-case-action="download-archive" data-case-id="${item.id}">Download Archive</button>`
+    );
     if (!isFinal) {
       parts.push(
         `<button type="button" class="menu-item" data-case-action="restore" data-case-id="${item.id}">Restore Case</button>`
       );
     }
-  } else {
+  } else if (!hasAssigned) {
     parts.push(
       `<button type="button" class="menu-item danger" data-case-action="archive" data-case-id="${item.id}">Archive Case</button>`
     );
@@ -2784,14 +2793,6 @@ function syncArchivedBulkUI() {
 
   const selectedCount = state.archivedSelection.size;
   bulkButtons.forEach((btn) => (btn.disabled = selectedCount === 0));
-  const restoreBtn = bar.querySelector('[data-archived-bulk="restore"]');
-  if (restoreBtn && selectedCount > 0) {
-    const selectedFinal = Array.from(state.archivedSelection).some((id) => {
-      const entry = state.caseLookup.get(String(id));
-      return isFinalCase(entry);
-    });
-    if (selectedFinal) restoreBtn.disabled = true;
-  }
 
   if (selectAll) {
     const totalVisible = checkboxes.length;
@@ -2970,7 +2971,14 @@ function closeCasePreviewModal() {
 function getCasePreviewQueryId() {
   try {
     const params = new URLSearchParams(window.location.search || "");
-    return params.get("previewCaseId");
+    const queryId = params.get("previewCaseId");
+    if (queryId) return queryId;
+  } catch {
+    /* ignore */
+  }
+  try {
+    const stored = sessionStorage.getItem(CASE_PREVIEW_STORAGE_KEY);
+    return stored || null;
   } catch {
     return null;
   }
@@ -2979,10 +2987,17 @@ function getCasePreviewQueryId() {
 function clearCasePreviewQuery() {
   try {
     const url = new URL(window.location.href);
-    if (!url.searchParams.has("previewCaseId")) return;
-    url.searchParams.delete("previewCaseId");
-    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    if (url.searchParams.has("previewCaseId")) {
+      url.searchParams.delete("previewCaseId");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    }
   } catch {}
+  try {
+    sessionStorage.removeItem(CASE_PREVIEW_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+  casePreviewFromQueryHandled = false;
 }
 
 function extractSummaryValue(summary, label) {
@@ -3401,11 +3416,11 @@ async function onArchivedBulkAction(event) {
   const ids = Array.from(state.archivedSelection);
   if (!ids.length) return;
   try {
-    if (action === "restore") {
-      for (const id of ids) {
-        await toggleCaseArchive(id, false);
-      }
-      notifyCases("Cases restored.", "success");
+    if (action === "download") {
+      ids.forEach((id) => {
+        window.open(`/api/cases/${encodeURIComponent(id)}/archive/download`, "_blank");
+      });
+      notifyCases("Download started for selected cases.", "success");
     } else if (action === "delete") {
       const confirmed = window.confirm(`Delete ${ids.length} case${ids.length === 1 ? "" : "s"}? This cannot be undone.`);
       if (!confirmed) return;
@@ -3526,6 +3541,8 @@ async function handleCaseAction(action, caseId) {
       return;
     } else if (action === "download") {
       await downloadCaseDeliverables(caseId);
+    } else if (action === "download-archive") {
+      window.open(`/api/cases/${encodeURIComponent(caseId)}/archive/download`, "_blank");
     } else if (action === "archive") {
       await toggleCaseArchive(caseId, true);
       renderCasesView();
@@ -3565,10 +3582,14 @@ async function downloadCaseDeliverables(caseId) {
 async function toggleCaseArchive(caseId, archived) {
   const archiveUrl = `/api/cases/${encodeURIComponent(caseId)}/archive`;
   const caseUrl = `/api/cases/${encodeURIComponent(caseId)}`;
+  const entry = state.caseLookup.get(String(caseId));
+
+  if (archived && hasAssignedParalegal(entry)) {
+    throw new Error("Cases with a hired paralegal cannot be archived.");
+  }
 
   // Ensure a valid status before unarchiving to avoid enum errors.
   if (!archived) {
-    const entry = state.caseLookup.get(String(caseId));
     if (isFinalCase(entry)) {
       throw new Error("Completed cases cannot be restored.");
     }
@@ -4919,6 +4940,11 @@ function isFinalCase(caseItem) {
   return status === "completed";
 }
 
+function hasAssignedParalegal(caseItem) {
+  if (!caseItem) return false;
+  return !!(caseItem?.paralegal || caseItem?.paralegalId);
+}
+
 function isTerminalCase(caseItem) {
   if (!caseItem) return false;
   if (caseItem.paymentReleased === true) return true;
@@ -4935,8 +4961,7 @@ function isWorkspaceEligibleCase(caseItem) {
   const escrowFunded =
     !!caseItem?.escrowIntentId && String(caseItem?.escrowStatus || "").toLowerCase() === "funded";
   if (!escrowFunded) return false;
-  const hasParalegal = caseItem?.paralegal || caseItem?.paralegalId;
-  return !!hasParalegal;
+  return hasAssignedParalegal(caseItem);
 }
 
 function filterWorkspaceEligibleCases(list = []) {

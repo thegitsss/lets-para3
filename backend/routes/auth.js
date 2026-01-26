@@ -187,7 +187,7 @@ function buildResetPasswordEmailHtml(user, resetUrl, opts = {}) {
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.08em;color:#1f1f1f;line-height:1.6;">
                 We received a request to reset your password. Use this
                 <a href="${resetUrl}" style="color:#1f1f1f;text-decoration:underline;">link</a>
-                to choose a new one. This link expires in 30 minutes.
+                to choose a new one. This link expires in 48 hours.
               </div>
             </td>
           </tr>
@@ -346,6 +346,7 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
 const TWO_HOURS = "2h";
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const FIFTEEN_MIN = 15 * 60 * 1000;
+const RESET_PASSWORD_MINUTES = 48 * 60;
 const DISABLED_ACCOUNT_MSG = "This account has been disabled.";
 const BOT_NAME_GIBBERISH = /^[bcdfghjklmnpqrstvwxyz]{6,}$/;
 const BOT_REPEATED = /(.)\1{3,}/;
@@ -1116,14 +1117,14 @@ router.post(
 
     const resetToken = signOneTime(
       { purpose: "reset-password", uid: user._id.toString() },
-      { minutes: 30, secretEnv: "JWT_SECRET" }
+      { minutes: RESET_PASSWORD_MINUTES, secretEnv: "JWT_SECRET" }
     );
     const baseUrl = (process.env.APP_BASE_URL || "").replace(/\/+$/, "");
     const resetUrl = `${baseUrl}/reset-password.html?token=${resetToken}`;
     try {
       const inlineLogoPath = path.join(__dirname, "../../frontend/Cleanfav.png");
       const html = buildResetPasswordEmailHtml(user, resetUrl, { logoUrl: "cid:cleanfav-logo" });
-      const text = `Reset your password using this link: ${resetUrl}\nThis link expires in 30 minutes.`;
+      const text = `Reset your password using this link: ${resetUrl}\nThis link expires in 48 hours.`;
       await sendEmail(user.email, "Reset your password", html, {
         text,
         attachments: [

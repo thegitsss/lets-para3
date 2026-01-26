@@ -9,6 +9,7 @@ const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const Case = require("../models/Case");
 const Job = require("../models/Job");
 const Application = require("../models/Application");
+const CaseFile = require("../models/CaseFile");
 const User = require("../models/User");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
@@ -303,6 +304,43 @@ function hasWorkStarted(caseDoc) {
   return false;
 }
 
+function resolveCaseJobId(caseDoc) {
+  if (!caseDoc) return null;
+  const raw = caseDoc.jobId || caseDoc.job || null;
+  if (!raw) return null;
+  if (typeof raw === "object") {
+    return raw._id || raw.id || raw;
+  }
+  return raw;
+}
+
+async function markJobAssigned(caseDoc) {
+  const jobId = resolveCaseJobId(caseDoc);
+  if (!jobId) return null;
+  try {
+    await Job.findByIdAndUpdate(jobId, { status: "assigned" });
+  } catch (err) {
+    console.warn("[cases] Unable to update job status after hire", jobId, err?.message || err);
+  }
+  return jobId;
+}
+
+async function rejectJobApplications(jobId, hiredParalegalId) {
+  if (!jobId || !hiredParalegalId) return;
+  try {
+    await Application.updateOne(
+      { jobId, paralegalId: hiredParalegalId },
+      { $set: { status: "accepted" } }
+    );
+    await Application.updateMany(
+      { jobId, paralegalId: { $ne: hiredParalegalId } },
+      { $set: { status: "rejected" } }
+    );
+  } catch (err) {
+    console.warn("[cases] Unable to update application statuses after hire", err?.message || err);
+  }
+}
+
 function parseDeadline(raw) {
   if (!raw) return null;
   const date = new Date(raw);
@@ -571,15 +609,17 @@ function caseSummary(doc, { includeFiles = false } = {}) {
 }
 
 function normalizeFile(file) {
-  const original = file.original || file.filename || "";
+  const original = file.original || file.filename || file.originalName || "";
+  const key = file.key || file.storageKey || "";
   return {
     id: file._id ? String(file._id) : undefined,
-    key: file.key,
+    key,
+    storageKey: key,
     original,
     filename: file.filename || original,
-    mime: file.mime || null,
+    mime: file.mime || file.mimeType || null,
     size: file.size || null,
-    uploadedBy: file.uploadedBy ? String(file.uploadedBy) : null,
+    uploadedBy: file.uploadedBy ? String(file.uploadedBy) : file.userId ? String(file.userId) : null,
     uploadedByRole: file.uploadedByRole || null,
     uploadedAt: file.createdAt || file.updatedAt || file.uploadedAt || null,
     status: file.status || "pending_review",
@@ -687,6 +727,17 @@ function nextFileVersion(doc, filename) {
     .map((f) => Number(f.version) || 1);
   if (!versions.length) return 1;
   return Math.max(...versions) + 1;
+}
+
+async function nextCaseFileVersion(caseId, filename) {
+  if (!caseId || !filename) return 1;
+  const recent = await CaseFile.find({ caseId, originalName: filename })
+    .sort({ version: -1, createdAt: -1 })
+    .limit(1)
+    .lean();
+  const latest = recent[0];
+  const prev = Number(latest?.version || 0);
+  return prev > 0 ? prev + 1 : 1;
 }
 
 async function signDownload(key) {
@@ -1072,8 +1123,15 @@ router.post(
       const existing = caseDoc.applicants.find((app) => String(app.paralegalId) === String(paralegalId));
       if (existing) existing.status = "accepted";
       else caseDoc.applicants.push({ paralegalId, status: "accepted" });
+      caseDoc.applicants.forEach((app) => {
+        if (String(app.paralegalId) !== String(paralegalId)) {
+          app.status = "rejected";
+        }
+      });
 
       await caseDoc.save();
+      const jobId = await markJobAssigned(caseDoc);
+      await rejectJobApplications(jobId, paralegalId);
       await notifyAttorneyAwaitingFunding(caseDoc, paralegalId);
       await sendCaseNotification(
         attorneyId,
@@ -1278,6 +1336,8 @@ router.post(
 
     try {
       const budgetDollars = Math.max(50, Math.round((amountCents || 0) / 100) || 0);
+      const attorneyProfile = await User.findById(req.user.id).select("state");
+      const attorneyState = String(attorneyProfile?.state || "").trim().toUpperCase();
       const job = await Job.create({
         caseId: created._id,
         attorneyId: req.user.id,
@@ -1286,6 +1346,8 @@ router.post(
         description: created.details,
         budget: budgetDollars,
         status: "open",
+        state: attorneyState,
+        locationState: attorneyState,
       });
       created.jobId = job._id;
       await created.save();
@@ -1466,7 +1528,28 @@ router.get(
       .populate("internalNotes.updatedBy", "firstName lastName email role avatarURL")
       .lean();
 
-    res.json(docs.map((doc) => caseSummary(doc, { includeFiles })));
+    let filesByCase = new Map();
+    if (includeFiles && docs.length) {
+      const caseIds = docs.map((doc) => doc._id);
+      const files = await CaseFile.find({ caseId: { $in: caseIds } }).sort({ createdAt: -1 }).lean();
+      files.forEach((file) => {
+        const key = String(file.caseId);
+        if (!filesByCase.has(key)) filesByCase.set(key, []);
+        filesByCase.get(key).push(normalizeFile(file));
+      });
+    }
+
+    const payload = docs.map((doc) => {
+      const summary = caseSummary(doc, { includeFiles: false });
+      if (includeFiles) {
+        const files = filesByCase.get(String(doc._id)) || [];
+        summary.files = files;
+        summary.filesCount = files.length;
+      }
+      return summary;
+    });
+
+    res.json(payload);
   })
 );
 
@@ -1947,34 +2030,32 @@ router.post(
     const { key, original, mime, size } = req.body || {};
     if (!key || typeof key !== "string") return res.status(400).json({ error: "key is required" });
     const doc = req.case;
-
-    const filename = cleanString(original || "", { len: 400 }) || key.split("/").pop();
+    const storageKey = String(key).trim();
+    const filename = cleanString(original || "", { len: 400 }) || storageKey.split("/").pop();
     const uploadRole = req.user.role || "attorney";
     const defaultStatus = req.acl?.isAttorney || uploadRole === "attorney" ? "attorney_revision" : "pending_review";
+    const status = FILE_STATUS.includes(defaultStatus) ? defaultStatus : "pending_review";
 
-    const entry = {
-      key: String(key).trim(),
-      original: cleanString(original || "", { len: 400 }) || undefined,
-      filename,
-      mime: typeof mime === "string" ? mime : undefined,
-      size: Number.isFinite(Number(size)) ? Number(size) : undefined,
-      uploadedBy: req.user.id,
-      uploadedByRole: uploadRole,
-      status: FILE_STATUS.includes(defaultStatus) ? defaultStatus : "pending_review",
-      version: nextFileVersion(doc, filename),
-    };
-
-    doc.files = doc.files || [];
-    const exists = doc.files.some((f) => f.key === entry.key);
+    const exists = await CaseFile.findOne({ caseId: doc._id, storageKey }).select("_id").lean();
     if (!exists) {
-      doc.files.push(entry);
-      await doc.save();
+      const version = await nextCaseFileVersion(doc._id, filename);
+      await CaseFile.create({
+        caseId: doc._id,
+        userId: req.user.id,
+        originalName: filename,
+        storageKey,
+        mimeType: typeof mime === "string" ? mime : "",
+        size: Number.isFinite(Number(size)) ? Number(size) : 0,
+        uploadedByRole: uploadRole,
+        status,
+        version,
+      });
       try {
         await logAction(req, "case.file.attach", {
           targetType: "case",
           targetId: doc._id,
           caseId: doc._id,
-          meta: { key: entry.key, name: entry.filename },
+          meta: { key: storageKey, name: filename },
         });
       } catch {}
     }
@@ -1996,20 +2077,27 @@ router.delete(
     const { key } = req.body || {};
     if (!key || typeof key !== "string") return res.status(400).json({ error: "key is required" });
     const doc = req.case;
-
-    const before = doc.files?.length || 0;
-    doc.files = (doc.files || []).filter((f) => f.key !== key);
-    if ((doc.files?.length || 0) === before) {
+    const storageKey = String(key).trim();
+    const record = await CaseFile.findOne({ caseId: doc._id, storageKey });
+    if (!record) {
       return res.status(404).json({ error: "File not found on case" });
     }
-    await doc.save();
+    if (S3_BUCKET && record.storageKey) {
+      try {
+        const keyPath = String(record.storageKey).replace(/^\/+/, "");
+        await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: keyPath }));
+      } catch (err) {
+        console.warn("[cases] file delete error", err?.message || err);
+      }
+    }
+    await CaseFile.deleteOne({ _id: record._id });
 
     try {
       await logAction(req, "case.file.remove", {
         targetType: "case",
         targetId: doc._id,
         caseId: doc._id,
-        meta: { key },
+        meta: { key: storageKey },
       });
     } catch {}
 
@@ -2031,12 +2119,12 @@ router.get(
     if (!req.acl?.isAdmin && isCaseClosedForFiles(doc)) {
       return res.status(403).json({ error: "Files are no longer available. Download the archive instead." });
     }
-    const file = (doc.files || []).find((f) => f.key === key);
+    const file = await CaseFile.findOne({ caseId: doc._id, storageKey: String(key).trim() }).lean();
     if (!file) return res.status(404).json({ error: "File not found" });
 
     try {
-      const url = await signDownload(file.key);
-      res.json({ url, filename: file.original || file.filename || null });
+      const url = await signDownload(file.storageKey);
+      res.json({ url, filename: file.originalName || null });
     } catch (e) {
       console.error("[cases] signed-get error:", e);
       res.status(500).json({ error: "Unable to sign file" });
@@ -2053,7 +2141,7 @@ router.patch(
       return res.status(403).json({ error: "Only the case attorney can update file status" });
     }
     const doc = req.case;
-    const file = findFile(doc, req.params.fileId);
+    const file = await CaseFile.findOne({ _id: req.params.fileId, caseId: doc._id });
     if (!file) return res.status(404).json({ error: "File not found" });
 
     const { status, notes } = req.body || {};
@@ -2076,7 +2164,7 @@ router.patch(
       if (file.revisionNotes) file.revisionRequestedAt = now;
     }
 
-    await doc.save();
+    await file.save();
     try {
       await logAction(req, "case.file.status.update", {
         targetType: "case",
@@ -2099,7 +2187,7 @@ router.post(
       return res.status(403).json({ error: "Only the attorney can request revisions" });
     }
     const doc = req.case;
-    const file = findFile(doc, req.params.fileId);
+    const file = await CaseFile.findOne({ _id: req.params.fileId, caseId: doc._id });
     if (!file) return res.status(404).json({ error: "File not found" });
 
     const note = cleanString(req.body?.notes || "", { len: 2000 });
@@ -2108,7 +2196,7 @@ router.post(
     file.status = "pending_review";
     file.approvedAt = null;
 
-    await doc.save();
+    await file.save();
     try {
       await logAction(req, "case.file.revision.request", {
         targetType: "case",
@@ -2133,34 +2221,35 @@ router.post(
     const { key, original, mime, size } = req.body || {};
     if (!key || typeof key !== "string") return res.status(400).json({ error: "key is required" });
     const doc = req.case;
-    const file = findFile(doc, req.params.fileId);
+    const file = await CaseFile.findOne({ _id: req.params.fileId, caseId: doc._id });
     if (!file) return res.status(404).json({ error: "File not found" });
 
     if (!Array.isArray(file.history)) file.history = [];
-    file.history.push({ key: file.key, replacedAt: new Date() });
+    if (file.storageKey) {
+      file.history.push({ storageKey: file.storageKey, replacedAt: new Date() });
+    }
 
     const filename = cleanString(original || "", { len: 400 }) || key.split("/").pop();
-    file.key = String(key).trim();
-    file.original = cleanString(original || "", { len: 400 }) || undefined;
-    file.filename = filename;
-    file.mime = typeof mime === "string" ? mime : undefined;
-    file.size = Number.isFinite(Number(size)) ? Number(size) : undefined;
+    file.storageKey = String(key).trim();
+    file.originalName = filename;
+    file.mimeType = typeof mime === "string" ? mime : "";
+    file.size = Number.isFinite(Number(size)) ? Number(size) : 0;
     file.replacedAt = new Date();
-    file.uploadedBy = req.user.id;
+    file.userId = req.user.id;
     file.uploadedByRole = req.user.role || "attorney";
     file.status = "attorney_revision";
-    file.version = nextFileVersion(doc, filename);
+    file.version = await nextCaseFileVersion(doc._id, filename);
     file.approvedAt = null;
     file.revisionRequestedAt = null;
     file.revisionNotes = "";
 
-    await doc.save();
+    await file.save();
     try {
       await logAction(req, "case.file.replace", {
         targetType: "case",
         targetId: doc._id,
         caseId: doc._id,
-        meta: { fileId: file._id, key: file.key },
+        meta: { fileId: file._id, key: file.storageKey },
       });
     } catch {}
 
@@ -2405,6 +2494,8 @@ router.post(
         if (String(app.paralegalId) === String(req.user.id)) {
           app.status = "accepted";
           found = true;
+        } else {
+          app.status = "rejected";
         }
       });
       if (!found) {
@@ -2413,6 +2504,8 @@ router.post(
     }
 
     await caseDoc.save();
+    const jobId = await markJobAssigned(caseDoc);
+    await rejectJobApplications(jobId, req.user.id);
 
     await notifyAttorneyAwaitingFunding(caseDoc, req.user.id);
 
@@ -2831,6 +2924,7 @@ router.post(
       }
       return res.status(500).json({ error: "Unable to finalize hire. Please try again." });
     }
+    await markJobAssigned(selectedCase);
     await selectedCase.populate([
       { path: "paralegal", select: "firstName lastName email role avatarURL" },
       { path: "attorney", select: "firstName lastName email role avatarURL" },

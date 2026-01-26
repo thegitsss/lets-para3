@@ -199,7 +199,9 @@ const userSchema = new Schema(
     },
     avatarURL: { type: String, default: "", trim: true },
     profileImage: { type: String, default: null },
+    profileImageOriginal: { type: String, default: "", trim: true },
     pendingProfileImage: { type: String, default: "", trim: true },
+    pendingProfileImageOriginal: { type: String, default: "", trim: true },
     profilePhotoStatus: {
       type: String,
       enum: ["unsubmitted", "pending_review", "approved", "rejected"],

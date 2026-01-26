@@ -3,8 +3,19 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="preload" as="image" href="hero-mountain.jpg" />
   <script>
     document.documentElement.classList.add("js");
+  </script>
+  <script>
+    (function preselectDashboardView() {
+      const hash = String(window.location.hash || "").toLowerCase();
+      if (hash.startsWith("#cases")) {
+        document.documentElement.classList.add("prefers-cases");
+      } else if (hash.startsWith("#billing")) {
+        document.documentElement.classList.add("prefers-billing");
+      }
+    })();
   </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -145,6 +156,7 @@
       overflow-y: auto;
       overflow-x: hidden;
       min-height: 100vh;
+      scrollbar-gutter: stable;
     }
     html.js .main {
       opacity: 0.85;
@@ -172,6 +184,10 @@
       display: flex;
       align-items: center;
       gap: 12px;
+    }
+
+    html.has-user-cache .header-skeleton {
+      display: none;
     }
     .skeleton-circle {
       width: 44px;
@@ -233,7 +249,7 @@
 
     body.theme-mountain .sidebar,
     body.theme-mountain-dark .sidebar {
-      background: url('hero-mountain.jpg') center/cover no-repeat;
+      background: var(--bg) url('hero-mountain.jpg') center/cover no-repeat;
     }
 
     body.theme-mountain .sidebar::before,
@@ -502,6 +518,9 @@
       font-size: 0.95rem;
       flex: 1 1 220px;
       min-width: 220px;
+    }
+    .info-box[data-metric] {
+      cursor: help;
     }
     .message-box {
       cursor:pointer;
@@ -1158,6 +1177,25 @@
       display: none !important;
     }
 
+    html.prefers-cases .view-home {
+      display: none !important;
+    }
+
+    html.prefers-cases .view-cases,
+    html.prefers-cases .view-cases[hidden] {
+      display: block !important;
+    }
+
+    html.prefers-billing .view-home,
+    html.prefers-billing .view-cases {
+      display: none !important;
+    }
+
+    html.prefers-billing .view-billing,
+    html.prefers-billing .view-billing[hidden] {
+      display: block !important;
+    }
+
     .view-cases {
       padding-bottom: 3rem;
     }
@@ -1308,6 +1346,7 @@
       align-items:center;
       gap:0.75rem;
       margin-bottom:0.65rem;
+      padding-top:2px;
       flex-wrap:wrap;
     }
 
@@ -1355,6 +1394,12 @@
       border-color:var(--accent);
     }
 
+    .archived-bulk-actions .pill-btn.primary:hover:not([disabled]) {
+      background:var(--accent);
+      color:#fff;
+      border-color:var(--accent);
+    }
+
     .archived-bulk-actions .pill-btn.danger {
       color:#b04747;
       border-color:rgba(176,71,71,0.3);
@@ -1364,6 +1409,22 @@
       opacity:0.55;
       cursor:not-allowed;
       transform:none;
+    }
+
+    @media (max-width: 820px) {
+      .view-cases .archived-bulk-bar {
+        align-items:flex-start;
+      }
+      .view-cases .archived-select-all {
+        width:100%;
+      }
+      .view-cases .archived-bulk-actions {
+        width:100%;
+      }
+      .archived-bulk-actions .pill-btn {
+        flex:1 1 180px;
+        min-width:160px;
+      }
     }
 
     .view-cases th {
@@ -1869,6 +1930,7 @@
       align-items:center;
       gap:12px;
       color:var(--ink);
+      min-height:90px;
     }
 
     .view-billing .pm-row {
@@ -2020,6 +2082,7 @@
       flex-direction:column;
       gap:0.85rem;
       margin-bottom:2rem;
+      min-height:110px;
     }
 
     .view-billing .finance-alert {
@@ -2090,6 +2153,7 @@
 
     .view-billing .table-wrapper {
       overflow-x:auto;
+      min-height:140px;
     }
 
     .view-billing .escrow-table {
@@ -2132,6 +2196,7 @@
       display:flex;
       flex-direction:column;
       gap:1.25rem;
+      min-height:140px;
     }
 
     .view-billing .history-card {
@@ -2378,6 +2443,28 @@
   </style>
 </head>
 <body>
+  <script>
+    (function applyStoredTheme() {
+      try {
+        const raw = localStorage.getItem("lpc_user");
+        if (!raw) return;
+        const stored = JSON.parse(raw);
+        const theme = String(stored?.preferences?.theme || "").toLowerCase();
+        const allowed = new Set(["light", "dark", "mountain", "mountain-dark"]);
+        if (allowed.has(theme)) {
+          const classes = theme === "mountain-dark" ? ["theme-mountain-dark", "theme-dark"] : [`theme-${theme}`];
+          classes.forEach((cls) => document.body.classList.add(cls));
+        }
+        const fontKey = String(stored?.preferences?.fontSize || "").toLowerCase();
+        const sizeMap = { xs: "14px", sm: "15px", md: "16px", lg: "17px", xl: "20px" };
+        if (sizeMap[fontKey]) {
+          document.documentElement.style.fontSize = sizeMap[fontKey];
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  </script>
   <a class="skip-link" href="#main">Skip to main content</a>
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
@@ -2469,13 +2556,13 @@
 
       <section class="home-panel" data-home-panel="cases" id="homeCasesPanel">
         <section class="summary case-snapshot">
-          <div class="info-box" id="attorneyActiveCases" data-metric="activeCases">
+          <div class="info-box" id="attorneyActiveCases" data-metric="activeCases" title="Active cases are open matters that are not archived or completed.">
             <div class="skeleton-line medium"></div>
           </div>
-          <div class="info-box" id="attorneyOverdueTasks" data-metric="overdueTasks">
+          <div class="info-box" id="attorneyOverdueTasks" data-metric="overdueTasks" title="Overdue tasks are checklist items past their due date and not completed.">
             <div class="skeleton-line medium"></div>
           </div>
-          <div class="info-box" id="attorneyEscrowTotal" data-metric="escrowTotal">
+          <div class="info-box" id="attorneyEscrowTotal" data-metric="escrowTotal" title="Escrow total is the sum of funds currently held in escrow.">
             <div class="skeleton-line long"></div>
           </div>
         </section>
@@ -2640,7 +2727,7 @@
                   <span>Select all</span>
                 </label>
                 <div class="archived-bulk-actions">
-                  <button type="button" class="pill-btn primary" data-archived-bulk="restore" disabled>Restore selected</button>
+                  <button type="button" class="pill-btn primary" data-archived-bulk="download" disabled>Download selected</button>
                   <button type="button" class="pill-btn danger" data-archived-bulk="delete" disabled>Delete selected</button>
                 </div>
               </div>

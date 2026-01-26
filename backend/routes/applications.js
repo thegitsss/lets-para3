@@ -113,6 +113,30 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     err.status = 400;
     throw err;
   }
+  if (job.caseId) {
+    const caseDoc = await Case.findById(job.caseId).select("status archived paralegal paralegalId");
+    if (!caseDoc) {
+      const err = new Error("Case not found");
+      err.status = 404;
+      throw err;
+    }
+    if (caseDoc.archived) {
+      const err = new Error("This case is not accepting applications");
+      err.status = 400;
+      throw err;
+    }
+    if (caseDoc.paralegal || caseDoc.paralegalId) {
+      const err = new Error("A paralegal has already been hired");
+      err.status = 400;
+      throw err;
+    }
+    const statusKey = String(caseDoc.status || "").toLowerCase();
+    if (statusKey !== "open") {
+      const err = new Error("Applications are closed for this case");
+      err.status = 400;
+      throw err;
+    }
+  }
 
   const existing = await Application.findOne({ jobId, paralegalId: user._id });
   if (existing) {

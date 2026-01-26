@@ -740,10 +740,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 let settingsState = {
   profileImage: "",
+  profileImageOriginal: "",
   pendingProfileImage: "",
+  pendingProfileImageOriginal: "",
   profilePhotoStatus: "",
   stagedProfilePhotoFile: null,
   stagedProfilePhotoUrl: "",
+  stagedProfilePhotoOriginalFile: null,
+  stagedProfilePhotoOriginalUrl: "",
   resumeFile: null,
   pendingResumeKey: "",
   pendingCertificateKey: "",
@@ -985,7 +989,9 @@ function seedSettingsState(user = {}) {
   settingsState.stateExperience = user.stateExperience || [];
   settingsState.linkedInURL = user.linkedInURL || "";
   settingsState.profileImage = user.profileImage || user.avatarURL || "";
+  settingsState.profileImageOriginal = user.profileImageOriginal || "";
   settingsState.pendingProfileImage = user.pendingProfileImage || "";
+  settingsState.pendingProfileImageOriginal = user.pendingProfileImageOriginal || "";
   settingsState.profilePhotoStatus = resolveProfilePhotoStatus(user);
   settingsState.notificationPrefs = {
     email: true,
@@ -1009,6 +1015,32 @@ function resolveProfilePhotoStatus(user = {}) {
 
 function resolvePendingProfileImage(user = {}) {
   return user.pendingProfileImage || settingsState.pendingProfileImage || "";
+}
+
+function resolvePendingProfileImageOriginal(user = {}) {
+  return user.pendingProfileImageOriginal || settingsState.pendingProfileImageOriginal || "";
+}
+
+function resolveProfileImageOriginal(user = {}) {
+  return user.profileImageOriginal || settingsState.profileImageOriginal || "";
+}
+
+function getOriginalPhotoSource(user = {}, { allowPending = false } = {}) {
+  if (settingsState.stagedProfilePhotoOriginalFile) {
+    return { type: "file", value: settingsState.stagedProfilePhotoOriginalFile };
+  }
+  if (settingsState.stagedProfilePhotoOriginalUrl) {
+    return { type: "url", value: settingsState.stagedProfilePhotoOriginalUrl };
+  }
+  const pendingOriginal = resolvePendingProfileImageOriginal(user);
+  if (allowPending && pendingOriginal) {
+    return { type: "url", value: pendingOriginal };
+  }
+  const approvedOriginal = resolveProfileImageOriginal(user);
+  if (approvedOriginal) {
+    return { type: "url", value: approvedOriginal };
+  }
+  return null;
 }
 
 function getDisplayProfileImage(user = {}, { allowPending = false } = {}) {
@@ -2423,7 +2455,10 @@ async function handleAttorneyProfileSave() {
     persistSession({ user: currentUser });
     window.updateSessionUser?.(currentUser);
     settingsState.profileImage = updatedUser.profileImage || settingsState.profileImage;
+    settingsState.profileImageOriginal = updatedUser.profileImageOriginal || settingsState.profileImageOriginal;
     settingsState.pendingProfileImage = updatedUser.pendingProfileImage || settingsState.pendingProfileImage;
+    settingsState.pendingProfileImageOriginal =
+      updatedUser.pendingProfileImageOriginal || settingsState.pendingProfileImageOriginal;
     settingsState.profilePhotoStatus = resolveProfilePhotoStatus(updatedUser);
     settingsState.practiceDescription = updatedUser.practiceDescription || updatedUser.bio || "";
     renderAttorneyPracticeAreas(updatedUser.practiceAreas || []);
@@ -3812,7 +3847,10 @@ async function saveSettings() {
   const writingSampleKeyInput = document.getElementById("writingSampleKeyInput");
   if (settingsState.stagedProfilePhotoFile) {
     try {
-      const payload = await uploadProfilePhotoFile(settingsState.stagedProfilePhotoFile);
+      const payload = await uploadProfilePhotoFile(
+        settingsState.stagedProfilePhotoFile,
+        settingsState.stagedProfilePhotoOriginalFile
+      );
       applyProfilePhotoUploadResult(payload, { suppressToast: true });
     } catch (err) {
       console.error("Unable to upload profile photo", err);
@@ -3910,7 +3948,10 @@ async function saveSettings() {
   const newFreq = typeof updatedUser.digestFrequency === "string" ? updatedUser.digestFrequency : "off";
   settingsState.digestFrequency = ["off", "daily", "weekly"].includes(newFreq) ? newFreq : "off";
   settingsState.profileImage = updatedUser.profileImage || settingsState.profileImage;
+  settingsState.profileImageOriginal = updatedUser.profileImageOriginal || settingsState.profileImageOriginal;
   settingsState.pendingProfileImage = updatedUser.pendingProfileImage || settingsState.pendingProfileImage;
+  settingsState.pendingProfileImageOriginal =
+    updatedUser.pendingProfileImageOriginal || settingsState.pendingProfileImageOriginal;
   settingsState.profilePhotoStatus = resolveProfilePhotoStatus(updatedUser);
   settingsState.pendingResumeKey = "";
   settingsState.pendingCertificateKey = "";
@@ -3960,8 +4001,47 @@ const avatarUploadConfigs = [
   }
 ];
 
+let activeCropper = null;
+let cropperModal = null;
+let cropperImage = null;
+let cropperZoom = null;
+let cropperConfig = null;
+let cropperFile = null;
+let cropperOriginalFile = null;
+let cropperOriginalUrl = "";
+let cropperObjectUrl = null;
+let cropperBaseZoom = 1;
+let cropperZoomLock = false;
+
+function getCurrentCropperZoom() {
+  if (!activeCropper) return 1;
+  const data = activeCropper.getImageData();
+  return data?.naturalWidth ? data.width / data.naturalWidth : 1;
+}
+
+function syncCropperBaseZoom({ resetSlider = false } = {}) {
+  if (!activeCropper) return;
+  cropperBaseZoom = getCurrentCropperZoom();
+  if (!cropperZoom) return;
+  cropperZoomLock = true;
+  cropperZoom.min = "0";
+  cropperZoom.max = "0.5";
+  cropperZoom.step = "0.01";
+  if (resetSlider) {
+    cropperZoom.value = "0";
+  } else {
+    const relative = cropperBaseZoom ? getCurrentCropperZoom() / cropperBaseZoom - 1 : 0;
+    cropperZoom.value = String(Math.min(0.5, Math.max(0, relative)));
+  }
+  requestAnimationFrame(() => {
+    cropperZoomLock = false;
+  });
+}
+
 function initAvatarUploaders() {
   bindAvatarRemoval();
+  bindAvatarEditing();
+  initPhotoCropperModal();
   avatarUploadConfigs.forEach((config) => {
     const frame = document.getElementById(config.frameId);
     const input = document.getElementById(config.inputId);
@@ -3982,13 +4062,24 @@ function initAvatarUploaders() {
 
 function updateAvatarRemoveButton(user = currentUser || {}) {
   const removeBtn = document.getElementById("removeAvatarBtn");
-  if (!removeBtn) return;
+  const editBtn = document.getElementById("editAvatarBtn");
+  const attorneyEditBtn = document.getElementById("editAttorneyAvatarBtn");
   const rawUrl = user.profileImage || user.avatarURL || settingsState.profileImage || "";
   const pendingUrl = resolvePendingProfileImage(user);
   const stagedUrl = settingsState.stagedProfilePhotoUrl || "";
   const hasPhoto = Boolean(rawUrl || pendingUrl || stagedUrl);
-  removeBtn.classList.toggle("hidden", !hasPhoto);
-  removeBtn.disabled = !hasPhoto;
+  if (removeBtn) {
+    removeBtn.classList.toggle("hidden", !hasPhoto);
+    removeBtn.disabled = !hasPhoto;
+  }
+  if (editBtn) {
+    editBtn.classList.toggle("hidden", !hasPhoto);
+    editBtn.disabled = !hasPhoto;
+  }
+  if (attorneyEditBtn) {
+    attorneyEditBtn.classList.toggle("hidden", !hasPhoto);
+    attorneyEditBtn.disabled = !hasPhoto;
+  }
 }
 
 function clearStagedProfilePhoto() {
@@ -3997,21 +4088,30 @@ function clearStagedProfilePhoto() {
   }
   settingsState.stagedProfilePhotoUrl = "";
   settingsState.stagedProfilePhotoFile = null;
+  if (settingsState.stagedProfilePhotoOriginalUrl?.startsWith("blob:")) {
+    URL.revokeObjectURL(settingsState.stagedProfilePhotoOriginalUrl);
+  }
+  settingsState.stagedProfilePhotoOriginalUrl = "";
+  settingsState.stagedProfilePhotoOriginalFile = null;
 }
 
 function applyProfilePhotoUploadResult(payload = {}, { suppressToast = false } = {}) {
   const status = String(payload?.status || payload?.profilePhotoStatus || "").trim();
   const pendingUrl = payload?.pendingProfileImage || (status === "pending_review" ? payload?.url : "");
   const approvedUrl = payload?.profileImage || payload?.avatarURL || (status !== "pending_review" ? payload?.url : "");
+  const pendingOriginal = payload?.pendingProfileImageOriginal || "";
+  const approvedOriginal = payload?.profileImageOriginal || "";
 
   if (status === "pending_review") {
     const updatedUser = mergeSessionPreferences({
       ...(currentUser || {}),
       pendingProfileImage: pendingUrl,
+      pendingProfileImageOriginal: pendingOriginal,
       profilePhotoStatus: "pending_review",
     });
     currentUser = updatedUser;
     settingsState.pendingProfileImage = pendingUrl || settingsState.pendingProfileImage;
+    settingsState.pendingProfileImageOriginal = pendingOriginal || settingsState.pendingProfileImageOriginal;
     settingsState.profilePhotoStatus = "pending_review";
     persistSession({ user: updatedUser });
     window.updateSessionUser?.(updatedUser);
@@ -4026,12 +4126,17 @@ function applyProfilePhotoUploadResult(payload = {}, { suppressToast = false } =
       ...(currentUser || {}),
       profileImage: approvedUrl,
       avatarURL: approvedUrl,
+      profileImageOriginal: approvedOriginal || (currentUser?.profileImageOriginal || ""),
       pendingProfileImage: "",
+      pendingProfileImageOriginal: "",
       profilePhotoStatus: "approved",
     });
     currentUser = updatedUser;
     settingsState.profileImage = approvedUrl;
+    settingsState.profileImageOriginal =
+      approvedOriginal || currentUser?.profileImageOriginal || settingsState.profileImageOriginal;
     settingsState.pendingProfileImage = "";
+    settingsState.pendingProfileImageOriginal = "";
     settingsState.profilePhotoStatus = "approved";
     persistSession({ user: updatedUser });
     window.updateSessionUser?.(updatedUser);
@@ -4078,7 +4183,9 @@ function bindAvatarRemoval() {
       const mergedUser = mergeSessionPreferences(updatedUser);
       currentUser = mergedUser;
       settingsState.profileImage = updatedUser.profileImage || "";
+      settingsState.profileImageOriginal = updatedUser.profileImageOriginal || "";
       settingsState.pendingProfileImage = updatedUser.pendingProfileImage || "";
+      settingsState.pendingProfileImageOriginal = updatedUser.pendingProfileImageOriginal || "";
       settingsState.profilePhotoStatus = resolveProfilePhotoStatus(updatedUser);
       persistSession({ user: mergedUser });
       window.updateSessionUser?.(mergedUser);
@@ -4097,43 +4204,38 @@ function bindAvatarRemoval() {
   });
 }
 
+function bindAvatarEditing() {
+  const editBtn = document.getElementById("editAvatarBtn");
+  const attorneyEditBtn = document.getElementById("editAttorneyAvatarBtn");
+  const paralegalConfig = avatarUploadConfigs.find((config) => config.frameId === "avatarFrame");
+  const attorneyConfig = avatarUploadConfigs.find((config) => config.frameId === "attorneyAvatarFrame");
+
+  if (editBtn && editBtn.dataset.bound !== "true") {
+    editBtn.dataset.bound = "true";
+    editBtn.addEventListener("click", () => {
+      if (paralegalConfig) openExistingPhotoEditor(paralegalConfig);
+    });
+  }
+  if (attorneyEditBtn && attorneyEditBtn.dataset.bound !== "true") {
+    attorneyEditBtn.dataset.bound = "true";
+    attorneyEditBtn.addEventListener("click", () => {
+      if (attorneyConfig) openExistingPhotoEditor(attorneyConfig);
+    });
+  }
+}
+
 async function handleAvatarUpload(config) {
   const input = document.getElementById(config.inputId);
-  const preview = document.getElementById(config.previewId);
-  const initials = document.getElementById(config.initialsId);
-  const frame = document.getElementById(config.frameId);
-  if (!input || !frame || !preview) return;
+  if (!input) return;
 
   const file = input.files?.[0];
   if (!file) return;
 
-  if (settingsState.stagedProfilePhotoUrl?.startsWith("blob:")) {
-    URL.revokeObjectURL(settingsState.stagedProfilePhotoUrl);
+  if (typeof Cropper !== "undefined" && cropperModal && cropperImage) {
+    openPhotoCropper(file, config);
+  } else {
+    stagePhotoDirect(file, config);
   }
-
-  const reader = new FileReader();
-  reader.onload = () => {
-    const dataUrl = typeof reader.result === "string" ? reader.result : "";
-    const previewUrl = dataUrl || URL.createObjectURL(file);
-    updateAvatarPreview(preview, frame, initials, previewUrl);
-    settingsState.stagedProfilePhotoFile = file;
-    settingsState.stagedProfilePhotoUrl = previewUrl;
-    applyAvatar(currentUser || {});
-    updateAvatarRemoveButton(currentUser || {});
-    updatePhotoReviewStatus(currentUser || {});
-    updateRequiredFieldMarkers();
-  };
-  reader.onerror = () => {
-    const fallbackUrl = URL.createObjectURL(file);
-    updateAvatarPreview(preview, frame, initials, fallbackUrl);
-    settingsState.stagedProfilePhotoFile = file;
-    settingsState.stagedProfilePhotoUrl = fallbackUrl;
-    applyAvatar(currentUser || {});
-    updateAvatarRemoveButton(currentUser || {});
-    updatePhotoReviewStatus(currentUser || {});
-    updateRequiredFieldMarkers();
-  };
-  reader.readAsDataURL(file);
   input.value = "";
 }
 
@@ -4147,9 +4249,274 @@ function updateAvatarPreview(preview, frame, initials, src) {
   if (initials) initials.style.display = "none";
 }
 
-async function uploadProfilePhotoFile(file) {
+function initPhotoCropperModal() {
+  cropperModal = document.getElementById("photoCropModal");
+  cropperImage = document.getElementById("photoCropImage");
+  cropperZoom = document.getElementById("photoCropZoom");
+  const cancelBtn = document.getElementById("photoCropCancel");
+  const saveBtn = document.getElementById("photoCropSave");
+  const modalCard = cropperModal?.querySelector(".photo-crop-card");
+  if (!cropperModal || !cropperImage || !saveBtn) return;
+
+  cancelBtn?.addEventListener("click", closePhotoCropper);
+  modalCard?.addEventListener("mousedown", (event) => event.stopPropagation());
+  cropperModal.addEventListener("mousedown", (event) => {
+    if (event.target === cropperModal) closePhotoCropper();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && cropperModal.classList.contains("show")) {
+      closePhotoCropper();
+    }
+  });
+  if (cropperZoom) {
+    cropperZoom.disabled = true;
+    cropperZoom.addEventListener("mousedown", () => syncCropperBaseZoom({ resetSlider: true }));
+    cropperZoom.addEventListener("touchstart", () => syncCropperBaseZoom({ resetSlider: true }), {
+      passive: true,
+    });
+    cropperZoom.addEventListener("input", () => {
+      if (activeCropper) {
+        const multiplier = Number(cropperZoom.value);
+        activeCropper.zoomTo(cropperBaseZoom * (1 + multiplier));
+      }
+    });
+  }
+  saveBtn.addEventListener("click", () => {
+    void applyCroppedPhoto();
+  });
+}
+
+function openPhotoCropper(file, config) {
+  if (!cropperModal || !cropperImage) return;
+  cropperConfig = config;
+  cropperFile = file;
+  cropperOriginalFile = file;
+  cropperOriginalUrl = "";
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = typeof reader.result === "string" ? reader.result : "";
+    if (dataUrl) {
+      loadCropperImage(dataUrl, false);
+    } else {
+      loadCropperImage(URL.createObjectURL(file), true);
+    }
+  };
+  reader.onerror = () => {
+    loadCropperImage(URL.createObjectURL(file), true);
+  };
+  reader.readAsDataURL(file);
+}
+
+function openPhotoCropperFromUrl(url, config, isObjectUrl = false, options = {}) {
+  if (!cropperModal || !cropperImage) return;
+  cropperConfig = config;
+  cropperFile = null;
+  cropperOriginalFile = null;
+  cropperOriginalUrl = options.originalUrl || (!isObjectUrl ? url : "");
+  loadCropperImage(url, isObjectUrl);
+}
+
+function openExistingPhotoEditor(config) {
+  const source = getOriginalPhotoSource(currentUser || {}, { allowPending: true });
+  if (!source || !source.value || source.value === DEFAULT_AVATAR_DATA) {
+    showToast("Upload the original profile photo to enable editing.", "err");
+    return;
+  }
+  if (source.type === "file") {
+    openPhotoCropper(source.value, config);
+    return;
+  }
+  const url = source.value;
+  if (url.startsWith("data:")) {
+    openPhotoCropperFromUrl(url, config, false, { originalUrl: url });
+    return;
+  }
+  fetch(url, { credentials: "include" })
+    .then((res) => {
+      if (!res.ok) throw new Error("Unable to load profile photo.");
+      return res.blob();
+    })
+    .then((blob) => {
+      const objectUrl = URL.createObjectURL(blob);
+      openPhotoCropperFromUrl(objectUrl, config, true, { originalUrl: url });
+    })
+    .catch(() => {
+      showToast("Unable to load the original photo. Please re-upload the image.", "err");
+    });
+}
+
+function loadCropperImage(url, isObjectUrl) {
+  if (!cropperModal || !cropperImage) return;
+  if (cropperZoom) {
+    cropperZoom.disabled = true;
+  }
+  if (cropperObjectUrl) {
+    URL.revokeObjectURL(cropperObjectUrl);
+    cropperObjectUrl = null;
+  }
+  if (isObjectUrl) cropperObjectUrl = url;
+  cropperModal.classList.add("show");
+  cropperModal.setAttribute("aria-hidden", "false");
+  if (activeCropper) {
+    activeCropper.destroy();
+    activeCropper = null;
+  }
+  cropperImage.onload = () => {
+    activeCropper = new Cropper(cropperImage, {
+      aspectRatio: 1,
+      viewMode: 1,
+      dragMode: "move",
+      autoCropArea: 1,
+      background: false,
+      guides: false,
+      center: false,
+      cropBoxMovable: false,
+      cropBoxResizable: false,
+      responsive: true,
+      zoomOnWheel: true,
+      zoomOnTouch: true,
+      ready() {
+        requestAnimationFrame(() => syncCropperBaseZoom({ resetSlider: true }));
+        if (cropperZoom) cropperZoom.disabled = false;
+      },
+      zoom() {
+        if (!cropperZoom) return;
+        if (cropperZoomLock) return;
+        const data = this.getImageData();
+        const currentZoom = data.naturalWidth ? data.width / data.naturalWidth : 1;
+        const relative = cropperBaseZoom ? currentZoom / cropperBaseZoom - 1 : 0;
+        const clamped = Math.min(0.5, Math.max(0, relative));
+        cropperZoom.value = String(clamped);
+      },
+    });
+    if (cropperZoom) {
+      cropperZoom.disabled = false;
+    }
+  };
+  cropperImage.src = url;
+}
+
+function closePhotoCropper() {
+  if (!cropperModal) return;
+  cropperModal.classList.remove("show");
+  cropperModal.setAttribute("aria-hidden", "true");
+  destroyPhotoCropper();
+}
+
+function destroyPhotoCropper() {
+  if (activeCropper) {
+    activeCropper.destroy();
+    activeCropper = null;
+  }
+  if (cropperImage) cropperImage.src = "";
+  if (cropperZoom) {
+    cropperZoom.value = "1";
+    cropperZoom.disabled = true;
+  }
+  cropperBaseZoom = 1;
+  if (cropperObjectUrl) {
+    URL.revokeObjectURL(cropperObjectUrl);
+    cropperObjectUrl = null;
+  }
+  cropperConfig = null;
+  cropperFile = null;
+  cropperOriginalFile = null;
+  cropperOriginalUrl = "";
+}
+
+async function applyCroppedPhoto() {
+  if (!activeCropper || !cropperConfig) return;
+  const preview = document.getElementById(cropperConfig.previewId);
+  const initials = document.getElementById(cropperConfig.initialsId);
+  const frame = document.getElementById(cropperConfig.frameId);
+  const canvas = activeCropper.getCroppedCanvas({
+    width: 600,
+    height: 600,
+    imageSmoothingQuality: "high",
+  });
+  if (!canvas) return;
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+  if (!blob) return;
+  const name = cropperFile?.name ? cropperFile.name.replace(/\.[^.]+$/, ".jpg") : "profile-photo.jpg";
+  const file = new File([blob], name, { type: "image/jpeg" });
+  const previewUrl = canvas.toDataURL("image/jpeg", 0.92);
+
+  updateAvatarPreview(preview, frame, initials, previewUrl);
+  settingsState.stagedProfilePhotoFile = file;
+  settingsState.stagedProfilePhotoUrl = previewUrl;
+  if (settingsState.stagedProfilePhotoOriginalUrl?.startsWith("blob:") && settingsState.stagedProfilePhotoOriginalUrl !== cropperOriginalUrl) {
+    URL.revokeObjectURL(settingsState.stagedProfilePhotoOriginalUrl);
+  }
+  if (cropperOriginalFile) {
+    settingsState.stagedProfilePhotoOriginalFile = cropperOriginalFile;
+    settingsState.stagedProfilePhotoOriginalUrl = "";
+  } else if (cropperOriginalUrl) {
+    settingsState.stagedProfilePhotoOriginalFile = null;
+    settingsState.stagedProfilePhotoOriginalUrl = cropperOriginalUrl;
+  } else {
+    settingsState.stagedProfilePhotoOriginalFile = null;
+    settingsState.stagedProfilePhotoOriginalUrl = "";
+  }
+  applyAvatar(currentUser || {});
+  updateAvatarRemoveButton(currentUser || {});
+  updatePhotoReviewStatus(currentUser || {});
+  updateRequiredFieldMarkers();
+  closePhotoCropper();
+}
+
+function stagePhotoDirect(file, config) {
+  const preview = document.getElementById(config.previewId);
+  const initials = document.getElementById(config.initialsId);
+  const frame = document.getElementById(config.frameId);
+  if (!preview || !frame) return;
+
+  if (settingsState.stagedProfilePhotoUrl?.startsWith("blob:")) {
+    URL.revokeObjectURL(settingsState.stagedProfilePhotoUrl);
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = typeof reader.result === "string" ? reader.result : "";
+    const previewUrl = dataUrl || URL.createObjectURL(file);
+    updateAvatarPreview(preview, frame, initials, previewUrl);
+    settingsState.stagedProfilePhotoFile = file;
+    settingsState.stagedProfilePhotoUrl = previewUrl;
+    if (settingsState.stagedProfilePhotoOriginalUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(settingsState.stagedProfilePhotoOriginalUrl);
+    }
+    settingsState.stagedProfilePhotoOriginalFile = file;
+    settingsState.stagedProfilePhotoOriginalUrl = "";
+    applyAvatar(currentUser || {});
+    updateAvatarRemoveButton(currentUser || {});
+    updatePhotoReviewStatus(currentUser || {});
+    updateRequiredFieldMarkers();
+  };
+  reader.onerror = () => {
+    const fallbackUrl = URL.createObjectURL(file);
+    updateAvatarPreview(preview, frame, initials, fallbackUrl);
+    settingsState.stagedProfilePhotoFile = file;
+    settingsState.stagedProfilePhotoUrl = fallbackUrl;
+    if (settingsState.stagedProfilePhotoOriginalUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(settingsState.stagedProfilePhotoOriginalUrl);
+    }
+    settingsState.stagedProfilePhotoOriginalFile = file;
+    settingsState.stagedProfilePhotoOriginalUrl = "";
+    applyAvatar(currentUser || {});
+    updateAvatarRemoveButton(currentUser || {});
+    updatePhotoReviewStatus(currentUser || {});
+    updateRequiredFieldMarkers();
+  };
+  reader.readAsDataURL(file);
+}
+
+async function uploadProfilePhotoFile(file, originalFile) {
   const formData = new FormData();
   formData.append("file", file, file.name || "avatar.png");
+  if (originalFile) {
+    formData.append("original", originalFile, originalFile.name || "profile-original.png");
+  }
 
   const res = await fetch("/api/uploads/profile-photo", {
     method: "POST",

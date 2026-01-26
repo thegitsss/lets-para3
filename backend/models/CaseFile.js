@@ -9,6 +9,19 @@ const caseFileSchema = new Schema(
     storageKey: { type: String, required: true, trim: true },
     mimeType: { type: String, trim: true, default: "" },
     size: { type: Number, default: 0 },
+    uploadedByRole: { type: String, enum: ["attorney", "paralegal", "admin"], default: "attorney" },
+    status: { type: String, enum: ["pending_review", "approved", "attorney_revision"], default: "pending_review" },
+    version: { type: Number, default: 1 },
+    revisionNotes: { type: String, trim: true, maxlength: 2000, default: "" },
+    revisionRequestedAt: { type: Date, default: null },
+    approvedAt: { type: Date, default: null },
+    replacedAt: { type: Date, default: null },
+    history: [
+      {
+        storageKey: { type: String, trim: true },
+        replacedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   {
     timestamps: { createdAt: true, updatedAt: false },

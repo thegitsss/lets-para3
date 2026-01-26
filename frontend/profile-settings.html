@@ -3,6 +3,7 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/libs/cropper/cropper.main.css" />
   <link rel="preload" as="font" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" type="font/woff2" crossorigin />
   <link rel="preload" as="font" href="assets/fonts/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2" type="font/woff2" crossorigin />
   <meta charset="UTF-8" />
@@ -287,6 +288,10 @@
       display: flex;
       align-items: center;
       gap: 12px;
+    }
+
+    html.has-user-cache .header-skeleton {
+      display: none;
     }
     .skeleton-circle {
       width: 44px;
@@ -2901,6 +2906,71 @@ input[type="number"],
       color: var(--muted);
     }
 
+    .photo-crop-card {
+      max-width: 720px;
+      width: min(92vw, 720px);
+      text-align: left;
+      padding: 24px;
+    }
+
+    .photo-crop-title {
+      font-size: 1.25rem;
+      margin-bottom: 6px;
+    }
+
+    .photo-crop-subtitle {
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    .photo-crop-stage {
+      height: min(60vh, 420px);
+      background: #f4f4f5;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      position: relative;
+    }
+
+    .photo-crop-stage img {
+      display: block;
+      max-width: 100%;
+    }
+
+    .photo-crop-stage .cropper-container {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .photo-crop-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .photo-crop-controls label {
+      font-size: 0.9rem;
+      color: var(--muted);
+      min-width: 52px;
+    }
+
+    .photo-crop-controls input[type="range"] {
+      flex: 1;
+    }
+
+    .photo-crop-controls input[type="range"][disabled] {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .photo-crop-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
     body.attorney-classic {
       --attorney-ink: #0f172a;
       --attorney-muted: #5c6575;
@@ -3322,6 +3392,9 @@ input[type="number"],
                   </div>
                 </div>
                 <input type="file" id="attorneyAvatarInput" accept="image/*" hidden />
+                <div class="avatar-actions">
+                  <button type="button" class="btn btn-outline avatar-edit-btn hidden" id="editAttorneyAvatarBtn">Edit photo</button>
+                </div>
               </div>
 
               <div class="form-stack">
@@ -3447,6 +3520,7 @@ input[type="number"],
                 </div>
                 <input type="file" id="avatarInput" accept="image/*" hidden />
                 <div class="avatar-actions">
+                  <button type="button" class="btn btn-outline avatar-edit-btn hidden" id="editAvatarBtn">Edit photo</button>
                   <button type="button" class="btn btn-outline avatar-remove-btn hidden" id="removeAvatarBtn">Remove photo</button>
                 </div>
                 <p class="photo-guidelines">
@@ -3692,7 +3766,7 @@ input[type="number"],
               </span>
               <h3>Change Password</h3>
             </div>
-            <label for="currentPassword">Current password</label>
+            <label for="currentPassword" class="sr-only">Current password</label>
             <div class="field-group">
               <input type="password" id="currentPassword" autocomplete="current-password" placeholder="Enter current password">
               <button type="button" class="toggle-visibility" data-toggle-password="currentPassword" aria-label="Show current password">
@@ -3703,7 +3777,7 @@ input[type="number"],
             </div>
             <div class="password-grid">
               <div>
-                <label for="newPassword">New password</label>
+                <label for="newPassword" class="sr-only">New password</label>
                 <div class="field-group">
                   <input type="password" id="newPassword" autocomplete="new-password" placeholder="Enter new password">
                   <button type="button" class="toggle-visibility" data-toggle-password="newPassword" aria-label="Show new password">
@@ -3714,7 +3788,7 @@ input[type="number"],
                 </div>
               </div>
               <div>
-                <label for="confirmPassword">Confirm password</label>
+                <label for="confirmPassword" class="sr-only">Confirm password</label>
                 <div class="field-group">
                   <input type="password" id="confirmPassword" autocomplete="new-password" placeholder="Confirm new password">
                   <button type="button" class="toggle-visibility" data-toggle-password="confirmPassword" aria-label="Show confirm password">
@@ -3986,6 +4060,24 @@ input[type="number"],
 
   <div id="toastBanner" class="toast" role="status" aria-live="assertive"></div>
 
+  <div class="modal" id="photoCropModal" role="dialog" aria-modal="true" aria-labelledby="photoCropTitle" aria-hidden="true">
+    <div class="modal-card photo-crop-card">
+      <h3 class="photo-crop-title" id="photoCropTitle">Adjust profile photo</h3>
+      <p class="photo-crop-subtitle">Drag to reposition and use zoom to refine the crop.</p>
+      <div class="photo-crop-stage">
+        <img id="photoCropImage" alt="Crop profile photo" />
+      </div>
+      <div class="photo-crop-controls">
+        <label for="photoCropZoom">Zoom</label>
+        <input type="range" id="photoCropZoom" min="1" max="3" step="0.01" value="1" />
+      </div>
+      <div class="photo-crop-actions">
+        <button type="button" class="btn btn-outline" id="photoCropCancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="photoCropSave">Save crop</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
     <div class="modal-card">
       <h3 id="deleteModalTitle">Delete account?</h3>
@@ -4029,6 +4121,7 @@ input[type="number"],
     window.__ATTORNEY_PAGE__ = "profile-settings";
     window.__TAB_ROLE__ = "attorney,paralegal";
   </script>
+  <script src="assets/libs/cropper/cropper.main.js"></script>
   <script type="module" src="assets/scripts/attorney-tabs.js"></script>
   <script type="module" src="assets/scripts/profile-settings.js"></script>
   <script>

@@ -3,6 +3,7 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="preload" as="image" href="hero-mountain.jpg" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -96,7 +97,7 @@
     }
     body.theme-mountain .sidebar,
     body.theme-mountain-dark .sidebar{
-      background:url('hero-mountain.jpg') center/cover no-repeat;
+      background:var(--bg) url('hero-mountain.jpg') center/cover no-repeat;
     }
     body.theme-mountain .sidebar::before,
     body.theme-mountain-dark .sidebar::before{
@@ -225,8 +226,8 @@
 }
 
     /* Main */
-    .main{flex:1;padding:40px;overflow-y:auto;}
-    .topbar{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:2rem;gap:1.5rem;position:relative;}
+    .main{flex:1;padding:40px;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;}
+    .topbar{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:2rem;gap:1.5rem;position:relative;min-height:72px;}
     .notification-icon{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);display:flex;justify-content:center;align-items:center;background:#fff;cursor:pointer;position:relative;transition:border-color .2s ease, transform .2s ease;}
     .notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
     .notification-icon svg{width:22px;height:22px;color:var(--ink);}
@@ -684,14 +685,36 @@
   </style>
 </head>
 <body>
+  <script>
+    (function applyStoredTheme() {
+      try {
+        const raw = localStorage.getItem("lpc_user");
+        if (!raw) return;
+        const stored = JSON.parse(raw);
+        const theme = String(stored?.preferences?.theme || "").toLowerCase();
+        const allowed = new Set(["light", "dark", "mountain", "mountain-dark"]);
+        if (allowed.has(theme)) {
+          const classes = theme === "mountain-dark" ? ["theme-mountain-dark", "theme-dark"] : [`theme-${theme}`];
+          classes.forEach((cls) => document.body.classList.add(cls));
+        }
+        const fontKey = String(stored?.preferences?.fontSize || "").toLowerCase();
+        const sizeMap = { xs: "14px", sm: "15px", md: "16px", lg: "17px", xl: "20px" };
+        if (sizeMap[fontKey]) {
+          document.documentElement.style.fontSize = sizeMap[fontKey];
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  </script>
   <a class="skip-link" href="#main">Skip to main content</a>
   <!-- Sidebar -->
   <aside class="sidebar">
     <div class="logo">Dashboard</div>
     <nav>
       <a href="dashboard-attorney.html">Home</a>
-      <a href="active-cases.html">Cases &amp; Files</a>
-      <a href="billing-attorney.html">Escrow</a>
+      <a href="dashboard-attorney.html#cases">Cases &amp; Files</a>
+      <a href="dashboard-attorney.html#billing">Escrow</a>
       <a href="help.html">Help</a>
     </nav>
     <div class="sidebar-bottom">
@@ -972,7 +995,7 @@
   </div>
   <div class="toast inline-toast" id="toast">
     ✅ Your case has been successfully posted.
-    <a href="active-cases.html">View Posted Case</a>
+    <a href="dashboard-attorney.html#cases">View Posted Case</a>
   </div>
   <script src="assets/scripts/utils/toast.js"></script>
   <script>

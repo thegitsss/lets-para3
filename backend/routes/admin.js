@@ -765,7 +765,11 @@ router.post(
     }
     user.profileImage = user.pendingProfileImage;
     user.avatarURL = user.pendingProfileImage;
+    if (user.pendingProfileImageOriginal) {
+      user.profileImageOriginal = user.pendingProfileImageOriginal;
+    }
     user.pendingProfileImage = "";
+    user.pendingProfileImageOriginal = "";
     user.profilePhotoStatus = "approved";
     user.preferences = {
       ...(typeof user.preferences?.toObject === "function"
@@ -804,11 +808,14 @@ router.post(
     }
     if (user.pendingProfileImage) {
       user.pendingProfileImage = "";
+      user.pendingProfileImageOriginal = "";
       user.profilePhotoStatus = "rejected";
     } else if (user.profileImage || user.avatarURL) {
       user.profileImage = null;
       user.avatarURL = "";
       user.pendingProfileImage = "";
+      user.profileImageOriginal = "";
+      user.pendingProfileImageOriginal = "";
       user.profilePhotoStatus = "rejected";
     } else {
       return res.status(400).json({ error: "No profile photo to reject" });

@@ -135,7 +135,7 @@ const parseParalegalFilters = (query = {}) => {
 };
 
 const SAFE_PUBLIC_SELECT =
-  "_id firstName lastName avatarURL profileImage pendingProfileImage profilePhotoStatus location specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt languages writingSamples status stateExperience";
+  "_id firstName lastName avatarURL profileImage profileImageOriginal pendingProfileImage pendingProfileImageOriginal profilePhotoStatus location specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt languages writingSamples status stateExperience";
 const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email phoneNumber`;
 const FILE_PUBLIC_BASE =
   (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
@@ -160,6 +160,8 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
   const certificateURL = toPublicUrl(src.certificateURL || "");
   const writingSampleURL = toPublicUrl(src.writingSampleURL || "");
   const resumeURL = toPublicUrl(src.resumeURL || "");
+  const profileImageOriginal = toPublicUrl(src.profileImageOriginal || "");
+  const pendingProfileImageOriginal = toPublicUrl(src.pendingProfileImageOriginal || "");
   const payload = {
     _id: String(src._id),
     firstName: src.firstName || "",
@@ -217,6 +219,8 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
   if (includePhotoMeta) {
     payload.profilePhotoStatus = resolvedPhotoStatus;
     payload.pendingProfileImage = toPublicUrl(src.pendingProfileImage || "");
+    payload.profileImageOriginal = profileImageOriginal;
+    payload.pendingProfileImageOriginal = pendingProfileImageOriginal;
   }
   return payload;
 }
@@ -561,7 +565,9 @@ router.patch(
       if (wantsClear) {
         me.avatarURL = "";
         me.profileImage = null;
+        me.profileImageOriginal = "";
         me.pendingProfileImage = "";
+        me.pendingProfileImageOriginal = "";
         me.profilePhotoStatus = "unsubmitted";
       }
     }

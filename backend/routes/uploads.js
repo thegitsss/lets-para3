@@ -4,7 +4,7 @@ const router = express.Router();
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const multer = require("multer");
-const { S3Client, PutObjectCommand, GetObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const verifyToken = require("../utils/verifyToken");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
@@ -75,6 +75,23 @@ function isCaseClosedForAccess(caseDoc) {
 
 function normalizeKeyPath(key) {
   return String(key || "").replace(/^\/+/, "");
+}
+
+function normalizeFileName(value = "", fallback = "") {
+  const cleaned = String(value || "").replace(/[\u0000-\u001F\u007F]/g, "").trim();
+  if (cleaned) return cleaned.slice(0, 500);
+  return fallback || `case-file-${Date.now()}`;
+}
+
+async function nextCaseFileVersion(caseId, filename) {
+  if (!caseId || !filename) return 1;
+  const recent = await CaseFile.find({ caseId, originalName: filename })
+    .sort({ version: -1, createdAt: -1 })
+    .limit(1)
+    .lean();
+  const latest = recent[0];
+  const prev = Number(latest?.version || 0);
+  return prev > 0 ? prev + 1 : 1;
 }
 
 function extractCaseIdFromKey(key) {
@@ -499,15 +516,32 @@ router.post(
 router.post(
   "/profile-photo",
   requireRole("paralegal", "attorney"),
-  profilePhotoUpload.single("file"),
+  profilePhotoUpload.fields([
+    { name: "file", maxCount: 1 },
+    { name: "original", maxCount: 1 },
+  ]),
   asyncHandler(async (req, res) => {
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
-    if (!req.file) return res.status(400).json({ msg: "Profile photo is required" });
-    if (!/image\/(png|jpe?g)/i.test(req.file.mimetype || "")) {
+    const getFileFromField = (field) => {
+      const list = req.files?.[field];
+      return Array.isArray(list) && list.length ? list[0] : null;
+    };
+    const photoFile = getFileFromField("file");
+    const originalFile = getFileFromField("original");
+    if (!photoFile) return res.status(400).json({ msg: "Profile photo is required" });
+    if (!/image\/(png|jpe?g)/i.test(photoFile.mimetype || "")) {
       return res.status(400).json({ msg: "Only JPEG or PNG images are allowed" });
     }
-    if (req.file.size > MAX_PROFILE_PHOTO_BYTES) {
+    if (photoFile.size > MAX_PROFILE_PHOTO_BYTES) {
       return res.status(400).json({ msg: "Profile photo exceeds maximum allowed size" });
+    }
+    if (originalFile) {
+      if (!/image\/(png|jpe?g)/i.test(originalFile.mimetype || "")) {
+        return res.status(400).json({ msg: "Only JPEG or PNG images are allowed" });
+      }
+      if (originalFile.size > MAX_PROFILE_PHOTO_BYTES) {
+        return res.status(400).json({ msg: "Profile photo exceeds maximum allowed size" });
+      }
     }
 
     const ownerId = String(req.user?.id || req.user?._id || "").trim();
@@ -517,26 +551,49 @@ router.post(
     const putParams = {
       Bucket: BUCKET,
       Key: key,
-      Body: req.file.buffer,
-      ContentType: req.file.mimetype || "image/jpeg",
-      ContentLength: req.file.size,
+      Body: photoFile.buffer,
+      ContentType: photoFile.mimetype || "image/jpeg",
+      ContentLength: photoFile.size,
       ACL: "public-read",
       ...sseParams(),
     };
     await s3.send(new PutObjectCommand(putParams));
 
     const publicUrl = `https://${process.env.S3_BUCKET}.s3.${process.env.S3_REGION}.amazonaws.com/${key}`;
+    let originalPublicUrl = "";
+    if (originalFile) {
+      const originalExt = /png/i.test(originalFile.mimetype || "") ? "png" : "jpg";
+      const originalKey = `profile-photos/${safeSegment(ownerId)}/original-${Date.now()}.${originalExt}`;
+      const originalPutParams = {
+        Bucket: BUCKET,
+        Key: originalKey,
+        Body: originalFile.buffer,
+        ContentType: originalFile.mimetype || "image/jpeg",
+        ContentLength: originalFile.size,
+        ACL: "public-read",
+        ...sseParams(),
+      };
+      await s3.send(new PutObjectCommand(originalPutParams));
+      originalPublicUrl = `https://${process.env.S3_BUCKET}.s3.${process.env.S3_REGION}.amazonaws.com/${originalKey}`;
+    }
     const user = await User.findById(ownerId);
     if (!user) return res.status(404).json({ msg: "User not found" });
     const role = String(user.role || "").toLowerCase();
     const requiresReview = role === "paralegal";
     if (requiresReview) {
       user.pendingProfileImage = publicUrl;
+      if (originalPublicUrl) {
+        user.pendingProfileImageOriginal = originalPublicUrl;
+      }
       user.profilePhotoStatus = "pending_review";
     } else {
       user.profileImage = publicUrl;
       user.avatarURL = publicUrl;
       user.pendingProfileImage = "";
+      user.pendingProfileImageOriginal = "";
+      if (originalPublicUrl) {
+        user.profileImageOriginal = originalPublicUrl;
+      }
       user.profilePhotoStatus = "approved";
     }
     await user.save();
@@ -553,7 +610,9 @@ router.post(
       status: user.profilePhotoStatus || (requiresReview ? "pending_review" : "approved"),
       pending: requiresReview,
       pendingProfileImage: requiresReview ? publicUrl : "",
+      pendingProfileImageOriginal: requiresReview ? user.pendingProfileImageOriginal || "" : "",
       profileImage: requiresReview ? user.profileImage || "" : publicUrl,
+      profileImageOriginal: user.profileImageOriginal || "",
     });
   })
 );
@@ -571,9 +630,12 @@ router.post(
       return res.status(400).json({ msg: "File exceeds maximum allowed size" });
     }
 
-    const originalName = req.file.originalname || `case-file-${Date.now()}`;
+    const originalName = normalizeFileName(req.file.originalname, `case-file-${Date.now()}`);
     const safeName = safeSegment(originalName) || `case-file-${Date.now()}`;
     const key = `${buildCasePrefix(caseDoc._id)}documents/${Date.now()}-${safeName}`.replace(/\/+/g, "/");
+    const uploadRole = String(req.user?.role || "attorney").toLowerCase();
+    const defaultStatus = uploadRole === "attorney" || uploadRole === "admin" ? "attorney_revision" : "pending_review";
+    const version = await nextCaseFileVersion(caseDoc._id, originalName);
     const putParams = {
       Bucket: BUCKET,
       Key: key,
@@ -591,6 +653,9 @@ router.post(
       storageKey: key,
       mimeType: req.file.mimetype || "",
       size: req.file.size || 0,
+      uploadedByRole: uploadRole,
+      status: defaultStatus,
+      version,
     });
 
     try {
@@ -641,6 +706,44 @@ router.get(
     if (!assertWorkspaceReady(caseDoc, res)) return;
     const files = await CaseFile.find({ caseId: caseDoc._id }).sort({ createdAt: -1 }).lean();
     res.json({ files: files.map(serializeCaseFile) });
+  })
+);
+
+router.delete(
+  "/case/:caseId/:fileId",
+  ensureCaseParticipant(),
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const { caseDoc, isAdmin, isAttorney } = await loadCaseForUser(req, req.params.caseId);
+    if (!assertWorkspaceReady(caseDoc, res)) return;
+    if (!isAdmin && !isAttorney) {
+      return res.status(403).json({ msg: "Only the case attorney can delete documents." });
+    }
+    if (!isObjId(req.params.fileId)) {
+      return res.status(400).json({ msg: "Invalid file id" });
+    }
+    const record = await CaseFile.findOne({ _id: req.params.fileId, caseId: caseDoc._id });
+    if (!record) {
+      return res.status(404).json({ msg: "File not found" });
+    }
+    if (BUCKET && record.storageKey) {
+      try {
+        await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(record.storageKey) }));
+      } catch (err) {
+        console.warn("[uploads] delete object failed", err?.message || err);
+      }
+    }
+    await CaseFile.deleteOne({ _id: record._id });
+    try {
+      await logAction(req, "file_deleted", {
+        targetType: "case",
+        targetId: caseDoc._id,
+        meta: { fileId: record._id, filename: record.originalName },
+      });
+    } catch (err) {
+      console.warn("[uploads] file delete audit failed", err?.message || err);
+    }
+    res.json({ ok: true });
   })
 );
 
@@ -766,9 +869,21 @@ function serializeCaseFile(doc) {
     userId: String(doc.userId),
     originalName: doc.originalName,
     storageKey: doc.storageKey,
+    key: doc.storageKey,
+    original: doc.originalName,
+    filename: doc.originalName,
     mimeType: doc.mimeType || null,
+    mime: doc.mimeType || null,
     size: doc.size || 0,
     createdAt: doc.createdAt,
+    uploadedAt: doc.createdAt,
+    uploadedByRole: doc.uploadedByRole || null,
+    status: doc.status || "pending_review",
+    version: typeof doc.version === "number" ? doc.version : 1,
+    revisionNotes: doc.revisionNotes || "",
+    revisionRequestedAt: doc.revisionRequestedAt || null,
+    approvedAt: doc.approvedAt || null,
+    replacedAt: doc.replacedAt || null,
   };
 }
 

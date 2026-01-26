@@ -84,7 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify({ token, newPassword })
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
         message.textContent = "✅ Password reset successful! Redirecting...";
@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", () => {
           window.location.href = "login.html";
         }, 3000);
       } else {
-        message.textContent = data.error || "❌ Error resetting password.";
+        message.textContent = data.msg || data.error || "❌ Error resetting password.";
       }
     } catch (err) {
       message.textContent = "❌ Network error. Please try again.";

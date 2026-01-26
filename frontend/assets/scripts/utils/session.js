@@ -20,6 +20,49 @@
   let currentTheme = null;
   let currentFontSize = null;
 
+  const earlyTheme = (() => {
+    try {
+      const raw = localStorage.getItem("lpc_user");
+      if (!raw) return null;
+      const stored = JSON.parse(raw);
+      const theme = String(stored?.preferences?.theme || "").toLowerCase();
+      const fontSize = String(stored?.preferences?.fontSize || "").toLowerCase();
+      const hasUser = !!(stored?.id || stored?._id || stored?.email || stored?.role);
+      if (!VALID_THEMES.includes(theme)) return { classes: [], fontSize, theme: "", hasUser };
+      const classes = theme === "mountain-dark" ? ["theme-mountain-dark", "theme-dark"] : [`theme-${theme}`];
+      return { classes, fontSize, theme, hasUser };
+    } catch (_) {
+      return null;
+    }
+  })();
+
+  function applyThemeClasses(node, classes) {
+    if (!node || !classes?.length) return;
+    VALID_THEMES.forEach((theme) => node.classList.remove(`theme-${theme}`));
+    classes.forEach((cls) => node.classList.add(cls));
+  }
+
+  if (earlyTheme) {
+    if (earlyTheme.hasUser) {
+      document.documentElement.classList.add("has-user-cache");
+    }
+    applyThemeClasses(document.documentElement, earlyTheme.classes);
+    if (earlyTheme.fontSize && FONT_SIZE_MAP[earlyTheme.fontSize]) {
+      document.documentElement.style.fontSize = FONT_SIZE_MAP[earlyTheme.fontSize];
+    }
+    if (document.body) {
+      applyThemeClasses(document.body, earlyTheme.classes);
+    } else if (document.documentElement) {
+      const observer = new MutationObserver(() => {
+        if (document.body) {
+          applyThemeClasses(document.body, earlyTheme.classes);
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+    }
+  }
+
   function normalizeTheme(value) {
     const candidate = String(value || "").toLowerCase();
     return VALID_THEMES.includes(candidate) ? candidate : "mountain";
