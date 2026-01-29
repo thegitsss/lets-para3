@@ -1006,10 +1006,14 @@ function seedSettingsState(user = {}) {
 }
 
 function resolveProfilePhotoStatus(user = {}) {
+  const role = String(user.role || currentUser?.role || "").trim().toLowerCase();
+  const hasApproved = Boolean(user.profileImage || user.avatarURL || settingsState.profileImage);
+  if (role === "attorney") {
+    return hasApproved ? "approved" : "unsubmitted";
+  }
   const raw = String(user.profilePhotoStatus || settingsState.profilePhotoStatus || "").trim();
   if (raw) return raw;
   if (user.pendingProfileImage || settingsState.pendingProfileImage) return "pending_review";
-  const hasApproved = Boolean(user.profileImage || user.avatarURL || settingsState.profileImage);
   return hasApproved ? "approved" : "unsubmitted";
 }
 
@@ -1045,7 +1049,8 @@ function getOriginalPhotoSource(user = {}, { allowPending = false } = {}) {
 
 function getDisplayProfileImage(user = {}, { allowPending = false } = {}) {
   const approved = user.profileImage || user.avatarURL || settingsState.profileImage || "";
-  if (allowPending) {
+  const role = String(user.role || currentUser?.role || "").trim().toLowerCase();
+  if (allowPending && role === "paralegal") {
     if (settingsState.stagedProfilePhotoUrl) {
       return settingsState.stagedProfilePhotoUrl;
     }
@@ -1059,6 +1064,13 @@ function getDisplayProfileImage(user = {}, { allowPending = false } = {}) {
 function updatePhotoReviewStatus(user = {}) {
   const statusEl = document.getElementById("photoReviewStatus");
   if (!statusEl) return;
+  const role = String(currentUser?.role || user?.role || "").trim().toLowerCase();
+  if (role === "attorney") {
+    statusEl.classList.remove("is-rejected");
+    statusEl.textContent = "";
+    statusEl.classList.add("hidden");
+    return;
+  }
   if (settingsState.stagedProfilePhotoFile) {
     statusEl.classList.remove("is-rejected");
     statusEl.textContent = "";

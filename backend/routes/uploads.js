@@ -592,6 +592,7 @@ router.post(
     if (!user) return res.status(404).json({ msg: "User not found" });
     const role = String(user.role || "").toLowerCase();
     const requiresReview = role === "paralegal";
+    const queueAdminReview = role === "attorney";
     if (requiresReview) {
       user.pendingProfileImage = publicUrl;
       if (originalPublicUrl) {
@@ -601,8 +602,8 @@ router.post(
     } else {
       user.profileImage = publicUrl;
       user.avatarURL = publicUrl;
-      user.pendingProfileImage = "";
-      user.pendingProfileImageOriginal = "";
+      user.pendingProfileImage = queueAdminReview ? publicUrl : "";
+      user.pendingProfileImageOriginal = queueAdminReview ? originalPublicUrl || "" : "";
       if (originalPublicUrl) {
         user.profileImageOriginal = originalPublicUrl;
       }

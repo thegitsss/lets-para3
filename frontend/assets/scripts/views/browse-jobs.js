@@ -1274,6 +1274,23 @@ function renderExpandedJob(job) {
   const summary = scrubStateLines(rawSummary, jobState);
   const rawDescription = job.description || job.details || job.briefSummary || "";
   const { description, experienceLine } = prepareExpandedContent(rawDescription, jobState);
+  const tasks = Array.isArray(job.tasks) ? job.tasks : [];
+  const tasksMarkup = `
+    <div class="description-label">TASKS</div>
+    ${
+      tasks.length
+        ? `<ul class="job-task-list">
+            ${tasks
+              .map((task) => {
+                const title = typeof task === "string" ? task : task?.title;
+                return title ? `<li>${escapeHtml(title)}</li>` : "";
+              })
+              .filter(Boolean)
+              .join("")}
+          </ul>`
+        : `<div class="job-task-empty">No tasks listed yet.</div>`
+    }
+  `;
   const applyInfoHtml = allowApply
     ? `
         <div class="apply-info">
@@ -1313,6 +1330,7 @@ function renderExpandedJob(job) {
         ${summary ? `<p class="lede">${escapeHtml(summary)}</p>` : ""}
         <div class="description-label">DESCRIPTION</div>
         <div class="rich-text main-description">${escapeHtml(description)}</div>
+        ${tasksMarkup}
       </div>
       ${experienceLine ? `<div class="experience-line-row"><div class="experience-line">${escapeHtml(experienceLine)}</div></div>` : ""}
       <div class="expanded-footer">

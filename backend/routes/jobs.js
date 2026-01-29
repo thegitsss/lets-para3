@@ -174,6 +174,7 @@ function shapeListing({ job = null, caseDoc = null }) {
     applicantsCount: Array.isArray(caseDoc?.applicants) ? caseDoc.applicants.length : job?.applicantsCount || 0,
     status: caseDoc?.status || job?.status || "open",
     contextCaseId: caseDoc?._id || job?.caseId || null,
+    tasks: Array.isArray(caseDoc?.tasks) ? caseDoc.tasks : [],
   };
 }
 
@@ -202,7 +203,7 @@ router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req,
         })
         .lean(),
       Case.find(caseFilter)
-        .select("title practiceArea details briefSummary totalAmount lockedTotalAmount currency state locationState status applicants attorney attorneyId jobId createdAt")
+        .select("title practiceArea details briefSummary totalAmount lockedTotalAmount currency state locationState status applicants attorney attorneyId jobId createdAt tasks")
         .populate({
           path: "attorney",
           select: "firstName lastName lawFirm firmName profileImage avatarURL",

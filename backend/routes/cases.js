@@ -104,6 +104,45 @@ function cleanString(value, { len = 400 } = {}) {
   return value.replace(/[\u0000-\u001F\u007F]/g, "").trim().slice(0, len);
 }
 
+const MAX_SCOPE_TASKS = 25;
+const MAX_SCOPE_TASK_TITLE = 200;
+
+function normalizeScopeTasks(value) {
+  if (!Array.isArray(value)) return [];
+  const normalized = [];
+  for (const item of value) {
+    const rawTitle = typeof item === "string" ? item : item?.title;
+    const title = cleanString(String(rawTitle || ""), { len: MAX_SCOPE_TASK_TITLE });
+    if (!title) continue;
+    normalized.push({ title });
+    if (normalized.length >= MAX_SCOPE_TASKS) break;
+  }
+  return normalized;
+}
+
+function hasScopeTasks(caseDoc) {
+  if (!caseDoc) return false;
+  const list = Array.isArray(caseDoc.tasks) ? caseDoc.tasks : [];
+  return list.some((task) => {
+    const title = typeof task === "string" ? task : task?.title;
+    return Boolean(String(title || "").trim());
+  });
+}
+
+function serializeScopeTasks(tasks) {
+  if (!Array.isArray(tasks)) return [];
+  return tasks
+    .map((task) => {
+      if (typeof task === "string") {
+        const title = cleanString(task, { len: MAX_SCOPE_TASK_TITLE });
+        return title ? { title } : null;
+      }
+      const title = cleanString(String(task?.title || ""), { len: MAX_SCOPE_TASK_TITLE });
+      return title ? { title } : null;
+    })
+    .filter(Boolean);
+}
+
 function safeArchiveName(title) {
   const cleaned = String(title || "")
     .replace(/[\u0000-\u001F\u007F]/g, "")
@@ -554,6 +593,8 @@ function caseSummary(doc, { includeFiles = false } = {}) {
     practiceArea: doc.practiceArea || "",
     state: stateValue,
     locationState: doc.locationState || stateValue,
+    tasks: serializeScopeTasks(doc.tasks),
+    tasksLocked: !!doc.tasksLocked,
     status: normalizedStatus,
     deadline: doc.deadline,
     zoomLink: doc.zoomLink || "",
@@ -1087,6 +1128,11 @@ router.post(
     const paralegalName = formatPersonName(paralegalProfile) || "Paralegal";
 
     if (decision === "accept") {
+      if (!hasScopeTasks(caseDoc)) {
+        return res.status(400).json({
+          error: "Add at least one task before hiring a paralegal for this case.",
+        });
+      }
       const otherInvitees = listCaseInvites(caseDoc)
         .filter((invite) => invite.status === "pending" && String(invite.paralegalId) !== String(paralegalId))
         .map((invite) => invite.paralegalId);
@@ -1112,6 +1158,7 @@ router.post(
       markOtherInvites(caseDoc, paralegalId, "declined");
       syncLegacyPendingFields(caseDoc);
       caseDoc.hiredAt = new Date();
+      caseDoc.tasksLocked = true;
       caseDoc.escrowStatus = "awaiting_funding";
       caseDoc.paralegalNameSnapshot = formatPersonName(paralegalProfile);
       if (typeof caseDoc.canTransitionTo === "function" && caseDoc.canTransitionTo("awaiting_funding")) {
@@ -1271,6 +1318,7 @@ router.post(
       experience,
       instructions,
       deadline,
+      tasks,
     } = req.body || {};
     const safeTitle = cleanTitle(title || "", 300);
     const questionList = parseListField(questions);
@@ -1307,6 +1355,7 @@ router.post(
       return res.status(400).json({ error: "Invalid deadline provided." });
     }
 
+    const normalizedTasks = normalizeScopeTasks(tasks);
     const created = await Case.create({
       title: safeTitle,
       practiceArea: normalizedPractice,
@@ -1319,6 +1368,7 @@ router.post(
       deadline: deadlineDate,
       state: normalizedState,
       locationState: normalizedState,
+      tasks: normalizedTasks,
       briefSummary: buildBriefSummary({ state: normalizedState, employmentType, experience }),
       updates: [
         {
@@ -1753,6 +1803,8 @@ router.patch(
     }
     const doc = req.case;
     const body = req.body || {};
+    const tasksInputProvided = Object.prototype.hasOwnProperty.call(body, "tasks");
+    const normalizedTasks = tasksInputProvided ? normalizeScopeTasks(body.tasks) : null;
     const amountInput =
       body.totalAmount ?? body.budget ?? body.compensationAmount ?? body.compAmount;
     if (typeof amountInput !== "undefined" && amountInput !== null && doc.lockedTotalAmount != null) {
@@ -1770,9 +1822,14 @@ router.patch(
         return res.status(403).json({ error: "Case edits are limited to draft or open status." });
       }
     }
-    const forbiddenKeys = ["applicants", "paralegal", "paralegalId", "attorney", "attorneyId"];
+    const forbiddenKeys = ["applicants", "paralegal", "paralegalId", "attorney", "attorneyId", "tasksLocked"];
     if (forbiddenKeys.some((key) => Object.prototype.hasOwnProperty.call(body, key))) {
       return res.status(400).json({ error: "One or more fields cannot be modified." });
+    }
+    if (tasksInputProvided && (doc.tasksLocked || doc.hiredAt || doc.paralegal || doc.paralegalId)) {
+      return res.status(403).json({
+        error: "Tasks are locked once a paralegal is hired. Create a new case for additional work.",
+      });
     }
     let touched = false;
 
@@ -1791,6 +1848,10 @@ router.patch(
         return res.status(400).json({ error: "Description is too short." });
       }
       doc.details = sanitizedDetails;
+      touched = true;
+    }
+    if (tasksInputProvided) {
+      doc.tasks = normalizedTasks || [];
       touched = true;
     }
     if (typeof body.practiceArea === "string") {
@@ -2472,6 +2533,11 @@ router.post(
       caseDoc.lockedTotalAmount = caseDoc.totalAmount;
       caseDoc.amountLockedAt = new Date();
     }
+    if (!hasScopeTasks(caseDoc)) {
+      return res.status(400).json({
+        error: "Add at least one task before hiring a paralegal for this case.",
+      });
+    }
     caseDoc.paralegal = req.user.id;
     caseDoc.paralegalId = req.user.id;
     const otherInvitees = listCaseInvites(caseDoc)
@@ -2481,6 +2547,7 @@ router.post(
     markOtherInvites(caseDoc, req.user.id, "declined");
     syncLegacyPendingFields(caseDoc);
     caseDoc.hiredAt = new Date();
+    caseDoc.tasksLocked = true;
     caseDoc.escrowStatus = "awaiting_funding";
     caseDoc.paralegalNameSnapshot = formatPersonName(paralegal);
     if (typeof caseDoc.canTransitionTo === "function" && caseDoc.canTransitionTo("awaiting_funding")) {
@@ -2749,6 +2816,11 @@ router.post(
     if (selectedCase.paralegalId || selectedCase.paralegal) {
       return res.status(400).json({ error: "A paralegal has already been hired" });
     }
+    if (!hasScopeTasks(selectedCase)) {
+      return res.status(400).json({
+        error: "Add at least one task before hiring a paralegal for this case.",
+      });
+    }
 
     const rawAttorney = selectedCase.attorney || selectedCase.attorneyId;
     const attorneyOnCase =
@@ -2867,6 +2939,7 @@ router.post(
       selectedCase.amountLockedAt = new Date();
     }
     selectedCase.hiredAt = new Date();
+    selectedCase.tasksLocked = true;
     selectedCase.paralegalNameSnapshot = formatPersonName(paralegal);
     selectedCase.paymentIntentId = paymentIntent.id;
     selectedCase.escrowIntentId = paymentIntent.id;
@@ -3246,7 +3319,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const doc = await Case.findById(req.params.caseId)
       .select(
-        "title status practiceArea deadline zoomLink paymentReleased escrowIntentId escrowStatus totalAmount lockedTotalAmount currency files attorney paralegal applicants hiredAt completedAt briefSummary archived downloadUrl terminationReason terminationStatus terminationRequestedAt terminationRequestedBy terminationDisputeId terminatedAt paralegalAccessRevokedAt archiveReadyAt archiveDownloadedAt purgeScheduledFor readOnly jobId job"
+        "title status practiceArea deadline zoomLink paymentReleased escrowIntentId escrowStatus totalAmount lockedTotalAmount currency files attorney paralegal applicants hiredAt completedAt briefSummary archived downloadUrl terminationReason terminationStatus terminationRequestedAt terminationRequestedBy terminationDisputeId terminatedAt paralegalAccessRevokedAt archiveReadyAt archiveDownloadedAt purgeScheduledFor readOnly jobId job tasks tasksLocked"
       )
       .populate("paralegal", "firstName lastName email role")
       .populate("attorney", "firstName lastName email role")
@@ -3344,6 +3417,8 @@ router.get(
       hiredAt: doc.hiredAt || null,
       completedAt: doc.completedAt || null,
       briefSummary: doc.briefSummary || "",
+      tasks: serializeScopeTasks(doc.tasks),
+      tasksLocked: !!doc.tasksLocked,
       archived: !!doc.archived,
       downloadUrl: Array.isArray(doc.downloadUrl) ? doc.downloadUrl : [],
       readOnly: !!doc.readOnly,

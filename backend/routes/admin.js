@@ -168,9 +168,9 @@ function normalizePhotoStatus(value) {
 }
 
 function resolvePhotoStatus(user = {}) {
+  if (user.pendingProfileImage) return "pending_review";
   const raw = String(user.profilePhotoStatus || "").trim();
   if (raw) return raw;
-  if (user.pendingProfileImage) return "pending_review";
   return user.profileImage || user.avatarURL ? "approved" : "unsubmitted";
 }
 
@@ -714,17 +714,15 @@ router.get(
   asyncHandler(async (req, res) => {
     const status = normalizePhotoStatus(req.query?.status) || "pending_review";
     const filter = {
-      role: "paralegal",
+      role: { $in: ["paralegal", "attorney"] },
       deleted: { $ne: true },
       status: { $ne: "denied" },
     };
     if (status === "pending_review") {
-      filter.profilePhotoStatus = "pending_review";
       filter.pendingProfileImage = { $nin: ["", null] };
     } else if (status === "rejected") {
       filter.profilePhotoStatus = "rejected";
     } else if (status === "approved") {
-      filter.status = "approved";
       filter.profilePhotoStatus = "approved";
       filter.pendingProfileImage = { $in: ["", null] };
       filter.$or = [
@@ -757,8 +755,9 @@ router.post(
     if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ error: "User not found" });
-    if (String(user.role || "").toLowerCase() !== "paralegal") {
-      return res.status(400).json({ error: "Only paralegal profile photos can be reviewed here" });
+    const role = String(user.role || "").toLowerCase();
+    if (!["paralegal", "attorney"].includes(role)) {
+      return res.status(400).json({ error: "Only attorney or paralegal profile photos can be reviewed here" });
     }
     if (!user.pendingProfileImage) {
       return res.status(400).json({ error: "No pending profile photo to approve" });
@@ -771,12 +770,14 @@ router.post(
     user.pendingProfileImage = "";
     user.pendingProfileImageOriginal = "";
     user.profilePhotoStatus = "approved";
-    user.preferences = {
-      ...(typeof user.preferences?.toObject === "function"
-        ? user.preferences.toObject()
-        : user.preferences || {}),
-      hideProfile: false,
-    };
+    if (role === "paralegal") {
+      user.preferences = {
+        ...(typeof user.preferences?.toObject === "function"
+          ? user.preferences.toObject()
+          : user.preferences || {}),
+        hideProfile: false,
+      };
+    }
     await user.save();
     try {
       await AuditLog.logFromReq(req, "admin.profile_photo.approved", {
@@ -787,7 +788,9 @@ router.post(
       console.warn("[admin] profile photo approval audit failed", err?.message || err);
     }
     try {
-      await notifyUser(user._id, "profile_photo_approved", {}, { actorUserId: req.user.id });
+      if (role === "paralegal") {
+        await notifyUser(user._id, "profile_photo_approved", {}, { actorUserId: req.user.id });
+      }
     } catch (err) {
       console.warn("[admin] notifyUser profile_photo_approved failed", err);
     }
@@ -803,13 +806,19 @@ router.post(
     if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ error: "User not found" });
-    if (String(user.role || "").toLowerCase() !== "paralegal") {
-      return res.status(400).json({ error: "Only paralegal profile photos can be reviewed here" });
+    const role = String(user.role || "").toLowerCase();
+    if (!["paralegal", "attorney"].includes(role)) {
+      return res.status(400).json({ error: "Only attorney or paralegal profile photos can be reviewed here" });
     }
     if (user.pendingProfileImage) {
       user.pendingProfileImage = "";
       user.pendingProfileImageOriginal = "";
       user.profilePhotoStatus = "rejected";
+      if (role === "attorney") {
+        user.profileImage = null;
+        user.avatarURL = "";
+        user.profileImageOriginal = "";
+      }
     } else if (user.profileImage || user.avatarURL) {
       user.profileImage = null;
       user.avatarURL = "";
@@ -834,6 +843,11 @@ router.post(
       await sendProfilePhotoRejectedEmail(user, { profileSettingsUrl });
     } catch (err) {
       console.warn("[admin] profile photo rejection email failed", err?.message || err);
+    }
+    try {
+      await notifyUser(user._id, "profile_photo_rejected", {}, { actorUserId: req.user.id });
+    } catch (err) {
+      console.warn("[admin] notifyUser profile_photo_rejected failed", err);
     }
     res.json({ ok: true, user: pickUserSafe(user.toObject()), profilePhotoStatus: user.profilePhotoStatus });
   })

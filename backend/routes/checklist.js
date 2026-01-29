@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const Task = require("../models/Task");
+const Case = require("../models/Case");
 const { logAction } = require("../utils/audit");
 const { assertCaseParticipant } = require("../middleware/ensureCaseParticipant");
 
@@ -45,6 +46,18 @@ async function ensureTaskCaseAccess(req, res, caseId) {
     res.status(status).json({ error: err.message || "Access denied" });
     return false;
   }
+}
+
+async function ensureCaseTasksUnlocked(req, res, caseId) {
+  if (!caseId) return true;
+  const doc = await Case.findById(caseId).select("tasksLocked hiredAt paralegal paralegalId");
+  if (doc?.tasksLocked || doc?.hiredAt || doc?.paralegal || doc?.paralegalId) {
+    res.status(403).json({
+      error: "Tasks are locked once a paralegal is hired. Create a new case for additional work.",
+    });
+    return false;
+  }
+  return true;
 }
 
 // ----------------------------------------
@@ -149,6 +162,8 @@ router.post(
     if (caseId) {
       const ok = await ensureTaskCaseAccess(req, res, caseId);
       if (!ok) return;
+      const unlocked = await ensureCaseTasksUnlocked(req, res, caseId);
+      if (!unlocked) return;
     }
 
     const doc = {
@@ -186,6 +201,8 @@ router.patch(
     if (t.caseId) {
       const ok = await ensureTaskCaseAccess(req, res, String(t.caseId));
       if (!ok) return;
+      const unlocked = await ensureCaseTasksUnlocked(req, res, String(t.caseId));
+      if (!unlocked) return;
     }
 
     const { title, notes, due, done, assignee, priority, labels, pinned, deleted } = req.body || {};
@@ -236,6 +253,8 @@ router.delete(
     if (existing.caseId) {
       const ok = await ensureTaskCaseAccess(req, res, String(existing.caseId));
       if (!ok) return;
+      const unlocked = await ensureCaseTasksUnlocked(req, res, String(existing.caseId));
+      if (!unlocked) return;
     }
 
     if (hard) {
@@ -266,6 +285,10 @@ router.post(
 
     const t = await Task.findOne({ _id: id, owner: req.user.id });
     if (!t) return res.status(404).json({ error: "Not found" });
+    if (t.caseId) {
+      const unlocked = await ensureCaseTasksUnlocked(req, res, String(t.caseId));
+      if (!unlocked) return;
+    }
 
     if (t.done) t.markUndone();
     else t.markDone(req.user.id);
@@ -291,6 +314,10 @@ router.post(
 
     const t = await Task.findOne({ _id: id, owner: req.user.id });
     if (!t) return res.status(404).json({ error: "Not found" });
+    if (t.caseId) {
+      const unlocked = await ensureCaseTasksUnlocked(req, res, String(t.caseId));
+      if (!unlocked) return;
+    }
 
     t.addChecklistItem(String(label));
     await t.save();
@@ -314,6 +341,10 @@ router.post(
 
     const t = await Task.findOne({ _id: id, owner: req.user.id });
     if (!t) return res.status(404).json({ error: "Not found" });
+    if (t.caseId) {
+      const unlocked = await ensureCaseTasksUnlocked(req, res, String(t.caseId));
+      if (!unlocked) return;
+    }
 
     t.toggleChecklistItem(itemId, req.user.id);
     await t.save();

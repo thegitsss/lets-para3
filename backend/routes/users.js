@@ -152,16 +152,24 @@ function toPublicUrl(val) {
 function serializePublicUser(user, { includeEmail = false, includeStatus = false, includePhotoMeta = false } = {}) {
   if (!user) return null;
   const src = user.toObject ? user.toObject() : user;
+  const role = String(src.role || "").toLowerCase();
+  const isParalegal = role === "paralegal";
   const profileImage = toPublicUrl(src.profileImage || "");
   const avatarURL = toPublicUrl(src.avatarURL || profileImage);
   const rawPhotoStatus = String(src.profilePhotoStatus || "").trim();
-  const resolvedPhotoStatus =
-    rawPhotoStatus || (src.pendingProfileImage ? "pending_review" : avatarURL || profileImage ? "approved" : "unsubmitted");
+  const resolvedPhotoStatus = isParalegal
+    ? rawPhotoStatus ||
+      (src.pendingProfileImage ? "pending_review" : avatarURL || profileImage ? "approved" : "unsubmitted")
+    : avatarURL || profileImage
+    ? "approved"
+    : "unsubmitted";
   const certificateURL = toPublicUrl(src.certificateURL || "");
   const writingSampleURL = toPublicUrl(src.writingSampleURL || "");
   const resumeURL = toPublicUrl(src.resumeURL || "");
   const profileImageOriginal = toPublicUrl(src.profileImageOriginal || "");
-  const pendingProfileImageOriginal = toPublicUrl(src.pendingProfileImageOriginal || "");
+  const pendingProfileImageOriginal = isParalegal
+    ? toPublicUrl(src.pendingProfileImageOriginal || "")
+    : "";
   const payload = {
     _id: String(src._id),
     firstName: src.firstName || "",
@@ -218,7 +226,7 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
   }
   if (includePhotoMeta) {
     payload.profilePhotoStatus = resolvedPhotoStatus;
-    payload.pendingProfileImage = toPublicUrl(src.pendingProfileImage || "");
+    payload.pendingProfileImage = isParalegal ? toPublicUrl(src.pendingProfileImage || "") : "";
     payload.profileImageOriginal = profileImageOriginal;
     payload.pendingProfileImageOriginal = pendingProfileImageOriginal;
   }

@@ -1205,11 +1205,15 @@ function renderCaseOverview(data) {
         const li = document.createElement("li");
         const label = document.createElement("label");
         const checkbox = document.createElement("input");
+        const title =
+          typeof task === "string"
+            ? task
+            : task?.title || task?.name || "";
         checkbox.type = "checkbox";
         checkbox.disabled = true;
         checkbox.checked = !!task?.completed;
         label.appendChild(checkbox);
-        label.append(` ${task?.title || task?.name || "Task"}`);
+        label.append(` ${title || "Task"}`);
         li.appendChild(label);
         caseTaskList.appendChild(li);
       });

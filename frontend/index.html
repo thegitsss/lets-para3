@@ -1044,14 +1044,19 @@
   <div class="how-it-works-bg">
     <h2>How It Works</h2>
     <p>Let’s ParaConnect is designed to be intuitive, fair, and efficient — for both attorneys and paralegals.</p>
-    <a class="cta mobile-only" href="paralegal-faq.html" style="display:inline-flex;align-items:center;gap:6px;margin:0 auto 1.5rem;">Paralegal FAQ
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
-    </a>
+    <div class="cta-row mobile-only" style="display:flex;flex-wrap:wrap;gap:9rem;justify-content:center;margin:0 auto 1.5rem;">
+      <a class="cta" href="paralegal-faq.html" style="display:inline-flex;align-items:center;gap:6px;">Paralegal FAQ
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+      </a>
+      <a class="cta" href="attorney-faq.html" style="display:inline-flex;align-items:center;gap:6px;">For Attorneys
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+      </a>
+    </div>
 
     <div class="cards">
       <div class="card">
         <div class="pad">
-          <span class="card-icon" aria-hidden="true">*</span>
+          <span class="card-icon" aria-hidden="true"><img src="android-chrome-512x512.png" alt="" /></span>
           <div class="hiw-card">
             <div class="hiw-default">
               <h3>Post a Job</h3>
@@ -1070,7 +1075,7 @@
       </div>
       <div class="card">
         <div class="pad">
-          <span class="card-icon" aria-hidden="true">*</span>
+          <span class="card-icon" aria-hidden="true"><img src="android-chrome-512x512.png" alt="" /></span>
           <div class="hiw-card">
             <div class="hiw-default">
               <h3>Paralegals Apply</h3>
@@ -1089,7 +1094,7 @@
       </div>
       <div class="card">
         <div class="pad">
-          <span class="card-icon" aria-hidden="true">*</span>
+          <span class="card-icon" aria-hidden="true"><img src="android-chrome-512x512.png" alt="" /></span>
           <div class="hiw-card">
             <div class="hiw-default">
               <h3>Work Begins</h3>
@@ -1108,7 +1113,7 @@
       </div>
       <div class="card">
         <div class="pad">
-          <span class="card-icon" aria-hidden="true">*</span>
+          <span class="card-icon" aria-hidden="true"><img src="android-chrome-512x512.png" alt="" /></span>
           <div class="hiw-card">
             <div class="hiw-default">
               <h3>Secure Escrow</h3>
@@ -1127,7 +1132,7 @@
       </div>
       <div class="card">
         <div class="pad">
-          <span class="card-icon" aria-hidden="true">*</span>
+          <span class="card-icon" aria-hidden="true"><img src="android-chrome-512x512.png" alt="" /></span>
           <div class="hiw-card">
             <div class="hiw-default">
               <h3>Finalize &amp; Close</h3>
@@ -1586,7 +1591,7 @@ updateHeaderAppearance();
   width: 52px;
   height: 52px;
   border-radius: 0;
-  background: #0a0f14;
+  background: #ffffff;
   color: #ffffff;
   display: inline-flex;
   align-items: center;
@@ -1594,6 +1599,12 @@ updateHeaderAppearance();
   font-size: 1.4rem;
   font-family: 'Cormorant Garamond', serif;
   letter-spacing: 0.08em;
+}
+.how-it-works-bg .card-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .how-it-works-bg .card h3 {

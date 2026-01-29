@@ -332,6 +332,50 @@
       box-shadow:0 0 0 3px rgba(182,164,122,0.15);
       outline:none;
     }
+    .task-input-row{
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+    .task-input-row input{flex:1;}
+    .task-list{
+      list-style:none;
+      padding-left:0;
+      margin:10px 0 0;
+      display:grid;
+      gap:8px;
+    }
+    .task-list li{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:8px 10px;
+      border:1px solid var(--line);
+      border-radius:6px;
+      background:#fff;
+      font-size:0.9rem;
+    }
+    .task-list .task-empty{
+      border:none;
+      background:transparent;
+      color:var(--muted);
+      padding:0;
+      justify-content:flex-start;
+    }
+    .task-remove{
+      border:none;
+      background:transparent;
+      color:var(--muted);
+      cursor:pointer;
+      font-size:0.85rem;
+    }
+    .task-remove:hover{color:var(--accent);}
+    .task-helper{
+      font-size:0.85rem;
+      color:var(--muted);
+      margin-top:6px;
+    }
 
     .btn{
       border:none;
@@ -925,6 +969,15 @@
             <textarea id="caseDescription" placeholder="Describe your case, goals, and expectations for the paralegal..."></textarea>
             <div class="char-count" id="descriptionCharCount">0 / 4000</div>
           </div>
+          <div class="field" id="caseTasksField">
+            <label for="caseTaskInput">Tasks (optional)</label>
+            <div class="task-input-row">
+              <input id="caseTaskInput" type="text" placeholder="e.g., Draft initial motion" />
+              <button type="button" class="btn secondary" id="addCaseTaskBtn">Add</button>
+            </div>
+            <p class="task-helper" id="caseTaskHelper">Tasks describe the overall scope of work, not every individual step. Additional work requires a new case.</p>
+            <ul class="task-list" id="caseTaskList"></ul>
+          </div>
           <div class="field">
             <label for="caseDeadline">Deadline (optional)</label>
             <input id="caseDeadline" type="date" placeholder="YYYY-MM-DD" />
@@ -1025,6 +1078,10 @@
       experience: document.getElementById("experience"),
       deadline: document.getElementById("caseDeadline"),
     };
+    const taskInput = document.getElementById("caseTaskInput");
+    const taskAddBtn = document.getElementById("addCaseTaskBtn");
+    const taskList = document.getElementById("caseTaskList");
+    const taskHelper = document.getElementById("caseTaskHelper");
     const compLockNotice = document.getElementById("compLockNotice");
     const compWrapper = fields.comp?.closest(".comp-wrapper");
     const titlePreview = document.getElementById("caseTitlePreviewText");
@@ -1049,6 +1106,10 @@
     const autoNoteCopy = "Applicants automatically include their résumé, cover letter (if available), and LinkedIn profile.";
     let latestCaseData = null;
     let csrfToken = "";
+    const tasksState = {
+      items: [],
+      locked: false,
+    };
 
     const validators = [
       {
@@ -1082,6 +1143,74 @@
     function updateDescriptionCount() {
       if (!descriptionInput || !descriptionCount) return;
       descriptionCount.textContent = `${descriptionInput.value.length} / 4000`;
+    }
+
+    function normalizeTaskTitle(value) {
+      return String(value || "")
+        .replace(/[\u0000-\u001F\u007F]/g, "")
+        .trim()
+        .slice(0, 200);
+    }
+
+    function readStoredTasks() {
+      try {
+        const raw = localStorage.getItem("caseTasks") || localStorage.getItem("case_tasks") || "";
+        const parsed = JSON.parse(raw || "[]");
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((entry) => {
+              const title = normalizeTaskTitle(typeof entry === "string" ? entry : entry?.title);
+              return title ? { title } : null;
+            })
+            .filter(Boolean);
+        }
+      } catch {}
+      return [];
+    }
+
+    function persistTasks() {
+      const payload = tasksState.items.map((task) => ({ title: task.title }));
+      localStorage.setItem("caseTasks", JSON.stringify(payload));
+      localStorage.setItem("case_tasks", JSON.stringify(payload));
+    }
+
+    function renderTasks() {
+      if (!taskList) return;
+      taskList.innerHTML = "";
+      if (!tasksState.items.length) {
+        const empty = document.createElement("li");
+        empty.className = "task-empty";
+        empty.textContent = "No tasks added yet.";
+        taskList.appendChild(empty);
+        return;
+      }
+      tasksState.items.forEach((task, idx) => {
+        const row = document.createElement("li");
+        const label = document.createElement("span");
+        label.textContent = task.title;
+        row.appendChild(label);
+        if (!tasksState.locked) {
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "task-remove";
+          removeBtn.textContent = "Remove";
+          removeBtn.addEventListener("click", () => {
+            tasksState.items.splice(idx, 1);
+            persistTasks();
+            renderTasks();
+          });
+          row.appendChild(removeBtn);
+        }
+        taskList.appendChild(row);
+      });
+    }
+
+    function setTasksLocked(locked) {
+      tasksState.locked = !!locked;
+      if (taskInput) taskInput.disabled = tasksState.locked;
+      if (taskAddBtn) taskAddBtn.disabled = tasksState.locked;
+      if (taskHelper) taskHelper.style.display = tasksState.locked ? "none" : "";
+      renderTasks();
     }
 
     function hydrateDeadline() {
@@ -1197,6 +1326,25 @@
       });
     }
 
+    tasksState.items = isEditing ? [] : readStoredTasks();
+    renderTasks();
+    if (taskAddBtn && taskInput) {
+      taskAddBtn.addEventListener("click", () => {
+        if (tasksState.locked) return;
+        const title = normalizeTaskTitle(taskInput.value);
+        if (!title) return;
+        tasksState.items.push({ title });
+        taskInput.value = "";
+        persistTasks();
+        renderTasks();
+      });
+      taskInput.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        taskAddBtn.click();
+      });
+    }
+
     function validateDetails() {
       let hasErrors = false;
       validators.forEach(({ field, check, message }) => {
@@ -1271,6 +1419,7 @@
       const experience = fields.experience?.value || getStoredValue("caseExperience", "case_experience");
       const deadline = fields.deadline?.value || getStoredValue("caseDeadline", "case_deadline");
       const description = (descriptionInput?.value || "").trim() || getStoredValue("caseDescription", "case_description").trim();
+      const tasks = tasksState.items.length ? tasksState.items : readStoredTasks();
       return {
         title: title || "",
         field: field || "",
@@ -1280,6 +1429,7 @@
         experience: experience || "",
         deadline: deadline || "",
         description: description || "",
+        tasks,
       };
     }
 
@@ -1317,6 +1467,10 @@
       const deadlineText = data.deadline
         ? new Date(data.deadline).toLocaleDateString() || data.deadline
         : "No deadline set";
+      const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+      const tasksMarkup = tasks.length
+        ? `<ul class="task-list">${tasks.map((task) => `<li>${task.title}</li>`).join("")}</ul>`
+        : `<p><strong>Tasks:</strong> Not provided</p>`;
       reviewSummary.innerHTML = `
         <h2>${data.title || "(Untitled Case)"}</h2>
         <p><small>${data.field || "Practice area pending"} • ${data.state || "Location pending"}</small></p>
@@ -1325,6 +1479,10 @@
         <p><strong>Deadline:</strong> ${deadlineText}</p>
         <hr>
         <p>${data.description || "No description provided yet."}</p>
+        <div style="margin-top:12px;">
+          <div class="description-label" style="margin-bottom:6px;">TASKS</div>
+          ${tasksMarkup}
+        </div>
         <p class="auto-note">${autoNoteCopy}</p>
       `;
     }
@@ -1366,6 +1524,8 @@
         "caseCompAmount",
         "caseExperience",
         "caseDescription",
+        "caseTasks",
+        "case_tasks",
       ].forEach((key) => localStorage.removeItem(key));
     }
 
@@ -1532,7 +1692,7 @@
       const description = data.description || "Additional details will be provided once the case is accepted.";
       const practiceArea = mapPracticeArea(data.field);
       const deadline = data.deadline || "";
-      return {
+      const payload = {
         title: data.title,
         practiceArea,
         state: data.state,
@@ -1541,6 +1701,10 @@
         details: description,
         deadline,
       };
+      if (!tasksState.locked) {
+        payload.tasks = Array.isArray(data.tasks) ? data.tasks : [];
+      }
+      return payload;
     }
 
     const LOCAL_DRAFTS_KEY = "attorneyLocalDraftCases";
@@ -1729,6 +1893,14 @@
         const iso = new Date(caseData.deadline).toISOString().slice(0, 10);
         fields.deadline.value = iso;
       }
+      const incomingTasks = Array.isArray(caseData.tasks) ? caseData.tasks : [];
+      tasksState.items = incomingTasks
+        .map((task) => ({
+          title: normalizeTaskTitle(typeof task === "string" ? task : task?.title),
+        }))
+        .filter((task) => task.title);
+      const lockTasks = Boolean(caseData.tasksLocked || caseData.paralegal || caseData.paralegalId || caseData.hiredAt);
+      setTasksLocked(lockTasks);
       latestCaseData = collectCaseData();
       hydrateReviewSummary();
     }

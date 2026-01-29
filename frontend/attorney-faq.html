@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="theme-color" content="#0B2A4A">
+  <link href="assets/styles/styles.css" rel="stylesheet" />
+  <link href="assets/styles/hero-pages.css" rel="stylesheet" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>For Attorneys – Let’s-ParaConnect</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
+
+
+  <style>
+    .gold{color:#b4975a;}
+    body {
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+      margin: 0;
+      padding: 0;
+      background-color: white;
+      color: #1a1a1a;
+      line-height: 1.6;
+    }
+
+    .header-logo {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 1.5rem;
+      letter-spacing: 0.08em;
+    }
+
+    .header-logo a {
+      text-decoration: none;
+      color: #1a1a1a;
+    }
+
+    main {
+      padding: 60px 40px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 2.5rem;
+      margin-bottom: 30px;
+      letter-spacing: 0.05em;
+    }
+
+    h2 {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      margin-top: 40px;
+      font-size: 1.75rem;
+    }
+
+    p {
+      margin-bottom: 20px;
+    }
+
+    .toc-list {
+      list-style: none;
+      padding-left: 0;
+      margin: 2rem 0;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 200;
+    }
+
+    .toc-list li {
+      margin: 0.5rem 0;
+    }
+
+    .toc-list a {
+      text-decoration: none;
+      color: var(--ink);
+      transition: color 0.2s ease-in-out;
+    }
+
+    .toc-list a:hover {
+      color: var(--gold);
+    }
+
+    #cta h2,
+    #cta p,
+    #cta .cta {
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+
+    #cta.is-visible h2,
+    #cta.is-visible p,
+    #cta.is-visible .cta {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    #cta.is-visible p {
+      transition-delay: 0.06s;
+    }
+
+    #cta.is-visible .cta {
+      transition-delay: 0.12s;
+      transition-property: opacity, transform, box-shadow, background-color;
+      transition-duration: 0.35s, 0.35s, 0.2s, 0.2s;
+      transition-timing-function: ease, ease, ease, ease;
+    }
+
+    #cta .cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+      background: rgba(182, 164, 122, 0.08);
+    }
+
+    #cta .cta:focus-visible {
+      outline: 2px solid #b6a47a;
+      outline-offset: 2px;
+    }
+
+    #cta {
+      margin-bottom: 48px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #cta h2,
+      #cta p,
+      #cta .cta {
+        opacity: 1;
+        transform: none;
+        transition: none;
+      }
+      #cta .cta {
+        transition: none;
+      }
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+  </style>
+</head>
+
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+<header>
+  <div class="header-inner">
+    <nav class="nav-left" aria-label="Primary">
+      <a href="index.html#who-we-are">About</a>
+      <a href="index.html#how">How It Works</a>
+    </nav>
+
+    <a href="index.html" class="header-logo">
+      Let’s-ParaConnect
+    </a>
+
+    <div class="header-actions">
+      <a class="pill" href="login.html" id="authAction">Sign In</a>
+      <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
+    </div>
+  </div>
+</header>
+
+<div class="hero-banner" role="presentation" aria-hidden="true"></div>
+
+<main tabindex="-1" id="main" aria-labelledby="faq-title">
+  <h1 id="faq-title">For Attorneys</h1>
+  <p class="muted">A curated platform for project-based paralegal support.</p>
+
+  <p>Let’s-ParaConnect is a curated platform designed to help solo and small-firm attorneys engage experienced paralegals through structured, project-based work — without staffing agencies, full-time hiring commitments, or administrative friction.</p>
+  <p>The platform is intentionally selective. Both attorneys and paralegals are individually reviewed to ensure professionalism, experience, and alignment with real legal workflows.</p>
+
+  <section>
+    <h2>Table of Contents</h2>
+    <ul class="toc-list">
+      <li><a href="#q1">1. Curated paralegal profiles</a></li>
+      <li><a href="#q2">2. Project-based work — not placement</a></li>
+      <li><a href="#q3">3. Clear scope before work begins</a></li>
+      <li><a href="#q4">4. Escrow-backed payments</a></li>
+      <li><a href="#q5">5. Independent, professional engagement</a></li>
+      <li><a href="#q6">6. What Let’s-ParaConnect is — and isn’t</a></li>
+      <li><a href="#q7">7. Admission &amp; availability</a></li>
+    </ul>
+  </section>
+
+  <section id="q1" class="card">
+    <h2>1) Curated paralegal profiles</h2>
+    <p>Paralegals on Let’s-ParaConnect are experienced professionals with prior law-firm and professional office experience. Each paralegal creates a detailed profile outlining their background, practice areas, and project experience. Admission is selective, and profiles are rigorously reviewed before approval.</p>
+  </section>
+
+  <section id="q2" class="card">
+    <h2>2) Project-based work — not placement</h2>
+    <p>Attorneys post defined legal projects, rather than open-ended roles or hourly employment arrangements. This structure allows attorneys to engage paralegal support on an as-needed basis — and to bill clients appropriately for paralegal time — without hiring full-time staff, paying salaries, or absorbing downtime associated with traditional employment.</p>
+    <p>Paralegals independently review postings and apply to work that aligns with their experience. Let’s-ParaConnect does not place, match, or assign paralegals. Attorneys retain full discretion over who they engage and how work is managed.</p>
+  </section>
+
+  <section id="q3" class="card">
+    <h2>3) Clear scope before work begins</h2>
+    <p>Each project includes a task overview so expectations are aligned from the outset. Final task details and workflow are confirmed after a paralegal is hired, allowing flexibility while maintaining clarity and control.</p>
+  </section>
+
+  <section id="q4" class="card">
+    <h2>4) Escrow-backed payments</h2>
+    <p>All projects are funded upfront through escrow, securely processed via <a href="https://stripe.com/security" target="_blank" rel="noopener">Stripe</a>. Funds are held until work is marked complete, providing transparency and protection for both attorneys and paralegals. This structure eliminates billing uncertainty and simplifies payment handling.</p>
+  </section>
+
+  <section id="q5" class="card">
+    <h2>5) Independent, professional engagement</h2>
+    <p>Paralegals work as independent professionals, not employees of the platform. Attorneys maintain control over scope, communication, and deliverables, while Let’s-ParaConnect provides the infrastructure for documentation, workflow clarity, and payments.</p>
+  </section>
+
+  <section id="q6" class="card">
+    <h2>6) What Let’s-ParaConnect is — and isn’t</h2>
+    <p><strong>It is:</strong></p>
+    <ul>
+      <li>A professional, escrow-backed platform for project-based legal work</li>
+      <li>Built specifically for solo and small-firm attorneys</li>
+      <li>Designed for experienced paralegals</li>
+      <li>Structured, transparent, and intentional</li>
+    </ul>
+    <p><strong>It is not:</strong></p>
+    <ul>
+      <li>A staffing agency</li>
+      <li>A placement service</li>
+      <li>A job board</li>
+      <li>A high-volume marketplace</li>
+      <li>An open or public sign-up platform</li>
+    </ul>
+    <p>Let’s-ParaConnect is a private, curated platform. Admission is limited and granted by approval only.</p>
+  </section>
+
+  <section id="q7" class="card">
+    <h2>7) Admission &amp; availability</h2>
+    <p>Attorney accounts are reviewed and approved manually. We are currently onboarding a limited group of founding attorneys ahead of escrow-backed project posting.</p>
+  </section>
+</main>
+
+<section class="section about wrap" style="text-align: center; background-color: #ffffff;" id="cta">
+  <h2 style="color: #1a2230; font-family: 'Cormorant Garamond', sans-serif; font-weight: 200;">Ready to Get Started?</h2>
+  <p style="color: #333333; font-family: 'Sarabun', sans-serif; font-weight: 200; max-width: 600px; margin: 0 auto 1.5rem;">
+    Join a limited group of founding attorneys and access curated paralegal support for your next project.
+  </p>
+  <a class="cta" href="signup.html" style="
+    margin-top: 1rem;
+    border: 1.5px solid #1a2230;
+    color: #1a2230;
+    font-family: 'Sarabun', sans-serif;
+    font-weight: 200;
+    padding: 0.75rem 2rem;
+    border-radius: 6px;
+    display: inline-block;
+    text-decoration: none;
+    transition: all 0.3s ease;
+  ">Request Access</a>
+</section>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <p>© 2025 Let’s-ParaConnect. All rights reserved.</p>
+    <nav>
+      <a href="privacy.html">Privacy Policy</a>
+      <span>|</span>
+      <a href="terms.html">Terms</a>
+      <span>|</span>
+      <a href="/paralegal-admission.html">Admissions</a>
+      <span>|</span>
+      <a href="contact.html">Contact</a>
+      <span>|</span>
+      <a href="accessibility.html">Accessibility</a>
+    </nav>
+    <div class="region">United States</div>
+  </div>
+</footer>
+
+<script type="module" src="assets/scripts/hero-parallax.js"></script>
+<script>
+  const ctaSection = document.getElementById("cta");
+  if (ctaSection) {
+    const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    if (prefersReduced || !("IntersectionObserver" in window)) {
+      ctaSection.classList.add("is-visible");
+    } else {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              ctaSection.classList.add("is-visible");
+              observer.disconnect();
+            }
+          });
+        },
+        { threshold: 0.35 }
+      );
+      observer.observe(ctaSection);
+    }
+  }
+</script>
+</body>
+</html>

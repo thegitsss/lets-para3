@@ -24,6 +24,16 @@ function assertEscrowFunded(req, res) {
   return false;
 }
 
+function assertTasksUnlocked(req, res) {
+  if (req.case?.tasksLocked || req.case?.hiredAt || req.case?.paralegal || req.case?.paralegalId) {
+    res.status(403).json({
+      error: "Tasks are locked once a paralegal is hired. Create a new case for additional work.",
+    });
+    return false;
+  }
+  return true;
+}
+
 // All task routes require auth + approval + being a participant on the case
 router.use(verifyToken);
 router.use(requireApproved);
@@ -45,6 +55,7 @@ router.post(
   "/",
   csrfProtection,
   asyncHandler(async (req, res) => {
+    if (!assertTasksUnlocked(req, res)) return;
     if (!assertEscrowFunded(req, res)) return;
     const { title, description, dueDate, status } = req.body;
     const caseId = req.params.caseId;
@@ -71,6 +82,7 @@ router.patch(
   "/:taskId",
   csrfProtection,
   asyncHandler(async (req, res) => {
+    if (!assertTasksUnlocked(req, res)) return;
     if (!assertEscrowFunded(req, res)) return;
     const { taskId } = req.params;
     const updates = req.body;

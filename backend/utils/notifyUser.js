@@ -38,6 +38,8 @@ function buildDisplayMessage(type, payload = {}) {
       return "Your profile was approved.";
     case "profile_photo_approved":
       return "Your profile photo was approved.";
+    case "profile_photo_rejected":
+      return "Your profile photo was rejected. Please upload a new one.";
     case "payout_released":
       return `Your payout was released${payload.amount ? ` (${payload.amount})` : ""}.`;
     case "application_submitted": {
@@ -169,6 +171,11 @@ function emailTemplate(type, payload) {
           html,
         };
       })();
+    case "profile_photo_rejected":
+      return {
+        subject: "Profile photo update needed",
+        html: "<p>Your profile photo was rejected. Please upload a new one.</p>",
+      };
     case "case_invite_response":
       return {
         subject: "Case invitation update",
@@ -252,6 +259,7 @@ const CASE_EMAIL_TYPES = new Set([
 
 function shouldSendEmailForType(user, type) {
   const prefs = user?.notificationPrefs || {};
+  if (type === "profile_photo_rejected") return false;
   if (prefs.email === false) return false;
   if (type === "message") {
     return prefs.emailMessages !== false;

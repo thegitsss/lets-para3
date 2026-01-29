@@ -135,6 +135,14 @@ const inviteSchema = new Schema(
   { _id: false }
 );
 
+const scopeTaskSchema = new Schema(
+  {
+    title: { type: String, trim: true, maxlength: 200 },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 /** ----------------------------------------
  * Main Case Schema
  * -----------------------------------------*/
@@ -156,6 +164,8 @@ const caseSchema = new Schema(
     details: { type: String, required: true, trim: true, maxlength: 100_000 },
     state: { type: String, trim: true, maxlength: 200, default: "" },
     locationState: { type: String, trim: true, maxlength: 200, default: "" },
+    tasks: { type: [scopeTaskSchema], default: [] },
+    tasksLocked: { type: Boolean, default: false, index: true },
     status: { type: String, enum: CASE_STATUS_ENUM, default: "open", index: true },
 
     // Timeline
