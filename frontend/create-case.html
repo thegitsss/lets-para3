@@ -1618,6 +1618,16 @@
       return csrfToken;
     }
 
+    async function readResponsePayload(res) {
+      const text = await res.text().catch(() => "");
+      if (!text) return { data: {}, text: "" };
+      try {
+        return { data: JSON.parse(text), text };
+      } catch {
+        return { data: {}, text };
+      }
+    }
+
     async function submitCase(payload) {
       const token = (window.getSessionToken && window.getSessionToken()) || "";
       if (!token) {
@@ -1636,9 +1646,11 @@
         },
         body: JSON.stringify(payload),
       });
-      const data = await res.json().catch(() => ({}));
+      const { data, text } = await readResponsePayload(res);
       if (!res.ok) {
-        throw new Error(data?.error || data?.msg || "Unable to post this case right now.");
+        const message = data?.error || data?.msg || data?.message || (text && !text.includes("<") ? text : "");
+        const statusNote = res.status ? ` (HTTP ${res.status})` : "";
+        throw new Error(message || `Unable to post this case right now.${statusNote}`);
       }
       return data;
     }
@@ -1981,8 +1993,12 @@
           headers: Object.assign({ Accept: "application/json" }, token ? { Authorization: `Bearer ${token}` } : {}),
           credentials: "include",
         });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data?.error || "Unable to load this case for editing.");
+        const { data, text } = await readResponsePayload(res);
+        if (!res.ok) {
+          const message = data?.error || data?.msg || data?.message || (text && !text.includes("<") ? text : "");
+          const statusNote = res.status ? ` (HTTP ${res.status})` : "";
+          throw new Error(message || `Unable to load this case for editing.${statusNote}`);
+        }
         applyCaseDataToForm(data);
       } catch (err) {
         console.warn("Edit case load failed", err);
@@ -2008,9 +2024,11 @@
         },
         body: JSON.stringify(payload),
       });
-      const data = await res.json().catch(() => ({}));
+      const { data, text } = await readResponsePayload(res);
       if (!res.ok) {
-        throw new Error(data?.error || data?.msg || "Unable to save changes to this case.");
+        const message = data?.error || data?.msg || data?.message || (text && !text.includes("<") ? text : "");
+        const statusNote = res.status ? ` (HTTP ${res.status})` : "";
+        throw new Error(message || `Unable to save changes to this case.${statusNote}`);
       }
       return data;
     }

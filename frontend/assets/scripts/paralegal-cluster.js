@@ -9,6 +9,7 @@
   let hydrated = false;
   let stylesInjected = false;
   let baseStylesInjected = false;
+  let pendingStylesInjected = false;
 
   function targetEls(){
     return {
@@ -34,6 +35,37 @@
       `;
       document.head.appendChild(base);
     }
+  }
+
+  function ensurePendingBannerStyles(){
+    if (pendingStylesInjected) return;
+    pendingStylesInjected = true;
+    const style = document.createElement("style");
+    style.textContent = `
+      .pending-approval-banner{
+        display:flex;
+        align-items:center;
+        gap:12px;
+        padding:12px 16px;
+        margin:0 0 1.25rem;
+        border-radius:12px;
+        background:#fff6e5;
+        border:1px solid #e6cf9a;
+        color:#5b4212;
+        font-size:0.95rem;
+        font-weight:200;
+        box-shadow:0 10px 24px rgba(0,0,0,0.05);
+      }
+      .pending-approval-banner strong{
+        font-family:'Cormorant Garamond',serif;
+        font-weight:300;
+        font-size:1.05rem;
+      }
+      .pending-approval-banner.hidden{
+        display:none;
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   function injectFloatingStyles(){
@@ -218,12 +250,69 @@
     return "";
   }
 
+  function isPendingPhoto(user = {}){
+    return (
+      String(user.profilePhotoStatus || "").toLowerCase() === "pending_review" ||
+      Boolean(user.pendingProfileImage)
+    );
+  }
+
   function applyGlobalAvatars(user = {}) {
-    if (!user.profileImage) return;
+    const avatar = user.pendingProfileImage || user.profileImage || user.avatarURL || "";
+    if (!avatar) return;
     const targets = document.querySelectorAll("#user-avatar, #headerAvatar, #avatarPreview");
     targets.forEach((el) => {
-      if (el) el.src = user.profileImage;
+      if (el) el.src = avatar;
     });
+  }
+
+  function findPendingBannerHost(){
+    return (
+      document.querySelector("main#main") ||
+      document.querySelector("main") ||
+      document.querySelector(".main") ||
+      document.querySelector("[role='main']") ||
+      document.body
+    );
+  }
+
+  function ensurePendingBanner(){
+    let banner = document.getElementById("pendingApprovalBanner");
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.id = "pendingApprovalBanner";
+      banner.className = "pending-approval-banner hidden";
+      banner.setAttribute("role", "status");
+      banner.setAttribute("aria-live", "polite");
+      banner.innerHTML = `
+        <strong>Pending Approval</strong>
+        <span>Your profile photo is under review and visible only to you.</span>
+      `;
+    }
+    if (!banner.parentElement) {
+      const host = findPendingBannerHost();
+      if (host) {
+        const header = Array.from(host.children || []).find((el) => el.tagName === "HEADER");
+        if (header) {
+          header.insertAdjacentElement("afterend", banner);
+        } else {
+          host.insertAdjacentElement("afterbegin", banner);
+        }
+      }
+    }
+    return banner;
+  }
+
+  function renderPendingBanner(user = {}){
+    const isParalegal = String(user.role || "").toLowerCase() === "paralegal";
+    const pending = isParalegal && isPendingPhoto(user);
+    const banner = document.getElementById("pendingApprovalBanner");
+    if (!pending) {
+      if (banner) banner.classList.add("hidden");
+      return;
+    }
+    ensurePendingBannerStyles();
+    ensurePendingBanner().classList.remove("hidden");
   }
 
   function renderUserFields(user = {}){
@@ -232,10 +321,16 @@
     if (els.name) els.name.textContent = formatName(user);
     if (els.role) {
       const roleText = formatRole(user);
-      els.role.textContent = roleText;
-      els.role.style.display = roleText ? "" : "none";
+      const pending = isPendingPhoto(user);
+      const displayText = pending
+        ? roleText
+          ? `${roleText} · PENDING`
+          : "PENDING"
+        : roleText;
+      els.role.textContent = displayText;
+      els.role.style.display = displayText ? "" : "none";
     }
-    const avatar = user.profileImage || user.avatarURL || FALLBACK_AVATAR;
+    const avatar = user.pendingProfileImage || user.profileImage || user.avatarURL || FALLBACK_AVATAR;
     if (els.avatar && avatar) {
       els.avatar.src = avatar;
       els.avatar.alt = `${formatName(user)} avatar`;
@@ -247,6 +342,7 @@
       els.badge.classList.toggle("show", count > 0);
     }
     applyGlobalAvatars(user);
+    renderPendingBanner(user);
   }
 
   function hydrate(user={}){

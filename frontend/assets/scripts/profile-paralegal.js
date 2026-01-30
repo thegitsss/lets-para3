@@ -40,7 +40,7 @@ function getProfileImageUrl(user = {}, { allowPending = false } = {}) {
   const approved = user.profileImage || user.avatarURL || "";
   if (allowPending) {
     const pending = user.pendingProfileImage || "";
-    if (resolveProfilePhotoStatus(user) === "pending_review" && pending) {
+    if (pending) {
       return pending;
     }
   }

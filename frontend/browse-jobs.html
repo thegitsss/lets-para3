@@ -317,16 +317,51 @@
 
     .clear-button:hover { background: rgba(180, 151, 90, 0.1); }
     .apply-button:hover { background: #a2864d; border-color: #a2864d; }
+    .apply-button.is-disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+    .apply-button.is-disabled[data-stripe-required="true"] {
+      position: relative;
+      overflow: hidden;
+    }
+    .apply-button.is-disabled[data-stripe-required="true"]::after {
+      content: attr(data-hover-label);
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0 12px;
+      font-size: 0.85rem;
+      letter-spacing: 0.02em;
+      color: #fff;
+      background: #a2864d;
+      border-radius: inherit;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .apply-button.is-disabled[data-stripe-required="true"]:hover::after,
+    .apply-button.is-disabled[data-stripe-required="true"]:focus-visible::after {
+      opacity: 1;
+    }
+    .apply-button.is-disabled[data-stripe-required="true"]:hover,
+    .apply-button.is-disabled[data-stripe-required="true"]:focus-visible {
+      color: transparent;
+    }
 
     .job-card.expanded {
       border-left-width: 6px;
       box-shadow: 0 28px 70px rgba(10, 15, 25, 0.12);
-      max-width: 980px;
+      max-width: 1040px;
       margin: 0 auto;
       animation: jobExpandIn 420ms cubic-bezier(.2,.7,.2,1);
       transform-origin: center top;
       position: relative;
-      padding-bottom: 130px;
+      padding-bottom: 110px;
     }
     .job-card .pill-label {
       display: inline-flex;
@@ -407,6 +442,7 @@
       border-radius: 16px;
       padding: 1.2rem 1.3rem;
       background: #fbfcff;
+      box-sizing: border-box;
       max-width: 520px;
       width: 100%;
       margin: 0 auto 0.2rem;
@@ -492,7 +528,7 @@
       display: none;
     }
     body.job-expanded .results {
-      width: min(980px, 100%);
+      width: min(1040px, 100%);
       margin: 0 auto;
     }
     body.job-expanded .jobs-grid {

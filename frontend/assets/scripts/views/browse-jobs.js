@@ -726,9 +726,13 @@ function openApplyModal(job) {
   const existingConfirm = applyModal.querySelector(".apply-confirm");
   if (existingConfirm) existingConfirm.remove();
   currentApplyJob = job;
-  const jobId = getJobIdForApply(job);
-  if (!jobId) return;
-  applyModal.dataset.jobId = jobId;
+  const target = resolveApplyTarget(job);
+  if (!target) {
+    showToast("Unable to apply to this case right now.", "error");
+    return;
+  }
+  applyModal.dataset.applyType = target.type;
+  applyModal.dataset.jobId = target.id;
   applyTitle.textContent = `Apply to ${escapeHtml(job.title || "this job")}`;
   applyTextarea.value = "";
   applyStatus.textContent = "";
@@ -835,7 +839,16 @@ async function loadAppliedJobsFromServer() {
 
 async function submitApplication() {
   if (!currentApplyJob || !applyTextarea || !applyStatus || !applySubmitBtn) return;
-  const jobId = getJobIdForApply(currentApplyJob);
+  const target = resolveApplyTarget(currentApplyJob);
+  const jobId = target?.id || "";
+  const applyPath =
+    target?.type === "case"
+      ? `/api/cases/${encodeURIComponent(jobId)}/apply`
+      : `/api/jobs/${encodeURIComponent(jobId)}/apply`;
+  if (!jobId) {
+    applyStatus.textContent = "Unable to submit this application right now.";
+    return;
+  }
   const note = applyTextarea.value.trim();
   if (!note) {
     applyStatus.textContent = "Add a short cover letter before submitting.";
@@ -854,7 +867,7 @@ async function submitApplication() {
     const active = await ensureSession();
     if (!active) throw new Error("Session expired. Refresh and try again.");
     const csrf = await ensureCsrfToken();
-    const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/apply`, {
+    const res = await fetch(applyPath, {
       method: "POST",
       credentials: "include",
       headers: {
@@ -1005,21 +1018,36 @@ async function openJobModal(job) {
     const applyKey = getApplyKey(job);
     const appliedAt = getAppliedAt(job);
     if (!allowApply) {
-      jobApplyBtn.disabled = true;
+      jobApplyBtn.disabled = false;
       jobApplyBtn.textContent = "Apply for this case";
       jobApplyBtn.title = "Only paralegals can apply.";
+      jobApplyBtn.classList.add("is-disabled");
+      jobApplyBtn.setAttribute("aria-disabled", "true");
+      jobApplyBtn.removeAttribute("data-stripe-required");
+      jobApplyBtn.removeAttribute("data-hover-label");
     } else if (appliedAt) {
       jobApplyBtn.disabled = true;
       jobApplyBtn.textContent = `Case applied · ${formatAppliedDate(appliedAt)}`;
       jobApplyBtn.removeAttribute("title");
+      jobApplyBtn.classList.add("is-disabled");
+      jobApplyBtn.removeAttribute("data-stripe-required");
+      jobApplyBtn.removeAttribute("data-hover-label");
     } else if (!stripeConnected) {
-      jobApplyBtn.disabled = true;
+      jobApplyBtn.disabled = false;
       jobApplyBtn.textContent = "Apply for this case";
       jobApplyBtn.title = STRIPE_GATE_MESSAGE;
+      jobApplyBtn.classList.add("is-disabled");
+      jobApplyBtn.setAttribute("aria-disabled", "true");
+      jobApplyBtn.dataset.stripeRequired = "true";
+      jobApplyBtn.dataset.hoverLabel = "Stripe Setup Required";
     } else {
       jobApplyBtn.disabled = false;
       jobApplyBtn.textContent = "Apply for this case";
       jobApplyBtn.removeAttribute("title");
+      jobApplyBtn.classList.remove("is-disabled");
+      jobApplyBtn.removeAttribute("aria-disabled");
+      jobApplyBtn.removeAttribute("data-stripe-required");
+      jobApplyBtn.removeAttribute("data-hover-label");
     }
   }
   try {
@@ -1191,17 +1219,29 @@ function getJobUniqueId(job) {
 }
 
 function getJobIdForApply(job) {
-  return normalizeId(job?.jobId || job?.job_id || "");
+  return normalizeId(job?.jobId || job?.job_id || job?.job?.id || job?.job?._id || "");
+}
+
+function getCaseIdForApply(job) {
+  return normalizeId(job?.caseId || job?.case_id || job?.case || job?.contextCaseId || "");
+}
+
+function resolveApplyTarget(job) {
+  const jobId = getJobIdForApply(job);
+  if (jobId) return { type: "job", id: jobId };
+  const caseId = getCaseIdForApply(job);
+  if (caseId) return { type: "case", id: caseId };
+  return null;
 }
 
 function getApplyKey(job) {
-  return normalizeId(getJobIdForApply(job) || "");
+  return normalizeId(getJobIdForApply(job) || getCaseIdForApply(job) || "");
 }
 
 function getAppliedAt(job) {
   if (!job) return null;
   if (job.appliedAt) return job.appliedAt;
-  const jobKey = getJobIdForApply(job);
+  const jobKey = getApplyKey(job);
   if (jobKey && appliedJobs.has(jobKey)) return appliedJobs.get(jobKey);
   return null;
 }
@@ -1214,9 +1254,7 @@ function expandJob(job) {
   }
   expandedJobId = id;
   renderJobs();
-  if (jobsGrid?.scrollIntoView) {
-    setTimeout(() => jobsGrid.scrollIntoView({ behavior: "smooth", block: "start" }), 10);
-  }
+  setTimeout(scrollToExpandedCard, 10);
 }
 
 function collapseExpanded() {
@@ -1227,29 +1265,55 @@ function collapseExpanded() {
   }
 }
 
+function scrollToExpandedCard() {
+  const card = document.querySelector(".job-card.expanded");
+  if (!card) return;
+  const header = document.querySelector(".site-header");
+  const headerOffset = header ? header.getBoundingClientRect().height + 12 : 0;
+  const rect = card.getBoundingClientRect();
+  const target = Math.max(0, rect.top + window.scrollY - headerOffset);
+  window.scrollTo({ top: target, behavior: "smooth" });
+}
+
 function buildApplyButton(job, jobId, appliedAt) {
   const applyBtn = document.createElement("button");
   applyBtn.type = "button";
   applyBtn.className = "apply-button";
   applyBtn.dataset.jobId = jobId;
   if (!allowApply) {
-    applyBtn.disabled = true;
     applyBtn.textContent = "Apply for this case";
     applyBtn.title = "Only paralegals can apply.";
-  } else if (appliedAt) {
-    applyBtn.disabled = true;
-    applyBtn.textContent = `Case applied · ${formatAppliedDate(appliedAt)}`;
-  } else if (!stripeConnected) {
-    applyBtn.disabled = true;
-    applyBtn.textContent = "Apply for this case";
-    applyBtn.title = STRIPE_GATE_MESSAGE;
-  } else {
-    applyBtn.textContent = "Apply for this case";
+    applyBtn.classList.add("is-disabled");
+    applyBtn.setAttribute("aria-disabled", "true");
     applyBtn.addEventListener("click", (event) => {
       event.stopPropagation();
-      openApplyModal(job);
+      showToast("Only paralegals can apply to cases.", "info");
     });
-  }
+    } else if (appliedAt) {
+      applyBtn.disabled = true;
+      applyBtn.textContent = `Case applied · ${formatAppliedDate(appliedAt)}`;
+      applyBtn.removeAttribute("data-stripe-required");
+      applyBtn.removeAttribute("data-hover-label");
+    } else if (!stripeConnected) {
+      applyBtn.textContent = "Apply for this case";
+      applyBtn.title = STRIPE_GATE_MESSAGE;
+      applyBtn.classList.add("is-disabled");
+      applyBtn.setAttribute("aria-disabled", "true");
+      applyBtn.dataset.stripeRequired = "true";
+      applyBtn.dataset.hoverLabel = "Stripe Setup Required";
+      applyBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        notifyStripeGate();
+      });
+    } else {
+      applyBtn.textContent = "Apply for this case";
+      applyBtn.removeAttribute("data-stripe-required");
+      applyBtn.removeAttribute("data-hover-label");
+      applyBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        openApplyModal(job);
+      });
+    }
   return applyBtn;
 }
 

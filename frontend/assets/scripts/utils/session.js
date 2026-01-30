@@ -268,12 +268,17 @@
             }
           }
           try {
+            const avatarSrc =
+              resolvedUser?.pendingProfileImage ||
+              resolvedUser?.profileImage ||
+              resolvedUser?.avatarURL ||
+              "assets/default-avatar.png";
             if (resolvedUser?.avatarURL) {
               localStorage.setItem("avatarURL", resolvedUser.avatarURL);
             }
             const avatarNodes = document.querySelectorAll("[data-avatar]");
             avatarNodes.forEach((el) => {
-              if (el) el.src = resolvedUser?.avatarURL || "assets/default-avatar.png";
+              if (el) el.src = avatarSrc;
             });
           } catch (_) {}
           return resolvedUser;

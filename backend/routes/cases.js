@@ -1582,7 +1582,7 @@ router.get(
       .sort({ updatedAt: -1 })
       .limit(limit)
       .select(
-        "title details practiceArea status escrowStatus deadline zoomLink paymentReleased escrowIntentId applicants files jobId createdAt updatedAt attorney attorneyId paralegal paralegalId pendingParalegalId pendingParalegalInvitedAt invites hiredAt completedAt briefSummary archived downloadUrl internalNotes totalAmount lockedTotalAmount currency"
+        "title details practiceArea status escrowStatus deadline zoomLink paymentReleased escrowIntentId applicants files jobId createdAt updatedAt attorney attorneyId paralegal paralegalId pendingParalegalId pendingParalegalInvitedAt invites hiredAt completedAt briefSummary archived downloadUrl internalNotes totalAmount lockedTotalAmount currency tasks tasksLocked"
       )
       .populate("paralegalId", "firstName lastName email role avatarURL")
       .populate("attorneyId", "firstName lastName email role avatarURL")

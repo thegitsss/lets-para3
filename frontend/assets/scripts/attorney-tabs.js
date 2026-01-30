@@ -39,9 +39,11 @@ const PARALEGAL_AVATAR_FALLBACK = `data:image/svg+xml;charset=UTF-8,${encodeURIC
   "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'><rect width='220' height='220' rx='110' fill='#f1f5f9'/><circle cx='110' cy='90' r='46' fill='#cbd5e1'/><path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/></svg>"
 )}`;
 function getProfileImageUrl(user = {}) {
-  const stored = user.profileImage || user.avatarURL;
-  if (stored) return stored;
   const role = String(user.role || "").toLowerCase();
+  const pending = role === "paralegal" ? user.pendingProfileImage : "";
+  const stored = user.profileImage || user.avatarURL;
+  if (pending) return pending;
+  if (stored) return stored;
   return role === "paralegal" ? PARALEGAL_AVATAR_FALLBACK : "assets/images/default-avatar.png";
 }
 
@@ -555,13 +557,18 @@ function applyUserToHeader(user = {}) {
   const name = [current.firstName, current.lastName].filter(Boolean).join(" ") || current.name || "Attorney";
   const avatar = getProfileImageUrl(current);
   const roleLabel = (current.role || "Attorney").replace(/\b\w/g, (c) => c.toUpperCase());
+  const isParalegal = String(current.role || "").toLowerCase() === "paralegal";
+  const isPendingPhoto =
+    isParalegal &&
+    (String(current.profilePhotoStatus || "").toLowerCase() === "pending_review" || current.pendingProfileImage);
+  const roleText = isPendingPhoto ? `${roleLabel} • PENDING` : roleLabel;
   const nameEl = document.getElementById("headerName");
   const avatarEl = document.getElementById("headerAvatar");
   const roleEl = document.getElementById("headerRole");
   const heading = document.getElementById("user-name-heading");
   if (nameEl) nameEl.textContent = name;
   if (avatarEl) avatarEl.src = avatar;
-  if (roleEl) roleEl.textContent = roleLabel;
+  if (roleEl) roleEl.textContent = roleText;
   if (heading) heading.textContent = current.firstName || heading.textContent;
   updateWelcomeGreeting(current);
   if (current.profileImage) {
@@ -2948,6 +2955,7 @@ function setupCasePreviewModal() {
     comp: casePreviewModalRef.querySelector("[data-case-preview-comp]"),
     experience: casePreviewModalRef.querySelector("[data-case-preview-experience]"),
     description: casePreviewModalRef.querySelector("[data-case-preview-description]"),
+    tasks: casePreviewModalRef.querySelector("[data-case-preview-tasks]"),
   };
   casePreviewModalRef.querySelectorAll("[data-case-preview-close]").forEach((btn) => {
     btn.addEventListener("click", closeCasePreviewModal);
@@ -3427,6 +3435,11 @@ async function openCasePreview(caseId) {
   const compensation = formatCaseAmount(entry);
   const description = String(entry.details || "").trim() || "No description provided.";
   const practiceArea = titleCaseWords(entry.practiceArea || "");
+  const tasks = Array.isArray(entry.tasks) ? entry.tasks : [];
+  const taskTitles = tasks
+    .map((task) => (typeof task === "string" ? task : task?.title))
+    .map((title) => String(title || "").trim())
+    .filter(Boolean);
 
   if (casePreviewFields.title) casePreviewFields.title.textContent = entry.title || "Case Preview";
   if (casePreviewFields.field) casePreviewFields.field.textContent = practiceArea || "—";
@@ -3434,6 +3447,13 @@ async function openCasePreview(caseId) {
   if (casePreviewFields.comp) casePreviewFields.comp.textContent = compensation || "—";
   if (casePreviewFields.experience) casePreviewFields.experience.textContent = experience || "—";
   if (casePreviewFields.description) casePreviewFields.description.textContent = description;
+  if (casePreviewFields.tasks) {
+    casePreviewFields.tasks.innerHTML = taskTitles.length
+      ? `<ul class="case-preview-task-list">${taskTitles
+          .map((title) => `<li>${sanitize(title)}</li>`)
+          .join("")}</ul>`
+      : `<p class="case-preview-empty">No tasks listed.</p>`;
+  }
 
   casePreviewModalRef.removeAttribute("aria-busy");
 }

@@ -1827,6 +1827,37 @@
       line-height:1.5;
     }
 
+    .case-preview-tasks .case-preview-task-list{
+      margin:0;
+      padding:0;
+      list-style:none;
+      display:grid;
+      gap:0.35rem;
+    }
+
+    .case-preview-tasks .case-preview-task-list li{
+      position:relative;
+      padding-left:1.1rem;
+    }
+
+    .case-preview-tasks .case-preview-task-list li::before{
+      content:"";
+      position:absolute;
+      left:0;
+      top:0.6rem;
+      width:6px;
+      height:6px;
+      border:1px solid var(--muted);
+      border-radius:50%;
+      opacity:0.8;
+    }
+
+    .case-preview-tasks .case-preview-empty{
+      margin:0;
+      color:var(--muted);
+      font-size:0.95rem;
+    }
+
     .case-invites-card{
       width:min(92vw,560px);
       max-height:85vh;
@@ -3267,6 +3298,10 @@
           <div class="case-preview-desc">
             <span class="case-preview-label">Description</span>
             <p data-case-preview-description>—</p>
+          </div>
+          <div class="case-preview-desc case-preview-tasks">
+            <span class="case-preview-label">Tasks</span>
+            <div data-case-preview-tasks>—</div>
           </div>
           <div class="note-modal-actions">
             <button type="button" class="btn secondary" data-case-preview-close>Close</button>

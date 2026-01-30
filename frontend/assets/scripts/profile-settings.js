@@ -1011,9 +1011,11 @@ function resolveProfilePhotoStatus(user = {}) {
   if (role === "attorney") {
     return hasApproved ? "approved" : "unsubmitted";
   }
+  if (user.pendingProfileImage || settingsState.pendingProfileImage || settingsState.stagedProfilePhotoUrl) {
+    return "pending_review";
+  }
   const raw = String(user.profilePhotoStatus || settingsState.profilePhotoStatus || "").trim();
   if (raw) return raw;
-  if (user.pendingProfileImage || settingsState.pendingProfileImage) return "pending_review";
   return hasApproved ? "approved" : "unsubmitted";
 }
 
@@ -1050,13 +1052,13 @@ function getOriginalPhotoSource(user = {}, { allowPending = false } = {}) {
 function getDisplayProfileImage(user = {}, { allowPending = false } = {}) {
   const approved = user.profileImage || user.avatarURL || settingsState.profileImage || "";
   const role = String(user.role || currentUser?.role || "").trim().toLowerCase();
-  if (allowPending && role === "paralegal") {
+  const hasPending = Boolean(resolvePendingProfileImage(user) || settingsState.stagedProfilePhotoUrl);
+  if (allowPending && (role === "paralegal" || hasPending)) {
     if (settingsState.stagedProfilePhotoUrl) {
       return settingsState.stagedProfilePhotoUrl;
     }
-    const status = resolveProfilePhotoStatus(user);
     const pending = resolvePendingProfileImage(user);
-    if (status === "pending_review" && pending) return pending;
+    if (pending) return pending;
   }
   return approved;
 }
@@ -1081,9 +1083,9 @@ function updatePhotoReviewStatus(user = {}) {
   statusEl.classList.remove("is-rejected");
   let message = "";
   if (status === "pending_review") {
-    message = "Photo pending review. It will appear to attorneys once approved.";
+    message = "Pending";
   } else if (status === "rejected") {
-    message = "Please upload a new photo. We recommend using your LinkedIn photo, if applicable.";
+    message = "Your photo needs a quick update. Please upload a new one that meets our guidelines.";
     statusEl.classList.add("is-rejected");
   }
   statusEl.textContent = message;
@@ -1091,7 +1093,9 @@ function updatePhotoReviewStatus(user = {}) {
 }
 
 function isParalegalPhotoApproved(user = {}) {
-  return String(user.profilePhotoStatus || "").trim() === "approved";
+  const status = String(user.profilePhotoStatus || "").trim();
+  const hasPending = Boolean(user.pendingProfileImage || settingsState.pendingProfileImage);
+  return status === "approved" && !hasPending;
 }
 
 function getParalegalRequiredFieldStatus() {
@@ -3939,6 +3943,16 @@ async function saveSettings() {
   }
 
   const updatedUser = await secureFetch("/api/users/me").then((r) => r.json());
+  const pendingFallback = settingsState.pendingProfileImage || currentUser?.pendingProfileImage || "";
+  const pendingOriginalFallback =
+    settingsState.pendingProfileImageOriginal || currentUser?.pendingProfileImageOriginal || "";
+  if (pendingFallback && !updatedUser?.pendingProfileImage) {
+    updatedUser.pendingProfileImage = pendingFallback;
+    updatedUser.profilePhotoStatus = updatedUser.profilePhotoStatus || "pending_review";
+  }
+  if (pendingOriginalFallback && !updatedUser?.pendingProfileImageOriginal) {
+    updatedUser.pendingProfileImageOriginal = pendingOriginalFallback;
+  }
   const mergedUser = mergeSessionPreferences({
     ...(currentUser || {}),
     ...updatedUser,
@@ -4587,8 +4601,24 @@ async function uploadProfilePhotoFile(file, originalFile) {
 
 document.addEventListener("DOMContentLoaded", initAvatarUploaders);
 
-function saveProfile() {
-  saveSettings();
+async function saveProfile() {
+  const saveBtn = document.getElementById("profileSaveBtn");
+  const originalLabel = saveBtn?.textContent || "Save changes";
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving…";
+  }
+  try {
+    await saveSettings();
+  } catch (err) {
+    console.error("Profile save failed", err);
+    showToast(err?.message || "Unable to save settings right now.", "err");
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = originalLabel;
+    }
+  }
 }
 
 const profileSaveBtn = document.getElementById("profileSaveBtn");

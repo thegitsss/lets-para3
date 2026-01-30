@@ -17,8 +17,9 @@ function hasUploadedPhoto(user = {}) {
 
 function hasApprovedPhoto(user = {}) {
   const status = String(user.profilePhotoStatus || "").trim();
+  const hasPending = hasNonEmptyString(user.pendingProfileImage);
   const hasApproved = hasNonEmptyString(user.profileImage) || hasNonEmptyString(user.avatarURL);
-  return status === "approved" && hasApproved;
+  return status === "approved" && hasApproved && !hasPending;
 }
 
 function hasRequiredParalegalFieldsForSave(user = {}, opts = {}) {
@@ -50,6 +51,7 @@ function applyPublicParalegalFilter(filter) {
     { "skills.0": { $exists: true } },
     { "practiceAreas.0": { $exists: true } },
     { profilePhotoStatus: "approved" },
+    { pendingProfileImage: { $in: ["", null] } },
     {
       $or: [
         { profileImage: { $nin: ["", null] } },

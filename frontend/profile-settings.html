@@ -1902,6 +1902,8 @@ input[type="number"],
     #paralegalSettings .photo-review-status {
       font-size: 0.85rem;
       padding: 6px 12px;
+      margin-top: 10px;
+      margin-bottom: 6px;
       border-radius: 999px;
       border: 1px solid var(--line);
       background: rgba(255, 255, 255, 0.6);
@@ -3518,6 +3520,7 @@ input[type="number"],
                     </div>
                   </div>
                 </div>
+                <div id="photoReviewStatus" class="photo-review-status hidden" role="status" aria-live="polite"></div>
                 <input type="file" id="avatarInput" accept="image/*" hidden />
                 <div class="avatar-actions">
                   <button type="button" class="btn btn-outline avatar-edit-btn hidden" id="editAvatarBtn">Edit photo</button>
@@ -3527,7 +3530,6 @@ input[type="number"],
                   Professional headshot required. Use a neutral background, business attire, and no pets or casual photos.
                   Photos are reviewed before they appear to attorneys.
                 </p>
-                <div id="photoReviewStatus" class="photo-review-status hidden" role="status" aria-live="polite"></div>
                 <div class="profile-meta-stack">
                   <div class="profile-meta-columns">
                     <div class="meta-column">

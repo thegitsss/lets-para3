@@ -24,7 +24,24 @@ const PLACEHOLDER_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponen
 )}`;
 
 function getAvatarUrl(user = {}) {
-  return user.profileImage || user.avatarURL || PLACEHOLDER_AVATAR;
+  return user.pendingProfileImage || user.profileImage || user.avatarURL || PLACEHOLDER_AVATAR;
+}
+
+function isPendingPhoto(profile = {}) {
+  return (
+    String(profile.profilePhotoStatus || "").toLowerCase() === "pending_review" ||
+    Boolean(profile.pendingProfileImage)
+  );
+}
+
+function updatePendingApprovalBanner(profile = {}) {
+  const banner = document.getElementById("photoPendingBanner");
+  if (!banner) return;
+  if (!pendingApprovalReady) {
+    banner.classList.add("hidden");
+    return;
+  }
+  banner.classList.toggle("hidden", !isPendingPhoto(profile));
 }
 
 function normalizeIdCandidate(value) {
@@ -157,6 +174,7 @@ let latestMessageThread = null;
 let unreadMessageCount = 0;
 let stripeConnected = false;
 let stripeGateBound = false;
+let pendingApprovalReady = false;
 let appliedAppsCache = [];
 let appliedShowAll = false;
 let appliedFiltersBound = false;
@@ -1071,10 +1089,9 @@ function updateProfile(profile = {}) {
     node.src = avatarUrl;
     node.alt = `${composedName}'s avatar`;
   });
-  if (profile.profileImage) {
-    const a = document.querySelector('#user-avatar');
-    if (a) a.src = profile.profileImage;
-  }
+  const a = document.querySelector('#user-avatar');
+  if (a) a.src = avatarUrl;
+  updatePendingApprovalBanner(profile);
 }
 
 function persistAvailabilityState(availabilityText, details = {}) {
@@ -1694,6 +1711,7 @@ async function initDashboard() {
       loadUnreadMessageCount().catch(() => 0),
     ]);
     const viewer = profile || {};
+    pendingApprovalReady = true;
     updateProfile(viewer);
     applyParalegalWelcomeNotice(viewer);
     updateStats({
