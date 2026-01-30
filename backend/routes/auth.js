@@ -694,6 +694,25 @@ router.post(
       meta: { role: user.role },
     });
 
+    try {
+      const baseUrl = String(process.env.APP_BASE_URL || "").replace(/\/+$/, "");
+      const adminLink = baseUrl ? `${baseUrl}/admin-dashboard.html#section-user-management` : "";
+      const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || "New user";
+      const timestamp = new Date().toISOString();
+      const linkHtml = adminLink ? `<p><a href="${adminLink}">Open admin dashboard</a></p>` : "";
+      await sendEmail(
+        "admin@lets-paraconnect.com",
+        "New user signup",
+        `<p>A new user signed up.</p>
+         <p><strong>Name:</strong> ${fullName}<br/>
+         <strong>Role:</strong> ${String(user.role || "").toLowerCase()}<br/>
+         <strong>Timestamp:</strong> ${timestamp}</p>
+         ${linkHtml}`
+      );
+    } catch (err) {
+      console.warn("[auth] admin signup email failed", err?.message || err);
+    }
+
     res.json({ msg: "Registered successfully. Await admin approval." });
   })
 );

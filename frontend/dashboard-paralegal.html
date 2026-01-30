@@ -1271,6 +1271,27 @@
       margin-top: 0.25rem;
     }
 
+    .case-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      border: 1px solid rgba(182, 164, 122, 0.4);
+      background: rgba(182, 164, 122, 0.14);
+      color: var(--accent);
+      font-size: 0.75rem;
+      font-family: var(--font-sans);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      align-self: flex-start;
+      white-space: nowrap;
+    }
+
+    .case-tag .check {
+      font-weight: 700;
+    }
+
     .receipt-link {
       color: var(--accent);
       text-decoration: none;
@@ -1915,26 +1936,30 @@
       gap: 0.75rem;
       margin-bottom: 1.5rem;
       flex-wrap: wrap;
+      align-items: center;
     }
 
-    .filters button {
+    .filters label {
+      font-size: 0.8rem;
+      font-family: var(--font-sans);
+      font-weight: 300;
+      color: var(--muted);
+    }
+
+    .filters select {
       border: 1px solid var(--line);
       background: var(--panel);
       border-radius: 8px;
-      padding: 0.5rem 1rem;
+      padding: 0.5rem 0.9rem;
       cursor: pointer;
       font-size: 0.9rem;
-      transition: all 0.2s ease;
+      font-family: var(--font-sans);
+      font-weight: 300;
       color: var(--ink);
+      transition: border-color 0.2s ease;
     }
 
-    .filters button.active {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-    }
-
-    .filters button:hover {
+    .filters select:hover {
       border-color: var(--accent);
     }
 
@@ -2313,8 +2338,12 @@
 
       <div class="section-title" style="margin-top:1.5rem;">Active Cases</div>
       <div class="filters">
-        <button type="button" id="filterAll" class="active">All</button>
-        <button type="button" id="filterCompleted">Completed</button>
+        <label for="casesSort">Sort By</label>
+        <select id="casesSort" name="casesSort">
+          <option value="active">Active</option>
+          <option value="completed">Completed</option>
+          <option value="all" selected>All</option>
+        </select>
       </div>
       <div class="case-files" id="filesContainer">
         <p class="case-files-empty">Loading files…</p>
@@ -2526,8 +2555,7 @@
 
       const completedList = document.getElementById("completedCasesList");
       const filesContainer = document.getElementById("filesContainer");
-      const filterButtons = Array.from(document.querySelectorAll(".filters button"));
-      const completedFilter = document.getElementById("filterCompleted");
+      const sortSelect = document.getElementById("casesSort");
 
       function formatCurrency(value = 0) {
         const amount = Number(value) || 0;
@@ -2570,6 +2598,10 @@
                     <div class="case-subinfo">Payment: ${payment}</div>
                     <div class="case-subinfo">Receipt: ${receiptLink}</div>
                   </div>
+                  <span class="case-tag" aria-label="Completed">
+                    <span class="check" aria-hidden="true">✓</span>
+                    Completed
+                  </span>
                 </div>
               </div>
             `;
@@ -2629,10 +2661,15 @@
         }
       }
 
-      function setActiveFilter(targetButton) {
-        filterButtons.forEach((btn) => {
-          btn.classList.toggle("active", btn === targetButton);
-        });
+      function getCasesMode() {
+        const value = sortSelect?.value || "all";
+        if (value === "completed") return "completed";
+        if (value === "all") return "all";
+        return "hidden";
+      }
+
+      function syncCasesMode() {
+        setCompletedMode(getCasesMode());
       }
 
       function setActiveView(target = "home") {
@@ -2656,19 +2693,13 @@
           casesReady = true;
           initCaseFilesView({
             containerId: "filesContainer",
-            filters: [
-              { id: "filterAll", fn: (files) => files },
-            ],
-            emptyCopy: "No files found.",
+            emptyCopy: "No active cases yet. New assignments will show up here.",
             gatedCopy: "No funded cases yet.",
             unauthorizedCopy: "You need a paralegal account to view these files.",
           }).catch((error) => console.warn("Case files view failed", error));
         }
         if (key === "cases") {
-          const allFilter = document.getElementById("filterAll");
-          const isCompleted = completedFilter?.classList.contains("active");
-          const isAll = allFilter?.classList.contains("active");
-          setCompletedMode(isCompleted ? "completed" : isAll ? "all" : "hidden");
+          syncCasesMode();
         }
         if (key === "cases") {
           history.replaceState(null, "", `${basePath}#cases`);
@@ -2677,7 +2708,7 @@
         }
         if (key !== "cases") {
           setCompletedMode("hidden");
-          setActiveFilter(document.getElementById("filterAll"));
+          if (sortSelect) sortSelect.value = "all";
         }
         if (key !== activeKey) {
           const main = document.getElementById("main");
@@ -2700,19 +2731,11 @@
         setActiveView(window.location.hash === "#cases" ? "cases" : "home");
       });
 
-      filterButtons.forEach((btn) => {
-        btn.addEventListener("click", () => {
-          if (btn === completedFilter) {
-            setActiveFilter(btn);
-            setCompletedMode("completed");
-            return;
-          }
-          if (completedFilter) completedFilter.classList.remove("active");
-          const allFilter = document.getElementById("filterAll");
-          const isAll = btn === allFilter;
-          setCompletedMode(isAll ? "all" : "hidden");
+      if (sortSelect) {
+        sortSelect.addEventListener("change", () => {
+          syncCasesMode();
         });
-      });
+      }
 
       setActiveView(window.location.hash === "#cases" ? "cases" : "home");
     });

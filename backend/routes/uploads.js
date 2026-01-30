@@ -4,7 +4,7 @@ const router = express.Router();
 const crypto = require("crypto");
 const mongoose = require("mongoose");
 const multer = require("multer");
-const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const verifyToken = require("../utils/verifyToken");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
@@ -14,6 +14,7 @@ const CaseFile = require("../models/CaseFile");
 const User = require("../models/User");
 const { logAction } = require("../utils/audit");
 const { notifyUser } = require("../utils/notifyUser");
+const sendEmail = require("../utils/email");
 const { normalizeCaseStatus, canUseWorkspace } = require("../utils/caseState");
 
 // ----------------------------------------
@@ -75,6 +76,27 @@ function isCaseClosedForAccess(caseDoc) {
 
 function normalizeKeyPath(key) {
   return String(key || "").replace(/^\/+/, "");
+}
+
+function isS3NotFound(err) {
+  const code = err?.name || err?.Code || err?.code;
+  if (code === "NoSuchKey" || code === "NotFound") return true;
+  return err?.$metadata?.httpStatusCode === 404;
+}
+
+async function ensureObjectExists(key) {
+  if (!BUCKET) throw new Error("S3 bucket not configured");
+  const cmd = new HeadObjectCommand({ Bucket: BUCKET, Key: key });
+  try {
+    await s3.send(cmd);
+  } catch (err) {
+    if (isS3NotFound(err)) {
+      const missing = new Error("S3 object not found");
+      missing.code = "NoSuchKey";
+      throw missing;
+    }
+    throw err;
+  }
 }
 
 function extractKeyFromUrl(value) {
@@ -322,6 +344,13 @@ router.get("/view", async (req, res) => {
     const allowed = await ensureKeyAccess(req, key, req.query.caseId);
     if (!allowed) return res.status(403).json({ msg: "Forbidden" });
 
+    try {
+      await ensureObjectExists(key);
+    } catch (err) {
+      if (err?.code === "NoSuchKey") return res.status(404).json({ msg: "File not found" });
+      throw err;
+    }
+
     const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
     const url = await getSignedUrl(s3, getCmd, { expiresIn: 60 });
     res.redirect(url);
@@ -341,12 +370,21 @@ router.get("/view", async (req, res) => {
 router.get("/signed-get", async (req, res) => {
   try {
     const { caseId, key } = req.query;
+    if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
     if (!key) return res.status(400).json({ msg: "Missing key" });
 
-    const allowed = await ensureKeyAccess(req, key, caseId);
+    const normalizedKey = normalizeKeyPath(key);
+    const allowed = await ensureKeyAccess(req, normalizedKey, caseId);
     if (!allowed) return res.status(403).json({ msg: "Forbidden" });
 
-    const get = new GetObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(key) });
+    try {
+      await ensureObjectExists(normalizedKey);
+    } catch (err) {
+      if (err?.code === "NoSuchKey") return res.status(404).json({ msg: "File not found" });
+      throw err;
+    }
+
+    const get = new GetObjectCommand({ Bucket: BUCKET, Key: normalizedKey });
     const url = await getSignedUrl(s3, get, { expiresIn: 60 });
     res.json({ url });
   } catch (e) {
@@ -362,6 +400,13 @@ router.get("/download", csrfProtection, async (req, res) => {
 
     const allowed = await ensureKeyAccess(req, key, req.query.caseId);
     if (!allowed) return res.status(403).json({ msg: "Forbidden" });
+
+    try {
+      await ensureObjectExists(key);
+    } catch (err) {
+      if (err?.code === "NoSuchKey") return res.status(404).json({ msg: "File not found" });
+      throw err;
+    }
 
     const expiresIn = 60; // seconds
     const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
@@ -615,6 +660,27 @@ router.post(
       await logAction(req, "user.profile_photo.upload", { targetType: "user", targetId: user._id });
     } catch (err) {
       console.warn("[uploads] profile photo upload audit failed", err?.message || err);
+    }
+
+    if (requiresReview) {
+      try {
+        const baseUrl = String(process.env.APP_BASE_URL || "").replace(/\/+$/, "");
+        const adminLink = baseUrl ? `${baseUrl}/admin-dashboard.html#section-photo-reviews` : "";
+        const fullName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Paralegal";
+        const timestamp = new Date().toISOString();
+        const linkHtml = adminLink ? `<p><a href="${adminLink}">Open photo reviews</a></p>` : "";
+        await sendEmail(
+          "admin@lets-paraconnect.com",
+          "Profile photo review submitted",
+          `<p>A paralegal submitted a profile photo for review.</p>
+           <p><strong>Name:</strong> ${fullName}<br/>
+           <strong>Role:</strong> ${String(user.role || "").toLowerCase()}<br/>
+           <strong>Timestamp:</strong> ${timestamp}</p>
+           ${linkHtml}`
+        );
+      } catch (err) {
+        console.warn("[uploads] admin photo review email failed", err?.message || err);
+      }
     }
 
     return res.json({

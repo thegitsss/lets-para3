@@ -116,6 +116,7 @@ const applicantSchema = new Schema(
   {
     paralegalId: { type: Types.ObjectId, ref: "User", required: true },
     status: { type: String, enum: APPLICANT_STATUS, default: "pending", index: true },
+    starredBy: [{ type: Types.ObjectId, ref: "User" }],
     appliedAt: { type: Date, default: Date.now },
     note: { type: String, trim: true, maxlength: 10_000 }, // optional cover note
     resumeURL: { type: String, trim: true, default: "" },

@@ -1,7 +1,7 @@
 // backend/routes/cases.js
 const router = require("express").Router();
 const mongoose = require("mongoose");
-const { S3Client, GetObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole, requireCaseAccess } = require("../utils/authz");
@@ -783,6 +783,19 @@ async function nextCaseFileVersion(caseId, filename) {
 
 async function signDownload(key) {
   if (!S3_BUCKET) throw new Error("S3 bucket not configured");
+  const head = new HeadObjectCommand({ Bucket: S3_BUCKET, Key: key });
+  try {
+    await s3.send(head);
+  } catch (err) {
+    const code = err?.name || err?.Code || err?.code;
+    const missing = code === "NoSuchKey" || code === "NotFound" || err?.$metadata?.httpStatusCode === 404;
+    if (missing) {
+      const notFound = new Error("S3 object not found");
+      notFound.code = "NoSuchKey";
+      throw notFound;
+    }
+    throw err;
+  }
   const command = new GetObjectCommand({ Bucket: S3_BUCKET, Key: key });
   return getSignedUrl(s3, command, { expiresIn: 60 });
 }
@@ -954,7 +967,7 @@ async function ensureFundsReleased(req, caseDoc) {
         "Your case has been completed",
         `<p>Hi ${attorneyName},</p>
          <p>Your case "<strong>${caseDoc.title}</strong>" was completed on <strong>${completedDateStr}</strong>.</p>
-         <p>Deliverables will be available for the next 24 hours.</p>`
+         <p>Deliverables will be available for the next 6 months.</p>`
       );
     }
     if (paralegal.email) {
@@ -2188,6 +2201,9 @@ router.get(
       res.json({ url, filename: file.originalName || null });
     } catch (e) {
       console.error("[cases] signed-get error:", e);
+      if (e?.code === "NoSuchKey") {
+        return res.status(404).json({ error: "File no longer available for download." });
+      }
       res.status(500).json({ error: "Unable to sign file" });
     }
   })
@@ -2397,6 +2413,76 @@ router.post(
     } catch {}
 
     res.status(201).json({ ok: true, applicants: doc.applicants.length });
+  })
+);
+
+router.post(
+  "/:caseId/applicants/:paralegalId/star",
+  verifyToken,
+  csrfProtection,
+  requireCaseAccess("caseId", { project: "applicants attorney attorneyId jobId job" }),
+  asyncHandler(async (req, res) => {
+    if (!req.acl?.isAttorney && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Only attorneys can star applications." });
+    }
+    const caseDoc = req.case;
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+    const ownerId = String(caseDoc.attorneyId || caseDoc.attorney || "");
+    if (ownerId && String(req.user.id) !== ownerId && req.user.role !== "admin") {
+      return res.status(403).json({ error: "You are not the attorney for this case." });
+    }
+
+    const paralegalId = req.params.paralegalId;
+    if (!isObjId(paralegalId)) {
+      return res.status(400).json({ error: "Invalid paralegal id" });
+    }
+
+    const jobId = caseDoc.jobId || caseDoc.job || null;
+    const userId = String(req.user.id);
+    const requested = req.body?.starred;
+    const desired = typeof requested === "boolean" ? requested : null;
+
+    const caseEntry = Array.isArray(caseDoc.applicants)
+      ? caseDoc.applicants.find((app) => String(app.paralegalId) === String(paralegalId))
+      : null;
+
+    const applicationDoc = jobId
+      ? await Application.findOne({ jobId, paralegalId })
+      : null;
+
+    if (!caseEntry && !applicationDoc) {
+      return res.status(404).json({ error: "Application not found." });
+    }
+
+    const caseStarred =
+      caseEntry &&
+      Array.isArray(caseEntry.starredBy) &&
+      caseEntry.starredBy.some((id) => String(id) === userId);
+    const appStarred =
+      applicationDoc &&
+      Array.isArray(applicationDoc.starredBy) &&
+      applicationDoc.starredBy.some((id) => String(id) === userId);
+    const shouldStar = typeof desired === "boolean" ? desired : !(caseStarred || appStarred);
+
+    const updateStarList = (list) => {
+      const idx = list.findIndex((id) => String(id) === userId);
+      if (shouldStar && idx === -1) list.push(req.user.id);
+      if (!shouldStar && idx !== -1) list.splice(idx, 1);
+    };
+
+    if (caseEntry) {
+      if (!Array.isArray(caseEntry.starredBy)) caseEntry.starredBy = [];
+      updateStarList(caseEntry.starredBy);
+      await caseDoc.save();
+    }
+
+    if (applicationDoc) {
+      if (!Array.isArray(applicationDoc.starredBy)) applicationDoc.starredBy = [];
+      updateStarList(applicationDoc.starredBy);
+      await applicationDoc.save();
+    }
+
+    res.json({ ok: true, starred: shouldStar });
   })
 );
 
@@ -3199,7 +3285,9 @@ router.post(
     doc.attorneyNameSnapshot =
       doc.attorneyNameSnapshot ||
       `${doc.attorney?.firstName || ""} ${doc.attorney?.lastName || ""}`.trim();
-    doc.purgeScheduledFor = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const purgeAt = new Date(now);
+    purgeAt.setMonth(purgeAt.getMonth() + 6);
+    doc.purgeScheduledFor = purgeAt;
     doc.archiveDownloadedAt = null;
     doc.downloadUrl = [];
     doc.applicants = [];
@@ -3328,6 +3416,7 @@ router.get(
       .lean();
     if (!doc) return res.status(404).json({ error: "Case not found" });
     const role = String(req.user?.role || "").toLowerCase();
+    const canSeeStars = role === "attorney" || role === "admin";
     const statusKey = String(doc.status || "").toLowerCase();
     if (role === "paralegal" && (statusKey === "completed" || doc.paymentReleased === true)) {
       return res.status(403).json({ error: "Completed cases are no longer accessible." });
@@ -3346,6 +3435,10 @@ router.get(
           const profileSnapshot = { ...baseSnapshot, ...storedSnapshot };
           const resumeURL = entry.resumeURL || paralegalDoc?.resumeURL || "";
           const linkedInURL = entry.linkedInURL || paralegalDoc?.linkedInURL || "";
+          const starred =
+            canSeeStars &&
+            Array.isArray(entry.starredBy) &&
+            entry.starredBy.some((id) => String(id) === String(req.user.id));
           return {
             status: entry.status,
             appliedAt: entry.appliedAt,
@@ -3354,6 +3447,8 @@ router.get(
             resumeURL,
             linkedInURL,
             profileSnapshot,
+            applicationId: null,
+            starred,
             paralegalId: entry.paralegalId ? String(entry.paralegalId._id || entry.paralegalId) : null,
             paralegal: summarizeUser(entry.paralegalId),
           };
@@ -3371,6 +3466,10 @@ router.get(
           .map((app) => {
             const paralegalDoc = app.paralegalId && typeof app.paralegalId === "object" ? app.paralegalId : null;
             const paralegalId = paralegalDoc?._id || app.paralegalId || null;
+            const starred =
+              canSeeStars &&
+              Array.isArray(app.starredBy) &&
+              app.starredBy.some((id) => String(id) === String(req.user.id));
             return {
               status: app.status || "submitted",
               appliedAt: app.createdAt,
@@ -3379,6 +3478,8 @@ router.get(
               resumeURL: app.resumeURL || "",
               linkedInURL: app.linkedInURL || "",
               profileSnapshot: app.profileSnapshot || {},
+              applicationId: app._id ? String(app._id) : null,
+              starred,
               paralegalId: paralegalId ? String(paralegalId) : null,
               paralegal: summarizeUser(paralegalDoc),
             };

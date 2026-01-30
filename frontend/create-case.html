@@ -67,13 +67,17 @@
     }
     *{margin:0;padding:0;box-sizing:border-box}
     body{
-      font-family:'Sarabun',serif;
+      font-family:var(--font-sans);
       background:var(--bg);
       color:var(--ink);
       display:flex;
       height:100vh;
       overflow:hidden;
       font-weight:200;
+    }
+    strong{
+      font-family:var(--font-serif);
+      font-weight:400;
     }
 
     /* Sidebar */
@@ -141,7 +145,8 @@
       padding:0.6rem 1rem;
       background:transparent;
       font-size:0.9rem;
-      font-family:var(--font-sans);
+      font-family:var(--font-serif);
+      font-weight:300;
       color:var(--sidebar-text);
       cursor:pointer;
       transition:background .2s,color .2s;
@@ -231,11 +236,11 @@
     .notification-icon{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);display:flex;justify-content:center;align-items:center;background:#fff;cursor:pointer;position:relative;transition:border-color .2s ease, transform .2s ease;}
     .notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
     .notification-icon svg{width:22px;height:22px;color:var(--ink);}
-    .notification-badge{position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:999px;font-size:.75rem;padding:2px 6px;line-height:1;display:none;font-weight:600;}
+    .notification-badge{position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:999px;font-size:.75rem;padding:2px 6px;line-height:1;display:none;font-weight:200;}
     .notification-badge.show{display:inline-flex;}
     .user-profile{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.4);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color 0.2s ease,box-shadow .2s ease;cursor:pointer;position:relative;}
     .user-profile img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,0.08);object-fit:cover;}
-    .user-profile strong{display:block;font-weight:200;color:var(--ink);}
+    .user-profile strong{display:block;font-weight:300;color:var(--ink);}
     .user-profile span{font-size:0.85rem;color:var(--muted);}
     body.theme-dark .user-profile{background:rgba(15,23,42,0.4);border-color:rgba(255,255,255,0.15);box-shadow:0 10px 25px rgba(0,0,0,0.35);}
     body.theme-dark .user-profile strong{color:#fff;}
@@ -318,12 +323,17 @@
       font-size:0.9rem;
       color:var(--ink);
     }
+    button{
+      font-family:var(--font-serif);
+      font-weight:300;
+    }
     input,select,textarea{
       width:100%;
       padding:10px 12px;
       border:1px solid var(--line);
       border-radius:6px;
       font-family:inherit;
+      font-weight:200;
       font-size:0.9rem;
       transition:border-color .2s,box-shadow .2s;
     }
@@ -382,6 +392,8 @@
       border-radius:6px;
       padding:0.6rem 1.1rem;
       font-size:0.9rem;
+      font-family:var(--font-serif);
+      font-weight:300;
       cursor:pointer;
       transition:all .2s;
     }
@@ -628,7 +640,7 @@
       padding:0 2rem;
       justify-content:flex-end;
     }
-    .btn{border:none;border-radius:6px;padding:0.6rem 1.1rem;font-size:0.9rem;cursor:pointer;transition:all .2s;}
+    .btn{border:none;border-radius:6px;padding:0.6rem 1.1rem;font-size:0.9rem;font-family:var(--font-serif);font-weight:300;cursor:pointer;transition:all .2s;}
     .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
     .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
     .btn.primary{background:var(--accent);color:#fff;}
@@ -966,7 +978,7 @@
           </div>
           <div class="field">
             <label for="caseDescription">Case Description</label>
-            <textarea id="caseDescription" placeholder="Describe your case, goals, and expectations for the paralegal..."></textarea>
+            <textarea id="caseDescription" placeholder="Describe your case, goals, and expectations for the paralegal..." maxlength="4000"></textarea>
             <div class="char-count" id="descriptionCharCount">0 / 4000</div>
           </div>
           <div class="field" id="caseTasksField">
@@ -1042,6 +1054,7 @@
       <p><strong>Experience:</strong> <span id="previewExperience">—</span></p>
       <hr>
       <p id="previewDescription"></p>
+      <div class="preview-tasks" id="previewTasks"></div>
       <p class="auto-note" id="previewAutoNote"></p>
       <button type="button" class="close-btn" id="closePreview">Close Preview</button>
     </div>
@@ -1101,6 +1114,7 @@
       comp: document.getElementById("previewComp"),
       experience: document.getElementById("previewExperience"),
       description: document.getElementById("previewDescription"),
+      tasks: document.getElementById("previewTasks"),
     };
     const previewAutoNote = document.getElementById("previewAutoNote");
     const autoNoteCopy = "Applicants automatically include their résumé, cover letter (if available), and LinkedIn profile.";
@@ -1145,6 +1159,10 @@
       descriptionCount.textContent = `${descriptionInput.value.length} / 4000`;
     }
 
+    const STORAGE_PARSE_LIMIT = 50000;
+    const MAX_REVIEW_DESCRIPTION = 1200;
+    const MAX_REVIEW_TASKS = 25;
+
     function normalizeTaskTitle(value) {
       return String(value || "")
         .replace(/[\u0000-\u001F\u007F]/g, "")
@@ -1155,6 +1173,7 @@
     function readStoredTasks() {
       try {
         const raw = localStorage.getItem("caseTasks") || localStorage.getItem("case_tasks") || "";
+        if (raw.length > STORAGE_PARSE_LIMIT) return [];
         const parsed = JSON.parse(raw || "[]");
         if (Array.isArray(parsed)) {
           return parsed
@@ -1315,13 +1334,18 @@
         ? ""
         : localStorage.getItem("caseDescription") || localStorage.getItem("case_description") || "";
       if (storedDescription) {
-        descriptionInput.value = storedDescription;
+        descriptionInput.value = storedDescription.slice(0, 4000);
       }
-    updateDescriptionCount();
-    hydrateDeadline();
+      updateDescriptionCount();
+      hydrateDeadline();
       descriptionInput.addEventListener("input", () => {
-        localStorage.setItem("caseDescription", descriptionInput.value);
-        localStorage.setItem("case_description", descriptionInput.value);
+        if (descriptionInput.value.length > 4000) {
+          descriptionInput.value = descriptionInput.value.slice(0, 4000);
+        }
+        try {
+          localStorage.setItem("caseDescription", descriptionInput.value);
+          localStorage.setItem("case_description", descriptionInput.value);
+        } catch {}
         updateDescriptionCount();
       });
     }
@@ -1401,7 +1425,11 @@
     }
 
     function getStoredValue(primaryKey, legacyKey) {
-      return localStorage.getItem(primaryKey) || localStorage.getItem(legacyKey) || "";
+      const value = localStorage.getItem(primaryKey) || localStorage.getItem(legacyKey) || "";
+      if (primaryKey === "caseDescription" || legacyKey === "case_description") {
+        return value.slice(0, 4000);
+      }
+      return value;
     }
 
     function formatComp(amount) {
@@ -1411,6 +1439,15 @@
       return numeric.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
     }
 
+    function escapeHTML(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
     function collectCaseData() {
       const title = (fields.title?.value || "").trim() || getStoredValue("caseTitle", "case_title");
       const field = fields.specialty?.value || getStoredValue("caseSpecialty", "case_specialty");
@@ -1418,7 +1455,10 @@
       const compRaw = fields.comp?.value || getStoredValue("caseCompAmount", "case_comp_amount");
       const experience = fields.experience?.value || getStoredValue("caseExperience", "case_experience");
       const deadline = fields.deadline?.value || getStoredValue("caseDeadline", "case_deadline");
-      const description = (descriptionInput?.value || "").trim() || getStoredValue("caseDescription", "case_description").trim();
+      let description = (descriptionInput?.value || "").trim() || getStoredValue("caseDescription", "case_description").trim();
+      if (description.length > 4000) {
+        description = description.slice(0, 4000);
+      }
       const tasks = tasksState.items.length ? tasksState.items : readStoredTasks();
       return {
         title: title || "",
@@ -1468,21 +1508,39 @@
         ? new Date(data.deadline).toLocaleDateString() || data.deadline
         : "No deadline set";
       const tasks = Array.isArray(data.tasks) ? data.tasks : [];
-      const tasksMarkup = tasks.length
-        ? `<ul class="task-list">${tasks.map((task) => `<li>${task.title}</li>`).join("")}</ul>`
+      const visibleTasks = tasks.slice(0, MAX_REVIEW_TASKS);
+      const extraTasks = tasks.length - visibleTasks.length;
+      const tasksMarkup = visibleTasks.length
+        ? `<ul class="task-list">${visibleTasks
+            .map((task) => `<li>${escapeHTML(task.title)}</li>`)
+            .join("")}</ul>`
         : `<p><strong>Tasks:</strong> Not provided</p>`;
+      const safeTitle = escapeHTML(data.title || "(Untitled Case)");
+      const safeField = escapeHTML(data.field || "Practice area pending");
+      const safeState = escapeHTML(data.state || "Location pending");
+      const safeComp = escapeHTML(data.comp || "—");
+      const safeExperience = escapeHTML(data.experience || "Not specified");
+      const safeDeadline = escapeHTML(deadlineText);
+      const rawDescription = data.description || "No description provided yet.";
+      const safeDescription = escapeHTML(rawDescription);
+      const truncated =
+        safeDescription.length > MAX_REVIEW_DESCRIPTION
+          ? `${safeDescription.slice(0, MAX_REVIEW_DESCRIPTION)}…`
+          : safeDescription;
+      const displayDescription = truncated.replace(/\n/g, "<br>");
       reviewSummary.innerHTML = `
-        <h2>${data.title || "(Untitled Case)"}</h2>
-        <p><small>${data.field || "Practice area pending"} • ${data.state || "Location pending"}</small></p>
-        <p><strong>Compensation:</strong> ${data.comp}</p>
-        <p><strong>Experience:</strong> ${data.experience || "Not specified"}</p>
-        <p><strong>Deadline:</strong> ${deadlineText}</p>
+        <h2>${safeTitle}</h2>
+        <p><small>${safeField} • ${safeState}</small></p>
+        <p><strong>Compensation:</strong> ${safeComp}</p>
+        <p><strong>Experience:</strong> ${safeExperience}</p>
+        <p><strong>Deadline:</strong> ${safeDeadline}</p>
         <hr>
-        <p>${data.description || "No description provided yet."}</p>
+        <p>${displayDescription}</p>
         <div style="margin-top:12px;">
           <div class="description-label" style="margin-bottom:6px;">TASKS</div>
           ${tasksMarkup}
         </div>
+        ${extraTasks > 0 ? `<p class="auto-note">+${extraTasks} more tasks will be included when you post.</p>` : ""}
         <p class="auto-note">${autoNoteCopy}</p>
       `;
     }
@@ -1494,12 +1552,22 @@
         showToastBanner("Add a case title and description before previewing.", "error");
         return;
       }
+      const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+      const visibleTasks = tasks.slice(0, MAX_REVIEW_TASKS);
+      const extraTasks = tasks.length - visibleTasks.length;
+      const tasksMarkup = visibleTasks.length
+        ? `<div class="description-label" style="margin-bottom:6px;">TASKS</div>
+           <ul class="task-list">${visibleTasks
+             .map((task) => `<li>${escapeHTML(task.title)}</li>`)
+             .join("")}</ul>${extraTasks > 0 ? `<p class="auto-note">+${extraTasks} more tasks will be included when you post.</p>` : ""}`
+        : `<p><strong>Tasks:</strong> Not provided</p>`;
       previewFields.title && (previewFields.title.textContent = data.title);
       previewFields.field && (previewFields.field.textContent = data.field || "—");
       previewFields.state && (previewFields.state.textContent = data.state || "—");
       previewFields.comp && (previewFields.comp.textContent = data.comp || "—");
       previewFields.experience && (previewFields.experience.textContent = data.experience || "—");
       previewFields.description && (previewFields.description.textContent = data.description || "No description provided yet.");
+      previewFields.tasks && (previewFields.tasks.innerHTML = tasksMarkup);
       if (data.deadline) {
         const deadlineText = new Date(data.deadline).toLocaleDateString() || data.deadline;
         previewFields.description.insertAdjacentHTML("beforebegin", `<p><strong>Deadline:</strong> ${deadlineText}</p>`);

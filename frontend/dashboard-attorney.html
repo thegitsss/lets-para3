@@ -129,8 +129,9 @@
       border-radius: var(--radius);
       padding: 0.6rem 1rem;
       background: transparent;
-      font-family: var(--font-sans);
-      font-size: 0.9rem;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      font-size: 1.1rem;
       cursor: pointer;
       transition: background 0.2s ease, color 0.2s ease;
       color: var(--sidebar-text);
@@ -152,6 +153,35 @@
       font-size:0.7rem;
       color:var(--muted);
       text-align:center;
+    }
+
+    .sidebar-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      position: relative;
+      z-index: 2100;
+    }
+
+    .sidebar-toggle-icon {
+      width: 28px;
+      height: 28px;
+      display: block;
+    }
+
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 1900;
     }
     .main {
       flex: 1;
@@ -575,7 +605,7 @@
 
     .today-value {
       font-size: 1.5rem;
-      font-weight: 400;
+      font-weight: 300;
       letter-spacing: -0.01em;
       line-height: 1.1;
     }
@@ -628,6 +658,7 @@
     }
 
     .queue-title {
+      font-family: var(--font-serif);
       font-weight: 500;
       margin-bottom: 0.25rem;
     }
@@ -666,6 +697,10 @@
       border-radius: 999px;
       padding: 0.45rem 1.2rem;
       font-size: 0.9rem;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
       background: var(--panel);
       cursor: pointer;
       transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
@@ -706,6 +741,12 @@
       padding: var(--card-pad);
       background: var(--panel);
       box-shadow: var(--card-shadow-soft);
+      font-family: var(--font-sans);
+      font-weight: 200;
+    }
+    .completed-job-card .info-line strong {
+      font-family: var(--font-serif);
+      font-weight: 300;
     }
     .completed-job-card .downloads {
       margin-top: 0.5rem;
@@ -716,7 +757,7 @@
     .completed-job-card .downloads a {
       color: var(--accent);
       text-decoration: none;
-      font-weight: 300;
+      font-weight: 200;
     }
     .completed-job-card .downloads a:hover {
       text-decoration: underline;
@@ -847,7 +888,7 @@
     .case-header h2 {
       font-family: var(--font-serif);
       font-size: 1.5rem;
-      font-weight: 600;
+      font-weight: 300;
     }
 
     .case-subinfo {
@@ -1243,9 +1284,11 @@
     .view-cases .case-switcher button {
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 0.45rem 1.2rem;
+      border-radius: 6px;
+      padding: 0.6rem 1.1rem;
       font-size: 0.9rem;
+      font-family: var(--font-serif);
+      font-weight: 300;
       color: var(--ink);
       cursor: pointer;
       transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
@@ -1297,11 +1340,11 @@
     .view-cases .add-btn {
       background: var(--accent);
       color: #fff;
-      font-family: Sarabun, sans-serif;
+      font-family: var(--font-serif);
       font-weight: 300;
       border: none;
       border-radius: 6px;
-      padding: 9px 14px;
+      padding: 0.6rem 1.1rem;
       cursor: pointer;
       font-size: 0.9rem;
       transition: background 0.2s;
@@ -1319,12 +1362,14 @@
     }
 
     .view-cases .filter-tab {
-      padding: 6px 14px;
-      border-radius: 20px;
+      padding: 0.6rem 1.1rem;
+      border-radius: 6px;
       border: 1px solid var(--line);
       background: var(--panel);
-      color: var(--muted);
-      font-size: 0.85rem;
+      color: var(--ink);
+      font-size: 0.9rem;
+      font-family: var(--font-serif);
+      font-weight: 300;
       cursor: pointer;
       transition: all 0.2s;
     }
@@ -1390,15 +1435,16 @@
     }
 
     .archived-bulk-actions .pill-btn {
-      border-radius:999px;
+      border-radius:6px;
       border:1px solid var(--line);
-      padding:0.45rem 1.1rem;
+      padding:0.6rem 1.1rem;
       background:var(--panel);
       color:var(--ink);
       cursor:pointer;
       font-size:0.9rem;
       font-weight:300;
-      letter-spacing:0.02em;
+      font-family:var(--font-serif);
+      letter-spacing:normal;
       transition:background 0.2s ease,border-color 0.2s ease,transform 0.15s ease,opacity 0.2s ease;
       text-decoration:none;
       display:inline-flex;
@@ -1524,8 +1570,10 @@
       border:none;
       background:none;
       text-align:left;
-      padding:0.6rem 0.85rem;
+      padding:0.6rem 1.1rem;
       font-size:0.9rem;
+      font-family:var(--font-serif);
+      font-weight:300;
       cursor:pointer;
       color:var(--ink);
       border-bottom:1px solid var(--line);
@@ -1561,11 +1609,13 @@
 
     .view-cases .case-files-filters button{
       border:1px solid var(--line);
-      border-radius:8px;
-      padding:0.5rem 1rem;
+      border-radius:6px;
+      padding:0.6rem 1.1rem;
       cursor:pointer;
       background:var(--panel);
       font-size:0.9rem;
+      font-family:var(--font-serif);
+      font-weight:300;
       transition:all .2s ease;
     }
 
@@ -1643,9 +1693,33 @@
       border:none;
       background:none;
       color:var(--accent);
-      font-size:0.8rem;
+      font-size:0.9rem;
+      font-family:var(--font-serif);
+      font-weight:300;
       cursor:pointer;
       padding:0;
+    }
+
+    .view-cases .btn{
+      border-radius:6px;
+      padding:0.6rem 1.1rem;
+      font-family:var(--font-serif);
+      font-weight:300;
+    }
+
+    .view-cases .btn.secondary{
+      background:#fff;
+      border:1px solid var(--line);
+      color:var(--ink);
+    }
+
+    .view-cases .btn.secondary:hover{
+      border-color:var(--accent);
+      color:var(--accent);
+    }
+
+    .view-cases .btn.primary:hover{
+      background:#a0854d;
     }
 
     .view-cases .note-cell .note-edit-btn:hover{text-decoration:underline;}
@@ -1800,6 +1874,47 @@
     .case-invite-date{
       font-size:0.85rem;
       color:var(--muted);
+    }
+
+    .case-applications-title{
+      font-size:0.7rem;
+      letter-spacing:0.18em;
+      text-transform:uppercase;
+      color:var(--muted);
+      margin-top:0.25rem;
+    }
+
+    .case-star-btn{
+      margin-left:auto;
+      border:1px solid var(--line);
+      background:transparent;
+      color:var(--muted);
+      border-radius:999px;
+      padding:0.3rem 0.6rem;
+      font-size:0.95rem;
+      line-height:1;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      transition:all 0.2s ease;
+      flex-shrink:0;
+    }
+
+    .case-star-btn:hover{
+      border-color:var(--accent);
+      color:var(--accent);
+    }
+
+    .case-star-btn[data-starred="true"]{
+      border-color:rgba(182, 164, 122, 0.5);
+      background:rgba(182, 164, 122, 0.16);
+      color:var(--accent);
+    }
+
+    .case-star-btn:disabled{
+      opacity:0.6;
+      cursor:not-allowed;
     }
 
     .btn{
@@ -2466,6 +2581,299 @@
       outline: none;
       box-shadow: var(--focus-ring);
     }
+
+    @media (max-width: 1024px) {
+      body {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 260px;
+        height: 100vh;
+        border-right: none;
+        border-bottom: none;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        gap: 24px;
+        padding: 24px 18px;
+        padding-top: 72px;
+        transform: translateX(-110%);
+        transition: transform 0.25s ease;
+        z-index: 2000;
+        box-shadow: 18px 0 40px rgba(0, 0, 0, 0.18);
+      }
+
+      body.nav-open .sidebar {
+        transform: translateX(0);
+      }
+
+      body.nav-open .sidebar-backdrop {
+        display: block;
+      }
+
+      .sidebar-toggle {
+        display: inline-flex;
+        position: fixed;
+        top: 14px;
+        left: 14px;
+      }
+
+      .topbar {
+        margin-bottom: 1.25rem;
+        min-height: 56px;
+        justify-content: flex-end;
+        gap: 12px;
+      }
+
+      .logo {
+        margin-bottom: 4px;
+        font-size: 1.4rem;
+        text-align: left;
+      }
+
+      nav {
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      nav a {
+        width: 100%;
+        text-align: left;
+        padding: 10px 14px;
+        font-size: 0.95rem;
+      }
+
+      .sidebar-bottom {
+        margin-top: auto;
+        align-items: stretch;
+        gap: 12px;
+      }
+
+      .sidebar-link {
+        width: 100%;
+        text-align: left;
+        padding: 10px 14px;
+        font-size: 0.95rem;
+      }
+
+      .sidebar-footer {
+        text-align: left;
+      }
+
+      .main {
+        padding: 28px 20px 60px;
+      }
+
+      header h1 {
+        font-size: 1.9rem;
+      }
+
+      .summary {
+        gap: 0.85rem;
+      }
+
+      .info-box {
+        min-width: 0;
+      }
+
+      .today-strip {
+        gap: 0.75rem;
+      }
+
+      .queue-item {
+        align-items: flex-start;
+      }
+
+      .queue-action {
+        align-self: flex-start;
+      }
+
+      .home-tabs {
+        flex-wrap: wrap;
+      }
+
+      .home-tab {
+        flex: 1 1 140px;
+        text-align: center;
+      }
+
+      .side-by-side-panels {
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .case-header {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .case-actions button,
+      .case-actions .chip {
+        min-width: 0;
+      }
+
+      .view-cases .cases-shell {
+        padding: 1.5rem;
+      }
+
+      .view-cases .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .view-cases .page-header .actions {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+
+      .view-cases .page-header input[type="search"] {
+        width: 100%;
+      }
+
+      .view-cases .add-btn {
+        width: 100%;
+        text-align: center;
+      }
+
+      .view-cases .case-switcher {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .view-cases .case-switcher button {
+        white-space: nowrap;
+      }
+
+      .view-billing header.page-header {
+        align-items: flex-start;
+      }
+
+      .view-billing header.page-header .actions {
+        width: 100%;
+      }
+
+      .view-billing .primary-btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .view-billing .panel-header {
+        align-items: flex-start;
+      }
+
+      .view-billing .panel-header .panel-actions {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .view-billing .ghost-btn {
+        flex: 1 1 160px;
+        text-align: center;
+      }
+
+      .view-billing .payment-method-summary {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .view-billing .history-meta,
+      .view-billing .history-actions {
+        flex-wrap: wrap;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .main {
+        padding: 20px 16px 32px;
+      }
+
+      header h1 {
+        font-size: 1.7rem;
+      }
+
+      .today-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .summary {
+        flex-direction: column;
+      }
+
+      .queue-item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .queue-action {
+        width: 100%;
+        text-align: center;
+      }
+
+      .case-actions {
+        flex-direction: column;
+      }
+
+      .case-actions button,
+      .case-actions .chip {
+        width: 100%;
+      }
+
+      .view-cases th,
+      .view-cases td {
+        padding: 0.65rem 0.5rem;
+        font-size: 0.85rem;
+      }
+
+      .view-cases .case-files-pane {
+        padding: 1rem;
+      }
+
+      .view-cases .case-files-grid .file-line {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .view-cases .case-files-grid .file-actions {
+        width: 100%;
+      }
+
+      .archived-bulk-actions .pill-btn {
+        flex: 1 1 100%;
+        min-width: 0;
+      }
+
+      .view-billing header.page-header h1 {
+        font-size: 1.9rem;
+      }
+
+      .view-billing .panel {
+        padding: 1rem;
+      }
+
+      .view-billing .panel-header h2 {
+        font-size: 1.35rem;
+      }
+
+      .view-billing .payment-actions {
+        flex-direction: column;
+      }
+
+      .payment-modal .payment-actions {
+        flex-direction: column;
+        justify-content: stretch;
+      }
+
+      .payment-modal .primary-btn,
+      .payment-modal .ghost-btn {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
@@ -2492,7 +2900,10 @@
     })();
   </script>
   <a class="skip-link" href="#main">Skip to main content</a>
-  <aside class="sidebar">
+  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
+    <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
+  </button>
+  <aside class="sidebar" id="sidebarNav">
     <div class="logo">Dashboard</div>
     <nav>
       <a href="#home" class="active" data-view-target="home">Home</a>
@@ -2505,6 +2916,7 @@
       <div class="sidebar-footer">© Let’s‑ParaConnect 2025</div>
     </div>
   </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <main id="main" tabindex="-1" class="main">
     <div class="topbar" data-attorney-header>
       <div class="header-skeleton" aria-hidden="true">
@@ -2985,6 +3397,40 @@
         apply();
       }
     })();
+  </script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const sidebarToggle = document.getElementById("sidebarToggle");
+      const sidebarNav = document.getElementById("sidebarNav");
+      const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+      const closeSidebar = () => {
+        document.body.classList.remove("nav-open");
+        if (sidebarToggle) sidebarToggle.setAttribute("aria-expanded", "false");
+      };
+      const openSidebar = () => {
+        document.body.classList.add("nav-open");
+        if (sidebarToggle) sidebarToggle.setAttribute("aria-expanded", "true");
+      };
+      if (sidebarToggle) {
+        sidebarToggle.addEventListener("click", () => {
+          if (document.body.classList.contains("nav-open")) closeSidebar();
+          else openSidebar();
+        });
+      }
+      if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener("click", closeSidebar);
+      }
+      if (sidebarNav) {
+        sidebarNav.addEventListener("click", (event) => {
+          if (event.target.closest("a") || event.target.closest("button")) {
+            closeSidebar();
+          }
+        });
+      }
+      window.addEventListener("resize", () => {
+        if (window.innerWidth > 1024) closeSidebar();
+      });
+    });
   </script>
   <script>
     window.__ATTORNEY_PAGE__ = "overview";

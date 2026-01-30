@@ -43,6 +43,7 @@ let hasPaymentMethodOnFile = true;
 let currentViewerRole = "";
 const PLATFORM_FEE_PCT = 21;
 const DEFAULT_HIRE_ERROR = "Unable to hire paralegal.";
+const MISSING_DOCUMENT_MESSAGE = "This document is no longer available for download.";
 
 function formatHireErrorMessage(message) {
   if (!message || typeof message !== "string") return DEFAULT_HIRE_ERROR;
@@ -788,9 +789,13 @@ function bindApplicantDocLinks(root) {
       if (data?.url) {
         window.open(data.url, "_blank", "noopener");
       } else {
-        notify("Document unavailable.", "error");
+        notify(MISSING_DOCUMENT_MESSAGE, "info");
       }
     } catch (err) {
+      if (err?.status === 404) {
+        notify(MISSING_DOCUMENT_MESSAGE, "info");
+        return;
+      }
       notify(err?.message || "Unable to open document.", "error");
     }
   });
@@ -1115,7 +1120,7 @@ function showCompletionModal(caseId, triggerButton) {
   overlay.innerHTML = `
     <div class="case-modal">
       <div class="case-modal-title">Mark case complete?</div>
-      <p>Confirming will release the escrow payment, lock all uploads and messages, revoke paralegal access, generate a ZIP archive, and start a 24-hour purge timer.</p>
+      <p>Confirming will release the escrow payment, lock all uploads and messages, revoke paralegal access, generate a ZIP archive, and start a 6-month purge timer.</p>
       <div class="case-modal-actions">
         <button class="btn" data-modal-cancel>Cancel</button>
         <button class="btn primary" data-modal-confirm>Confirm</button>
@@ -1197,12 +1202,7 @@ async function completeCase(caseId) {
     const result = await j(`/api/cases/${encodeURIComponent(caseId)}/complete`, {
       method: "POST",
     });
-    notify("Case archived. Downloading…", "success");
-    if (result?.downloadPath) {
-      setTimeout(() => {
-        window.open(result.downloadPath, "_blank", "noopener");
-      }, 300);
-    }
+    notify("Case archived. Redirecting to archive.", "success");
     removeWorkspaceActions(document);
     const redirect = getCompletionRedirectForRole(currentViewerRole);
     if (redirect) {
@@ -1245,9 +1245,14 @@ function startCountdown(node, targetDate) {
 function formatCountdown(targetDate) {
   const diff = Math.max(0, targetDate.getTime() - Date.now());
   const totalMinutes = Math.floor(diff / 60000);
-  const hours = Math.floor(totalMinutes / 60);
+  const totalHours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  if (days > 0) {
+    return `${days}d ${String(hours).padStart(2, "0")}h`;
+  }
+  return `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 function notify(message, type = "info") {

@@ -197,7 +197,7 @@ function formatNotificationBody(item = {}) {
     case "profile_photo_approved":
       return "Your profile photo was approved.";
     case "profile_photo_rejected":
-      return "Your profile photo was rejected. Please upload a new one.";
+      return "Your profile photo was rejected. Please upload a new one that meets our photo guidelines, including a plain or neutral background.";
     case "payout_released":
       return `Your payout is on the way${payload.amount ? ` (${payload.amount})` : ""}.`;
     case "case_awaiting_funding":

@@ -39,7 +39,7 @@ function buildDisplayMessage(type, payload = {}) {
     case "profile_photo_approved":
       return "Your profile photo was approved.";
     case "profile_photo_rejected":
-      return "Your profile photo was rejected. Please upload a new one.";
+      return "Your profile photo was rejected. Please upload a new one that meets our photo guidelines, including a plain or neutral background.";
     case "payout_released":
       return `Your payout was released${payload.amount ? ` (${payload.amount})` : ""}.`;
     case "application_submitted": {
@@ -174,7 +174,7 @@ function emailTemplate(type, payload) {
     case "profile_photo_rejected":
       return {
         subject: "Profile photo update needed",
-        html: "<p>Your profile photo was rejected. Please upload a new one.</p>",
+        html: "<p>Your profile photo was rejected. Please upload a new one that meets our photo guidelines, including a plain or neutral background.</p>",
       };
     case "case_invite_response":
       return {

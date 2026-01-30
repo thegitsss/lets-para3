@@ -26,6 +26,7 @@ const PLACEHOLDER_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponen
     <path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/>
   </svg>`
 )}`;
+const MISSING_DOCUMENT_MESSAGE = "This document is no longer available for download.";
 
 function resolveProfilePhotoStatus(user = {}) {
   const raw = String(user.profilePhotoStatus || "").trim();
@@ -395,7 +396,7 @@ function bindDocumentLinks() {
       try {
         const signed = await fetchDocumentUrl(key);
         if (signed) window.open(signed, "_blank", "noopener");
-        else showToast("Document is unavailable.", "error");
+        else showToast(MISSING_DOCUMENT_MESSAGE, "info");
       } catch (err) {
         console.error(err);
         showToast("Unable to open document.", "error");
@@ -407,6 +408,7 @@ function bindDocumentLinks() {
 async function fetchDocumentUrl(key) {
   const params = new URLSearchParams({ key });
   const res = await secureFetch(`/api/uploads/signed-get?${params.toString()}`);
+  if (res.status === 404) return null;
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.url) throw new Error(data?.msg || "Download failed");
   return data.url;

@@ -38,6 +38,7 @@ async function ensureStripeOnboardedUser(userDoc) {
 }
 
 async function getCaseApplicationsForAttorney(attorneyId, blockedSet = null) {
+  const attorneyKey = String(attorneyId || "");
   const cases = await Case.find({
     attorneyId,
     "applicants.0": { $exists: true },
@@ -62,6 +63,10 @@ async function getCaseApplicationsForAttorney(attorneyId, blockedSet = null) {
       if (blockedSet && paralegalId && blockedSet.has(String(paralegalId))) {
         return;
       }
+      const starred =
+        !!attorneyKey &&
+        Array.isArray(applicant?.starredBy) &&
+        applicant.starredBy.some((id) => String(id) === attorneyKey);
       entries.push({
         id: `case:${caseId}:${paralegalId || "unknown"}`,
         jobId: null,
@@ -71,6 +76,7 @@ async function getCaseApplicationsForAttorney(attorneyId, blockedSet = null) {
         caseId,
         paralegal,
         coverLetter: applicant?.note || applicant?.coverLetter || "",
+        starred,
         createdAt: applicant?.appliedAt || fallbackDate,
       });
     });
@@ -269,6 +275,9 @@ router.get("/my-postings", auth, requireApproved, requireRole("attorney"), async
       .lean();
     const shaped = apps.map((app) => {
       const job = jobById.get(String(app.jobId?._id || app.jobId)) || {};
+      const starred =
+        Array.isArray(app.starredBy) &&
+        app.starredBy.some((id) => String(id) === String(req.user._id || req.user.id));
       return {
         id: String(app._id),
         jobId: app.jobId?._id || app.jobId || null,
@@ -278,6 +287,7 @@ router.get("/my-postings", auth, requireApproved, requireRole("attorney"), async
         caseId: job.caseId || null,
         paralegal: app.paralegalId || null,
         coverLetter: app.coverLetter || "",
+        starred,
         createdAt: app.createdAt,
       };
     });

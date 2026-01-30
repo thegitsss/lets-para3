@@ -36,6 +36,7 @@ const ApplicationSchema = new mongoose.Schema({
     enum: ["submitted", "viewed", "shortlisted", "accepted", "rejected"],
     default: "submitted",
   },
+  starredBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 
   createdAt: { type: Date, default: Date.now },
 });

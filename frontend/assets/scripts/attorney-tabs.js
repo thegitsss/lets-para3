@@ -20,6 +20,7 @@ const STATUS_LABELS = {
   approved: "Approved",
   attorney_revision: "Attorney Revisions",
 };
+const MISSING_DOCUMENT_MESSAGE = "This document is no longer available for download.";
 const CASE_VIEW_FILTERS = ["active", "draft", "archived", "inquiries"];
 const CASE_FILE_MAX_BYTES = 20 * 1024 * 1024;
 const LOCAL_DRAFTS_KEY = "attorneyLocalDraftCases";
@@ -276,7 +277,7 @@ function ensureHeaderStyles() {
   }
   .lpc-shared-header .user-chip{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.4);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color .2s ease, box-shadow .2s ease}
   .lpc-shared-header .user-chip img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,0.08);object-fit:cover}
-  .lpc-shared-header .user-chip strong{display:block;font-weight:600;color:#1a1a1a}
+  .lpc-shared-header .user-chip strong{display:block;font-family:var(--font-serif);font-weight:500;letter-spacing:.02em;color:#1a1a1a}
   .lpc-shared-header .user-chip span{font-size:.85rem;color:#6b6b6b}
   body.theme-dark .lpc-shared-header .user-chip{background:rgba(15,23,42,0.4);border-color:rgba(255,255,255,0.15);box-shadow:0 10px 25px rgba(0,0,0,0.35)}
   body.theme-dark .lpc-shared-header .user-chip strong{color:#fff}
@@ -287,13 +288,16 @@ function ensureHeaderStyles() {
   .lpc-shared-header .profile-dropdown{position:absolute;right:0;top:calc(100% + 10px);background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:16px;box-shadow:0 18px 30px rgba(0,0,0,0.12);display:none;flex-direction:column;min-width:200px;z-index:9999;pointer-events:auto;overflow:visible;color:var(--ink,#1a1a1a)}
   .lpc-shared-header .profile-dropdown.show{display:flex;pointer-events:auto;overflow:visible}
   .lpc-shared-header .profile-dropdown button,
-  .lpc-shared-header .profile-dropdown a{background:none;border:none;padding:.85rem 1.1rem;text-align:left;font-size:.92rem;cursor:pointer;color:inherit;text-decoration:none;display:block}
+  .lpc-shared-header .profile-dropdown a{background:none;border:none;padding:.85rem 1.1rem;text-align:left;font-size:.92rem;cursor:pointer;color:inherit;text-decoration:none;display:block;font-weight:200;border-radius:12px;margin:4px 6px;width:calc(100% - 12px)}
   .lpc-shared-header .profile-dropdown button:hover,
   .lpc-shared-header .profile-dropdown a:hover{background:rgba(0,0,0,0.04)}
+  .lpc-shared-header .profile-dropdown .logout-btn{color:#b91c1c;background:rgba(185,28,28,0.08);border:1px solid rgba(185,28,28,0.2)}
+  .lpc-shared-header .profile-dropdown .logout-btn:hover{background:rgba(185,28,28,0.15);color:#991b1b}
   body.theme-dark .lpc-shared-header .profile-dropdown button:hover,
   body.theme-dark .lpc-shared-header .profile-dropdown a:hover,
   body.theme-mountain-dark .lpc-shared-header .profile-dropdown button:hover,
   body.theme-mountain-dark .lpc-shared-header .profile-dropdown a:hover{background:rgba(255,255,255,0.06)}
+  body.theme-dark .lpc-shared-header .profile-dropdown .logout-btn{border-top-color:rgba(255,255,255,0.08)}
   .lpc-shared-header .notifications-panel{position:absolute;top:72px;right:0;width:340px;background:var(--panel,#fff);border-radius:14px;border:1px solid var(--line,rgba(0,0,0,0.08));box-shadow:0 24px 48px rgba(0,0,0,0.15);padding:0;opacity:0;pointer-events:none;transform:translateY(-10px);transition:opacity .2s ease,transform .2s ease;z-index:30;display:flex;flex-direction:column}
   .lpc-shared-header .notifications-panel.show{opacity:1;pointer-events:auto;transform:translateY(0)}
   .lpc-shared-header .notifications-panel.hidden{display:none}
@@ -423,7 +427,7 @@ async function initHeader(options = {}) {
           </div>
           <div class="profile-dropdown" id="profileDropdown" aria-hidden="true">
             <a href="profile-settings.html" data-account-settings>Account Settings</a>
-            <button type="button" data-logout onclick="window.logoutUser?.(event)">Log Out</button>
+            <button type="button" class="logout-btn" data-logout onclick="window.logoutUser?.(event)">Log Out</button>
           </div>
         </div>
       </div>
@@ -2693,7 +2697,7 @@ function renderCaseMenu(item) {
       `<button type="button" class="menu-item" data-case-action="view-invited" data-case-id="${item.id}">View Invited Paralegals</button>`
     );
   }
-  if (hasDeliverables(item)) {
+  if (hasDeliverables(item) && !item.archived) {
     parts.push(
       `<button type="button" class="menu-item" data-case-action="download" data-case-id="${item.id}">Download Files</button>`
     );
@@ -3025,6 +3029,7 @@ let caseInvitesSetup = false;
 let caseApplicationsModalRef = null;
 let caseApplicationsListRef = null;
 let caseApplicationsSetup = false;
+let caseApplicationsCaseId = null;
 
 function setupCaseInvitesModal() {
   if (caseInvitesSetup) return;
@@ -3067,6 +3072,12 @@ function setupCaseApplicationsModal() {
     btn.addEventListener("click", closeCaseApplicationsModal);
   });
   caseApplicationsModalRef.addEventListener("click", (event) => {
+    const starBtn = event.target.closest("[data-application-star]");
+    if (starBtn) {
+      event.preventDefault();
+      handleCaseApplicationStar(starBtn);
+      return;
+    }
     if (event.target === caseApplicationsModalRef) {
       closeCaseApplicationsModal();
     }
@@ -3083,6 +3094,7 @@ function closeCaseApplicationsModal() {
     caseApplicationsModalRef.classList.add("hidden");
     caseApplicationsModalRef.removeAttribute("aria-busy");
   }
+  caseApplicationsCaseId = null;
 }
 
 function buildParalegalProfileUrl(paralegalId) {
@@ -3248,8 +3260,81 @@ async function openCaseInvites(caseId) {
   caseInvitesModalRef.removeAttribute("aria-busy");
 }
 
+function buildCaseApplicantItem(applicant, caseId, showStar) {
+  const starActive = !!applicant.starred;
+  const starIcon = starActive ? "&#9733;" : "&#9734;";
+  const starLabel = starActive ? "Remove star from applicant" : "Star applicant";
+  const starButton = showStar
+    ? `<button type="button" class="case-star-btn" data-application-star data-case-id="${sanitize(
+        caseId
+      )}" data-paralegal-id="${sanitize(applicant.paralegalId || "")}" data-starred="${starActive}" aria-pressed="${starActive}" aria-label="${starLabel}" title="${starLabel}">
+        <span aria-hidden="true">${starIcon}</span>
+      </button>`
+    : "";
+  return `
+    <div class="case-invite-item">
+      <img src="${sanitize(applicant.avatar)}" alt="${sanitize(applicant.name)} profile photo" />
+      <div class="case-invite-meta">
+        ${
+          applicant.link
+            ? `<a href="${sanitize(applicant.link)}">${sanitize(applicant.name)}</a>`
+            : `<span>${sanitize(applicant.name)}</span>`
+        }
+        <span class="case-invite-date">${sanitize(formatAppliedDate(applicant.appliedAt))}</span>
+      </div>
+      ${starButton}
+    </div>
+  `;
+}
+
+function renderCaseApplicationsList(caseId, applicants) {
+  if (!caseApplicationsListRef) return;
+  if (!applicants.length) {
+    caseApplicationsListRef.innerHTML = `<p class="muted">No applications yet.</p>`;
+    return;
+  }
+  const showStar = applicants.length > 1;
+  const starred = applicants.filter((applicant) => applicant.starred);
+  const remaining = starred.length ? applicants.filter((applicant) => !applicant.starred) : applicants;
+  let html = "";
+  if (starred.length) {
+    html += `<div class="case-applications-title">Starred</div>`;
+    html += starred.map((applicant) => buildCaseApplicantItem(applicant, caseId, showStar)).join("");
+  }
+  if (remaining.length) {
+    if (starred.length) html += `<div class="case-applications-title">All applicants</div>`;
+    html += remaining.map((applicant) => buildCaseApplicantItem(applicant, caseId, showStar)).join("");
+  }
+  caseApplicationsListRef.innerHTML = html;
+}
+
+async function handleCaseApplicationStar(button) {
+  if (!button || button.disabled) return;
+  const caseId = button.dataset.caseId || caseApplicationsCaseId;
+  const paralegalId = button.dataset.paralegalId || "";
+  if (!caseId || !paralegalId) return;
+  const nextStarred = button.dataset.starred !== "true";
+  button.disabled = true;
+  try {
+    const res = await secureFetch(
+      `/api/cases/${encodeURIComponent(caseId)}/applicants/${encodeURIComponent(paralegalId)}/star`,
+      { method: "POST", body: { starred: nextStarred } }
+    );
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload?.error || "Unable to update star.");
+    }
+    await openCaseApplications(caseId);
+  } catch (err) {
+    console.warn("Unable to update application star", err);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function openCaseApplications(caseId) {
   if (!caseId) return;
+  caseApplicationsCaseId = caseId;
   setupCaseApplicationsModal();
   if (!caseApplicationsModalRef || !caseApplicationsListRef) return;
   caseApplicationsModalRef.classList.remove("hidden");
@@ -3288,17 +3373,16 @@ async function openCaseApplications(caseId) {
         snapshot.profileImage || profile.profileImage || profile.avatarURL || INVITE_AVATAR_FALLBACK;
       const link = buildParalegalProfileUrl(paralegalId);
       const appliedAt = applicant?.appliedAt || applicant?.createdAt || "";
-      return `
-        <div class="case-invite-item">
-          <img src="${sanitize(avatar)}" alt="${sanitize(name)} profile photo" />
-          <div class="case-invite-meta">
-            ${link ? `<a href="${sanitize(link)}">${sanitize(name)}</a>` : `<span>${sanitize(name)}</span>`}
-            <span class="case-invite-date">${sanitize(formatAppliedDate(appliedAt))}</span>
-          </div>
-        </div>
-      `;
+      return {
+        paralegalId: paralegalId || "",
+        name,
+        avatar,
+        link,
+        appliedAt,
+        starred: Boolean(applicant?.starred),
+      };
     });
-    caseApplicationsListRef.innerHTML = items.join("");
+    renderCaseApplicationsList(caseId, items);
     caseApplicationsModalRef.removeAttribute("aria-busy");
   } catch (err) {
     console.warn("Case applications load failed", err);
@@ -4378,9 +4462,14 @@ function startChatCountdown(node, targetDate) {
 function formatAutoDelete(targetDate) {
   const diff = Math.max(0, targetDate.getTime() - Date.now());
   const totalMinutes = Math.floor(diff / 60000);
-  const hours = Math.floor(totalMinutes / 60);
+  const totalHours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  if (days > 0) {
+    return `${days}d ${String(hours).padStart(2, "0")}h`;
+  }
+  return `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 async function sendCurrentMessage() {
@@ -4827,7 +4916,8 @@ async function downloadSelectedDocument() {
       return;
     }
     if (doc.file.key) {
-      await openFile(doc.caseId, doc.file.key, "download", doc.file.filename || doc.file.original);
+      const opened = await openFile(doc.caseId, doc.file.key, "download", doc.file.filename || doc.file.original);
+      if (!opened) return;
       return;
     }
     throw new Error("Download link unavailable.");
@@ -5013,7 +5103,10 @@ function mergeUpdatedFile(caseId, file) {
 async function openFile(caseId, key, mode, fileName) {
   if (!key) throw new Error("Missing key");
   const url = await getSignedUrl(caseId, key);
-  if (!url) throw new Error("Unable to sign file");
+  if (!url) {
+    notifyCases(MISSING_DOCUMENT_MESSAGE, "info");
+    return false;
+  }
   if (mode === "download") {
     const a = document.createElement("a");
     a.href = url;
@@ -5021,20 +5114,24 @@ async function openFile(caseId, key, mode, fileName) {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    return true;
   } else if (mode === "print") {
     const win = window.open(url, "_blank");
     if (win) {
       win.addEventListener("load", () => win.print());
     }
+    return true;
   } else {
     window.open(url, "_blank");
+    return true;
   }
 }
 
 async function openReviewFile(caseId, fileKey, downloadUrl, mode, fileName) {
   if (fileKey) {
-    await openFile(caseId, fileKey, mode, fileName);
-    return;
+    const opened = await openFile(caseId, fileKey, mode, fileName);
+    if (!opened) return false;
+    return true;
   }
   if (downloadUrl && downloadUrl !== "#" && downloadUrl !== "undefined") {
     if (mode === "print") {
@@ -5043,7 +5140,7 @@ async function openReviewFile(caseId, fileKey, downloadUrl, mode, fileName) {
     } else {
       window.open(downloadUrl, "_blank");
     }
-    return;
+    return true;
   }
   throw new Error("Download link unavailable for this file.");
 }
@@ -5051,10 +5148,20 @@ async function openReviewFile(caseId, fileKey, downloadUrl, mode, fileName) {
 async function getSignedUrl(caseId, key) {
   const res = await secureFetch(`/api/cases/${caseId}/files/signed-get?key=${encodeURIComponent(key)}`, {
     headers: { Accept: "application/json" },
+    noRedirect: true,
   });
-  if (!res.ok) throw new Error("signed url failed");
+  if (res.status === 401) {
+    throw new Error("Session expired. Please sign in again.");
+  }
+  if (res.status === 404) {
+    return null;
+  }
+  if (!res.ok) {
+    const payload = await res.json().catch(() => ({}));
+    throw new Error(payload?.error || payload?.msg || "Unable to sign file");
+  }
   const data = await res.json();
-  return data.url;
+  return data?.url || null;
 }
 
 async function uploadToS3(file, caseId) {

@@ -16,6 +16,7 @@ const state = {
 
 const PLATFORM_FEE_PCT = 21;
 const DEFAULT_HIRE_ERROR = "Unable to hire paralegal.";
+const MISSING_DOCUMENT_MESSAGE = "This document is no longer available for download.";
 
 function formatHireErrorMessage(message) {
   if (!message || typeof message !== "string") return DEFAULT_HIRE_ERROR;
@@ -290,6 +291,10 @@ async function openDocument(key) {
     const res = await secureFetch(`/api/uploads/signed-get?${params.toString()}`, {
       headers: { Accept: "application/json" },
     });
+    if (res.status === 404) {
+      setNotice(MISSING_DOCUMENT_MESSAGE);
+      return;
+    }
     const payload = await res.json().catch(() => ({}));
     if (!res.ok || !payload?.url) {
       throw new Error(payload?.msg || payload?.error || "Document unavailable.");

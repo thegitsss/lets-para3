@@ -276,6 +276,7 @@ async function sendProfilePhotoRejectedEmail(user, opts = {}) {
                 Hi &mdash;<br><br>
                 Thank you for completing your profile. Before we publish it, we just need a different photo selected for your attorney-facing profile.<br><br>
                 If helpful, many paralegals choose to use the same photo they have on LinkedIn.<br><br>
+                Please ensure your photo has a plain or neutral background. It helps keep profiles polished and consistent.<br><br>
                 We&rsquo;re excited to have you as part of the early group joining the platform.<br><br>
                 Once that&rsquo;s done, we&rsquo;ll take care of the rest.<br><br>
                 Best,<br>
