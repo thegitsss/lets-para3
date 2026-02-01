@@ -37,7 +37,7 @@
 
     :root {
       --bg: #ffffff;
-      --sidebar-bg: #f5f5f5e6;
+      --sidebar-bg: #ffffff;
       --accent: #b6a47a;
       --ink: #1a2230;
       --muted: #5c6b7a;
@@ -56,6 +56,18 @@
       font-weight: 200;
       display: flex;
       min-height: 100vh;
+    }
+    body.theme-light,
+    body.theme-mountain {
+      background: #ffffff;
+    }
+    body.theme-light .sidebar,
+    body.theme-mountain .sidebar {
+      background: #ffffff;
+    }
+    body.theme-light .callout,
+    body.theme-mountain .callout {
+      background: #ffffff;
     }
 
     .sidebar {
@@ -204,7 +216,7 @@
 
     .callout {
       border-left: 4px solid var(--accent);
-      background: #fdfbf7;
+      background: #ffffff;
       padding: 14px;
       margin: 18px 0;
       font-size: 0.95rem;
@@ -247,6 +259,16 @@
   text-decoration: none;
   font-weight: 200;
 }
+
+    main a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 200;
+    }
+    main a:hover,
+    main a:focus-visible {
+      color: #9c8a63;
+    }
 
   @media (max-width: 1024px) {
     body {

@@ -89,6 +89,7 @@ const elements = {
   locationMeta: document.getElementById("locationMeta"),
   credentialMeta: document.getElementById("credentialMeta"),
   joinedMeta: document.getElementById("joinedMeta"),
+  joinedMetaCorner: document.getElementById("joinedMetaCorner"),
   nameField: document.getElementById("profileName"),
   roleLine: document.getElementById("roleLine"),
   bioCopy: document.getElementById("bioCopy"),
@@ -298,6 +299,7 @@ async function init() {
   }
   state.viewerRole = String(state.viewerUser?.role || "").toLowerCase();
   state.viewerId = String(state.viewerUser?.id || state.viewerUser?._id || "");
+  document.body.classList.toggle("viewer-attorney", state.viewerRole === "attorney");
 
   hydrateHeader();
   bindHeaderEvents();
@@ -710,24 +712,6 @@ function hydrateHeader() {
 }
 
 function bindHeaderEvents() {
-  if (elements.notificationToggle && elements.notificationPanel) {
-    elements.notificationToggle.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      if (typeof event.stopImmediatePropagation === "function") {
-        event.stopImmediatePropagation();
-      }
-      const isShowing = elements.notificationPanel.classList.toggle("show");
-      elements.notificationPanel.classList.toggle("hidden", !isShowing);
-      if (isShowing) {
-        if (typeof window.refreshNotificationCenters === "function") {
-          window.refreshNotificationCenters();
-        }
-        secureFetch("/api/notifications/read-all", { method: "POST" }).catch(() => {});
-      }
-    });
-  }
-
   if (elements.userChip && elements.profileDropdown) {
     elements.userChip.addEventListener("click", (event) => {
       event.preventDefault();
@@ -983,7 +967,9 @@ function renderMetadata(profile) {
     joinedSource && !Number.isNaN(new Date(joinedSource).getTime())
       ? new Date(joinedSource).toLocaleDateString(undefined, { month: "long", year: "numeric" })
       : null;
-  renderMetaLine(elements.joinedMeta, "J", joined ? `Joined ${joined}` : "Joined date unavailable");
+  const joinedLabel = joined ? `Joined ${joined}` : "Joined date unavailable";
+  renderMetaLine(elements.joinedMeta, "J", joinedLabel);
+  renderMetaLine(elements.joinedMetaCorner, "", joinedLabel);
 }
 
 function renderDocumentLinks(profile) {

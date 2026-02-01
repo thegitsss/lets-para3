@@ -463,6 +463,7 @@
               <input id="password" type="password" autocomplete="new-password" placeholder="Password" required />
               <button id="togglePw" class="pw-toggle" aria-controls="password">Show</button>
             </div>
+            <input id="passwordConfirm" type="password" autocomplete="new-password" placeholder="Confirm password" required />
 
             <button id="nextStepBtn" class="btn" type="button">Next →</button>
             <div class="extra-links">
@@ -536,6 +537,12 @@
                 <a href="privacy.html" target="_blank" style="color:var(--gold);text-decoration:none;">Privacy Policy</a>.
               </span>
             </label>
+            <div id="attorneyConfirmWrap" style="display:none;margin-top:10px;">
+              <label class="terms-label" style="display:flex;align-items:flex-start;gap:8px;font-size:0.9rem;font-weight:200;color:var(--muted);">
+                <input id="attorneyGoodStanding" type="checkbox" />
+                <span>I confirm that I am an attorney licensed and in good standing in the state listed above.</span>
+              </label>
+            </div>
 
             <div class="turnstile-wrap" aria-hidden="true">
               <div
@@ -593,6 +600,7 @@
     const admissionNotice = document.getElementById('paralegalAdmissionNotice');
     const togglePw = document.getElementById('togglePw');
     const pw = document.getElementById('password');
+    const pwConfirm = document.getElementById('passwordConfirm');
     const stepOnePanel = document.getElementById('stepOnePanel');
     const stepTwoPanel = document.getElementById('stepTwoPanel');
     const nextStepBtn = document.getElementById('nextStepBtn');
@@ -666,7 +674,8 @@
       const lastName = lastNameEl.value.trim();
       const email = emailEl.value.trim();
       const password = pw.value;
-      if (!firstName || !lastName || !email || !password) {
+      const passwordConfirm = pwConfirm?.value || '';
+      if (!firstName || !lastName || !email || !password || !passwordConfirm) {
         say('Please complete your basic account information.', 'err');
         return false;
       }
@@ -680,6 +689,10 @@
       }
       if (password.length < 8) {
         say('Use 8+ characters with letters and numbers.', 'err');
+        return false;
+      }
+      if (password !== passwordConfirm) {
+        say('Passwords do not match.', 'err');
         return false;
       }
       return true;
@@ -792,6 +805,15 @@
              <label for="certUpload" class="upload-placeholder">Certificate / License</label>
            </div>
            <div class="file-hint" id="certFileHint">No file selected</div>`;
+      const attorneyConfirmWrap = document.getElementById('attorneyConfirmWrap');
+      const attorneyConfirm = document.getElementById('attorneyGoodStanding');
+      if (attorneyConfirmWrap && attorneyConfirm) {
+        const showConfirm = r === 'attorney';
+        attorneyConfirmWrap.style.display = showConfirm ? '' : 'none';
+        attorneyConfirm.required = showConfirm;
+        attorneyConfirm.disabled = !showConfirm;
+        if (!showConfirm) attorneyConfirm.checked = false;
+      }
       if (r === 'paralegal') attachResumeHandler();
     }
     setRole(role);
@@ -804,6 +826,7 @@
       e.preventDefault();
       const show = pw.type === 'password';
       pw.type = show ? 'text' : 'password';
+      if (pwConfirm) pwConfirm.type = show ? 'text' : 'password';
       togglePw.textContent = show ? 'Hide' : 'Show';
     });
 
@@ -869,6 +892,16 @@
       } catch {
         return false;
       }
+    }
+
+    function isValidBarNumber(value, state) {
+      const raw = (value || '').trim();
+      if (!raw) return false;
+      const normalized = raw.replace(/\s+/g, '');
+      const digits = normalized.match(/\d/g) || [];
+      if (digits.length < 4) return false;
+      if (state && normalized.toUpperCase() === String(state).trim().toUpperCase()) return false;
+      return true;
     }
 
     const defaultSubmitText = submitBtn?.textContent || "Create Account";
@@ -955,6 +988,7 @@
       const lastName = lastNameEl.value.trim();
       const email = emailEl.value.trim().toLowerCase();
       const password = pw.value;
+      const passwordConfirm = pwConfirm?.value || '';
       const phoneNumber = (phoneEl?.value || '').trim();
       const signupState = (stateSelect?.value || '').trim();
       const timezone = getBrowserTimezone();
@@ -965,10 +999,11 @@
         return;
       }
 
-      if (!firstName || !lastName || !email || !password) { say('Please fill all required fields.', 'err'); return; }
+      if (!firstName || !lastName || !email || !password || !passwordConfirm) { say('Please fill all required fields.', 'err'); return; }
       if (!isValidEmail(email)) { say('Enter a valid email address.', 'err'); return; }
       if (isTypoEmailDomain(email)) { say('Please use a .com email address (.con is a typo).', 'err'); return; }
       if (password.length < 8) { say('Use 8+ characters with letters and numbers.', 'err'); return; }
+      if (password !== passwordConfirm) { say('Passwords do not match.', 'err'); return; }
       if (!signupState) {
         say('Please select your state.', 'err');
         stateSelect?.focus();
@@ -988,8 +1023,17 @@
         attorneyLinkedIn = (document.getElementById('attorneyLinkedIn')?.value || '').trim();
         attorneyBarState = (document.getElementById('barState')?.value || '').trim();
         attorneyLawFirm = (document.getElementById('lawFirm')?.value || '').trim();
+        const goodStandingConfirmed = document.getElementById('attorneyGoodStanding')?.checked;
         if (!attorneyBar) { say('State Bar Number is required for attorneys.', 'err'); return; }
+        if (!isValidBarNumber(attorneyBar, attorneyBarState)) {
+          say('Enter a valid bar number (must include at least one number).', 'err');
+          return;
+        }
         if (!attorneyBarState) { say('Please select the state for your bar number.', 'err'); return; }
+        if (!goodStandingConfirmed) {
+          say('Please confirm you are licensed and in good standing.', 'err');
+          return;
+        }
         if (attorneyLinkedIn && !isValidLinkedInUrl(attorneyLinkedIn)) {
           say('Enter a valid LinkedIn URL (e.g., https://www.linkedin.com/in/username).', 'err');
           return;

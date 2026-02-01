@@ -279,8 +279,8 @@ function ensureHeaderStyles() {
   }
   .lpc-shared-header .user-chip{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.4);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color .2s ease, box-shadow .2s ease}
   .lpc-shared-header .user-chip img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,0.08);object-fit:cover}
-  .lpc-shared-header .user-chip strong{display:block;font-family:var(--font-serif);font-weight:500;letter-spacing:.02em;color:#1a1a1a}
-  .lpc-shared-header .user-chip span{font-size:.85rem;color:#6b6b6b}
+  .lpc-shared-header .user-chip strong{display:block;font-family:var(--font-serif);font-weight:500;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lpc-shared-header .user-chip span{font-size:.85rem;color:#6b6b6b;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   body.theme-dark .lpc-shared-header .user-chip{background:rgba(15,23,42,0.4);border-color:rgba(255,255,255,0.15);box-shadow:0 10px 25px rgba(0,0,0,0.35)}
   body.theme-dark .lpc-shared-header .user-chip strong{color:#fff}
   body.theme-dark .lpc-shared-header .user-chip span{color:rgba(255,255,255,0.8)}
@@ -436,6 +436,10 @@ async function initHeader(options = {}) {
     </div>
   `;
 
+  const cachedUser = getStoredUserSnapshot();
+  if (cachedUser) {
+    applyUserToHeader(cachedUser);
+  }
   await loadUser();
   bindHeaderEvents();
   if (!skipNotifications) {

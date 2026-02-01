@@ -1,6 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>
+    (function applyEarlyTheme() {
+      try {
+        const raw = localStorage.getItem("lpc_user");
+        if (!raw) return;
+        const stored = JSON.parse(raw);
+        const theme = String(stored?.preferences?.theme || "").toLowerCase();
+        if (!theme) return;
+        const classes = theme === "mountain-dark" ? ["theme-mountain-dark", "theme-dark"] : [`theme-${theme}`];
+        classes.forEach((cls) => document.documentElement.classList.add(cls));
+      } catch (_) {}
+    })();
+  </script>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
   <link rel="preload" as="image" href="hero-mountain.jpg" />
@@ -740,7 +753,7 @@
 
   </style>
 </head>
-<body>
+  <body>
   <script>
     (function applyStoredTheme() {
       try {

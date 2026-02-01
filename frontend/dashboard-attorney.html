@@ -1,6 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>
+    (function applyEarlyTheme() {
+      try {
+        const raw = localStorage.getItem("lpc_user");
+        if (!raw) return;
+        const stored = JSON.parse(raw);
+        const theme = String(stored?.preferences?.theme || "").toLowerCase();
+        if (!theme) return;
+        const classes = theme === "mountain-dark" ? ["theme-mountain-dark", "theme-dark"] : [`theme-${theme}`];
+        classes.forEach((cls) => document.documentElement.classList.add(cls));
+      } catch (_) {}
+    })();
+  </script>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
   <link rel="preload" as="image" href="hero-mountain.jpg" />
@@ -28,7 +41,7 @@
 
 
 <link rel="stylesheet" href="assets/libs/cropper/cropper.main.css" />
-<script defer src="assets/scripts/utils/session.js"></script>
+<script src="assets/scripts/utils/session.js"></script>
   <style>
     .skip-link {
       position: absolute;
@@ -192,9 +205,9 @@
       scrollbar-gutter: stable;
     }
     html.js .main {
-      opacity: 0.85;
-      transform: translateY(4px);
-      transition: opacity 0.35s ease, transform 0.35s ease;
+      opacity: 1;
+      transform: none;
+      transition: none;
     }
     html.js body.is-ready .main {
       opacity: 1;
@@ -502,12 +515,44 @@
       font-weight: 300;
       font-size: 2.2rem;
       margin-bottom: 0.25rem;
+      line-height: 1.2;
     }
 
     header p {
       font-weight: 200;
       color: var(--muted);
       margin-bottom: 2rem;
+    }
+
+    .view-home header h1 {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-height: 2.7rem;
+    }
+    html.js .view-home header h1 {
+      visibility: hidden;
+    }
+    html.js body.is-ready .view-home header h1 {
+      visibility: visible;
+    }
+
+    #user-name-heading {
+      display: inline-block;
+      min-width: 8ch;
+      max-width: 22ch;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: bottom;
+    }
+
+    #user-name-heading:empty::after {
+      content: "Attorney";
+      color: transparent;
+    }
+
+    #activeCasesHeading {
+      min-height: 1.1em;
     }
 
     .summary {
@@ -3423,6 +3468,39 @@
 
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
   <script src="assets/scripts/utils/toast.js"></script>
+  <script>
+    (function seedWelcomeHeader() {
+      const apply = () => {
+        try {
+          const raw = localStorage.getItem("lpc_user");
+          if (!raw) return;
+          const user = JSON.parse(raw);
+          if (!user || typeof user !== "object") return;
+          const heading = document.getElementById("user-name-heading");
+          const greeting = document.getElementById("welcomeGreeting");
+          const firstName =
+            String(user.firstName || "")
+              .trim()
+              .split(/\s+/)[0] ||
+            String(user.name || "")
+              .trim()
+              .split(/\s+/)[0] ||
+            "";
+          if (heading && firstName) {
+            heading.textContent = firstName;
+          }
+          if (greeting && typeof user.isFirstLogin === "boolean") {
+            greeting.textContent = user.isFirstLogin ? "Welcome" : "Welcome back";
+          }
+        } catch (_) {}
+      };
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", apply, { once: true });
+      } else {
+        apply();
+      }
+    })();
+  </script>
   <script>
     (function markReady() {
       const apply = () => document.body.classList.add("is-ready");

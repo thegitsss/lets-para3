@@ -645,6 +645,36 @@
       width: 100%;
     }
 
+    .joined-meta-corner {
+      display: none;
+      width: 100%;
+      justify-content: flex-start;
+      margin-top: auto;
+      padding-left: 6px;
+    }
+
+    body.viewer-attorney .profile-layout {
+      align-items: stretch;
+    }
+
+    body.viewer-attorney .profile-sidebar {
+      align-items: stretch;
+    }
+
+    body.viewer-attorney #joinedMeta {
+      display: none;
+    }
+
+    body.viewer-attorney .joined-meta-corner {
+      display: flex;
+    }
+
+    body.viewer-attorney .joined-meta-corner .hero-meta-pill {
+      width: auto;
+      justify-content: flex-start;
+      text-align: left;
+    }
+
     .profile-layout {
       display: grid;
       grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.6fr);
@@ -1432,6 +1462,12 @@
         margin-top: 22px;
       }
 
+      body.viewer-attorney .joined-meta-corner {
+        justify-content: center;
+        padding-left: 0;
+        margin-top: 12px;
+      }
+
       img,
       svg,
       video,
@@ -1596,6 +1632,9 @@
             <a href="#" target="_blank" rel="noopener" id="writingSampleLink" class="doc-chip hidden">Writing Sample</a>
           </div>
         </article>
+        <div class="joined-meta-corner" aria-hidden="true">
+          <span id="joinedMetaCorner" class="hero-meta-pill">Joined date unavailable</span>
+        </div>
       </aside>
 
       <section class="profile-main">
@@ -1678,26 +1717,46 @@
   <input type="file" id="photoInput" accept="image/png, image/jpeg" style="display:none" />
 
   <script src="assets/scripts/utils/toast.js"></script>
+  <script>
+    window.__SKIP_NOTIFICATIONS__ = true;
+  </script>
   <script type="module" src="assets/scripts/utils/notifications.js"></script>
   <script src="assets/scripts/paralegal-cluster.js"></script>
   <script type="module" src="assets/scripts/profile-paralegal.js"></script>
   <script>
-    // Ensure notification dropdown binds even if modules load after DOM ready
-    (function ensureNotificationsInit() {
-      const init = () => {
-        if (typeof window.scanNotificationCenters === 'function') {
-          window.scanNotificationCenters();
-        } else if (typeof window.initNotificationCenters === 'function') {
-          window.initNotificationCenters();
-        }
+    (function bindNotificationToggle() {
+      const bind = () => {
+        const toggle = document.getElementById("notificationToggle");
+        const panel = document.getElementById("notificationPanel");
+        if (!toggle || !panel || toggle.dataset.boundToggle === "true") return;
+        toggle.dataset.boundToggle = "true";
+        const closePanel = () => {
+          panel.classList.remove("show");
+          panel.classList.add("hidden");
+          panel.style.display = "none";
+        };
+        toggle.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const willShow = !panel.classList.contains("show");
+          panel.classList.toggle("show", willShow);
+          panel.classList.toggle("hidden", !willShow);
+          panel.style.display = willShow ? "flex" : "none";
+        });
+        document.addEventListener("click", (event) => {
+          if (toggle.contains(event.target) || panel.contains(event.target)) return;
+          closePanel();
+        });
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") closePanel();
+        });
       };
       if (document.readyState === "complete" || document.readyState === "interactive") {
-        init();
+        bind();
       } else {
-        window.addEventListener('DOMContentLoaded', init, { once: true });
+        window.addEventListener("DOMContentLoaded", bind, { once: true });
       }
     })();
-
   </script>
   <script>
     const sidebarToggle = document.getElementById('sidebarToggle');
