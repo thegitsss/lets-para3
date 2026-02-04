@@ -99,6 +99,31 @@
       color: var(--gold);
     }
 
+    .faq-label {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 0.9rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #6b7280;
+      margin: 20px 0 10px;
+    }
+
+    .faq-list {
+      list-style: disc;
+      padding-left: 1.1rem;
+      margin: 0 0 20px;
+    }
+
+    .faq-list li {
+      margin: 8px 0;
+    }
+
+    .faq-list li::marker {
+      font-size: 0.65em;
+      color: var(--gold);
+    }
+
     #cta h2,
     #cta p,
     #cta .cta {
@@ -231,15 +256,15 @@
 
   <section id="q6" class="card">
     <h2>6) What Let’s-ParaConnect is — and isn’t</h2>
-    <p><strong>It is:</strong></p>
-    <ul>
+    <p class="faq-label">It is</p>
+    <ul class="faq-list">
       <li>A professional, escrow-backed platform for project-based legal work</li>
       <li>Built specifically for solo and small-firm attorneys</li>
       <li>Designed for experienced paralegals</li>
       <li>Structured, transparent, and intentional</li>
     </ul>
-    <p><strong>It is not:</strong></p>
-    <ul>
+    <p class="faq-label">It is not</p>
+    <ul class="faq-list">
       <li>A staffing agency</li>
       <li>A placement service</li>
       <li>A job board</li>
@@ -256,7 +281,7 @@
 
   <section id="q8" class="card">
     <h2>8) Are there platform fees?</h2>
-    <p>Yes. Let’s-ParaConnect applies a 21% platform fee to completed cases. This fee supports attorney and paralegal vetting, escrow-based payment handling, and the ongoing operation of the platform. Let’s-ParaConnect also covers all Stripe payment processing fees, and no additional transaction charges are assessed.</p>
+    <p>Yes. Let’s-ParaConnect applies a 21% platform fee to completed cases. This fee supports the attorney and paralegal vetting process, secure escrow-based payment handling, and ongoing platform operations. All Stripe processing fees are covered by Let’s-ParaConnect, and no additional transaction charges are assessed.</p>
   </section>
 
   <section id="q9" class="card">
