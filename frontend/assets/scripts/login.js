@@ -1,10 +1,5 @@
 const API_BASE = "/api";
 
-function getTurnstileToken(form) {
-  const input = form?.querySelector('input[name="cf-turnstile-response"]');
-  return input?.value?.trim() || "";
-}
-
 const clearLocalSession = () => {
   if (window.clearStoredSession) window.clearStoredSession();
   try {
@@ -83,7 +78,6 @@ if (!skipInit) {
   const twoFactorBackBtn = document.getElementById("twoFactorBackBtn");
   let pendingTwoFactorEmail = "";
   let useBackupCode = false;
-  let pendingTurnstileLogin = null;
 
   const notify = (message, type = "err") => {
     if (toastHelper) {
@@ -125,7 +119,7 @@ if (!skipInit) {
     loginButton.textContent = label || "Log In";
   };
 
-  const submitLogin = async ({ email, password, turnstileToken, originalLabel }) => {
+  const submitLogin = async ({ email, password, originalLabel }) => {
     let shouldRestoreButton = true;
 
     try {
@@ -141,7 +135,7 @@ if (!skipInit) {
           ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
         },
         credentials: "include",
-        body: JSON.stringify({ email, password, turnstileToken }),
+        body: JSON.stringify({ email, password }),
       });
 
       let data = {};
@@ -152,9 +146,6 @@ if (!skipInit) {
       if (!res.ok) {
         clearLocalSession();
         const msg = data?.error || data?.msg || data?.message || "Login failed";
-        if (window.turnstile?.reset) {
-          window.turnstile.reset();
-        }
         notify(msg);
         return;
       }
@@ -186,80 +177,14 @@ if (!skipInit) {
     }
   };
 
-  const startTurnstileLogin = (email, password, originalLabel) => {
-    if (pendingTurnstileLogin) return;
-    pendingTurnstileLogin = { email, password, originalLabel };
-    if (loginButton) {
-      loginButton.disabled = true;
-      loginButton.textContent = "Verifying…";
-    }
-    if (window.turnstile?.execute) {
-      if (window.turnstile.ready) {
-        window.turnstile.ready(() => window.turnstile.execute());
-      } else {
-        window.turnstile.execute();
-      }
-      return;
-    }
-    pendingTurnstileLogin = null;
-    restoreLoginButton(originalLabel);
-    notify("Verification failed to load. Refresh and try again.");
-  };
-
-  window.onTurnstileLoginSuccess = (token) => {
-    const pending = pendingTurnstileLogin;
-    pendingTurnstileLogin = null;
-    if (!pending) return;
-    const finalToken = token || getTurnstileToken(loginForm);
-    if (!finalToken) {
-      if (window.turnstile?.reset) {
-        window.turnstile.reset();
-      }
-      restoreLoginButton(pending.originalLabel);
-      notify("Verification expired. Please try again.");
-      return;
-    }
-    submitLogin({ ...pending, turnstileToken: finalToken });
-  };
-
-  window.onTurnstileLoginError = () => {
-    const pending = pendingTurnstileLogin;
-    pendingTurnstileLogin = null;
-    if (window.turnstile?.reset) {
-      window.turnstile.reset();
-    }
-    if (pending) {
-      restoreLoginButton(pending.originalLabel);
-    }
-    notify("Verification failed. Please try again.");
-  };
-
-  window.onTurnstileLoginExpired = () => {
-    const pending = pendingTurnstileLogin;
-    pendingTurnstileLogin = null;
-    if (window.turnstile?.reset) {
-      window.turnstile.reset();
-    }
-    if (pending) {
-      restoreLoginButton(pending.originalLabel);
-    }
-    notify("Verification expired. Please try again.");
-  };
-
   loginForm?.addEventListener("submit", (e) => {
     e.preventDefault();
 
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value.trim();
     const originalLabel = loginButton?.textContent || "Log In";
-    const turnstileToken = getTurnstileToken(loginForm);
 
-    if (!turnstileToken) {
-      startTurnstileLogin(email, password, originalLabel);
-      return;
-    }
-
-    submitLogin({ email, password, turnstileToken, originalLabel });
+    submitLogin({ email, password, originalLabel });
   });
 
   if (twoFactorBackupToggle) {

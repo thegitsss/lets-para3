@@ -725,29 +725,6 @@ router.post(
   "/login",
   asyncHandler(async (req, res) => {
     const { email, password } = req.body || {};
-    const enforceTurnstile = String(process.env.TURNSTILE_ENFORCED || "true").toLowerCase() === "true";
-
-    if (IS_PROD && enforceTurnstile) {
-      const turnstileToken =
-        req.body?.turnstileToken ||
-        req.body?.["cf-turnstile-response"] ||
-        req.body?.cfTurnstileResponse ||
-        req.body?.recaptchaToken ||
-        req.body?.recaptcha ||
-        "";
-      if (!process.env.TURNSTILE_SECRET) {
-        return res.status(500).json({ error: "Turnstile is not configured." });
-      }
-      if (!turnstileToken) {
-        return res.status(400).json({ error: "Turnstile verification failed" });
-      }
-
-      const verification = await verifyTurnstile(turnstileToken, req.ip);
-      if (!verification?.success) {
-        console.warn("[turnstile] login verify failed", verification?.["error-codes"] || verification?.errorCodes);
-        return res.status(400).json({ error: "Turnstile verification failed" });
-      }
-    }
 
     if (!isEmail(email) || !password) {
       return res.status(400).json({ msg: "Invalid credentials" });

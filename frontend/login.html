@@ -65,7 +65,6 @@
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js"></script>
   <style>
     .gold{color:var(--gold);}
     html, body {
@@ -347,12 +346,6 @@ button[type="submit"]:focus-visible {
       font-size: 0.95rem;
     }
 
-    .turnstile-wrap {
-      margin: 0;
-      height: 0;
-      overflow: hidden;
-    }
-
     @media (max-width: 768px) {
       .login-title {
         display: none;
@@ -382,17 +375,6 @@ button[type="submit"]:focus-visible {
             <div class="pw-wrap">
               <input id="password" name="password" type="password" placeholder="••••••••" required />
               <button type="button" class="show-toggle" aria-pressed="false">Show</button>
-            </div>
-
-            <div class="turnstile-wrap" aria-hidden="true">
-              <div
-                class="cf-turnstile"
-                data-sitekey="0x4AAAAAACND61mi1ZgPWRsA"
-                data-appearance="execute"
-                data-callback="onTurnstileLoginSuccess"
-                data-error-callback="onTurnstileLoginError"
-                data-expired-callback="onTurnstileLoginExpired"
-              ></div>
             </div>
 
             <button type="submit" class="login-btn">Log In</button>
