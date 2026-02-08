@@ -704,6 +704,13 @@
       color: var(--muted);
     }
 
+    .inquire-modal .invite-lock-note {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
     .job-list {
       display: flex;
       flex-direction: column;
@@ -985,6 +992,7 @@
       <h3>Send Inquiry</h3>
       <p id="selectedParalegalText">Select a case to send this paralegal.</p>
       <div class="job-list" id="jobList"></div>
+      <p class="invite-lock-note">Sending an invitation locks the escrow amount for the selected case.</p>
       <label class="modal-note">
         <span>Optional message</span>
         <textarea id="inquireMessage" placeholder="Add context or next steps" rows="3"></textarea>

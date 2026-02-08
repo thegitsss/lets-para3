@@ -467,12 +467,10 @@
     }
     html.js .main {
       opacity: 0.85;
-      transform: translateY(4px);
-      transition: opacity 0.35s ease, transform 0.35s ease;
+      transition: opacity 0.35s ease;
     }
     html.js body.is-ready .main {
       opacity: 1;
-      transform: none;
     }
 
     .dashboard-view {
@@ -1187,6 +1185,38 @@
       gap: 1.25rem;
     }
 
+    .cases-apps-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      gap: 0;
+      align-items: start;
+    }
+
+    .cases-column,
+    .apps-column {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-width: 0;
+    }
+
+    .cases-column {
+      padding-right: 2rem;
+    }
+
+    .apps-column {
+      padding-left: 2rem;
+      border-left: 1px solid var(--line);
+    }
+
+    .apps-column .applied-header {
+      margin-top: 0;
+    }
+
+    .apps-column .applied-controls {
+      margin-top: 0;
+    }
+
     .applied-header {
       display: flex;
       align-items: flex-end;
@@ -1215,6 +1245,40 @@
     .applied-toggle-btn:hover {
       border-color: var(--accent);
       color: var(--accent);
+    }
+
+    .applied-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .applied-page-btn {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 0.35rem 1rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
+    }
+
+    .applied-page-btn:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .applied-page-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .applied-page-info {
+      font-size: 0.85rem;
+      color: var(--muted);
     }
 
     .applied-controls {
@@ -1247,7 +1311,25 @@
       color: var(--muted);
     }
 
+    .availability-hidden {
+      display: none;
+    }
+
     @media (max-width: 820px) {
+      .cases-apps-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .cases-column {
+        padding-right: 0;
+      }
+
+      .apps-column {
+        margin-top: 1.5rem;
+        padding-left: 0;
+        border-left: none;
+      }
+
       .applied-header {
         flex-direction: column;
         align-items: flex-start;
@@ -1256,6 +1338,11 @@
       .applied-controls {
         flex-direction: column;
         align-items: stretch;
+      }
+
+      .applied-pagination {
+        justify-content: flex-start;
+        flex-wrap: wrap;
       }
 
       .applied-count {
@@ -1268,6 +1355,70 @@
       border-radius: var(--radius);
       padding: 1.25rem 1.5rem;
       background: var(--panel);
+    }
+
+    .activity-card .case-header {
+      cursor: default;
+    }
+
+    .activity-list {
+      list-style: none;
+      padding: 0;
+      margin: 1rem 0 0;
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .activity-item {
+      border-top: 1px solid var(--line);
+      padding-top: 0.85rem;
+    }
+
+    .activity-item:first-child {
+      border-top: none;
+      padding-top: 0;
+    }
+
+    .activity-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .activity-title {
+      font-size: 1rem;
+      font-weight: 300;
+    }
+
+    .activity-link {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .activity-link:hover {
+      text-decoration: underline;
+      text-decoration-color: var(--accent);
+    }
+
+    .activity-time {
+      font-size: 0.85rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .activity-meta {
+      margin-top: 0.2rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .activity-action {
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      text-align: left;
     }
 
     .dashboard-card {
@@ -1346,6 +1497,52 @@
       gap: 10px;
       flex-wrap: wrap;
       align-items: center;
+    }
+
+    .case-card .case-actions button,
+    .case-card .case-actions a {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-family: var(--font-sans);
+      font-weight: 200;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s ease, background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .case-card .case-actions button:hover,
+    .case-card .case-actions a:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+      background: rgba(182, 164, 122, 0.1);
+    }
+
+    body.theme-dark .case-card .case-actions button,
+    body.theme-dark .case-card .case-actions a,
+    html.theme-dark .case-card .case-actions button,
+    html.theme-dark .case-card .case-actions a {
+      border-color: rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.06);
+      color: #f4f6fb;
+    }
+
+    body.theme-dark .case-card .case-actions [data-action="primary"],
+    html.theme-dark .case-card .case-actions [data-action="primary"] {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #ffffff;
+    }
+
+    body.theme-dark .case-card .case-actions [data-action="secondary"],
+    html.theme-dark .case-card .case-actions [data-action="secondary"] {
+      background: rgba(255, 255, 255, 0.02);
+      color: #f4f6fb;
     }
 
     .case-item,
@@ -2158,6 +2355,16 @@
       background: var(--panel);
     }
 
+    .note-modal-actions .revoke-btn {
+      border-color: rgba(185, 28, 28, 0.4);
+      color: #b91c1c;
+      background: #fff5f5;
+    }
+
+    .note-modal-actions .revoke-btn:hover {
+      background: #fee2e2;
+    }
+
     /* Premium polish */
     :root {
       --shadow-sm: 0 10px 24px rgba(15, 23, 42, 0.08);
@@ -2275,7 +2482,6 @@
     <div id="paralegalHomeView" class="dashboard-view is-active">
       <header>
         <h1><span id="welcomeGreeting">Welcome</span><span id="user-name-heading" data-field="name"></span></h1>
-        <p><span data-field="welcomeSubheading"></span></p>
       </header>
 
       <div id="paralegalWelcomeNotice" class="welcome-notice hidden" role="status" aria-live="polite">
@@ -2312,22 +2518,20 @@
         </div>
       </section>
 
-      <div class="side-by-side-panels">
-        <section>
-          <div class="section-title">Availability</div>
-          <div class="info-line">Status: <span id="availabilityStatus">Available now</span></div>
-          <div class="info-line" id="availabilityNextRow">Next available date: <span id="availabilityNext">This week</span></div>
-          <div class="info-line"><a href="#" id="updateAvailabilityLink" class="card-link">Update availability →</a></div>
-        </section>
-      </div>
-
       <section class="quick-actions">
         <div class="section-title">Quick Actions</div>
         <button type="button" data-action="browse">Browse postings</button>
+        <button type="button" data-action="availability">Update availability</button>
       </section>
+      <div class="availability-hidden" aria-hidden="true">
+        <span id="availabilityStatus">Available now</span>
+        <span id="availabilityNext"></span>
+        <span id="availabilityNextRow"></span>
+        <a href="#" id="updateAvailabilityLink">Update availability</a>
+      </div>
 
       <div class="side-by-side-panels case-panels">
-        <section class="case-list" id="inviteList">
+        <section class="case-list" id="recentActivityList">
           <div class="case-card skeleton-card" aria-hidden="true">
             <div class="case-header">
               <div class="skeleton-stack">
@@ -2337,93 +2541,73 @@
             </div>
           </div>
         </section>
-        <section class="case-list" id="assignedCasesList">
-          <div class="dashboard-card full-width" id="recommendedPostingsCard">
-            <h3 class="card-title">Recommended for You</h3>
-            <ul class="recommendations-list"></ul>
-            <a href="browse-jobs.html" class="card-link">Refine filters →</a>
+        <section class="case-list" id="assignmentList">
+          <div class="case-card skeleton-card" aria-hidden="true">
+            <div class="case-header">
+              <div class="skeleton-stack">
+                <div class="skeleton-line long"></div>
+                <div class="skeleton-line medium"></div>
+              </div>
+            </div>
           </div>
         </section>
       </div>
-
-      <section class="case-list" id="assignmentList">
-        <div class="case-card skeleton-card" aria-hidden="true">
-          <div class="case-header">
-            <div class="skeleton-stack">
-              <div class="skeleton-line long"></div>
-              <div class="skeleton-line medium"></div>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
 
     <div id="paralegalCasesView" class="dashboard-view" hidden>
       <header class="page-header">
         <div>
           <h1>Cases and Applications</h1>
-          <p>Track your applications and manage active case files.</p>
+          <p>Track your applications and manage active cases.</p>
         </div>
       </header>
 
-      <div class="section-title" style="margin-top:1.5rem;">Active Cases</div>
-      <div class="filters">
-        <label for="casesSort">Sort By</label>
-        <select id="casesSort" name="casesSort">
-          <option value="active">Active</option>
-          <option value="completed">Completed</option>
-          <option value="all" selected>All</option>
-        </select>
-      </div>
-      <div class="case-files" id="filesContainer">
-        <p class="case-files-empty">Loading files…</p>
-      </div>
-      <section class="case-list" id="completedCasesList" hidden>
-        <div class="case-card empty-state">
-          <div class="case-header">
+      <div class="cases-apps-grid">
+        <section class="cases-column" aria-label="Active cases">
+          <div class="section-title">Active Cases</div>
+          <div class="case-files" id="filesContainer">
+            <p class="case-files-empty">Loading cases…</p>
+          </div>
+        </section>
+
+        <section class="apps-column" aria-label="Applications">
+          <div class="applied-header">
             <div>
-              <h2>Loading completed cases</h2>
-              <div class="case-subinfo">Completed case history will appear here.</div>
+              <h2>My Applications</h2>
+              <div class="case-subinfo">Search and filter your recent applications.</div>
             </div>
           </div>
-        </div>
-      </section>
-
-      <div class="applied-header" style="margin-top:1.5rem;">
-        <div>
-          <h2>My Applications</h2>
-          <div class="case-subinfo">Search and filter your recent applications.</div>
-        </div>
-        <button type="button" class="applied-toggle-btn" id="appliedToggleBtn">View all</button>
-      </div>
-      <div class="applied-controls">
-        <input type="search" id="appliedSearch" placeholder="Search by job title or practice area" />
-        <select id="appliedStatusFilter">
-          <option value="all">All statuses</option>
-        </select>
-        <select id="appliedPracticeFilter">
-          <option value="all">All practice areas</option>
-        </select>
-        <select id="appliedDateFilter">
-          <option value="3">Last 3 days</option>
-          <option value="5">Last 5 days</option>
-          <option value="7">Last week</option>
-          <option value="30">Last month</option>
-          <option value="all">All time</option>
-        </select>
-        <span class="applied-count" id="appliedCount"></span>
-      </div>
-
-      <section class="case-list" id="appliedJobsList">
-        <div class="case-card empty-state">
-          <div class="case-header">
-            <div>
-              <h2>No applications yet</h2>
-              <div class="case-subinfo">Jobs you apply to will appear here.</div>
-            </div>
+          <div class="applied-controls">
+            <input type="search" id="appliedSearch" placeholder="Search by job title or practice area" />
+            <select id="appliedPracticeFilter">
+              <option value="all">All practice areas</option>
+            </select>
+            <select id="appliedDateFilter">
+              <option value="3">Last 3 days</option>
+              <option value="7">Last week</option>
+              <option value="30">Last month</option>
+              <option value="all">All time</option>
+            </select>
+            <span class="applied-count" id="appliedCount"></span>
           </div>
-        </div>
-      </section>
+
+          <section class="case-list" id="appliedJobsList">
+            <div class="case-card empty-state">
+              <div class="case-header">
+                <div>
+                  <h2>No applications yet</h2>
+                  <div class="case-subinfo">Jobs you apply to will appear here.</div>
+                </div>
+              </div>
+            </div>
+          </section>
+          <div class="applied-pagination" aria-label="Applications pagination">
+            <button type="button" class="applied-page-btn" id="appliedPrevBtn" disabled>Previous</button>
+            <span class="applied-page-info" id="appliedPageInfo"></span>
+            <button type="button" class="applied-page-btn" id="appliedNextBtn" disabled>Next</button>
+          </div>
+        </section>
+      </div>
     </div>
     <div class="tour-overlay" id="paralegalTourOverlay" aria-hidden="true"></div>
     <div class="tour-modal" id="paralegalTourModal" role="dialog" aria-modal="true" aria-labelledby="tourTitle" aria-describedby="tourText">
@@ -2455,13 +2639,11 @@
           <h2 data-field="assignmentTitle">Case name</h2>
           <div class="case-subinfo" data-field="assignmentMeta"></div>
         </div>
-        <div aria-hidden="true">▾</div>
       </div>
       <div class="case-content">
         <p data-field="assignmentSummary"></p>
         <div class="case-actions">
           <button data-action="primary">Open Workspace</button>
-          <button data-action="secondary">Message Attorney</button>
         </div>
       </div>
     </div>
@@ -2500,6 +2682,7 @@
         <p class="muted">Loading application...</p>
       </div>
       <div class="note-modal-actions">
+        <button type="button" class="btn secondary revoke-btn" data-application-revoke>Revoke application</button>
         <button type="button" class="btn secondary" data-application-close>Close</button>
       </div>
     </div>
@@ -2571,7 +2754,6 @@
   </script>
   <script type="module" src="assets/scripts/paralegal-dashboard.js"></script>
   <script type="module">
-    import { initCaseFilesView } from "./assets/scripts/case-files-view.js";
     import { secureFetch } from "./assets/scripts/auth.js";
 
     document.addEventListener("DOMContentLoaded", () => {
@@ -2583,123 +2765,87 @@
       let casesReady = false;
       let activeKey = "home";
 
-      const completedList = document.getElementById("completedCasesList");
       const filesContainer = document.getElementById("filesContainer");
-      const sortSelect = document.getElementById("casesSort");
+      let activeCasesCache = [];
+
+      function escapeHTML(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
 
       function formatCurrency(value = 0) {
         const amount = Number(value) || 0;
         return amount.toLocaleString(undefined, { style: "currency", currency: "USD" });
       }
 
-      function renderCompletedCases(items = []) {
-        if (!completedList) return;
+      function formatStatus(value) {
+        const raw = String(value || "").trim();
+        if (!raw) return "";
+        const cleaned = raw.replace(/_/g, " ");
+        return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+      }
+
+      function renderActiveCases(items = activeCasesCache) {
+        if (!filesContainer) return;
         if (!items.length) {
-          completedList.innerHTML = `
-            <div class="case-card empty-state">
-              <div class="case-header">
-                <div>
-                  <h2>No completed cases yet</h2>
-                  <div class="case-subinfo">Completed case history will appear here.</div>
-                </div>
-              </div>
-            </div>
-          `;
+          filesContainer.innerHTML = `<p class="case-files-empty">No active cases yet. New assignments will show up here.</p>`;
           return;
         }
-        completedList.innerHTML = items
+        filesContainer.innerHTML = items
           .map((item) => {
-            const title = item.title || "Untitled Case";
+            const caseId = item.caseId || item.id || item._id || "";
+            const title = item.jobTitle || item.title || "Case";
             const attorney = item.attorneyName || "Attorney";
-            const completedAt = item.completedAt
-              ? new Date(item.completedAt).toLocaleDateString()
-              : "—";
-            const payment = formatCurrency(item.paymentAmount || 0);
-            const receiptLink = item.caseId
-              ? `<a class="receipt-link" href="/api/payments/receipt/paralegal/${encodeURIComponent(item.caseId)}?regen=1" target="_blank" rel="noopener">Download Receipt</a>`
-              : "Receipt unavailable";
+            const status = formatStatus(item.status);
+            const deadline = item.deadline ? new Date(item.deadline).toLocaleDateString() : "";
+            const meta = [
+              `Attorney: ${attorney}`,
+              status ? `Status: ${status}` : "",
+              deadline ? `Deadline: ${deadline}` : "",
+            ]
+              .filter(Boolean)
+              .map((line) => `<span>${escapeHTML(line)}</span>`)
+              .join("");
+            const viewLink = caseId
+              ? `case-detail.html?caseId=${encodeURIComponent(caseId)}`
+              : "#";
             return `
-              <div class="case-card">
-                <div class="case-header">
-                  <div>
-                    <h2>${title}</h2>
-                    <div class="case-subinfo">Attorney: ${attorney}</div>
-                    <div class="case-subinfo">Completed: ${completedAt}</div>
-                    <div class="case-subinfo">Payment: ${payment}</div>
-                    <div class="case-subinfo">Receipt: ${receiptLink}</div>
-                  </div>
-                  <span class="case-tag" aria-label="Completed">
-                    <span class="check" aria-hidden="true">✓</span>
-                    Completed
-                  </span>
+              <article class="file-card" data-case-id="${escapeHTML(caseId)}">
+                <div class="file-line">
+                  <span class="file-name">${escapeHTML(title)}</span>
                 </div>
-              </div>
+                <div class="file-meta">${meta}</div>
+                <div class="file-actions">
+                  <a href="${viewLink}" class="btn-link">View case</a>
+                </div>
+              </article>
             `;
           })
           .join("");
       }
 
-      async function loadCompletedCases() {
-        if (!completedList) return;
-        completedList.innerHTML = `
-          <div class="case-card empty-state">
-            <div class="case-header">
-              <div>
-                <h2>Loading completed cases</h2>
-                <div class="case-subinfo">Completed case history will appear here.</div>
-              </div>
-            </div>
-          </div>
-        `;
+      async function loadActiveCases() {
+        if (!filesContainer) return;
+        filesContainer.innerHTML = `<p class="case-files-empty">Loading cases…</p>`;
         try {
-          const res = await secureFetch("/api/cases/my-completed?limit=200", {
+          const res = await secureFetch("/api/paralegal/dashboard", {
             headers: { Accept: "application/json" },
           });
           const payload = await res.json().catch(() => ({}));
           if (!res.ok) {
-            throw new Error(payload?.error || "Unable to load completed cases.");
+            throw new Error(payload?.error || "Unable to load active cases.");
           }
-          const items = Array.isArray(payload?.items) ? payload.items : [];
-          renderCompletedCases(items);
+          activeCasesCache = Array.isArray(payload?.activeCases) ? payload.activeCases : [];
+          renderActiveCases(activeCasesCache);
         } catch (err) {
-          completedList.innerHTML = `
-            <div class="case-card empty-state">
-              <div class="case-header">
-                <div>
-                  <h2>Unable to load completed cases</h2>
-                  <div class="case-subinfo">${err?.message || "Please refresh to try again."}</div>
-                </div>
-              </div>
-            </div>
-          `;
+          filesContainer.innerHTML = `<p class="case-files-empty">${escapeHTML(
+            err?.message || "Unable to load active cases."
+          )}</p>`;
         }
-      }
-
-      function setCompletedMode(mode) {
-        const showCompleted = mode !== "hidden";
-        const hideFiles = mode === "completed";
-        if (filesContainer) {
-          filesContainer.hidden = hideFiles;
-          filesContainer.style.display = hideFiles ? "none" : "";
-        }
-        if (completedList) {
-          completedList.hidden = !showCompleted;
-          completedList.style.display = showCompleted ? "" : "none";
-        }
-        if (showCompleted) {
-          void loadCompletedCases();
-        }
-      }
-
-      function getCasesMode() {
-        const value = sortSelect?.value || "all";
-        if (value === "completed") return "completed";
-        if (value === "all") return "all";
-        return "hidden";
-      }
-
-      function syncCasesMode() {
-        setCompletedMode(getCasesMode());
       }
 
       function setActiveView(target = "home") {
@@ -2721,24 +2867,12 @@
         });
         if (key === "cases" && !casesReady) {
           casesReady = true;
-          initCaseFilesView({
-            containerId: "filesContainer",
-            emptyCopy: "No active cases yet. New assignments will show up here.",
-            gatedCopy: "No funded cases yet.",
-            unauthorizedCopy: "You need a paralegal account to view these files.",
-          }).catch((error) => console.warn("Case files view failed", error));
-        }
-        if (key === "cases") {
-          syncCasesMode();
+          loadActiveCases().catch((error) => console.warn("Active cases load failed", error));
         }
         if (key === "cases") {
           history.replaceState(null, "", `${basePath}#cases`);
         } else {
           history.replaceState(null, "", basePath);
-        }
-        if (key !== "cases") {
-          setCompletedMode("hidden");
-          if (sortSelect) sortSelect.value = "all";
         }
         if (key !== activeKey) {
           const main = document.getElementById("main");
@@ -2760,12 +2894,6 @@
       window.addEventListener("hashchange", () => {
         setActiveView(window.location.hash === "#cases" ? "cases" : "home");
       });
-
-      if (sortSelect) {
-        sortSelect.addEventListener("change", () => {
-          syncCasesMode();
-        });
-      }
 
       setActiveView(window.location.hash === "#cases" ? "cases" : "home");
     });

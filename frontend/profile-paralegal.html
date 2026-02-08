@@ -85,6 +85,8 @@
       z-index: 20;
       background: #fff;
       box-shadow: 0 40px 90px rgba(15, 23, 42, 0.25);
+      display: flex;
+      flex-direction: column;
     }
 
     .topbar {
@@ -638,19 +640,26 @@
       text-decoration: underline;
     }
 
-    #joinedMeta,
     #credentialMeta {
       justify-content: center;
       text-align: center;
       width: 100%;
     }
 
-    .joined-meta-corner {
-      display: none;
-      width: 100%;
-      justify-content: flex-start;
+    .profile-joined-footer {
       margin-top: auto;
-      padding-left: 6px;
+      padding-top: 12px;
+      display: flex;
+      justify-content: center;
+      color: #9aa3b2;
+      font-size: 0.85rem;
+      letter-spacing: 0.02em;
+    }
+
+    .profile-joined-footer .hero-meta-pill {
+      width: auto;
+      text-shadow: none;
+      color: inherit;
     }
 
     body.viewer-attorney .profile-layout {
@@ -659,20 +668,6 @@
 
     body.viewer-attorney .profile-sidebar {
       align-items: stretch;
-    }
-
-    body.viewer-attorney #joinedMeta {
-      display: none;
-    }
-
-    body.viewer-attorney .joined-meta-corner {
-      display: flex;
-    }
-
-    body.viewer-attorney .joined-meta-corner .hero-meta-pill {
-      width: auto;
-      justify-content: flex-start;
-      text-align: left;
     }
 
     .profile-layout {
@@ -913,6 +908,12 @@
       cursor: pointer;
       letter-spacing: 0.03em;
       transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    #inviteToCaseBtn[data-mode="hire"] {
+      font-family: "Cormorant Garamond", "Times New Roman", serif;
+      font-weight: 300;
+      letter-spacing: 0.02em;
     }
 
     .hero-cta-row button:hover:not(:disabled) {
@@ -1280,6 +1281,14 @@
       font-size: 0.95rem;
     }
 
+    .invite-modal .invite-note {
+      margin: 0;
+      color: #6b7280;
+      font-size: 0.9rem;
+      text-align: center;
+      line-height: 1.4;
+    }
+
     .invite-modal label {
       display: flex;
       flex-direction: column;
@@ -1462,12 +1471,6 @@
         margin-top: 22px;
       }
 
-      body.viewer-attorney .joined-meta-corner {
-        justify-content: center;
-        padding-left: 0;
-        margin-top: 12px;
-      }
-
       img,
       svg,
       video,
@@ -1588,7 +1591,6 @@
             <div class="profile-meta-columns">
               <div class="meta-column">
                 <span id="locationMeta" class="hero-meta-pill">Location</span>
-                <span id="joinedMeta" class="hero-meta-pill">Joined date unavailable</span>
               </div>
               <div class="meta-column">
                 <div class="profile-docs-stack">
@@ -1632,9 +1634,6 @@
             <a href="#" target="_blank" rel="noopener" id="writingSampleLink" class="doc-chip hidden">Writing Sample</a>
           </div>
         </article>
-        <div class="joined-meta-corner" aria-hidden="true">
-          <span id="joinedMetaCorner" class="hero-meta-pill">Joined date unavailable</span>
-        </div>
       </aside>
 
       <section class="profile-main">
@@ -1693,6 +1692,9 @@
       <div class="card-title">Fun Facts &amp; Extras</div>
       <p id="funFactsCopy"></p>
     </article>
+    <div class="profile-joined-footer">
+      <span id="joinedMeta" class="hero-meta-pill">Joined date unavailable</span>
+    </div>
   </div>
 
   <!-- Modal + toast + scripts stay intact -->
@@ -1704,6 +1706,7 @@
         <span style="display:block;font-size:0.9rem;color:var(--muted);margin-bottom:6px;">Select a case</span>
         <select id="inviteCaseSelect"></select>
       </label>
+      <p class="invite-note">Sending an invitation locks the escrow amount for this case.</p>
       <div class="modal-actions">
         <button type="button" id="sendInviteBtn" class="confirm" disabled>Send Invite</button>
         <button type="button" id="closeInviteBtn">Cancel</button>

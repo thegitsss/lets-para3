@@ -62,6 +62,10 @@
       --radius:14px;
       --font-serif:'Cormorant Garamond',serif;
       --font-sans:'Sarabun',sans-serif;
+      --notif-card-bg:linear-gradient(160deg, rgba(248,249,252,0.78), rgba(232,234,240,0.6));
+      --notif-card-border:rgba(255,255,255,0.72);
+      --notif-card-shadow:0 10px 24px rgba(8,10,16,0.12), inset 0 1px 0 rgba(255,255,255,0.55);
+      --notif-card-hover-shadow:0 14px 30px rgba(8,10,16,0.16), inset 0 1px 0 rgba(255,255,255,0.58);
     }
     body.theme-dark{
       --bg:#0f172a;
@@ -71,6 +75,10 @@
       --muted:#9aa7c4;
       --line:rgba(255,255,255,0.08);
       --sidebar-text:#f8fbff;
+      --notif-card-bg:linear-gradient(160deg, rgba(54,60,73,0.68), rgba(29,34,45,0.58));
+      --notif-card-border:rgba(255,255,255,0.24);
+      --notif-card-shadow:0 12px 30px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16);
+      --notif-card-hover-shadow:0 16px 36px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
     }
     body.theme-mountain{
       --bg:#f8f6f1;
@@ -191,6 +199,32 @@
       color:var(--muted);
       text-align:center;
     }
+    .sidebar-toggle {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      position: relative;
+      z-index: 2100;
+    }
+    .sidebar-toggle-icon {
+      width: 28px;
+      height: 28px;
+      display: block;
+    }
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.35);
+      z-index: 1900;
+    }
     /* uniform style for step bubbles across all create-case pages */
 .steps {
   display: flex;
@@ -245,28 +279,83 @@
 
     /* Main */
     .main{flex:1;padding:40px;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;}
-    .topbar{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:2rem;gap:1.5rem;position:relative;min-height:72px;}
+    .topbar{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:0.2rem;gap:1.5rem;position:relative;min-height:0;}
+    #createCaseTopbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;}
+    .notification-wrapper{position:relative;}
+    .topbar .lpc-shared-header{margin-bottom:0.2rem !important;}
     .notification-icon{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);display:flex;justify-content:center;align-items:center;background:#fff;cursor:pointer;position:relative;transition:border-color .2s ease, transform .2s ease;}
     .notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
     .notification-icon svg{width:22px;height:22px;color:var(--ink);}
-    .notification-badge{position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:999px;font-size:.75rem;padding:2px 6px;line-height:1;display:none;font-weight:200;}
+    .notification-badge{position:absolute;top:-4px;right:-4px;background:var(--accent);color:#fff;border-radius:999px;font-size:.75rem;padding:2px 6px;line-height:1;display:none;font-weight:200;}
     .notification-badge.show{display:inline-flex;}
+    #createCaseTopbar .notifications-panel{position:absolute;top:56px;right:0;width:min(340px,calc(100vw - 24px));background:transparent !important;border:none !important;box-shadow:none !important;outline:none !important;filter:none !important;padding:0 !important;opacity:0;pointer-events:none;transform:translateY(-8px) scale(0.98);transition:opacity .26s ease,transform .32s cubic-bezier(.22,.76,.28,1);z-index:40;display:flex;flex-direction:column;visibility:hidden;}
+    #createCaseTopbar .notifications-panel.show{opacity:1;pointer-events:auto;transform:translateY(0) scale(1);visibility:visible;}
+    #createCaseTopbar .notifications-panel.hidden{opacity:0;pointer-events:none;visibility:hidden;}
+    #createCaseTopbar .notifications-panel .notif-header{display:none !important;}
+    #createCaseTopbar .notifications-panel .notif-scroll{
+      --notif-gap: 12px;
+      max-height: none;
+      overflow: visible;
+      display: flex;
+      flex-direction: column;
+      gap: var(--notif-gap);
+      padding: 4px 2px;
+    }
+    #createCaseTopbar .notifications-panel .notif-scroll{background:transparent !important;border:none !important;box-shadow:none !important;outline:none !important;}
+    #createCaseTopbar .notifications-panel .notif-empty{padding:10px 2px 2px;text-align:left;font-size:.9rem;color:var(--muted,#777);margin:0;background:transparent !important;border:none !important;box-shadow:none !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;}
+    #createCaseTopbar .notifications-panel .notif-markall{display:none !important;}
+    #createCaseTopbar .notif-card{width:100%;text-align:left;border:1px solid rgba(255,255,255,0.48) !important;background:var(--notif-card-bg) !important;padding:8px 9px;border-radius:12px;cursor:pointer;box-shadow:var(--notif-card-shadow);backdrop-filter:blur(28px) saturate(145%) !important;-webkit-backdrop-filter:blur(28px) saturate(145%) !important;opacity:0;transform:translateY(-16px) scale(0.98);transition:opacity .34s ease,transform .36s cubic-bezier(.2,.72,.2,1),box-shadow .22s ease;transition-delay:var(--drop-delay, 0ms);}
+    #createCaseTopbar .notif-card.is-ready{opacity:1;transform:translateY(0) scale(1);}
+    #createCaseTopbar .notif-card:hover{box-shadow:var(--notif-card-hover-shadow);}
+    #createCaseTopbar .notif-card .notif-main{display:flex;align-items:flex-start;gap:6px;}
+    #createCaseTopbar .notif-card .notif-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:6px;opacity:0;}
+    #createCaseTopbar .notif-card.unread .notif-dot{opacity:1;}
+    #createCaseTopbar .notif-card .notif-copy{display:flex;flex-direction:column;gap:3px;min-width:0;}
+    #createCaseTopbar .notif-card .notif-title{font-size:.84rem;line-height:1.28;color:var(--ink);font-weight:400;display:block;white-space:normal;overflow:visible;}
+    #createCaseTopbar .notif-card .notif-time{font-size:.72rem;color:var(--muted,#6b7280);opacity:.95;}
     .user-profile{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.4);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color 0.2s ease,box-shadow .2s ease;cursor:pointer;position:relative;}
     .user-profile img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,0.08);object-fit:cover;}
     .user-profile strong{display:block;font-weight:300;color:var(--ink);}
     .user-profile span{font-size:0.85rem;color:var(--muted);}
+    .profile-dropdown{position:absolute;right:0;top:calc(100% + 10px);background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:16px;box-shadow:0 18px 30px rgba(0,0,0,0.12);display:none;flex-direction:column;min-width:200px;z-index:45;pointer-events:auto;overflow:visible;color:var(--ink,#1a1a1a);}
+    .profile-dropdown.show{display:flex;pointer-events:auto;overflow:visible;}
+    .profile-dropdown button,
+    .profile-dropdown a{background:none;border:none;padding:.85rem 1.1rem;text-align:left;font-size:.92rem;cursor:pointer;color:inherit;text-decoration:none;display:block;font-weight:200;border-radius:12px;margin:4px 6px;width:calc(100% - 12px);}
+    .profile-dropdown button:hover,
+    .profile-dropdown a:hover{background:rgba(0,0,0,0.04);}
+    .profile-dropdown .logout-btn{color:#8f7240;background:rgba(182,164,122,0.14);border:1px solid rgba(182,164,122,0.35);}
+    .profile-dropdown .logout-btn:hover{background:rgba(182,164,122,0.22);color:#6f552b;}
     body.theme-dark .user-profile{background:rgba(15,23,42,0.4);border-color:rgba(255,255,255,0.15);box-shadow:0 10px 25px rgba(0,0,0,0.35);}
     body.theme-dark .user-profile strong{color:#fff;}
     body.theme-dark .user-profile span{color:rgba(255,255,255,0.8);}
+    body.theme-dark .profile-dropdown button:hover,
+    body.theme-dark .profile-dropdown a:hover,
+    body.theme-mountain-dark .profile-dropdown button:hover,
+    body.theme-mountain-dark .profile-dropdown a:hover{background:rgba(255,255,255,0.06);}
     body.theme-mountain .user-profile{background:rgba(255,255,255,0.65);border-color:rgba(255,255,255,0.42);box-shadow:0 18px 34px rgba(17,22,26,0.2);}
     body.theme-mountain .user-profile strong{color:#fff;}
     body.theme-mountain .user-profile span{color:rgba(255,255,255,0.85);}
+    body.theme-mountain #createCaseTopbar .user-profile strong{color:#1a1a1a;}
+    body.theme-mountain #createCaseTopbar .user-profile span{color:#6b6b6b;}
+    body.theme-mountain-dark #createCaseTopbar .notification-icon,
+    body.theme-dark #createCaseTopbar .notification-icon{background:rgba(17,25,40,0.75);border-color:rgba(255,255,255,0.18);}
+    body.theme-mountain-dark #createCaseTopbar .notification-icon svg,
+    body.theme-dark #createCaseTopbar .notification-icon svg{color:#f8fbff;}
+    body.theme-dark #createCaseTopbar .notifications-panel{background:transparent !important;}
+    body.theme-dark #createCaseTopbar .notifications-panel .notif-empty{color:#a9b4d6;}
+    body.theme-dark #createCaseTopbar .notifications-panel .notif-markall{background:transparent !important;border-color:rgba(182,164,122,0.45);color:#f4f7ff;}
+    body.theme-dark #createCaseTopbar .notif-card,
+    body.theme-mountain-dark #createCaseTopbar .notif-card{background:var(--notif-card-bg) !important;border-color:var(--notif-card-border) !important;box-shadow:var(--notif-card-shadow);}
+    body.theme-dark #createCaseTopbar .notif-card .notif-title,
+    body.theme-mountain-dark #createCaseTopbar .notif-card .notif-title{color:#f5f7ff;}
+    body.theme-dark #createCaseTopbar .notif-card .notif-time,
+    body.theme-mountain-dark #createCaseTopbar .notif-card .notif-time{color:#c4cde3;}
 
     header h1{
       font-family:var(--font-serif);
       font-weight:300;
       font-size:2rem;
-      margin-bottom:1rem;
+      margin:0 0 0.75rem;
     }
     header p{font-weight:200;color:var(--muted);margin-bottom:2rem;}
 
@@ -350,6 +439,7 @@
       font-size:0.9rem;
       transition:border-color .2s,box-shadow .2s;
     }
+    textarea{resize:vertical;}
     input:focus,select:focus,textarea:focus{
       border-color:var(--accent);
       box-shadow:0 0 0 3px rgba(182,164,122,0.15);
@@ -607,12 +697,26 @@
     }
 
     .case-title-preview{
-      border:1px solid rgba(182,164,122,0.4);
-      border-radius:var(--radius);
-      background:#fffbe8;
-      padding:1rem 1.2rem;
+      display:flex;
+      flex-direction:column;
+      gap:0.35rem;
       margin-bottom:1rem;
-      font-size:0.95rem;
+      text-align:center;
+      align-items:center;
+    }
+    .case-title-preview .label{
+      text-transform:uppercase;
+      letter-spacing:0.18em;
+      font-size:0.7rem;
+      color:var(--muted);
+      font-weight:300;
+      font-family:var(--font-sans);
+    }
+    .case-title-preview .value{
+      font-family:var(--font-serif);
+      font-size:1.6rem;
+      font-weight:300;
+      color:var(--ink);
     }
 
     .char-count{
@@ -751,6 +855,177 @@
     .toast.inline-toast.error{background:#c0392b;}
     .toast.inline-toast a{color:#fff;text-decoration:underline;margin-left:10px;}
 
+    @media (max-width: 1024px) {
+      body {
+        flex-direction: column;
+        height: auto;
+        overflow: auto;
+      }
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 260px;
+        height: 100vh;
+        border-right: none;
+        border-bottom: none;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        gap: 24px;
+        padding: 24px 18px;
+        padding-top: 72px;
+        transform: translateX(-110%);
+        transition: transform 0.25s ease;
+        z-index: 2000;
+        box-shadow: 18px 0 40px rgba(0, 0, 0, 0.18);
+      }
+      body.nav-open .sidebar {
+        transform: translateX(0);
+      }
+      body.nav-open .sidebar-backdrop {
+        display: block;
+      }
+      .sidebar-toggle {
+        display: inline-flex;
+        position: fixed;
+        top: 14px;
+        left: 14px;
+      }
+      .topbar {
+        margin-bottom: 1.25rem;
+        min-height: 56px;
+        justify-content: flex-end;
+        gap: 12px;
+      }
+      .logo {
+        margin-bottom: 4px;
+        text-align: left;
+        font-size: 1.4rem;
+      }
+      nav {
+        flex-direction: column;
+        gap: 12px;
+      }
+      nav a {
+        width: 100%;
+        text-align: left;
+        padding: 10px 14px;
+        font-size: 0.95rem;
+      }
+      .sidebar-bottom {
+        margin-top: auto;
+        align-items: stretch;
+        gap: 12px;
+      }
+      .sidebar-link {
+        width: 100%;
+        text-align: left;
+        padding: 10px 14px;
+        font-size: 0.95rem;
+      }
+      .sidebar-footer {
+        text-align: left;
+      }
+      .main {
+        padding: 28px 20px 60px;
+        overflow: visible;
+      }
+      .user-profile {
+        padding: 6px 10px;
+      }
+      .user-profile img {
+        width: 38px;
+        height: 38px;
+      }
+      header h1 {
+        font-size: 1.7rem;
+      }
+      header p {
+        margin-bottom: 1.5rem;
+      }
+      .steps {
+        max-width: 100%;
+        margin: 0 0 1.5rem;
+      }
+      .steps::before {
+        left: 8px;
+        right: 8px;
+      }
+      .circle {
+        width: 24px;
+        height: 24px;
+        font-size: 0.75rem;
+      }
+      .step span {
+        font-size: 0.75rem;
+      }
+      form {
+        padding: 1.5rem;
+        width: 100%;
+      }
+      .step-panel .actions,
+      .actions {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 0;
+      }
+      .actions .btn {
+        width: 100%;
+      }
+      .summary {
+        padding: 1.6rem 1.4rem;
+      }
+      .tips {
+        padding: 1.1rem;
+      }
+      .task-input-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .task-input-row button {
+        width: 100%;
+      }
+      .comp-wrapper {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      #comp {
+        width: 100%;
+      }
+      .comp-type {
+        flex-wrap: wrap;
+      }
+      .modal-content {
+        padding: 1.8rem 1.6rem;
+      }
+      .modal-content h3 {
+        font-size: 1.6rem;
+      }
+      .modal-content strong {
+        min-width: 110px;
+      }
+      .toast.inline-toast {
+        right: 16px;
+        left: 16px;
+        max-width: none;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .main {
+        padding: 20px 14px 48px;
+      }
+      .steps {
+        gap: 0.4rem;
+      }
+      .steps::before {
+        top: 12px;
+      }
+      .step span {
+        font-size: 0.7rem;
+      }
+    }
+
   </style>
 </head>
   <body>
@@ -777,8 +1052,11 @@
     })();
   </script>
   <a class="skip-link" href="#main">Skip to main content</a>
+  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
+    <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
+  </button>
   <!-- Sidebar -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebarNav">
     <div class="logo">Dashboard</div>
     <nav>
       <a href="dashboard-attorney.html">Home</a>
@@ -791,10 +1069,40 @@
       <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
     </div>
   </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
   <!-- Main -->
   <main id="main" tabindex="-1" class="main">
-    <div class="topbar" data-attorney-header></div>
+    <div class="topbar" id="createCaseTopbar">
+      <div class="notification-wrapper" data-notification-center>
+        <button class="notification-icon" id="createCaseNotifBtn" type="button" aria-label="View notifications" data-notification-toggle>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 01-3.46 0" />
+          </svg>
+          <span class="notification-badge" id="createCaseNotifBadge" data-notification-badge>0</span>
+        </button>
+        <div class="notifications-panel hidden" role="region" aria-live="polite" data-notification-panel>
+          <div class="notif-header">
+            <span>Notifications</span>
+            <button type="button" class="notif-markall" data-notification-mark>Mark All Read</button>
+          </div>
+          <div class="notif-scroll" data-notification-list></div>
+          <div class="notif-empty" data-notification-empty>Loading...</div>
+        </div>
+      </div>
+      <div class="user-profile" id="createCaseUserChip" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-controls="createCaseProfileMenu" aria-label="Open profile menu">
+        <img id="createCaseAvatar" src="assets/images/default-avatar.png" alt="Attorney avatar" />
+        <div>
+          <strong id="createCaseName">Attorney</strong>
+          <span id="createCaseRole">Attorney</span>
+        </div>
+        <div class="profile-dropdown" id="createCaseProfileMenu" aria-hidden="true">
+          <a href="profile-settings.html" data-account-settings>Account Settings</a>
+          <button type="button" class="logout-btn" data-logout>Log Out</button>
+        </div>
+      </div>
+    </div>
 
     <section class="step-panel" data-step="details" id="create-step-details">
       <header>
@@ -961,7 +1269,7 @@
       </form>
 
       <div class="actions">
-        <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html">Cancel</button>
+        <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html#cases">Cancel</button>
         <button type="button" class="btn primary" data-step-switch="description" id="detailsNextBtn">Next Step</button>
       </div>
     </section>
@@ -987,26 +1295,26 @@
       <div class="form-wrapper">
         <form>
           <div class="case-title-preview" id="caseTitlePreview">
-            <strong>Case Title:</strong> <span id="caseTitlePreviewText">Untitled Case</span>
+            <span class="label">Matter Title</span>
+            <span class="value" id="caseTitlePreviewText">Untitled Case</span>
           </div>
           <div class="field">
-            <label for="caseDescription">Case Description</label>
-            <textarea id="caseDescription" placeholder="Describe your case, goals, and expectations for the paralegal..." maxlength="4000"></textarea>
+            <label for="caseDescription">Matter Description</label>
+            <textarea id="caseDescription" placeholder="Describe your matter, goals, and expectations for the paralegal..." maxlength="4000"></textarea>
             <div class="char-count" id="descriptionCharCount">0 / 4000</div>
           </div>
           <div class="field" id="caseTasksField">
-            <label for="caseTaskInput">Tasks (optional)</label>
+            <label for="caseTaskInput">Tasks</label>
             <div class="task-input-row">
               <input id="caseTaskInput" type="text" placeholder="e.g., Draft initial motion" />
               <button type="button" class="btn secondary" id="addCaseTaskBtn">Add</button>
             </div>
-            <p class="task-helper" id="caseTaskHelper">Tasks describe the overall scope of work, not every individual step. Additional work requires a new case.</p>
+            <p class="task-helper" id="caseTaskHelper">Add at least one task. Tasks describe the overall scope of deliverables required to satisfy the matter.</p>
             <ul class="task-list" id="caseTaskList"></ul>
           </div>
           <div class="field">
-            <label for="caseDeadline">Deadline (optional)</label>
+            <label for="caseDeadline">Deadline</label>
             <input id="caseDeadline" type="date" placeholder="YYYY-MM-DD" />
-            <small style="color:var(--muted);">You can type a date or use the picker.</small>
           </div>
         </form>
 
@@ -1017,7 +1325,6 @@
             <li>Include the scope of work, deliverables, and deadlines.</li>
             <li>Avoid sensitive or identifying details in the posting.</li>
           </ul>
-          <p>For examples of effective job descriptions, <a href="help.html">read our help article</a>.</p>
         </div>
 
         <div class="actions">
@@ -1078,16 +1385,308 @@
   </div>
   <script src="assets/scripts/utils/toast.js?v=20260208"></script>
   <script>
-    window.__ATTORNEY_PAGE__ = "create-case";
-    window.__SKIP_NOTIFICATIONS__ = true;
+    (function initCreateCaseAuthHeader() {
+      function userDisplayName(user) {
+        const first = String(user?.firstName || "").trim();
+        const last = String(user?.lastName || "").trim();
+        const full = [first, last].filter(Boolean).join(" ").trim();
+        const fallbackName = String(user?.name || user?.email || "Attorney").trim();
+        return full || fallbackName || "Attorney";
+      }
+
+      function userRoleLabel(user) {
+        const role = String(user?.role || "attorney").toLowerCase();
+        return role ? role.charAt(0).toUpperCase() + role.slice(1) : "Attorney";
+      }
+
+      function userAvatar(user) {
+        return (
+          user?.profileImage ||
+          user?.avatarURL ||
+          user?.pendingProfileImage ||
+          "assets/images/default-avatar.png"
+        );
+      }
+
+      function applyUser(user) {
+        const nameEl = document.getElementById("createCaseName");
+        const roleEl = document.getElementById("createCaseRole");
+        const avatarEl = document.getElementById("createCaseAvatar");
+        if (nameEl) nameEl.textContent = userDisplayName(user);
+        if (roleEl) roleEl.textContent = userRoleLabel(user);
+        if (avatarEl) avatarEl.src = userAvatar(user);
+      }
+
+      function formatNotifTime(value) {
+        if (!value) return "";
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return "";
+        return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      }
+
+      function resolveNotifLink(item = {}) {
+        const payload = item.payload || {};
+        const caseId =
+          item.caseId || payload.caseId || payload.caseID || payload.case || payload.case_id || payload.caseRef || "";
+        const type = String(item.type || "").toLowerCase();
+        if (item.link) return item.link;
+        if (caseId) {
+          const base = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
+          if (type === "message") return `${base}#case-messages`;
+          return base;
+        }
+        return "dashboard-attorney.html";
+      }
+
+      function setNotifBadge(count) {
+        const badge = document.getElementById("createCaseNotifBadge");
+        if (!badge) return;
+        const safe = Math.max(0, Number(count) || 0);
+        badge.textContent = String(safe);
+        badge.classList.toggle("show", safe > 0);
+      }
+
+      function renderNotifList(items = []) {
+        const list = document.querySelector("[data-notification-list]");
+        const empty = document.querySelector("[data-notification-empty]");
+        if (!list || !empty) return;
+        const notifications = Array.isArray(items) ? items : [];
+        const unread = notifications.filter((item) => item?.read === false).length;
+        setNotifBadge(unread);
+        list.innerHTML = "";
+        if (!notifications.length) {
+          empty.style.display = "block";
+          empty.textContent = "You're all caught up.";
+          return;
+        }
+        empty.style.display = "none";
+        notifications.forEach((item, idx) => {
+          const row = document.createElement("button");
+          row.type = "button";
+          row.className = `notif-card ${item?.read === false ? "unread" : "read"}`;
+          row.style.setProperty("--drop-delay", `${Math.min(idx, 3) * 55}ms`);
+          const message = String(item?.message || item?.payload?.message || "You have a new notification.");
+          const time = formatNotifTime(item?.createdAt);
+          row.innerHTML = `
+            <div class="notif-main">
+              <span class="notif-dot" aria-hidden="true"></span>
+              <div class="notif-copy">
+                <div class="notif-title">${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+                <div class="notif-time">${time}</div>
+              </div>
+            </div>
+          `;
+          row.addEventListener("click", async () => {
+            try {
+              if (item?.read === false && (item?.id || item?._id)) {
+                await fetch(`/api/notifications/${encodeURIComponent(item.id || item._id)}/read`, {
+                  method: "POST",
+                  credentials: "include",
+                });
+              }
+            } catch (_) {}
+            window.location.href = resolveNotifLink(item);
+          });
+          list.appendChild(row);
+        });
+        requestAnimationFrame(() => {
+          list.querySelectorAll(".notif-card").forEach((card) => card.classList.add("is-ready"));
+        });
+      }
+
+      async function fetchNotifications() {
+        try {
+          const res = await fetch("/api/notifications", {
+            credentials: "include",
+            headers: { Accept: "application/json" },
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const payload = await res.json().catch(() => []);
+          renderNotifList(Array.isArray(payload) ? payload : []);
+        } catch (_) {
+          renderNotifList([]);
+        }
+      }
+
+      function bindNotificationCenter() {
+        const toggle = document.querySelector("[data-notification-toggle]");
+        const panel = document.querySelector("[data-notification-panel]");
+        const markAll = document.querySelector("[data-notification-mark]");
+        if (!toggle || !panel) return;
+        const setOpen = (open) => {
+          panel.classList.toggle("show", open);
+          panel.classList.toggle("hidden", !open);
+        };
+        setOpen(false);
+        toggle.addEventListener("click", async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const willOpen = !panel.classList.contains("show");
+          setOpen(willOpen);
+          if (willOpen) {
+            await fetchNotifications();
+          }
+        });
+        markAll?.addEventListener("click", async (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          try {
+            await fetch("/api/notifications/read-all", {
+              method: "POST",
+              credentials: "include",
+            });
+          } catch (_) {}
+          await fetchNotifications();
+        });
+        document.addEventListener("click", (event) => {
+          if (toggle.contains(event.target) || panel.contains(event.target)) return;
+          setOpen(false);
+        });
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") setOpen(false);
+        });
+      }
+
+      async function hydrateUser() {
+        const session = await window.requireRole?.("attorney");
+        const user = session || window.getStoredUser?.();
+        if (!user) {
+          window.location.href = "login.html";
+          return;
+        }
+        applyUser(user);
+        try {
+          const res = await fetch("/api/users/me", {
+            credentials: "include",
+            headers: { Accept: "application/json" },
+          });
+          if (res.ok) {
+            const profile = await res.json().catch(() => null);
+            if (profile && typeof profile === "object") {
+              applyUser(profile);
+            }
+          }
+        } catch (_) {}
+      }
+
+      async function logoutNow(event) {
+        event?.preventDefault?.();
+        try {
+          await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+        } catch (_) {}
+        window.clearStoredSession?.();
+        window.location.href = "login.html";
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const logoutBtn = document.getElementById("logoutBtn");
+        if (logoutBtn) logoutBtn.addEventListener("click", logoutNow);
+        bindNotificationCenter();
+
+        const userChip = document.getElementById("createCaseUserChip");
+        const profileMenu = document.getElementById("createCaseProfileMenu");
+        const menuLogoutBtn = profileMenu?.querySelector("[data-logout]");
+        if (menuLogoutBtn) {
+          menuLogoutBtn.addEventListener("click", logoutNow);
+        }
+        if (userChip && profileMenu) {
+          const setProfileMenuOpen = (open) => {
+            profileMenu.classList.toggle("show", open);
+            profileMenu.setAttribute("aria-hidden", open ? "false" : "true");
+            userChip.setAttribute("aria-expanded", open ? "true" : "false");
+          };
+          setProfileMenuOpen(false);
+          userChip.addEventListener("click", (event) => {
+            if (profileMenu.contains(event.target)) return;
+            setProfileMenuOpen(!profileMenu.classList.contains("show"));
+          });
+          userChip.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setProfileMenuOpen(!profileMenu.classList.contains("show"));
+            } else if (event.key === "Escape") {
+              setProfileMenuOpen(false);
+            }
+          });
+          document.addEventListener("click", (event) => {
+            if (!profileMenu.classList.contains("show")) return;
+            if (userChip.contains(event.target)) return;
+            setProfileMenuOpen(false);
+          });
+          document.addEventListener("keydown", (event) => {
+            if (event.key !== "Escape") return;
+            if (!profileMenu.classList.contains("show")) return;
+            setProfileMenuOpen(false);
+          });
+        }
+
+        const cached = window.getStoredUser?.();
+        if (cached) applyUser(cached);
+        void hydrateUser();
+        void fetchNotifications();
+      });
+    })();
   </script>
-  <script type="module" src="assets/scripts/attorney-tabs.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const sidebarToggle = document.getElementById("sidebarToggle");
+      const sidebarNav = document.getElementById("sidebarNav");
+      const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+      const closeSidebar = () => {
+        document.body.classList.remove("nav-open");
+        if (sidebarToggle) sidebarToggle.setAttribute("aria-expanded", "false");
+      };
+      const openSidebar = () => {
+        document.body.classList.add("nav-open");
+        if (sidebarToggle) sidebarToggle.setAttribute("aria-expanded", "true");
+      };
+      if (sidebarToggle) {
+        sidebarToggle.addEventListener("click", () => {
+          if (document.body.classList.contains("nav-open")) closeSidebar();
+          else openSidebar();
+        });
+      }
+      if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener("click", closeSidebar);
+      }
+      if (sidebarNav) {
+        sidebarNav.addEventListener("click", (event) => {
+          if (event.target.closest("a") || event.target.closest("button")) {
+            closeSidebar();
+          }
+        });
+      }
+      window.addEventListener("resize", () => {
+        if (window.innerWidth > 1024) closeSidebar();
+      });
+    });
+  </script>
 
   <script>
   (function () {
     const params = new URLSearchParams(window.location.search);
     const editingCaseId = params.get("caseId");
+    const draftIdParam = params.get("draftId");
     const isEditing = Boolean(editingCaseId);
+    let currentDraftId = !isEditing ? draftIdParam : "";
+    const DRAFT_AUTOSAVE_MS = 1600;
+    const DRAFT_SAVE_ERROR_BACKOFF_MS = 3000;
+    let draftLoaded = false;
+    let draftSaveTimer = null;
+    let draftSavePending = false;
+    let draftSaveInFlight = false;
+    let lastDraftSaveSnapshot = "";
+    let draftSaveBlockedUntil = 0;
+    const draftCache = {
+      title: "",
+      practiceArea: "",
+      state: "",
+      compAmount: "",
+      experience: "",
+      deadline: "",
+      description: "",
+      tasks: [],
+    };
 
     const stepPanels = new Map();
     document.querySelectorAll(".step-panel").forEach((panel) => {
@@ -1161,6 +1760,21 @@
       },
     ];
 
+    const stepForms = document.querySelectorAll(".step-panel form");
+    stepForms.forEach((form) => {
+      form.setAttribute("novalidate", "novalidate");
+      form.addEventListener("submit", (event) => event.preventDefault());
+    });
+
+    function focusFirstInvalidField() {
+      const firstInvalid = validators.find(({ field, check }) => field && !check(field.value || ""));
+      if (!firstInvalid?.field) return;
+      try {
+        firstInvalid.field.focus({ preventScroll: true });
+        firstInvalid.field.scrollIntoView({ block: "center" });
+      } catch {}
+    }
+
     function updateTitlePreview(value = "") {
       if (!titlePreview) return;
       const safe = value.trim();
@@ -1172,7 +1786,6 @@
       descriptionCount.textContent = `${descriptionInput.value.length} / 4000`;
     }
 
-    const STORAGE_PARSE_LIMIT = 50000;
     const MAX_REVIEW_DESCRIPTION = 1200;
     const MAX_REVIEW_TASKS = 25;
 
@@ -1184,26 +1797,37 @@
     }
 
     function readStoredTasks() {
-      try {
-        const raw = localStorage.getItem("caseTasks") || localStorage.getItem("case_tasks") || "";
-        if (raw.length > STORAGE_PARSE_LIMIT) return [];
-        const parsed = JSON.parse(raw || "[]");
-        if (Array.isArray(parsed)) {
-          return parsed
-            .map((entry) => {
-              const title = normalizeTaskTitle(typeof entry === "string" ? entry : entry?.title);
-              return title ? { title } : null;
-            })
-            .filter(Boolean);
-        }
-      } catch {}
-      return [];
+      if (!Array.isArray(draftCache.tasks)) return [];
+      return draftCache.tasks
+        .map((entry) => {
+          const title = normalizeTaskTitle(typeof entry === "string" ? entry : entry?.title);
+          return title ? { title } : null;
+        })
+        .filter(Boolean);
     }
 
     function persistTasks() {
-      const payload = tasksState.items.map((task) => ({ title: task.title }));
-      localStorage.setItem("caseTasks", JSON.stringify(payload));
-      localStorage.setItem("case_tasks", JSON.stringify(payload));
+      draftCache.tasks = tasksState.items.map((task) => ({ title: task.title }));
+      queueDraftSave();
+    }
+
+    function getNormalizedTasks() {
+      const source = tasksState.items.length ? tasksState.items : readStoredTasks();
+      return source
+        .map((task) => normalizeTaskTitle(typeof task === "string" ? task : task?.title))
+        .filter(Boolean)
+        .map((title) => ({ title }));
+    }
+
+    function validateTasks() {
+      if (!taskInput) return true;
+      clearFieldError(taskInput);
+      const tasks = getNormalizedTasks();
+      if (!tasks.length) {
+        showFieldError(taskInput, "Add at least one task.");
+        return false;
+      }
+      return true;
     }
 
     function renderTasks() {
@@ -1212,7 +1836,7 @@
       if (!tasksState.items.length) {
         const empty = document.createElement("li");
         empty.className = "task-empty";
-        empty.textContent = "No tasks added yet.";
+        empty.textContent = "";
         taskList.appendChild(empty);
         return;
       }
@@ -1235,6 +1859,9 @@
         }
         taskList.appendChild(row);
       });
+      if (tasksState.items.length) {
+        clearFieldError(taskInput);
+      }
     }
 
     function setTasksLocked(locked) {
@@ -1243,6 +1870,27 @@
       if (taskAddBtn) taskAddBtn.disabled = tasksState.locked;
       if (taskHelper) taskHelper.style.display = tasksState.locked ? "none" : "";
       renderTasks();
+    }
+
+    const DRAFT_FIELD_MAP = {
+      caseTitle: "title",
+      caseSpecialty: "practiceArea",
+      caseState: "state",
+      caseComp: "compAmount",
+      caseCompAmount: "compAmount",
+      caseExperience: "experience",
+      caseDeadline: "deadline",
+      caseDescription: "description",
+    };
+
+    function setDraftField(key, value) {
+      const mapped = DRAFT_FIELD_MAP[key] || key;
+      draftCache[mapped] = String(value || "");
+    }
+
+    function getDraftField(key) {
+      const mapped = DRAFT_FIELD_MAP[key] || key;
+      return String(draftCache[mapped] || "");
     }
 
     function hydrateDeadline() {
@@ -1264,17 +1912,23 @@
     }
 
     function attemptStepChange(targetStep) {
-      if (!targetStep || targetStep === currentStep) return;
-      if (targetStep === "description" && currentStep !== "description") {
-        if (!validateDetails()) return;
-        persistDraft();
+      try {
+        if (!targetStep || targetStep === currentStep) return;
+        if (targetStep === "description" && currentStep !== "description") {
+          if (!validateDetails()) return;
+          persistDraft();
+        }
+        if (targetStep === "review") {
+          if (!ensureReviewReady()) return;
+          persistDraft();
+          hydrateReviewSummary();
+        }
+        showStep(targetStep);
+      } catch (err) {
+        console.warn("Step change failed", err);
+        showStep("details", { updateHash: false });
+        showToastBanner("Finish the required fields before moving to the next step.", "error");
       }
-      if (targetStep === "review") {
-        if (!ensureReviewReady()) return;
-        persistDraft();
-        hydrateReviewSummary();
-      }
-      showStep(targetStep);
     }
 
     document.querySelectorAll("[data-step-link]").forEach((link) => {
@@ -1294,19 +1948,22 @@
     });
 
     const initialHash = (window.location.hash || "").replace("#", "");
-    if (initialHash && stepPanels.has(initialHash)) {
-      if (initialHash === "description") {
+    const pendingInitialStep = initialHash && stepPanels.has(initialHash) ? initialHash : "details";
+    let initialStepApplied = false;
+
+    function applyInitialStep() {
+      if (initialStepApplied) return;
+      initialStepApplied = true;
+      if (pendingInitialStep === "description") {
         showStep("details", { updateHash: false });
         attemptStepChange("description");
-      } else if (initialHash === "review") {
+      } else if (pendingInitialStep === "review") {
         showStep("details", { updateHash: false });
         attemptStepChange("description");
         attemptStepChange("review");
       } else {
-        showStep(initialHash, { updateHash: false });
+        showStep(pendingInitialStep, { updateHash: false });
       }
-    } else {
-      showStep("details", { updateHash: false });
     }
 
     window.addEventListener("hashchange", () => {
@@ -1325,7 +1982,7 @@
       const eventName = field.tagName === "SELECT" ? "change" : "input";
       field.addEventListener(eventName, () => clearFieldError(field));
       const storageKeyCamel = `case${key.charAt(0).toUpperCase() + key.slice(1)}`;
-      const storedValue = isEditing ? "" : localStorage.getItem(storageKeyCamel) || localStorage.getItem(`case_${key}`) || "";
+      const storedValue = isEditing ? "" : getStoredValue(storageKeyCamel, `case_${key}`);
       if (storedValue && field.value !== storedValue) {
         field.value = storedValue;
       }
@@ -1334,8 +1991,8 @@
       }
       field.addEventListener(eventName, () => {
         const value = field.value || "";
-        localStorage.setItem(storageKeyCamel, value);
-        localStorage.setItem(`case_${key}`, value);
+        setDraftField(storageKeyCamel, value);
+        queueDraftSave();
         if (key === "title") {
           updateTitlePreview(value);
         }
@@ -1345,7 +2002,7 @@
     if (descriptionInput) {
       const storedDescription = isEditing
         ? ""
-        : localStorage.getItem("caseDescription") || localStorage.getItem("case_description") || "";
+        : getStoredValue("caseDescription", "case_description");
       if (storedDescription) {
         descriptionInput.value = storedDescription.slice(0, 4000);
       }
@@ -1355,10 +2012,8 @@
         if (descriptionInput.value.length > 4000) {
           descriptionInput.value = descriptionInput.value.slice(0, 4000);
         }
-        try {
-          localStorage.setItem("caseDescription", descriptionInput.value);
-          localStorage.setItem("case_description", descriptionInput.value);
-        } catch {}
+        setDraftField("caseDescription", descriptionInput.value);
+        queueDraftSave();
         updateDescriptionCount();
       });
     }
@@ -1381,6 +2036,48 @@
         taskAddBtn.click();
       });
     }
+    async function initDraftLoad() {
+      if (isEditing) {
+        applyInitialStep();
+        return;
+      }
+      if (!currentDraftId) {
+        applyInitialStep();
+        return;
+      }
+      try {
+        const draft = await fetchDraftById(currentDraftId);
+        if (draft) {
+          draftCache.title = draft.title || "";
+          draftCache.practiceArea = draft.practiceArea || "";
+          draftCache.state = draft.state || "";
+          draftCache.compAmount = draft.compAmount || "";
+          draftCache.experience = draft.experience || "";
+          draftCache.deadline = draft.deadline || "";
+          draftCache.description = draft.description || "";
+          draftCache.tasks = Array.isArray(draft.tasks) ? draft.tasks : [];
+          if (fields.title) fields.title.value = draftCache.title;
+          if (fields.specialty) fields.specialty.value = draftCache.practiceArea;
+          if (fields.state) fields.state.value = draftCache.state;
+          if (fields.comp) fields.comp.value = draftCache.compAmount;
+          if (fields.experience) fields.experience.value = draftCache.experience;
+          if (fields.deadline) fields.deadline.value = draftCache.deadline;
+          if (descriptionInput) {
+            descriptionInput.value = draftCache.description.slice(0, 4000);
+            updateDescriptionCount();
+          }
+          updateTitlePreview(draftCache.title);
+          tasksState.items = readStoredTasks();
+          renderTasks();
+          draftLoaded = true;
+        }
+      } catch (err) {
+        console.warn("Unable to load draft", err);
+      }
+      applyInitialStep();
+    }
+
+    void initDraftLoad();
 
     function validateDetails() {
       let hasErrors = false;
@@ -1393,19 +2090,24 @@
         }
       });
       if (hasErrors) {
+        focusFirstInvalidField();
         return false;
       }
       return true;
     }
 
     function persistDraft() {
-      localStorage.setItem("caseTitle", fields.title?.value?.trim() || "");
-      localStorage.setItem("caseSpecialty", fields.specialty?.value || "");
-      localStorage.setItem("caseState", fields.state?.value || "");
-      localStorage.setItem("caseComp", fields.comp?.value || "");
-      localStorage.setItem("caseCompAmount", fields.comp?.value || "");
-      localStorage.setItem("caseExperience", fields.experience?.value || "");
-      localStorage.setItem("caseDeadline", fields.deadline?.value || "");
+      if (isEditing) return;
+      setDraftField("caseTitle", fields.title?.value?.trim() || "");
+      setDraftField("caseSpecialty", fields.specialty?.value || "");
+      setDraftField("caseState", fields.state?.value || "");
+      setDraftField("caseComp", fields.comp?.value || "");
+      setDraftField("caseCompAmount", fields.comp?.value || "");
+      setDraftField("caseExperience", fields.experience?.value || "");
+      setDraftField("caseDeadline", fields.deadline?.value || "");
+      setDraftField("caseDescription", descriptionInput?.value || "");
+      draftCache.tasks = tasksState.items.map((task) => ({ title: task.title }));
+      queueDraftSave({ immediate: true });
     }
 
     function showFieldError(field, message) {
@@ -1438,7 +2140,7 @@
     }
 
     function getStoredValue(primaryKey, legacyKey) {
-      const value = localStorage.getItem(primaryKey) || localStorage.getItem(legacyKey) || "";
+      const value = getDraftField(primaryKey) || getDraftField(legacyKey);
       if (primaryKey === "caseDescription" || legacyKey === "case_description") {
         return value.slice(0, 4000);
       }
@@ -1500,6 +2202,7 @@
 
     function ensureReviewReady() {
       if (!validateDetails()) return false;
+      if (!validateTasks()) return false;
       if (!hasDescription()) {
         return false;
       }
@@ -1597,17 +2300,14 @@
     }
 
     function clearDraft() {
-      [
-        "caseTitle",
-        "caseSpecialty",
-        "caseState",
-        "caseComp",
-        "caseCompAmount",
-        "caseExperience",
-        "caseDescription",
-        "caseTasks",
-        "case_tasks",
-      ].forEach((key) => localStorage.removeItem(key));
+      draftCache.title = "";
+      draftCache.practiceArea = "";
+      draftCache.state = "";
+      draftCache.compAmount = "";
+      draftCache.experience = "";
+      draftCache.deadline = "";
+      draftCache.description = "";
+      draftCache.tasks = [];
     }
 
     function showToast(message, href, isError = false) {
@@ -1641,6 +2341,73 @@
       }
     }
 
+    function resolveAuthHeader(token) {
+      if (!token || token === "__cookie_session__") return {};
+      return { Authorization: `Bearer ${token}` };
+    }
+
+    async function authorizedFetch(url, options = {}) {
+      const token = (window.getSessionToken && window.getSessionToken()) || "";
+      if (!token) {
+        window.checkSession?.("attorney");
+        throw new Error("Please log in again.");
+      }
+      const headers = { ...(options.headers || {}), ...resolveAuthHeader(token) };
+      let body = options.body;
+      if (typeof body !== "undefined" && body !== null && !(body instanceof FormData)) {
+        headers["Content-Type"] = headers["Content-Type"] || "application/json";
+        body = JSON.stringify(body);
+      }
+      if (options.method && options.method !== "GET") {
+        await fetchCsrfToken();
+        headers["X-CSRF-Token"] = csrfToken || "";
+      }
+      return fetch(url, {
+        credentials: "include",
+        ...options,
+        headers,
+        body,
+      });
+    }
+
+    async function fetchDraftById(draftId) {
+      if (!draftId) return null;
+      const res = await authorizedFetch(`/api/case-drafts/${encodeURIComponent(draftId)}`);
+      const { data, text } = await readResponsePayload(res);
+      if (!res.ok) {
+        const message = data?.error || data?.message || text;
+        throw new Error(message || "Unable to load draft.");
+      }
+      return data?.draft || null;
+    }
+
+    async function saveDraftRemote(payload) {
+      if (!payload) return null;
+      const url = currentDraftId
+        ? `/api/case-drafts/${encodeURIComponent(currentDraftId)}`
+        : "/api/case-drafts";
+      const method = currentDraftId ? "PUT" : "POST";
+      const res = await authorizedFetch(url, { method, body: payload });
+      const { data, text } = await readResponsePayload(res);
+      if (!res.ok) {
+        const message = data?.error || data?.message || text;
+        throw new Error(message || "Unable to save draft.");
+      }
+      return data?.draft || null;
+    }
+
+    async function deleteDraftRemote(draftId) {
+      if (!draftId) return;
+      const res = await authorizedFetch(`/api/case-drafts/${encodeURIComponent(draftId)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const { data, text } = await readResponsePayload(res);
+        const message = data?.error || data?.message || text;
+        throw new Error(message || "Unable to delete draft.");
+      }
+    }
+
     async function submitCase(payload) {
       const token = (window.getSessionToken && window.getSessionToken()) || "";
       if (!token) {
@@ -1653,7 +2420,7 @@
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...resolveAuthHeader(token),
           "X-CSRF-Token": csrfToken || "",
           Accept: "application/json",
         },
@@ -1800,70 +2567,89 @@
       return payload;
     }
 
-    const LOCAL_DRAFTS_KEY = "attorneyLocalDraftCases";
-    let currentDraftId = localStorage.getItem("currentDraftId") || "";
-    if (isEditing) {
-      currentDraftId = editingCaseId;
+    function hasDraftContent(payload) {
+      if (!payload) return false;
+      if (payload.title || payload.practiceArea || payload.state || payload.compAmount) return true;
+      if (payload.experience || payload.deadline || payload.description) return true;
+      return Array.isArray(payload.tasks) && payload.tasks.length > 0;
     }
 
-    function readLocalDrafts() {
-      try {
-        const raw = localStorage.getItem(LOCAL_DRAFTS_KEY);
-        const parsed = JSON.parse(raw || "[]");
-        return Array.isArray(parsed) ? parsed : [];
-      } catch {
-        return [];
-      }
-    }
-
-    function writeLocalDrafts(list) {
-      localStorage.setItem(LOCAL_DRAFTS_KEY, JSON.stringify(list || []));
-    }
-
-    function upsertLocalDraft(draft) {
-      if (!draft?.id) return;
-      const list = readLocalDrafts().filter((d) => d && d.id !== draft.id);
-      list.unshift(draft);
-      writeLocalDrafts(list);
-    }
-
-    function removeLocalDraft(draftId) {
-      if (!draftId) return;
-      const list = readLocalDrafts().filter((d) => d && d.id !== draftId);
-      writeLocalDrafts(list);
-    }
-
-    function saveDraftToLocalList() {
+    function buildDraftPayload() {
       const data = latestCaseData || collectCaseData();
-      if (!currentDraftId) {
-        currentDraftId = `draft-${Date.now()}`;
-        localStorage.setItem("currentDraftId", currentDraftId);
-      }
-      persistDraft();
-      const now = new Date().toISOString();
-      upsertLocalDraft({
-        id: currentDraftId,
-        title: data.title || "Untitled Case",
+      return {
+        title: data.title || "",
         practiceArea: data.field || "",
-        details: data.description || "",
         state: data.state || "",
-        status: "draft",
-        createdAt: now,
-        updatedAt: now,
-        localDraft: true,
-      });
+        compAmount: data.compAmount || "",
+        experience: data.experience || "",
+        deadline: data.deadline || "",
+        description: data.description || "",
+        tasks: Array.isArray(data.tasks) ? data.tasks : [],
+      };
     }
 
-    function clearCurrentDraftId() {
-      if (currentDraftId) {
-        removeLocalDraft(currentDraftId);
+    async function flushDraftSave() {
+      if (isEditing) return;
+      if (draftSaveInFlight) {
+        draftSavePending = true;
+        return;
       }
-      currentDraftId = "";
-      localStorage.removeItem("currentDraftId");
+      if (Date.now() < draftSaveBlockedUntil) return;
+      const payload = buildDraftPayload();
+      if (!hasDraftContent(payload)) return;
+      const snapshot = JSON.stringify(payload);
+      if (snapshot === lastDraftSaveSnapshot) return;
+      draftSaveInFlight = true;
+      try {
+        const saved = await saveDraftRemote(payload);
+        if (saved?.id) {
+          currentDraftId = saved.id;
+          draftLoaded = true;
+        }
+        lastDraftSaveSnapshot = snapshot;
+        draftSaveBlockedUntil = 0;
+      } catch (err) {
+        console.warn("Draft save failed", err);
+        draftSaveBlockedUntil = Date.now() + DRAFT_SAVE_ERROR_BACKOFF_MS;
+      } finally {
+        draftSaveInFlight = false;
+        if (draftSavePending) {
+          draftSavePending = false;
+          if (Date.now() >= draftSaveBlockedUntil) {
+            void flushDraftSave();
+          }
+        }
+      }
     }
 
-    window.saveDraftAndExit = function (targetHref) {
-      saveDraftToLocalList();
+    function queueDraftSave({ immediate = false } = {}) {
+      if (isEditing) return;
+      if (immediate) {
+        if (draftSaveTimer) clearTimeout(draftSaveTimer);
+        draftSaveTimer = null;
+        void flushDraftSave();
+        return;
+      }
+      if (draftSaveTimer) clearTimeout(draftSaveTimer);
+      draftSaveTimer = setTimeout(() => {
+        draftSaveTimer = null;
+        void flushDraftSave();
+      }, DRAFT_AUTOSAVE_MS);
+    }
+
+    async function deleteDraftIfExists() {
+      if (!currentDraftId) return;
+      try {
+        await deleteDraftRemote(currentDraftId);
+      } catch (err) {
+        console.warn("Unable to delete draft", err);
+      } finally {
+        currentDraftId = "";
+      }
+    }
+
+    window.saveDraftAndExit = async function (targetHref) {
+      await flushDraftSave();
       if (targetHref) {
         window.location.href = targetHref;
       }
@@ -1885,8 +2671,8 @@
         const created = isEditing && editingCaseId
           ? await updateCase(editingCaseId, payload)
           : await submitCase(payload);
+        await deleteDraftIfExists();
         clearDraft();
-        clearCurrentDraftId();
         const caseId = created?.id || created?._id || editingCaseId;
         // Jobs are now mirrored automatically when a case is created on the backend.
         const href = caseId
@@ -1996,6 +2782,7 @@
       setTasksLocked(lockTasks);
       latestCaseData = collectCaseData();
       hydrateReviewSummary();
+      applyInitialStep();
     }
 
     async function loadExistingCase() {
@@ -2003,7 +2790,7 @@
       try {
         const token = (window.getSessionToken && window.getSessionToken()) || "";
         const res = await fetch(`/api/cases/${encodeURIComponent(editingCaseId)}`, {
-          headers: Object.assign({ Accept: "application/json" }, token ? { Authorization: `Bearer ${token}` } : {}),
+          headers: Object.assign({ Accept: "application/json" }, resolveAuthHeader(token)),
           credentials: "include",
         });
         const { data, text } = await readResponsePayload(res);
@@ -2031,7 +2818,7 @@
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...resolveAuthHeader(token),
           "X-CSRF-Token": csrfToken || "",
           Accept: "application/json",
         },
@@ -2053,14 +2840,6 @@
     }
   })();
   </script>
-<script>
-const compInput = document.getElementById('comp');
-if (compInput) {
-  compInput.addEventListener('input', () => {
-    localStorage.setItem('caseCompAmount', compInput.value);
-  });
-}
-</script>
-<script src="assets/scripts/create-case-nav.js"></script>
+  <script src="assets/scripts/create-case-nav.js"></script>
 </body>
 </html>
