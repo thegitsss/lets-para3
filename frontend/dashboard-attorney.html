@@ -22,8 +22,11 @@
   </script>
   <script>
     (function preselectDashboardView() {
+      const params = new URLSearchParams(window.location.search);
+      const forceCases =
+        params.get("openApplicant") === "1" || params.get("returnFromProfile") === "1";
       const hash = String(window.location.hash || "").toLowerCase();
-      if (hash.startsWith("#cases")) {
+      if (forceCases || hash.startsWith("#cases")) {
         document.documentElement.classList.add("prefers-cases");
       } else if (hash.startsWith("#billing")) {
         document.documentElement.classList.add("prefers-billing");
@@ -270,6 +273,11 @@
     }
     body.theme-dark .notification-icon svg{color:#f8fbff;}
 
+    .lpc-shared-header .notification-badge,
+    .lpc-shared-header .notification-badge.show {
+      display: none !important;
+    }
+
     [data-notification-toggle][data-count]:after {
       content: attr(data-count);
       position: absolute;
@@ -294,21 +302,29 @@
     }
 
     body.theme-mountain .sidebar,
-    body.theme-mountain-dark .sidebar {
+    html.theme-mountain .sidebar,
+    body.theme-mountain-dark .sidebar,
+    html.theme-mountain-dark .sidebar {
       background: var(--bg) url('hero-mountain.jpg') center/cover no-repeat;
     }
 
     body.theme-mountain .sidebar::before,
-    body.theme-mountain-dark .sidebar::before {
+    html.theme-mountain .sidebar::before,
+    body.theme-mountain-dark .sidebar::before,
+    html.theme-mountain-dark .sidebar::before {
       background: rgba(0, 0, 0, 0.45);
     }
 
     body.theme-mountain .sidebar > *,
-    body.theme-mountain-dark .sidebar > * {
+    html.theme-mountain .sidebar > *,
+    body.theme-mountain-dark .sidebar > *,
+    html.theme-mountain-dark .sidebar > * {
       position: relative;
       z-index: 1;
     }
 
+    html.theme-dark,
+    html.theme-dark body,
     body.theme-dark {
       --bg: #0f172a;
       --sidebar-bg: #1c2333;
@@ -319,7 +335,8 @@
       --sidebar-text: #f8fbff;
     }
 
-    body.theme-mountain {
+    body.theme-mountain,
+    html.theme-mountain body {
       --bg: #f8f6f1;
       --panel: #ffffff;
       --muted: #7a736a;
@@ -332,14 +349,20 @@
     }
 
     body.theme-mountain nav a,
-    body.theme-mountain-dark nav a {
+    html.theme-mountain nav a,
+    body.theme-mountain-dark nav a,
+    html.theme-mountain-dark nav a {
       color: #fff;
     }
 
     body.theme-mountain nav a.active,
     body.theme-mountain nav a:hover,
     body.theme-mountain-dark nav a.active,
-    body.theme-mountain-dark nav a:hover {
+    body.theme-mountain-dark nav a:hover,
+    html.theme-mountain nav a.active,
+    html.theme-mountain nav a:hover,
+    html.theme-mountain-dark nav a.active,
+    html.theme-mountain-dark nav a:hover {
       background: rgba(255, 255, 255, 0.18);
     }
 
@@ -347,13 +370,19 @@
     body.theme-dark .sidebar-link:focus,
     body.theme-mountain .sidebar-link:hover,
     body.theme-mountain .sidebar-link:focus,
+    html.theme-mountain .sidebar-link:hover,
+    html.theme-mountain .sidebar-link:focus,
     body.theme-mountain-dark .sidebar-link:hover,
-    body.theme-mountain-dark .sidebar-link:focus {
+    body.theme-mountain-dark .sidebar-link:focus,
+    html.theme-mountain-dark .sidebar-link:hover,
+    html.theme-mountain-dark .sidebar-link:focus {
       color: #fff;
     }
 
     body.theme-mountain .sidebar-link,
-    body.theme-mountain-dark .sidebar-link {
+    html.theme-mountain .sidebar-link,
+    body.theme-mountain-dark .sidebar-link,
+    html.theme-mountain-dark .sidebar-link {
       color: #fff;
     }
 
@@ -599,78 +628,234 @@
       box-shadow: var(--card-shadow-soft);
     }
     .info-box[data-metric] {
-      cursor: help;
+      cursor: default;
     }
     .message-box {
       cursor:pointer;
       transition:background .25s ease, transform .15s ease;
     }
-    .message-box:hover {
-      background:rgba(182,164,122,0.08);
-      border-color:var(--accent);
-      transform:scale(1.02);
-    }
 
-    .today-strip {
+    .home-layout {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-      gap: 0.9rem;
-      margin-bottom: 2rem;
+      grid-template-columns: minmax(0, 1fr) 260px;
+      gap: 2.5rem;
+      align-items: stretch;
     }
 
-    .today-card {
-      background: var(--panel);
-      border: 1px solid rgba(0, 0, 0, 0.06);
+    .command-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 2rem;
+      margin-bottom: 2.4rem;
+      padding-bottom: 1.2rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .ledger-shell {
+      border: 1px solid var(--line);
       border-radius: var(--radius);
-      padding: var(--card-pad);
+      padding: 1.2rem 1.4rem;
+      background: var(--panel);
+      font-size: 12.5pt;
+    }
+
+    .command-title p {
+      margin-bottom: 0;
+    }
+
+    .command-actions {
+      justify-content: flex-end;
+    }
+
+    .home-main {
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
-      min-height: 120px;
-      box-shadow: var(--card-shadow-soft);
+      gap: 1.8rem;
+      min-height: 100%;
     }
 
-    .today-label {
+    .home-sidebar {
       display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      width: 100%;
-      font-size: 0.68rem;
-      letter-spacing: 0.1em;
+      flex-direction: column;
+      gap: 1.2rem;
+      height: 100%;
+      min-height: 100%;
+      align-self: stretch;
+    }
+
+    .status-rail {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      justify-content: flex-start;
+    }
+
+    .status-rail-shell {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.1rem;
+      background: transparent;
+      height: auto;
+      min-height: 100%;
+      font-size: 12.5pt;
+    }
+
+    .status-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .status-label {
+      font-size: 0.72em;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
       color: var(--muted);
-    }
-    .today-label::after {
-      content: "";
-      height: 1px;
-      flex: 1;
-      background: var(--line);
-      opacity: 0.6;
+      font-weight: 400;
     }
 
-    .today-value {
-      font-size: 1.5rem;
+    .status-value {
+      font-size: 1em;
       font-weight: 300;
+      color: var(--ink);
       letter-spacing: -0.01em;
-      line-height: 1.1;
     }
-
-    .today-sub {
-      font-size: 0.82rem;
-      line-height: 1.4;
+    .status-value .is-muted {
       color: var(--muted);
+      font-weight: 400;
+      font-size: 0.72em;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
     }
 
-    .today-link {
-      margin-top: auto;
-      font-size: 0.85rem;
-      color: var(--accent);
+    .status-link {
+      font-size: 0.72em;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
       text-decoration: none;
-      font-weight: 500;
+      font-weight: 400;
     }
 
-    .today-link:hover {
+    .status-link:hover {
+      color: var(--accent);
       text-decoration: underline;
+    }
+    .message-box:hover .status-label {
+      text-decoration: underline;
+    }
+
+    .ledger-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 0.6rem;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .ledger-title {
+      font-size: 1em;
+      font-weight: 300;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+
+    .case-ledger {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      padding: 0.2rem 0;
+    }
+
+    .matter-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 1.25rem;
+      padding: 0.4rem 0;
+      cursor: pointer;
+      position: relative;
+    }
+    .matter-row::before {
+      content: "";
+      position: absolute;
+      inset: -6px -12px;
+      background: rgba(182, 164, 122, 0.08);
+      opacity: 0;
+      border-radius: 12px;
+      transition: opacity 0.35s ease;
+      pointer-events: none;
+    }
+    .matter-row > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .matter-row:hover {
+      background: transparent;
+    }
+    .matter-row:hover::before {
+      opacity: 1;
+    }
+
+    body.theme-dark .matter-row:hover,
+    body.theme-mountain-dark .matter-row:hover {
+      background: transparent;
+    }
+    body.theme-dark .matter-row::before,
+    body.theme-mountain-dark .matter-row::before {
+      background: rgba(148, 163, 184, 0.12);
+    }
+
+    .matter-main {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      min-width: 0;
+    }
+
+    .matter-title {
+      font-size: 1em;
+      font-weight: 300;
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .matter-meta {
+      font-size: 0.85em;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+    }
+
+    .matter-message {
+      font-size: 0.85em;
+      color: var(--accent);
+      background: transparent;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .matter-view {
+      font-size: 0.85em;
+      color: var(--accent);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      white-space: nowrap;
+      padding: 0;
+    }
+
+    .matter-row.skeleton-row {
+      align-items: start;
+      gap: 1rem;
     }
 
     .action-queue {
@@ -715,8 +900,8 @@
 
     .queue-action {
       border: 1px solid var(--line);
-      background: #fff;
-      color: var(--text);
+      background: var(--panel);
+      color: var(--ink);
       border-radius: 999px;
       padding: 0.4rem 1rem;
       font-size: 0.85rem;
@@ -769,11 +954,126 @@
       color: #1a1f27;
       margin-bottom: 1rem;
     }
+    .section-subtitle {
+      margin: -0.6rem 0 1rem;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
     .section-title.applications-title {
       padding: 0.75rem 0 0.25rem;
     }
     .completed-section {
       margin-top: 2.5rem;
+    }
+    .mini-deadlines {
+      margin-top: 32px;
+    }
+    .mini-deadlines .section-title {
+      font-family: inherit;
+      font-size: 0.72em;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.6rem;
+      font-weight: 400;
+    }
+    .weekly-notes {
+      margin-top: 1.4rem;
+    }
+    .weekly-notes.ledger-shell {
+      background: transparent;
+      border: 1px solid var(--line);
+      padding: 1.1rem;
+    }
+    .weekly-notes .ledger-title {
+      font-size: 0.72em;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 400;
+    }
+    .weekly-notes-range {
+      font-size: 0.72em;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .weekly-notes-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 0.75rem;
+      padding-top: 0.8rem;
+    }
+    .weekly-note-day {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.6rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      background: transparent;
+      min-height: 120px;
+    }
+    .weekly-note-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+    .weekly-note-name {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .weekly-note-date {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .weekly-note-input {
+      flex: 1;
+      border: none;
+      resize: none;
+      background: transparent;
+      font-family: inherit;
+      font-size: 0.8rem;
+      color: var(--ink);
+      outline: none;
+    }
+    .weekly-note-input::placeholder {
+      color: var(--muted);
+    }
+    .weekly-note-day.is-today {
+      border-color: rgba(182, 164, 122, 0.45);
+      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.15);
+    }
+    .view-home.home-compact .home-layout {
+      gap: 1.7rem;
+    }
+    .view-home.home-compact .command-header {
+      margin-bottom: 1.6rem;
+      padding-bottom: 0.9rem;
+    }
+    .view-home.home-compact .home-main {
+      gap: 1.2rem;
+    }
+    .view-home.home-compact .home-sidebar {
+      gap: 0.9rem;
+    }
+    .view-home.home-compact .ledger-shell,
+    .view-home.home-compact .status-rail-shell {
+      padding: 1rem 1.1rem;
+    }
+    .view-home.home-compact .status-rail {
+      gap: 32px;
+    }
+    .view-home.home-compact .mini-deadlines {
+      margin-top: 32px;
+    }
+    .view-home.home-compact .status-rail-shell {
+      min-height: 0;
+    }
+    .mini-deadlines .section-subtitle {
+      margin-bottom: 0.75rem;
     }
     .completed-jobs-list {
       display: flex;
@@ -839,19 +1139,119 @@
     }
 
     .quick-actions {
-      margin-bottom: 2rem;
+      margin-bottom: 0;
     }
 
-    .quick-actions button {
-      background: var(--accent);
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 8px;
+    .quick-actions-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 260px));
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .quick-action-card {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background: linear-gradient(135deg, rgba(182, 164, 122, 0.16), rgba(255, 255, 255, 0.92));
+      border: 1px solid rgba(182, 164, 122, 0.32);
+      border-radius: var(--radius);
+      padding: 1.2rem 1.3rem 1.2rem 2rem;
       font-family: var(--font-sans);
-      font-weight: 200;
+      color: var(--ink);
+      text-align: left;
       cursor: pointer;
-      margin-right: 0.5rem;
+      box-shadow: var(--card-shadow-soft);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 0.35rem;
+      min-height: 0;
+      transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .quick-action-card::before {
+      content: "";
+      position: absolute;
+      left: 0.9rem;
+      top: 0.9rem;
+      bottom: 0.9rem;
+      width: 3px;
+      border-radius: 999px;
+      background: var(--accent);
+      opacity: 0.7;
+    }
+
+    .quick-action-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+      box-shadow: var(--card-shadow);
+    }
+
+    body.theme-dark .quick-action-card,
+    body.theme-mountain-dark .quick-action-card {
+      background: linear-gradient(135deg, rgba(148, 163, 184, 0.18), rgba(15, 23, 42, 0.8));
+      border-color: rgba(148, 163, 184, 0.3);
+    }
+
+    .quick-action-title {
+      font-size: 1.1rem;
+      font-weight: 300;
+      letter-spacing: -0.01em;
+    }
+
+    .quick-action-sub {
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    @media (max-width: 900px) {
+      .command-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+
+      .command-actions {
+        width: 100%;
+      }
+
+      .command-actions.btn-group {
+        width: 100%;
+      }
+
+      .command-actions.btn-group button {
+        flex: 1 1 160px;
+      }
+
+      .home-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .home-sidebar {
+        order: 2;
+        height: auto;
+      }
+
+      .status-rail-shell {
+        height: auto;
+        border-left: none;
+        border-top: 1px solid var(--line);
+        padding: 1rem 0 0;
+        border-radius: 0;
+      }
+
+      .quick-actions-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .quick-action-card {
+        padding: 1.5rem;
+      }
+      .weekly-notes-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
 
     .btn-group {
@@ -1020,6 +1420,18 @@
     .case-actions .chip:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 2px;
+    }
+
+    .case-card.applications-summary .case-header {
+      cursor: default;
+      align-items: flex-start;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .case-card.applications-summary .case-actions {
+      margin-top: 0;
+      align-items: center;
     }
 
     .toast {
@@ -1404,6 +1816,7 @@
       gap: 8px;
       margin-bottom: 1.5rem;
       flex-wrap: wrap;
+      align-items: center;
     }
 
     .view-cases .filter-tab {
@@ -1423,6 +1836,30 @@
       background: var(--accent);
       color: #fff;
       border-color: var(--accent);
+    }
+
+    .view-cases .filter-search {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+    }
+
+    .view-cases .filter-search input[type="search"] {
+      padding: 0.6rem 1rem;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      width: 220px;
+      transition: border-color 0.2s;
+      background: var(--panel);
+      color: var(--ink);
+    }
+
+    .view-cases .filter-search input[type="search"]:focus {
+      border-color: var(--accent);
+      outline: none;
     }
 
     .view-cases table {
@@ -1553,7 +1990,7 @@
     }
 
     .view-cases tbody tr:hover {
-      background: rgba(182, 164, 122, 0.05);
+      background: transparent;
     }
 
     .view-cases td a {
@@ -1635,6 +2072,608 @@
       text-align:center;
       color:var(--muted);
       font-style:italic;
+    }
+
+    .view-cases .case-actions-inline {
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      gap:0.5rem;
+    }
+
+    .view-cases .applicant-toggle {
+      border:1px solid var(--line);
+      background:var(--panel);
+      color:var(--ink);
+      border-radius:999px;
+      padding:0.35rem 0.85rem;
+      font-size:0.82rem;
+      font-family:var(--font-serif);
+      font-weight:300;
+      cursor:pointer;
+      transition:background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+      white-space:nowrap;
+    }
+
+    .view-cases .applicant-toggle:hover:not([disabled]) {
+      border-color:var(--accent);
+      color:var(--accent);
+      background:rgba(182,164,122,0.08);
+    }
+
+    .view-cases .applicant-toggle[disabled] {
+      opacity:0.6;
+      cursor:not-allowed;
+    }
+
+    .view-cases .applicant-drawer-row td {
+      padding:0;
+      border-bottom:none;
+      background:transparent;
+      overflow:hidden;
+    }
+
+    .view-cases .applicant-drawer {
+      margin:0.35rem 0 1rem;
+      border:1px solid #faf9f5;
+      border-radius:8px;
+      background:#fff;
+      overflow:hidden;
+      max-height:1600px;
+      opacity:1;
+      transform:translateY(0);
+      transition:max-height 0.35s ease, opacity 0.2s ease, transform 0.2s ease, margin 0.35s ease;
+    }
+
+    .view-cases .applicant-drawer.no-transition {
+      transition:none;
+    }
+
+    .view-cases .applicant-drawer-row.hidden {
+      display:table-row !important;
+    }
+
+    .view-cases .applicant-drawer-row.hidden .applicant-drawer {
+      max-height:0;
+      opacity:0;
+      transform:translateY(-6px);
+      margin:0;
+      border-width:0;
+      pointer-events:none;
+    }
+
+    .view-cases .applicant-drawer-header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:1rem;
+      padding:0.75rem 1rem;
+      background:#faf9f5;
+    }
+
+    .view-cases .applicant-drawer-title {
+      font-family:var(--font-serif);
+      font-weight:300;
+      color:var(--ink);
+      font-size:0.9rem;
+    }
+
+    .view-cases .applicant-drawer-close {
+      border:none;
+      background:none;
+      color:var(--muted);
+      font-size:0.8rem;
+      letter-spacing:0.04em;
+      text-transform:uppercase;
+      cursor:pointer;
+      padding:0.25rem 0.5rem;
+      border-radius:6px;
+      transition:color 0.2s ease, background 0.2s ease;
+    }
+
+    .view-cases .applicant-drawer-close:hover {
+      color:var(--accent);
+      background:#faf9f5;
+    }
+
+    .view-cases .applicant-drawer-body {
+      padding:0.9rem 1.1rem 1.2rem 0;
+      background:#fff;
+    }
+
+    .view-cases .applicant-layout {
+      display:grid;
+      grid-template-columns:260px minmax(0, 1fr);
+      gap:1.1rem;
+      align-items:start;
+      background:#fff;
+    }
+
+    .view-cases .applicant-list-panel {
+      background:transparent;
+      border:none;
+      border-radius:0;
+      padding:0;
+    }
+
+    .view-cases .applicant-list-title {
+      font-family:var(--font-serif);
+      font-weight:300;
+      font-size:0.95rem;
+      color:var(--ink);
+      margin:0.1rem 0 0.6rem;
+    }
+
+    .view-cases .applicant-list {
+      display:flex;
+      flex-direction:column;
+      gap:0.35rem;
+      background:transparent;
+      border:none;
+      border-radius:0;
+      padding:0;
+      max-height:560px;
+      overflow:auto;
+    }
+
+    .view-cases .applicant-table {
+      width:100%;
+      border-collapse:collapse;
+      background:var(--panel);
+    }
+
+    .view-cases .applicant-table th,
+    .view-cases .applicant-table td {
+      padding:0.7rem 0.75rem;
+      border-bottom:1px solid var(--line);
+      text-align:left;
+      font-size:0.85rem;
+    }
+
+    .view-cases .applicant-table th {
+      font-weight:600;
+      text-transform:uppercase;
+      font-size:0.7rem;
+      letter-spacing:0.05em;
+      color:var(--muted);
+      background:rgba(0,0,0,0.02);
+    }
+
+    .view-cases .applicant-card {
+      cursor:pointer;
+      background:#fcfbf8;
+      border:1px solid #f0ece3;
+      border-radius:0;
+      padding:0.65rem 0.7rem;
+      position:relative;
+      transition:background 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+      width:100%;
+    }
+
+    .view-cases .applicant-card:hover {
+      background:#faf8f2;
+    }
+
+    .view-cases .applicant-card.is-active {
+      background:#f7f4ed;
+      border-color:#efe3d2;
+      box-shadow:none;
+      border-left:3px solid var(--accent);
+      padding-left:0.6rem;
+    }
+
+    .view-cases .applicant-card-top {
+      display:flex;
+      align-items:center;
+      gap:0.6rem;
+    }
+
+    .view-cases .applicant-card-info {
+      display:flex;
+      flex-direction:column;
+      gap:0.25rem;
+      min-width:0;
+    }
+
+    .view-cases .applicant-card-name {
+      font-size:0.92rem;
+      font-family:var(--font-serif);
+      font-weight:300;
+      color:var(--ink);
+      letter-spacing:0.01em;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .view-cases .applicant-card-meta {
+      display:flex;
+      flex-wrap:wrap;
+      gap:0.3rem;
+      font-size:0.74rem;
+      color:#6b7280;
+      letter-spacing:0.01em;
+      line-height:1.3;
+    }
+
+    .view-cases .applicant-card-meta .dot {
+      color:#c9c2b4;
+    }
+
+    .view-cases .applicant-card.empty-card {
+      cursor:default;
+      text-align:center;
+      color:#6b7280;
+      font-size:0.85rem;
+      padding:0.8rem 0.6rem;
+      background:#faf9f5;
+      border-radius:10px;
+      border:1px dashed #f0ece3;
+    }
+
+    .view-cases .applicant-avatar {
+      width:40px;
+      height:40px;
+      aspect-ratio:1 / 1;
+      flex-shrink:0;
+      border-radius:50%;
+      overflow:hidden;
+      background:#faf9f5;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:600;
+      color:var(--muted);
+      font-size:0.8rem;
+    }
+
+    .view-cases .applicant-avatar img {
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      border-radius:50%;
+    }
+
+    .view-cases .applicant-detail {
+      border-radius:0;
+      background:#fff;
+      padding:0.2rem 0.2rem 0;
+      min-height:420px;
+      box-shadow:none;
+    }
+
+    .view-cases .applicant-detail.hidden {
+      display:none;
+    }
+
+    .view-cases .applicant-detail-grid {
+      display:grid;
+      grid-template-columns:minmax(0, 1fr) 240px;
+      gap:1.2rem;
+      align-items:start;
+    }
+
+    .view-cases .applicant-detail-main {
+      min-width:0;
+    }
+
+    .view-cases .applicant-detail-side {
+      align-self:start;
+      padding-left:0.6rem;
+      border-left:1px solid #f0ece3;
+    }
+
+    .view-cases .applicant-detail-name {
+      font-size:1.25rem;
+      font-family:var(--font-serif);
+      font-weight:300;
+      margin-bottom:0.35rem;
+      color:var(--ink);
+    }
+
+    .view-cases .applicant-detail-line {
+      font-size:0.9rem;
+      color:#6b7280;
+      margin-bottom:1rem;
+    }
+
+    .view-cases .applicant-detail-divider {
+      height:1px;
+      background:#f0ece3;
+      margin:0 0 1rem;
+    }
+
+    .view-cases .applicant-detail-section {
+      margin-bottom:1.3rem;
+    }
+
+    .view-cases .applicant-detail-section-title {
+      font-size:0.95rem;
+      font-family:var(--font-serif);
+      font-weight:300;
+      margin-bottom:0.5rem;
+      color:var(--ink);
+    }
+
+    .view-cases .applicant-detail-list {
+      margin:0;
+      padding-left:1.1rem;
+      color:var(--ink);
+      font-size:0.88rem;
+      line-height:1.6;
+    }
+
+    .view-cases .applicant-detail-empty {
+      color:#6b7280;
+      font-size:0.88rem;
+    }
+
+    .view-cases .applicant-cover-box {
+      border-radius:8px;
+      padding:0.8rem 0.9rem;
+      background:#fff;
+      border:1px dashed #e6e1d7;
+      color:#2d2d2d;
+      font-size:0.9rem;
+      line-height:1.5;
+    }
+
+    .view-cases .applicant-cover-box.muted {
+      color:#6b7280;
+    }
+
+    .view-cases .applicant-side-card {
+      border-radius:8px;
+      background:#faf9f5;
+      padding:0.85rem 0.9rem;
+      border:1px solid #f0ece3;
+      display:flex;
+      flex-direction:column;
+      gap:0.75rem;
+      box-shadow:none;
+    }
+
+    .view-cases .applicant-side-name {
+      font-size:1.1rem;
+      font-family:var(--font-serif);
+      font-weight:300;
+      color:var(--ink);
+      padding-bottom:0.6rem;
+      border-bottom:1px solid #f0ece3;
+    }
+
+    .view-cases .applicant-side-meta {
+      display:flex;
+      flex-direction:column;
+      gap:0.4rem;
+      color:#6b7280;
+      font-size:0.85rem;
+    }
+
+    .view-cases .applicant-side-meta .icon {
+      display:inline-flex;
+      width:18px;
+      height:18px;
+      align-items:center;
+      justify-content:center;
+      margin-right:0.45rem;
+      color:#9aa1aa;
+    }
+
+    .view-cases .applicant-side-meta .icon svg {
+      width:16px;
+      height:16px;
+      display:block;
+    }
+
+    .view-cases .applicant-side-actions {
+      display:flex;
+      flex-direction:column;
+      gap:0.5rem;
+    }
+
+    .view-cases .applicant-side-btn {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:999px;
+      border:1px solid #e9e2d6;
+      padding:0.45rem 0.8rem;
+      font-size:0.85rem;
+      font-family:var(--font-serif);
+      font-weight:300;
+      color:var(--ink);
+      background:#faf9f5;
+      text-decoration:none;
+      cursor:pointer;
+      transition:transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .view-cases .applicant-side-btn:hover {
+      transform:translateY(-1px);
+      background:#fff;
+      border-color:#e0d6c7;
+    }
+
+    .view-cases .applicant-side-btn.muted {
+      color:#6b7280;
+      cursor:default;
+      box-shadow:none;
+      transform:none;
+    }
+
+    .view-cases .applicant-side-hire {
+      border:none;
+      border-radius:999px;
+      padding:0.6rem 1rem;
+      font-size:0.9rem;
+      font-family:var(--font-serif);
+      font-weight:400;
+      letter-spacing:0.02em;
+      background:var(--accent);
+      color:#fff;
+      cursor:pointer;
+      box-shadow:none;
+      transition:transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+
+    .view-cases .applicant-side-hire:hover {
+      transform:translateY(-2px);
+      background:#c1b08a;
+    }
+
+    .view-cases .applicant-side-hire.is-pressed {
+      animation:hirePress 0.18s ease;
+    }
+
+    @keyframes hirePress {
+      0% {
+        transform:translateY(0) scale(1);
+      }
+      50% {
+        transform:translateY(1px) scale(0.98);
+      }
+      100% {
+        transform:translateY(0) scale(1);
+      }
+    }
+
+    .view-cases .applicant-side-note {
+      font-size:0.78rem;
+      color:#6b7280;
+      line-height:1.4;
+      text-align:center;
+    }
+
+    @media (max-width: 1100px) {
+      .view-cases .applicant-layout {
+        grid-template-columns:1fr;
+      }
+
+      .view-cases .applicant-detail-grid {
+        grid-template-columns:1fr;
+      }
+
+      .view-cases .applicant-detail {
+        min-height:auto;
+      }
+    }
+
+    .view-cases .applicant-detail-title {
+      font-size:0.95rem;
+      font-weight:500;
+      margin-bottom:0.35rem;
+    }
+
+    .view-cases .applicant-detail-title.legacy-font {
+      font-family:var(--font-serif);
+      font-weight:300;
+    }
+
+    .view-cases .applicant-name.legacy-font {
+      font-family:var(--font-serif);
+      font-weight:300;
+    }
+
+    .view-cases .applicant-detail-meta {
+      color:var(--muted);
+      font-size:0.85rem;
+      margin-bottom:0.55rem;
+    }
+
+    .view-cases .applicant-detail-actions {
+      display:flex;
+      flex-wrap:wrap;
+      gap:0.5rem;
+      margin-bottom:0.65rem;
+    }
+
+    .view-cases .applicant-detail-chip {
+      border:1px solid var(--line);
+      border-radius:999px;
+      padding:0.35rem 0.85rem;
+      font-size:0.8rem;
+      color:var(--ink);
+      background:#fafafa;
+      text-decoration:none;
+      font-family:var(--font-serif);
+      font-weight:300;
+      transition:transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .view-cases a.applicant-detail-chip,
+    .view-cases button.applicant-detail-chip {
+      cursor:pointer;
+    }
+
+    .view-cases a.applicant-detail-chip:hover,
+    .view-cases a.applicant-detail-chip:focus-visible,
+    .view-cases button.applicant-detail-chip:hover,
+    .view-cases button.applicant-detail-chip:focus-visible {
+      transform:translateY(-1px);
+      box-shadow:0 6px 14px rgba(0,0,0,0.08);
+      background:#fff;
+      border-color:rgba(182,164,122,0.45);
+    }
+
+    .view-cases .applicant-detail-chip.hire-primary {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      flex-basis:100%;
+      padding:0.55rem 1.6rem;
+      font-size:0.9rem;
+      font-weight:400;
+      letter-spacing:0.02em;
+      background:var(--accent);
+      color:#fff;
+      border-color:var(--accent);
+      box-shadow:0 10px 26px rgba(182,164,122,0.32);
+      animation:hirePulse 2.4s ease-in-out infinite;
+    }
+
+    .view-cases .applicant-detail-chip.hire-primary:hover,
+    .view-cases .applicant-detail-chip.hire-primary:focus-visible {
+      transform:translateY(-2px) scale(1.01);
+      box-shadow:0 16px 34px rgba(182,164,122,0.38);
+      background:#c1b08a;
+      border-color:#c1b08a;
+    }
+
+    @keyframes hirePulse {
+      0%, 100% {
+        transform:translateY(0);
+        box-shadow:0 10px 26px rgba(182,164,122,0.28);
+      }
+      50% {
+        transform:translateY(-1px);
+        box-shadow:0 14px 30px rgba(182,164,122,0.36);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .view-cases .applicant-detail-chip.hire-primary {
+        animation:none;
+      }
+    }
+
+    .view-cases .applicant-detail-chip.muted {
+      color:var(--muted);
+      opacity:0.7;
+    }
+
+    .view-cases .applicant-cover {
+      border:1px dashed rgba(0,0,0,0.08);
+      border-radius:10px;
+      padding:0.75rem 0.9rem;
+      background:#fafafa;
+      color:#2d2d2d;
+      font-size:0.9rem;
+      line-height:1.45;
+    }
+
+    .view-cases .applicant-cover.muted {
+      color:var(--muted);
     }
 
     .view-cases .case-files-pane{
@@ -1814,6 +2853,13 @@
       gap:0.75rem;
       flex-wrap:wrap;
     }
+    .note-modal-actions a.btn{
+      text-decoration:none;
+    }
+    .note-modal-actions a.btn:hover,
+    .note-modal-actions a.btn:focus{
+      text-decoration:none;
+    }
 
     .case-preview-card{
       width:min(92vw,720px);
@@ -1952,47 +2998,6 @@
       color:var(--muted);
     }
 
-    .case-applications-title{
-      font-size:0.7rem;
-      letter-spacing:0.18em;
-      text-transform:uppercase;
-      color:var(--muted);
-      margin-top:0.25rem;
-    }
-
-    .case-star-btn{
-      margin-left:auto;
-      border:1px solid var(--line);
-      background:transparent;
-      color:var(--muted);
-      border-radius:999px;
-      padding:0.3rem 0.6rem;
-      font-size:0.95rem;
-      line-height:1;
-      cursor:pointer;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      transition:all 0.2s ease;
-      flex-shrink:0;
-    }
-
-    .case-star-btn:hover{
-      border-color:var(--accent);
-      color:var(--accent);
-    }
-
-    .case-star-btn[data-starred="true"]{
-      border-color:rgba(182, 164, 122, 0.5);
-      background:rgba(182, 164, 122, 0.16);
-      color:var(--accent);
-    }
-
-    .case-star-btn:disabled{
-      opacity:0.6;
-      cursor:not-allowed;
-    }
-
     .btn{
       border-radius:999px;
       padding:0.55rem 1.4rem;
@@ -2099,7 +3104,7 @@
       border-radius:var(--radius);
       background:var(--panel);
       padding:var(--card-pad);
-      margin-bottom:2rem;
+      margin-bottom:1.2rem;
       box-shadow: var(--card-shadow-soft);
     }
 
@@ -2109,7 +3114,7 @@
       gap:1rem;
       flex-wrap:wrap;
       align-items:center;
-      margin-bottom:1.25rem;
+      margin-bottom:0.9rem;
     }
 
     .view-billing .panel-header h2 {
@@ -2147,7 +3152,7 @@
       align-items:center;
       gap:12px;
       color:var(--ink);
-      min-height:90px;
+      min-height:70px;
     }
 
     .view-billing .pm-row {
@@ -2263,6 +3268,22 @@
       margin-top:8px;
       min-height:20px;
       font-size:0.9rem;
+    }
+    body.theme-dark .payment-modal .modal-card {
+      background: rgba(18, 23, 36, 0.98);
+      color: var(--ink);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    }
+    body.theme-dark .payment-modal p {
+      color: var(--muted);
+    }
+    body.theme-dark .payment-modal .payment-method-form {
+      background: rgba(255, 255, 255, 0.04);
+    }
+    body.theme-dark .payment-modal .payment-element-host {
+      background: var(--panel);
+      border-color: rgba(255, 255, 255, 0.08);
     }
     .payment-modal .payment-actions {
       display:flex;
@@ -2410,69 +3431,76 @@
     }
 
     .view-billing .history-list {
-      display:flex;
-      flex-direction:column;
-      gap:1.25rem;
+      --history-gap: 0.9rem;
+      display:grid;
+      grid-auto-flow:column;
+      grid-auto-columns: calc((100% - (4 * var(--history-gap))) / 5);
+      gap:var(--history-gap);
       min-height:140px;
+      overflow-x:auto;
+      overflow-y:hidden;
+      padding-bottom:0.75rem;
     }
 
     .view-billing .history-card {
       border:1px solid var(--line);
       border-radius:var(--radius);
       background:var(--panel);
-      padding:1.25rem;
+      padding:0.9rem;
       display:flex;
       flex-direction:column;
-      gap:1rem;
+      gap:0.65rem;
+      min-height:100%;
     }
 
     .view-billing .history-primary .case-name {
       font-family:var(--font-serif);
-      font-size:1.45rem;
+      font-size:1rem;
       font-weight:300;
     }
 
     .view-billing .history-primary .job-title {
       color:var(--muted);
-      font-size:1rem;
+      font-size:0.85rem;
     }
 
     .view-billing .history-primary .paralegal-name {
-      font-size:0.95rem;
+      font-size:0.82rem;
       color:var(--ink);
     }
 
     .view-billing .history-meta {
       display:flex;
-      flex-wrap:wrap;
-      gap:1.5rem;
+      flex-direction:column;
+      gap:0.55rem;
     }
 
     .view-billing .meta-item span {
       display:block;
       text-transform:uppercase;
-      font-size:0.7rem;
+      font-size:0.62rem;
       color:var(--muted);
       letter-spacing:0.08em;
       margin-bottom:0.3rem;
     }
 
     .view-billing .meta-item strong {
-      font-size:1.2rem;
+      font-size:0.95rem;
       font-weight:300;
     }
 
     .view-billing .history-actions {
       display:flex;
-      flex-wrap:wrap;
-      gap:0.75rem;
-      align-items:center;
+      flex-direction:column;
+      gap:0.5rem;
+      align-items:flex-start;
     }
 
     .view-billing .history-actions button {
       border:1px solid var(--line);
       border-radius:999px;
-      padding:0.45rem 1.25rem;
+      padding:0.35rem 0.85rem;
+      font-size:0.78rem;
       background:var(--panel);
       cursor:pointer;
       transition:transform 0.2s ease, box-shadow 0.2s ease;
@@ -2490,6 +3518,8 @@
       border:1px dashed var(--line);
       border-radius:var(--radius);
       background:var(--panel);
+      grid-column:1 / -1;
+      min-width:100%;
     }
 
     .view-billing .history-empty.error {
@@ -2755,8 +3785,8 @@
         min-width: 0;
       }
 
-      .today-strip {
-        gap: 0.75rem;
+      .status-rail {
+        gap: 32px;
       }
 
       .queue-item {
@@ -2805,13 +3835,18 @@
         flex-wrap: wrap;
       }
 
-      .view-cases .page-header input[type="search"] {
-        width: 100%;
-      }
-
       .view-cases .add-btn {
         width: 100%;
         text-align: center;
+      }
+
+      .view-cases .filter-search {
+        width: 100%;
+        margin-left: 0;
+      }
+
+      .view-cases .filter-search input[type="search"] {
+        width: 100%;
       }
 
       .view-cases .case-switcher {
@@ -2848,6 +3883,10 @@
         gap: 0.5rem;
       }
 
+      .view-billing .history-list {
+        grid-auto-columns: minmax(220px, 75%);
+      }
+
       .view-billing .ghost-btn {
         flex: 1 1 160px;
         text-align: center;
@@ -2873,8 +3912,8 @@
         font-size: 1.7rem;
       }
 
-      .today-strip {
-        grid-template-columns: 1fr;
+      .status-rail {
+        gap: 32px;
       }
 
       .summary {
@@ -3005,142 +4044,100 @@
     </div>
 
     <section class="view-panel view-home" data-view="home">
-      <header>
-        <h1><span id="welcomeGreeting">Welcome back</span>, <span id="user-name-heading"></span></h1>
-        <p id="activeCasesHeading"></p>
+      <header class="command-header">
+        <div class="command-title">
+          <h1><span id="welcomeGreeting">Welcome</span>, <span id="user-name-heading"></span></h1>
+          <p id="activeCasesHeading" data-static="true">Your matters at a glance</p>
+        </div>
+        <div class="command-actions btn-group" role="group" aria-label="Quick actions">
+          <button type="button" data-quick-link="create-case">+ New Request</button>
+          <button type="button" class="secondary" data-quick-link="browse-paralegals">Browse Paralegals</button>
+        </div>
       </header>
 
-      <section class="today-strip">
-        <div class="today-card">
-          <div class="today-label">Unfunded escrows</div>
-          <div class="today-value" data-today="unfunded">0</div>
-          <div class="today-sub">Matters awaiting funding</div>
-          <a class="today-link" href="#cases" data-view-target="cases">Review cases</a>
-        </div>
-        <div class="today-card">
-          <div class="today-label">Pending reviews</div>
-          <div class="today-value" data-today="pendingReviews">0</div>
-          <div class="today-sub">Submissions awaiting review</div>
-          <a class="today-link" href="#cases" data-view-target="cases">Open case files</a>
-        </div>
-        <div class="today-card message-box" id="messageBox" role="button" tabindex="0">
-          <div class="today-label">Unread messages</div>
-          <div class="today-value"><span id="messageCount">0</span> <span id="plural">waiting</span></div>
-          <div class="today-sub" id="messageSnippet">No unread messages.</div>
-        </div>
-        <div class="today-card">
-          <div class="today-label">New applications</div>
-          <div class="today-value" data-today="applications">0</div>
-          <div class="today-sub">Applications awaiting review</div>
-          <a class="today-link" href="#applicationsSection">View applications</a>
-        </div>
-      </section>
-
-      <section class="action-queue">
-        <div class="section-title">Action Queue</div>
-        <div class="queue-list">
-          <div class="queue-item">
-            <div>
-              <div class="queue-title">Fund escrow</div>
-              <div class="queue-meta"><span data-queue="unfunded">0</span> matters awaiting funding</div>
-            </div>
-            <a class="queue-action" href="#cases" data-view-target="cases">Review</a>
-          </div>
-          <div class="queue-item">
-            <div>
-              <div class="queue-title">Review submissions</div>
-              <div class="queue-meta"><span data-queue="pendingReviews">0</span> matters need review</div>
-            </div>
-            <a class="queue-action" href="#cases" data-view-target="cases">Open files</a>
-          </div>
-          <div class="queue-item">
-            <div>
-              <div class="queue-title">Review applications</div>
-              <div class="queue-meta"><span data-queue="applications">0</span> new applicants</div>
-            </div>
-            <a class="queue-action" href="#cases" data-view-target="cases">View</a>
-          </div>
-        </div>
-      </section>
-
-      <div class="home-tabs" role="tablist" aria-label="Dashboard views">
-        <button type="button" class="home-tab active" data-home-tab="cases" aria-controls="homeCasesPanel" aria-selected="true">Cases</button>
-        <button type="button" class="home-tab" data-home-tab="activity" aria-controls="homeActivityPanel" aria-selected="false">Activity</button>
-      </div>
-
       <section class="home-panel" data-home-panel="cases" id="homeCasesPanel">
-        <section class="summary case-snapshot">
-          <div class="info-box" id="attorneyActiveCases" data-metric="activeCases" title="Active cases are open matters that are not archived or completed.">
-            <div class="skeleton-line medium"></div>
-          </div>
-          <div class="info-box" id="attorneyOverdueTasks" data-metric="overdueTasks" title="Overdue tasks are checklist items past their due date and not completed.">
-            <div class="skeleton-line medium"></div>
-          </div>
-          <div class="info-box" id="attorneyEscrowTotal" data-metric="escrowTotal" title="Escrow total is the sum of funds currently held in escrow.">
-            <div class="skeleton-line long"></div>
-          </div>
-        </section>
-
-        <section class="quick-actions">
-          <div class="section-title">Quick Actions</div>
-          <button type="button" data-quick-link="create-case">Create New Request</button>
-          <button type="button" data-quick-link="browse-paralegals">Browse Paralegals</button>
-        </section>
-
-        <section class="case-list" id="caseCards">
-          <div class="case-card skeleton-card" aria-hidden="true">
-            <div class="case-header">
-              <div class="skeleton-stack">
-                <div class="skeleton-line long"></div>
-                <div class="skeleton-line medium"></div>
+        <div class="home-layout">
+          <div class="home-main">
+            <div class="ledger-shell">
+              <div class="ledger-header">
+                <div class="ledger-title">Recent Matters</div>
               </div>
-            </div>
-          </div>
-          <div class="case-card skeleton-card" aria-hidden="true">
-            <div class="case-header">
-              <div class="skeleton-stack">
-                <div class="skeleton-line long"></div>
-                <div class="skeleton-line short"></div>
-              </div>
-            </div>
-          </div>
-        </section>
 
-        <div class="section-title applications-title">Applications</div>
-        <section class="case-list" id="applicationsSection">
-          <div class="case-card skeleton-card" aria-hidden="true">
-            <div class="case-header">
-              <div class="skeleton-stack">
-                <div class="skeleton-line long"></div>
-                <div class="skeleton-line medium"></div>
-              </div>
+              <section class="case-ledger" id="caseCards">
+                <div class="matter-row skeleton-row" aria-hidden="true">
+                  <div class="matter-main">
+                    <div class="skeleton-line long"></div>
+                    <div class="skeleton-line medium"></div>
+                  </div>
+                  <div class="skeleton-line short"></div>
+                </div>
+                <div class="matter-row skeleton-row" aria-hidden="true">
+                  <div class="matter-main">
+                    <div class="skeleton-line long"></div>
+                    <div class="skeleton-line medium"></div>
+                  </div>
+                  <div class="skeleton-line short"></div>
+                </div>
+              </section>
             </div>
+
+
+            <section class="ledger-shell weekly-notes" aria-labelledby="weeklyNotesTitle">
+              <div class="ledger-header">
+                <div class="ledger-title" id="weeklyNotesTitle">Weekly Notes</div>
+                <div class="weekly-notes-range" id="weeklyNotesRange"></div>
+              </div>
+              <div class="weekly-notes-grid" id="weeklyNotesGrid" aria-label="Weekly notes">
+                <div class="weekly-note-day">
+                  <div class="weekly-note-header">
+                    <div class="weekly-note-name">Mon</div>
+                    <div class="weekly-note-date">—</div>
+                  </div>
+                  <div class="weekly-note-input" aria-hidden="true">Loading…</div>
+                </div>
+              </div>
+            </section>
           </div>
-        </section>
+
+          <aside class="home-sidebar">
+            <section class="status-rail-shell" aria-label="Status rail">
+              <div class="status-rail">
+                <div class="status-item">
+                  <a class="status-label status-link" href="#cases" data-view-target="cases">Cases</a>
+                  <div class="status-value" data-today="casesCreated">0</div>
+                </div>
+                <div class="status-item">
+                  <a class="status-label status-link" href="#cases:inquiries">Applications</a>
+                  <div class="status-value" data-today="applications">0</div>
+                </div>
+                <div class="status-item message-box" id="messageBox" role="button" tabindex="0">
+                  <div class="status-label">Unread Messages</div>
+                  <div class="status-value"><span id="messageCount">0</span></div>
+                </div>
+                <div class="status-item">
+                  <a class="status-label status-link" href="#cases:archived">Total Completed Matters</a>
+                  <div class="status-value" data-today="completedCases">0</div>
+                </div>
+              </div>
+
+              <section class="deadlines mini-deadlines">
+                <div class="section-title">Week at a glance</div>
+                <div id="deadlineList">
+                  <div class="skeleton-stack" aria-hidden="true">
+                    <div class="skeleton-line long"></div>
+                    <div class="skeleton-line medium"></div>
+                    <div class="skeleton-line short"></div>
+                  </div>
+                  <div class="info-line" id="attorneyDeadlinesEmpty" style="color:var(--muted);" hidden>No upcoming deadlines this week.</div>
+                </div>
+              </section>
+            </section>
+          </aside>
+        </div>
       </section>
 
       <section class="home-panel" data-home-panel="activity" id="homeActivityPanel" hidden>
-        <section class="deadlines">
-          <div class="section-title">Upcoming Deadlines</div>
-          <div id="deadlineList">
-            <div class="skeleton-stack" aria-hidden="true">
-              <div class="skeleton-line long"></div>
-              <div class="skeleton-line medium"></div>
-              <div class="skeleton-line short"></div>
-            </div>
-            <div class="info-line" id="attorneyDeadlinesEmpty" style="color:var(--muted);" hidden>No upcoming deadlines.</div>
-          </div>
-        </section>
-
         <div class="side-by-side-panels">
-          <section id="latestMessagePreview">
-            <div class="section-title">Unread Messages</div>
-            <div class="info-line">
-              <strong id="messagePreviewSender"></strong>
-              <span id="messagePreviewText"></span>
-              <a id="messagePreviewLink" href="#" style="color:var(--accent);font-weight:500;">View</a>
-            </div>
-          </section>
           <section>
             <div class="section-title">Invoices &amp; Receipts</div>
             <div id="escrowDetails">
@@ -3172,16 +4169,9 @@
           <h1>Active Cases</h1>
           <p>Manage and monitor your open matters below.</p>
         </header>
-        <div class="case-switcher" role="tablist" aria-label="Case views">
-          <button type="button" class="active" data-case-view="cases" role="tab" aria-selected="true">Cases</button>
-          <button type="button" data-case-view="files" role="tab" aria-selected="false">Case Files</button>
-        </div>
-
         <section id="casesViewSection">
           <div class="page-header">
-            <h2>All Active Cases</h2>
             <div class="actions">
-              <input type="search" placeholder="Search cases..." data-cases-search aria-label="Search cases" />
               <button class="add-btn" type="button" data-case-quick="create">＋ New Case</button>
             </div>
           </div>
@@ -3191,6 +4181,9 @@
             <button class="filter-tab" data-case-filter="draft">Draft (<span data-case-count="draft">0</span>)</button>
             <button class="filter-tab" data-case-filter="archived">Archived (<span data-case-count="archived">0</span>)</button>
             <button class="filter-tab" data-case-filter="inquiries">Inquiries (<span data-case-count="inquiries">0</span>)</button>
+            <div class="filter-search">
+              <input type="search" placeholder="Search cases..." data-cases-search aria-label="Search cases" />
+            </div>
           </div>
 
           <div data-cases-wrapper>
@@ -3199,11 +4192,10 @@
                 <thead>
                   <tr>
                     <th>Title</th>
-                    <th>Client</th>
-                    <th>Specialty</th>
+                    <th>Paralegal Assigned</th>
+                    <th>Field</th>
                     <th>Status</th>
                     <th>Amount</th>
-                    <th>Notes</th>
                     <th>Posted</th>
                     <th class="actions"></th>
                   </tr>
@@ -3219,11 +4211,10 @@
                 <thead>
                   <tr>
                     <th>Title</th>
-                    <th>Client</th>
-                    <th>Specialty</th>
+                    <th>Paralegal Assigned</th>
+                    <th>Field</th>
                     <th>Status</th>
                     <th>Amount</th>
-                    <th>Notes</th>
                     <th>Last Edited</th>
                     <th class="actions"></th>
                   </tr>
@@ -3250,17 +4241,16 @@
                   <tr>
                     <th style="width:42px;">Select</th>
                     <th>Title</th>
-                    <th>Client</th>
-                    <th>Specialty</th>
+                    <th>Paralegal Assigned</th>
+                    <th>Field</th>
                     <th>Status</th>
                     <th>Amount</th>
-                    <th>Notes</th>
                     <th>Archived</th>
                     <th class="actions"></th>
                   </tr>
                 </thead>
                 <tbody data-table-body="archived">
-                  <tr><td colspan="9" class="empty-row">Loading archived cases…</td></tr>
+                  <tr><td colspan="8" class="empty-row">Loading archived cases…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -3270,11 +4260,10 @@
                 <thead>
                   <tr>
                     <th>Title</th>
-                    <th>Client</th>
-                    <th>Specialty</th>
+                    <th>Paralegal Assigned</th>
+                    <th>Field</th>
                     <th>Status</th>
                     <th>Amount</th>
-                    <th>Notes</th>
                     <th>Posted</th>
                     <th class="actions"></th>
                   </tr>
@@ -3287,23 +4276,6 @@
           </div>
         </section>
 
-        <section id="caseFilesSection" class="case-files-pane hidden" aria-labelledby="caseFilesHeading">
-          <div class="page-header">
-            <div>
-              <h2 id="caseFilesHeading">Case Files</h2>
-              <p>Review uploaded work, download approved files, or request revisions.</p>
-            </div>
-          </div>
-          <div class="case-files-filters">
-            <button type="button" id="caseFilesEmbedFilterAll" class="active">All Files</button>
-            <button type="button" id="caseFilesEmbedFilterApproved">Approved</button>
-            <button type="button" id="caseFilesEmbedFilterPending">Awaiting Review</button>
-            <button type="button" id="caseFilesEmbedFilterRevisions">Revisions Requested</button>
-          </div>
-          <div class="case-files-grid" id="caseFilesEmbedContainer">
-            <p class="case-files-empty">Loading files…</p>
-          </div>
-        </section>
       </div>
 
       <div id="caseNoteModal" class="note-modal hidden" role="dialog" aria-modal="true">
@@ -3349,6 +4321,7 @@
             <div data-case-preview-tasks>—</div>
           </div>
           <div class="note-modal-actions">
+            <a class="btn secondary" data-case-preview-receipt target="_blank" rel="noopener" hidden>Receipt</a>
             <button type="button" class="btn secondary" data-case-preview-close>Close</button>
           </div>
         </div>
@@ -3364,20 +4337,6 @@
           </div>
           <div class="note-modal-actions">
             <button type="button" class="btn secondary" data-case-invites-close>Close</button>
-          </div>
-        </div>
-      </div>
-      <div id="caseApplicationsModal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="caseApplicationsTitle">
-        <div class="note-modal-card case-invites-card">
-          <header class="case-preview-header">
-            <h3 id="caseApplicationsTitle">Case Applications</h3>
-            <button type="button" class="case-preview-close" aria-label="Close case applications" data-case-applications-close>&times;</button>
-          </header>
-          <div class="case-invites-list" data-case-applications-list>
-            <p class="muted">Loading applications…</p>
-          </div>
-          <div class="note-modal-actions">
-            <button type="button" class="btn secondary" data-case-applications-close>Close</button>
           </div>
         </div>
       </div>
@@ -3398,7 +4357,6 @@
         <div class="panel-header">
           <div>
             <h2 id="payment-method-heading">Payment Method</h2>
-            <p>Save a card on file for faster escrow funding.</p>
           </div>
           <div class="panel-actions">
             <button type="button" class="ghost-btn" id="addPaymentMethodBtn">Add Card</button>
@@ -3408,15 +4366,12 @@
         <div id="paymentMethodSummary" class="payment-method-summary"></div>
       </section>
 
-      <section id="financeAlerts" class="finance-alerts" aria-live="polite"></section>
-
       <section class="panel" aria-labelledby="escrow-heading">
         <div class="panel-header">
           <div>
             <h2 id="escrow-heading">Active Escrow</h2>
             <p>Funds currently held in trust for ongoing cases.</p>
           </div>
-          <button type="button" class="ghost-btn" id="refreshEscrowsBtn">Refresh</button>
         </div>
         <div class="table-wrapper">
           <table class="escrow-table" aria-describedby="escrow-heading">
@@ -3427,11 +4382,10 @@
                 <th>Held Amount</th>
                 <th>Funded</th>
                 <th>Status</th>
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="escrowTableBody">
-              <tr><td colspan="6" class="history-empty">Loading active escrows…</td></tr>
+              <tr><td colspan="5" class="history-empty">Loading active escrows…</td></tr>
             </tbody>
           </table>
         </div>
@@ -3490,7 +4444,7 @@
             heading.textContent = firstName;
           }
           if (greeting && typeof user.isFirstLogin === "boolean") {
-            greeting.textContent = user.isFirstLogin ? "Welcome" : "Welcome back";
+            greeting.textContent = "Welcome";
           }
         } catch (_) {}
       };

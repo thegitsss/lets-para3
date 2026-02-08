@@ -118,7 +118,7 @@ const selectors = {
   pluralText: document.getElementById('plural'),
   deadlineList: document.getElementById('deadlineList'),
   assignmentList: document.getElementById('assignmentList'),
-  inviteList: document.getElementById('inviteList'),
+  recentActivityList: document.getElementById('recentActivityList'),
   assignedCasesList: document.getElementById('assignedCasesList'),
   assignmentTemplate: document.getElementById('assignmentCardTemplate'),
   toastBanner: document.getElementById('toastBanner'),
@@ -141,13 +141,24 @@ const selectors = {
   welcomeNoticeDismiss: document.getElementById('dismissWelcomeNotice'),
 };
 
+const recentActivityState = {
+  threads: [],
+  deadlines: [],
+  invites: [],
+};
+
 const appliedFilters = {
   search: document.getElementById('appliedSearch'),
   status: document.getElementById('appliedStatusFilter'),
   practice: document.getElementById('appliedPracticeFilter'),
   dateRange: document.getElementById('appliedDateFilter'),
-  toggle: document.getElementById('appliedToggleBtn'),
   count: document.getElementById('appliedCount'),
+};
+
+const appliedPagination = {
+  prev: document.getElementById('appliedPrevBtn'),
+  next: document.getElementById('appliedNextBtn'),
+  info: document.getElementById('appliedPageInfo'),
 };
 
 const JSON_HEADERS = { Accept: 'application/json' };
@@ -176,9 +187,11 @@ let stripeConnected = false;
 let stripeGateBound = false;
 let pendingApprovalReady = false;
 let appliedAppsCache = [];
-let appliedShowAll = false;
 let appliedFiltersBound = false;
-const DEFAULT_APPLIED_LIMIT = 10;
+let activeApplication = null;
+const APPLIED_PAGE_SIZE = 3;
+let appliedPage = 1;
+let appliedTotalPages = 1;
 const applicationModal = document.getElementById('applicationDetailModal');
 const applicationDetail = applicationModal?.querySelector('[data-application-detail]');
 let applicationModalBound = false;
@@ -284,6 +297,29 @@ async function loadDeadlineEvents(limit = 5) {
   return fetchJson(`/api/events?${params.toString()}`).then((data) => (Array.isArray(data.items) ? data.items : []));
 }
 
+function getCaseDeadlineDate(caseItem = {}) {
+  const raw = caseItem.deadline || caseItem.dueDate || caseItem.deadlineDate || null;
+  if (!raw) return null;
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function buildCaseDeadlines(activeCases = []) {
+  return (Array.isArray(activeCases) ? activeCases : [])
+    .map((caseItem) => {
+      const date = getCaseDeadlineDate(caseItem);
+      if (!date) return null;
+      return {
+        title: caseItem.jobTitle || caseItem.title || 'Case deadline',
+        where: caseItem.practiceArea || '',
+        start: date.toISOString(),
+        caseId: getCaseId(caseItem),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(a.start) - new Date(b.start));
+}
+
 async function loadMessageThreads(limit = 50) {
   return fetchJson(`/api/messages/threads?limit=${limit}`).then((data) => (Array.isArray(data.threads) ? data.threads : []));
 }
@@ -298,7 +334,7 @@ function formatCurrency(value = 0) {
 }
 
 function deriveNextDeadline(events = []) {
-  const next = events[0];
+  const next = Array.isArray(events) ? events[0] : null;
   if (!next) return '--';
   return next.start ? new Date(next.start).toLocaleDateString() : '--';
 }
@@ -391,38 +427,19 @@ function renderAssignments(assignments = []) {
     metaEl.textContent = metaParts.join(' · ');
     summaryEl.textContent = assignment.summary || '';
     if (card) card.dataset.caseId = caseId;
-
-    header.setAttribute('role', 'button');
-    header.setAttribute('tabindex', '0');
-    header.setAttribute('aria-expanded', card.classList.contains('open') ? 'true' : 'false');
-
-    const toggleOpen = () => {
-      card.classList.toggle('open');
-      header.setAttribute('aria-expanded', card.classList.contains('open') ? 'true' : 'false');
-    };
-
-    header.addEventListener('click', toggleOpen);
-    header.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        toggleOpen();
-      }
-    });
+    card.classList.add('open');
 
     if (actions) {
       actions.hidden = !eligible;
+    }
+    if (secondaryBtn) {
+      secondaryBtn.remove();
     }
     if (eligible && caseId) {
       if (primaryBtn) {
         primaryBtn.addEventListener('click', (event) => {
           event.stopPropagation();
           navigateToCase(caseId);
-        });
-      }
-      if (secondaryBtn) {
-        secondaryBtn.addEventListener('click', (event) => {
-          event.stopPropagation();
-          navigateToCase(caseId, { messages: true });
         });
       }
     }
@@ -440,11 +457,13 @@ function mapActiveCasesToAssignments(activeCases = []) {
         caseId,
         title: caseItem.jobTitle || caseItem.title || 'Case',
         attorney: caseItem.attorneyName || '',
-        due: caseItem.dueDate
-          ? new Date(caseItem.dueDate).toLocaleDateString()
-          : caseItem.createdAt
-            ? new Date(caseItem.createdAt).toLocaleDateString()
-            : '',
+        due: caseItem.deadline
+          ? new Date(caseItem.deadline).toLocaleDateString()
+          : caseItem.dueDate
+            ? new Date(caseItem.dueDate).toLocaleDateString()
+            : caseItem.createdAt
+              ? new Date(caseItem.createdAt).toLocaleDateString()
+              : '',
         status: caseItem.status || '',
         summary: caseItem.practiceArea ? `Practice area: ${caseItem.practiceArea}` : '',
         escrowStatus: caseItem.escrowStatus || null,
@@ -470,96 +489,116 @@ async function loadInvites() {
 }
 
 function renderInvites(invites = []) {
-  const container = selectors.inviteList;
-  if (!container) return;
-  if (!invites.length) {
-    container.innerHTML = `
-      <div class="case-card empty-state">
-        <div class="case-header">
-          <div>
-            <h2>No invitations yet</h2>
-            <div class="case-subinfo">Case invites will appear here.</div>
-          </div>
-        </div>
-        <div class="case-actions">
-          <a class="open-case-btn" href="help.html#cases">Learn how invites work</a>
-        </div>
-      </div>
-    `;
-    return;
-  }
-  container.innerHTML = '';
+  return renderRecentActivity({ invites });
+}
+
+function buildRecentActivityEntries({ invites = [], threads = [], deadlines = [] } = {}) {
+  const entries = [];
 
   invites.forEach((invite) => {
-    const card = document.createElement('div');
-    card.className = 'case-card';
-    card.dataset.caseId = invite.id || invite._id || '';
-
-    const header = document.createElement('div');
-    header.className = 'case-header';
-    const headerBody = document.createElement('div');
-    const titleEl = document.createElement('h2');
-    titleEl.textContent = invite.title || 'Case Invitation';
-    const subInfo = document.createElement('div');
-    subInfo.className = 'case-subinfo';
+    const inviteId = invite?.id || invite?._id;
+    if (!inviteId) return;
+    const invitedAt = invite.inviteInvitedAt || invite.pendingParalegalInvitedAt || invite.createdAt || null;
+    const timestamp = invitedAt ? new Date(invitedAt).getTime() : 0;
     const attorneyName =
       invite.attorney?.name ||
       [invite.attorney?.firstName, invite.attorney?.lastName].filter(Boolean).join(' ').trim() ||
-      'Attorney';
-    const inviteDateValue = invite.inviteInvitedAt || invite.pendingParalegalInvitedAt;
-    const invitedAt = inviteDateValue
-      ? `Invited ${new Date(inviteDateValue).toLocaleDateString()}`
-      : '';
-    subInfo.textContent = [attorneyName, invitedAt].filter(Boolean).join(' · ');
-    headerBody.appendChild(titleEl);
-    headerBody.appendChild(subInfo);
-    header.appendChild(headerBody);
-    card.appendChild(header);
-
-    const body = document.createElement('div');
-    body.className = 'case-content';
-    const summary = document.createElement('p');
-    summary.textContent = invite.practiceArea || 'General matter';
-    body.appendChild(summary);
-
-    const actions = document.createElement('div');
-    actions.className = 'case-actions';
-    const acceptBtn = document.createElement('button');
-    acceptBtn.textContent = 'Accept';
-    acceptBtn.dataset.inviteAction = 'accept';
-    acceptBtn.dataset.caseId = invite.id || invite._id;
-    acceptBtn.dataset.stripeApply = "true";
-    if (!stripeConnected) {
-      acceptBtn.disabled = true;
-      acceptBtn.title = STRIPE_GATE_MESSAGE;
-    }
-    const declineBtn = document.createElement('button');
-    declineBtn.textContent = 'Decline';
-    declineBtn.dataset.inviteAction = 'decline';
-    declineBtn.dataset.caseId = invite.id || invite._id;
-    actions.appendChild(acceptBtn);
-    actions.appendChild(declineBtn);
-    body.appendChild(actions);
-    card.appendChild(body);
-    container.appendChild(card);
-
-    const openDetail = () => openInviteOverlay(invite);
-    header.addEventListener('click', openDetail);
-    card.addEventListener('click', (e) => {
-      if (e.target?.closest('button')) return;
-      openDetail();
+      '';
+    const title = invite.title || 'Case invitation';
+    entries.push({
+      type: 'invite',
+      caseId: String(inviteId),
+      timestamp,
+      title,
+      meta: ['Invitation received', attorneyName].filter(Boolean).join(' · '),
+      time: formatActivityDate(invitedAt),
+      href: `case-detail.html?caseId=${encodeURIComponent(inviteId)}`,
     });
   });
 
-  container.querySelectorAll('[data-invite-action]').forEach((button) => {
-    button.addEventListener('click', () => respondToInvite(button.dataset.caseId, button.dataset.inviteAction, button));
+  (Array.isArray(threads) ? threads : []).forEach((thread) => {
+    const caseId = thread?.caseId || thread?.case?.id || thread?.id || '';
+    const timestamp = getThreadTimestamp(thread);
+    entries.push({
+      type: 'message',
+      caseId: String(caseId),
+      timestamp,
+      title: thread?.title || 'Case thread',
+      meta: thread?.lastMessageSnippet || 'New message',
+      time: formatActivityDate(timestamp),
+      href: caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : '',
+    });
   });
 
-  const footer = document.createElement('div');
-  footer.className = 'info-line';
-  footer.innerHTML = '<a href="browse-jobs.html" class="card-link">Browse postings →</a>';
-  container.appendChild(footer);
-  applyStripeGateToApplyActions();
+  (Array.isArray(deadlines) ? deadlines : []).forEach((event) => {
+    const start = event?.start;
+    if (!start) return;
+    const timestamp = new Date(start).getTime();
+    const caseId = event?.caseId || '';
+    const dueLabel = formatActivityDate(start);
+    entries.push({
+      type: 'deadline',
+      caseId: String(caseId),
+      timestamp,
+      title: event?.title || 'Upcoming deadline',
+      meta: event?.where || 'Deadline reminder',
+      time: dueLabel ? `Due ${dueLabel}` : '',
+      href: caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : '',
+    });
+  });
+
+  return entries.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 3);
+}
+
+function renderRecentActivity({ invites = [], threads = [], deadlines = [] } = {}) {
+  const container = selectors.recentActivityList;
+  if (!container) return;
+
+  recentActivityState.invites = invites;
+  recentActivityState.threads = threads;
+  recentActivityState.deadlines = deadlines;
+
+  const entries = buildRecentActivityEntries({ invites, threads, deadlines });
+  const subtitle = entries.length ? 'Latest updates from your cases.' : 'No recent activity yet.';
+  const card = document.createElement('div');
+  card.className = `case-card activity-card${entries.length ? '' : ' empty-state'}`;
+  card.innerHTML = `
+    <div class="case-header">
+      <div>
+        <h2>Recent activity</h2>
+        <div class="case-subinfo">${escapeHtml(subtitle)}</div>
+      </div>
+    </div>
+  `;
+
+  if (entries.length) {
+    const list = document.createElement('ul');
+    list.className = 'activity-list';
+    entries.forEach((entry) => {
+      const item = document.createElement('li');
+      item.className = 'activity-item';
+      const time = entry.time ? `<div class="activity-time">${escapeHtml(entry.time)}</div>` : '';
+      const title = entry.href
+        ? `<a class="activity-link" href="${escapeHtml(entry.href)}">${escapeHtml(entry.title)}</a>`
+        : escapeHtml(entry.title);
+      item.innerHTML = `
+        <div class="activity-row">
+          <div class="activity-title">${title}</div>
+          ${time}
+        </div>
+        <div class="activity-meta">${escapeHtml(entry.meta)}</div>
+      `;
+      list.appendChild(item);
+    });
+    card.appendChild(list);
+  }
+
+  container.innerHTML = '';
+  container.appendChild(card);
+
+  container.querySelectorAll('.activity-link').forEach((link) => {
+    link.addEventListener('click', (event) => event.stopPropagation());
+  });
 }
 
 async function respondToInvite(caseId, action, button) {
@@ -588,12 +627,18 @@ async function respondToInvite(caseId, action, button) {
       return;
     }
     // Optimistically remove the invite card and close the overlay
-    if (action === 'decline' && selectors.inviteList) {
-      selectors.inviteList.querySelector(`[data-case-id="${caseId}"]`)?.remove();
+    if (action === 'decline') {
+      recentActivityState.invites = recentActivityState.invites.filter(
+        (invite) => String(invite?.id || invite?._id || '') !== String(caseId)
+      );
     }
     closeInviteOverlay();
     const invites = await loadInvites();
-    renderInvites(invites);
+    renderRecentActivity({
+      invites,
+      threads: recentActivityState.threads,
+      deadlines: recentActivityState.deadlines,
+    });
     // Refresh notification bell to reflect the decline notice
     if (typeof window.refreshNotificationCenters === 'function') {
       window.refreshNotificationCenters();
@@ -874,68 +919,92 @@ function getStoredUserSnapshot() {
   }
 }
 
-function getTourKey(user) {
-  const id = String(user?.id || user?._id || "").trim();
-  return id ? `lpc_paralegal_tour_done_${id}` : "";
+let onboardingState = null;
+let onboardingPromise = null;
+
+function normalizeOnboarding(raw = {}) {
+  return {
+    paralegalWelcomeDismissed: Boolean(raw?.paralegalWelcomeDismissed),
+    paralegalTourCompleted: Boolean(raw?.paralegalTourCompleted),
+    paralegalProfileTourCompleted: Boolean(raw?.paralegalProfileTourCompleted),
+  };
 }
 
-function hasCompletedTour(user) {
-  const key = getTourKey(user);
-  if (!key) return false;
+function getCachedOnboarding(user) {
+  if (user?.onboarding && typeof user.onboarding === "object") {
+    onboardingState = normalizeOnboarding(user.onboarding);
+    return onboardingState;
+  }
+  return onboardingState || normalizeOnboarding({});
+}
+
+async function loadOnboardingState(user) {
+  if (user?.onboarding && typeof user.onboarding === "object") {
+    onboardingState = normalizeOnboarding(user.onboarding);
+    return onboardingState;
+  }
+  if (onboardingState) return onboardingState;
+  if (onboardingPromise) return onboardingPromise;
+  onboardingPromise = (async () => {
+    try {
+      const res = await secureFetch("/api/users/me/onboarding", { headers: { Accept: "application/json" } });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || "Unable to load onboarding state.");
+      onboardingState = normalizeOnboarding(payload.onboarding || {});
+      return onboardingState;
+    } catch (err) {
+      console.warn("Unable to load onboarding state", err);
+      onboardingState = normalizeOnboarding({});
+      return onboardingState;
+    } finally {
+      onboardingPromise = null;
+    }
+  })();
+  return onboardingPromise;
+}
+
+async function updateOnboardingState(updates = {}, { markFirstLoginComplete = false } = {}) {
   try {
-    return localStorage.getItem(key) === "1";
-  } catch {
-    return false;
+    const res = await secureFetch("/api/users/me/onboarding", {
+      method: "PATCH",
+      headers: { Accept: "application/json" },
+      body: updates,
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload?.error || "Unable to update onboarding state.");
+    onboardingState = normalizeOnboarding(payload.onboarding || {});
+    if (typeof window.updateSessionUser === "function") {
+      const nextUser = { onboarding: onboardingState };
+      if (markFirstLoginComplete) nextUser.isFirstLogin = false;
+      window.updateSessionUser(nextUser);
+    }
+    return onboardingState;
+  } catch (err) {
+    console.warn("Unable to update onboarding state", err);
+    return getCachedOnboarding({});
   }
 }
 
-function markTourCompleted(user) {
-  const key = getTourKey(user);
-  if (!key) return;
-  try {
-    localStorage.setItem(key, "1");
-    const raw = localStorage.getItem("lpc_user");
-    if (raw) {
-      const stored = JSON.parse(raw);
-      if (stored && typeof stored === "object") {
-        stored.isFirstLogin = false;
-        localStorage.setItem("lpc_user", JSON.stringify(stored));
-      }
-    }
-  } catch {}
+function hasCompletedTour(user) {
+  return getCachedOnboarding(user).paralegalTourCompleted;
+}
+
+function markTourCompleted() {
+  void updateOnboardingState({ paralegalTourCompleted: true }, { markFirstLoginComplete: true });
 }
 
 function updateWelcomeGreeting(user) {
   const greetingEl = selectors.welcomeGreeting;
   if (!greetingEl) return;
-  const stored = getStoredUserSnapshot();
-  const tourCompleted = hasCompletedTour(user || stored);
-  if (!tourCompleted) {
-    greetingEl.textContent = "Welcome";
-    return;
-  }
-  greetingEl.textContent = "Welcome back";
-}
-
-function getWelcomeDismissKey(user) {
-  const id = String(user?.id || user?._id || "").trim();
-  return id ? `lpc_paralegal_welcome_dismissed_${id}` : "lpc_paralegal_welcome_dismissed";
+  greetingEl.textContent = "Welcome";
 }
 
 function hasDismissedWelcome(user) {
-  const key = getWelcomeDismissKey(user);
-  try {
-    return localStorage.getItem(key) === "1";
-  } catch {
-    return false;
-  }
+  return getCachedOnboarding(user).paralegalWelcomeDismissed;
 }
 
 function markWelcomeDismissed(user) {
-  const key = getWelcomeDismissKey(user);
-  try {
-    localStorage.setItem(key, "1");
-  } catch {}
+  void updateOnboardingState({ paralegalWelcomeDismissed: true });
 }
 
 function applyParalegalWelcomeNotice(user) {
@@ -952,8 +1021,16 @@ function applyParalegalWelcomeNotice(user) {
   const storedFlag = stored?.isFirstLogin;
   const userFlag = user?.isFirstLogin;
   const isFirstLogin = typeof storedFlag === "boolean" ? storedFlag : Boolean(userFlag);
-  const dismissed = hasDismissedWelcome(user || stored);
-  notice.classList.toggle("hidden", !isFirstLogin || dismissed);
+  const applyState = (onboarding) => {
+    const dismissed = Boolean(onboarding?.paralegalWelcomeDismissed);
+    notice.classList.toggle("hidden", !isFirstLogin || dismissed);
+  };
+  const cached = getCachedOnboarding(user || stored);
+  if (cached && (cached.paralegalWelcomeDismissed || cached.paralegalTourCompleted || cached.paralegalProfileTourCompleted)) {
+    applyState(cached);
+  } else {
+    void loadOnboardingState(user || stored).then(applyState);
+  }
 
   if (!dismissBtn.dataset.bound) {
     dismissBtn.dataset.bound = "true";
@@ -966,7 +1043,7 @@ function applyParalegalWelcomeNotice(user) {
 
 let tourInitialized = false;
 
-function initParalegalTour(user) {
+async function initParalegalTour(user) {
   if (tourInitialized) return;
   tourInitialized = true;
 
@@ -989,13 +1066,14 @@ function initParalegalTour(user) {
   const storedFlag = stored?.isFirstLogin;
   const userFlag = effectiveUser?.isFirstLogin;
   const isFirstLogin = typeof storedFlag === "boolean" ? storedFlag : Boolean(userFlag);
+  const onboarding = await loadOnboardingState(effectiveUser);
   const shouldShow =
     role === "paralegal" &&
     (!status || status === "approved") &&
     isFirstLogin &&
-    !hasCompletedTour(effectiveUser);
+    !onboarding?.paralegalTourCompleted;
   if (!shouldShow) return;
-  markTourCompleted(effectiveUser);
+  markTourCompleted();
 
   const showOverlay = () => {
     overlay.classList.add("is-active");
@@ -1046,8 +1124,18 @@ function initParalegalTour(user) {
   const completeTour = () => {
     tooltip.classList.remove("is-active");
     hideOverlay();
-    markTourCompleted(user);
+    markTourCompleted();
     updateWelcomeGreeting(user);
+  };
+
+  const buildProfileTourUrl = (href = "profile-settings.html") => {
+    try {
+      const url = new URL(href, window.location.href);
+      url.searchParams.set("tour", "1");
+      return `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      return "profile-settings.html?tour=1";
+    }
   };
 
   startBtn?.addEventListener("click", showProfileStep);
@@ -1056,11 +1144,13 @@ function initParalegalTour(user) {
   backBtn?.addEventListener("click", showIntro);
   nextBtn?.addEventListener("click", () => {
     completeTour();
-    window.location.href = "profile-settings.html";
+    window.location.href = buildProfileTourUrl(profileLink.getAttribute("href") || "profile-settings.html");
   });
-  profileLink.addEventListener("click", () => {
+  profileLink.addEventListener("click", (event) => {
     if (overlay.classList.contains("is-active")) {
+      event.preventDefault();
       completeTour();
+      window.location.href = buildProfileTourUrl(profileLink.getAttribute("href") || "profile-settings.html");
     }
   });
   window.addEventListener("resize", () => {
@@ -1176,6 +1266,10 @@ function initQuickActions() {
         }
         return;
       }
+      if (action === 'availability') {
+        event.preventDefault();
+        return;
+      }
       event.preventDefault();
       handleCaseAction(button.textContent || 'Action', 'your assignments');
     });
@@ -1255,6 +1349,19 @@ function formatDate(value) {
   return date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+function formatActivityDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const today = new Date();
+  const isSameDay =
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate();
+  if (isSameDay) return 'Today';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 function formatMultiline(value) {
   if (!value) return '';
   return escapeHtml(value).replace(/\r?\n/g, '<br>');
@@ -1270,7 +1377,7 @@ function buildApplicationDetail(app) {
   const description = escapeHtml(job.description || '');
   const budgetValue = Number(job.budget);
   const budget = job.compensationDisplay || job.payDisplay || (Number.isFinite(budgetValue) ? formatCurrency(budgetValue) : '');
-  const status = formatApplicationStatus(normalizeApplicationStatus(app.status));
+  const status = formatApplicationStatus(getApplicationStatusKey(app));
   const appliedAt = app.createdAt ? formatDate(app.createdAt) : 'Recently';
   const cover = formatMultiline(app.coverLetter || '');
 
@@ -1314,12 +1421,45 @@ function findAppliedApplication(applicationId, jobId) {
   const appId = String(applicationId || '');
   const jobKey = String(jobId || '');
   return appliedAppsCache.find((app) => {
+    if (isRejectedApplication(app)) return false;
     const id = String(app._id || app.id || '');
     if (appId && id === appId) return true;
     if (!jobKey) return false;
     const appJobId = String(app.jobId?._id || app.jobId || '');
     return appJobId === jobKey;
   });
+}
+
+async function revokeApplication(app, button) {
+  const appId = app?._id || app?.id || '';
+  if (!appId) return;
+  const toastHelper = window.toastUtils;
+  const originalLabel = button?.textContent || 'Revoke application';
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Revoking…';
+  }
+  try {
+    const res = await secureFetch(`/api/applications/${encodeURIComponent(appId)}/revoke`, {
+      method: 'POST',
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload?.error || 'Unable to revoke this application.');
+    appliedAppsCache = appliedAppsCache.filter((entry) => String(entry?._id || entry?.id || '') !== String(appId));
+    populateAppliedFilterOptions(appliedAppsCache);
+    applyAppliedFilters();
+    closeApplicationModal();
+    toastHelper?.show?.('Application revoked.', { targetId: selectors.toastBanner?.id, type: 'success' });
+  } catch (error) {
+    toastHelper?.show?.(error.message || 'Unable to revoke this application.', {
+      targetId: selectors.toastBanner?.id,
+      type: 'error',
+    });
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
+  }
 }
 
 function setApplicationQuery(appId, jobId) {
@@ -1353,6 +1493,19 @@ function clearApplicationQuery() {
 function openApplicationModal(app) {
   if (!applicationModal || !applicationDetail) return;
   if (window.location.hash !== '#cases') return;
+  if (isRejectedApplication(app)) {
+    closeApplicationModal();
+    return;
+  }
+  activeApplication = app || null;
+  const revokeBtn = applicationModal.querySelector('[data-application-revoke]');
+  if (revokeBtn) {
+    const statusKey = getApplicationStatusKey(app);
+    const hasId = Boolean(app?._id || app?.id);
+    const disabled = !hasId || statusKey === 'accepted';
+    revokeBtn.disabled = disabled;
+    revokeBtn.textContent = disabled ? 'Revoke unavailable' : 'Revoke application';
+  }
   applicationDetail.innerHTML = buildApplicationDetail(app);
   applicationModal.classList.remove('hidden');
 }
@@ -1360,6 +1513,7 @@ function openApplicationModal(app) {
 function closeApplicationModal() {
   if (!applicationModal) return;
   applicationModal.classList.add('hidden');
+  activeApplication = null;
   clearApplicationQuery();
 }
 
@@ -1369,6 +1523,13 @@ function bindApplicationModal() {
   applicationModal.querySelectorAll('[data-application-close]').forEach((btn) => {
     btn.addEventListener('click', closeApplicationModal);
   });
+  const revokeBtn = applicationModal.querySelector('[data-application-revoke]');
+  if (revokeBtn) {
+    revokeBtn.addEventListener('click', async () => {
+      if (!activeApplication) return;
+      await revokeApplication(activeApplication, revokeBtn);
+    });
+  }
   applicationModal.addEventListener('click', (event) => {
     if (event.target === applicationModal) {
       closeApplicationModal();
@@ -1492,12 +1653,16 @@ async function loadAppliedJobs() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json().catch(() => []);
     const apps = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
-    const visibleApps = apps.filter((app) => normalizeApplicationStatus(app.status) !== 'accepted');
+    const visibleApps = apps.filter((app) => {
+      if (!hasApplicationJob(app)) return false;
+      const status = getApplicationStatusKey(app);
+      return status !== 'accepted' && status !== 'rejected';
+    });
     appliedAppsCache = visibleApps;
-    appliedShowAll = false;
+    appliedPage = 1;
     bindAppliedFilters();
     populateAppliedFilterOptions(visibleApps);
-    applyAppliedFilters();
+    applyAppliedFilters({ resetPage: false });
     maybeOpenApplicationFromQuery();
   } catch (err) {
     console.error('Failed to load applied jobs', err);
@@ -1510,37 +1675,54 @@ async function loadAppliedJobs() {
           </div>
         </div>
       </div>`;
-    updateAppliedCount(0, 0, true);
+    updateAppliedPagination({ total: 0 });
     maybeOpenApplicationFromQuery();
   }
 }
 
 function bindAppliedFilters() {
   if (appliedFiltersBound) return;
-  const { search, status, practice, dateRange, toggle } = appliedFilters;
-  if (!search || !status || !practice || !dateRange || !toggle) return;
+  const { search, status, practice, dateRange } = appliedFilters;
+  if (!search || !practice || !dateRange) return;
   appliedFiltersBound = true;
-  search.addEventListener('input', () => applyAppliedFilters());
-  status.addEventListener('change', () => applyAppliedFilters());
-  practice.addEventListener('change', () => applyAppliedFilters());
-  dateRange.addEventListener('change', () => applyAppliedFilters());
-  toggle.addEventListener('click', () => {
-    appliedShowAll = !appliedShowAll;
-    applyAppliedFilters();
-  });
+  search.addEventListener('input', () => applyAppliedFilters({ resetPage: true }));
+  if (status) {
+    status.addEventListener('change', () => applyAppliedFilters({ resetPage: true }));
+  }
+  practice.addEventListener('change', () => applyAppliedFilters({ resetPage: true }));
+  dateRange.addEventListener('change', () => applyAppliedFilters({ resetPage: true }));
+  if (appliedPagination.prev) {
+    appliedPagination.prev.addEventListener('click', () => {
+      if (appliedPage > 1) {
+        appliedPage -= 1;
+        applyAppliedFilters({ resetPage: false });
+      }
+    });
+  }
+  if (appliedPagination.next) {
+    appliedPagination.next.addEventListener('click', () => {
+      if (appliedPage < appliedTotalPages) {
+        appliedPage += 1;
+        applyAppliedFilters({ resetPage: false });
+      }
+    });
+  }
 }
 
 function populateAppliedFilterOptions(apps = []) {
   const { status, practice } = appliedFilters;
-  if (!status || !practice) return;
+  if (!status && !practice) return;
 
-  const currentStatus = status.value || 'all';
-  const currentPractice = practice.value || 'all';
+  const currentStatus = status?.value || 'all';
+  const currentPractice = practice?.value || 'all';
 
   const statusValues = new Set();
   const practiceValues = new Set();
   apps.forEach((app) => {
-    statusValues.add(normalizeApplicationStatus(app.status));
+    const normalizedStatus = getApplicationStatusKey(app);
+    if (normalizedStatus && normalizedStatus !== 'rejected') {
+      statusValues.add(normalizedStatus);
+    }
     const job = app.jobId || {};
     const area = String(job.practiceArea || '').trim();
     if (area) practiceValues.add(area);
@@ -1549,18 +1731,22 @@ function populateAppliedFilterOptions(apps = []) {
   const statusOptions = Array.from(statusValues).filter(Boolean).sort();
   const practiceOptions = Array.from(practiceValues).sort((a, b) => a.localeCompare(b));
 
-  status.innerHTML = `<option value="all">All statuses</option>` +
-    statusOptions.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(formatApplicationStatus(value))}</option>`).join('');
-  practice.innerHTML = `<option value="all">All practice areas</option>` +
-    practiceOptions.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
-
-  if (statusOptions.includes(currentStatus)) status.value = currentStatus;
-  if (practiceOptions.includes(currentPractice)) practice.value = currentPractice;
+  if (status) {
+    status.innerHTML = `<option value="all">All statuses</option>` +
+      statusOptions.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(formatApplicationStatus(value))}</option>`).join('');
+    if (statusOptions.includes(currentStatus)) status.value = currentStatus;
+  }
+  if (practice) {
+    practice.innerHTML = `<option value="all">All practice areas</option>` +
+      practiceOptions.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
+    if (practiceOptions.includes(currentPractice)) practice.value = currentPractice;
+  }
 }
 
-function applyAppliedFilters() {
+function applyAppliedFilters({ resetPage = false } = {}) {
   const container = document.getElementById('appliedJobsList');
   if (!container) return;
+  if (resetPage) appliedPage = 1;
 
   const { search, status, practice, dateRange } = appliedFilters;
   const query = String(search?.value || '').trim().toLowerCase();
@@ -1568,7 +1754,8 @@ function applyAppliedFilters() {
   const practiceFilter = String(practice?.value || 'all');
   const rangeFilter = String(dateRange ? dateRange.value : 'all');
 
-  let filtered = [...appliedAppsCache];
+  let filtered = appliedAppsCache.filter((app) => hasApplicationJob(app));
+  filtered = filtered.filter((app) => !isRejectedApplication(app));
 
   if (query) {
     filtered = filtered.filter((app) => {
@@ -1580,7 +1767,7 @@ function applyAppliedFilters() {
   }
 
   if (statusFilter !== 'all') {
-    filtered = filtered.filter((app) => normalizeApplicationStatus(app.status) === statusFilter);
+    filtered = filtered.filter((app) => getApplicationStatusKey(app) === statusFilter);
   }
 
   if (practiceFilter !== 'all') {
@@ -1604,11 +1791,16 @@ function applyAppliedFilters() {
   filtered.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
   const total = filtered.length;
-  const limited = appliedShowAll ? filtered : filtered.slice(0, DEFAULT_APPLIED_LIMIT);
-  renderAppliedJobs(container, limited, total);
+  appliedTotalPages = total ? Math.ceil(total / APPLIED_PAGE_SIZE) : 1;
+  if (appliedPage > appliedTotalPages) appliedPage = appliedTotalPages;
+  if (appliedPage < 1) appliedPage = 1;
+  const startIndex = total ? (appliedPage - 1) * APPLIED_PAGE_SIZE : 0;
+  const endIndex = total ? Math.min(startIndex + APPLIED_PAGE_SIZE, total) : 0;
+  const limited = filtered.slice(startIndex, endIndex);
+  renderAppliedJobs(container, limited, total, { startIndex, endIndex });
 }
 
-function renderAppliedJobs(container, apps, total) {
+function renderAppliedJobs(container, apps, total, { startIndex = 0, endIndex = 0 } = {}) {
   if (!appliedAppsCache.length) {
     container.innerHTML = `
       <div class="case-card empty-state">
@@ -1619,7 +1811,7 @@ function renderAppliedJobs(container, apps, total) {
           </div>
         </div>
       </div>`;
-    updateAppliedCount(0, 0, true);
+    updateAppliedPagination({ total: 0 });
     return;
   }
 
@@ -1633,7 +1825,7 @@ function renderAppliedJobs(container, apps, total) {
           </div>
         </div>
       </div>`;
-    updateAppliedCount(0, 0, false);
+    updateAppliedPagination({ total: 0 });
     return;
   }
 
@@ -1669,27 +1861,59 @@ function renderAppliedJobs(container, apps, total) {
     })
     .join('');
 
-  updateAppliedCount(apps.length, total, false);
+  updateAppliedPagination({ total, startIndex, endIndex });
 }
 
-function updateAppliedCount(shown, total, hideToggle) {
-  const { count, toggle } = appliedFilters;
+function updateAppliedPagination({ total = 0, startIndex = 0, endIndex = 0 } = {}) {
+  const { count } = appliedFilters;
   if (count) {
-    count.textContent = total ? `Showing ${shown} of ${total}` : '';
-  }
-  if (toggle) {
-    if (hideToggle || total <= DEFAULT_APPLIED_LIMIT) {
-      toggle.hidden = true;
+    if (!total) {
+      count.textContent = '';
     } else {
-      toggle.hidden = false;
-      toggle.textContent = appliedShowAll ? 'Show recent' : 'View all';
+      const displayEnd = Math.max(startIndex + 1, endIndex);
+      count.textContent = `Showing ${startIndex + 1}-${displayEnd} of ${total}`;
     }
+  }
+
+  const hidePagination = total <= APPLIED_PAGE_SIZE;
+  if (appliedPagination.info) {
+    appliedPagination.info.hidden = hidePagination;
+    appliedPagination.info.textContent = total ? `Page ${appliedPage} of ${appliedTotalPages}` : '';
+  }
+  if (appliedPagination.prev) {
+    appliedPagination.prev.hidden = hidePagination;
+    appliedPagination.prev.disabled = appliedPage <= 1;
+  }
+  if (appliedPagination.next) {
+    appliedPagination.next.hidden = hidePagination;
+    appliedPagination.next.disabled = appliedPage >= appliedTotalPages;
   }
 }
 
 function normalizeApplicationStatus(value) {
   const raw = String(value || 'submitted').trim().toLowerCase();
   return raw.replace(/\s+/g, '_');
+}
+
+function getApplicationStatusKey(app) {
+  return normalizeApplicationStatus(
+    app?.status ||
+      app?.applicationStatus ||
+      app?.application_status ||
+      app?.state ||
+      app?.applicationState ||
+      ''
+  );
+}
+
+function hasApplicationJob(app) {
+  const job = app?.jobId || app?.job || null;
+  if (!job || typeof job !== 'object') return false;
+  return Boolean(job._id || job.id || job.title);
+}
+
+function isRejectedApplication(app) {
+  return getApplicationStatusKey(app) === 'rejected';
 }
 
 function formatApplicationStatus(value) {
@@ -1714,24 +1938,26 @@ async function initDashboard() {
     pendingApprovalReady = true;
     updateProfile(viewer);
     applyParalegalWelcomeNotice(viewer);
+    const caseDeadlines = buildCaseDeadlines(dashboard?.activeCases || []);
+    const deadlineEvents = deadlines.length ? deadlines : caseDeadlines;
     updateStats({
       activeCases: dashboard?.metrics?.activeCases,
       unreadMessages: unreadCount,
-      nextDeadline: deriveNextDeadline(deadlines),
+      nextDeadline: deriveNextDeadline(deadlineEvents),
       monthEarnings: dashboard?.metrics?.earnings,
       payout30Days: dashboard?.metrics?.earningsLast30Days,
       nextPayout: dashboard?.metrics?.nextPayoutDate,
     });
     loadRecommendedJobs(viewer);
     loadAppliedJobs();
-    renderDeadlines(deadlines);
+    renderDeadlines(deadlineEvents);
     initLatestMessage(threads);
     renderAssignments(mapActiveCasesToAssignments(dashboard?.activeCases || []));
-    renderInvites(invites);
+    renderRecentActivity({ invites, threads, deadlines: deadlineEvents });
   } catch (err) {
     console.warn('Paralegal dashboard init failed', err);
     renderAssignments([]);
-    renderInvites([]);
+    renderRecentActivity({ invites: [], threads: [], deadlines: [] });
     renderDeadlines([]);
     initLatestMessage([]);
     loadRecommendedJobs({});

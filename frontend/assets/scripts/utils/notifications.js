@@ -12,12 +12,34 @@ function ensureNotificationStyles() {
   style.textContent = `
     .notification-wrapper{position:relative;}
     .notification-dropdown{position:absolute;top:calc(100% + 8px);right:0;z-index:100000;}
-    [data-notification-list]{max-height:220px;overflow-y:auto;}
-    .notif-item{display:flex;align-items:flex-start;gap:12px;}
-    .notif-main{display:flex;align-items:flex-start;gap:12px;flex:1;}
+    [data-notification-list]{
+      --notif-gap: 12px;
+      max-height:none;
+      overflow:visible;
+    }
+    .notif-item{display:flex;align-items:flex-start;gap:6px;}
+    .notif-main{display:flex;align-items:flex-start;gap:6px;flex:1;}
     .notif-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#f2f4f8;flex-shrink:0;}
     .notif-copy{display:flex;flex-direction:column;gap:4px;flex:1;}
-    .notif-dot{width:10px;height:10px;border-radius:50%;background:var(--accent,#b6a47a);margin-top:6px;opacity:0;flex-shrink:0;}
+    .notif-copy,
+    .notif-title,
+    .notif-time,
+    .notif-body{
+      font-family:'Sarabun',sans-serif !important;
+    }
+    .notif-title,
+    .notif-time,
+    .notif-body{
+      font-size:14px !important;
+      line-height:1.4;
+      font-weight:200 !important;
+    }
+    .notif-copy,
+    .notif-title,
+    .notif-body{
+      text-align:left !important;
+    }
+    .notif-dot{width:6px;height:6px;border-radius:50%;background:var(--accent,#b6a47a);margin-top:6px;opacity:0;flex-shrink:0;}
     .notif-item.unread .notif-dot{opacity:0.9;}
     .notif-dismiss{background:transparent;border:none;color:var(--muted,#7a7a7a);font-size:0.9rem;cursor:pointer;padding:6px;border-radius:8px;align-self:flex-start;flex-shrink:0;}
     .notif-dismiss:hover{background:rgba(0,0,0,0.06);color:var(--ink,#1a1a1a);}
@@ -31,6 +53,128 @@ function ensureNotificationStyles() {
     .notif-actions .notif-clear{border-color:rgba(0,0,0,0.2);color:var(--ink,#1a1a1a);}
     .notif-actions .notif-clear:hover{background:transparent;box-shadow:none;color:var(--ink,#1a1a1a);}
     .notif-actions .notif-markall:disabled{opacity:0.5;cursor:default;}
+    /* Global glass-style notifications (transparent container, floating cards) */
+    [data-notification-panel],
+    .notifications-panel,
+    .notif-panel,
+    .notification-dropdown{
+      background:transparent !important;
+      border:none !important;
+      box-shadow:none !important;
+      outline:none !important;
+      filter:none !important;
+      padding:0 !important;
+    }
+    [data-notification-panel]::before,
+    [data-notification-panel]::after,
+    .notifications-panel::before,
+    .notifications-panel::after,
+    .notif-panel::before,
+    .notif-panel::after,
+    .notification-dropdown::before,
+    .notification-dropdown::after{
+      content:none !important;
+      box-shadow:none !important;
+      border:none !important;
+      background:transparent !important;
+    }
+    [data-notification-panel] [data-notification-list],
+    .notifications-panel [data-notification-list],
+    [data-notification-panel] .notif-scroll,
+    .notifications-panel .notif-scroll{
+      max-height:none;
+      overflow:visible;
+      display:flex;
+      flex-direction:column;
+      gap:var(--notif-gap);
+      padding:2px;
+    }
+    [data-notification-panel] .notif-item,
+    .notifications-panel .notif-item,
+    .notif-panel .notif-item,
+    .notification-dropdown .notif-item,
+    [data-notification-panel] .notif-card,
+    .notifications-panel .notif-card,
+    .notif-panel .notif-card,
+    .notification-dropdown .notif-card{
+      border:1px solid rgba(255,255,255,0.48) !important;
+      background:rgba(255,255,255,0.16) !important;
+      border-radius:12px;
+      padding:8px 9px !important;
+      box-shadow:0 10px 24px rgba(8,10,16,0.12), inset 0 1px 0 rgba(255,255,255,0.55);
+      backdrop-filter:blur(52px) saturate(180%);
+      -webkit-backdrop-filter:blur(52px) saturate(180%);
+      transition:transform .22s ease, box-shadow .22s ease, opacity .22s ease;
+      border-bottom:none !important;
+    }
+    [data-notification-panel] .notif-title,
+    .notifications-panel .notif-title,
+    .notif-panel .notif-title,
+    .notification-dropdown .notif-title{
+      font-size:14px !important;
+      line-height:1.35;
+      font-weight:200 !important;
+      color:var(--ink,#1a1a1a);
+      display:block;
+      white-space:normal;
+      overflow:visible;
+      text-align:left !important;
+    }
+    [data-notification-panel] .notif-main,
+    .notifications-panel .notif-main{
+      gap:6px;
+    }
+    [data-notification-panel] .notif-time,
+    .notifications-panel .notif-time,
+    .notif-panel .notif-time,
+    .notification-dropdown .notif-time{
+      font-size:14px !important;
+      opacity:0.95;
+      text-align:left !important;
+    }
+    [data-notification-panel] .notif-item:hover,
+    .notifications-panel .notif-item:hover,
+    [data-notification-panel] .notif-card:hover,
+    .notifications-panel .notif-card:hover{
+      transform:translateY(-1px);
+      box-shadow:0 14px 30px rgba(8,10,16,0.16), inset 0 1px 0 rgba(255,255,255,0.58);
+    }
+    [data-notification-panel] .notif-item.unread,
+    .notifications-panel .notif-item.unread{
+      border-left:none !important;
+    }
+    body.theme-dark [data-notification-panel] .notif-item,
+    body.theme-dark .notifications-panel .notif-item,
+    body.theme-dark .notif-panel .notif-item,
+    body.theme-dark .notification-dropdown .notif-item,
+    body.theme-mountain-dark [data-notification-panel] .notif-item,
+    body.theme-mountain-dark .notifications-panel .notif-item,
+    body.theme-mountain-dark .notif-panel .notif-item,
+    body.theme-mountain-dark .notification-dropdown .notif-item,
+    body.theme-dark [data-notification-panel] .notif-card,
+    body.theme-dark .notifications-panel .notif-card,
+    body.theme-dark .notif-panel .notif-card,
+    body.theme-dark .notification-dropdown .notif-card,
+    body.theme-mountain-dark [data-notification-panel] .notif-card,
+    body.theme-mountain-dark .notifications-panel .notif-card,
+    body.theme-mountain-dark .notif-panel .notif-card,
+    body.theme-mountain-dark .notification-dropdown .notif-card{
+      background:rgba(18,24,36,0.2) !important;
+      border-color:rgba(255,255,255,0.24) !important;
+      box-shadow:0 12px 30px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16);
+      backdrop-filter:blur(52px) saturate(180%);
+      -webkit-backdrop-filter:blur(52px) saturate(180%);
+    }
+    body.theme-dark [data-notification-panel] .notif-time,
+    body.theme-dark .notifications-panel .notif-time,
+    body.theme-mountain-dark [data-notification-panel] .notif-time,
+    body.theme-mountain-dark .notifications-panel .notif-time,
+    body.theme-dark [data-notification-panel] [data-notification-empty],
+    body.theme-dark .notifications-panel [data-notification-empty],
+    body.theme-mountain-dark [data-notification-panel] [data-notification-empty],
+    body.theme-mountain-dark .notifications-panel [data-notification-empty]{
+      color:#c4cde3;
+    }
     @media (max-width: 600px){
       .notification-dropdown,
       [data-notification-panel],
@@ -42,7 +186,7 @@ function ensureNotificationStyles() {
         width:auto !important;
         max-width:calc(100vw - 24px) !important;
       }
-      [data-notification-list]{max-height:50vh;}
+      [data-notification-list]{max-height:none;overflow:visible;}
       .notif-actions.notif-actions-header{flex-wrap:wrap;justify-content:flex-end;gap:6px;}
     }
   `;
@@ -72,22 +216,37 @@ function getAvatarFallback(name = "") {
 
 const ADMIN_NOTIFICATION_IMAGE = "/hero-mountain.jpg";
 const ADMIN_TITLE_HINT = "welcome to let's-paraconnect";
+const PLATFORM_NOTIFICATION_TYPES = new Set([
+  "paralegal_welcome",
+  "profile_approved",
+  "profile_photo_approved",
+  "profile_photo_rejected",
+]);
 
 function isAdminNotification(item = {}) {
   const actorName = String(item.actorFirstName || "").trim().toLowerCase();
   const payloadRole = String(item.payload?.actorRole || item.payload?.fromRole || "").trim().toLowerCase();
   const fromName = String(item.payload?.fromName || "").trim().toLowerCase();
-  if (actorName === "admin" || payloadRole === "admin" || fromName === "admin") return true;
+  const type = String(item.type || "").trim().toLowerCase();
+  if (
+    actorName === "admin" ||
+    payloadRole === "admin" ||
+    payloadRole === "platform" ||
+    payloadRole === "system" ||
+    fromName === "admin"
+  ) {
+    return true;
+  }
+  if (PLATFORM_NOTIFICATION_TYPES.has(type)) return true;
   const message = String(item.message || item.payload?.message || "").trim().toLowerCase();
   const title = String(item.payload?.title || "").trim().toLowerCase();
   if (message.includes(ADMIN_TITLE_HINT) || title.includes(ADMIN_TITLE_HINT)) return true;
-  const type = String(item.type || "").trim().toLowerCase();
-  return type === "paralegal_welcome";
+  return false;
 }
 
 function getNotificationAvatar(item = {}, actorName = "") {
-  if (item.actorProfileImage) return item.actorProfileImage;
   if (isAdminNotification(item)) return ADMIN_NOTIFICATION_IMAGE;
+  if (item.actorProfileImage) return item.actorProfileImage;
   return getAvatarFallback(actorName);
 }
 
@@ -642,13 +801,39 @@ function extractId(value) {
   return value;
 }
 
-function resolveNotificationLink(item = {}) {
+function extractApplicantId(item = {}) {
   const payload = item.payload || {};
-  const primaryLink = typeof item.link === "string" ? item.link.trim() : "";
-  const payloadLink = typeof payload.link === "string" ? payload.link.trim() : "";
-  const payloadUrl = typeof payload.url === "string" ? payload.url.trim() : "";
-  const explicitLink = primaryLink || payloadLink || payloadUrl;
-  if (explicitLink) return explicitLink;
+  return extractId(
+    item.applicantId ||
+      item.paralegalId ||
+      item.actorId ||
+      payload.applicantId ||
+      payload.paralegalId ||
+      payload.paralegalID ||
+      payload.paralegal ||
+      payload.paralegalRef ||
+      payload.paralegalUserId ||
+      payload.userId ||
+      payload.actorId
+  );
+}
+
+function isEscrowLockedNotice(item = {}) {
+  const text = [
+    item.message,
+    item.payload?.title,
+    item.payload?.body,
+    item.payload?.message,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return text.includes("escrow amount locked");
+}
+
+function resolveNotificationLink(item = {}) {
+  if (isEscrowLockedNotice(item)) return "";
+  const payload = item.payload || {};
   const type = String(item.type || "").toLowerCase();
   const role = String(item.userRole || "").toLowerCase();
   const caseId = extractId(
@@ -660,6 +845,20 @@ function resolveNotificationLink(item = {}) {
       payload.caseRef ||
       payload.caseDoc
   );
+  if (type === "application_submitted" && role === "attorney") {
+    const applicantId = extractApplicantId(item);
+    if (caseId && applicantId) {
+      return `dashboard-attorney.html?caseId=${encodeURIComponent(
+        caseId
+      )}&applicantId=${encodeURIComponent(applicantId)}&openApplicant=1#cases:inquiries`;
+    }
+    return "dashboard-attorney.html#cases:inquiries";
+  }
+  const primaryLink = typeof item.link === "string" ? item.link.trim() : "";
+  const payloadLink = typeof payload.link === "string" ? payload.link.trim() : "";
+  const payloadUrl = typeof payload.url === "string" ? payload.url.trim() : "";
+  const explicitLink = primaryLink || payloadLink || payloadUrl;
+  if (explicitLink) return explicitLink;
   if (caseId) {
     const base = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
     if (type === "message") return `${base}#case-messages`;
@@ -669,9 +868,6 @@ function resolveNotificationLink(item = {}) {
   }
   if (type === "case_invite") return "paralegal-invitations.html";
   const jobId = extractId(item.jobId || payload.jobId || payload.job || payload.job_id || payload.jobRef);
-  if (type === "application_submitted" && role === "attorney") {
-    return "dashboard-attorney.html#applicationsSection";
-  }
   if (type === "application_accepted") {
     return caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "dashboard-paralegal.html";
   }
@@ -770,18 +966,6 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
   const wrapper = document.createElement("div");
   wrapper.className = `notif-item ${normalized.isRead ? "read" : "unread"}`;
   wrapper.dataset.id = normalized.id || normalized._id || "";
-  const actorName = normalized.actorFirstName || "";
-
-  const avatar = document.createElement("img");
-  avatar.className = "notif-avatar";
-  avatar.src = getNotificationAvatar(normalized, actorName);
-  avatar.alt = actorName
-    ? `${actorName}'s profile photo`
-    : isAdminNotification(normalized)
-    ? "Admin notification"
-    : "Notification";
-  avatar.loading = "lazy";
-
   const dot = document.createElement("span");
   dot.className = "notif-dot";
   dot.setAttribute("aria-hidden", "true");
@@ -799,8 +983,30 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
   copy.appendChild(message);
   copy.appendChild(time);
 
+  const actorName = String(
+    normalized.actorFirstName ||
+      normalized.payload?.actorFirstName ||
+      normalized.payload?.fromName ||
+      normalized.payload?.actorName ||
+      normalized.payload?.paralegalName ||
+      ""
+  ).trim();
+  const avatar = document.createElement("img");
+  avatar.className = "notif-avatar";
+  avatar.loading = "lazy";
+  avatar.alt = actorName ? `${actorName} profile photo` : "Notification profile photo";
+  avatar.src = getNotificationAvatar(normalized, actorName);
+  avatar.addEventListener(
+    "error",
+    () => {
+      avatar.src = getAvatarFallback(actorName);
+    },
+    { once: true }
+  );
+
   const main = document.createElement("div");
   main.className = "notif-main";
+  main.appendChild(avatar);
   main.appendChild(dot);
   main.appendChild(copy);
 
@@ -819,7 +1025,6 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
     }
   });
 
-  wrapper.appendChild(avatar);
   wrapper.appendChild(main);
   wrapper.appendChild(dismiss);
 

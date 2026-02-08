@@ -1227,38 +1227,81 @@ function getStoredUserSnapshot() {
   }
 }
 
-function getProfileTourKey(user) {
-  const id = String(user?.id || user?._id || "").trim();
-  return id ? `lpc_paralegal_profile_tour_${id}` : "";
+let onboardingState = null;
+let onboardingPromise = null;
+
+function normalizeOnboarding(raw = {}) {
+  return {
+    paralegalWelcomeDismissed: Boolean(raw?.paralegalWelcomeDismissed),
+    paralegalTourCompleted: Boolean(raw?.paralegalTourCompleted),
+    paralegalProfileTourCompleted: Boolean(raw?.paralegalProfileTourCompleted),
+  };
 }
 
-function hasCompletedProfileTour(user) {
-  const key = getProfileTourKey(user);
-  if (!key) return false;
+function getCachedOnboarding(user) {
+  if (user?.onboarding && typeof user.onboarding === "object") {
+    onboardingState = normalizeOnboarding(user.onboarding);
+    return onboardingState;
+  }
+  return onboardingState || normalizeOnboarding({});
+}
+
+async function loadOnboardingState(user) {
+  if (user?.onboarding && typeof user.onboarding === "object") {
+    onboardingState = normalizeOnboarding(user.onboarding);
+    return onboardingState;
+  }
+  if (onboardingState) return onboardingState;
+  if (onboardingPromise) return onboardingPromise;
+  onboardingPromise = (async () => {
+    try {
+      const res = await secureFetch("/api/users/me/onboarding", { headers: { Accept: "application/json" } });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || "Unable to load onboarding state.");
+      onboardingState = normalizeOnboarding(payload.onboarding || {});
+      return onboardingState;
+    } catch (err) {
+      console.warn("Unable to load onboarding state", err);
+      onboardingState = normalizeOnboarding({});
+      return onboardingState;
+    } finally {
+      onboardingPromise = null;
+    }
+  })();
+  return onboardingPromise;
+}
+
+async function updateOnboardingState(updates = {}, { markFirstLoginComplete = false } = {}) {
   try {
-    return localStorage.getItem(key) === "1";
-  } catch {
-    return false;
+    const res = await secureFetch("/api/users/me/onboarding", {
+      method: "PATCH",
+      headers: { Accept: "application/json" },
+      body: updates,
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload?.error || "Unable to update onboarding state.");
+    onboardingState = normalizeOnboarding(payload.onboarding || {});
+    if (typeof window.updateSessionUser === "function") {
+      const nextUser = { onboarding: onboardingState };
+      if (markFirstLoginComplete) nextUser.isFirstLogin = false;
+      window.updateSessionUser(nextUser);
+    }
+    return onboardingState;
+  } catch (err) {
+    console.warn("Unable to update onboarding state", err);
+    return getCachedOnboarding({});
   }
 }
 
-function markProfileTourCompleted(user) {
-  const key = getProfileTourKey(user);
-  if (!key) return;
-  try {
-    localStorage.setItem(key, "1");
-    const raw = localStorage.getItem("lpc_user");
-    if (raw) {
-      const stored = JSON.parse(raw);
-      if (stored && typeof stored === "object") {
-        stored.isFirstLogin = false;
-        localStorage.setItem("lpc_user", JSON.stringify(stored));
-      }
-    }
-  } catch {}
+function hasCompletedProfileTour(user) {
+  return getCachedOnboarding(user).paralegalProfileTourCompleted;
 }
 
-function initParalegalProfileTour(user = {}) {
+function markProfileTourCompleted() {
+  void updateOnboardingState({ paralegalProfileTourCompleted: true }, { markFirstLoginComplete: true });
+}
+
+async function initParalegalProfileTour(user = {}) {
   if (profileTourInitialized) return;
   profileTourInitialized = true;
   if (String(user?.role || "").toLowerCase() !== "paralegal") return;
@@ -1270,6 +1313,10 @@ function initParalegalProfileTour(user = {}) {
   const closeBtn = document.getElementById("profileTourCloseBtn");
   const backBtn = document.getElementById("profileTourBackBtn");
   const nextBtn = document.getElementById("profileTourNextBtn");
+  const saveChangesBtn = document.getElementById("profileSaveBtn");
+  const previewProfileBtn = document.getElementById("previewProfileBtn");
+  const saveChangesInitiallyDisabled = Boolean(saveChangesBtn?.disabled);
+  const previewProfileInitiallyDisabled = Boolean(previewProfileBtn?.disabled);
   if (!overlay || !tooltip || !titleEl || !textEl || !closeBtn || !backBtn || !nextBtn) return;
 
   const stored = getStoredUserSnapshot();
@@ -1279,6 +1326,7 @@ function initParalegalProfileTour(user = {}) {
   const storedFlag = stored?.isFirstLogin;
   const userFlag = effectiveUser?.isFirstLogin;
   const isFirstLogin = typeof storedFlag === "boolean" ? storedFlag : Boolean(userFlag);
+  const onboarding = await loadOnboardingState(effectiveUser);
 
   const params = new URLSearchParams(window.location.search);
   const forceTour = params.get("tour") === "1";
@@ -1287,47 +1335,122 @@ function initParalegalProfileTour(user = {}) {
     (role === "paralegal" &&
       (!status || status === "approved") &&
       isFirstLogin &&
-      !hasCompletedProfileTour(effectiveUser));
+      !onboarding?.paralegalProfileTourCompleted);
   if (!shouldShow) return;
   if (!forceTour) {
-    markProfileTourCompleted(effectiveUser);
+    markProfileTourCompleted();
   }
 
   const steps = [
     {
-      id: "educationCard",
-      title: "Education",
-      text: "List where you attended school and any legal training or certifications.",
-    },
-    {
       id: "bioSection",
+      sectionId: "profileSection",
       title: "Bio",
       text: "Share a short overview of your background, specialties, and the types of matters you support.",
-    },
-    {
-      id: "languagesRow",
-      title: "Languages",
-      text: "List the languages you know and select your experience level.",
+      autoScroll: "smooth",
     },
     {
       id: "profileSaveBtn",
+      sectionId: "profileSection",
       title: "Save changes",
       text: "Save your updates so your profile stays current.",
+      autoScroll: "smooth",
     },
     {
       id: "previewProfileBtn",
+      sectionId: "profileSection",
       title: "View profile",
       text: "Preview the profile attorneys will see. We are in pre-launch, so attorneys are not onboarded yet. You will be emailed when onboarding begins.",
+      autoScroll: "smooth",
+    },
+    {
+      id: "connectStripeBtn",
+      sectionId: "securitySection",
+      title: "Payouts Setup",
+      text: "Set up payouts here. Connect Stripe so you can receive payments once platform payouts are active.",
+    },
+    {
+      selector: "[data-theme-preview='mountain']",
+      sectionId: "preferencesSection",
+      title: "Preferences Tab / Theme Changes",
+      text: "In Preferences, you can change your theme here to personalize how your dashboard looks.",
+    },
+    {
+      id: "dashboardReturnLink",
+      title: "Return to Dashboard",
+      text: "Use this button anytime to go back to your dashboard.",
     },
   ];
 
   let activeIndex = 0;
+  let activeRenderToken = 0;
+  let activeTourTarget = null;
+  let pendingSyncFrame = null;
+  const sectionNavMap = {
+    profileSection: "navProfile",
+    securitySection: "navSecurity",
+    preferencesSection: "navPreferences",
+  };
+
+  const activateSection = (sectionId) => {
+    if (!sectionId) return;
+    const navId = sectionNavMap[sectionId];
+    if (!navId) return;
+    const navBtn = document.getElementById(navId);
+    if (navBtn && !navBtn.classList.contains("active")) {
+      navBtn.click();
+    }
+  };
+
+  const setTourSaveButtonLock = (locked) => {
+    if (!saveChangesBtn) return;
+    if (locked) {
+      saveChangesBtn.disabled = true;
+      saveChangesBtn.setAttribute("aria-disabled", "true");
+      saveChangesBtn.dataset.tourLocked = "true";
+      return;
+    }
+    if (saveChangesBtn.dataset.tourLocked !== "true") return;
+    delete saveChangesBtn.dataset.tourLocked;
+    saveChangesBtn.disabled = saveChangesInitiallyDisabled;
+    if (saveChangesInitiallyDisabled) {
+      saveChangesBtn.setAttribute("aria-disabled", "true");
+    } else {
+      saveChangesBtn.removeAttribute("aria-disabled");
+    }
+  };
+
+  const setTourPreviewButtonLock = (locked) => {
+    if (!previewProfileBtn) return;
+    if (locked) {
+      previewProfileBtn.disabled = true;
+      previewProfileBtn.setAttribute("aria-disabled", "true");
+      previewProfileBtn.dataset.tourLocked = "true";
+      return;
+    }
+    if (previewProfileBtn.dataset.tourLocked !== "true") return;
+    delete previewProfileBtn.dataset.tourLocked;
+    previewProfileBtn.disabled = previewProfileInitiallyDisabled;
+    if (previewProfileInitiallyDisabled) {
+      previewProfileBtn.setAttribute("aria-disabled", "true");
+    } else {
+      previewProfileBtn.removeAttribute("aria-disabled");
+    }
+  };
 
   const clearTour = () => {
+    activeRenderToken += 1;
+    activeTourTarget = null;
+    if (pendingSyncFrame) {
+      cancelAnimationFrame(pendingSyncFrame);
+      pendingSyncFrame = null;
+    }
+    setTourSaveButtonLock(false);
+    setTourPreviewButtonLock(false);
     overlay.classList.remove("is-active", "spotlight");
     overlay.setAttribute("aria-hidden", "true");
     tooltip.classList.remove("is-active", "arrow-left", "arrow-right");
-    markProfileTourCompleted(user);
+    markProfileTourCompleted();
     if (forceTour) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -1363,17 +1486,49 @@ function initParalegalProfileTour(user = {}) {
     overlay.style.setProperty("--spot-h", `${rect.height + padding * 2}px`);
   };
 
-  const showStep = (index) => {
+  const syncActiveStepPosition = () => {
+    if (!activeTourTarget) return;
+    if (!overlay.classList.contains("is-active") || !tooltip.classList.contains("is-active")) return;
+    if (!document.body.contains(activeTourTarget)) return;
+    positionSpotlight(activeTourTarget);
+    positionTooltip(activeTourTarget);
+  };
+
+  const scheduleActiveStepSync = () => {
+    if (pendingSyncFrame) return;
+    pendingSyncFrame = requestAnimationFrame(() => {
+      pendingSyncFrame = null;
+      syncActiveStepPosition();
+    });
+  };
+
+  const trackStepTargetPosition = (target, renderToken, durationMs = 750) => {
+    const start = performance.now();
+    const tick = () => {
+      if (renderToken !== activeRenderToken) return;
+      positionSpotlight(target);
+      positionTooltip(target);
+      if (performance.now() - start < durationMs) {
+        requestAnimationFrame(tick);
+      }
+    };
+    requestAnimationFrame(tick);
+  };
+
+  const showStep = (index, { allowAutoScroll = true } = {}) => {
+    const renderToken = ++activeRenderToken;
     const step = steps[index];
     if (!step) {
       clearTour();
       return;
     }
-    const target = document.getElementById(step.id);
+    activateSection(step.sectionId);
+    const target = step.id ? document.getElementById(step.id) : document.querySelector(step.selector);
     if (!target) {
       showStep(index + 1);
       return;
     }
+    activeTourTarget = target;
     activeIndex = index;
     titleEl.textContent = step.title;
     textEl.textContent = step.text;
@@ -1383,10 +1538,13 @@ function initParalegalProfileTour(user = {}) {
     overlay.classList.add("is-active", "spotlight");
     overlay.setAttribute("aria-hidden", "false");
     tooltip.classList.add("is-active");
-    requestAnimationFrame(() => {
-      positionSpotlight(target);
-      positionTooltip(target);
-    });
+    const shouldAutoScroll = allowAutoScroll && step.autoScroll === "smooth";
+    if (shouldAutoScroll) {
+      target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      trackStepTargetPosition(target, renderToken);
+      return;
+    }
+    trackStepTargetPosition(target, renderToken, 450);
   };
 
   closeBtn.addEventListener("click", clearTour);
@@ -1399,8 +1557,14 @@ function initParalegalProfileTour(user = {}) {
     }
   });
 
-  window.addEventListener("resize", () => showStep(activeIndex));
+  const handleViewportMutation = () => {
+    scheduleActiveStepSync();
+  };
+  document.addEventListener("scroll", handleViewportMutation, true);
+  window.addEventListener("resize", () => showStep(activeIndex, { allowAutoScroll: false }));
 
+  setTourSaveButtonLock(true);
+  setTourPreviewButtonLock(true);
   showStep(0);
 }
 
@@ -4384,6 +4548,10 @@ function openExistingPhotoEditor(config) {
     fetch(targetUrl, fetchOptions)
       .then((res) => {
         if (!res.ok) throw new Error("Unable to load profile photo.");
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType && !contentType.startsWith("image/")) {
+          throw new Error("Profile photo unavailable.");
+        }
         return res.blob();
       })
       .then((blob) => openFromBlob(blob, targetUrl))
@@ -4406,6 +4574,10 @@ function openExistingPhotoEditor(config) {
   secureFetch("/api/uploads/profile-photo/original")
     .then((res) => {
       if (!res.ok) throw new Error("Unable to load profile photo.");
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType && !contentType.startsWith("image/")) {
+        throw new Error("Profile photo unavailable.");
+      }
       return res.blob();
     })
     .then((blob) => openFromBlob(blob, originalUrl || primaryUrl))
@@ -4430,6 +4602,11 @@ function loadCropperImage(url, isObjectUrl) {
     activeCropper.destroy();
     activeCropper = null;
   }
+  cropperImage.onerror = () => {
+    if (cropperZoom) cropperZoom.disabled = true;
+    showToast("Unable to load the profile photo. Please re-upload the image.", "err");
+    closePhotoCropper();
+  };
   cropperImage.onload = () => {
     activeCropper = new Cropper(cropperImage, {
       aspectRatio: 1,
