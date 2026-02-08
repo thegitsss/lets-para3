@@ -1011,6 +1011,9 @@ function applyParalegalWelcomeNotice(user) {
   const notice = selectors.welcomeNotice;
   const dismissBtn = selectors.welcomeNoticeDismiss;
   if (!notice || !dismissBtn) return;
+  // Welcome notice is intentionally disabled.
+  notice.classList.add("hidden");
+  return;
 
   const stored = getStoredUserSnapshot();
   const role = String((user?.role || stored?.role || "")).toLowerCase();
