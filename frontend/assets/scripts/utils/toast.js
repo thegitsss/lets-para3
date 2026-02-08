@@ -70,17 +70,26 @@
       const response = await originalFetch(...args);
       try {
         const request = args[0];
+        const options = args[1] || {};
         const url =
           typeof request === "string"
             ? request
             : typeof request === "object" && request
             ? request.url
             : "";
+        const method =
+          String(
+            (options && options.method) ||
+              (typeof request === "object" && request ? request.method : "") ||
+              "GET"
+          ).toUpperCase();
+        const isReadRequest = method === "GET" || method === "HEAD";
         if (
           response &&
           !response.ok &&
           typeof url === "string" &&
-          url.includes("/api/")
+          url.includes("/api/") &&
+          !(isReadRequest && response.status === 404)
         ) {
           showStatus(response.status);
         }
