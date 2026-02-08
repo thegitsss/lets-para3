@@ -108,7 +108,66 @@ function buildShortPreview(text = "", maxLen = 50) {
   return `${source.slice(0, maxLen - 1).trim()}…`;
 }
 
-async function createMessageNotification({ caseDoc, senderDoc, previewText }) {
+function buildMessagesAfterBoundary(createdAt, messageId) {
+  return {
+    $or: [
+      { createdAt: { $gt: createdAt } },
+      { createdAt, _id: { $gt: messageId } },
+    ],
+  };
+}
+
+function buildMessagesBeforeBoundary(createdAt, messageId) {
+  return {
+    $or: [
+      { createdAt: { $lt: createdAt } },
+      { createdAt, _id: { $lt: messageId } },
+    ],
+  };
+}
+
+async function shouldNotifyAttorneyForParalegalMessage({ caseId, messageDoc }) {
+  const caseObjectId = toObjectId(caseId);
+  const currentMessageId = toObjectId(messageDoc?._id);
+  const currentCreatedAt = messageDoc?.createdAt ? new Date(messageDoc.createdAt) : null;
+  if (!caseObjectId || !currentMessageId || !currentCreatedAt || Number.isNaN(currentCreatedAt.getTime())) {
+    return true;
+  }
+
+  const latestAttorneyMessage = await Message.findOne({
+    caseId: caseObjectId,
+    deleted: { $ne: true },
+    senderRole: "attorney",
+  })
+    .sort({ createdAt: -1, _id: -1 })
+    .select("_id createdAt")
+    .lean();
+
+  const bounds = [buildMessagesBeforeBoundary(currentCreatedAt, currentMessageId)];
+  const latestAttorneyMessageId = toObjectId(latestAttorneyMessage?._id);
+  const latestAttorneyCreatedAt = latestAttorneyMessage?.createdAt ? new Date(latestAttorneyMessage.createdAt) : null;
+  if (
+    latestAttorneyMessageId &&
+    latestAttorneyCreatedAt &&
+    !Number.isNaN(latestAttorneyCreatedAt.getTime())
+  ) {
+    bounds.push(buildMessagesAfterBoundary(latestAttorneyCreatedAt, latestAttorneyMessageId));
+  }
+
+  const priorParalegalMessageInStreak = await Message.findOne({
+    caseId: caseObjectId,
+    deleted: { $ne: true },
+    senderRole: "paralegal",
+    _id: { $ne: currentMessageId },
+    $and: bounds,
+  })
+    .select("_id")
+    .lean();
+
+  return !priorParalegalMessageInStreak;
+}
+
+async function createMessageNotification({ caseDoc, senderDoc, previewText, messageDoc }) {
   if (!caseDoc || !senderDoc) return;
   const role = String(senderDoc.role || "").toLowerCase();
   let recipientId = null;
@@ -116,6 +175,11 @@ async function createMessageNotification({ caseDoc, senderDoc, previewText }) {
     recipientId = toObjectId(caseDoc.paralegal) || toObjectId(caseDoc.paralegalId);
   } else if (role === "paralegal") {
     recipientId = toObjectId(caseDoc.attorney) || toObjectId(caseDoc.attorneyId);
+    const shouldNotify = await shouldNotifyAttorneyForParalegalMessage({
+      caseId: caseDoc._id,
+      messageDoc,
+    });
+    if (!shouldNotify) return;
   } else {
     return;
   }
@@ -139,6 +203,7 @@ async function createMessageNotification({ caseDoc, senderDoc, previewText }) {
 function buildUnreadClause(userObjectId) {
   return {
     $and: [
+      { senderId: { $ne: userObjectId } },
       { readBy: { $not: { $elemMatch: { $eq: userObjectId } } } },
       { readReceipts: { $not: { $elemMatch: { user: userObjectId } } } },
     ],
@@ -193,15 +258,25 @@ router.get(
     if (!caseDocs.length) {
       return res.json({ count: 0 });
     }
-    const caseIds = caseDocs.map((doc) => doc._id);
     const requesterObjectId = new mongoose.Types.ObjectId(req.user.id);
-    const unreadClause = buildUnreadClause(requesterObjectId);
-    const aggregateResult = await Message.aggregate([
-      { $match: { caseId: { $in: caseIds }, deleted: { $ne: true } } },
-      { $match: unreadClause },
-      { $count: "count" },
-    ]);
-    const totalUnread = aggregateResult[0]?.count || 0;
+    const viewer = await User.findById(req.user.id).select("messageLastViewedAt");
+    const lastMap = viewer?.messageLastViewedAt || new Map();
+    let totalUnread = 0;
+    for (const doc of caseDocs) {
+      const key = String(doc._id);
+      const lastViewed =
+        typeof lastMap.get === "function" ? lastMap.get(key) : lastMap?.[key];
+      const baseQuery = {
+        caseId: doc._id,
+        deleted: { $ne: true },
+        senderId: { $ne: requesterObjectId },
+      };
+      const query = lastViewed
+        ? { ...baseQuery, createdAt: { $gt: new Date(lastViewed) } }
+        : { ...baseQuery, $and: buildUnreadClause(requesterObjectId).$and };
+      // eslint-disable-next-line no-await-in-loop
+      totalUnread += await Message.countDocuments(query);
+    }
     res.json({ count: totalUnread });
   })
 );
@@ -403,6 +478,7 @@ router.post(
         caseDoc,
         senderDoc,
         previewText: text,
+        messageDoc: msg,
       });
     } catch (err) {
       console.warn("[messages] notification creation failed", err);
@@ -547,6 +623,15 @@ router.post(
       caseId,
       meta: { upTo },
     });
+
+    const viewer = await User.findById(req.user.id).select("messageLastViewedAt");
+    if (viewer) {
+      if (!viewer.messageLastViewedAt || typeof viewer.messageLastViewedAt.set !== "function") {
+        viewer.messageLastViewedAt = new Map();
+      }
+      viewer.messageLastViewedAt.set(String(caseId), new Date(upTo));
+      await viewer.save();
+    }
 
     res.json({ updatedLegacy: res1.modifiedCount || 0, updatedReceipts: res2.modifiedCount || 0 });
   })

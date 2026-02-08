@@ -20,8 +20,8 @@ function initBillingLite() {
   const replaceCardBtn = document.getElementById("replacePaymentMethodBtn");
   const saveCardBtn = document.getElementById("savePaymentMethodBtn");
   const cancelCardBtn = document.getElementById("cancelPaymentMethodBtn");
-  const PENDING_HIRE_KEY = "lpc_pending_hire_funding";
   const CASE_PREVIEW_STORAGE_KEY = "lpc_case_preview_id";
+  const CASE_PREVIEW_RECEIPT_KEY = "lpc_case_preview_receipt";
 
   let cachedEscrows = [];
   let openDrawerEl = null;
@@ -29,6 +29,7 @@ function initBillingLite() {
   let setupElements = null;
   let setupPaymentElement = null;
   let pendingHire = null;
+  let pendingHireLoaded = false;
 
   const STRIPE_JS_SRC = "https://js.stripe.com/v3/";
   let stripeJsPromise = null;
@@ -36,7 +37,7 @@ function initBillingLite() {
   (async function initBillingSurface() {
     console.log("billing-lite loaded");
     bindEvents();
-    pendingHire = readPendingHire();
+    pendingHire = await loadPendingHire();
     if (pendingHire?.message) {
       showToast(pendingHire.message, "info");
     }
@@ -55,12 +56,24 @@ function bindEvents() {
     if (!btn) return;
     const caseId = btn.getAttribute("data-case-id");
     if (!caseId) return;
+    const receiptUrl = btn.getAttribute("data-receipt-url") || "";
+    if (receiptUrl) {
+      try {
+        sessionStorage.setItem(
+          CASE_PREVIEW_RECEIPT_KEY,
+          JSON.stringify({ caseId: String(caseId), receiptUrl })
+        );
+      } catch {}
+    } else {
+      try {
+        sessionStorage.removeItem(CASE_PREVIEW_RECEIPT_KEY);
+      } catch {}
+    }
     viewArchivedCase(caseId);
   });
   refreshEscrowsBtn?.addEventListener("click", () => {
     loadActiveEscrows(true, { syncAlerts: true });
   });
-  escrowTableBody?.addEventListener("click", handleEscrowClick);
   financeAlertsEl?.addEventListener("click", handleAlertAction);
   document.addEventListener("click", handleGlobalClick);
   document.addEventListener("keydown", (event) => {
@@ -88,7 +101,7 @@ async function loadActiveEscrows(showLoading = false, { syncAlerts = false } = {
     const items = Array.isArray(payload?.items) ? payload.items : [];
     cachedEscrows = items;
     if (!items.length) {
-      escrowTableBody.innerHTML = `<tr><td colspan="6" class="history-empty">No funds currently held in escrow.</td></tr>`;
+      escrowTableBody.innerHTML = `<tr><td colspan="5" class="history-empty">No funds currently held in escrow.</td></tr>`;
     } else {
       escrowTableBody.innerHTML = items.map(renderEscrowRow).join("");
     }
@@ -98,7 +111,7 @@ async function loadActiveEscrows(showLoading = false, { syncAlerts = false } = {
     return items;
   } catch (err) {
     console.warn("Unable to load active escrows", err);
-    escrowTableBody.innerHTML = `<tr><td colspan="6" class="history-empty error">Unable to load active escrow records.</td></tr>`;
+    escrowTableBody.innerHTML = `<tr><td colspan="5" class="history-empty error">Unable to load active escrow records.</td></tr>`;
     return [];
   }
 }
@@ -109,9 +122,6 @@ function renderEscrowRow(entry = {}) {
   const amount = formatCurrency(entry.amountHeld ?? entry.amount ?? entry.lockedTotalAmount ?? entry.totalAmount);
   const funded = formatDate(entry.fundedAt || entry.updatedAt);
   const statusLabel = formatStatusLabel(entry.status || "");
-  const caseId = String(entry.caseId || entry.id || "");
-  const safeCaseId = String(caseId || "case").replace(/[^a-z0-9_-]/gi, "");
-  const menuId = `escrow-actions-${safeCaseId || "case"}`;
   return `
     <tr>
       <td>${caseName}</td>
@@ -119,17 +129,6 @@ function renderEscrowRow(entry = {}) {
       <td>${amount}</td>
       <td>${funded}</td>
       <td><span class="pill">${statusLabel}</span></td>
-      <td>
-        <div class="action-drawer" data-case-id="${caseId}">
-          <button type="button" class="action-toggle" aria-haspopup="menu" aria-expanded="false" aria-controls="${menuId}">
-            Actions <span aria-hidden="true">⋯</span>
-          </button>
-          <div class="action-menu" id="${menuId}" role="menu">
-            <button type="button" data-escrow-action="view" data-case-id="${caseId}">View Case</button>
-            <button type="button" data-escrow-action="messages" data-case-id="${caseId}">Message Paralegal</button>
-          </div>
-        </div>
-      </td>
     </tr>
   `;
 }
@@ -182,13 +181,7 @@ function buildFinanceAlerts({ active = [], pending = [] } = {}) {
 function renderFinanceAlerts(alerts = []) {
   if (!financeAlertsEl) return;
   if (!alerts.length) {
-    financeAlertsEl.innerHTML = `
-      <div class="finance-alert calm">
-        <div>
-          <div class="alert-title">No urgent finance actions</div>
-          <p>You're caught up on escrow, funding, and payouts.</p>
-        </div>
-      </div>`;
+    financeAlertsEl.innerHTML = "";
     return;
   }
   financeAlertsEl.innerHTML = alerts.map(renderFinanceAlert).join("");
@@ -473,7 +466,7 @@ async function savePaymentMethod() {
     showToast("Card saved and set as default.", "success");
     await loadPaymentMethodStatus();
     cancelPaymentFlow();
-    if (!pendingHire) pendingHire = readPendingHire();
+    if (!pendingHire) pendingHire = await loadPendingHire(true);
     if (pendingHire?.caseId) {
       resumePendingHire(pendingHire);
     }
@@ -508,18 +501,30 @@ function cancelPaymentFlow() {
   }
 }
 
-function readPendingHire() {
+async function loadPendingHire(force = false) {
+  if (pendingHireLoaded && !force) return pendingHire;
+  pendingHireLoaded = true;
   try {
-    const raw = localStorage.getItem(PENDING_HIRE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
+    const res = await secureFetch("/api/users/me/pending-hire", { headers: { Accept: "application/json" } });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      pendingHire = null;
+      return null;
+    }
+    pendingHire = payload?.pendingHire || null;
+    return pendingHire;
+  } catch (err) {
+    console.warn("Unable to load pending hire", err);
+    pendingHire = null;
     return null;
   }
 }
 
-function clearPendingHire() {
+async function clearPendingHire() {
+  pendingHire = null;
+  pendingHireLoaded = true;
   try {
-    localStorage.removeItem(PENDING_HIRE_KEY);
+    await secureFetch("/api/users/me/pending-hire", { method: "DELETE", headers: { Accept: "application/json" } });
   } catch {
     /* ignore */
   }
@@ -528,7 +533,7 @@ function clearPendingHire() {
 function resumePendingHire(pending) {
   if (!pending?.caseId) return;
   pendingHire = null;
-  clearPendingHire();
+  void clearPendingHire();
   const target = pending.fundUrl || `fund-escrow.html?caseId=${encodeURIComponent(pending.caseId)}`;
   showToast("Payment method ready. Redirecting to fund escrow...", "success");
   setTimeout(() => {
@@ -538,20 +543,16 @@ function resumePendingHire(pending) {
 
 function renderHistoryCard(entry = {}) {
   const caseName = escapeHtml(entry.caseName || entry.caseTitle || entry.title || "Case");
-  const jobTitle = escapeHtml(entry.jobTitle || caseName);
   const paralegal = escapeHtml(entry.paralegalName || "Assigned Paralegal");
   const amount = formatCurrency(entry.jobAmount ?? entry.amount ?? entry.lockedTotalAmount ?? entry.totalAmount);
   const datePaid = formatDate(entry.releaseDate || entry.paidOutAt || entry.completedAt);
   const receipt = sanitizeUrl(entry.stripeReceiptUrl || entry.receiptUrl || entry.receipt);
-  const receiptLink = receipt
-    ? `<a class="pill-btn" href="${receipt}" target="_blank" rel="noopener">View Stripe Receipt</a>`
-    : '<span class="muted">Receipt unavailable</span>';
   const caseId = String(entry.caseId || entry.id || "");
+  const receiptAttr = receipt ? ` data-receipt-url="${receipt}"` : "";
   return `
     <article class="history-card">
       <div class="history-primary">
         <div class="case-name">${caseName}</div>
-        <div class="job-title">${jobTitle}</div>
         <div class="paralegal-name">Paralegal: ${paralegal}</div>
       </div>
       <div class="history-meta">
@@ -565,8 +566,7 @@ function renderHistoryCard(entry = {}) {
         </div>
       </div>
       <div class="history-actions">
-        ${receiptLink}
-        <button type="button" data-case-id="${caseId}">View Case</button>
+        <button type="button" data-case-id="${caseId}"${receiptAttr}>Details</button>
       </div>
     </article>
   `;
@@ -661,7 +661,6 @@ function renderEscrowSkeletonRows(count = 3) {
           <td>${cell("short")}</td>
           <td>${cell("short")}</td>
           <td>${cell("short")}</td>
-          <td>${cell("medium")}</td>
         </tr>
       `
     )
@@ -676,7 +675,6 @@ function renderHistorySkeleton(count = 2) {
         <article class="history-card">
           <div class="history-primary">
             ${line("long")}
-            ${line("medium")}
             ${line("short")}
           </div>
           <div class="history-meta">

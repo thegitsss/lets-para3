@@ -7,13 +7,16 @@ const requireRole = require("../middleware/requireRole");
 const requireApprovedUser = require("../middleware/requireApprovedUser");
 const User = require("../models/User");
 const Case = require("../models/Case");
+const Application = require("../models/Application");
 const Task = require("../models/Task");
 const Notification = require("../models/Notification");
 const Job = require("../models/Job");
 const Block = require("../models/Block");
+const WeeklyNote = require("../models/WeeklyNote");
 const { maskProfanity } = require("../utils/badWords");
 const { logAction } = require("../utils/audit");
 const { notifyUser } = require("../utils/notifyUser");
+const { cleanMessage } = require("../utils/sanitize");
 const {
   applyPublicParalegalFilter,
   hasRequiredParalegalFieldsForPublic,
@@ -91,6 +94,23 @@ const cleanLanguages = (value) => {
     .filter(Boolean);
 };
 const resolveParalegalId = (rawId, userId) => (rawId === "me" ? userId : rawId);
+const hasAttorneyParalegalAccess = async (attorneyId, paralegalId) => {
+  if (!isObjId(attorneyId) || !isObjId(paralegalId)) return false;
+  const caseMatch = await Case.exists({
+    attorneyId,
+    $or: [
+      { paralegal: paralegalId },
+      { paralegalId },
+      { "applicants.paralegalId": paralegalId },
+    ],
+  });
+  if (caseMatch) return true;
+  const jobIds = await Job.find({ attorneyId }).select("_id").lean();
+  if (!jobIds.length) return false;
+  const jobIdList = jobIds.map((job) => job._id);
+  const applicationMatch = await Application.exists({ paralegalId, jobId: { $in: jobIdList } });
+  return Boolean(applicationMatch);
+};
 const normalizeAvailability = (val) => {
   if (typeof val === "string" && val.trim()) return normStr(val, { len: 200 });
   if (typeof val === "boolean") return val ? "Available Now" : "Unavailable";
@@ -136,7 +156,7 @@ const parseParalegalFilters = (query = {}) => {
 
 const SAFE_PUBLIC_SELECT =
   "_id firstName lastName avatarURL profileImage profileImageOriginal pendingProfileImage pendingProfileImageOriginal profilePhotoStatus location specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt languages writingSamples status stateExperience";
-const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email phoneNumber`;
+const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email phoneNumber onboarding pendingHire`;
 const FILE_PUBLIC_BASE =
   (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
   (process.env.S3_BUCKET && process.env.S3_REGION
@@ -231,6 +251,25 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
     payload.pendingProfileImageOriginal = pendingProfileImageOriginal;
   }
   return payload;
+}
+
+function serializeOnboarding(onboarding = {}) {
+  return {
+    paralegalWelcomeDismissed: Boolean(onboarding?.paralegalWelcomeDismissed),
+    paralegalTourCompleted: Boolean(onboarding?.paralegalTourCompleted),
+    paralegalProfileTourCompleted: Boolean(onboarding?.paralegalProfileTourCompleted),
+  };
+}
+
+function serializePendingHire(pendingHire = {}) {
+  if (!pendingHire || !pendingHire.caseId) return null;
+  return {
+    caseId: String(pendingHire.caseId),
+    paralegalName: normStr(pendingHire.paralegalName || "", { len: 200 }).trim(),
+    fundUrl: normStr(pendingHire.fundUrl || "", { len: 2000 }).trim(),
+    message: normStr(pendingHire.message || "", { len: 2000 }).trim(),
+    updatedAt: pendingHire.updatedAt || null,
+  };
 }
 
 function formatDisplayName(user) {
@@ -367,7 +406,152 @@ router.get(
     if (!me) return res.status(404).json({ error: "Not found" });
     const payload = serializePublicUser(me, { includeEmail: true, includeStatus: true, includePhotoMeta: true });
     payload.role = me.role;
+    payload.onboarding = serializeOnboarding(me.onboarding || {});
+    payload.pendingHire = serializePendingHire(me.pendingHire || {});
     return res.json(payload);
+  })
+);
+
+router.get(
+  "/me/onboarding",
+  requireApprovedUser,
+  requireRole("paralegal", "admin"),
+  asyncHandler(async (req, res) => {
+    const me = await User.findById(req.user.id).select("onboarding").lean();
+    if (!me) return res.status(404).json({ error: "Not found" });
+    return res.json({ onboarding: serializeOnboarding(me.onboarding || {}) });
+  })
+);
+
+router.patch(
+  "/me/onboarding",
+  csrfProtection,
+  requireApprovedUser,
+  requireRole("paralegal", "admin"),
+  asyncHandler(async (req, res) => {
+    const body = req.body || {};
+    const updates = {};
+    const allowed = [
+      "paralegalWelcomeDismissed",
+      "paralegalTourCompleted",
+      "paralegalProfileTourCompleted",
+    ];
+    allowed.forEach((key) => {
+      if (typeof body[key] === "boolean") {
+        updates[`onboarding.${key}`] = body[key];
+      }
+    });
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ error: "No recognized onboarding fields" });
+    }
+    const me = await User.findByIdAndUpdate(req.user.id, { $set: updates }, { new: true }).select("onboarding");
+    if (!me) return res.status(404).json({ error: "Not found" });
+    return res.json({ onboarding: serializeOnboarding(me.onboarding || {}) });
+  })
+);
+
+router.get(
+  "/me/pending-hire",
+  requireApprovedUser,
+  requireRole("attorney", "admin"),
+  asyncHandler(async (req, res) => {
+    const me = await User.findById(req.user.id).select("pendingHire").lean();
+    if (!me) return res.status(404).json({ error: "Not found" });
+    return res.json({ pendingHire: serializePendingHire(me.pendingHire || {}) });
+  })
+);
+
+router.put(
+  "/me/pending-hire",
+  csrfProtection,
+  requireApprovedUser,
+  requireRole("attorney", "admin"),
+  asyncHandler(async (req, res) => {
+    const body = req.body || {};
+    const caseId = String(body.caseId || "").trim();
+    if (!isObjId(caseId)) {
+      return res.status(400).json({ error: "Invalid caseId" });
+    }
+    const updates = {
+      "pendingHire.caseId": caseId,
+      "pendingHire.paralegalName": normStr(body.paralegalName || "", { len: 200 }).trim(),
+      "pendingHire.fundUrl": normStr(body.fundUrl || "", { len: 2000 }).trim(),
+      "pendingHire.message": normStr(body.message || "", { len: 2000 }).trim(),
+      "pendingHire.updatedAt": new Date(),
+    };
+    const me = await User.findByIdAndUpdate(req.user.id, { $set: updates }, { new: true }).select("pendingHire");
+    if (!me) return res.status(404).json({ error: "Not found" });
+    return res.json({ pendingHire: serializePendingHire(me.pendingHire || {}) });
+  })
+);
+
+router.delete(
+  "/me/pending-hire",
+  csrfProtection,
+  requireApprovedUser,
+  requireRole("attorney", "admin"),
+  asyncHandler(async (req, res) => {
+    const me = await User.findByIdAndUpdate(req.user.id, { $set: { pendingHire: null } }, { new: true }).select(
+      "pendingHire"
+    );
+    if (!me) return res.status(404).json({ error: "Not found" });
+    return res.json({ pendingHire: null });
+  })
+);
+
+function normalizeWeekStart(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return null;
+  const day = date.getDay();
+  const diff = (day + 6) % 7;
+  date.setDate(date.getDate() - diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function normalizeWeeklyNotes(notes = []) {
+  const output = Array(7).fill("");
+  notes.forEach((note, idx) => {
+    if (idx >= output.length) return;
+    output[idx] = cleanMessage(String(note || ""), 2000);
+  });
+  return output;
+}
+
+router.get(
+  "/me/weekly-notes",
+  requireApprovedUser,
+  asyncHandler(async (req, res) => {
+    const weekStart = normalizeWeekStart(req.query.weekStart);
+    if (!weekStart) return res.status(400).json({ error: "Invalid weekStart" });
+    const doc = await WeeklyNote.findOne({ userId: req.user.id, weekStart }).lean();
+    const notes = normalizeWeeklyNotes(doc?.notes || []);
+    return res.json({
+      weekStart: weekStart.toISOString().slice(0, 10),
+      notes,
+      updatedAt: doc?.updatedAt || null,
+    });
+  })
+);
+
+router.put(
+  "/me/weekly-notes",
+  csrfProtection,
+  requireApprovedUser,
+  asyncHandler(async (req, res) => {
+    const weekStart = normalizeWeekStart(req.body?.weekStart || req.query?.weekStart);
+    if (!weekStart) return res.status(400).json({ error: "Invalid weekStart" });
+    const notes = normalizeWeeklyNotes(req.body?.notes || []);
+    const doc = await WeeklyNote.findOneAndUpdate(
+      { userId: req.user.id, weekStart },
+      { $set: { notes } },
+      { upsert: true, new: true }
+    );
+    return res.json({
+      weekStart: weekStart.toISOString().slice(0, 10),
+      notes: normalizeWeeklyNotes(doc?.notes || []),
+      updatedAt: doc?.updatedAt || null,
+    });
   })
 );
 
@@ -954,10 +1138,18 @@ paralegalRouter.get(
     const requesterRole = String(req.user.role || "").toLowerCase();
     const isOwner = String(profile._id) === String(req.user.id);
     const isAdmin = requesterRole === "admin";
-    if (profile.role === "paralegal" && profile.preferences?.hideProfile && !isOwner && !isAdmin) {
+    const hasAttorneyContext =
+      requesterRole === "attorney" ? await hasAttorneyParalegalAccess(req.user.id, profile._id) : false;
+    if (profile.role === "paralegal" && profile.preferences?.hideProfile && !isOwner && !isAdmin && !hasAttorneyContext) {
       return res.status(404).json({ error: "Paralegal not found" });
     }
-    if (profile.role === "paralegal" && !isOwner && !isAdmin && !hasRequiredParalegalFieldsForPublic(profile)) {
+    if (
+      profile.role === "paralegal" &&
+      !isOwner &&
+      !isAdmin &&
+      !hasAttorneyContext &&
+      !hasRequiredParalegalFieldsForPublic(profile)
+    ) {
       return res.status(404).json({ error: "Paralegal not found" });
     }
     if (String(req.user.role || "").toLowerCase() === "attorney") {

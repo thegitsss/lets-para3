@@ -128,11 +128,13 @@ router.get("/", auth, requireApproved, requireRole(["paralegal"]), async (req, r
       caseId: c._id,
       jobId: c.jobId?._id,
       jobTitle: c.jobId?.title,
+      title: c.title,
       practiceArea: c.jobId?.practiceArea,
       attorneyName: c.attorneyId
         ? `${c.attorneyId.firstName} ${c.attorneyId.lastName}`
         : null,
       status: String(c.status || "").toLowerCase() === "in_progress" ? "in progress" : c.status,
+      deadline: c.deadline || null,
       createdAt: c.createdAt,
       archived: c.archived,
       paymentReleased: c.paymentReleased,

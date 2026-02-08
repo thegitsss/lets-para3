@@ -30,7 +30,7 @@ const FILE_STATUS = ["pending_review", "approved", "attorney_revision"];
 
 const ZOOM_REGEX = /^https:\/\/.*zoom\.us\/[^\s]+$/i;
 const DEFAULT_ATTORNEY_FEE_PCT = Number(
-  process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 21
+  process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 22
 );
 const DEFAULT_PARALEGAL_FEE_PCT = Number(
   process.env.PLATFORM_FEE_PARALEGAL_PERCENT || process.env.PLATFORM_FEE_PERCENT || 18
@@ -139,6 +139,7 @@ const inviteSchema = new Schema(
 const scopeTaskSchema = new Schema(
   {
     title: { type: String, trim: true, maxlength: 200 },
+    completed: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
   },
   { _id: false }

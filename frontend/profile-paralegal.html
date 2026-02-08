@@ -3,6 +3,7 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -222,64 +223,6 @@
       margin-bottom: 12px;
     }
 
-    .notification-wrapper {
-      position: relative;
-    }
-
-    .notification-icon {
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
-      border: 1px solid var(--line);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #fff;
-      cursor: pointer;
-      transition: border-color 0.2s ease, transform 0.2s ease;
-      position: relative;
-    }
-
-    .notification-icon:hover {
-      border-color: var(--accent);
-      transform: translateY(-1px);
-    }
-
-    .notification-badge {
-      position: absolute;
-      top: -5px;
-      right: -5px;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: #e63946;
-      color: #fff;
-      font-size: 0.7rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      display: none;
-    }
-
-    .notification-badge.show {
-      display: flex;
-    }
-
-    #notificationToggle[data-count]:after,
-    [data-notification-toggle][data-count]:after {
-      content: attr(data-count);
-      position: absolute;
-      top: -4px;
-      right: -4px;
-      background: var(--accent);
-      color: #fff;
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      font-size: 0.7rem;
-      padding: 2px 6px;
-      border-radius: 999px;
-    }
 
     .user-chip {
       display: flex;
@@ -349,135 +292,6 @@
       background: rgba(182, 164, 122, 0.14);
     }
 
-    .notif-panel {
-      position: absolute;
-      right: 0;
-      top: 48px;
-      width: 340px;
-      background: #ffffff;
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      border-radius: 12px;
-      padding: 0;
-      z-index: 6000;
-      display: none;
-      flex-direction: column;
-      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);
-    }
-    .notification-dropdown {
-      z-index: 6000;
-    }
-
-    .notif-panel.show {
-      display: flex;
-    }
-
-    .notif-panel.hidden {
-      display: none;
-    }
-
-    .notif-header {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      font-size: 1.3rem;
-      padding: 14px 18px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-      background: #fafafa;
-    }
-
-    #notifList {
-      max-height: 220px;
-      overflow-y: auto;
-    }
-
-    .notif-item {
-      padding: 14px 18px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-      cursor: pointer;
-      transition: background 0.15s ease;
-    }
-
-    .notif-item:last-child {
-      border-bottom: none;
-    }
-
-    .notif-item:hover {
-      background: #f6f6f6;
-    }
-
-    .notif-item.unread {
-      background: #ffffff;
-      border-left: 3px solid var(--accent);
-    }
-
-    .notif-item.read {
-      opacity: 0.75;
-    }
-
-    .notif-meta {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-    }
-
-    .notif-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--accent);
-      opacity: 0.6;
-      margin-top: 6px;
-      flex-shrink: 0;
-    }
-
-    .notif-item:not(.unread) .notif-dot {
-      opacity: 0;
-    }
-
-    .notif-copy {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      width: 100%;
-    }
-
-    .notif-title {
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 400;
-      font-size: 0.98rem;
-      margin: 0;
-      color: #1a1a1a;
-      line-height: 1.35;
-    }
-
-    .notif-time {
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      font-size: 0.82rem;
-      color: #777;
-    }
-
-    .notif-empty {
-      padding: 18px;
-      text-align: center;
-      font-size: 0.9rem;
-      color: #8a8a8a;
-    }
-
-    .notif-markall {
-      border: none;
-      border-top: 1px solid rgba(0, 0, 0, 0.08);
-      background: #fafafa;
-      padding: 12px;
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      font-size: 0.9rem;
-      cursor: pointer;
-      text-align: left;
-    }
-
-    .notif-markall:hover {
-      background: #f0f0f0;
-    }
 
     /* HERO CARD (matches UX layout) */
 
@@ -1515,7 +1329,7 @@
       <a href="help.html">Help</a>
     </nav>
     <button type="button" class="sidebar-link" id="logoutBtn" data-logout>Log out</button>
-    <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
+    <div class="sidebar-footer">© Let’s-ParaConnect 2026</div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <div class="page-shell" id="main" role="main" tabindex="-1">
@@ -1547,17 +1361,15 @@
             padding: 16px;
           "
         >
-            <div style="font-weight: 600; margin-bottom: 8px;">
-              Notifications
-            </div>
+            <div style="font-weight: 600; margin-bottom: 8px;" aria-label="Notifications"></div>
 
             <div id="notificationList" style="font-size: 14px; color: #555;">
               No new notifications.
             </div>
           </div>
-          <div id="notificationPanel" class="notif-panel hidden" data-notification-panel>
-            <div class="notif-header">Notifications</div>
-            <div class="notif-body" id="notifList" data-notification-list></div>
+          <div id="notificationPanel" class="notifications-panel notif-panel hidden" role="region" aria-live="polite" data-notification-panel>
+            <div class="notif-header" aria-label="Notifications"></div>
+            <div class="notif-scroll" id="notifList" data-notification-list></div>
             <div class="notif-empty" data-notification-empty>No new notifications.</div>
           </div>
           </div>

@@ -48,7 +48,7 @@ const elements = {
 
 const state = {
   page: 1,
-  limit: 15,
+  limit: 10,
   total: 0,
   pages: 1,
   filters: {
@@ -410,15 +410,14 @@ function buildParalegalCard(paralegal) {
   img.alt = `Portrait of ${name}`;
   photoLink.appendChild(img);
   card.appendChild(photoLink);
-
-  const content = document.createElement("div");
-  content.className = "card-content";
   const heading = document.createElement("h3");
   const headingLink = document.createElement("a");
   headingLink.href = buildParalegalProfileUrl(paralegalId);
   headingLink.textContent = name;
   headingLink.className = "profile-name-link profile-link";
   heading.appendChild(headingLink);
+  const content = document.createElement("div");
+  content.className = "card-content";
   content.appendChild(heading);
 
   const intro = document.createElement("p");
@@ -426,16 +425,13 @@ function buildParalegalCard(paralegal) {
   content.appendChild(intro);
 
   const bio = document.createElement("p");
-  bio.textContent = truncate(summary, 240);
+  bio.textContent = getFirstSentence(summary);
   content.appendChild(bio);
 
   const meta = document.createElement("div");
   meta.className = "card-meta";
   meta.appendChild(buildMetaChip("Experience", experience));
-  meta.appendChild(buildMetaChip("Availability", availability));
-  if (specialties.length) {
-    meta.appendChild(buildMetaChip("Specialty", specialties.join(", ")));
-  }
+  meta.appendChild(buildMetaChip("Availability", availability, { hideLabel: true }));
   content.appendChild(meta);
   card.appendChild(content);
 
@@ -445,7 +441,7 @@ function buildParalegalCard(paralegal) {
     const inquireBtn = document.createElement("button");
     inquireBtn.type = "button";
     inquireBtn.className = "action-btn invite-btn";
-    inquireBtn.textContent = "Invite to Job";
+    inquireBtn.textContent = "Invite to Case";
     inquireBtn.addEventListener("click", () => openInquireModal({ id: paralegalId, name }));
     actions.appendChild(inquireBtn);
   }
@@ -463,9 +459,17 @@ function buildParalegalCard(paralegal) {
   return card;
 }
 
-function buildMetaChip(label, value) {
+function getFirstSentence(summary) {
+  const clean = String(summary || "").replace(/\s+/g, " ").trim();
+  if (!clean) return "";
+  const firstSentenceMatch = clean.match(/^(.+?[.!?])(\s|$)/);
+  return firstSentenceMatch ? firstSentenceMatch[1] : clean;
+}
+
+function buildMetaChip(label, value, options = {}) {
   const span = document.createElement("span");
-  span.textContent = `${label}: ${value}`;
+  const hideLabel = Boolean(options.hideLabel);
+  span.textContent = hideLabel ? value : `${label}: ${value}`;
   return span;
 }
 

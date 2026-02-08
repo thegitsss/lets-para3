@@ -3,6 +3,7 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Paralegal Assigned Cases – Let’s-ParaConnect</title>
@@ -180,100 +181,6 @@ header p{color:var(--muted);font-size:.95rem;margin-bottom:2rem;}
   align-items:center;
   gap:16px;
 }
-.header-cluster [data-notification-toggle][data-count]:after,
-#notificationToggle[data-count]:after{
-  content:attr(data-count);
-  position:absolute;
-  top:-4px;
-  right:-4px;
-  background:var(--accent);
-  color:#fff;
-  font-family:'Sarabun',sans-serif;
-  font-weight:200;
-  font-size:0.7rem;
-  padding:2px 6px;
-  border-radius:999px;
-}
-.notif-panel{
-  position:absolute;
-  right:0;
-  top:48px;
-  width:340px;
-  background:#fff;
-  border:1px solid rgba(0,0,0,0.08);
-  border-radius:12px;
-  padding:0;
-  z-index:2000;
-  display:none;
-  flex-direction:column;
-  box-shadow:0 24px 48px rgba(0,0,0,0.12);
-}
-.notif-panel.show{display:flex;}
-.notif-panel.hidden{display:none;}
-.notif-header{
-  font-family:'Cormorant Garamond',serif;
-  font-weight:300;
-  font-size:1.3rem;
-  padding:14px 18px;
-  border-bottom:1px solid rgba(0,0,0,0.08);
-  background:#fafafa;
-}
-#notifList{
-  max-height: 220px;
-  overflow-y:auto;
-}
-.notif-item{
-  padding:14px 18px;
-  border-bottom:1px solid rgba(0,0,0,0.06);
-  cursor:pointer;
-  transition:background .15s ease;
-}
-.notif-item:last-child{border-bottom:none;}
-.notif-item:hover{background:#f6f6f6;}
-.notif-item.unread{
-  background:#fff;
-  border-left:3px solid var(--accent);
-}
-.notif-item.read{opacity:.75;}
-.notif-title{
-  font-family:'Cormorant Garamond',serif;
-  font-weight:300;
-  font-size:1.15rem;
-  margin-bottom:2px;
-  color:#1a1a1a;
-}
-.notif-body{
-  font-family:'Sarabun',sans-serif;
-  font-weight:200;
-  font-size:.92rem;
-  color:#444;
-  line-height:1.45;
-}
-.notif-time{
-  margin-top:4px;
-  font-family:'Sarabun',sans-serif;
-  font-weight:200;
-  font-size:.8rem;
-  color:#888;
-}
-.notif-empty{
-  padding:18px;
-  text-align:center;
-  font-size:.9rem;
-  color:#8a8a8a;
-}
-.notif-markall{
-  border:none;
-  border-top:1px solid rgba(0,0,0,0.08);
-  background:#fafafa;
-  padding:12px;
-  font-family:'Sarabun',sans-serif;
-  font-weight:200;
-  font-size:.9rem;
-  cursor:pointer;
-  text-align:left;
-}
-.notif-markall:hover{background:#f0f0f0;}
 
 /* Metrics */
 .metrics{
@@ -495,8 +402,6 @@ nav a.active {background:rgba(255,255,255,0.25);}
   .lpc-card,
   .panel,
   .case-subinfo,
-  .notif-body,
-  .notif-item,
   .user-list li{
     min-width:0;
     overflow-wrap:anywhere;
@@ -521,7 +426,7 @@ nav a.active {background:rgba(255,255,255,0.25);}
   </nav>
   <button type="button" class="sidebar-link sideNavItem" data-target="logout" id="logoutBtn">Log Out</button>
   <div id="weatherSidebar">Stay current</div>
-  <div class="sidebar-footer">© Let’s-ParaConnect 2025</div>
+  <div class="sidebar-footer">© Let’s-ParaConnect 2026</div>
 </aside>
 <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
@@ -552,17 +457,15 @@ nav a.active {background:rgba(255,255,255,0.25);}
             padding: 16px;
           "
         >
-          <div style="font-weight: 600; margin-bottom: 8px;">
-            Notifications
-          </div>
+          <div style="font-weight: 600; margin-bottom: 8px;" aria-label="Notifications"></div>
 
           <div id="notificationList" style="font-size: 14px; color: #555;">
             No new notifications.
           </div>
         </div>
-        <div id="notificationPanel" class="notif-panel hidden" data-notification-panel>
-          <div class="notif-header">Notifications</div>
-          <div class="notif-body" id="notifList" data-notification-list></div>
+        <div id="notificationPanel" class="notifications-panel notif-panel hidden" role="region" aria-live="polite" data-notification-panel>
+          <div class="notif-header" aria-label="Notifications"></div>
+          <div class="notif-scroll" id="notifList" data-notification-list></div>
           <div class="notif-empty" data-notification-empty>No new notifications.</div>
         </div>
       </div>

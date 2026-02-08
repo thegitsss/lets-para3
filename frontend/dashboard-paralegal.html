@@ -3,6 +3,7 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
   <link rel="preload" as="font" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" type="font/woff2" crossorigin />
   <link rel="preload" as="font" href="assets/fonts/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2" type="font/woff2" crossorigin />
   <script>
@@ -523,49 +524,6 @@
       pointer-events: auto;
     }
 
-    .notification-wrapper {
-      position: relative;
-    }
-
-    .notification-icon {
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
-      border: 1px solid var(--line);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #fff;
-      cursor: pointer;
-      transition: border-color 0.2s ease, transform 0.2s ease;
-      position: relative;
-    }
-
-    .notification-icon:hover {
-      border-color: var(--accent);
-      transform: translateY(-1px);
-    }
-
-    .notification-badge {
-      position: absolute;
-      top: -5px;
-      right: -5px;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: #e63946;
-      color: #fff;
-      font-size: 0.7rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      display: none;
-    }
-
-    .notification-badge.show {
-      display: flex;
-    }
 
     .user-chip {
       display: flex;
@@ -1107,9 +1065,6 @@
         max-width: 100%;
       }
 
-      .notif-panel {
-        width: min(92vw, 320px);
-      }
 
       .summary {
         display: grid;
@@ -1167,7 +1122,6 @@
       .case-subinfo,
       .case-meta,
       .card-link,
-      .notif-body,
       .invite-dialog,
       .invite-lead,
       .invite-meta,
@@ -1202,6 +1156,18 @@
 
     .cases-column {
       padding-right: 2rem;
+    }
+
+    .cases-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .completed-cases-section {
+      margin-top: 0.25rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--line);
     }
 
     .apps-column {
@@ -1901,114 +1867,6 @@
       line-height: 1;
     }
 
-    .header-cluster [data-notification-toggle][data-count]:after,
-    #notificationToggle[data-count]:after {
-      content: attr(data-count);
-      position: absolute;
-      top: -4px;
-      right: -4px;
-      background: var(--accent);
-      color: #fff;
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      font-size: 0.7rem;
-      padding: 2px 6px;
-      border-radius: 999px;
-    }
-
-    .notif-panel {
-      position: absolute;
-      top: 48px;
-      right: 0;
-      width: 340px;
-      background: var(--panel);
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      border-radius: 12px;
-      padding: 0;
-      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
-      display: none;
-      flex-direction: column;
-      z-index: 5000;
-    }
-
-    .notif-panel.show {
-      display: flex;
-    }
-
-    .notif-panel.hidden {
-      display: none;
-    }
-
-    .notif-header {
-      font-family: var(--font-serif);
-      font-weight: 300;
-      font-size: 1.3rem;
-      padding: 14px 18px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-      background: var(--panel);
-    }
-
-    #notifList {
-      max-height: 220px;
-      overflow-y: auto;
-    }
-
-    .notif-item {
-      padding: 14px 18px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-      cursor: pointer;
-      transition: background 0.15s ease;
-    }
-
-    .notif-item:last-child {
-      border-bottom: none;
-    }
-
-    .notif-item.unread {
-      border-left: 3px solid var(--accent);
-    }
-
-    .notif-item.read {
-      opacity: 0.75;
-    }
-
-    .notif-title {
-      font-family: var(--font-serif);
-      font-weight: 300;
-      font-size: 1.15rem;
-      margin-bottom: 2px;
-    }
-
-    .notif-body {
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      font-size: 0.92rem;
-      color: var(--muted);
-      line-height: 1.4;
-    }
-
-    .notif-time {
-      margin-top: 4px;
-      font-size: 0.8rem;
-      color: #888;
-    }
-
-    .notif-empty {
-      padding: 16px;
-      text-align: center;
-      font-size: 0.9rem;
-      color: #888;
-    }
-
-    .notif-markall {
-      border: none;
-      border-top: 1px solid rgba(0, 0, 0, 0.08);
-      background: #fafafa;
-      padding: 12px;
-      text-align: left;
-      font-size: 0.9rem;
-      cursor: pointer;
-    }
 
     #latestMessage a {
       color: var(--accent);
@@ -2424,13 +2282,11 @@
       box-shadow: var(--shadow-md);
     }
 
-    body:not(.theme-dark) .notification-icon,
     body:not(.theme-dark) .user-chip {
       border-color: rgba(15, 23, 42, 0.12);
       box-shadow: var(--shadow-sm);
     }
 
-    body.theme-dark .notification-icon,
     body.theme-dark .user-chip {
       box-shadow: var(--shadow-sm);
     }
@@ -2460,7 +2316,7 @@
       <a href="help.html">Help</a>
     </nav>
     <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
+    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2026</a></div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <main id="main" tabindex="-1" class="main">
@@ -2563,10 +2419,18 @@
       </header>
 
       <div class="cases-apps-grid">
-        <section class="cases-column" aria-label="Active cases">
-          <div class="section-title">Active Cases</div>
-          <div class="case-files" id="filesContainer">
-            <p class="case-files-empty">Loading cases…</p>
+        <section class="cases-column" aria-label="Cases">
+          <div class="cases-section">
+            <div class="section-title">Active Cases</div>
+            <div class="case-files" id="filesContainer">
+              <p class="case-files-empty">Loading cases…</p>
+            </div>
+          </div>
+          <div class="cases-section completed-cases-section">
+            <div class="section-title">Completed Cases</div>
+            <div class="case-files" id="completedCasesContainer">
+              <p class="case-files-empty">Loading completed cases…</p>
+            </div>
           </div>
         </section>
 
@@ -2766,7 +2630,9 @@
       let activeKey = "home";
 
       const filesContainer = document.getElementById("filesContainer");
+      const completedCasesContainer = document.getElementById("completedCasesContainer");
       let activeCasesCache = [];
+      let completedCasesCache = [];
 
       function escapeHTML(value) {
         return String(value ?? "")
@@ -2780,6 +2646,13 @@
       function formatCurrency(value = 0) {
         const amount = Number(value) || 0;
         return amount.toLocaleString(undefined, { style: "currency", currency: "USD" });
+      }
+
+      function formatDate(value) {
+        if (!value) return "";
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return "";
+        return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
       }
 
       function formatStatus(value) {
@@ -2828,6 +2701,45 @@
           .join("");
       }
 
+      function renderCompletedCases(items = completedCasesCache) {
+        if (!completedCasesContainer) return;
+        if (!items.length) {
+          completedCasesContainer.innerHTML = `<p class="case-files-empty">No completed cases yet.</p>`;
+          return;
+        }
+        completedCasesContainer.innerHTML = items
+          .map((item) => {
+            const caseId = item.caseId || item.id || item._id || "";
+            const title = item.title || "Case";
+            const attorney = item.attorneyName || "Attorney";
+            const completed = formatDate(item.completedAt);
+            const hasPaymentAmount = Number.isFinite(Number(item.paymentAmount));
+            const meta = [
+              `Attorney: ${attorney}`,
+              completed ? `Completed: ${completed}` : "",
+              hasPaymentAmount ? `Payout: ${formatCurrency(item.paymentAmount)}` : "",
+            ]
+              .filter(Boolean)
+              .map((line) => `<span>${escapeHTML(line)}</span>`)
+              .join("");
+            const receiptLink = caseId
+              ? `/api/payments/receipt/paralegal/${encodeURIComponent(caseId)}?regen=1`
+              : "#";
+            return `
+              <article class="file-card" data-case-id="${escapeHTML(caseId)}">
+                <div class="file-line">
+                  <span class="file-name">${escapeHTML(title)}</span>
+                </div>
+                <div class="file-meta">${meta}</div>
+                <div class="file-actions">
+                  <a href="${receiptLink}" class="btn-link" target="_blank" rel="noopener">Download Receipt</a>
+                </div>
+              </article>
+            `;
+          })
+          .join("");
+      }
+
       async function loadActiveCases() {
         if (!filesContainer) return;
         filesContainer.innerHTML = `<p class="case-files-empty">Loading cases…</p>`;
@@ -2844,6 +2756,26 @@
         } catch (err) {
           filesContainer.innerHTML = `<p class="case-files-empty">${escapeHTML(
             err?.message || "Unable to load active cases."
+          )}</p>`;
+        }
+      }
+
+      async function loadCompletedCases() {
+        if (!completedCasesContainer) return;
+        completedCasesContainer.innerHTML = `<p class="case-files-empty">Loading completed cases…</p>`;
+        try {
+          const res = await secureFetch("/api/cases/my-completed", {
+            headers: { Accept: "application/json" },
+          });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error(payload?.error || "Unable to load completed cases.");
+          }
+          completedCasesCache = Array.isArray(payload?.items) ? payload.items : [];
+          renderCompletedCases(completedCasesCache);
+        } catch (err) {
+          completedCasesContainer.innerHTML = `<p class="case-files-empty">${escapeHTML(
+            err?.message || "Unable to load completed cases."
           )}</p>`;
         }
       }
@@ -2868,6 +2800,9 @@
         if (key === "cases" && !casesReady) {
           casesReady = true;
           loadActiveCases().catch((error) => console.warn("Active cases load failed", error));
+          loadCompletedCases().catch((error) =>
+            console.warn("Completed cases load failed", error)
+          );
         }
         if (key === "cases") {
           history.replaceState(null, "", `${basePath}#cases`);
@@ -2907,6 +2842,9 @@
       const browseAction = document.querySelector('.quick-actions button[data-action="browse"]');
 
       if (!modal) return;
+      if (modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+      }
 
       const showModal = (event) => {
         event?.preventDefault();

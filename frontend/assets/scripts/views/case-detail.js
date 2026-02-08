@@ -2,7 +2,7 @@
 // Case detail view wired to /api/cases/:caseId
 
 import { j } from "../helpers.js";
-import { requireAuth, fetchCSRF } from "../auth.js";
+import { requireAuth, fetchCSRF, secureFetch } from "../auth.js";
 import { render as renderChecklist } from "./checklist.js";
 import { getStripeConnectStatus, isStripeConnected, STRIPE_GATE_MESSAGE } from "../utils/stripe-connect.js";
 
@@ -39,9 +39,12 @@ let cardErrorsNode = null;
 let cardHostNode = null;
 let paymentEnabled = false;
 let countdownTimer = null;
+let applyConfirmModal = null;
+let applyConfirmTitle = null;
+let applyConfirmMessage = null;
 let hasPaymentMethodOnFile = true;
 let currentViewerRole = "";
-const PLATFORM_FEE_PCT = 21;
+const PLATFORM_FEE_PCT = 22;
 const DEFAULT_HIRE_ERROR = "Unable to hire paralegal.";
 const MISSING_DOCUMENT_MESSAGE = "This document is no longer available for download.";
 
@@ -58,6 +61,33 @@ function formatHireErrorMessage(message) {
     return "This paralegal must complete Stripe onboarding before you can hire them.";
   }
   return message;
+}
+
+async function storePendingHire(pending = {}) {
+  if (!pending?.caseId) return null;
+  try {
+    const res = await secureFetch("/api/users/me/pending-hire", {
+      method: "PUT",
+      headers: { Accept: "application/json" },
+      body: {
+        caseId: pending.caseId,
+        paralegalName: pending.paralegalName || "",
+        message: pending.message || "",
+        fundUrl: pending.fundUrl || "",
+      },
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload?.error || "Unable to save pending hire.");
+    }
+    if (typeof window.updateSessionUser === "function") {
+      window.updateSessionUser({ pendingHire: payload?.pendingHire || null });
+    }
+    return payload?.pendingHire || null;
+  } catch (err) {
+    console.warn("Unable to store pending hire", err);
+    return null;
+  }
 }
 
 export async function render(el, { escapeHTML, params: routeParams } = {}) {
@@ -252,7 +282,7 @@ function draw(root, data, escapeHTML, caseId, session, hasPaymentMethod) {
           <form class="apply-form" data-case-apply-form>
             <label for="caseApplyNote">Cover letter (optional)</label>
             <textarea id="caseApplyNote" data-apply-note rows="5" placeholder="Explain why you are a strong fit."></textarea>
-            <p class="apply-footnote">Your résumé, LinkedIn profile, and saved cover letter are included automatically.</p>
+            <p class="apply-footnote">Your résumé and LinkedIn profile are included automatically.</p>
             <div class="case-actions">
               <button class="btn primary" type="submit">Submit application</button>
               <span class="apply-status" data-apply-status></span>
@@ -371,7 +401,7 @@ function draw(root, data, escapeHTML, caseId, session, hasPaymentMethod) {
   bindEscrowButton(root, caseId);
   bindCompleteButton(root, caseId);
   bindDownloadButton(root, caseId);
-  bindApplicationForm(root, caseId);
+  bindApplicationForm(root, caseId, data?.title || "this case");
   bindInviteResponses(root, caseId);
   bindTerminationButton(root, caseId);
   bindApplicantDocLinks(root);
@@ -446,6 +476,16 @@ function ensureStyles() {
     .case-modal{background:#fff;border-radius:16px;padding:24px;max-width:420px;box-shadow:0 20px 45px rgba(0,0,0,.22)}
     .case-modal-title{font-weight:600;font-size:1.15rem;margin-bottom:8px}
     .case-modal-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:16px}
+    .apply-confirm-overlay{position:fixed;inset:0;background:rgba(17,24,39,.45);display:flex;align-items:center;justify-content:center;z-index:1100;opacity:0;pointer-events:none;transition:opacity .2s ease}
+    .apply-confirm-overlay.show{opacity:1;pointer-events:auto}
+    .apply-confirm-dialog{background:#fff;border-radius:16px;padding:22px;max-width:420px;width:92%;box-shadow:0 20px 45px rgba(0,0,0,.22);display:grid;gap:12px;text-align:center}
+    .apply-confirm-dialog header{display:flex;align-items:center;justify-content:center;gap:12px}
+    .apply-confirm-dialog h3{margin:0;font-weight:600;font-size:1.2rem}
+    .apply-confirm-dialog .close-btn{border:none;background:none;font-size:1.5rem;line-height:1;cursor:pointer}
+    .apply-confirm-message{margin:0;color:#6b7280;font-size:.95rem}
+    .apply-confirm-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+    .apply-confirm-link{background:#111827;color:#fff;border-radius:999px;padding:0.55rem 1.2rem;text-decoration:none;font-weight:250;font-size:.95rem}
+    .apply-confirm-close{border:1px solid #d1d5db;background:#fff;border-radius:999px;padding:0.55rem 1.2rem;font-weight:250;font-size:.95rem;cursor:pointer}
   `;
   document.head.appendChild(style);
   stylesInjected = true;
@@ -801,7 +841,59 @@ function bindApplicantDocLinks(root) {
   });
 }
 
-function bindApplicationForm(root, caseId) {
+function openApplyConfirmModal(caseTitle = "") {
+  ensureApplyConfirmModal();
+  if (applyConfirmTitle) applyConfirmTitle.textContent = "Applied";
+  if (applyConfirmMessage) {
+    const title = String(caseTitle || "").trim();
+    applyConfirmMessage.textContent = title
+      ? `Your application to ${title} has been submitted.`
+      : "Your application has been submitted.";
+  }
+  if (applyConfirmModal) {
+    applyConfirmModal.classList.add("show");
+    const focusTarget = applyConfirmModal.querySelector("[data-apply-confirm-close]");
+    focusTarget?.focus();
+  }
+}
+
+function closeApplyConfirmModal() {
+  if (applyConfirmModal) applyConfirmModal.classList.remove("show");
+}
+
+function ensureApplyConfirmModal() {
+  if (applyConfirmModal) return;
+  applyConfirmModal = document.createElement("div");
+  applyConfirmModal.className = "apply-confirm-overlay";
+  applyConfirmModal.innerHTML = `
+    <div class="apply-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="applyConfirmTitle">
+      <header>
+        <h3 id="applyConfirmTitle" data-apply-confirm-title>Applied</h3>
+      </header>
+      <p class="apply-confirm-message" data-apply-confirm-message>Your application has been submitted.</p>
+      <div class="apply-confirm-actions">
+        <a class="apply-confirm-link" href="dashboard-paralegal.html#cases">View my applications</a>
+        <button type="button" class="apply-confirm-close" data-apply-confirm-close>Close</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(applyConfirmModal);
+  applyConfirmTitle = applyConfirmModal.querySelector("[data-apply-confirm-title]");
+  applyConfirmMessage = applyConfirmModal.querySelector("[data-apply-confirm-message]");
+  applyConfirmModal.querySelectorAll("[data-apply-confirm-close]").forEach((btn) => {
+    btn.addEventListener("click", closeApplyConfirmModal);
+  });
+  applyConfirmModal.addEventListener("click", (event) => {
+    if (event.target === applyConfirmModal) closeApplyConfirmModal();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && applyConfirmModal?.classList.contains("show")) {
+      closeApplyConfirmModal();
+    }
+  });
+}
+
+function bindApplicationForm(root, caseId, caseTitle = "") {
   const form = root.querySelector("[data-case-apply-form]");
   if (!form) return;
   const textarea = form.querySelector("[data-apply-note]");
@@ -844,10 +936,14 @@ function bindApplicationForm(root, caseId) {
         body: { note },
         noRedirect: true,
       });
-      if (statusNode) statusNode.textContent = "Application submitted!";
+      if (statusNode) statusNode.textContent = "";
       if (textarea) textarea.value = "";
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Applied";
+      }
       restoreButton = false;
-      setTimeout(() => window.location.reload(), 800);
+      openApplyConfirmModal(caseTitle);
     } catch (err) {
       if (statusNode) statusNode.textContent = err?.message || "Unable to apply right now.";
       if (err?.status === 403 && /stripe/i.test(err?.message || "")) {
@@ -892,7 +988,7 @@ async function inviteParalegal(caseId, paralegalId, button) {
       button.classList.add("success");
       button.removeAttribute("data-btn-text");
     }
-    notify("Invitation sent to paralegal.", "success");
+    notify("Invitation sent. Escrow amount locked for this case.", "success");
   } catch (err) {
     if (button) {
       button.removeAttribute("disabled");
@@ -1299,10 +1395,10 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   overlay.innerHTML = `
     <div class="case-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
       <div class="case-modal-title" id="hireConfirmTitle">Confirm Hire</div>
-      <p>You’re about to hire '${safeName}'. This will fund escrow immediately.</p>
+      <p>You’re about to hire ${safeName}. This will fund escrow immediately.</p>
       <div style="border:1px solid rgba(15,23,42,.08);border-radius:12px;padding:12px 14px;display:grid;gap:8px;">
         <div style="display:flex;justify-content:space-between;gap:16px;">
-          <span>Locked case amount</span>
+          <span>Case amount</span>
           <strong>${formatCurrency(Number(amountCents || 0) / 100)}</strong>
         </div>
         <div style="display:flex;justify-content:space-between;gap:16px;">

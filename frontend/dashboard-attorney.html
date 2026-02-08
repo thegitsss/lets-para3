@@ -16,6 +16,7 @@
   </script>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
   <link rel="preload" as="image" href="hero-mountain.jpg" />
   <script>
     document.documentElement.classList.add("js");
@@ -247,51 +248,6 @@
       animation: skeletonShimmer 1.4s ease infinite;
     }
 
-    .notification-icon {
-      position: relative;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      transition: border-color 0.2s ease, background 0.2s ease;
-      background: var(--panel);
-    }
-
-    .notification-icon:hover {
-      border-color: var(--accent);
-      background: rgba(0, 0, 0, 0.02);
-    }
-
-    .notification-icon svg {
-      width: 20px;
-      height: 20px;
-      color: var(--ink);
-    }
-    body.theme-dark .notification-icon svg{color:#f8fbff;}
-
-    .lpc-shared-header .notification-badge,
-    .lpc-shared-header .notification-badge.show {
-      display: none !important;
-    }
-
-    [data-notification-toggle][data-count]:after {
-      content: attr(data-count);
-      position: absolute;
-      top: -4px;
-      right: -4px;
-      background: var(--accent);
-      color: #fff;
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      font-size: 0.7rem;
-      padding: 2px 6px;
-      border-radius: 999px;
-    }
-
     .sidebar::before {
       content: "";
       position: absolute;
@@ -391,9 +347,7 @@
     body.theme-dark .case-card,
     body.theme-dark .dashboard-card,
     body.theme-dark .history-card,
-    body.theme-dark table,
-    body.theme-dark .notif-panel,
-    body.theme-dark .notification-icon {
+    body.theme-dark table {
       background: rgba(18, 23, 36, 0.92);
       border-color: rgba(255, 255, 255, 0.08);
       color: var(--ink);
@@ -403,121 +357,6 @@
     body.theme-dark .info-line,
     body.theme-dark .muted {
       color: var(--muted);
-    }
-
-    .notif-panel {
-      position: absolute;
-      top: 56px;
-      right: 0;
-      width: 340px;
-      background: var(--panel);
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      border-radius: 12px;
-      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
-      padding: 0;
-      display: none;
-      flex-direction: column;
-      z-index: 5000;
-    }
-
-    .notif-panel.show {
-      display: flex;
-    }
-
-    .notif-panel.hidden {
-      display: none;
-    }
-
-    .notif-header {
-      font-family: var(--font-serif);
-      font-weight: 300;
-      font-size: 1.2rem;
-      padding: 14px 18px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-      background: var(--panel);
-    }
-
-    body.theme-dark .notif-panel,
-    body.theme-dark .notification-panel {
-      background: rgba(18, 23, 36, 0.96);
-      border-color: rgba(255, 255, 255, 0.08);
-    }
-    body.theme-dark .notif-header,
-    body.theme-dark .notification-panel .notif-header {
-      background: transparent;
-      border-color: rgba(255, 255, 255, 0.08);
-      color: #f8fbff;
-    }
-    body.theme-dark .notif-empty,
-    body.theme-dark .notification-panel p,
-    body.theme-dark .notification-panel button,
-    body.theme-dark .notification-panel li,
-    body.theme-dark .notif-scroll {
-      color: #f8fbff;
-    }
-
-    .notif-scroll {
-      max-height: 360px;
-      overflow-y: auto;
-    }
-
-    .notif-item {
-      padding: 14px 18px;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-      cursor: pointer;
-      transition: background 0.15s ease;
-    }
-
-    .notif-item:last-child {
-      border-bottom: none;
-    }
-
-    .notif-item.unread {
-      border-left: 3px solid var(--accent);
-    }
-
-    .notif-item.read {
-      opacity: 0.75;
-    }
-
-    .notif-title {
-      font-family: var(--font-serif);
-      font-weight: 300;
-      font-size: 1.1rem;
-      margin-bottom: 2px;
-      color: var(--ink);
-    }
-
-    .notif-body {
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      font-size: 0.92rem;
-      color: #4b4b4b;
-      line-height: 1.45;
-    }
-
-    .notif-time {
-      margin-top: 4px;
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      font-size: 0.8rem;
-      color: #888;
-    }
-
-    .notif-markall {
-      border: none;
-      border-top: 1px solid rgba(0, 0, 0, 0.08);
-      background: #fafafa;
-      padding: 12px;
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 200;
-      font-size: 0.9rem;
-      cursor: pointer;
-      text-align: left;
-    }
-
-    .notif-markall:hover {
-      background: #f0f0f0;
     }
 
     .user-profile {
@@ -1013,6 +852,11 @@
       gap: 0.5rem;
       background: transparent;
       min-height: 120px;
+      cursor: pointer;
+    }
+    .weekly-note-day:focus {
+      outline: 2px solid rgba(182, 164, 122, 0.35);
+      outline-offset: 2px;
     }
     .weekly-note-header {
       display: flex;
@@ -1039,8 +883,24 @@
       color: var(--ink);
       outline: none;
     }
+    .weekly-note-body {
+      flex: 1;
+      font-family: inherit;
+      font-size: 0.8rem;
+      color: var(--ink);
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      white-space: pre-wrap;
+    }
     .weekly-note-input::placeholder {
       color: var(--muted);
+    }
+    .weekly-note-modal-date {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: -0.35rem;
     }
     .weekly-note-day.is-today {
       border-color: rgba(182, 164, 122, 0.45);
@@ -1290,6 +1150,18 @@
       background: #000;
     }
 
+    body.theme-dark .btn-group button.secondary,
+    body.theme-mountain-dark .btn-group button.secondary {
+      background: transparent;
+      color: #f8fbff;
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    body.theme-dark .btn-group button.secondary:hover,
+    body.theme-mountain-dark .btn-group button.secondary:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
     .btn-group button:not(.secondary) {
       background: var(--accent);
       border-color: var(--accent);
@@ -1454,70 +1326,6 @@
       transform: translate(-50%, 0);
     }
 
-
-    .notification-panel {
-      position: absolute;
-      top: 40px;
-      right: 0;
-      width: 280px;
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      box-shadow: 0 15px 35px rgba(15, 23, 42, 0.18);
-      padding: 1rem;
-      display: none;
-      flex-direction: column;
-      gap: 0.75rem;
-      z-index: 5000;
-    }
-
-
-    .notification-panel.show {
-      display: flex;
-    }
-
-
-    .notification-panel h4 {
-      margin: 0;
-      font-family: var(--font-serif);
-      font-size: 1.1rem;
-      font-weight: 600;
-    }
-
-
-    .notification-panel p {
-      margin: 0;
-      font-size: 0.9rem;
-      color: var(--muted);
-    }
-
-
-    .notification-item {
-      padding: 0.5rem 0;
-      border-bottom: 1px solid var(--line);
-      font-size: 0.9rem;
-      line-height: 1.4;
-      color: var(--ink);
-    }
-
-    body.theme-dark .notification-panel{
-      background: rgba(18,23,36,0.96);
-      border-color: rgba(255,255,255,0.08);
-    }
-    body.theme-dark .notification-panel h4,
-    body.theme-dark .notification-panel p,
-    body.theme-dark .notification-panel button,
-    body.theme-dark .notification-item{
-      color:#f8fbff;
-    }
-    body.theme-dark .notification-item{
-      border-color:rgba(255,255,255,0.08);
-    }
-
-
-    .notification-item:last-child {
-      border-bottom: none;
-    }
 
     .settings-card {
       margin: 2rem 0;
@@ -3649,13 +3457,11 @@
       box-shadow: var(--shadow-md);
     }
 
-    body:not(.theme-dark) .notification-icon,
     body:not(.theme-dark) .user-chip {
       border-color: rgba(15, 23, 42, 0.12);
       box-shadow: var(--shadow-sm);
     }
 
-    body.theme-dark .notification-icon,
     body.theme-dark .user-chip {
       box-shadow: var(--shadow-sm);
     }
@@ -4028,7 +3834,7 @@
     </nav>
     <div class="sidebar-bottom">
       <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-      <div class="sidebar-footer">© Let’s‑ParaConnect 2025</div>
+      <div class="sidebar-footer">© Let’s‑ParaConnect 2026</div>
     </div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
@@ -4050,7 +3856,7 @@
           <p id="activeCasesHeading" data-static="true">Your matters at a glance</p>
         </div>
         <div class="command-actions btn-group" role="group" aria-label="Quick actions">
-          <button type="button" data-quick-link="create-case">+ New Request</button>
+          <button type="button" data-quick-link="create-case">+ New Case</button>
           <button type="button" class="secondary" data-quick-link="browse-paralegals">Browse Paralegals</button>
         </div>
       </header>
@@ -4288,6 +4094,17 @@
           </div>
         </div>
       </div>
+      <div id="weeklyNoteModal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="weeklyNoteModalTitle">
+        <div class="note-modal-card">
+          <h3 id="weeklyNoteModalTitle" style="font-family:var(--font-serif);font-weight:300;">Weekly Note</h3>
+          <div class="weekly-note-modal-date" id="weeklyNoteModalDate"></div>
+          <textarea id="weeklyNoteModalTextarea" placeholder="Add a note for this day."></textarea>
+          <div class="note-modal-actions">
+            <button type="button" class="btn secondary" data-weekly-note-cancel>Cancel</button>
+            <button type="button" class="btn primary" data-weekly-note-save>Save Note</button>
+          </div>
+        </div>
+      </div>
       <div id="casePreviewModal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="casePreviewTitle">
         <div class="note-modal-card case-preview-card">
           <header class="case-preview-header">
@@ -4501,6 +4318,60 @@
   </script>
   <script>
     window.__ATTORNEY_PAGE__ = "overview";
+  </script>
+  <script>
+    (function enhanceNotificationScrollExperience() {
+      const ATTACHED_KEY = "notifScrollEnhanced";
+      const ITEM_BOUND_KEY = "notifFadeBound";
+
+      const initList = (list) => {
+        if (!list || list.dataset[ATTACHED_KEY] === "true") return;
+        list.dataset[ATTACHED_KEY] = "true";
+
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              const item = entry.target;
+              if (!(item instanceof HTMLElement)) return;
+              if (entry.isIntersecting) {
+                item.classList.add("notif-fade-in");
+                observer.unobserve(item);
+              }
+            });
+          },
+          { root: list, threshold: 0.2, rootMargin: "0px 0px -4% 0px" }
+        );
+
+        const bindItems = () => {
+          const items = list.querySelectorAll(".notif-item, .notif-card");
+          items.forEach((item) => {
+            if (!(item instanceof HTMLElement)) return;
+            if (item.dataset[ITEM_BOUND_KEY] === "true") return;
+            item.dataset[ITEM_BOUND_KEY] = "true";
+            item.classList.add("notif-fade-ready");
+            observer.observe(item);
+          });
+        };
+
+        const itemObserver = new MutationObserver(() => bindItems());
+        itemObserver.observe(list, { childList: true, subtree: true });
+        bindItems();
+      };
+
+      const scan = () => {
+        document
+          .querySelectorAll(".topbar .lpc-shared-header [data-notification-list]")
+          .forEach((list) => initList(list));
+      };
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", scan, { once: true });
+      } else {
+        scan();
+      }
+      const rootObserver = new MutationObserver(() => scan());
+      rootObserver.observe(document.body, { childList: true, subtree: true });
+    })();
   </script>
 <script src="assets/libs/cropper/cropper.main.js"></script>
 <script src="https://js.stripe.com/v3/"></script>

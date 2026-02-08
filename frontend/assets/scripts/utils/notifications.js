@@ -2,195 +2,109 @@
 import { secureFetch } from "../auth.js";
 
 const NOTIFICATION_STYLE_ID = "lpc-notification-styles";
+const MAX_VISIBLE_NOTIFICATION_CARDS = 3;
+const COMPLETED_CASE_CACHE_TTL = 60 * 1000;
+const NOTIF_FADE_ENHANCE_KEY = "notifFadeEnhanced";
+const NOTIF_FADE_ITEM_KEY = "notifFadeItemBound";
 let lastKnownUnread = 0;
+let viewportResizeBound = false;
+let completedCaseCache = { role: "", ids: new Set(), ts: 0 };
 
 function ensureNotificationStyles() {
-  if (typeof document === "undefined") return;
-  if (document.getElementById(NOTIFICATION_STYLE_ID)) return;
-  const style = document.createElement("style");
-  style.id = NOTIFICATION_STYLE_ID;
-  style.textContent = `
-    .notification-wrapper{position:relative;}
-    .notification-dropdown{position:absolute;top:calc(100% + 8px);right:0;z-index:100000;}
-    [data-notification-list]{
-      --notif-gap: 12px;
-      max-height:none;
-      overflow:visible;
-    }
-    .notif-item{display:flex;align-items:flex-start;gap:6px;}
-    .notif-main{display:flex;align-items:flex-start;gap:6px;flex:1;}
-    .notif-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#f2f4f8;flex-shrink:0;}
-    .notif-copy{display:flex;flex-direction:column;gap:4px;flex:1;}
-    .notif-copy,
-    .notif-title,
-    .notif-time,
-    .notif-body{
-      font-family:'Sarabun',sans-serif !important;
-    }
-    .notif-title,
-    .notif-time,
-    .notif-body{
-      font-size:14px !important;
-      line-height:1.4;
-      font-weight:200 !important;
-    }
-    .notif-copy,
-    .notif-title,
-    .notif-body{
-      text-align:left !important;
-    }
-    .notif-dot{width:6px;height:6px;border-radius:50%;background:var(--accent,#b6a47a);margin-top:6px;opacity:0;flex-shrink:0;}
-    .notif-item.unread .notif-dot{opacity:0.9;}
-    .notif-dismiss{background:transparent;border:none;color:var(--muted,#7a7a7a);font-size:0.9rem;cursor:pointer;padding:6px;border-radius:8px;align-self:flex-start;flex-shrink:0;}
-    .notif-dismiss:hover{background:rgba(0,0,0,0.06);color:var(--ink,#1a1a1a);}
-    .notif-time{color:var(--muted,#6b7280);}
-    .notif-header{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-    .notif-header-title{flex:1;}
-    .notif-actions{display:flex;gap:8px;justify-content:flex-end;padding:10px 12px;border-top:1px solid rgba(0,0,0,0.08);background:transparent;}
-    .notif-actions.notif-actions-header{padding:0;border-top:none;background:transparent;margin-left:auto;}
-    .notif-actions .notif-markall{border:1px solid rgba(0,0,0,0.2);background:transparent;color:var(--ink,#1a1a1a);padding:4px 8px;text-align:center;font-size:0.78rem;font-weight:400;border-radius:4px;cursor:pointer;box-shadow:none;}
-    .notif-actions .notif-markall:hover{background:transparent;box-shadow:none;color:var(--ink,#1a1a1a);}
-    .notif-actions .notif-clear{border-color:rgba(0,0,0,0.2);color:var(--ink,#1a1a1a);}
-    .notif-actions .notif-clear:hover{background:transparent;box-shadow:none;color:var(--ink,#1a1a1a);}
-    .notif-actions .notif-markall:disabled{opacity:0.5;cursor:default;}
-    /* Global glass-style notifications (transparent container, floating cards) */
-    [data-notification-panel],
-    .notifications-panel,
-    .notif-panel,
-    .notification-dropdown{
-      background:transparent !important;
-      border:none !important;
-      box-shadow:none !important;
-      outline:none !important;
-      filter:none !important;
-      padding:0 !important;
-    }
-    [data-notification-panel]::before,
-    [data-notification-panel]::after,
-    .notifications-panel::before,
-    .notifications-panel::after,
-    .notif-panel::before,
-    .notif-panel::after,
-    .notification-dropdown::before,
-    .notification-dropdown::after{
-      content:none !important;
-      box-shadow:none !important;
-      border:none !important;
-      background:transparent !important;
-    }
-    [data-notification-panel] [data-notification-list],
-    .notifications-panel [data-notification-list],
-    [data-notification-panel] .notif-scroll,
-    .notifications-panel .notif-scroll{
-      max-height:none;
-      overflow:visible;
-      display:flex;
-      flex-direction:column;
-      gap:var(--notif-gap);
-      padding:2px;
-    }
-    [data-notification-panel] .notif-item,
-    .notifications-panel .notif-item,
-    .notif-panel .notif-item,
-    .notification-dropdown .notif-item,
-    [data-notification-panel] .notif-card,
-    .notifications-panel .notif-card,
-    .notif-panel .notif-card,
-    .notification-dropdown .notif-card{
-      border:1px solid rgba(255,255,255,0.48) !important;
-      background:rgba(255,255,255,0.16) !important;
-      border-radius:12px;
-      padding:8px 9px !important;
-      box-shadow:0 10px 24px rgba(8,10,16,0.12), inset 0 1px 0 rgba(255,255,255,0.55);
-      backdrop-filter:blur(52px) saturate(180%);
-      -webkit-backdrop-filter:blur(52px) saturate(180%);
-      transition:transform .22s ease, box-shadow .22s ease, opacity .22s ease;
-      border-bottom:none !important;
-    }
-    [data-notification-panel] .notif-title,
-    .notifications-panel .notif-title,
-    .notif-panel .notif-title,
-    .notification-dropdown .notif-title{
-      font-size:14px !important;
-      line-height:1.35;
-      font-weight:200 !important;
-      color:var(--ink,#1a1a1a);
-      display:block;
-      white-space:normal;
-      overflow:visible;
-      text-align:left !important;
-    }
-    [data-notification-panel] .notif-main,
-    .notifications-panel .notif-main{
-      gap:6px;
-    }
-    [data-notification-panel] .notif-time,
-    .notifications-panel .notif-time,
-    .notif-panel .notif-time,
-    .notification-dropdown .notif-time{
-      font-size:14px !important;
-      opacity:0.95;
-      text-align:left !important;
-    }
-    [data-notification-panel] .notif-item:hover,
-    .notifications-panel .notif-item:hover,
-    [data-notification-panel] .notif-card:hover,
-    .notifications-panel .notif-card:hover{
-      transform:translateY(-1px);
-      box-shadow:0 14px 30px rgba(8,10,16,0.16), inset 0 1px 0 rgba(255,255,255,0.58);
-    }
-    [data-notification-panel] .notif-item.unread,
-    .notifications-panel .notif-item.unread{
-      border-left:none !important;
-    }
-    body.theme-dark [data-notification-panel] .notif-item,
-    body.theme-dark .notifications-panel .notif-item,
-    body.theme-dark .notif-panel .notif-item,
-    body.theme-dark .notification-dropdown .notif-item,
-    body.theme-mountain-dark [data-notification-panel] .notif-item,
-    body.theme-mountain-dark .notifications-panel .notif-item,
-    body.theme-mountain-dark .notif-panel .notif-item,
-    body.theme-mountain-dark .notification-dropdown .notif-item,
-    body.theme-dark [data-notification-panel] .notif-card,
-    body.theme-dark .notifications-panel .notif-card,
-    body.theme-dark .notif-panel .notif-card,
-    body.theme-dark .notification-dropdown .notif-card,
-    body.theme-mountain-dark [data-notification-panel] .notif-card,
-    body.theme-mountain-dark .notifications-panel .notif-card,
-    body.theme-mountain-dark .notif-panel .notif-card,
-    body.theme-mountain-dark .notification-dropdown .notif-card{
-      background:rgba(18,24,36,0.2) !important;
-      border-color:rgba(255,255,255,0.24) !important;
-      box-shadow:0 12px 30px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16);
-      backdrop-filter:blur(52px) saturate(180%);
-      -webkit-backdrop-filter:blur(52px) saturate(180%);
-    }
-    body.theme-dark [data-notification-panel] .notif-time,
-    body.theme-dark .notifications-panel .notif-time,
-    body.theme-mountain-dark [data-notification-panel] .notif-time,
-    body.theme-mountain-dark .notifications-panel .notif-time,
-    body.theme-dark [data-notification-panel] [data-notification-empty],
-    body.theme-dark .notifications-panel [data-notification-empty],
-    body.theme-mountain-dark [data-notification-panel] [data-notification-empty],
-    body.theme-mountain-dark .notifications-panel [data-notification-empty]{
-      color:#c4cde3;
-    }
-    @media (max-width: 600px){
-      .notification-dropdown,
-      [data-notification-panel],
-      .notifications-panel{
-        position:fixed !important;
-        left:12px !important;
-        right:12px !important;
-        top:64px !important;
-        width:auto !important;
-        max-width:calc(100vw - 24px) !important;
-      }
-      [data-notification-list]{max-height:none;overflow:visible;}
-      .notif-actions.notif-actions-header{flex-wrap:wrap;justify-content:flex-end;gap:6px;}
-    }
-  `;
-  document.head.appendChild(style);
+  return;
+}
+
+function syncNotificationListViewport(listEl) {
+  if (!listEl || typeof window === "undefined") return;
+  const cards = listEl.querySelectorAll(".notif-item, .notif-card");
+  if (!cards.length) {
+    listEl.style.removeProperty("--notif-three-card-max-height");
+    delete listEl.dataset.notifThreeCardHeight;
+    return;
+  }
+  const targetIndex = Math.min(MAX_VISIBLE_NOTIFICATION_CARDS, cards.length) - 1;
+  const targetCard = cards[targetIndex];
+  if (!targetCard) {
+    listEl.style.removeProperty("--notif-three-card-max-height");
+    return;
+  }
+  const listStyles = window.getComputedStyle(listEl);
+  const gap = parseFloat(listStyles.rowGap || listStyles.gap || "0") || 0;
+  const paddingTop = parseFloat(listStyles.paddingTop || "0") || 0;
+  const paddingBottom = parseFloat(listStyles.paddingBottom || "0") || 0;
+  let measuredHeight = paddingTop + paddingBottom;
+  const visibleCards = Math.min(MAX_VISIBLE_NOTIFICATION_CARDS, cards.length);
+  for (let index = 0; index < visibleCards; index += 1) {
+    measuredHeight += cards[index].offsetHeight;
+  }
+  if (visibleCards > 1) measuredHeight += gap * (visibleCards - 1);
+  measuredHeight = Math.round(measuredHeight);
+  if (measuredHeight > 0) {
+    const px = `${measuredHeight}px`;
+    listEl.style.setProperty("--notif-three-card-max-height", px);
+    listEl.dataset.notifThreeCardHeight = px;
+    return;
+  }
+  if (listEl.dataset.notifThreeCardHeight) {
+    listEl.style.setProperty("--notif-three-card-max-height", listEl.dataset.notifThreeCardHeight);
+    return;
+  }
+  listEl.style.removeProperty("--notif-three-card-max-height");
+}
+
+function scheduleNotificationListViewportSync(listEl) {
+  if (!listEl || typeof window === "undefined") return;
+  window.requestAnimationFrame(() => syncNotificationListViewport(listEl));
+}
+
+function syncAllNotificationListViewports() {
+  document.querySelectorAll("[data-notification-list]").forEach((listEl) => {
+    syncNotificationListViewport(listEl);
+  });
+}
+
+function bindNotificationViewportResize() {
+  if (viewportResizeBound || typeof window === "undefined") return;
+  viewportResizeBound = true;
+  window.addEventListener("resize", () => {
+    window.requestAnimationFrame(syncAllNotificationListViewports);
+  });
+}
+
+function enhanceNotificationListFade(list) {
+  if (!list || typeof window === "undefined") return;
+  if (list.dataset[NOTIF_FADE_ENHANCE_KEY] === "true") return;
+  if (list.dataset.sharedNotifEnhanced === "true") return;
+  if (!("IntersectionObserver" in window)) return;
+  list.dataset[NOTIF_FADE_ENHANCE_KEY] = "true";
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        const item = entry.target;
+        if (!(item instanceof HTMLElement)) return;
+        if (!entry.isIntersecting) return;
+        item.classList.add("notif-fade-in");
+        observer.unobserve(item);
+      });
+    },
+    { root: list, threshold: 0.2, rootMargin: "0px 0px -4% 0px" }
+  );
+
+  const bindItems = () => {
+    const items = list.querySelectorAll(".notif-item");
+    items.forEach((item) => {
+      if (!(item instanceof HTMLElement)) return;
+      if (item.dataset[NOTIF_FADE_ITEM_KEY] === "true") return;
+      item.dataset[NOTIF_FADE_ITEM_KEY] = "true";
+      item.classList.add("notif-fade-ready");
+      observer.observe(item);
+    });
+  };
+
+  const itemObserver = new MutationObserver(() => bindItems());
+  itemObserver.observe(list, { childList: true, subtree: true });
+  bindItems();
 }
 
 function normalizeNotification(item = {}) {
@@ -269,6 +183,7 @@ function formatNotificationMessage(item = {}) {
 }
 
 export async function loadNotifications() {
+  bindNotificationViewportResize();
   try {
     const res = await fetch("/api/notifications", { credentials: "include" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -280,6 +195,7 @@ export async function loadNotifications() {
       const emptyEl = listEl.parentElement?.querySelector("[data-notification-empty]") || null;
       renderNotificationList(listEl, emptyEl, items);
     });
+    syncAllNotificationListViewports();
 
     const unreadCount = getUnreadCount(items);
     lastKnownUnread = unreadCount;
@@ -420,6 +336,7 @@ function totalUnread() {
 ensureNotificationStyles();
 
 export function scanNotificationCenters() {
+  bindNotificationViewportResize();
   document.querySelectorAll("[data-notification-center]").forEach((root) => {
     if (root.dataset.boundNotificationCenter === "true") return;
     const center = createCenter(root);
@@ -520,6 +437,8 @@ function createCenter(root) {
     loaded: false,
   };
 
+  enhanceNotificationListFade(list);
+
   if (!root.dataset.boundNotificationCenter) {
     root.dataset.boundNotificationCenter = "true";
     toggle.addEventListener("click", () => togglePanel(state));
@@ -543,6 +462,7 @@ function togglePanel(center) {
   center.panel.classList.toggle("show", willShow);
   center.panel.classList.toggle("hidden", !willShow);
   if (willShow) {
+    scheduleNotificationListViewportSync(center.list);
     if (!center.loaded) {
       fetchNotifications(center, { markReadOnLoad: true });
     } else {
@@ -575,7 +495,9 @@ async function fetchNotifications(center, options = {}) {
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json();
-    center.notifications = Array.isArray(payload) ? payload.map(normalizeNotification) : [];
+    const items = Array.isArray(payload) ? payload : [];
+    const filtered = await filterCompletedCaseNotifications(items);
+    center.notifications = Array.isArray(filtered) ? filtered.map(normalizeNotification) : [];
     center.unread = getUnreadCount(center.notifications);
     center.loaded = true;
     renderNotifications(center);
@@ -612,6 +534,7 @@ function renderNotifications(center) {
     const node = buildNotificationNode(item, center);
     center.list.appendChild(node);
   });
+  scheduleNotificationListViewportSync(center.list);
   const total = totalUnread();
   lastKnownUnread = total;
   syncNotificationBadges(total);
@@ -625,7 +548,10 @@ function renderEmpty(center, text) {
     center.empty.style.display = "block";
     center.empty.textContent = text;
   }
-  if (center.list) center.list.innerHTML = "";
+  if (center.list) {
+    center.list.innerHTML = "";
+    center.list.style.removeProperty("--notif-three-card-max-height");
+  }
   updateBadge(center, getUnreadCount(center?.notifications || []));
   syncNotificationBadges(totalUnread());
 }
@@ -775,6 +701,10 @@ function bindMinimalToggleHandler() {
     });
     panel.classList.toggle("show", willShow);
     panel.classList.toggle("hidden", !willShow);
+    if (willShow) {
+      const list = panel.querySelector("[data-notification-list]");
+      scheduleNotificationListViewportSync(list);
+    }
   });
 }
 
@@ -799,6 +729,74 @@ function extractId(value) {
     return value._id || value.id || value.caseId || value.jobId || "";
   }
   return value;
+}
+
+function getNotificationCaseId(item = {}) {
+  const payload = item.payload || {};
+  return extractId(
+    item.caseId ||
+      payload.caseId ||
+      payload.caseID ||
+      payload.case ||
+      payload.case_id ||
+      payload.caseRef ||
+      payload.caseDoc
+  );
+}
+
+async function getCompletedCaseIds(role = "") {
+  const roleKey = String(role || "").toLowerCase();
+  const now = Date.now();
+  if (roleKey === completedCaseCache.role && now - completedCaseCache.ts < COMPLETED_CASE_CACHE_TTL) {
+    return completedCaseCache.ids;
+  }
+  try {
+    let ids = new Set();
+    if (roleKey === "paralegal") {
+      const res = await secureFetch("/api/cases/my-completed?limit=500");
+      const payload = await res.json().catch(() => ({}));
+      const items = Array.isArray(payload?.items)
+        ? payload.items
+        : Array.isArray(payload)
+        ? payload
+        : [];
+      ids = new Set(
+        items
+          .map((item) => String(item?.caseId || item?._id || item?.id || ""))
+          .filter(Boolean)
+      );
+    } else {
+      const res = await secureFetch("/api/cases/my?archived=true&limit=200");
+      const payload = await res.json().catch(() => []);
+      const items = Array.isArray(payload) ? payload : [];
+      ids = new Set(
+        items
+          .filter((item) => {
+            const status = String(item?.status || "").toLowerCase();
+            return status === "completed" || item?.paymentReleased === true;
+          })
+          .map((item) => String(item?._id || item?.id || ""))
+          .filter(Boolean)
+      );
+    }
+    completedCaseCache = { role: roleKey, ids, ts: now };
+    return ids;
+  } catch {
+    return new Set();
+  }
+}
+
+async function filterCompletedCaseNotifications(items = []) {
+  if (!Array.isArray(items) || !items.length) return items;
+  const role = String(items.find((item) => item?.userRole)?.userRole || "").toLowerCase();
+  if (role !== "attorney" && role !== "paralegal") return items;
+  const completedIds = await getCompletedCaseIds(role);
+  if (!completedIds.size) return items;
+  return items.filter((item) => {
+    const caseId = getNotificationCaseId(item);
+    if (!caseId) return true;
+    return !completedIds.has(String(caseId));
+  });
 }
 
 function extractApplicantId(item = {}) {
@@ -836,6 +834,7 @@ function resolveNotificationLink(item = {}) {
   const payload = item.payload || {};
   const type = String(item.type || "").toLowerCase();
   const role = String(item.userRole || "").toLowerCase();
+  if (type === "payout_released" && role === "paralegal") return "";
   const caseId = extractId(
     item.caseId ||
       payload.caseId ||
@@ -1091,6 +1090,7 @@ function renderNotificationList(listEl, emptyEl, items = []) {
       emptyEl.style.display = "block";
       emptyEl.textContent = "You're all caught up.";
     }
+    listEl.style.removeProperty("--notif-three-card-max-height");
     return;
   }
   if (emptyEl) emptyEl.style.display = "none";
@@ -1105,10 +1105,12 @@ function renderNotificationList(listEl, emptyEl, items = []) {
             emptyEl.style.display = "block";
             emptyEl.textContent = "You're all caught up.";
           }
+          scheduleNotificationListViewportSync(listEl);
         },
       })
     )
   );
+  scheduleNotificationListViewportSync(listEl);
 }
 
 function syncNotificationBadges(unreadCount) {

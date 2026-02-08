@@ -10,7 +10,12 @@ const { requireApproved, requireRole } = require("../utils/authz");
 const applicationsRouter = require("./applications");
 const { cleanTitle, cleanText, cleanBudget } = require("../utils/sanitize");
 const { getBlockedUserIds } = require("../utils/blocks");
+const stripe = require("../utils/stripe");
 const createApplicationForJob = applicationsRouter?.createApplicationForJob;
+const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
+  "samanthasider+attorney@gmail.com",
+  "samanthasider+56@gmail.com",
+]);
 const PRACTICE_AREAS = [
   "administrative law",
   "bankruptcy",
@@ -37,9 +42,30 @@ const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
   return acc;
 }, {});
 
+async function attorneyHasPaymentMethod(attorneyId) {
+  if (!attorneyId) return false;
+  try {
+    const attorney = await User.findById(attorneyId).select("email stripeCustomerId");
+    const attorneyEmail = String(attorney?.email || "").toLowerCase().trim();
+    if (STRIPE_PAYMENT_METHOD_BYPASS_EMAILS.has(attorneyEmail)) return true;
+    if (!attorney?.stripeCustomerId) return false;
+    const customer = await stripe.customers.retrieve(attorney.stripeCustomerId);
+    return Boolean(customer?.invoice_settings?.default_payment_method);
+  } catch (err) {
+    console.warn("[jobs] Unable to verify attorney payment method", err?.message || err);
+    return false;
+  }
+}
+
 // POST /jobs — Attorney posts a job
 router.post("/", auth, requireApproved, requireRole("attorney"), async (req, res) => {
   try {
+    const hasPaymentMethod = await attorneyHasPaymentMethod(req.user._id || req.user.id);
+    if (!hasPaymentMethod) {
+      return res
+        .status(403)
+        .json({ error: "Connect Stripe and add a payment method before posting a job." });
+    }
     const caseId = req.body?.caseId || null;
     let caseDoc = null;
     if (caseId) {

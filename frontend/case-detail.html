@@ -3,6 +3,7 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -55,6 +56,8 @@
       --radius: 14px;
     }
 
+    html.theme-dark,
+    html.theme-dark body,
     body.theme-dark {
       --bg: #0f172a;
       --sidebar-bg: #1c2333;
@@ -65,6 +68,8 @@
       --sidebar-text: #f8fbff;
     }
 
+    html.theme-mountain,
+    html.theme-mountain body,
     body.theme-mountain {
       --bg: #f8f6f1;
       --panel: #ffffff;
@@ -153,18 +158,24 @@
     }
 
     body.theme-mountain .sidebar,
-    body.theme-mountain-dark .sidebar {
+    html.theme-mountain .sidebar,
+    body.theme-mountain-dark .sidebar,
+    html.theme-mountain-dark .sidebar {
       background: url("hero-mountain.jpg") center/cover no-repeat;
       color: #ffffff;
     }
 
     body.theme-mountain .sidebar::before,
-    body.theme-mountain-dark .sidebar::before {
+    html.theme-mountain .sidebar::before,
+    body.theme-mountain-dark .sidebar::before,
+    html.theme-mountain-dark .sidebar::before {
       background: rgba(0, 0, 0, 0.45);
     }
 
     body.theme-mountain .sidebar > *,
-    body.theme-mountain-dark .sidebar > * {
+    html.theme-mountain .sidebar > *,
+    body.theme-mountain-dark .sidebar > *,
+    html.theme-mountain-dark .sidebar > * {
       position: relative;
       z-index: 1;
     }
@@ -222,6 +233,7 @@
       flex-direction: column;
       gap: 6px;
       overflow: hidden;
+      width: 100%;
     }
 
     .case-nav-dropdown.show {
@@ -256,9 +268,13 @@
       gap: 6px;
       margin: 0;
       padding: 0;
+      width: 100%;
     }
 
     .case-nav-link {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
       padding: 8px 10px;
       border-radius: 10px;
       font-size: 0.9rem;
@@ -277,48 +293,70 @@
     }
 
     body.theme-dark .sidebar nav a.active,
-    body.theme-dark .sidebar nav a:hover {
+    body.theme-dark .sidebar nav a:hover,
+    html.theme-dark .sidebar nav a.active,
+    html.theme-dark .sidebar nav a:hover {
       background: rgba(255, 255, 255, 0.12);
     }
 
     body.theme-mountain .sidebar nav a,
-    body.theme-mountain-dark .sidebar nav a {
+    html.theme-mountain .sidebar nav a,
+    body.theme-mountain-dark .sidebar nav a,
+    html.theme-mountain-dark .sidebar nav a {
       color: #ffffff;
     }
 
     body.theme-mountain .sidebar nav a.active,
     body.theme-mountain .sidebar nav a:hover,
     body.theme-mountain-dark .sidebar nav a.active,
-    body.theme-mountain-dark .sidebar nav a:hover {
+    body.theme-mountain-dark .sidebar nav a:hover,
+    html.theme-mountain .sidebar nav a.active,
+    html.theme-mountain .sidebar nav a:hover,
+    html.theme-mountain-dark .sidebar nav a.active,
+    html.theme-mountain-dark .sidebar nav a:hover {
       background: rgba(255, 255, 255, 0.18);
     }
 
     body.theme-mountain .case-nav-caret,
     body.theme-mountain-dark .case-nav-caret,
-    body.theme-dark .case-nav-caret {
+    body.theme-dark .case-nav-caret,
+    html.theme-mountain .case-nav-caret,
+    html.theme-mountain-dark .case-nav-caret,
+    html.theme-dark .case-nav-caret {
       color: inherit;
     }
 
     body.theme-mountain .case-nav-dropdown,
-    body.theme-mountain-dark .case-nav-dropdown {
+    body.theme-mountain-dark .case-nav-dropdown,
+    html.theme-mountain .case-nav-dropdown,
+    html.theme-mountain-dark .case-nav-dropdown {
       border-color: rgba(255, 255, 255, 0.35);
     }
 
     body.theme-mountain .case-nav-status,
     body.theme-mountain-dark .case-nav-status,
-    body.theme-dark .case-nav-status {
+    body.theme-dark .case-nav-status,
+    html.theme-mountain .case-nav-status,
+    html.theme-mountain-dark .case-nav-status,
+    html.theme-dark .case-nav-status {
       color: inherit;
     }
 
     body.theme-mountain .case-nav-link,
     body.theme-mountain-dark .case-nav-link,
-    body.theme-dark .case-nav-link {
+    body.theme-dark .case-nav-link,
+    html.theme-mountain .case-nav-link,
+    html.theme-mountain-dark .case-nav-link,
+    html.theme-dark .case-nav-link {
       color: inherit;
     }
 
     body.theme-mountain .case-nav-link:hover,
     body.theme-mountain-dark .case-nav-link:hover,
-    body.theme-dark .case-nav-link:hover {
+    body.theme-dark .case-nav-link:hover,
+    html.theme-mountain .case-nav-link:hover,
+    html.theme-mountain-dark .case-nav-link:hover,
+    html.theme-dark .case-nav-link:hover {
       background: rgba(255, 255, 255, 0.18);
     }
 
@@ -351,7 +389,9 @@
     }
 
     body.theme-mountain .sidebar-link,
-    body.theme-mountain-dark .sidebar-link {
+    html.theme-mountain .sidebar-link,
+    body.theme-mountain-dark .sidebar-link,
+    html.theme-mountain-dark .sidebar-link {
       color: #ffffff;
       border-color: rgba(255, 255, 255, 0.4);
     }
@@ -361,7 +401,13 @@
     body.theme-mountain-dark .sidebar-link:hover,
     body.theme-mountain-dark .sidebar-link:focus,
     body.theme-dark .sidebar-link:hover,
-    body.theme-dark .sidebar-link:focus {
+    body.theme-dark .sidebar-link:focus,
+    html.theme-mountain .sidebar-link:hover,
+    html.theme-mountain .sidebar-link:focus,
+    html.theme-mountain-dark .sidebar-link:hover,
+    html.theme-mountain-dark .sidebar-link:focus,
+    html.theme-dark .sidebar-link:hover,
+    html.theme-dark .sidebar-link:focus {
       color: #ffffff;
     }
 
@@ -410,7 +456,7 @@
       gap: 24px;
       min-width: 0;
       height: 100vh;
-      overflow-y: auto;
+      overflow: hidden;
     }
 
     .case-topbar {
@@ -481,141 +527,6 @@
       position: relative;
     }
 
-    .notification-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      border: 1px solid var(--app-border-soft);
-      display: grid;
-      place-items: center;
-      background: var(--app-surface);
-      cursor: pointer;
-      position: relative;
-      transition: border-color 0.2s ease, transform 0.2s ease;
-    }
-
-    .notification-icon:hover {
-      border-color: var(--app-accent);
-      transform: translateY(-1px);
-    }
-
-    .notification-icon svg {
-      width: 22px;
-      height: 22px;
-      color: var(--app-text);
-    }
-
-    .notification-badge {
-      position: absolute;
-      top: -4px;
-      right: -4px;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--app-accent);
-      color: var(--app-surface);
-      font-size: 0.7rem;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
-    }
-
-    .notification-badge.show {
-      display: inline-flex;
-    }
-
-    .notifications-panel {
-      position: absolute;
-      top: calc(100% + 10px);
-      right: 0;
-      width: 320px;
-      background: var(--app-surface);
-      border-radius: 14px;
-      border: 1px solid var(--app-border);
-      box-shadow: var(--app-shadow-card);
-      padding: 0;
-      opacity: 0;
-      pointer-events: none;
-      transform: translateY(-10px);
-      transition: opacity 0.2s ease, transform 0.2s ease;
-      z-index: 30;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .notifications-panel.show {
-      opacity: 1;
-      pointer-events: auto;
-      transform: translateY(0);
-    }
-
-    .notifications-panel.hidden {
-      display: none;
-    }
-
-    .notifications-panel .notif-header {
-      font-family: var(--font-serif);
-      font-weight: 300;
-      font-size: 1.1rem;
-      padding: 14px 18px;
-      border-bottom: 1px solid var(--app-border-soft);
-      background: var(--app-surface-contrast);
-    }
-
-    .notifications-panel .notif-scroll {
-      max-height: 260px;
-      overflow-y: auto;
-    }
-
-    .notifications-panel .notif-item {
-      padding: 14px 18px;
-      border-bottom: 1px solid var(--app-border-soft);
-      cursor: pointer;
-    }
-
-    .notifications-panel .notif-item:last-child {
-      border-bottom: none;
-    }
-
-    .notifications-panel .notif-item.unread {
-      border-left: 3px solid var(--app-accent);
-    }
-
-    .notifications-panel .notif-item.read {
-      opacity: 0.75;
-    }
-
-    .notifications-panel .notif-body {
-      color: var(--app-muted);
-      font-size: 0.9rem;
-      line-height: 1.4;
-    }
-
-    .notifications-panel .notif-time {
-      font-size: 0.78rem;
-      color: var(--app-muted);
-      margin-top: 4px;
-    }
-
-    .notifications-panel .notif-empty {
-      padding: 16px;
-      text-align: center;
-      font-size: 0.9rem;
-      color: var(--app-muted);
-    }
-
-    .notifications-panel .notif-markall {
-      border: none;
-      border-top: 1px solid var(--app-border-soft);
-      background: var(--app-surface-contrast);
-      padding: 12px 18px;
-      text-align: left;
-      font-size: 0.9rem;
-      cursor: pointer;
-      font-family: var(--font-sans);
-      color: var(--app-text);
-    }
 
     .user-chip {
       display: inline-flex;
@@ -640,7 +551,7 @@
 
     .user-chip strong {
       display: block;
-      font-weight: 600;
+      font-weight: 400;
     }
 
     .user-chip span {
@@ -682,81 +593,60 @@
 
     .case-workspace {
       display: grid;
-      grid-template-columns: minmax(170px, 200px) minmax(0, 1fr) minmax(190px, 220px);
-      gap: 24px;
-      align-items: start;
+      grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(260px, 320px);
+      grid-template-rows: 1fr;
+      gap: 0;
+      align-items: stretch;
+      background: var(--app-surface);
+      border: 1px solid var(--app-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      flex: 1;
+      min-height: 0;
     }
 
     .case-rail-stack {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 18px;
+      padding: 20px 18px;
+      border-right: 1px solid var(--app-border-soft);
     }
 
     .case-rail {
-      background: var(--app-surface);
-      border: 1px solid var(--app-border);
-      border-radius: var(--radius-lg);
-      padding: 18px;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 16px;
       box-shadow: none;
     }
 
     .case-rail-header {
       display: flex;
-      flex-direction: column;
-      gap: 6px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
     }
 
     .case-rail-title {
-      font-family: var(--font-serif);
       font-size: 1.2rem;
-      font-weight: 300;
-      letter-spacing: 0.02em;
+      font-weight: 250;
+      font-family: var(--font-sans);
+      letter-spacing: 0.01em;
     }
 
-    .case-rail-note {
-      font-size: 0.9rem;
-      color: var(--app-muted);
-    }
-
-    .case-rail-tabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    .case-rail-tabs button {
-      border: none;
-      background: var(--app-card-muted);
-      color: var(--app-text);
-      padding: 8px 14px;
-      border-radius: 999px;
-      font-size: 0.85rem;
-      cursor: pointer;
-    }
-
-    .case-rail-tabs button[aria-selected="true"] {
-      background: var(--app-accent-soft);
-      color: var(--app-text);
-    }
-
-    .case-rail-filters label {
-      display: block;
-      font-size: 0.85rem;
-      margin-bottom: 6px;
-      color: var(--app-muted);
-    }
-
-    .case-rail-filters input {
+    .case-rail-header input,
+    .case-rail-header select {
       width: 100%;
-      padding: 12px 14px;
-      border-radius: var(--radius-sm);
-      border: none;
-      box-shadow: inset 0 0 0 1px var(--app-border-soft);
-      background: var(--app-surface);
+      max-width: 200px;
+      min-width: 140px;
+      padding: 8px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--app-border-soft);
+      background: var(--app-surface-contrast);
       color: var(--app-text);
     }
 
@@ -764,52 +654,60 @@
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 8px;
       margin: 0;
       padding: 0;
     }
 
     .case-card {
       width: 100%;
-      border: 1px solid var(--app-border-soft);
-      background: var(--app-card);
-      border-radius: var(--radius-md);
-      padding: 16px 18px;
+      border: 1px solid transparent;
+      background: transparent;
+      border-radius: 12px;
+      padding: 10px 12px;
       text-align: left;
       display: grid;
-      gap: 8px;
+      gap: 6px;
       cursor: pointer;
       position: relative;
       box-shadow: none;
+      transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+    }
+
+    .case-card:hover {
+      border-color: var(--app-border-soft);
+      background: var(--app-surface-contrast);
+      transform: translateY(-1px);
     }
 
     .case-card[aria-current="true"] {
       border-color: var(--app-accent);
-      box-shadow: var(--app-shadow-soft);
+      background: var(--app-surface-contrast);
     }
 
     .case-title {
-      font-weight: 300;
+      font-weight: 500;
+      font-size: 0.95rem;
     }
 
     .case-meta,
     .case-preview {
-      font-size: 0.85rem;
+      font-size: 0.76rem;
       color: var(--app-muted);
     }
 
     .case-unread {
       position: absolute;
-      top: 14px;
-      right: 14px;
+      top: 12px;
+      right: 12px;
       background: var(--app-accent);
       color: var(--app-surface);
-      min-width: 22px;
-      height: 22px;
+      min-width: 20px;
+      height: 20px;
       border-radius: 999px;
       display: grid;
       place-items: center;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
     }
 
     .case-thread {
@@ -817,6 +715,9 @@
       flex-direction: column;
       gap: 16px;
       min-width: 0;
+      padding: 12px 22px 20px;
+      border-right: 1px solid var(--app-border-soft);
+      min-height: 0;
     }
 
     .case-thread-header {
@@ -831,22 +732,29 @@
 
 
     .case-participants,
+    .case-documents-panel,
     .message-panel {
-      background: var(--app-surface);
-      border: 1px solid var(--app-border);
-      border-radius: var(--radius-lg);
-      padding: 24px;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
       box-shadow: none;
+    }
+
+    .case-rail-stack > * + * {
+      border-top: 1px solid var(--app-border-soft);
+      padding-top: 16px;
     }
 
     .message-panel {
       display: flex;
       flex-direction: column;
       gap: 12px;
-      height: clamp(680px, 82vh, 980px);
-      padding: 20px;
+      height: 100%;
+      min-height: 0;
+      padding: 0 0 12px;
       position: relative;
-      border: 1px solid var(--app-border-soft);
+      border: none;
       box-shadow: none;
     }
 
@@ -858,6 +766,8 @@
     .message-panel-header {
       display: grid;
       gap: 4px;
+      padding-bottom: 6px;
+      border-bottom: none;
     }
 
     .message-panel-title-row {
@@ -867,10 +777,17 @@
       gap: 12px;
     }
 
+    .message-panel-title-wrap {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
     .message-panel-title-row h2 {
-      font-size: 1.2rem;
-      font-family: var(--font-serif);
-      font-weight: 300;
+      font-size: 1.1rem;
+      font-family: var(--font-sans);
+      font-weight: 500;
       margin: 0;
     }
 
@@ -892,14 +809,18 @@
       color: var(--app-muted);
     }
 
+    .message-panel-subtitle:empty {
+      display: none;
+    }
+
     .message-panel-banner {
-      background: var(--app-surface-muted);
-      border: 1px solid var(--app-border-soft);
-      border-radius: var(--radius-sm);
-      padding: 8px 12px;
-      font-size: 0.9rem;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      font-size: 0.85rem;
       color: var(--app-muted);
-      text-align: center;
+      text-align: left;
     }
 
     .message-panel-divider {
@@ -937,7 +858,9 @@
     }
 
     body.theme-dark .message-dropzone,
-    body.theme-mountain-dark .message-dropzone {
+    body.theme-mountain-dark .message-dropzone,
+    html.theme-dark .message-dropzone,
+    html.theme-mountain-dark .message-dropzone {
       background: rgba(12, 18, 28, 0.75);
       border-color: var(--app-border-soft);
       color: var(--app-text);
@@ -954,35 +877,161 @@
       background: transparent;
       border-radius: var(--radius-md);
       min-height: 0;
+      display: flex;
+      flex-direction: column;
     }
 
     .case-participants h2,
+    .case-documents-panel h2,
     .message-panel h2,
     .message-composer h2 {
-      font-size: 1.1rem;
+      font-size: 1rem;
       margin-bottom: 10px;
+      font-weight: 250;
+      font-family: var(--font-sans);
+      letter-spacing: 0.01em;
+    }
+
+    .case-participants h2,
+    .case-documents-panel h2 {
+      text-align: center;
+    }
+
+    .case-participants-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      position: relative;
+    }
+
+    .case-participants-header h2 {
+      flex: 1;
+      text-align: center;
+    }
+
+    .case-participants-toggle {
+      position: absolute;
+      right: 0;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--app-border-soft);
+      background: var(--app-surface);
+      color: var(--app-muted);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease;
+    }
+
+    .case-participants-toggle:hover {
+      border-color: var(--app-accent);
+      color: var(--app-accent);
+    }
+
+    .case-participants-caret {
+      font-size: 0.8rem;
+      transition: transform 0.2s ease;
+    }
+
+    .case-overview-panel,
+    .case-overview-panel h2,
+    .case-overview-panel h3,
+    .case-overview-panel dt,
+    .case-overview-panel dd,
+    .case-overview-panel p,
+    .case-overview-panel li {
+      font-family: var(--font-sans);
+      font-weight: 250;
+    }
+
+    .case-overview-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      position: relative;
+      text-align: center;
+    }
+
+    .case-overview-header h2 {
+      flex: 1;
+      text-align: center;
+    }
+
+    .case-overview-panel h3 {
+      text-align: center;
+    }
+
+    .case-overview-toggle {
+      position: absolute;
+      right: 0;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--app-border-soft);
+      background: var(--app-surface);
+      color: var(--app-muted);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease;
+    }
+
+    .case-overview-toggle:hover {
+      border-color: var(--app-accent);
+      color: var(--app-accent);
+    }
+
+    .case-overview-caret {
+      font-size: 0.8rem;
+      transition: transform 0.2s ease;
     }
 
     .case-participants ul {
       list-style: none;
       display: grid;
-      gap: 6px;
+      gap: 2px;
       color: var(--app-muted);
       margin: 0;
       padding: 0;
+    }
+
+    .case-participants ul li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+      padding: 4px 6px;
+      border: none;
+      border-radius: 10px;
+      background: var(--app-surface-contrast);
+      color: var(--app-text);
+      font-size: 0.82rem;
+      line-height: 1.2;
     }
 
     .message-list {
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 6px;
       margin: 0;
-      padding: 0;
+      padding: 0 2px 6px;
+      margin-top: auto;
     }
 
     .message-list li {
       display: flex;
+      width: 100%;
+      justify-content: flex-start;
+    }
+
+    .message-list li.is-grouped {
+      margin-top: -4px;
     }
 
     .thread-card {
@@ -996,7 +1045,7 @@
     }
 
     .message-card {
-      max-width: 78%;
+      max-width: 72%;
       align-items: flex-start;
     }
 
@@ -1009,17 +1058,7 @@
     }
 
     .message-avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      background: var(--app-surface-contrast);
-      color: var(--app-muted);
-      font-weight: 600;
-      display: grid;
-      place-items: center;
-      font-size: 0.85rem;
-      flex-shrink: 0;
-      overflow: hidden;
+      display: none;
     }
 
     .message-avatar img {
@@ -1033,25 +1072,41 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
       min-width: 0;
     }
 
     .message-bubble {
-      background: var(--app-surface);
-      border: 1px solid var(--app-border-soft);
-      border-radius: 14px;
-      padding: 10px 14px;
-      box-shadow: var(--app-shadow-soft);
+      background: #f7f7f7;
+      border: none;
+      border-radius: 18px;
+      padding: 8px 12px;
+      box-shadow: none;
     }
 
     .message-card.is-outgoing .message-bubble {
-      background: var(--app-surface-contrast);
+      background: #f1f1f1;
+      color: var(--app-text);
+    }
+
+    body.theme-dark .message-bubble,
+    body.theme-mountain-dark .message-bubble,
+    html.theme-dark .message-bubble,
+    html.theme-mountain-dark .message-bubble {
+      background: #1f2533;
+      color: var(--app-text);
+    }
+
+    body.theme-dark .message-card.is-outgoing .message-bubble,
+    body.theme-mountain-dark .message-card.is-outgoing .message-bubble,
+    html.theme-dark .message-card.is-outgoing .message-bubble,
+    html.theme-mountain-dark .message-card.is-outgoing .message-bubble {
+      background: #2a3344;
+      color: var(--app-text);
     }
 
     .message-bubble .card-header {
-      display: block;
-      margin-bottom: 4px;
+      display: none;
     }
 
     .message-bubble .card-header h3 {
@@ -1065,12 +1120,12 @@
     }
 
     .message-bubble .card-body p {
-      font-size: 0.92rem;
-      color: var(--app-text);
+      font-size: 0.95rem;
+      color: inherit;
     }
 
     .message-time {
-      font-size: 0.78rem;
+      font-size: 0.72rem;
       color: var(--app-muted);
       padding-left: 6px;
       margin-top: 4px;
@@ -1088,17 +1143,102 @@
       padding-left: 0;
       padding-right: 6px;
       text-align: right;
+      color: var(--app-muted);
     }
 
     .document-card {
       background: var(--app-surface-contrast);
       border: 1px solid var(--app-border-soft);
-      border-radius: var(--radius-md);
-      padding: 16px;
+      border-radius: 12px;
+      padding: 6px 10px;
       box-shadow: none;
-      display: grid;
-      gap: 14px;
-      max-width: 78%;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      max-width: 72%;
+    }
+
+    .document-card.is-outgoing {
+      background: var(--app-surface);
+    }
+
+    body.theme-dark .document-card,
+    body.theme-mountain-dark .document-card,
+    html.theme-dark .document-card,
+    html.theme-mountain-dark .document-card {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--app-text);
+    }
+
+    body.theme-dark .document-card.is-outgoing,
+    body.theme-mountain-dark .document-card.is-outgoing,
+    html.theme-dark .document-card.is-outgoing,
+    html.theme-mountain-dark .document-card.is-outgoing {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .document-card .card-header {
+      margin: 0;
+      align-items: center;
+      gap: 0;
+    }
+
+    .document-card .card-header h3 {
+      font-size: 0.85rem;
+      font-weight: 250;
+      margin: 0;
+    }
+
+    .document-card .card-role {
+      display: none;
+    }
+
+    .document-card .card-body p {
+      font-size: 0.9rem;
+      color: var(--app-muted);
+    }
+
+    .document-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: inherit;
+      text-decoration: none;
+      max-width: 240px;
+    }
+
+    .document-link:hover {
+      text-decoration: underline;
+    }
+
+    .document-link:focus,
+    .document-link:focus-visible {
+      outline: none;
+      box-shadow: none;
+    }
+
+    .document-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      background: rgba(182, 164, 122, 0.15);
+      color: var(--app-text);
+    }
+
+    .document-icon svg {
+      width: 12px;
+      height: 12px;
+      stroke: currentColor;
+    }
+
+    .document-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .message-composer {
@@ -1158,26 +1298,40 @@
 
     .document-actions button {
       border: none;
-      background: var(--app-card-muted);
+      background: #f1f1f1;
       color: var(--app-text);
-      padding: 8px 14px;
-      border-radius: 999px;
+      padding: 6px 10px;
+      border-radius: 12px;
       cursor: pointer;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
+      font-weight: 250;
     }
 
     .document-actions a {
       border: none;
-      background: var(--app-card-muted);
+      background: #f1f1f1;
       color: var(--app-text);
-      padding: 8px 14px;
-      border-radius: 999px;
+      padding: 6px 10px;
+      border-radius: 12px;
       cursor: pointer;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
+      font-weight: 250;
       text-decoration: none;
       display: inline-flex;
       align-items: center;
       justify-content: center;
+    }
+
+    body.theme-dark .document-actions button,
+    body.theme-mountain-dark .document-actions button,
+    body.theme-dark .document-actions a,
+    body.theme-mountain-dark .document-actions a,
+    html.theme-dark .document-actions button,
+    html.theme-mountain-dark .document-actions button,
+    html.theme-dark .document-actions a,
+    html.theme-mountain-dark .document-actions a {
+      background: #2a3344;
+      color: var(--app-text);
     }
 
     .document-comments {
@@ -1250,6 +1404,8 @@
       min-height: 24px;
       max-height: 88px;
       padding: 4px 0;
+      font-size: 0.95rem;
+      line-height: 1.4;
       border: none;
       box-shadow: none;
       background: transparent;
@@ -1283,7 +1439,7 @@
       width: 32px;
       height: 32px;
       border-radius: 8px;
-      border: 1px solid var(--app-border-soft);
+      border: none;
       background: var(--app-surface);
       color: var(--app-muted);
       display: grid;
@@ -1408,58 +1564,318 @@
     }
 
     .case-overview-panel {
-      background: var(--app-surface);
-      border: 1px solid var(--app-border);
-      border-radius: var(--radius-lg);
-      padding: 18px;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 20px 22px 32px;
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 24px;
       box-shadow: none;
+      min-width: 0;
+      min-height: 0;
+      overflow-y: auto;
+    }
+
+    .case-overview-panel > header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--app-border-soft);
     }
 
     .case-overview-panel h2 {
-      font-size: 1.4rem;
-      font-family: var(--font-serif);
-      font-weight: 300;
+      font-size: 1rem;
+      font-weight: 250;
+      font-family: var(--font-sans);
+      letter-spacing: 0.01em;
     }
 
     .case-overview-panel h3 {
-      font-size: 1.05rem;
-      font-weight: 300;
+      font-size: 0.9rem;
+      font-weight: 250;
       margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--app-muted);
+    }
+
+    .case-overview-panel section + section {
+      border-top: 1px solid var(--app-border-soft);
+      padding-top: 22px;
+    }
+
+    .case-overview-panel section {
+      padding-bottom: 18px;
+    }
+
+    .case-overview-panel section:last-of-type {
+      padding-bottom: 0;
     }
 
     .case-overview-panel dl,
     .case-overview-panel ul {
       display: grid;
-      gap: 8px;
+      gap: 10px;
       list-style: none;
-      font-size: 0.92rem;
-      color: var(--app-muted);
+      font-size: 0.9rem;
+      color: var(--app-text);
       margin: 0;
       padding: 0;
     }
 
+    .case-overview-deadlines ul {
+      text-align: center;
+    }
+
+    .case-overview-deadlines li {
+      text-align: center;
+    }
+
+    .case-overview-panel dl div {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .case-overview-panel dt {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--app-muted);
+      font-weight: 250;
+    }
+
+    .case-overview-panel dd {
+      margin: 0;
+      font-weight: 250;
+    }
+
     .case-overview-panel a {
+      color: var(--app-text);
+      font-weight: 250;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--app-border-soft);
+      background: var(--app-surface-contrast);
+    }
+
+    .case-overview-panel .case-action-btn {
+      font-weight: 250;
+    }
+
+    .case-overview-footer {
+      margin-top: auto;
+      padding-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .case-dispute-button {
+      align-self: flex-end;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--app-muted);
+      padding: 2px 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .case-dispute-button.is-floating {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 2200;
+      border-color: var(--app-border-soft);
+      background: var(--app-surface);
+      padding: 8px 12px;
+      border-radius: 999px;
+      box-shadow: var(--app-shadow-soft);
+    }
+
+    .case-dispute-button:hover {
       color: var(--app-accent);
-      font-weight: 600;
+    }
+
+    .case-dispute-button:disabled {
+      cursor: not-allowed;
+      color: var(--app-border);
+    }
+
+    .case-dispute-button svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+    }
+
+    .case-dispute-status {
+      font-size: 0.82rem;
+      color: var(--app-muted);
+      margin: 0;
+    }
+
+    .case-documents-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .case-documents-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 10px;
+      border: 1px solid var(--app-border-soft);
+      border-radius: 10px;
+      background: var(--app-surface-contrast);
+    }
+
+    .case-documents-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 0.85rem;
+      color: var(--app-text);
+    }
+
+    .case-documents-sub {
+      font-size: 0.78rem;
+      color: var(--app-muted);
+    }
+
+    .case-documents-actions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .case-documents-approve {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      color: var(--app-text);
+    }
+
+    .case-documents-request {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      color: var(--app-text);
+    }
+
+    .case-documents-approve input {
+      width: 14px;
+      height: 14px;
+      accent-color: var(--app-accent);
+    }
+
+    .case-documents-request input {
+      width: 14px;
+      height: 14px;
+      accent-color: var(--app-accent);
+    }
+
+    .case-documents-approve.is-approved {
+      color: var(--app-muted);
+    }
+
+    .case-documents-request.is-requested {
+      color: var(--app-muted);
     }
 
     .case-overview-actions {
-      border: 1px solid var(--app-border);
-      border-radius: var(--radius-md);
+      border: none;
+      border-radius: 12px;
       padding: 14px;
-      background: var(--app-card);
+      background: var(--app-surface-contrast);
       display: flex;
       flex-direction: column;
       gap: 10px;
+    }
+
+    .case-overview-actions .case-action-btn {
+      align-self: center;
     }
 
     .case-overview-note {
       font-size: 0.88rem;
       color: var(--app-muted);
       margin: 0;
+    }
+
+    .case-overview-tasks {
+      position: relative;
+    }
+
+    .case-overview-tasks h3 {
+      margin-right: 28px;
+    }
+
+    .case-tasks-help {
+      position: absolute;
+      top: 0;
+      right: 0;
+      z-index: 2;
+    }
+
+    .case-tasks-help summary {
+      list-style: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      border: 1px solid var(--app-border-soft);
+      background: var(--app-surface-contrast);
+      color: var(--app-muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.74rem;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .case-tasks-help summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .case-tasks-help-panel {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      width: 230px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--app-border-soft);
+      background: var(--app-surface);
+      box-shadow: var(--app-shadow-soft);
+      color: var(--app-text);
+      font-size: 0.76rem;
+      line-height: 1.4;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .case-tasks-help:not([open]) .case-tasks-help-panel {
+      display: none;
+    }
+
+    .case-overview-note.is-alert {
+      color: #b91c1c;
+      text-align: center;
     }
 
     .case-action-btn {
@@ -1471,6 +1887,11 @@
       background: var(--app-accent);
       color: var(--app-surface);
       cursor: pointer;
+    }
+
+    .case-action-btn.is-locked {
+      opacity: 0.65;
+      cursor: not-allowed;
     }
 
     .case-action-btn.secondary {
@@ -1491,6 +1912,14 @@
 
       .case-overview-panel {
         grid-column: 1 / -1;
+      }
+
+      .case-thread {
+        border-right: none;
+      }
+
+      .case-overview-panel {
+        border-top: 1px solid var(--app-border-soft);
       }
     }
 
@@ -1556,8 +1985,128 @@
     }
 
     @media (max-width: 900px) {
+      body {
+        height: auto;
+        min-height: 100vh;
+        overflow-x: hidden;
+        overflow-y: auto;
+      }
+
+      .case-shell {
+        height: auto;
+        min-height: 100vh;
+      }
+
+      .case-main {
+        height: auto;
+        overflow: visible;
+      }
+
+      .case-workspace {
+        flex: 0 0 auto;
+        overflow: visible;
+      }
+
+      .case-overview-panel {
+        overflow: visible;
+        padding: 12px 14px 20px;
+      }
+
+      .case-topbar-controls {
+        position: fixed;
+        top: 12px;
+        right: 16px;
+        z-index: 2200;
+      }
+
+      .case-topbar-left {
+        width: 100%;
+        align-items: flex-end;
+      }
+
+      .case-topbar-title {
+        text-align: right;
+        margin-top: 32px;
+      }
+
+      .case-overview-panel {
+        order: 3;
+      }
+
+      .case-thread {
+        order: 1;
+      }
+
+      .case-rail-stack {
+        order: 2;
+      }
+
+      .case-rail-stack {
+        padding: 12px 14px;
+      }
+
+      .case-overview-toggle {
+        display: inline-flex;
+      }
+
+      .case-overview-content {
+        display: none;
+      }
+
+      .case-overview-panel.is-open .case-overview-content {
+        display: block;
+      }
+
+      .case-overview-panel.is-open .case-overview-caret {
+        transform: rotate(180deg);
+      }
+
       .case-workspace {
         grid-template-columns: 1fr;
+        overflow-x: hidden;
+        overflow-y: visible;
+      }
+
+      .case-rail {
+        order: 1;
+      }
+
+      .case-documents-panel {
+        order: 2;
+      }
+
+      .case-participants {
+        order: 3;
+      }
+
+      .case-participants-toggle {
+        display: inline-flex;
+      }
+
+      .case-participants ul {
+        display: none;
+      }
+
+      .case-participants.is-open ul {
+        display: grid;
+      }
+
+      .case-participants.is-open .case-participants-caret {
+        transform: rotate(180deg);
+      }
+
+      .case-rail-stack,
+      .case-thread {
+        border-right: none;
+      }
+
+      .case-thread,
+      .case-overview-panel {
+        border-top: 1px solid var(--app-border-soft);
+      }
+
+      .case-thread {
+        min-height: 70vh;
       }
 
       .case-thread-header {
@@ -1571,6 +2120,36 @@
       }
     }
 
+    @media (max-height: 820px) {
+      .case-overview-panel {
+        padding: 16px 18px 24px;
+        gap: 12px;
+      }
+
+      .case-overview-panel > header {
+        padding-bottom: 8px;
+      }
+
+      .case-overview-panel section + section {
+        padding-top: 10px;
+      }
+
+      .case-overview-tasks { order: 1; }
+      .case-overview-actions { order: 2; }
+      .case-overview-deadlines { order: 3; }
+      .case-overview-summary { order: 4; }
+      .case-overview-hire { order: 5; }
+      .case-overview-footer { order: 6; }
+
+      .case-overview-hire {
+        position: sticky;
+        top: 0;
+        background: var(--app-surface);
+        z-index: 2;
+        padding-top: 8px;
+      }
+    }
+
     @media (max-width: 720px) {
       .case-topbar {
         flex-direction: column;
@@ -1578,7 +2157,7 @@
       }
 
       .case-topbar-controls {
-        width: 100%;
+        width: auto;
         justify-content: flex-end;
       }
 
@@ -1625,7 +2204,7 @@
       </nav>
       <div class="sidebar-bottom">
         <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-        <div class="sidebar-footer">&copy; Let&#8217;s-ParaConnect 2025</div>
+        <div class="sidebar-footer">&copy; Let&#8217;s-ParaConnect 2026</div>
       </div>
     </aside>
     <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
@@ -1640,7 +2219,6 @@
             Back
           </button>
           <div class="case-topbar-title">
-            <h1>Messages</h1>
             <p class="case-thread-title" id="caseTitle">Select a case</p>
             <p class="case-thread-subtitle" id="caseStatusLine">Waiting for case selection.</p>
           </div>
@@ -1654,7 +2232,7 @@
             <span class="notification-badge" data-notification-badge>0</span>
           </button>
           <div class="notifications-panel hidden" role="region" aria-live="polite" data-notification-panel>
-            <div class="notif-header">Notifications</div>
+            <div class="notif-header" aria-label="Notifications"></div>
             <div class="notif-scroll" data-notification-list></div>
             <div class="notif-empty" data-notification-empty>Loading...</div>
             <button type="button" class="notif-markall" data-notification-mark>Mark All Read</button>
@@ -1678,27 +2256,25 @@
           <aside class="case-rail" aria-label="Case switcher">
             <header class="case-rail-header">
               <div class="case-rail-title">Cases</div>
-              <p class="case-rail-note">Shared workspace for attorneys and paralegals.</p>
+              <select id="case-select" name="case-select" aria-label="Select a case"></select>
             </header>
-
-            <section class="case-rail-filters" aria-label="Case filters">
-              <div class="case-rail-tabs" role="tablist" aria-label="Case view">
-                <button type="button" role="tab" aria-selected="true">Active</button>
-                <button type="button" role="tab" aria-selected="false">Unread</button>
-              </div>
-              <label for="case-search">Search cases</label>
-              <input id="case-search" name="case-search" type="search" placeholder="Search by client or matter" />
-            </section>
-
-            <nav class="case-rail-list" aria-label="Active cases">
-              <p id="caseListStatus" class="case-rail-note">Loading cases...</p>
-              <ul id="caseList"></ul>
-            </nav>
           </aside>
 
           <section class="case-participants" aria-label="Participants">
-            <h2>Participants</h2>
+            <div class="case-participants-header">
+              <h2>Participants</h2>
+              <button type="button" class="case-participants-toggle" aria-expanded="false" aria-controls="caseParticipants">
+                <span class="visually-hidden">Toggle participants</span>
+                <span class="case-participants-caret" aria-hidden="true">▾</span>
+              </button>
+            </div>
             <ul id="caseParticipants"></ul>
+          </section>
+
+          <section class="case-documents-panel" aria-label="Shared documents">
+            <h2>Shared documents</h2>
+            <ul id="caseSharedDocuments" class="case-documents-list" aria-live="polite"></ul>
+            <p class="case-overview-note" id="caseSharedDocumentsEmpty">No documents shared yet.</p>
           </section>
         </div>
 
@@ -1706,12 +2282,13 @@
           <section class="message-panel" aria-label="Conversation">
             <header class="message-panel-header">
               <div class="message-panel-title-row">
-                <h2 id="messagePanelTitle">Case conversation</h2>
-                <button type="button" class="message-panel-info" aria-label="Case details">i</button>
+                <div class="message-panel-title-wrap">
+                  <h2 id="messagePanelTitle"></h2>
+                  <span class="message-panel-banner" id="messagePanelBanner">Case updates will appear here.</span>
+                </div>
               </div>
-              <p class="message-panel-subtitle" id="messagePanelSubtitle">Case details</p>
+              <p class="message-panel-subtitle" id="messagePanelSubtitle"></p>
             </header>
-            <div class="message-panel-banner" id="messagePanelBanner">Case updates will appear here.</div>
             <div class="message-panel-divider"><span id="messagePanelDivider">Today</span></div>
             <div class="message-dropzone" id="caseDropzoneOverlay" aria-hidden="true">Drop files here</div>
             <div class="message-scroll" role="region" aria-label="Conversation thread">
@@ -1738,67 +2315,75 @@
           </section>
         </section>
 
-        <aside class="case-overview-panel" aria-label="Case overview">
-          <header>
+        <aside class="case-overview-panel is-open" aria-label="Case overview">
+          <header class="case-overview-header">
             <h2>Case overview</h2>
+            <button type="button" class="case-overview-toggle" aria-expanded="true" aria-controls="caseOverviewContent">
+              <span class="visually-hidden">Toggle case overview</span>
+              <span class="case-overview-caret" aria-hidden="true">▾</span>
+            </button>
           </header>
 
-          <section class="case-overview-escrow">
-            <h3>Escrow</h3>
-            <dl>
-              <div>
-                <dt>Amount</dt>
-                <dd id="caseEscrowAmount">-</dd>
-              </div>
-              <div>
-                <dt>Status</dt>
-                <dd id="caseEscrowStatus">-</dd>
-              </div>
-            </dl>
-          </section>
+          <div id="caseOverviewContent" class="case-overview-content">
+            <section class="case-overview-tasks">
+              <h3>Tasks</h3>
+              <details class="case-tasks-help" data-visible="paralegal">
+                <summary aria-label="Task help">?</summary>
+                <div class="case-tasks-help-panel">
+                  Attorneys check off boxes. They will appear here as required tasks are completed.
+                </div>
+              </details>
+              <ul id="caseTaskList"></ul>
+            </section>
 
-          <section class="case-overview-actions" id="caseCompleteSection" data-visible="attorney" hidden>
-            <h3>Complete &amp; release</h3>
-            <p class="case-overview-note" id="caseCompleteNote">
-              Mark work complete and release escrow to the paralegal.
-            </p>
-            <button type="button" class="case-action-btn" id="caseCompleteButton">Complete &amp; Release Funds</button>
-            <p class="case-overview-note" id="caseCompleteStatus" role="status" aria-live="polite"></p>
-          </section>
+            <section class="case-overview-actions" id="caseCompleteSection" data-visible="attorney" hidden>
+              <h3>Complete &amp; release</h3>
+              <p class="case-overview-note" id="caseCompleteNote">
+                Mark work complete and release escrow to the paralegal.
+              </p>
+              <button type="button" class="case-action-btn" id="caseCompleteButton">Complete &amp; Release Funds</button>
+              <p class="case-overview-note" id="caseCompleteStatus" role="status" aria-live="polite"></p>
+            </section>
 
-          <section class="case-overview-hire">
-            <h3>Hire details</h3>
-            <dl>
-              <div>
-                <dt>Hire date</dt>
-                <dd id="caseHireDate">-</dd>
-              </div>
-              <div>
-                <dt>Matter type</dt>
-                <dd id="caseMatterType">-</dd>
-              </div>
-            </dl>
-          </section>
+            <section class="case-overview-deadlines">
+              <h3>Deadline</h3>
+              <ul id="caseDeadlineList"></ul>
+            </section>
 
-          <section class="case-overview-deadlines">
-            <h3>Deadlines</h3>
-            <ul id="caseDeadlineList"></ul>
-          </section>
+            <section class="case-overview-summary">
+              <h3>Case summary</h3>
+              <p id="caseSummary">-</p>
+            </section>
 
-          <section class="case-overview-summary">
-            <h3>Case summary</h3>
-            <p id="caseSummary">-</p>
-          </section>
+            <section class="case-overview-hire">
+              <h3>Hire details</h3>
+              <dl>
+                <div>
+                  <dt>Hire date</dt>
+                  <dd id="caseHireDate">-</dd>
+                </div>
+                <div>
+                  <dt>Matter type</dt>
+                  <dd id="caseMatterType">-</dd>
+                </div>
+                <div>
+                  <dt>Escrow amount</dt>
+                  <dd id="caseEscrowAmount">-</dd>
+                </div>
+              </dl>
+            </section>
 
-          <section class="case-overview-tasks">
-            <h3>Tasks</h3>
-            <ul id="caseTaskList"></ul>
-          </section>
-
-          <section class="case-overview-meeting">
-            <h3>Zoom link</h3>
-            <a id="caseZoomLink" href="#" target="_blank" rel="noopener">Join scheduled Zoom</a>
-          </section>
+            <footer class="case-overview-footer">
+            <button type="button" class="case-dispute-button is-floating" id="caseDisputeButton" aria-label="Flag dispute">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M6 4v16" />
+                  <path d="M6 5h11l-2 4 2 4H6" />
+                </svg>
+                <span class="visually-hidden">Flag dispute</span>
+              </button>
+              <p class="case-dispute-status" id="caseDisputeStatus" role="status" aria-live="polite"></p>
+            </footer>
+          </div>
         </aside>
       </div>
     </main>
@@ -1830,6 +2415,96 @@
       sidebarNav.addEventListener('click', (event) => {
         if (event.target && event.target.tagName === 'A') closeSidebar();
       });
+    }
+    const participantsSection = document.querySelector('.case-participants');
+    const participantsToggle = participantsSection?.querySelector('.case-participants-toggle');
+    const participantsMedia = window.matchMedia('(max-width: 900px)');
+    const syncParticipantsAccordion = () => {
+      if (!participantsSection || !participantsToggle) return;
+      if (participantsMedia.matches) {
+        participantsSection.classList.remove('is-open');
+        participantsToggle.setAttribute('aria-expanded', 'false');
+      } else {
+        participantsSection.classList.add('is-open');
+        participantsToggle.setAttribute('aria-expanded', 'true');
+      }
+    };
+    if (participantsToggle) {
+      participantsToggle.addEventListener('click', () => {
+        if (!participantsMedia.matches) return;
+        const isOpen = participantsSection.classList.toggle('is-open');
+        participantsToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+      syncParticipantsAccordion();
+      if (participantsMedia.addEventListener) {
+        participantsMedia.addEventListener('change', syncParticipantsAccordion);
+      } else {
+        participantsMedia.addListener(syncParticipantsAccordion);
+      }
+    }
+    const overviewPanel = document.querySelector('.case-overview-panel');
+    const overviewToggle = overviewPanel?.querySelector('.case-overview-toggle');
+    const overviewMedia = window.matchMedia('(max-width: 900px)');
+    const syncOverviewAccordion = () => {
+      if (!overviewPanel || !overviewToggle) return;
+      overviewPanel.classList.add('is-open');
+      overviewToggle.setAttribute('aria-expanded', 'true');
+    };
+    if (overviewToggle) {
+      overviewToggle.addEventListener('click', () => {
+        if (!overviewMedia.matches) return;
+        const isOpen = overviewPanel.classList.toggle('is-open');
+        overviewToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+      syncOverviewAccordion();
+      if (overviewMedia.addEventListener) {
+        overviewMedia.addEventListener('change', syncOverviewAccordion);
+      } else {
+        overviewMedia.addListener(syncOverviewAccordion);
+      }
+    }
+    const notifToggle = document.querySelector('[data-notification-toggle]');
+    const notifPanel = document.querySelector('[data-notification-panel]');
+    if (notifToggle && notifPanel) {
+      const toggleNotifPanel = () => {
+        const willShow = !notifPanel.classList.contains('show');
+        notifPanel.classList.toggle('show', willShow);
+        notifPanel.classList.toggle('hidden', !willShow);
+      };
+      notifToggle.addEventListener('click', (event) => {
+        event.preventDefault();
+        toggleNotifPanel();
+      });
+      notifToggle.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        toggleNotifPanel();
+      });
+    }
+    const notifList = document.querySelector('.case-topbar-controls [data-notification-list]');
+    if (notifList) {
+      const syncThreeCardNotificationHeight = () => {
+        const cards = notifList.querySelectorAll('.notif-item, .notif-card');
+        if (!cards.length) {
+          notifList.style.removeProperty('--notif-three-card-max-height');
+          return;
+        }
+        const visibleCards = Math.min(3, cards.length);
+        const listStyles = window.getComputedStyle(notifList);
+        const gap = parseFloat(listStyles.rowGap || listStyles.gap || '0') || 0;
+        let totalHeight = 0;
+        for (let index = 0; index < visibleCards; index += 1) {
+          totalHeight += cards[index].getBoundingClientRect().height;
+        }
+        if (visibleCards > 1) totalHeight += gap * (visibleCards - 1);
+        notifList.style.setProperty('--notif-three-card-max-height', `${Math.ceil(totalHeight)}px`);
+      };
+      const scheduleThreeCardSync = () => window.requestAnimationFrame(syncThreeCardNotificationHeight);
+      const notifListObserver = new MutationObserver(scheduleThreeCardSync);
+      notifListObserver.observe(notifList, { childList: true, subtree: true, characterData: true });
+      window.addEventListener('resize', scheduleThreeCardSync);
+      window.addEventListener('load', scheduleThreeCardSync, { once: true });
+      scheduleThreeCardSync();
     }
     window.addEventListener('resize', () => {
       if (window.innerWidth > 960) closeSidebar();

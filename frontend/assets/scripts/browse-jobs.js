@@ -23,6 +23,21 @@ let jobsCache = [];
 let modalJob = null;
 let stripeConnected = false;
 let viewerRole = "";
+let viewerEmail = "";
+const STRIPE_BYPASS_EMAILS = new Set([
+  "samanthasider+11@gmail.com",
+  "samanthasider+56@gmail.com",
+]);
+
+function getStoredUserEmail() {
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    const parsed = raw ? JSON.parse(raw) : null;
+    return String(parsed?.email || "").toLowerCase().trim();
+  } catch {
+    return "";
+  }
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
   let session = null;
@@ -36,6 +51,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     session = await window.checkSession("paralegal");
   }
   viewerRole = String(session?.role || session?.user?.role || "").toLowerCase();
+  viewerEmail = String(session?.email || session?.user?.email || "").toLowerCase().trim();
+  if (!viewerEmail) {
+    viewerEmail = getStoredUserEmail();
+  }
   if (viewerRole === "paralegal") {
     await loadStripeStatus();
   }
@@ -104,10 +123,11 @@ function renderJobs(jobs) {
   }
 
   const canApply = viewerRole === "paralegal";
-  const applyDisabled = canApply && stripeConnected ? "" : "disabled";
+  const stripeAllowed = stripeConnected || STRIPE_BYPASS_EMAILS.has(viewerEmail);
+  const applyDisabled = canApply && stripeAllowed ? "" : "disabled";
   const applyTitle = !canApply
     ? `title="Only paralegals can apply."`
-    : stripeConnected
+    : stripeAllowed
     ? ""
     : `title="${escapeHtml(STRIPE_GATE_MESSAGE)}"`;
 
@@ -158,7 +178,7 @@ function bindJobListEvents() {
         alert("Only paralegals can apply for jobs.");
         return;
       }
-      if (!stripeConnected) {
+      if (!stripeConnected && !STRIPE_BYPASS_EMAILS.has(viewerEmail)) {
         alert(STRIPE_GATE_MESSAGE);
         return;
       }
@@ -315,9 +335,10 @@ async function openJobModal(job) {
     attorneyBtn.dataset.jobId = job._id || job.id || "";
   }
   if (jobApplyBtn) {
-    jobApplyBtn.disabled = !stripeConnected;
+    const stripeAllowed = stripeConnected || STRIPE_BYPASS_EMAILS.has(viewerEmail);
+    jobApplyBtn.disabled = !stripeAllowed;
     jobApplyBtn.textContent = "Apply";
-    if (!stripeConnected) {
+    if (!stripeAllowed) {
       jobApplyBtn.title = STRIPE_GATE_MESSAGE;
     } else {
       jobApplyBtn.removeAttribute("title");
@@ -367,7 +388,7 @@ attorneyBtn?.addEventListener("click", async () => {
 });
 
 jobApplyBtn?.addEventListener("click", async () => {
-  if (!stripeConnected) {
+  if (!stripeConnected && !STRIPE_BYPASS_EMAILS.has(viewerEmail)) {
     alert(STRIPE_GATE_MESSAGE);
     return;
   }

@@ -390,18 +390,11 @@ function renderAssignments(assignments = []) {
   if (!container || !selectors.assignmentTemplate) return;
   const usableAssignments = assignments.filter((assignment) => assignment && assignment.caseId);
   if (!usableAssignments.length) {
-    container.innerHTML = `
-      <div class="case-card empty-state">
-        <div class="case-header">
-          <div>
-            <h2>No active assignments</h2>
-            <div class="case-subinfo">Active assignments will appear here.</div>
-          </div>
-        </div>
-      </div>
-    `;
+    container.innerHTML = "";
+    container.setAttribute("hidden", "hidden");
     return;
   }
+  container.removeAttribute("hidden");
   container.innerHTML = '';
 
   usableAssignments.forEach((assignment) => {
@@ -686,6 +679,7 @@ function renderAssignedCases(items = []) {
     .map(
       (c) => {
         const caseId = getCaseId(c);
+        const safeCaseId = escapeHTML(caseId);
         const eligible = caseId ? isWorkspaceEligibleCase(c) : false;
         const buttonLabel = eligible ? 'Open Case' : 'Awaiting Attorney Funding';
         const disabledAttr = eligible ? '' : ' disabled aria-disabled="true"';
@@ -694,7 +688,7 @@ function renderAssignedCases(items = []) {
         const statusKey = statusValue.toLowerCase().replace(/\s+/g, '_');
         const canWithdraw = !!caseId && !eligible && statusKey === 'awaiting_funding';
       return `
-      <div class="case-item" data-id="${caseId}">
+      <div class="case-item" data-id="${safeCaseId}">
         <div class="case-title">${escapeHTML(c.title || 'Untitled Case')}</div>
         <div class="case-meta">
           <span>${escapeHTML(c.caseNumber || '')}</span>
@@ -702,10 +696,10 @@ function renderAssignedCases(items = []) {
           <span>Status: ${escapeHTML(statusLabel)}</span>
         </div>
         <div class="case-actions">
-          <button class="open-case-btn" data-id="${caseId}"${disabledAttr}>${buttonLabel}</button>
+          <button class="open-case-btn" data-id="${safeCaseId}"${disabledAttr}>${buttonLabel}</button>
           ${
             canWithdraw
-              ? `<button class="withdraw-application-btn" data-id="${caseId}">Withdraw application</button>`
+              ? `<button class="withdraw-application-btn" data-id="${safeCaseId}">Withdraw application</button>`
               : ''
           }
         </div>
@@ -947,7 +941,10 @@ async function loadOnboardingState(user) {
   if (onboardingPromise) return onboardingPromise;
   onboardingPromise = (async () => {
     try {
-      const res = await secureFetch("/api/users/me/onboarding", { headers: { Accept: "application/json" } });
+      const res = await secureFetch("/api/users/me/onboarding", {
+        headers: { Accept: "application/json" },
+        suppressToast: true,
+      });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload?.error || "Unable to load onboarding state.");
       onboardingState = normalizeOnboarding(payload.onboarding || {});
@@ -969,6 +966,7 @@ async function updateOnboardingState(updates = {}, { markFirstLoginComplete = fa
       method: "PATCH",
       headers: { Accept: "application/json" },
       body: updates,
+      suppressToast: true,
     });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(payload?.error || "Unable to update onboarding state.");
@@ -1059,6 +1057,9 @@ async function initParalegalTour(user) {
   const backBtn = document.getElementById("tourBackBtn");
   const nextBtn = document.getElementById("tourNextBtn");
   const profileLink = document.getElementById("profileSettingsLink");
+  const sidebarToggle = document.getElementById("sidebarToggle");
+  const sidebarNav = document.getElementById("sidebarNav");
+  let sidebarOpenedByTour = false;
 
   if (!overlay || !modal || !tooltip || !profileLink) return;
 
@@ -1084,7 +1085,36 @@ async function initParalegalTour(user) {
     profileLink.classList.add("tour-highlight");
   };
 
+  const setSidebarOpen = (open) => {
+    document.body.classList.toggle("nav-open", Boolean(open));
+    if (sidebarToggle) sidebarToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+
+  const isMobileSidebarMode = () => window.matchMedia("(max-width: 1024px)").matches;
+
+  const ensureSidebarVisibleForTarget = (target) => {
+    if (!target || !sidebarNav) {
+      if (sidebarOpenedByTour) {
+        setSidebarOpen(false);
+        sidebarOpenedByTour = false;
+      }
+      return;
+    }
+    const isSidebarTarget = sidebarNav.contains(target);
+    if (isMobileSidebarMode() && isSidebarTarget) {
+      const alreadyOpen = document.body.classList.contains("nav-open");
+      if (!alreadyOpen) sidebarOpenedByTour = true;
+      setSidebarOpen(true);
+      return;
+    }
+    if (sidebarOpenedByTour) {
+      setSidebarOpen(false);
+      sidebarOpenedByTour = false;
+    }
+  };
+
   const hideOverlay = () => {
+    ensureSidebarVisibleForTarget(null);
     overlay.classList.remove("is-active", "spotlight");
     overlay.setAttribute("aria-hidden", "true");
     modal.classList.remove("is-active");
@@ -1106,6 +1136,7 @@ async function initParalegalTour(user) {
 
   const showIntro = () => {
     showOverlay();
+    ensureSidebarVisibleForTarget(null);
     overlay.classList.remove("spotlight");
     modal.classList.add("is-active");
     tooltip.classList.remove("is-active");
@@ -1113,21 +1144,33 @@ async function initParalegalTour(user) {
 
   const showProfileStep = () => {
     showOverlay();
+    ensureSidebarVisibleForTarget(profileLink);
     modal.classList.remove("is-active");
     overlay.classList.add("spotlight");
-    const rect = profileLink.getBoundingClientRect();
-    const padding = 10;
-    overlay.style.setProperty("--spot-x", `${rect.left - padding}px`);
-    overlay.style.setProperty("--spot-y", `${rect.top - padding}px`);
-    overlay.style.setProperty("--spot-w", `${rect.width + padding * 2}px`);
-    overlay.style.setProperty("--spot-h", `${rect.height + padding * 2}px`);
-    positionTooltip();
+    const positionProfileStep = () => {
+      const rect = profileLink.getBoundingClientRect();
+      const padding = 10;
+      overlay.style.setProperty("--spot-x", `${rect.left - padding}px`);
+      overlay.style.setProperty("--spot-y", `${rect.top - padding}px`);
+      overlay.style.setProperty("--spot-w", `${rect.width + padding * 2}px`);
+      overlay.style.setProperty("--spot-h", `${rect.height + padding * 2}px`);
+      positionTooltip();
+    };
+    // Keep spotlight aligned while the mobile sidebar animates into view.
+    const start = performance.now();
+    const sync = () => {
+      if (!overlay.classList.contains("is-active") || !overlay.classList.contains("spotlight")) return;
+      positionProfileStep();
+      if (performance.now() - start < 380) {
+        requestAnimationFrame(sync);
+      }
+    };
+    requestAnimationFrame(sync);
   };
 
   const completeTour = () => {
     tooltip.classList.remove("is-active");
     hideOverlay();
-    markTourCompleted();
     updateWelcomeGreeting(user);
   };
 

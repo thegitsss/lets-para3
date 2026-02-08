@@ -23,7 +23,7 @@ const STATUS_LABELS = {
 const MISSING_DOCUMENT_MESSAGE = "This document is no longer available for download.";
 const CASE_VIEW_FILTERS = ["active", "draft", "archived", "inquiries"];
 const CASE_FILE_MAX_BYTES = 20 * 1024 * 1024;
-const PLATFORM_FEE_PCT = 21;
+const PLATFORM_FEE_PCT = 22;
 const HOME_PAGE_SIZE = 5;
 const FUNDED_WORKSPACE_STATUSES = new Set([
   "funded_in_progress",
@@ -130,6 +130,7 @@ let caseMenuKeydownBound = false;
 let chatMenuWrapper = null;
 let applicationsActionsBound = false;
 let homeTabsBound = false;
+let headerDocListenersBound = false;
 const applicantDrawerCache = new Map();
 let applicantReturnHandled = false;
 let applicantReturnContext = null;
@@ -269,25 +270,6 @@ function ensureHeaderStyles() {
   .lpc-shared-header .btn:hover{transform:translateY(-1px);background:#9c8a63}
   .lpc-shared-header .btn.btn-outline{background:transparent;border-color:rgba(0,0,0,0.08);color:#1a1a1a}
   .lpc-shared-header .btn.btn-outline:hover{border-color:#b6a47a;color:#b6a47a;background:rgba(182,164,122,0.06)}
-  .lpc-shared-header .notification-wrapper{position:relative}
-  .lpc-shared-header .notification-icon{width:46px;height:46px;border-radius:50%;border:1px solid var(--line, rgba(0,0,0,0.08));display:flex;justify-content:center;align-items:center;background:var(--panel, #fff);cursor:pointer;transition:border-color .2s ease,transform .2s ease,background .2s ease}
-  .lpc-shared-header .notification-icon:hover{border-color:#b6a47a;transform:translateY(-1px)}
-  .lpc-shared-header .notification-icon svg{width:22px;height:22px;color:var(--ink, #1a1a1a);transition:color .2s ease}
-  .lpc-shared-header .notification-badge{position:absolute;top:-4px;right:-4px;background:#b6a47a;color:#fff;font-size:.75rem;border-radius:999px;padding:2px 6px;line-height:1;display:none;font-weight:200}
-  .lpc-shared-header .notification-badge.show{display:inline-flex}
-  .lpc-shared-header [data-notification-toggle][data-count]:after{
-    content:attr(data-count);
-    position:absolute;
-    top:-4px;
-    right:-4px;
-    background:#b6a47a;
-    color:#fff;
-    font-family:'Sarabun',sans-serif;
-    font-weight:200;
-    font-size:0.7rem;
-    padding:2px 6px;
-    border-radius:999px;
-  }
   .lpc-shared-header .user-chip{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.4);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color .2s ease, box-shadow .2s ease}
   .lpc-shared-header .user-chip img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,0.08);object-fit:cover}
   .lpc-shared-header .user-chip strong{display:block;font-family:var(--font-serif);font-weight:500;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -311,127 +293,50 @@ function ensureHeaderStyles() {
   body.theme-mountain-dark .lpc-shared-header .profile-dropdown button:hover,
   body.theme-mountain-dark .lpc-shared-header .profile-dropdown a:hover{background:rgba(255,255,255,0.06)}
   body.theme-dark .lpc-shared-header .profile-dropdown .logout-btn{border-top-color:rgba(255,255,255,0.08)}
-  .lpc-shared-header .notifications-panel{position:absolute;top:72px;right:0;width:340px;background:var(--panel,#fff);border-radius:14px;border:1px solid var(--line,rgba(0,0,0,0.08));box-shadow:0 24px 48px rgba(0,0,0,0.15);padding:0;opacity:0;pointer-events:none;transform:translateY(-10px);transition:opacity .2s ease,transform .2s ease;z-index:30;display:flex;flex-direction:column}
-  .lpc-shared-header .notifications-panel.show{opacity:1;pointer-events:auto;transform:translateY(0)}
-  .lpc-shared-header .notifications-panel.hidden{display:none}
-  .lpc-shared-header .notifications-panel .notif-header{font-family:'Cormorant Garamond',serif;font-weight:300;font-size:1.2rem;padding:14px 18px;border-bottom:1px solid var(--line,rgba(0,0,0,0.08));background:rgba(0,0,0,0.02);margin:0}
-  .lpc-shared-header .notifications-panel #notifList{max-height:220px;overflow-y:auto}
-  .lpc-shared-header .notifications-panel .notif-item{padding:14px 18px;border-bottom:1px solid var(--line,rgba(0,0,0,0.06));cursor:pointer}
-  .lpc-shared-header .notifications-panel .notif-item.unread{border-left:3px solid #b6a47a}
-  .lpc-shared-header .notifications-panel .notif-item.read{opacity:.75}
-  .lpc-shared-header .notifications-panel .notif-title{font-family:'Cormorant Garamond',serif;font-weight:300;font-size:1.1rem;margin-bottom:2px}
-  .lpc-shared-header .notifications-panel .notif-body{font-family:'Sarabun',sans-serif;font-weight:200;font-size:.92rem;color:var(--ink,#4b4b4b)}
-  .lpc-shared-header .notifications-panel .notif-time{font-family:'Sarabun',sans-serif;font-weight:200;font-size:.78rem;color:var(--muted,#888);margin-top:4px}
-  .lpc-shared-header .notifications-panel .notif-empty{padding:16px;text-align:center;font-size:.9rem;color:var(--muted,#777);margin:0}
-  .lpc-shared-header .notifications-panel .notif-markall{border:none;border-top:1px solid var(--line,rgba(0,0,0,0.08));background:rgba(0,0,0,0.02);padding:12px;text-align:left;font-size:.9rem;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:200;color:var(--ink,#1a1a1a)}
-  body.theme-dark .lpc-shared-header .notification-icon{border-color:rgba(255,255,255,0.18);background:rgba(17,25,40,0.75)}
-  body.theme-dark .lpc-shared-header .notification-icon svg{color:#f8fbff}
-  body.theme-dark .lpc-shared-header .notifications-panel{background:rgba(18,23,36,0.98);border-color:rgba(255,255,255,0.12);box-shadow:0 24px 48px rgba(0,0,0,0.5)}
-  body.theme-dark .lpc-shared-header .notifications-panel .notif-header{background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.12)}
-  body.theme-dark .lpc-shared-header .notifications-panel .notif-item{border-color:rgba(255,255,255,0.08)}
-  body.theme-dark .lpc-shared-header .notifications-panel .notif-body{color:#e3e8f7}
-  body.theme-dark .lpc-shared-header .notifications-panel .notif-time,
-  body.theme-dark .lpc-shared-header .notifications-panel .notif-empty{color:#a9b4d6}
-  body.theme-dark .lpc-shared-header .notifications-panel .notif-markall{background:rgba(255,255,255,0.04);border-color:rgba(255,255,255,0.08);color:#f4f7ff}
-  body.theme-mountain .lpc-shared-header .notification-icon{background:rgba(255,255,255,0.75);border-color:rgba(255,255,255,0.5)}
-  body.theme-mountain .lpc-shared-header .notification-icon svg{color:#1d1d1d}
-  body.theme-mountain .lpc-shared-header .notifications-panel{background:rgba(255,255,255,0.9);border-color:rgba(255,255,255,0.5);backdrop-filter:blur(14px)}
-  body.theme-mountain .lpc-shared-header .notifications-panel .notif-header{background:rgba(255,255,255,0.6);border-color:rgba(255,255,255,0.4)}
-  body.theme-mountain .lpc-shared-header .notifications-panel .notif-body{color:#2e2b28}
-  /* Floating glass notification cards (no dropdown panel background) */
-  .lpc-shared-header .notifications-panel{
-    width:min(340px,calc(100vw - 24px));
-    background:transparent !important;
-    border:none !important;
-    box-shadow:none !important;
-    outline:none !important;
-    filter:none !important;
-    padding:0 !important;
-  }
-  .lpc-shared-header .notifications-panel .notif-header{
-    display:none !important;
-  }
-  .lpc-shared-header .notifications-panel .notif-scroll{
-    --notif-gap: 12px;
-    max-height:none;
-    overflow:visible;
-    display:flex;
-    flex-direction:column;
-    gap:var(--notif-gap);
-    padding:4px 2px;
-    background:transparent !important;
-    border:none !important;
-    box-shadow:none !important;
-    outline:none !important;
-  }
-  .lpc-shared-header .notifications-panel .notif-empty{
-    background:transparent !important;
-    border:none !important;
-    box-shadow:none !important;
-    text-align:left;
-    padding:10px 2px 2px;
-  }
-  .lpc-shared-header .notifications-panel .notif-markall{
-    display:none !important;
-  }
-  .lpc-shared-header .notifications-panel .notif-item{
-    border:1px solid rgba(255,255,255,0.48) !important;
-    background:linear-gradient(160deg, rgba(248,249,252,0.78), rgba(232,234,240,0.6)) !important;
-    border-radius:12px;
-    padding:8px 9px !important;
-    border-bottom:none !important;
-    box-shadow:0 10px 24px rgba(8,10,16,0.12), inset 0 1px 0 rgba(255,255,255,0.55);
-    backdrop-filter:blur(28px) saturate(145%);
-    -webkit-backdrop-filter:blur(28px) saturate(145%);
-    transition:transform .22s ease, box-shadow .22s ease, opacity .22s ease;
-    margin:0;
-  }
-  .lpc-shared-header .notifications-panel .notif-item:hover{
-    transform:translateY(-1px);
-    box-shadow:0 14px 30px rgba(8,10,16,0.16), inset 0 1px 0 rgba(255,255,255,0.58);
-  }
-  .lpc-shared-header .notifications-panel .notif-item.unread{
-    border-left:none !important;
-  }
-  .lpc-shared-header .notifications-panel .notif-main{
-    gap:6px;
-  }
-  .lpc-shared-header .notifications-panel .notif-time{
-    margin-top:2px;
-    font-size:0.72rem;
-  }
-  .lpc-shared-header .notifications-panel .notif-title{
-    font-size:0.84rem;
-    line-height:1.28;
-    font-weight:400;
-    display:block;
-    white-space:normal;
-    overflow:visible;
-  }
-  body.theme-dark .lpc-shared-header .notifications-panel,
-  body.theme-mountain-dark .lpc-shared-header .notifications-panel{
-    background:transparent !important;
-    border:none !important;
-    box-shadow:none !important;
-  }
-  body.theme-dark .lpc-shared-header .notifications-panel .notif-item,
-  body.theme-mountain-dark .lpc-shared-header .notifications-panel .notif-item{
-    background:linear-gradient(160deg, rgba(54,60,73,0.68), rgba(29,34,45,0.58)) !important;
-    border-color:rgba(255,255,255,0.24) !important;
-    box-shadow:0 12px 30px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16);
-  }
-  body.theme-dark .lpc-shared-header .notifications-panel .notif-title,
-  body.theme-mountain-dark .lpc-shared-header .notifications-panel .notif-title{
-    color:#f5f7ff;
-  }
-  body.theme-dark .lpc-shared-header .notifications-panel .notif-time,
-  body.theme-mountain-dark .lpc-shared-header .notifications-panel .notif-time,
-  body.theme-dark .lpc-shared-header .notifications-panel .notif-empty,
-  body.theme-mountain-dark .lpc-shared-header .notifications-panel .notif-empty{
-    color:#c4cde3;
-  }
   `;
   document.head.appendChild(style);
+}
+
+const SHARED_NOTIF_ENHANCE_KEY = "sharedNotifEnhanced";
+const SHARED_NOTIF_ITEM_KEY = "sharedNotifItemBound";
+
+function enhanceSharedHeaderNotificationScroll() {
+  const initList = (list) => {
+    if (!list || list.dataset[SHARED_NOTIF_ENHANCE_KEY] === "true") return;
+    list.dataset[SHARED_NOTIF_ENHANCE_KEY] = "true";
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const item = entry.target;
+          if (!(item instanceof HTMLElement)) return;
+          if (!entry.isIntersecting) return;
+          item.classList.add("notif-fade-in");
+          observer.unobserve(item);
+        });
+      },
+      { root: list, threshold: 0.2, rootMargin: "0px 0px -4% 0px" }
+    );
+
+    const bindItems = () => {
+      const items = list.querySelectorAll(".notif-item");
+      items.forEach((item) => {
+        if (!(item instanceof HTMLElement)) return;
+        if (item.dataset[SHARED_NOTIF_ITEM_KEY] === "true") return;
+        item.dataset[SHARED_NOTIF_ITEM_KEY] = "true";
+        item.classList.add("notif-fade-ready");
+        observer.observe(item);
+      });
+    };
+
+    const itemObserver = new MutationObserver(() => bindItems());
+    itemObserver.observe(list, { childList: true, subtree: true });
+    bindItems();
+  };
+
+  document
+    .querySelectorAll(".lpc-shared-header [data-notification-list]")
+    .forEach((list) => initList(list));
 }
 
 function ensureSimpleMessageStyles() {
@@ -518,7 +423,7 @@ async function initHeader(options = {}) {
             <span class="notification-badge" data-notification-badge>0</span>
           </button>
           <div class="notifications-panel notif-panel hidden" role="region" aria-live="polite" data-notification-panel>
-            <div class="notif-header">Notifications</div>
+            <div class="notif-header" aria-label="Notifications"></div>
             <div class="notif-scroll" data-notification-list></div>
             <div class="notif-empty" data-notification-empty>Loading…</div>
             <button type="button" class="notif-markall" data-notification-mark>Mark All Read</button>
@@ -532,7 +437,7 @@ async function initHeader(options = {}) {
           </div>
           <div class="profile-dropdown" id="profileDropdown" aria-hidden="true">
             <a href="profile-settings.html" data-account-settings>Account Settings</a>
-            <button type="button" class="logout-btn" data-logout onclick="window.logoutUser?.(event)">Log Out</button>
+            <button type="button" class="logout-btn" data-logout>Log Out</button>
           </div>
         </div>
       </div>
@@ -548,27 +453,28 @@ async function initHeader(options = {}) {
   if (!skipNotifications) {
     scanNotificationCenters();
   }
+  enhanceSharedHeaderNotificationScroll();
+}
+
+async function triggerLogout(evt) {
+  evt?.preventDefault?.();
+  if (typeof window.logoutUser === "function") {
+    await window.logoutUser(evt);
+    return;
+  }
+  try {
+    await logout("login.html");
+  } catch {
+    window.location.href = "login.html";
+  }
 }
 
 function bindHeaderEvents() {
   const profileTrigger = document.getElementById("headerUser");
   const profileMenu = document.getElementById("profileDropdown");
   const settingsBtn = profileMenu?.querySelector("[data-account-settings]");
-  const logoutBtn = profileMenu?.querySelector("[data-logout]");
   const notifToggle = document.querySelector("[data-notification-toggle]");
   const notifPanel = document.querySelector("[data-notification-panel]");
-  const triggerLogout = async (evt) => {
-    evt?.preventDefault?.();
-    if (typeof window.logoutUser === "function") {
-      await window.logoutUser(evt);
-      return;
-    }
-    try {
-      await logout("login.html");
-    } catch {
-      window.location.href = "login.html";
-    }
-  };
 
   if (profileTrigger && profileMenu) {
     const setProfileMenuOpen = (open) => {
@@ -601,10 +507,6 @@ function bindHeaderEvents() {
   settingsBtn?.addEventListener("click", () => {
     window.location.href = "profile-settings.html";
   });
-  if (logoutBtn && !logoutBtn.dataset.boundLogout) {
-    logoutBtn.dataset.boundLogout = "true";
-    logoutBtn.addEventListener("click", triggerLogout);
-  }
 
   // Fallback notification toggle if notifications.js didn't bind yet
   if (notifToggle && notifPanel && !notifToggle.dataset.boundNotifFallback) {
@@ -622,28 +524,34 @@ function bindHeaderEvents() {
     });
   }
 
-  document.addEventListener("click", (evt) => {
-    const target = evt.target.closest("[data-logout]");
-    if (!target) return;
-    triggerLogout(evt);
-  });
+  if (!headerDocListenersBound) {
+    headerDocListenersBound = true;
+    document.addEventListener("click", (evt) => {
+      const target = evt.target.closest("[data-logout]");
+      if (target) {
+        triggerLogout(evt);
+        return;
+      }
+      const menu = document.getElementById("profileDropdown");
+      const trigger = document.getElementById("headerUser");
+      if (menu && trigger && !menu.contains(evt.target) && !trigger.contains(evt.target)) {
+        menu.classList.remove("show");
+        menu.setAttribute("aria-hidden", "true");
+        trigger.setAttribute("aria-expanded", "false");
+      }
+    });
 
-  document.addEventListener("click", (evt) => {
-    if (profileMenu && !profileMenu.contains(evt.target) && !profileTrigger.contains(evt.target)) {
-      profileMenu.classList.remove("show");
-      profileMenu.setAttribute("aria-hidden", "true");
-      profileTrigger?.setAttribute("aria-expanded", "false");
-    }
-  });
-
-  document.addEventListener("keydown", (evt) => {
-    if (evt.key !== "Escape") return;
-    if (!profileMenu || !profileTrigger) return;
-    if (!profileMenu.classList.contains("show")) return;
-    profileMenu.classList.remove("show");
-    profileMenu.setAttribute("aria-hidden", "true");
-    profileTrigger.setAttribute("aria-expanded", "false");
-  });
+    document.addEventListener("keydown", (evt) => {
+      if (evt.key !== "Escape") return;
+      const menu = document.getElementById("profileDropdown");
+      const trigger = document.getElementById("headerUser");
+      if (!menu || !trigger) return;
+      if (!menu.classList.contains("show")) return;
+      menu.classList.remove("show");
+      menu.setAttribute("aria-hidden", "true");
+      trigger.setAttribute("aria-expanded", "false");
+    });
+  }
 }
 
 async function loadUser() {
@@ -816,6 +724,7 @@ async function initOverviewPage() {
   fetchUnreadMessages().catch(() => {});
   loadCompletedJobs(completedJobsList).catch(() => {});
   hydrateOverview().catch(() => {});
+  setupWeeklyNoteModal();
   void initWeeklyNotes(weeklyNotesGrid, weeklyNotesRange);
 
   quickButtons.forEach((btn) => {
@@ -896,6 +805,7 @@ async function initOverviewPage() {
 
 async function initWeeklyNotes(grid, rangeEl) {
   if (!grid) return;
+  const modalReady = Boolean(weeklyNoteModalRef && weeklyNoteTextarea && weeklyNoteSaveBtn);
   const start = getWeekStart(new Date());
   const weekKey = formatDateKey(start);
   const notes = await fetchWeeklyNotes(weekKey);
@@ -937,19 +847,125 @@ async function initWeeklyNotes(grid, rangeEl) {
 
     header.append(name, dateLabel);
 
-    const textarea = document.createElement("textarea");
-    textarea.className = "weekly-note-input";
-    textarea.rows = 3;
-    textarea.placeholder = "";
-    textarea.value = notes[i] || "";
-    textarea.addEventListener("input", () => {
-      notes[i] = textarea.value;
-      scheduleSave();
+    if (!modalReady) {
+      const textarea = document.createElement("textarea");
+      textarea.className = "weekly-note-input";
+      textarea.rows = 3;
+      textarea.placeholder = "";
+      textarea.value = notes[i] || "";
+      textarea.addEventListener("input", () => {
+        notes[i] = textarea.value;
+        scheduleSave();
+      });
+      day.append(header, textarea);
+      grid.appendChild(day);
+      continue;
+    }
+
+    day.tabIndex = 0;
+    day.setAttribute("role", "button");
+    day.setAttribute(
+      "aria-label",
+      `Weekly note for ${date.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}`
+    );
+
+    const body = document.createElement("div");
+    body.className = "weekly-note-body";
+    const updateBody = (value) => {
+      body.textContent = value || "";
+    };
+    updateBody(notes[i] || "");
+
+    const openModal = () => {
+      openWeeklyNoteModal({
+        date,
+        note: notes[i] || "",
+        onSave: (value) => {
+          notes[i] = value;
+          updateBody(value);
+          scheduleSave();
+        },
+      });
+    };
+
+    day.addEventListener("click", openModal);
+    day.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openModal();
+      }
     });
 
-    day.append(header, textarea);
+    day.append(header, body);
     grid.appendChild(day);
   }
+}
+
+let weeklyNoteModalRef = null;
+let weeklyNoteModalTitle = null;
+let weeklyNoteModalDate = null;
+let weeklyNoteTextarea = null;
+let weeklyNoteSaveBtn = null;
+let weeklyNoteCancelBtn = null;
+let weeklyNoteModalBound = false;
+let weeklyNoteModalOnSave = null;
+
+function setupWeeklyNoteModal() {
+  if (weeklyNoteModalBound) return;
+  weeklyNoteModalRef = document.getElementById("weeklyNoteModal");
+  if (!weeklyNoteModalRef) return;
+  weeklyNoteModalBound = true;
+  weeklyNoteModalTitle = document.getElementById("weeklyNoteModalTitle");
+  weeklyNoteModalDate = document.getElementById("weeklyNoteModalDate");
+  weeklyNoteTextarea = document.getElementById("weeklyNoteModalTextarea") || weeklyNoteModalRef.querySelector("textarea");
+  weeklyNoteSaveBtn = weeklyNoteModalRef.querySelector("[data-weekly-note-save]");
+  weeklyNoteCancelBtn = weeklyNoteModalRef.querySelector("[data-weekly-note-cancel]");
+
+  weeklyNoteCancelBtn?.addEventListener("click", closeWeeklyNoteModal);
+  weeklyNoteModalRef.addEventListener("click", (event) => {
+    if (event.target === weeklyNoteModalRef) {
+      closeWeeklyNoteModal();
+    }
+  });
+  weeklyNoteSaveBtn?.addEventListener("click", () => {
+    if (!weeklyNoteModalOnSave) return;
+    const value = weeklyNoteTextarea?.value?.trim() || "";
+    weeklyNoteModalOnSave(value);
+    closeWeeklyNoteModal();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && weeklyNoteModalRef && !weeklyNoteModalRef.classList.contains("hidden")) {
+      closeWeeklyNoteModal();
+    }
+  });
+}
+
+function openWeeklyNoteModal({ date, note, onSave }) {
+  if (!weeklyNoteModalRef) return;
+  weeklyNoteModalOnSave = onSave;
+  if (weeklyNoteModalTitle) {
+    weeklyNoteModalTitle.textContent = "Weekly Note";
+  }
+  if (weeklyNoteModalDate && date) {
+    weeklyNoteModalDate.textContent = date.toLocaleDateString(undefined, {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    });
+  }
+  if (weeklyNoteTextarea) {
+    weeklyNoteTextarea.value = note || "";
+  }
+  weeklyNoteModalRef.classList.remove("hidden");
+  weeklyNoteModalRef.removeAttribute("aria-hidden");
+  weeklyNoteTextarea?.focus();
+}
+
+function closeWeeklyNoteModal() {
+  if (!weeklyNoteModalRef) return;
+  weeklyNoteModalRef.classList.add("hidden");
+  weeklyNoteModalRef.removeAttribute("aria-busy");
+  weeklyNoteModalOnSave = null;
 }
 
 function getWeekStart(date) {
@@ -1219,14 +1235,11 @@ function renderCompletedJobCard(job) {
   const archiveLink = caseId
     ? `<a href="/api/cases/${encodeURIComponent(caseId)}/archive/download" target="_blank" rel="noopener">Download Archive</a>`
     : '<span class="muted">Archive unavailable</span>';
-  const receiptLink = caseId
-    ? `<a href="/api/payments/receipt/attorney/${encodeURIComponent(caseId)}?regen=1" target="_blank" rel="noopener">Download Receipt</a>`
-    : '<span class="muted">Receipt unavailable</span>';
   return `
     <div class="completed-job-card">
       <div class="info-line"><strong>${summary}</strong></div>
       <div class="info-line" style="color:var(--muted);">Completed ${completedAt}</div>
-      <div class="downloads">${archiveLink} · ${receiptLink}</div>
+      <div class="downloads">${archiveLink}</div>
     </div>
   `;
 }
@@ -3014,16 +3027,19 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
   const coverMarkup = cover
     ? `<div class="applicant-cover-box">${sanitize(cover).replace(/\n/g, "<br>")}</div>`
     : `<div class="applicant-cover-box muted">No cover note provided.</div>`;
-  const profileMarkup = profileLink
-    ? `<a href="${sanitize(profileLink)}" class="applicant-side-btn">View full profile</a>`
+  const safeProfileLink = sanitizeUrl(profileLink);
+  const safeResumeUrl = sanitizeUrl(resumeURL);
+  const safeLinkedInUrl = sanitizeUrl(linkedInURL);
+  const profileMarkup = safeProfileLink
+    ? `<a href="${sanitize(safeProfileLink)}" class="applicant-side-btn">View full profile</a>`
     : `<span class="applicant-side-btn muted" aria-disabled="true">Profile unavailable</span>`;
   const resumeMarkup = resumeURL
-    ? resumeIsHttp
-      ? `<a href="${sanitize(resumeURL)}" target="_blank" rel="noopener" class="applicant-side-btn">Résumé</a>`
+    ? resumeIsHttp && safeResumeUrl
+      ? `<a href="${sanitize(safeResumeUrl)}" target="_blank" rel="noopener" class="applicant-side-btn">Résumé</a>`
       : `<a href="#" data-applicant-doc data-doc-key="${sanitize(resumeKey)}" class="applicant-side-btn">Résumé</a>`
     : `<span class="applicant-side-btn muted" aria-disabled="true">No résumé</span>`;
-  const linkedInMarkup = linkedInURL
-    ? `<a href="${sanitize(linkedInURL)}" target="_blank" rel="noopener" class="applicant-side-btn">LinkedIn</a>`
+  const linkedInMarkup = safeLinkedInUrl
+    ? `<a href="${sanitize(safeLinkedInUrl)}" target="_blank" rel="noopener" class="applicant-side-btn">LinkedIn</a>`
     : `<span class="applicant-side-btn muted" aria-disabled="true">LinkedIn unavailable</span>`;
   const firstName = String(applicant.name || "Paralegal").split(" ")[0] || "Paralegal";
   const hireMarkup = canHire
@@ -3214,6 +3230,11 @@ function renderCaseMenu(item) {
   if (hasDeliverables(item) && !item.archived) {
     parts.push(
       `<button type="button" class="menu-item" data-case-action="download" data-case-id="${item.id}">Download Files</button>`
+    );
+  }
+  if (isFinal) {
+    parts.push(
+      `<button type="button" class="menu-item" data-case-action="download-receipt" data-case-id="${item.id}">Download Receipt</button>`
     );
   }
   if (item.archived) {
@@ -4035,7 +4056,7 @@ async function openCaseInvites(caseId) {
       <div class="case-invite-item">
         <img src="${sanitize(avatar)}" alt="${sanitize(name)} profile photo" />
         <div class="case-invite-meta">
-          ${link ? `<a href="${sanitize(link)}">${sanitize(name)}</a>` : `<span>${sanitize(name)}</span>`}
+          ${sanitizeUrl(link) ? `<a href="${sanitize(sanitizeUrl(link))}">${sanitize(name)}</a>` : `<span>${sanitize(name)}</span>`}
           <span class="case-invite-date">${sanitize(formatInvitedDate(invite.invitedAt))}</span>
           ${statusLabel ? `<span class="case-invite-date">${sanitize(statusLabel)}</span>` : ""}
         </div>
@@ -4386,6 +4407,8 @@ async function handleCaseAction(action, caseId) {
       return;
     } else if (action === "download") {
       await downloadCaseDeliverables(caseId);
+    } else if (action === "download-receipt") {
+      window.open(`/api/payments/receipt/attorney/${encodeURIComponent(caseId)}?regen=1`, "_blank");
     } else if (action === "download-archive") {
       window.open(`/api/cases/${encodeURIComponent(caseId)}/archive/download`, "_blank");
     } else if (action === "archive") {
@@ -6001,6 +6024,18 @@ function sanitize(str) {
     .replace(/'/g, "&#39;");
 }
 
+function sanitizeUrl(rawUrl) {
+  if (!rawUrl) return "";
+  try {
+    const url = new URL(String(rawUrl), window.location.origin);
+    const protocol = url.protocol.toLowerCase();
+    if (protocol === "http:" || protocol === "https:" || protocol === "mailto:") {
+      return url.href;
+    }
+  } catch {}
+  return "";
+}
+
 function sanitizeDownloadPath(path) {
   if (!path) return "#";
   if (/^https?:/i.test(path)) return path;
@@ -6675,7 +6710,7 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   overlay.innerHTML = `
     <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
       <div class="hire-confirm-title" id="hireConfirmTitle">Confirm Hire</div>
-      <p>You’re about to hire ${safeName}. This will fund escrow immediately.</p>
+      <p>You’re about to hire ${safeName}. This will fund escrow immediately. Once you mark the matter Complete, only then will funds be released to the paralegal.</p>
       <div class="hire-confirm-summary">
         <div class="hire-confirm-row">
           <span>Case amount</span>

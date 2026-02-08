@@ -27,6 +27,8 @@ const PLACEHOLDER_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponen
   </svg>`
 )}`;
 const MISSING_DOCUMENT_MESSAGE = "This document is no longer available for download.";
+const PLATFORM_FEE_PCT = 22;
+const DEFAULT_HIRE_ERROR = "Unable to hire paralegal.";
 
 function resolveProfilePhotoStatus(user = {}) {
   const raw = String(user.profilePhotoStatus || "").trim();
@@ -45,6 +47,32 @@ function getProfileImageUrl(user = {}, { allowPending = false } = {}) {
     }
   }
   return approved || PLACEHOLDER_AVATAR;
+}
+
+function getReturnToUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get("returnTo");
+  if (!raw) return "";
+  const decoded = decodeURIComponent(raw);
+  if (!decoded || /^(https?:)?\/\//i.test(decoded)) return "";
+  return decoded;
+}
+
+function getApplicantContextFromReturnTo() {
+  const returnTo = getReturnToUrl();
+  if (!returnTo) return null;
+  try {
+    const url = new URL(returnTo, window.location.origin);
+    const caseId = url.searchParams.get("caseId") || "";
+    const applicantId = url.searchParams.get("applicantId") || "";
+    const returnFromProfile = url.searchParams.get("returnFromProfile") === "1";
+    const openApplicant = url.searchParams.get("openApplicant") === "1";
+    if (!caseId || !applicantId) return null;
+    if (!returnFromProfile && !openApplicant) return null;
+    return { caseId, applicantId, returnTo };
+  } catch {
+    return null;
+  }
 }
 function applyGlobalAvatars(user = state.profileUser || {}) {
   const src = getProfileImageUrl(user, { allowPending: canEditProfile() });
@@ -89,7 +117,6 @@ const elements = {
   locationMeta: document.getElementById("locationMeta"),
   credentialMeta: document.getElementById("credentialMeta"),
   joinedMeta: document.getElementById("joinedMeta"),
-  joinedMetaCorner: document.getElementById("joinedMetaCorner"),
   nameField: document.getElementById("profileName"),
   roleLine: document.getElementById("roleLine"),
   bioCopy: document.getElementById("bioCopy"),
@@ -164,8 +191,12 @@ const state = {
   viewingSelf: false,
   profileUser: null, // the paralegal being displayed
   caseContextId: null,
+  caseContextTitle: "",
+  caseContextLoading: false,
+  caseLookup: new Map(),
   openCases: [],
   inviteTarget: null,
+  applicantContext: null,
 };
 
 const PREFILL_CACHE_KEY = "lpc_edit_profile_prefill";
@@ -311,6 +342,10 @@ async function init() {
 
   const params = new URLSearchParams(window.location.search);
   state.caseContextId = params.get("caseId") || null;
+  state.applicantContext = getApplicantContextFromReturnTo();
+  if (!state.caseContextId && state.applicantContext?.caseId) {
+    state.caseContextId = state.applicantContext.caseId;
+  }
   const explicitId = params.get("paralegalId") || params.get("id");
   state.viewingSelf = params.get("me") === "1";
 
@@ -355,6 +390,10 @@ async function init() {
 
 function bindCtaEvents() {
   elements.inviteBtn?.addEventListener("click", () => {
+    if (state.applicantContext?.caseId) {
+      handleHireForCase();
+      return;
+    }
     openInviteModal();
   });
   const handleEditProfileClick = async (event) => {
@@ -378,8 +417,16 @@ function bindCtaEvents() {
 
 function bindBackButton() {
   if (!elements.backBtn) return;
+  const returnTo = getReturnToUrl();
+  if (returnTo) {
+    elements.backBtn.setAttribute("href", returnTo);
+  }
   elements.backBtn.addEventListener("click", (event) => {
     event.preventDefault();
+    if (returnTo) {
+      window.location.href = returnTo;
+      return;
+    }
     if (window.history.length > 1) {
       window.history.back();
     } else {
@@ -487,9 +534,15 @@ function sanitizeText(value) {
 }
 
 function sanitizeUrl(value) {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim();
-  return trimmed || null;
+  if (!value) return "";
+  try {
+    const url = new URL(String(value), window.location.origin);
+    const protocol = url.protocol.toLowerCase();
+    if (protocol === "http:" || protocol === "https:" || protocol === "mailto:") {
+      return url.href;
+    }
+  } catch {}
+  return "";
 }
 
 function sanitizeYears(value) {
@@ -937,8 +990,11 @@ function renderPhotoReviewStatus(profile = {}) {
 
 function renderStatus(profile) {
   if (!elements.statusChip) return;
-  const message = profile.availability || "Availability on request";
-  const nextAvailable = friendlyAvailabilityDate(profile.availabilityDetails?.nextAvailable);
+  const nextRaw = profile.availabilityDetails?.nextAvailable;
+  const nextDate = nextRaw ? new Date(nextRaw) : null;
+  const nextExpired = nextDate && !Number.isNaN(nextDate.getTime()) && nextDate.getTime() <= Date.now();
+  const message = nextExpired ? "Available Now" : profile.availability || "Availability on request";
+  const nextAvailable = nextExpired ? "" : friendlyAvailabilityDate(nextRaw);
   elements.statusChip.textContent = nextAvailable ? `${message} · Next opening ${nextAvailable}` : message;
 }
 
@@ -946,7 +1002,8 @@ function renderMetadata(profile) {
   const stateOnly = extractState(profile.location);
   if (stateOnly) {
     const href = `https://www.google.com/maps/search/${encodeURIComponent(stateOnly + " state")}`;
-    renderMetaLine(elements.locationMeta, "map", stateOnly, href);
+    const safeHref = sanitizeUrl(href);
+    renderMetaLine(elements.locationMeta, "map", stateOnly, safeHref);
   } else {
     clearMetaLine(elements.locationMeta);
   }
@@ -955,8 +1012,9 @@ function renderMetadata(profile) {
     renderMetaLine(elements.credentialMeta, "C", `Bar #${profile.barNumber}`);
   } else {
     const linkedIn = profile.linkedInURL || profile.linkedin || "";
-    if (linkedIn) {
-      renderMetaLine(elements.credentialMeta, "link", "LinkedIn", linkedIn);
+    const safeLinkedIn = sanitizeUrl(linkedIn);
+    if (safeLinkedIn) {
+      renderMetaLine(elements.credentialMeta, "link", "LinkedIn", safeLinkedIn);
     } else {
       renderMetaLine(elements.credentialMeta, "", "Credentials available upon request");
     }
@@ -969,7 +1027,6 @@ function renderMetadata(profile) {
       : null;
   const joinedLabel = joined ? `Joined ${joined}` : "Joined date unavailable";
   renderMetaLine(elements.joinedMeta, "J", joinedLabel);
-  renderMetaLine(elements.joinedMetaCorner, "", joinedLabel);
 }
 
 function renderDocumentLinks(profile) {
@@ -992,12 +1049,28 @@ function renderDocumentLinks(profile) {
     if (certKey) {
       const key = deriveKey(certKey);
       if (key) {
+        let shouldShow = true;
         elements.certificateLink.dataset.key = key;
-        if (/^https?:\/\//i.test(certKey)) {
-          elements.certificateLink.href = `${certKey}${certKey.includes("?") ? "&" : "?"}v=${Date.now()}`;
+        const isExternal = /^https?:\/\//i.test(certKey) || /^mailto:/i.test(certKey);
+        if (isExternal) {
+          const safeExternal = sanitizeUrl(certKey);
+          if (safeExternal) {
+            if (/^https?:/i.test(safeExternal)) {
+              elements.certificateLink.href = `${safeExternal}${safeExternal.includes("?") ? "&" : "?"}v=${Date.now()}`;
+            } else {
+              elements.certificateLink.href = safeExternal;
+            }
+          } else {
+            shouldShow = false;
+            elements.certificateLink.dataset.key = "";
+          }
         }
-        elements.certificateLink.classList.remove("hidden");
-        hasDoc = true;
+        if (shouldShow) {
+          elements.certificateLink.classList.remove("hidden");
+          hasDoc = true;
+        } else {
+          elements.certificateLink.classList.add("hidden");
+        }
       } else {
         elements.certificateLink.dataset.key = "";
         elements.certificateLink.classList.add("hidden");
@@ -1013,12 +1086,28 @@ function renderDocumentLinks(profile) {
     if (resumeKey) {
       const key = deriveKey(resumeKey);
       if (key) {
+        let shouldShow = true;
         elements.resumeLink.dataset.key = key;
-        if (/^https?:\/\//i.test(resumeKey)) {
-          elements.resumeLink.href = `${resumeKey}${resumeKey.includes("?") ? "&" : "?"}v=${Date.now()}`;
+        const isExternal = /^https?:\/\//i.test(resumeKey) || /^mailto:/i.test(resumeKey);
+        if (isExternal) {
+          const safeExternal = sanitizeUrl(resumeKey);
+          if (safeExternal) {
+            if (/^https?:/i.test(safeExternal)) {
+              elements.resumeLink.href = `${safeExternal}${safeExternal.includes("?") ? "&" : "?"}v=${Date.now()}`;
+            } else {
+              elements.resumeLink.href = safeExternal;
+            }
+          } else {
+            shouldShow = false;
+            elements.resumeLink.dataset.key = "";
+          }
         }
-        elements.resumeLink.classList.remove("hidden");
-        hasDoc = true;
+        if (shouldShow) {
+          elements.resumeLink.classList.remove("hidden");
+          hasDoc = true;
+        } else {
+          elements.resumeLink.classList.add("hidden");
+        }
       } else {
         elements.resumeLink.dataset.key = "";
         elements.resumeLink.classList.add("hidden");
@@ -1034,12 +1123,28 @@ function renderDocumentLinks(profile) {
     if (writingKey) {
       const key = deriveKey(writingKey);
       if (key) {
+        let shouldShow = true;
         elements.writingSampleLink.dataset.key = key;
-        if (/^https?:\/\//i.test(writingKey)) {
-          elements.writingSampleLink.href = `${writingKey}${writingKey.includes("?") ? "&" : "?"}v=${Date.now()}`;
+        const isExternal = /^https?:\/\//i.test(writingKey) || /^mailto:/i.test(writingKey);
+        if (isExternal) {
+          const safeExternal = sanitizeUrl(writingKey);
+          if (safeExternal) {
+            if (/^https?:/i.test(safeExternal)) {
+              elements.writingSampleLink.href = `${safeExternal}${safeExternal.includes("?") ? "&" : "?"}v=${Date.now()}`;
+            } else {
+              elements.writingSampleLink.href = safeExternal;
+            }
+          } else {
+            shouldShow = false;
+            elements.writingSampleLink.dataset.key = "";
+          }
         }
-        elements.writingSampleLink.classList.remove("hidden");
-        hasDoc = true;
+        if (shouldShow) {
+          elements.writingSampleLink.classList.remove("hidden");
+          hasDoc = true;
+        } else {
+          elements.writingSampleLink.classList.add("hidden");
+        }
       } else {
         elements.writingSampleLink.dataset.key = "";
         elements.writingSampleLink.classList.add("hidden");
@@ -1448,11 +1553,13 @@ function renderAttorneyHighlights(profile) {
 
   const entries = [];
   if (profile.linkedInURL) {
-    const safeUrl = escapeAttribute(profile.linkedInURL);
+    const safeUrl = sanitizeUrl(profile.linkedInURL);
+    if (safeUrl) {
     entries.push({
       title: "LinkedIn",
-      content: `<a href="${safeUrl}" target="_blank" rel="noopener">View LinkedIn profile</a>`,
+      content: `<a href="${escapeAttribute(safeUrl)}" target="_blank" rel="noopener">View LinkedIn profile</a>`,
     });
+    }
   }
   const experienceLabel = describeExperience(profile.yearsExperience);
   if (experienceLabel) {
@@ -1462,18 +1569,22 @@ function renderAttorneyHighlights(profile) {
     });
   }
   if (profile.certificateURL) {
-    const certUrl = escapeAttribute(profile.certificateURL);
+    const certUrl = sanitizeUrl(profile.certificateURL);
+    if (certUrl) {
     entries.push({
       title: "Certificate",
-      content: `<a href="${certUrl}" target="_blank" rel="noopener">View credential</a>`,
+      content: `<a href="${escapeAttribute(certUrl)}" target="_blank" rel="noopener">View credential</a>`,
     });
+    }
   }
   if (profile.resumeURL) {
-    const resumeHref = escapeAttribute(profile.resumeURL);
+    const resumeHref = sanitizeUrl(profile.resumeURL);
+    if (resumeHref) {
     entries.push({
       title: "Résumé",
-      content: `<a href="${resumeHref}" target="_blank" rel="noopener">View Résumé</a>`,
+      content: `<a href="${escapeAttribute(resumeHref)}" target="_blank" rel="noopener">View Résumé</a>`,
     });
+    }
   }
 
   container.innerHTML = "";
@@ -1512,12 +1623,25 @@ function toggleElement(el, shouldShow) {
 
 function updateInviteButtonState() {
   if (!elements.inviteBtn) return;
-  const hasOpenCases = state.viewerRole === "attorney" && state.openCases.length > 0;
+  const isAttorney = state.viewerRole === "attorney";
+  const applicantCaseId = state.applicantContext?.caseId || "";
+  if (isAttorney && applicantCaseId) {
+    const label = buildHireLabel(applicantCaseId);
+    elements.inviteBtn.textContent = label;
+    elements.inviteBtn.dataset.mode = "hire";
+    toggleElement(elements.inviteBtn, true);
+    elements.inviteBtn.disabled = false;
+    if (!state.caseContextTitle && !state.caseContextLoading) {
+      void loadCaseContextTitle(applicantCaseId);
+    }
+    return;
+  }
+  const hasOpenCases = isAttorney && state.openCases.length > 0;
+  elements.inviteBtn.textContent = "Invite to Case";
+  elements.inviteBtn.dataset.mode = "invite";
   toggleElement(elements.inviteBtn, hasOpenCases);
   elements.inviteBtn.disabled = !hasOpenCases;
-  if (elements.sendInviteBtn) {
-    elements.sendInviteBtn.disabled = !hasOpenCases;
-  }
+  if (elements.sendInviteBtn) elements.sendInviteBtn.disabled = !hasOpenCases;
 }
 
 function toggleSkeleton(enable) {
@@ -1563,6 +1687,47 @@ async function loadAttorneyCases() {
   updateInviteButtonState();
 }
 
+function buildHireLabel(caseId) {
+  const title = resolveCaseTitle(caseId);
+  return title ? `Hire for ${title}` : "Hire for this case";
+}
+
+function normalizeId(value) {
+  if (!value) return "";
+  return String(value);
+}
+
+function resolveCaseTitle(caseId) {
+  const normalized = normalizeId(caseId);
+  if (!normalized) return "";
+  if (state.caseContextTitle) return state.caseContextTitle;
+  const match = state.openCases.find((item) => normalizeId(item.id || item._id) === normalized);
+  if (!match) return "";
+  state.caseContextTitle = match.title || match.caseNumber || "";
+  return state.caseContextTitle;
+}
+
+async function loadCaseContextTitle(caseId) {
+  const normalized = normalizeId(caseId);
+  if (!normalized) return;
+  if (state.caseContextLoading) return;
+  state.caseContextLoading = true;
+  try {
+    const res = await secureFetch(`/api/cases/${encodeURIComponent(normalized)}`, {
+      headers: { Accept: "application/json" },
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) return;
+    state.caseLookup.set(normalized, payload);
+    state.caseContextTitle = payload?.title || payload?.caseNumber || "";
+  } catch (err) {
+    console.warn("Unable to load case context", err);
+  } finally {
+    state.caseContextLoading = false;
+    updateInviteButtonState();
+  }
+}
+
 function renderCaseOptions() {
   const select = elements.inviteCaseSelect;
   if (!select) return;
@@ -1596,6 +1761,259 @@ function openInviteModal() {
   clearFieldError(elements.inviteCaseSelect);
   renderCaseOptions();
   elements.inviteModal.classList.add("show");
+}
+
+async function handleHireForCase() {
+  const caseId = state.applicantContext?.caseId || state.caseContextId || "";
+  const paralegalId = state.profileUser?.id || state.profileUser?._id || state.paralegalId || "";
+  if (!caseId || !paralegalId) {
+    showToast("Unable to hire for this case.", "error");
+    return;
+  }
+  const button = elements.inviteBtn;
+  if (button) {
+    button.classList.add("is-pressed");
+    window.setTimeout(() => button.classList.remove("is-pressed"), 180);
+  }
+  const paymentReady = await hasDefaultPaymentMethod();
+  if (!paymentReady) {
+    showToast("Add a payment method to hire before hiring.", "error");
+    return;
+  }
+  let caseDetails;
+  try {
+    caseDetails = await getCaseForHire(caseId);
+  } catch (err) {
+    showToast(err?.message || "Unable to load case details.", "error");
+    return;
+  }
+  const amountCents = Number(caseDetails?.lockedTotalAmount ?? caseDetails?.totalAmount ?? 0);
+  if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    showToast("Escrow amount is unavailable for this case.", "error");
+    return;
+  }
+  const paralegalName = formatName(state.profileUser || {});
+  openHireConfirmModal({
+    paralegalName,
+    amountCents,
+    feePct: PLATFORM_FEE_PCT,
+    continueHref: `case-detail.html?caseId=${encodeURIComponent(caseId)}`,
+    onConfirm: async () => {
+      const originalText = button?.textContent || "Hire";
+      if (button) {
+        button.textContent = "Processing...";
+        button.setAttribute("disabled", "disabled");
+      }
+      try {
+        await hireParalegal(caseId, paralegalId);
+      } finally {
+        if (button) {
+          button.removeAttribute("disabled");
+          button.textContent = originalText;
+        }
+      }
+    },
+  });
+}
+
+async function hasDefaultPaymentMethod() {
+  try {
+    const res = await secureFetch("/api/payments/payment-method/default", {
+      headers: { Accept: "application/json" },
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) return false;
+    return !!payload?.paymentMethod;
+  } catch {
+    return false;
+  }
+}
+
+async function getCaseForHire(caseId) {
+  const normalized = normalizeId(caseId);
+  if (state.caseLookup.has(normalized)) return state.caseLookup.get(normalized);
+  const res = await secureFetch(`/api/cases/${encodeURIComponent(normalized)}`, { headers: { Accept: "application/json" } });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload?.error || "Unable to load case details.");
+  }
+  state.caseLookup.set(normalized, payload);
+  return payload;
+}
+
+function formatHireErrorMessage(message) {
+  if (!message || typeof message !== "string") return DEFAULT_HIRE_ERROR;
+  const normalized = message.toLowerCase();
+  if (normalized.includes("stripe") && normalized.includes("connect")) {
+    return "This paralegal must connect Stripe before you can hire them.";
+  }
+  if (
+    normalized.includes("stripe") &&
+    (normalized.includes("onboard") || normalized.includes("onboarding") || normalized.includes("payout"))
+  ) {
+    return "This paralegal must complete Stripe onboarding before you can hire them.";
+  }
+  return message;
+}
+
+async function hireParalegal(caseId, paralegalId) {
+  const res = await secureFetch(
+    `/api/cases/${encodeURIComponent(caseId)}/hire/${encodeURIComponent(paralegalId)}`,
+    { method: "POST", body: {} }
+  );
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(payload?.error || DEFAULT_HIRE_ERROR);
+  return payload;
+}
+
+function ensureHireModalStyles() {
+  if (document.getElementById("hire-confirm-styles")) return;
+  const style = document.createElement("style");
+  style.id = "hire-confirm-styles";
+  style.textContent = `
+    .hire-confirm-overlay{position:fixed;inset:0;background:rgba(15,23,42,.4);display:flex;align-items:center;justify-content:center;z-index:1500;opacity:0;visibility:hidden;transition:opacity .16s ease,visibility .16s ease}
+    .hire-confirm-overlay.is-visible{opacity:1;visibility:visible}
+    .hire-confirm-overlay.is-closing{pointer-events:none}
+    .hire-confirm-modal{background:#fff;border:1px solid rgba(0,0,0,0.08);border-radius:18px;padding:28px;max-width:580px;width:min(94%,580px);box-shadow:0 24px 50px rgba(0,0,0,.2);display:grid;gap:16px;font-family:'Cormorant Garamond',serif;font-weight:300;color:#1a1a1a;font-size:1.05rem;opacity:0;transform:translateY(10px) scale(.985);transition:opacity .16s ease,transform .16s ease}
+    .hire-confirm-overlay.is-visible .hire-confirm-modal{opacity:1;transform:translateY(0) scale(1)}
+    .hire-confirm-modal button,
+    .hire-confirm-modal a{font-family:'Cormorant Garamond',serif}
+    .hire-confirm-modal p{font-weight:300;color:#6b7280}
+    .hire-confirm-title{font-weight:300;font-size:1.6rem;letter-spacing:0.01em}
+    .hire-confirm-summary{border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:14px 18px;display:grid;gap:12px;background:#fff}
+    .hire-confirm-row{display:flex;justify-content:space-between;gap:16px;align-items:baseline}
+    .hire-confirm-row span{text-transform:uppercase;font-size:0.75rem;letter-spacing:0.08em;color:#6b7280;font-weight:300}
+    .hire-confirm-row strong{font-size:1.3rem;font-weight:300;color:#1a1a1a}
+    .hire-confirm-total strong{font-weight:400}
+    .hire-confirm-error{border:1px solid rgba(185,28,28,.4);background:rgba(254,242,242,.9);color:#991b1b;border-radius:10px;padding:8px 10px;font-size:0.9rem}
+    .hire-confirm-success{border:1px solid rgba(22,163,74,.35);background:rgba(240,253,244,.9);color:#166534;border-radius:10px;padding:8px 10px;font-size:0.9rem}
+    .hire-confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:4px;flex-wrap:wrap}
+    .hire-confirm-actions[hidden]{display:none}
+    @media (prefers-reduced-motion: reduce){
+      .hire-confirm-overlay,.hire-confirm-modal{transition:none}
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref, onConfirm }) {
+  ensureHireModalStyles();
+  const safeName = escapeHtml(paralegalName || "Paralegal");
+  const feeRate = Number(feePct || 0);
+  const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
+  const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
+  const overlay = document.createElement("div");
+  overlay.className = "hire-confirm-overlay";
+  overlay.innerHTML = `
+    <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
+      <div class="hire-confirm-title" id="hireConfirmTitle">Confirm Hire</div>
+      <p>You're about to hire ${safeName}. This will fund escrow immediately.</p>
+      <div class="hire-confirm-summary">
+        <div class="hire-confirm-row">
+          <span>Case amount</span>
+          <strong>${escapeHtml(formatCurrency(amountCents))}</strong>
+        </div>
+        <div class="hire-confirm-row">
+          <span>Platform fee (${feeRate}%)</span>
+          <strong>${escapeHtml(formatCurrency(feeCents))}</strong>
+        </div>
+        <div class="hire-confirm-row hire-confirm-total">
+          <span>Total charge</span>
+          <strong>${escapeHtml(formatCurrency(totalCents))}</strong>
+        </div>
+      </div>
+      <div class="hire-confirm-error" data-hire-error hidden></div>
+      <div class="hire-confirm-success" data-hire-success hidden>Escrow funded. Work can begin.</div>
+      <div class="hire-confirm-actions" data-hire-continue hidden>
+        <a class="btn primary" href="${escapeAttribute(continueHref || "#")}">Continue to case</a>
+      </div>
+      <div class="hire-confirm-actions" data-hire-actions>
+        <button class="btn secondary" type="button" data-hire-cancel>Cancel</button>
+        <button class="btn primary" type="button" data-hire-confirm>Confirm &amp; Hire</button>
+      </div>
+    </div>
+  `;
+  const errorEl = overlay.querySelector("[data-hire-error]");
+  const successEl = overlay.querySelector("[data-hire-success]");
+  const continueEl = overlay.querySelector("[data-hire-continue]");
+  const confirmBtn = overlay.querySelector("[data-hire-confirm]");
+  const cancelBtn = overlay.querySelector("[data-hire-cancel]");
+
+  const close = () => {
+    if (overlay.classList.contains("is-closing")) return;
+    overlay.classList.add("is-closing");
+    overlay.classList.remove("is-visible");
+    const removeOverlay = () => {
+      overlay.removeEventListener("transitionend", handleTransitionEnd);
+      overlay.remove();
+    };
+    const handleTransitionEnd = (event) => {
+      if (event.target === overlay) removeOverlay();
+    };
+    overlay.addEventListener("transitionend", handleTransitionEnd);
+    window.setTimeout(removeOverlay, 200);
+  };
+  const setLoading = (isLoading) => {
+    if (confirmBtn) {
+      confirmBtn.disabled = isLoading;
+      confirmBtn.textContent = isLoading ? "Charging..." : "Confirm & Hire";
+    }
+    if (cancelBtn) cancelBtn.disabled = isLoading;
+  };
+  const showError = (message) => {
+    if (!errorEl) return;
+    if (!message) {
+      errorEl.hidden = true;
+      errorEl.textContent = "";
+      return;
+    }
+    errorEl.textContent = message;
+    errorEl.hidden = false;
+  };
+  const showSuccess = () => {
+    if (successEl) successEl.hidden = false;
+    if (confirmBtn) {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = "Hired";
+    }
+    if (cancelBtn) {
+      cancelBtn.disabled = false;
+      cancelBtn.textContent = "Close";
+    }
+    if (continueEl) continueEl.hidden = false;
+  };
+
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay && !confirmBtn?.disabled) close();
+  });
+  cancelBtn?.addEventListener("click", () => {
+    if (!confirmBtn?.disabled) close();
+  });
+  confirmBtn?.addEventListener("click", async () => {
+    showError("");
+    setLoading(true);
+    try {
+      await onConfirm?.();
+      showSuccess();
+    } catch (err) {
+      showError(formatHireErrorMessage(err?.message));
+      setLoading(false);
+    }
+  });
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key === "Escape" && !confirmBtn?.disabled) close();
+    },
+    { once: true }
+  );
+  document.body.appendChild(overlay);
+  window.requestAnimationFrame(() => overlay.classList.add("is-visible"));
+}
+
+function formatCurrency(amountCents = 0) {
+  const dollars = Number(amountCents || 0) / 100;
+  return dollars.toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
 function closeInviteModal() {

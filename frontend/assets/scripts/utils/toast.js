@@ -71,6 +71,10 @@
       try {
         const request = args[0];
         const options = args[1] || {};
+        const suppressToast = Boolean(
+          (options && options.suppressToast) ||
+            (typeof request === "object" && request && request.suppressToast)
+        );
         const url =
           typeof request === "string"
             ? request
@@ -85,6 +89,7 @@
           ).toUpperCase();
         const isReadRequest = method === "GET" || method === "HEAD";
         if (
+          !suppressToast &&
           response &&
           !response.ok &&
           typeof url === "string" &&

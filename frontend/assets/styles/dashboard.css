@@ -92,25 +92,6 @@ nav a.active, nav a:hover {
   margin-bottom: 2rem;
   gap: 1.5rem;
 }
-.notification-icon svg {
-  width: 20px;
-  height: 20px;
-  color: var(--ink);
-}
-.notification-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  background: red;
-  color: white;
-  border-radius: 50%;
-  font-size: 0.7rem;
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 .user-profile {
   display: flex;
   align-items: center;

@@ -16,6 +16,7 @@
   </script>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
   <link rel="preload" as="image" href="hero-mountain.jpg" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
@@ -62,10 +63,6 @@
       --radius:14px;
       --font-serif:'Cormorant Garamond',serif;
       --font-sans:'Sarabun',sans-serif;
-      --notif-card-bg:linear-gradient(160deg, rgba(248,249,252,0.78), rgba(232,234,240,0.6));
-      --notif-card-border:rgba(255,255,255,0.72);
-      --notif-card-shadow:0 10px 24px rgba(8,10,16,0.12), inset 0 1px 0 rgba(255,255,255,0.55);
-      --notif-card-hover-shadow:0 14px 30px rgba(8,10,16,0.16), inset 0 1px 0 rgba(255,255,255,0.58);
     }
     body.theme-dark{
       --bg:#0f172a;
@@ -75,10 +72,6 @@
       --muted:#9aa7c4;
       --line:rgba(255,255,255,0.08);
       --sidebar-text:#f8fbff;
-      --notif-card-bg:linear-gradient(160deg, rgba(54,60,73,0.68), rgba(29,34,45,0.58));
-      --notif-card-border:rgba(255,255,255,0.24);
-      --notif-card-shadow:0 12px 30px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.16);
-      --notif-card-hover-shadow:0 16px 36px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2);
     }
     body.theme-mountain{
       --bg:#f8f6f1;
@@ -281,38 +274,6 @@
     .main{flex:1;padding:40px;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;}
     .topbar{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:0.2rem;gap:1.5rem;position:relative;min-height:0;}
     #createCaseTopbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;}
-    .notification-wrapper{position:relative;}
-    .topbar .lpc-shared-header{margin-bottom:0.2rem !important;}
-    .notification-icon{width:46px;height:46px;border-radius:50%;border:1px solid var(--line);display:flex;justify-content:center;align-items:center;background:#fff;cursor:pointer;position:relative;transition:border-color .2s ease, transform .2s ease;}
-    .notification-icon:hover{border-color:var(--accent);transform:translateY(-1px);}
-    .notification-icon svg{width:22px;height:22px;color:var(--ink);}
-    .notification-badge{position:absolute;top:-4px;right:-4px;background:var(--accent);color:#fff;border-radius:999px;font-size:.75rem;padding:2px 6px;line-height:1;display:none;font-weight:200;}
-    .notification-badge.show{display:inline-flex;}
-    #createCaseTopbar .notifications-panel{position:absolute;top:56px;right:0;width:min(340px,calc(100vw - 24px));background:transparent !important;border:none !important;box-shadow:none !important;outline:none !important;filter:none !important;padding:0 !important;opacity:0;pointer-events:none;transform:translateY(-8px) scale(0.98);transition:opacity .26s ease,transform .32s cubic-bezier(.22,.76,.28,1);z-index:40;display:flex;flex-direction:column;visibility:hidden;}
-    #createCaseTopbar .notifications-panel.show{opacity:1;pointer-events:auto;transform:translateY(0) scale(1);visibility:visible;}
-    #createCaseTopbar .notifications-panel.hidden{opacity:0;pointer-events:none;visibility:hidden;}
-    #createCaseTopbar .notifications-panel .notif-header{display:none !important;}
-    #createCaseTopbar .notifications-panel .notif-scroll{
-      --notif-gap: 12px;
-      max-height: none;
-      overflow: visible;
-      display: flex;
-      flex-direction: column;
-      gap: var(--notif-gap);
-      padding: 4px 2px;
-    }
-    #createCaseTopbar .notifications-panel .notif-scroll{background:transparent !important;border:none !important;box-shadow:none !important;outline:none !important;}
-    #createCaseTopbar .notifications-panel .notif-empty{padding:10px 2px 2px;text-align:left;font-size:.9rem;color:var(--muted,#777);margin:0;background:transparent !important;border:none !important;box-shadow:none !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;}
-    #createCaseTopbar .notifications-panel .notif-markall{display:none !important;}
-    #createCaseTopbar .notif-card{width:100%;text-align:left;border:1px solid rgba(255,255,255,0.48) !important;background:var(--notif-card-bg) !important;padding:8px 9px;border-radius:12px;cursor:pointer;box-shadow:var(--notif-card-shadow);backdrop-filter:blur(28px) saturate(145%) !important;-webkit-backdrop-filter:blur(28px) saturate(145%) !important;opacity:0;transform:translateY(-16px) scale(0.98);transition:opacity .34s ease,transform .36s cubic-bezier(.2,.72,.2,1),box-shadow .22s ease;transition-delay:var(--drop-delay, 0ms);}
-    #createCaseTopbar .notif-card.is-ready{opacity:1;transform:translateY(0) scale(1);}
-    #createCaseTopbar .notif-card:hover{box-shadow:var(--notif-card-hover-shadow);}
-    #createCaseTopbar .notif-card .notif-main{display:flex;align-items:flex-start;gap:6px;}
-    #createCaseTopbar .notif-card .notif-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:6px;opacity:0;}
-    #createCaseTopbar .notif-card.unread .notif-dot{opacity:1;}
-    #createCaseTopbar .notif-card .notif-copy{display:flex;flex-direction:column;gap:3px;min-width:0;}
-    #createCaseTopbar .notif-card .notif-title{font-size:.84rem;line-height:1.28;color:var(--ink);font-weight:400;display:block;white-space:normal;overflow:visible;}
-    #createCaseTopbar .notif-card .notif-time{font-size:.72rem;color:var(--muted,#6b7280);opacity:.95;}
     .user-profile{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.4);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color 0.2s ease,box-shadow .2s ease;cursor:pointer;position:relative;}
     .user-profile img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,0.08);object-fit:cover;}
     .user-profile strong{display:block;font-weight:300;color:var(--ink);}
@@ -337,19 +298,6 @@
     body.theme-mountain .user-profile span{color:rgba(255,255,255,0.85);}
     body.theme-mountain #createCaseTopbar .user-profile strong{color:#1a1a1a;}
     body.theme-mountain #createCaseTopbar .user-profile span{color:#6b6b6b;}
-    body.theme-mountain-dark #createCaseTopbar .notification-icon,
-    body.theme-dark #createCaseTopbar .notification-icon{background:rgba(17,25,40,0.75);border-color:rgba(255,255,255,0.18);}
-    body.theme-mountain-dark #createCaseTopbar .notification-icon svg,
-    body.theme-dark #createCaseTopbar .notification-icon svg{color:#f8fbff;}
-    body.theme-dark #createCaseTopbar .notifications-panel{background:transparent !important;}
-    body.theme-dark #createCaseTopbar .notifications-panel .notif-empty{color:#a9b4d6;}
-    body.theme-dark #createCaseTopbar .notifications-panel .notif-markall{background:transparent !important;border-color:rgba(182,164,122,0.45);color:#f4f7ff;}
-    body.theme-dark #createCaseTopbar .notif-card,
-    body.theme-mountain-dark #createCaseTopbar .notif-card{background:var(--notif-card-bg) !important;border-color:var(--notif-card-border) !important;box-shadow:var(--notif-card-shadow);}
-    body.theme-dark #createCaseTopbar .notif-card .notif-title,
-    body.theme-mountain-dark #createCaseTopbar .notif-card .notif-title{color:#f5f7ff;}
-    body.theme-dark #createCaseTopbar .notif-card .notif-time,
-    body.theme-mountain-dark #createCaseTopbar .notif-card .notif-time{color:#c4cde3;}
 
     header h1{
       font-family:var(--font-serif);
@@ -445,6 +393,17 @@
       box-shadow:0 0 0 3px rgba(182,164,122,0.15);
       outline:none;
     }
+    body.theme-dark input,
+    body.theme-dark select,
+    body.theme-dark textarea{
+      background:rgba(15,23,42,0.55);
+      color:var(--ink);
+      border-color:var(--line);
+    }
+    body.theme-dark input::placeholder,
+    body.theme-dark textarea::placeholder{
+      color:var(--muted);
+    }
     .task-input-row{
       display:flex;
       gap:8px;
@@ -468,6 +427,11 @@
       border-radius:6px;
       background:#fff;
       font-size:0.9rem;
+    }
+    body.theme-dark .task-list li{
+      background:rgba(15,23,42,0.6);
+      color:var(--ink);
+      border-color:var(--line);
     }
     .task-list .task-empty{
       border:none;
@@ -504,6 +468,15 @@
     .btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
     .btn.primary{background:var(--accent);color:#fff;}
     .btn.primary:hover{background:#a0854d;}
+    body.theme-dark .btn.secondary{
+      background:transparent;
+      border-color:var(--line);
+      color:var(--ink);
+    }
+    body.theme-dark .btn.secondary:hover{
+      border-color:var(--accent);
+      color:var(--accent);
+    }
 .comp-wrapper {
   display: flex;
   align-items: center;
@@ -528,6 +501,11 @@
   padding: 0.5rem 0.6rem 0.5rem 1.4rem;
   font-family: inherit;
   font-size: 0.9rem;
+}
+body.theme-dark #comp{
+  background:rgba(15,23,42,0.55);
+  color:var(--ink);
+  border-color:var(--line);
 }
 
 #comp:focus {
@@ -561,6 +539,11 @@
   cursor: pointer;
   transition: all 0.2s;
 }
+body.theme-dark .type-btn{
+  background:rgba(15,23,42,0.55);
+  color:var(--ink);
+  border-color:var(--line);
+}
 
 .type-btn.active {
   background: var(--accent);
@@ -585,6 +568,11 @@
   background: #fff;
   appearance: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+body.theme-dark .select-field select{
+  background:rgba(15,23,42,0.55);
+  color:var(--ink);
+  border-color:var(--line);
 }
 .select-field select:focus {
   border-color: var(--accent);
@@ -613,6 +601,11 @@
   background: #fff;
   appearance: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+body.theme-dark .select-field select{
+  background:rgba(15,23,42,0.55);
+  color:var(--ink);
+  border-color:var(--line);
 }
 .select-field select:focus {
   border-color: var(--accent);
@@ -785,6 +778,13 @@
       color:var(--ink);
       line-height:1.6;
     }
+    body.theme-dark .modal-content,
+    body.theme-mountain-dark .modal-content{
+      background:var(--panel);
+      border-color:rgba(255,255,255,0.08);
+      box-shadow:0 18px 50px rgba(0,0,0,0.35);
+      color:var(--ink);
+    }
     .modal-content h3{
       font-family:'Cormorant Garamond',serif;
       font-weight:300;
@@ -794,10 +794,18 @@
       text-align:center;
       letter-spacing:0.3px;
     }
+    body.theme-dark .modal-content h3,
+    body.theme-mountain-dark .modal-content h3{
+      color:#f8fbff;
+    }
     .modal-content hr{
       border:none;
       border-top:1px solid #e0ded8;
       margin:1.5rem 0;
+    }
+    body.theme-dark .modal-content hr,
+    body.theme-mountain-dark .modal-content hr{
+      border-top-color:rgba(255,255,255,0.12);
     }
     .modal-content p{
       margin:0.35rem 0;
@@ -807,6 +815,10 @@
       align-items:baseline;
       gap:6px;
     }
+    body.theme-dark .modal-content p,
+    body.theme-mountain-dark .modal-content p{
+      color:#e6ecf8;
+    }
     .modal-content strong{
       font-family:'Cormorant Garamond',serif;
       font-weight:300;
@@ -814,6 +826,10 @@
       color:#111;
       min-width:130px;
       display:inline-block;
+    }
+    body.theme-dark .modal-content strong,
+    body.theme-mountain-dark .modal-content strong{
+      color:#f8fbff;
     }
     .close-btn{
       display:block;
@@ -827,6 +843,12 @@
       color:#333;
       transition:all 0.2s ease;
       font-family:'Cormorant Garamond',serif;
+    }
+    body.theme-dark .close-btn,
+    body.theme-mountain-dark .close-btn{
+      background:rgba(255,255,255,0.08);
+      border-color:rgba(255,255,255,0.2);
+      color:#f8fbff;
     }
     .close-btn:hover{
       background:var(--accent);
@@ -1084,7 +1106,7 @@
         </button>
         <div class="notifications-panel hidden" role="region" aria-live="polite" data-notification-panel>
           <div class="notif-header">
-            <span>Notifications</span>
+            <span class="notif-header-title" aria-label="Notifications"></span>
             <button type="button" class="notif-markall" data-notification-mark>Mark All Read</button>
           </div>
           <div class="notif-scroll" data-notification-list></div>
@@ -1372,6 +1394,7 @@
       <p><strong>Location:</strong> <span id="previewState">—</span></p>
       <p><strong>Compensation:</strong> <span id="previewComp">—</span></p>
       <p><strong>Experience:</strong> <span id="previewExperience">—</span></p>
+      <p id="previewDeadlineRow" hidden><strong>Deadline:</strong> <span id="previewDeadline">—</span></p>
       <hr>
       <p id="previewDescription"></p>
       <div class="preview-tasks" id="previewTasks"></div>
@@ -1424,6 +1447,81 @@
         return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric" });
       }
 
+      const ADMIN_NOTIFICATION_IMAGE = "/hero-mountain.jpg";
+      const ADMIN_TITLE_HINT = "welcome to let's-paraconnect";
+      const PLATFORM_NOTIFICATION_TYPES = new Set([
+        "paralegal_welcome",
+        "profile_approved",
+        "profile_photo_approved",
+        "profile_photo_rejected",
+      ]);
+
+      function getAvatarFallback(name = "") {
+        const letter = (name || "?").trim().charAt(0).toUpperCase() || "?";
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="32" fill="#eef1f7"/><text x="50%" y="56%" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#5c6477">${letter}</text></svg>`;
+        return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+      }
+
+      function isAdminNotification(item = {}) {
+        const actorName = String(item.actorFirstName || "").trim().toLowerCase();
+        const payloadRole = String(item.payload?.actorRole || item.payload?.fromRole || "").trim().toLowerCase();
+        const fromName = String(item.payload?.fromName || "").trim().toLowerCase();
+        const type = String(item.type || "").trim().toLowerCase();
+        if (
+          actorName === "admin" ||
+          payloadRole === "admin" ||
+          payloadRole === "platform" ||
+          payloadRole === "system" ||
+          fromName === "admin"
+        ) {
+          return true;
+        }
+        if (PLATFORM_NOTIFICATION_TYPES.has(type)) return true;
+        const message = String(item.message || item.payload?.message || "").trim().toLowerCase();
+        const title = String(item.payload?.title || "").trim().toLowerCase();
+        if (message.includes(ADMIN_TITLE_HINT) || title.includes(ADMIN_TITLE_HINT)) return true;
+        return false;
+      }
+
+      function getNotificationAvatar(item = {}, actorName = "") {
+        if (isAdminNotification(item)) return ADMIN_NOTIFICATION_IMAGE;
+        if (item.actorProfileImage) return item.actorProfileImage;
+        return getAvatarFallback(actorName);
+      }
+
+      function formatNotificationMessage(item = {}) {
+        if (item.type === "paralegal_welcome") {
+          const title = String(item.payload?.title || "").trim();
+          const body = String(item.payload?.body || "").trim();
+          if (title && body) {
+            return `${title} ${body}`;
+          }
+          if (item.message) {
+            return item.message.replace(/\.\./g, ".");
+          }
+        }
+        if (item.message) return item.message;
+        if (item.type === "message" && item.actorFirstName) {
+          return `${item.actorFirstName} sent you a message.`;
+        }
+        return "You have a new notification.";
+      }
+
+      function formatRelativeTime(value) {
+        if (!value) return "";
+        const date = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(date.getTime())) return "";
+        const diff = Date.now() - date.getTime();
+        const minutes = Math.floor(diff / 60000);
+        if (minutes < 1) return "Moments ago";
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        const days = Math.floor(hours / 24);
+        if (days < 7) return `${days}d ago`;
+        return date.toLocaleDateString();
+      }
+
       function resolveNotifLink(item = {}) {
         const payload = item.payload || {};
         const caseId =
@@ -1440,10 +1538,93 @@
 
       function setNotifBadge(count) {
         const badge = document.getElementById("createCaseNotifBadge");
-        if (!badge) return;
+        const toggle = document.querySelector("[data-notification-toggle]");
         const safe = Math.max(0, Number(count) || 0);
-        badge.textContent = String(safe);
-        badge.classList.toggle("show", safe > 0);
+        if (badge) {
+          badge.textContent = String(safe);
+          badge.classList.toggle("show", safe > 0);
+        }
+        if (toggle) {
+          if (safe > 0) toggle.dataset.count = String(safe);
+          else delete toggle.dataset.count;
+        }
+      }
+
+      const CREATE_CASE_NOTIF_ENHANCED_KEY = "createCaseNotifEnhanced";
+      const CREATE_CASE_NOTIF_ITEM_KEY = "createCaseNotifItemBound";
+
+      function enhanceCreateCaseNotifScroll(list) {
+        if (!list || list.dataset[CREATE_CASE_NOTIF_ENHANCED_KEY] === "true") return;
+        list.dataset[CREATE_CASE_NOTIF_ENHANCED_KEY] = "true";
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              const item = entry.target;
+              if (!(item instanceof HTMLElement)) return;
+              if (!entry.isIntersecting) return;
+              item.classList.add("notif-fade-in");
+              observer.unobserve(item);
+            });
+          },
+          { root: list, threshold: 0.2, rootMargin: "0px 0px -4% 0px" }
+        );
+        const bindItems = () => {
+          const items = list.querySelectorAll(".notif-item, .notif-card");
+          items.forEach((item) => {
+            if (!(item instanceof HTMLElement)) return;
+            if (item.dataset[CREATE_CASE_NOTIF_ITEM_KEY] === "true") return;
+            item.dataset[CREATE_CASE_NOTIF_ITEM_KEY] = "true";
+            item.classList.add("notif-fade-ready");
+            observer.observe(item);
+          });
+        };
+        const itemObserver = new MutationObserver(() => bindItems());
+        itemObserver.observe(list, { childList: true, subtree: true });
+        bindItems();
+      }
+
+      function syncCreateCaseNotifViewport(list) {
+        if (!list) return;
+        const cards = Array.from(list.querySelectorAll(":scope > .notif-item, :scope > .notif-card"));
+        if (!cards.length) {
+          list.style.removeProperty("--notif-three-card-max-height");
+          return;
+        }
+        const targetIndex = Math.min(3, cards.length) - 1;
+        const targetCard = cards[targetIndex];
+        if (!targetCard) return;
+        const listStyles = window.getComputedStyle(list);
+        const gap = parseFloat(listStyles.rowGap || listStyles.gap || "0") || 0;
+        const paddingTop = parseFloat(listStyles.paddingTop || "0") || 0;
+        const paddingBottom = parseFloat(listStyles.paddingBottom || "0") || 0;
+        let maxHeight = paddingTop + paddingBottom;
+        const visibleCards = Math.min(3, cards.length);
+        for (let index = 0; index < visibleCards; index += 1) {
+          maxHeight += cards[index].offsetHeight;
+        }
+        if (visibleCards > 1) maxHeight += gap * (visibleCards - 1);
+        maxHeight = Math.round(maxHeight);
+        if (maxHeight > 0) {
+          list.style.setProperty("--notif-three-card-max-height", `${maxHeight}px`);
+        }
+      }
+
+      let currentNotifications = [];
+
+      async function dismissNotification(id) {
+        if (!id) return false;
+        try {
+          await fetch(`/api/notifications/${encodeURIComponent(id)}`, {
+            method: "DELETE",
+            credentials: "include",
+          });
+        } catch (_) {}
+        const targetId = String(id);
+        currentNotifications = currentNotifications.filter(
+          (item) => String(item?._id || item?.id) !== targetId
+        );
+        renderNotifList(currentNotifications);
+        return true;
       }
 
       function renderNotifList(items = []) {
@@ -1451,31 +1632,77 @@
         const empty = document.querySelector("[data-notification-empty]");
         if (!list || !empty) return;
         const notifications = Array.isArray(items) ? items : [];
+        currentNotifications = notifications.slice();
         const unread = notifications.filter((item) => item?.read === false).length;
         setNotifBadge(unread);
         list.innerHTML = "";
         if (!notifications.length) {
           empty.style.display = "block";
           empty.textContent = "You're all caught up.";
+          list.style.removeProperty("--notif-three-card-max-height");
           return;
         }
         empty.style.display = "none";
-        notifications.forEach((item, idx) => {
-          const row = document.createElement("button");
-          row.type = "button";
-          row.className = `notif-card ${item?.read === false ? "unread" : "read"}`;
-          row.style.setProperty("--drop-delay", `${Math.min(idx, 3) * 55}ms`);
-          const message = String(item?.message || item?.payload?.message || "You have a new notification.");
-          const time = formatNotifTime(item?.createdAt);
-          row.innerHTML = `
-            <div class="notif-main">
-              <span class="notif-dot" aria-hidden="true"></span>
-              <div class="notif-copy">
-                <div class="notif-title">${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
-                <div class="notif-time">${time}</div>
-              </div>
-            </div>
-          `;
+        notifications.forEach((item) => {
+          const row = document.createElement("div");
+          row.className = `notif-item ${item?.read === false ? "unread" : "read"}`;
+          row.dataset.id = item?.id || item?._id || "";
+          const message = String(formatNotificationMessage(item));
+          const time = formatRelativeTime(item?.createdAt);
+          const actorName = String(
+            item?.actorFirstName ||
+              item?.payload?.actorFirstName ||
+              item?.payload?.fromName ||
+              item?.payload?.actorName ||
+              item?.payload?.paralegalName ||
+              ""
+          ).trim();
+          const avatarSrc = getNotificationAvatar(item, actorName);
+
+          const main = document.createElement("div");
+          main.className = "notif-main";
+          const avatar = document.createElement("img");
+          avatar.className = "notif-avatar";
+          avatar.loading = "lazy";
+          avatar.alt = actorName ? `${actorName} profile photo` : "Notification profile photo";
+          avatar.src = avatarSrc;
+          avatar.addEventListener(
+            "error",
+            () => {
+              avatar.src = getAvatarFallback(actorName);
+            },
+            { once: true }
+          );
+          const dot = document.createElement("span");
+          dot.className = "notif-dot";
+          dot.setAttribute("aria-hidden", "true");
+          const copy = document.createElement("div");
+          copy.className = "notif-copy";
+          const title = document.createElement("div");
+          title.className = "notif-title";
+          title.textContent = message;
+          const timeEl = document.createElement("div");
+          timeEl.className = "notif-time";
+          timeEl.textContent = time;
+          copy.appendChild(title);
+          copy.appendChild(timeEl);
+          main.appendChild(avatar);
+          main.appendChild(dot);
+          main.appendChild(copy);
+
+          const dismiss = document.createElement("button");
+          dismiss.className = "notif-dismiss";
+          dismiss.type = "button";
+          dismiss.title = "Dismiss";
+          dismiss.setAttribute("aria-label", "Dismiss notification");
+          dismiss.textContent = "x";
+          dismiss.addEventListener("click", async (event) => {
+            event.stopPropagation();
+            await dismissNotification(item?.id || item?._id);
+          });
+
+          row.appendChild(main);
+          row.appendChild(dismiss);
           row.addEventListener("click", async () => {
             try {
               if (item?.read === false && (item?.id || item?._id)) {
@@ -1490,7 +1717,8 @@
           list.appendChild(row);
         });
         requestAnimationFrame(() => {
-          list.querySelectorAll(".notif-card").forEach((card) => card.classList.add("is-ready"));
+          enhanceCreateCaseNotifScroll(list);
+          syncCreateCaseNotifViewport(list);
         });
       }
 
@@ -1511,8 +1739,10 @@
       function bindNotificationCenter() {
         const toggle = document.querySelector("[data-notification-toggle]");
         const panel = document.querySelector("[data-notification-panel]");
+        const list = document.querySelector("[data-notification-list]");
         const markAll = document.querySelector("[data-notification-mark]");
         if (!toggle || !panel) return;
+        enhanceCreateCaseNotifScroll(list);
         const setOpen = (open) => {
           panel.classList.toggle("show", open);
           panel.classList.toggle("hidden", !open);
@@ -1525,6 +1755,7 @@
           setOpen(willOpen);
           if (willOpen) {
             await fetchNotifications();
+            syncCreateCaseNotifViewport(list);
           }
         });
         markAll?.addEventListener("click", async (event) => {
@@ -1544,6 +1775,10 @@
         });
         document.addEventListener("keydown", (event) => {
           if (event.key === "Escape") setOpen(false);
+        });
+        window.addEventListener("resize", () => {
+          if (!panel.classList.contains("show")) return;
+          syncCreateCaseNotifViewport(list);
         });
       }
 
@@ -1725,11 +1960,17 @@
       state: document.getElementById("previewState"),
       comp: document.getElementById("previewComp"),
       experience: document.getElementById("previewExperience"),
+      deadline: document.getElementById("previewDeadline"),
+      deadlineRow: document.getElementById("previewDeadlineRow"),
       description: document.getElementById("previewDescription"),
       tasks: document.getElementById("previewTasks"),
     };
     const previewAutoNote = document.getElementById("previewAutoNote");
     const autoNoteCopy = "Applicants automatically include their résumé, cover letter (if available), and LinkedIn profile.";
+    const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
+      "samanthasider+attorney@gmail.com",
+      "samanthasider+56@gmail.com",
+    ]);
     let latestCaseData = null;
     let csrfToken = "";
     const tasksState = {
@@ -2284,9 +2525,15 @@
       previewFields.experience && (previewFields.experience.textContent = data.experience || "—");
       previewFields.description && (previewFields.description.textContent = data.description || "No description provided yet.");
       previewFields.tasks && (previewFields.tasks.innerHTML = tasksMarkup);
-      if (data.deadline) {
-        const deadlineText = new Date(data.deadline).toLocaleDateString() || data.deadline;
-        previewFields.description.insertAdjacentHTML("beforebegin", `<p><strong>Deadline:</strong> ${deadlineText}</p>`);
+      if (previewFields.deadline && previewFields.deadlineRow) {
+        if (data.deadline) {
+          const deadlineText = new Date(data.deadline).toLocaleDateString() || data.deadline;
+          previewFields.deadline.textContent = deadlineText;
+          previewFields.deadlineRow.hidden = false;
+        } else {
+          previewFields.deadline.textContent = "—";
+          previewFields.deadlineRow.hidden = true;
+        }
       }
       if (previewAutoNote) previewAutoNote.textContent = autoNoteCopy;
       previewModal.classList.add("active");
@@ -2310,9 +2557,9 @@
       draftCache.tasks = [];
     }
 
-    function showToast(message, href, isError = false) {
+    function showToast(message, href, isError = false, linkLabel = "View Case") {
       if (!toastEl) return;
-      const linkHtml = href ? ` <a href="${href}">View Case</a>` : "";
+      const linkHtml = href ? ` <a href="${href}">${escapeHTML(linkLabel || "View Case")}</a>` : "";
       toastEl.innerHTML = `${isError ? "⚠️" : "✅"} ${message}${linkHtml}`;
       toastEl.classList.toggle("error", Boolean(isError));
       toastEl.classList.add("show");
@@ -2417,6 +2664,7 @@
       await fetchCsrfToken();
       const res = await fetch("/api/cases", {
         method: "POST",
+        suppressToast: true,
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
@@ -2433,6 +2681,22 @@
         throw new Error(message || `Unable to post this case right now.${statusNote}`);
       }
       return data;
+    }
+
+    async function hasDefaultPaymentMethod() {
+      const storedUser = window.getStoredUser?.() || null;
+      const email = String(storedUser?.email || "").toLowerCase().trim();
+      if (STRIPE_PAYMENT_METHOD_BYPASS_EMAILS.has(email)) return true;
+      const res = await authorizedFetch("/api/payments/payment-method/default", {
+        headers: { Accept: "application/json" },
+        suppressToast: true,
+      });
+      const { data, text } = await readResponsePayload(res);
+      if (!res.ok) {
+        const message = data?.error || data?.msg || data?.message || (text && !text.includes("<") ? text : "");
+        throw new Error(message || "Unable to verify your payment method.");
+      }
+      return Boolean(data?.paymentMethod);
     }
 
     function mapPracticeArea(area = "") {
@@ -2667,6 +2931,19 @@
       }
       if (postBtn) postBtn.disabled = true;
       try {
+        if (!isEditing) {
+          const paymentMethodReady = await hasDefaultPaymentMethod();
+          if (!paymentMethodReady) {
+            showToast(
+              "Connect Stripe and add a payment method before posting a case.",
+              "dashboard-attorney.html#billing",
+              true,
+              "Open Billing"
+            );
+            if (postBtn) postBtn.disabled = false;
+            return;
+          }
+        }
         const payload = buildPayload(data);
         const created = isEditing && editingCaseId
           ? await updateCase(editingCaseId, payload)
@@ -2815,6 +3092,7 @@
       await fetchCsrfToken();
       const res = await fetch(`/api/cases/${encodeURIComponent(caseId)}`, {
         method: "PATCH",
+        suppressToast: true,
         credentials: "include",
         headers: {
           "Content-Type": "application/json",

@@ -2,8 +2,13 @@
 const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
+const fs = require("fs/promises");
 const mongoose = require("mongoose");
 const multer = require("multer");
+const os = require("os");
+const path = require("path");
+const util = require("util");
+const { execFile } = require("child_process");
 const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const verifyToken = require("../utils/verifyToken");
@@ -16,6 +21,9 @@ const { logAction } = require("../utils/audit");
 const { notifyUser } = require("../utils/notifyUser");
 const sendEmail = require("../utils/email");
 const { normalizeCaseStatus, canUseWorkspace } = require("../utils/caseState");
+
+const execFileAsync = util.promisify(execFile);
+const ENABLE_DOC_PREVIEW_CONVERSION = process.env.ENABLE_DOC_PREVIEW_CONVERSION === "true";
 
 // ----------------------------------------
 // CSRF (enabled in production or when ENABLE_CSRF=true)
@@ -76,6 +84,56 @@ function isCaseClosedForAccess(caseDoc) {
 
 function normalizeKeyPath(key) {
   return String(key || "").replace(/^\/+/, "");
+}
+
+const DOC_PREVIEW_EXTS = new Set(["doc", "docx"]);
+const DOC_PREVIEW_MIMES = new Set([
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]);
+
+function getFileExtension(name) {
+  const trimmed = String(name || "").trim();
+  if (!trimmed) return "";
+  const parts = trimmed.split(".");
+  if (parts.length < 2) return "";
+  return parts.pop().toLowerCase();
+}
+
+function shouldConvertToPdf({ mimeType, filename } = {}) {
+  const ext = getFileExtension(filename);
+  const mime = String(mimeType || "").toLowerCase();
+  return DOC_PREVIEW_EXTS.has(ext) || DOC_PREVIEW_MIMES.has(mime);
+}
+
+function replaceKeyExtension(key, ext) {
+  const keyString = String(key || "");
+  const lastSlash = keyString.lastIndexOf("/");
+  const lastDot = keyString.lastIndexOf(".");
+  if (lastDot > lastSlash) {
+    return `${keyString.slice(0, lastDot)}${ext}`;
+  }
+  return `${keyString}${ext}`;
+}
+
+async function convertDocToPdfBuffer(buffer, originalName) {
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "lpc-doc-"));
+  const ext = getFileExtension(originalName) || "docx";
+  const base = safeSegment(originalName.replace(/\.[^/.]+$/, "")) || "document";
+  const inputFile = `${base}.${ext}`;
+  const inputPath = path.join(tempDir, inputFile);
+  try {
+    await fs.writeFile(inputPath, buffer);
+    await execFileAsync(
+      "soffice",
+      ["--headless", "--convert-to", "pdf", "--outdir", tempDir, inputPath],
+      { timeout: 30000 }
+    );
+    const outputPath = path.join(tempDir, `${base}.pdf`);
+    return await fs.readFile(outputPath);
+  } finally {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  }
 }
 
 function isS3NotFound(err) {
@@ -384,8 +442,11 @@ router.get("/signed-get", async (req, res) => {
       throw err;
     }
 
+    const wantsPreview = String(req.query.preview || "").toLowerCase() === "true";
+    const ttlRaw = Number(req.query.ttl);
+    const ttl = Number.isFinite(ttlRaw) ? Math.min(Math.max(ttlRaw, 60), 900) : wantsPreview ? 600 : 60;
     const get = new GetObjectCommand({ Bucket: BUCKET, Key: normalizedKey });
-    const url = await getSignedUrl(s3, get, { expiresIn: 60 });
+    const url = await getSignedUrl(s3, get, { expiresIn: ttl });
     res.json({ url });
   } catch (e) {
     console.error(e);
@@ -770,13 +831,43 @@ router.post(
       ...sseParams(),
     };
     await s3.send(new PutObjectCommand(putParams));
+
+    let previewKey = "";
+    let previewMimeType = "";
+    let previewSize = 0;
+    if (ENABLE_DOC_PREVIEW_CONVERSION && shouldConvertToPdf({ mimeType: req.file.mimetype, filename: originalName })) {
+      try {
+        const pdfBuffer = await convertDocToPdfBuffer(req.file.buffer, originalName);
+        if (pdfBuffer?.length) {
+          previewKey = replaceKeyExtension(key, ".pdf");
+          const previewParams = {
+            Bucket: BUCKET,
+            Key: previewKey,
+            Body: pdfBuffer,
+            ContentType: "application/pdf",
+            ContentLength: pdfBuffer.length,
+            ACL: "private",
+            ...sseParams(),
+          };
+          await s3.send(new PutObjectCommand(previewParams));
+          previewMimeType = "application/pdf";
+          previewSize = pdfBuffer.length;
+        }
+      } catch (err) {
+        console.warn("[uploads] pdf preview conversion failed", err?.message || err);
+      }
+    }
+
     const entry = await CaseFile.create({
       caseId: caseDoc._id,
       userId: req.user.id,
       originalName,
       storageKey: key,
+      previewKey,
       mimeType: req.file.mimetype || "",
+      previewMimeType,
       size: req.file.size || 0,
+      previewSize,
       uploadedByRole: uploadRole,
       status: defaultStatus,
       version,
@@ -855,6 +946,13 @@ router.delete(
         await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(record.storageKey) }));
       } catch (err) {
         console.warn("[uploads] delete object failed", err?.message || err);
+      }
+    }
+    if (BUCKET && record.previewKey) {
+      try {
+        await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(record.previewKey) }));
+      } catch (err) {
+        console.warn("[uploads] delete preview object failed", err?.message || err);
       }
     }
     await CaseFile.deleteOne({ _id: record._id });
@@ -993,12 +1091,16 @@ function serializeCaseFile(doc) {
     userId: String(doc.userId),
     originalName: doc.originalName,
     storageKey: doc.storageKey,
+    previewKey: doc.previewKey || "",
     key: doc.storageKey,
     original: doc.originalName,
     filename: doc.originalName,
     mimeType: doc.mimeType || null,
     mime: doc.mimeType || null,
+    previewMimeType: doc.previewMimeType || null,
+    previewMime: doc.previewMimeType || null,
     size: doc.size || 0,
+    previewSize: doc.previewSize || 0,
     createdAt: doc.createdAt,
     uploadedAt: doc.createdAt,
     uploadedByRole: doc.uploadedByRole || null,

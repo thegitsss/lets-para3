@@ -14,7 +14,7 @@ const state = {
   caseCurrency: "USD",
 };
 
-const PLATFORM_FEE_PCT = 21;
+const PLATFORM_FEE_PCT = 22;
 const DEFAULT_HIRE_ERROR = "Unable to hire paralegal.";
 const MISSING_DOCUMENT_MESSAGE = "This document is no longer available for download.";
 
@@ -394,10 +394,10 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   overlay.innerHTML = `
     <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
       <div class="hire-confirm-title" id="hireConfirmTitle">Confirm Hire</div>
-      <p>You’re about to hire '${safeName}'. This will fund escrow immediately.</p>
+      <p>You’re about to hire ${safeName}. This will fund escrow immediately.</p>
       <div class="hire-confirm-summary">
         <div class="hire-confirm-row">
-          <span>Locked case amount</span>
+          <span>Case amount</span>
           <strong>${escapeHTML(formatCurrency(Number(amountCents || 0) / 100))}</strong>
         </div>
         <div class="hire-confirm-row">

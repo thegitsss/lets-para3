@@ -142,6 +142,25 @@ function buildUnsubscribeToken(user) {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "180d" });
 }
 
+function serializeOnboarding(onboarding = {}) {
+  return {
+    paralegalWelcomeDismissed: Boolean(onboarding?.paralegalWelcomeDismissed),
+    paralegalTourCompleted: Boolean(onboarding?.paralegalTourCompleted),
+    paralegalProfileTourCompleted: Boolean(onboarding?.paralegalProfileTourCompleted),
+  };
+}
+
+function serializePendingHire(pendingHire = {}) {
+  if (!pendingHire || !pendingHire.caseId) return null;
+  return {
+    caseId: String(pendingHire.caseId),
+    paralegalName: String(pendingHire.paralegalName || "").slice(0, 200),
+    fundUrl: String(pendingHire.fundUrl || "").slice(0, 2000),
+    message: String(pendingHire.message || "").slice(0, 2000),
+    updatedAt: pendingHire.updatedAt || null,
+  };
+}
+
 function buildResetPasswordEmailHtml(user, resetUrl, opts = {}) {
   const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
   const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
@@ -832,6 +851,8 @@ router.post(
         stateExperience: Array.isArray(user.stateExperience) ? user.stateExperience : [],
         disabled: Boolean(user.disabled),
         isFirstLogin,
+        onboarding: serializeOnboarding(user.onboarding || {}),
+        pendingHire: serializePendingHire(user.pendingHire || {}),
       },
     });
   })
@@ -905,6 +926,8 @@ router.post(
         stateExperience: Array.isArray(user.stateExperience) ? user.stateExperience : [],
         disabled: Boolean(user.disabled),
         isFirstLogin,
+        onboarding: serializeOnboarding(user.onboarding || {}),
+        pendingHire: serializePendingHire(user.pendingHire || {}),
       },
     });
   })
@@ -971,6 +994,8 @@ router.post(
         status: user.status,
         disabled: Boolean(user.disabled),
         isFirstLogin,
+        onboarding: serializeOnboarding(user.onboarding || {}),
+        pendingHire: serializePendingHire(user.pendingHire || {}),
       },
     });
   })
@@ -1022,6 +1047,8 @@ router.get(
               (u.preferences && typeof u.preferences === "object" && u.preferences.fontSize) ||
               "md",
           },
+          onboarding: serializeOnboarding(u.onboarding || {}),
+          pendingHire: serializePendingHire(u.pendingHire || {}),
         },
       });
     } catch {

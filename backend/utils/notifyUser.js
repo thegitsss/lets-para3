@@ -58,6 +58,8 @@ function buildDisplayMessage(type, payload = {}) {
       const fileName = payload.fileName || "a document";
       return `${actorName || "Someone"} uploaded ${fileName}${caseFragment || ""}`.trim();
     }
+    case "case_budget_locked":
+      return `Escrow amount locked${caseFragment || ""}.`.trim();
     default:
       return "You have a new notification.";
   }
@@ -259,6 +261,7 @@ const CASE_EMAIL_TYPES = new Set([
 
 function shouldSendEmailForType(user, type) {
   const prefs = user?.notificationPrefs || {};
+  if (type === "case_budget_locked") return false;
   if (type === "profile_photo_rejected") return false;
   if (prefs.email === false) return false;
   if (type === "message") {

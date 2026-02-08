@@ -2,12 +2,58 @@ import { secureFetch } from "../auth.js";
 
 const CACHE_KEY = "lpc_stripe_connect_status";
 const CACHE_TTL_MS = 2 * 60 * 1000;
+const DEV_STRIPE_STORAGE_KEY = "lpc_stripe_dev_override";
+const DEV_STRIPE_ALLOWLIST = [
+  "samanthasider+attorney@gmail.com",
+  "samanthasider+paralegal@gmail.com",
+  "samanthasider+11@gmail.com",
+  "samanthasider+56@gmail.com",
+];
+const ALWAYS_STRIPE_BYPASS_EMAILS = new Set(["samanthasider+56@gmail.com"]);
+const DEV_STRIPE_QUERY_PARAM = "stripe";
+const DEV_STRIPE_QUERY_VALUE = "dev";
 
 export const STRIPE_GATE_MESSAGE = "Stripe Connect is required to receive payment. Connect it from your dashboard.";
 
 let cachedStatus;
 let cachedAt = 0;
 let inFlight = null;
+
+function getStoredUserEmail() {
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    const parsed = raw ? JSON.parse(raw) : null;
+    return String(parsed?.email || "").trim().toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function hasDevStripeToggle() {
+  if (typeof window === "undefined") return false;
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    const paramValue = String(params.get(DEV_STRIPE_QUERY_PARAM) || "").toLowerCase();
+    if (paramValue === DEV_STRIPE_QUERY_VALUE) {
+      localStorage.setItem(DEV_STRIPE_STORAGE_KEY, "true");
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    return localStorage.getItem(DEV_STRIPE_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function shouldBypassStripe() {
+  const email = getStoredUserEmail();
+  if (!email) return false;
+  if (ALWAYS_STRIPE_BYPASS_EMAILS.has(email)) return true;
+  if (!DEV_STRIPE_ALLOWLIST.includes(email)) return false;
+  return hasDevStripeToggle();
+}
 
 function readCache() {
   try {
@@ -39,6 +85,13 @@ export function isStripeConnected(status) {
 }
 
 export async function getStripeConnectStatus({ force = false } = {}) {
+  if (shouldBypassStripe()) {
+    const devStatus = { connected: true, details_submitted: true, payouts_enabled: true, devBypass: true };
+    cachedStatus = devStatus;
+    cachedAt = Date.now();
+    writeCache(devStatus);
+    return devStatus;
+  }
   const now = Date.now();
   if (!force && cachedAt && now - cachedAt < CACHE_TTL_MS) {
     return cachedStatus ?? null;

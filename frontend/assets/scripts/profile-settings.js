@@ -1255,7 +1255,10 @@ async function loadOnboardingState(user) {
   if (onboardingPromise) return onboardingPromise;
   onboardingPromise = (async () => {
     try {
-      const res = await secureFetch("/api/users/me/onboarding", { headers: { Accept: "application/json" } });
+      const res = await secureFetch("/api/users/me/onboarding", {
+        headers: { Accept: "application/json" },
+        suppressToast: true,
+      });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload?.error || "Unable to load onboarding state.");
       onboardingState = normalizeOnboarding(payload.onboarding || {});
@@ -1277,6 +1280,7 @@ async function updateOnboardingState(updates = {}, { markFirstLoginComplete = fa
       method: "PATCH",
       headers: { Accept: "application/json" },
       body: updates,
+      suppressToast: true,
     });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(payload?.error || "Unable to update onboarding state.");
@@ -1315,6 +1319,9 @@ async function initParalegalProfileTour(user = {}) {
   const nextBtn = document.getElementById("profileTourNextBtn");
   const saveChangesBtn = document.getElementById("profileSaveBtn");
   const previewProfileBtn = document.getElementById("previewProfileBtn");
+  const sidebarToggle = document.getElementById("sidebarToggle");
+  const sidebarNav = document.getElementById("sidebarNav");
+  let sidebarOpenedByTour = false;
   const saveChangesInitiallyDisabled = Boolean(saveChangesBtn?.disabled);
   const previewProfileInitiallyDisabled = Boolean(previewProfileBtn?.disabled);
   if (!overlay || !tooltip || !titleEl || !textEl || !closeBtn || !backBtn || !nextBtn) return;
@@ -1368,12 +1375,14 @@ async function initParalegalProfileTour(user = {}) {
       sectionId: "securitySection",
       title: "Payouts Setup",
       text: "Set up payouts here. Connect Stripe so you can receive payments once platform payouts are active.",
+      autoScroll: "smooth",
     },
     {
-      selector: "[data-theme-preview='mountain']",
+      selector: ".theme-preview-grid",
       sectionId: "preferencesSection",
       title: "Preferences Tab / Theme Changes",
       text: "In Preferences, you can change your theme here to personalize how your dashboard looks.",
+      autoScroll: "smooth",
     },
     {
       id: "dashboardReturnLink",
@@ -1399,6 +1408,38 @@ async function initParalegalProfileTour(user = {}) {
     const navBtn = document.getElementById(navId);
     if (navBtn && !navBtn.classList.contains("active")) {
       navBtn.click();
+    }
+  };
+
+  const setSidebarOpen = (open) => {
+    document.body.classList.toggle("nav-open", Boolean(open));
+    if (sidebarToggle) {
+      sidebarToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+  };
+
+  const isMobileSidebarMode = () => window.matchMedia("(max-width: 960px)").matches;
+
+  const ensureSidebarVisibleForTarget = (target) => {
+    if (!target || !sidebarNav) {
+      if (sidebarOpenedByTour) {
+        setSidebarOpen(false);
+        sidebarOpenedByTour = false;
+      }
+      return;
+    }
+
+    const isSidebarTarget = sidebarNav.contains(target);
+    if (isMobileSidebarMode() && isSidebarTarget) {
+      const alreadyOpen = document.body.classList.contains("nav-open");
+      if (!alreadyOpen) sidebarOpenedByTour = true;
+      setSidebarOpen(true);
+      return;
+    }
+
+    if (sidebarOpenedByTour) {
+      setSidebarOpen(false);
+      sidebarOpenedByTour = false;
     }
   };
 
@@ -1441,6 +1482,7 @@ async function initParalegalProfileTour(user = {}) {
   const clearTour = () => {
     activeRenderToken += 1;
     activeTourTarget = null;
+    ensureSidebarVisibleForTarget(null);
     if (pendingSyncFrame) {
       cancelAnimationFrame(pendingSyncFrame);
       pendingSyncFrame = null;
@@ -1449,8 +1491,7 @@ async function initParalegalProfileTour(user = {}) {
     setTourPreviewButtonLock(false);
     overlay.classList.remove("is-active", "spotlight");
     overlay.setAttribute("aria-hidden", "true");
-    tooltip.classList.remove("is-active", "arrow-left", "arrow-right");
-    markProfileTourCompleted();
+    tooltip.classList.remove("is-active", "arrow-left", "arrow-right", "arrow-top", "arrow-bottom");
     if (forceTour) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -1459,22 +1500,154 @@ async function initParalegalProfileTour(user = {}) {
   const positionTooltip = (target) => {
     const rect = target.getBoundingClientRect();
     const tipRect = tooltip.getBoundingClientRect();
-    let left = rect.right + 16;
-    let arrowClass = "arrow-left";
-    if (left + tipRect.width > window.innerWidth - 16) {
-      left = rect.left - tipRect.width - 16;
-      arrowClass = "arrow-right";
+    const viewportPadding = 12;
+    const gap = 14;
+    const arrowClassNames = ["arrow-left", "arrow-right", "arrow-top", "arrow-bottom"];
+    const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+    const isCompactViewport = window.matchMedia("(max-width: 900px)").matches;
+    const targetCenterX = rect.left + rect.width / 2;
+    const targetCenterY = rect.top + rect.height / 2;
+    const overlapArea = (a, b) => {
+      const width = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+      const height = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      return width * height;
+    };
+    const getOverflow = (box) =>
+      Math.max(0, viewportPadding - box.left) +
+      Math.max(0, box.right - (window.innerWidth - viewportPadding)) +
+      Math.max(0, viewportPadding - box.top) +
+      Math.max(0, box.bottom - (window.innerHeight - viewportPadding));
+
+    if (isCompactViewport) {
+      const left = clamp(
+        targetCenterX - tipRect.width / 2,
+        viewportPadding,
+        Math.max(viewportPadding, window.innerWidth - tipRect.width - viewportPadding)
+      );
+      const topCandidates = [
+        {
+          top: Math.max(viewportPadding, rect.top - tipRect.height - gap),
+          arrowClass: "arrow-bottom",
+        },
+        {
+          top: Math.min(window.innerHeight - tipRect.height - viewportPadding, rect.bottom + gap),
+          arrowClass: "arrow-top",
+        },
+      ];
+
+      const ranked = topCandidates
+        .map((candidate, index) => {
+          const box = {
+            left,
+            top: candidate.top,
+            right: left + tipRect.width,
+            bottom: candidate.top + tipRect.height,
+          };
+          const overflow = getOverflow(box);
+          const overlap = overlapArea(box, rect);
+          const score = overlap * 100000 + overflow * 100 + index;
+          return { ...candidate, left, score };
+        })
+        .sort((a, b) => a.score - b.score);
+
+      const best = ranked[0];
+      tooltip.style.left = `${best.left}px`;
+      tooltip.style.top = `${best.top}px`;
+      tooltip.classList.remove(...arrowClassNames);
+      tooltip.classList.add(best.arrowClass);
+      const arrowLeft = clamp(targetCenterX - best.left - 8, 16, tipRect.width - 20);
+      tooltip.style.setProperty("--arrow-left", `${arrowLeft}px`);
+      return;
     }
-    const top = Math.max(
-      12,
-      Math.min(window.innerHeight - tipRect.height - 12, rect.top + rect.height / 2 - tipRect.height / 2)
-    );
-    tooltip.style.left = `${Math.max(12, left)}px`;
-    tooltip.style.top = `${top}px`;
-    tooltip.classList.remove("arrow-left", "arrow-right");
-    tooltip.classList.add(arrowClass);
-    const arrowTop = Math.max(16, Math.min(tipRect.height - 20, rect.top + rect.height / 2 - top - 8));
-    tooltip.style.setProperty("--arrow-top", `${arrowTop}px`);
+
+    const buildCandidate = (placement) => {
+      if (placement === "right") {
+        const left = rect.right + gap;
+        const top = clamp(
+          targetCenterY - tipRect.height / 2,
+          viewportPadding,
+          Math.max(viewportPadding, window.innerHeight - tipRect.height - viewportPadding)
+        );
+        return {
+          left,
+          top,
+          arrowClass: "arrow-left",
+          arrowTop: clamp(targetCenterY - top - 8, 16, tipRect.height - 20),
+        };
+      }
+      if (placement === "left") {
+        const left = rect.left - tipRect.width - gap;
+        const top = clamp(
+          targetCenterY - tipRect.height / 2,
+          viewportPadding,
+          Math.max(viewportPadding, window.innerHeight - tipRect.height - viewportPadding)
+        );
+        return {
+          left,
+          top,
+          arrowClass: "arrow-right",
+          arrowTop: clamp(targetCenterY - top - 8, 16, tipRect.height - 20),
+        };
+      }
+      if (placement === "top") {
+        const left = clamp(
+          targetCenterX - tipRect.width / 2,
+          viewportPadding,
+          Math.max(viewportPadding, window.innerWidth - tipRect.width - viewportPadding)
+        );
+        const top = rect.top - tipRect.height - gap;
+        return {
+          left,
+          top,
+          arrowClass: "arrow-bottom",
+          arrowLeft: clamp(targetCenterX - left - 8, 16, tipRect.width - 20),
+        };
+      }
+      const left = clamp(
+        targetCenterX - tipRect.width / 2,
+        viewportPadding,
+        Math.max(viewportPadding, window.innerWidth - tipRect.width - viewportPadding)
+      );
+      const top = rect.bottom + gap;
+      return {
+        left,
+        top,
+        arrowClass: "arrow-top",
+        arrowLeft: clamp(targetCenterX - left - 8, 16, tipRect.width - 20),
+      };
+    };
+
+    const preferredPlacements = window.matchMedia("(max-width: 900px)").matches
+      ? ["top", "bottom", "right", "left"]
+      : ["right", "left", "top", "bottom"];
+
+    const ranked = preferredPlacements
+      .map((placement, index) => {
+        const candidate = buildCandidate(placement);
+        const box = {
+          left: candidate.left,
+          top: candidate.top,
+          right: candidate.left + tipRect.width,
+          bottom: candidate.top + tipRect.height,
+        };
+        const overflow = getOverflow(box);
+        const overlap = overlapArea(box, rect);
+        const score = overflow * 100000 + overlap * 100 + index;
+        return { ...candidate, score };
+      })
+      .sort((a, b) => a.score - b.score);
+
+    const best = ranked[0];
+    tooltip.style.left = `${best.left}px`;
+    tooltip.style.top = `${best.top}px`;
+    tooltip.classList.remove(...arrowClassNames);
+    tooltip.classList.add(best.arrowClass);
+    if (typeof best.arrowTop === "number") {
+      tooltip.style.setProperty("--arrow-top", `${best.arrowTop}px`);
+    }
+    if (typeof best.arrowLeft === "number") {
+      tooltip.style.setProperty("--arrow-left", `${best.arrowLeft}px`);
+    }
   };
 
   const positionSpotlight = (target) => {
@@ -1528,6 +1701,7 @@ async function initParalegalProfileTour(user = {}) {
       showStep(index + 1);
       return;
     }
+    ensureSidebarVisibleForTarget(target);
     activeTourTarget = target;
     activeIndex = index;
     titleEl.textContent = step.title;
@@ -4190,11 +4364,15 @@ const avatarUploadConfigs = [
     initialsId: "attorneyAvatarInitials"
   }
 ];
+const PROFILE_PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+const PROFILE_PHOTO_ALLOWED_MIMES = new Set(["image/jpeg", "image/jpg", "image/png"]);
+const PROFILE_PHOTO_ALLOWED_EXT = /\.(jpe?g|png)$/i;
 
 let activeCropper = null;
 let cropperModal = null;
 let cropperImage = null;
 let cropperZoom = null;
+let cropperSaveBtn = null;
 let cropperConfig = null;
 let cropperFile = null;
 let cropperOriginalFile = null;
@@ -4202,6 +4380,8 @@ let cropperOriginalUrl = "";
 let cropperObjectUrl = null;
 let cropperBaseZoom = 1;
 let cropperZoomLock = false;
+let cropperReady = false;
+let cropperLoadRetries = 0;
 
 function getCurrentCropperZoom() {
   if (!activeCropper) return 1;
@@ -4225,6 +4405,32 @@ function syncCropperBaseZoom({ resetSlider = false } = {}) {
   }
   requestAnimationFrame(() => {
     cropperZoomLock = false;
+  });
+}
+
+async function canDecodeImageFile(file) {
+  if (!file) return false;
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file);
+      if (bitmap && typeof bitmap.close === "function") bitmap.close();
+      return true;
+    } catch (_) {
+      // Fall through to Image-based decode check.
+    }
+  }
+  return await new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(true);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(false);
+    };
+    img.src = objectUrl;
   });
 }
 
@@ -4420,6 +4626,28 @@ async function handleAvatarUpload(config) {
 
   const file = input.files?.[0];
   if (!file) return;
+  const mime = String(file.type || "").toLowerCase();
+  const filename = String(file.name || "");
+  const mimeAllowed = PROFILE_PHOTO_ALLOWED_MIMES.has(mime);
+  const hasMime = Boolean(mime);
+  const extAllowed = PROFILE_PHOTO_ALLOWED_EXT.test(filename);
+  // Allow extension fallback only when browser does not provide a MIME type.
+  if (!mimeAllowed && !(extAllowed && !hasMime)) {
+    showToast("Upload a JPEG or PNG profile photo.", "err");
+    input.value = "";
+    return;
+  }
+  if (Number(file.size || 0) > PROFILE_PHOTO_MAX_BYTES) {
+    showToast("Profile photo must be 5 MB or smaller.", "err");
+    input.value = "";
+    return;
+  }
+  const decodable = await canDecodeImageFile(file);
+  if (!decodable) {
+    showToast("This image can't be read on this device. Please upload a JPG or PNG.", "err");
+    input.value = "";
+    return;
+  }
 
   if (typeof Cropper !== "undefined" && cropperModal && cropperImage) {
     openPhotoCropper(file, config);
@@ -4445,8 +4673,10 @@ function initPhotoCropperModal() {
   cropperZoom = document.getElementById("photoCropZoom");
   const cancelBtn = document.getElementById("photoCropCancel");
   const saveBtn = document.getElementById("photoCropSave");
+  cropperSaveBtn = saveBtn;
   const modalCard = cropperModal?.querySelector(".photo-crop-card");
   if (!cropperModal || !cropperImage || !saveBtn) return;
+  saveBtn.disabled = true;
 
   cancelBtn?.addEventListener("click", closePhotoCropper);
   modalCard?.addEventListener("mousedown", (event) => event.stopPropagation());
@@ -4472,6 +4702,10 @@ function initPhotoCropperModal() {
     });
   }
   saveBtn.addEventListener("click", () => {
+    if (!cropperReady || !activeCropper) {
+      showToast("Image is still loading. Please wait a moment and try again.", "err");
+      return;
+    }
     void applyCroppedPhoto();
   });
 }
@@ -4482,15 +4716,16 @@ function openPhotoCropper(file, config) {
   cropperFile = file;
   cropperOriginalFile = file;
   cropperOriginalUrl = "";
+  cropperLoadRetries = 0;
 
   const reader = new FileReader();
   reader.onload = () => {
     const dataUrl = typeof reader.result === "string" ? reader.result : "";
     if (dataUrl) {
       loadCropperImage(dataUrl, false);
-    } else {
-      loadCropperImage(URL.createObjectURL(file), true);
+      return;
     }
+    loadCropperImage(URL.createObjectURL(file), true);
   };
   reader.onerror = () => {
     loadCropperImage(URL.createObjectURL(file), true);
@@ -4504,6 +4739,7 @@ function openPhotoCropperFromUrl(url, config, isObjectUrl = false, options = {})
   cropperFile = null;
   cropperOriginalFile = null;
   cropperOriginalUrl = options.originalUrl || (!isObjectUrl ? url : "");
+  cropperLoadRetries = 0;
   loadCropperImage(url, isObjectUrl);
 }
 
@@ -4588,6 +4824,8 @@ function openExistingPhotoEditor(config) {
 
 function loadCropperImage(url, isObjectUrl) {
   if (!cropperModal || !cropperImage) return;
+  cropperReady = false;
+  if (cropperSaveBtn) cropperSaveBtn.disabled = true;
   if (cropperZoom) {
     cropperZoom.disabled = true;
   }
@@ -4603,40 +4841,68 @@ function loadCropperImage(url, isObjectUrl) {
     activeCropper = null;
   }
   cropperImage.onerror = () => {
+    const fallbackFile = cropperFile;
+    const fallbackConfig = cropperConfig;
+    if (fallbackFile && cropperLoadRetries === 0) {
+      cropperLoadRetries += 1;
+      loadCropperImage(URL.createObjectURL(fallbackFile), true);
+      return;
+    }
     if (cropperZoom) cropperZoom.disabled = true;
-    showToast("Unable to load the profile photo. Please re-upload the image.", "err");
+    if (cropperSaveBtn) cropperSaveBtn.disabled = true;
+    showToast("Unable to open the crop editor for this image. We'll add it without cropping.", "err");
     closePhotoCropper();
+    if (fallbackFile && fallbackConfig) {
+      stagePhotoDirect(fallbackFile, fallbackConfig);
+    }
   };
   cropperImage.onload = () => {
-    activeCropper = new Cropper(cropperImage, {
-      aspectRatio: 1,
-      viewMode: 1,
-      dragMode: "move",
-      autoCropArea: 1,
-      background: false,
-      guides: false,
-      center: false,
-      cropBoxMovable: false,
-      cropBoxResizable: false,
-      responsive: true,
-      zoomOnWheel: true,
-      zoomOnTouch: true,
-      ready() {
-        requestAnimationFrame(() => syncCropperBaseZoom({ resetSlider: true }));
-        if (cropperZoom) cropperZoom.disabled = false;
-      },
-      zoom() {
-        if (!cropperZoom) return;
-        if (cropperZoomLock) return;
-        const data = this.getImageData();
-        const currentZoom = data.naturalWidth ? data.width / data.naturalWidth : 1;
-        const relative = cropperBaseZoom ? currentZoom / cropperBaseZoom - 1 : 0;
-        const clamped = Math.min(0.5, Math.max(0, relative));
-        cropperZoom.value = String(clamped);
-      },
-    });
-    if (cropperZoom) {
-      cropperZoom.disabled = false;
+    try {
+      activeCropper = new Cropper(cropperImage, {
+        aspectRatio: 1,
+        viewMode: 1,
+        dragMode: "move",
+        autoCropArea: 1,
+        background: false,
+        guides: false,
+        center: false,
+        cropBoxMovable: false,
+        cropBoxResizable: false,
+        responsive: true,
+        zoomOnWheel: true,
+        zoomOnTouch: true,
+        ready() {
+          requestAnimationFrame(() => syncCropperBaseZoom({ resetSlider: true }));
+          if (cropperZoom) cropperZoom.disabled = false;
+          cropperReady = true;
+          if (cropperSaveBtn) cropperSaveBtn.disabled = false;
+        },
+        zoom() {
+          if (!cropperZoom) return;
+          if (cropperZoomLock) return;
+          const data = this.getImageData();
+          const currentZoom = data.naturalWidth ? data.width / data.naturalWidth : 1;
+          const relative = cropperBaseZoom ? currentZoom / cropperBaseZoom - 1 : 0;
+          const clamped = Math.min(0.5, Math.max(0, relative));
+          cropperZoom.value = String(clamped);
+        },
+      });
+      if (cropperZoom) {
+        cropperZoom.disabled = false;
+      }
+      cropperReady = true;
+      if (cropperSaveBtn) cropperSaveBtn.disabled = false;
+    } catch (err) {
+      console.error("Unable to initialize cropper", err);
+      const fallbackFile = cropperFile;
+      const fallbackConfig = cropperConfig;
+      closePhotoCropper();
+      if (fallbackFile && fallbackConfig) {
+        showToast("Crop editor unavailable. Photo was added without cropping.", "err");
+        stagePhotoDirect(fallbackFile, fallbackConfig);
+      } else {
+        showToast("Unable to open the crop editor right now.", "err");
+      }
     }
   };
   cropperImage.src = url;
@@ -4654,12 +4920,21 @@ function destroyPhotoCropper() {
     activeCropper.destroy();
     activeCropper = null;
   }
-  if (cropperImage) cropperImage.src = "";
+  if (cropperImage) {
+    cropperImage.onerror = null;
+    cropperImage.onload = null;
+    cropperImage.src = "";
+  }
   if (cropperZoom) {
     cropperZoom.value = "1";
     cropperZoom.disabled = true;
   }
+  if (cropperSaveBtn) {
+    cropperSaveBtn.disabled = true;
+  }
   cropperBaseZoom = 1;
+  cropperReady = false;
+  cropperLoadRetries = 0;
   if (cropperObjectUrl) {
     URL.revokeObjectURL(cropperObjectUrl);
     cropperObjectUrl = null;
@@ -4683,7 +4958,10 @@ async function applyCroppedPhoto() {
   if (!canvas) return;
 
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
-  if (!blob) return;
+  if (!blob) {
+    showToast("Unable to process this image. Please choose a JPG or PNG file.", "err");
+    return;
+  }
   const name = cropperFile?.name ? cropperFile.name.replace(/\.[^.]+$/, ".jpg") : "profile-photo.jpg";
   const file = new File([blob], name, { type: "image/jpeg" });
   const previewUrl = canvas.toDataURL("image/jpeg", 0.92);

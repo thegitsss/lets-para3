@@ -77,36 +77,6 @@ header {
   position: relative;
 }
 
-.notification-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: #fff;
-  cursor: pointer;
-  transition: border-color 0.2s ease;
-}
-
-.notification-icon:hover {
-  border-color: var(--gold);
-}
-
-.notification-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  background: #c0392b;
-  color: #fff;
-  font-size: 0.65rem;
-  border-radius: 999px;
-  padding: 1px 4px;
-  line-height: 1;
-  display: none;
-}
-.notification-badge.show{display:inline-flex; align-items:center; justify-content:center;}
 
 .user-chip {
   display: flex;
@@ -136,77 +106,6 @@ header {
   color: var(--muted);
 }
 
-.notification-panel {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 12px);
-  width: 280px;
-  padding: 16px;
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-  display: none;
-}
-
-.notification-panel.show {
-  display: block;
-}
-
-.notification-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.notification-panel-header button {
-  border: none;
-  background: none;
-  color: var(--gold);
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.notification-panel h4 {
-  font-size: 0.9rem;
-  margin-bottom: 8px;
-}
-
-.notification-item {
-  font-size: 0.85rem;
-  color: var(--muted);
-  border-bottom: 1px solid var(--line);
-  padding: 6px 0;
-}
-
-.notification-panel ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.notification-panel ul li {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 12px;
-  background: #fcfcfc;
-}
-
-.notification-panel ul li strong {
-  display: block;
-  font-size: 0.95rem;
-  margin-bottom: 4px;
-  font-weight: 300;
-}
-
-.notification-panel ul li span {
-  font-size: 0.8rem;
-  color: var(--muted);
-}
 
 .page-wrapper {
   max-width: 1300px;

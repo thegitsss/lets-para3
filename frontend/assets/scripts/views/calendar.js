@@ -71,6 +71,19 @@ function ensureStylesOnce() {
   .badge-call{background:#e9d5ff;border-color:#c4b5fd}
   .badge-court{background:#fee2e2;border-color:#fca5a5}
   .badge-misc{background:#f3f4f6;border-color:#e5e7eb}
+  .cal-modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:2000;padding:16px}
+  .cal-modal-overlay.show{display:flex}
+  .cal-modal{background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 24px 50px rgba(0,0,0,.2);width:min(720px,96vw);display:grid;gap:12px;padding:18px}
+  .cal-modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .cal-modal-title{font-weight:600;font-size:1.05rem}
+  .cal-modal-close{border:none;background:transparent;font-size:20px;line-height:1;cursor:pointer;color:#6b7280}
+  .cal-modal-close:hover{color:#111827}
+  .cal-modal-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .cal-modal-form label{display:grid;gap:6px;font-size:.85rem;color:#374151}
+  .cal-modal-form input,.cal-modal-form select{padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px}
+  .cal-modal-form .wide{grid-column:1/-1}
+  .cal-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
+  .cal-modal-actions .btn.primary{background:#111827;color:#fff;border-color:#111827}
   .skel{background:linear-gradient(90deg,#eee 25%,#f5f5f5 37%,#eee 63%);background-size:400% 100%;animation:sk 1.4s ease infinite}
   @keyframes sk{0%{background-position:100% 0}100%{background-position:-100% 0}}
   .toast{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;border-radius:8px;padding:10px 14px;font-size:14px;box-shadow:0 10px 20px rgba(0,0,0,.15);z-index:9999}
@@ -180,6 +193,35 @@ export async function render(el) {
       <div class="cal-grid cal-dows" aria-hidden="true"></div>
       <div class="cal-grid cal-days" role="grid" aria-label="Month grid"></div>
     </div>
+    <div class="cal-modal-overlay" data-cal-modal hidden aria-hidden="true">
+      <div class="cal-modal" role="dialog" aria-modal="true" aria-labelledby="calModalTitle">
+        <div class="cal-modal-head">
+          <div class="cal-modal-title" id="calModalTitle">Add calendar item</div>
+          <button type="button" class="cal-modal-close" data-cal-modal-close aria-label="Close">×</button>
+        </div>
+        <form class="cal-modal-form" autocomplete="off">
+          <label>Date <input required name="date" type="date"></label>
+          <label>Start <input name="start" type="time" placeholder="HH:MM"></label>
+          <label>End <input name="end" type="time" placeholder="HH:MM"></label>
+          <label>Type
+            <select name="type">
+              <option value="deadline">Deadline</option>
+              <option value="meeting">Meeting</option>
+              <option value="call">Call</option>
+              <option value="court">Court</option>
+              <option value="misc">Other</option>
+            </select>
+          </label>
+          <label class="wide">Title <input required name="title" type="text" placeholder="e.g., File motion; Zoom with paralegal" maxlength="200"></label>
+          <label class="wide">Link/Loc <input name="where" type="text" placeholder="Zoom or location (optional)"></label>
+          <label class="wide">Case ID <input name="caseId" type="text" inputmode="latin" pattern="[a-fA-F0-9]{24}" title="24-char Mongo ID (optional)"></label>
+          <div class="cal-modal-actions wide">
+            <button type="button" class="btn" data-cal-modal-cancel>Cancel</button>
+            <button type="submit" class="btn primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
   `;
 
   const dows = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -194,6 +236,10 @@ export async function render(el) {
   const titleEl = el.querySelector(".month-title");
   const daysEl = el.querySelector(".cal-days");
   const formEl = el.querySelector(".cal-form");
+  const modalOverlay = el.querySelector("[data-cal-modal]");
+  const modalForm = modalOverlay?.querySelector("form");
+  const modalCloseBtn = modalOverlay?.querySelector("[data-cal-modal-close]");
+  const modalCancelBtn = modalOverlay?.querySelector("[data-cal-modal-cancel]");
 
   // Focus month persistence
   let focus = (() => {
@@ -339,11 +385,15 @@ export async function render(el) {
       cell.appendChild(row);
     });
 
-    // quick-prefill date by clicking the cell
+    // open modal for date add
     cell.addEventListener("click", (e) => {
-      if (e.target.classList.contains("x")) return;
-      formEl.date.value = cell.dataset.date;
-      formEl.title.focus();
+      if (e.target.closest(".x")) return;
+      if (modalForm) {
+        openModal(cell.dataset.date);
+      } else {
+        formEl.date.value = cell.dataset.date;
+        formEl.title.focus();
+      }
     });
 
     // keyboard nav between cells
@@ -356,6 +406,13 @@ export async function render(el) {
       else if (e.key === "ArrowLeft") to = idx - 1;
       else if (e.key === "ArrowDown") to = idx + rowLen;
       else if (e.key === "ArrowUp") to = idx - rowLen;
+      if (e.key === "Enter" || e.key === " ") {
+        if (modalForm) {
+          openModal(cell.dataset.date);
+          e.preventDefault();
+        }
+        return;
+      }
       if (to != null) {
         const target = daysEl.children[to];
         if (target) target.focus();
@@ -388,31 +445,56 @@ export async function render(el) {
   const formSubmitBtn = formEl?.querySelector('button[type="submit"]');
   const defaultSubmitText = formSubmitBtn?.textContent || "Add";
 
-  const scheduleFormReset = () => {
-    if (!formEl || !formSubmitBtn) return;
+  const scheduleFormReset = (form, button, defaultText) => {
+    if (!form || !button) return;
     const handler = () => {
-      formSubmitBtn.disabled = false;
-      formSubmitBtn.textContent = defaultSubmitText;
-      formEl.removeEventListener("input", handler);
+      button.disabled = false;
+      button.textContent = defaultText;
+      form.removeEventListener("input", handler);
     };
-    formEl.addEventListener("input", handler, { once: true });
+    form.addEventListener("input", handler, { once: true });
   };
 
-  formEl.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const date = formEl.date.value;
-    const title = formEl.title.value.trim();
+  const openModal = (dateStr = "") => {
+    if (!modalOverlay || !modalForm) return;
+    modalOverlay.hidden = false;
+    modalOverlay.setAttribute("aria-hidden", "false");
+    modalOverlay.classList.add("show");
+    if (dateStr) modalForm.date.value = dateStr;
+    modalForm.title.focus();
+  };
+
+  const closeModal = () => {
+    if (!modalOverlay) return;
+    modalOverlay.classList.remove("show");
+    modalOverlay.setAttribute("aria-hidden", "true");
+    modalOverlay.hidden = true;
+  };
+
+  modalCloseBtn?.addEventListener("click", closeModal);
+  modalCancelBtn?.addEventListener("click", closeModal);
+  modalOverlay?.addEventListener("click", (e) => {
+    if (e.target === modalOverlay) closeModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && modalOverlay && modalOverlay.classList.contains("show")) {
+      closeModal();
+    }
+  });
+
+  async function submitEvent(form, { resetButtonOnInput = false, afterSuccess } = {}) {
+    const date = form?.date?.value;
+    const title = form?.title?.value?.trim?.() || "";
     if (!date || !title) return;
 
-    const st = formEl.start.value;
-    const en = formEl.end.value;
+    const st = form.start.value;
+    const en = form.end.value;
     if (st && en) {
-      // simple end >= start validation
       const sDt = new Date(atLocalISO(date, st));
       const eDt = new Date(atLocalISO(date, en));
       if (eDt < sDt) {
         toast("End time is before start time");
-        formEl.end.focus();
+        form.end.focus();
         return;
       }
     }
@@ -421,41 +503,58 @@ export async function render(el) {
       title,
       start: atLocalISO(date, st),
       end: en ? atLocalISO(date, en) : undefined,
-      type: formEl.type.value || "misc",
-      where: formEl.where.value.trim(),
-      caseId: formEl.caseId.value.trim() || undefined,
+      type: form.type.value || "misc",
+      where: form.where.value.trim(),
+      caseId: form.caseId.value.trim() || undefined,
     };
 
-    // optimistic create in UI: push to dayMap
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn?.textContent || "Save";
+
     const tempId = "tmp_" + Math.random().toString(36).slice(2);
     const k = keyFromDate(new Date(payload.start));
     (dayMap[k] ||= []).push({ id: tempId, ...payload });
     renderMonth();
 
     let restoreButton = true;
-    if (formSubmitBtn) {
-      formSubmitBtn.disabled = true;
-      formSubmitBtn.textContent = "Saving…";
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Saving…";
     }
     try {
       await apiCreate(payload);
       toast("Event added");
-      formEl.reset();
+      form.reset();
       await loadMonth();
       renderMonth();
-      scheduleFormReset();
+      if (resetButtonOnInput) {
+        scheduleFormReset(form, submitBtn, originalText);
+      } else if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
       restoreButton = false;
+      if (typeof afterSuccess === "function") afterSuccess();
     } catch (err) {
-      // rollback optimistic
       dayMap[k] = (dayMap[k] || []).filter((e) => e.id !== tempId);
       renderMonth();
       toast("Failed to add event");
     } finally {
-      if (restoreButton && formSubmitBtn) {
-        formSubmitBtn.disabled = false;
-        formSubmitBtn.textContent = defaultSubmitText;
+      if (restoreButton && submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
       }
     }
+  }
+
+  formEl.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await submitEvent(formEl, { resetButtonOnInput: true });
+  });
+
+  modalForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await submitEvent(modalForm, { afterSuccess: closeModal });
   });
 
   // initial load

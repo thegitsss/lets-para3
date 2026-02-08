@@ -36,6 +36,21 @@ function normalizeKey(key) {
   return String(key || "").replace(/^\/+/, "");
 }
 
+function isReceiptKey(key) {
+  const normalized = normalizeKey(key).toLowerCase();
+  return (
+    normalized.includes("/receipt-") ||
+    normalized.includes("receipt-attorney") ||
+    normalized.includes("receipt-payout") ||
+    normalized.includes("receipt-paralegal")
+  );
+}
+
+function isReceiptName(name) {
+  const normalized = String(name || "").toLowerCase();
+  return normalized.includes("receipt");
+}
+
 function safeFilename(input, { fallback = "file" } = {}) {
   const value = String(input || "")
     .replace(/[\u0000-\u001F\u007F]/g, "")
@@ -888,6 +903,7 @@ async function generateArchiveZip(caseDoc) {
     const seenKeys = new Set();
     for (const entry of documentEntries) {
       if (!entry?.key || seenKeys.has(entry.key)) continue;
+      if (isReceiptKey(entry.key) || isReceiptName(entry.name)) continue;
       seenKeys.add(entry.key);
       const baseName = safeFilename(entry.name || `document-${Date.now()}`);
       const uniqueName = ensureUniqueFilename(baseName, seenNames);

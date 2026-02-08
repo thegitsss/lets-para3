@@ -154,6 +154,26 @@ const availabilityDetailsSchema = new Schema(
   { _id: false }
 );
 
+const onboardingSchema = new Schema(
+  {
+    paralegalWelcomeDismissed: { type: Boolean, default: false },
+    paralegalTourCompleted: { type: Boolean, default: false },
+    paralegalProfileTourCompleted: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const pendingHireSchema = new Schema(
+  {
+    caseId: { type: Types.ObjectId, ref: "Case", default: null },
+    paralegalName: { type: String, default: "", trim: true, maxlength: 200 },
+    fundUrl: { type: String, default: "", trim: true, maxlength: 2000 },
+    message: { type: String, default: "", trim: true, maxlength: 2000 },
+    updatedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 /** ----------------------------------------
  * Main schema
  * -----------------------------------------*/
@@ -281,6 +301,8 @@ const userSchema = new Schema(
       },
       hideProfile: { type: Boolean, default: false },
     },
+    onboarding: { type: onboardingSchema, default: () => ({}) },
+    pendingHire: { type: pendingHireSchema, default: null },
     pushSubscription: { type: Object, default: null },
     digestFrequency: { type: String, enum: ["off", "daily", "weekly"], default: "daily" },
     emailPref: {

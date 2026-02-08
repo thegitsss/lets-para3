@@ -197,8 +197,9 @@ function formatSpecialties(paralegal = {}) {
 
 function buildLinkedInSnippet(paralegal = {}) {
   if (!paralegal.linkedInURL) return "";
-  const safe = escapeAttribute(paralegal.linkedInURL);
-  return `<p>LinkedIn: <a href="${safe}" target="_blank" rel="noopener">View profile</a></p>`;
+  const safe = sanitizeUrl(paralegal.linkedInURL);
+  if (!safe) return "";
+  return `<p>LinkedIn: <a href="${escapeAttribute(safe)}" target="_blank" rel="noopener">View profile</a></p>`;
 }
 
 function buildEducationSnippet(paralegal = {}) {
@@ -215,8 +216,9 @@ function buildEducationSnippet(paralegal = {}) {
 
 function buildCertificateSnippet(paralegal = {}) {
   if (!paralegal.certificateURL) return "";
-  const safe = escapeAttribute(paralegal.certificateURL);
-  return `<p>Certificate: <a href="${safe}" target="_blank" rel="noopener">View</a></p>`;
+  const safe = sanitizeUrl(paralegal.certificateURL);
+  if (!safe) return "";
+  return `<p>Certificate: <a href="${escapeAttribute(safe)}" target="_blank" rel="noopener">View</a></p>`;
 }
 
 function buildParalegalProfileUrl(paralegalId = "") {
@@ -236,6 +238,18 @@ function escapeHtml(value = "") {
 
 function escapeAttribute(value = "") {
   return String(value).replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+function sanitizeUrl(rawUrl) {
+  if (!rawUrl) return "";
+  try {
+    const url = new URL(String(rawUrl), window.location.origin);
+    const protocol = url.protocol.toLowerCase();
+    if (protocol === "http:" || protocol === "https:" || protocol === "mailto:") {
+      return url.href;
+    }
+  } catch {}
+  return "";
 }
 
 pagination?.addEventListener("click", (event) => {

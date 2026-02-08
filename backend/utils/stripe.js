@@ -27,7 +27,7 @@ function parseCents(amount) {
 }
 
 const DEFAULT_ATTORNEY_FEE_PCT = Number(
-  process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 21
+  process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 22
 );
 const DEFAULT_PARALEGAL_FEE_PCT = Number(
   process.env.PLATFORM_FEE_PARALEGAL_PERCENT || process.env.PLATFORM_FEE_PERCENT || 18

@@ -3,6 +3,7 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/notifications-dashboard.css" />
   <link rel="stylesheet" href="assets/libs/cropper/cropper.main.css" />
   <link rel="preload" as="font" href="assets/fonts/DtVmJx26TKEr37c9YNpoilss6yLUrwA.woff2" type="font/woff2" crossorigin />
   <link rel="preload" as="font" href="assets/fonts/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtKky2F7g.woff2" type="font/woff2" crossorigin />
@@ -359,10 +360,6 @@
       font-weight: 300 !important;
     }
 
-    .lpc-shared-header .notification-badge {
-      display: none !important;
-    }
-
     .topbar .lpc-shared-header {
       margin-bottom: 0;
       align-items: center;
@@ -508,6 +505,14 @@
 
     body.theme-dark .profile-tour-tooltip.arrow-right::after {
       border-color: transparent transparent transparent var(--panel);
+    }
+
+    body.theme-dark .profile-tour-tooltip.arrow-top::after {
+      border-color: transparent transparent var(--panel) transparent;
+    }
+
+    body.theme-dark .profile-tour-tooltip.arrow-bottom::after {
+      border-color: var(--panel) transparent transparent transparent;
     }
 
     body.theme-dark .profile-tour-title {
@@ -2748,6 +2753,19 @@ input[type="number"],
       border-color: transparent transparent transparent #ffffff;
     }
 
+    .profile-tour-tooltip.arrow-top::after {
+      top: -8px;
+      left: var(--arrow-left, 24px);
+      border-color: transparent transparent #ffffff transparent;
+    }
+
+    .profile-tour-tooltip.arrow-bottom::after {
+      top: auto;
+      bottom: -8px;
+      left: var(--arrow-left, 24px);
+      border-color: #ffffff transparent transparent transparent;
+    }
+
     .profile-tour-title {
       font-size: 1.02rem;
       font-weight: 500;
@@ -3489,6 +3507,80 @@ input[type="number"],
     font-size: 0.95rem;
   }
 
+  body.attorney-classic .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 260px;
+    height: 100vh;
+    border-right: none;
+    border-bottom: none;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 24px;
+    padding: 24px 18px;
+    padding-top: 72px;
+    transform: translateX(-110%);
+    transition: transform 0.25s ease;
+    z-index: 2000;
+    box-shadow: 18px 0 40px rgba(0, 0, 0, 0.18);
+  }
+
+  body.attorney-classic.nav-open .sidebar {
+    transform: translateX(0);
+  }
+
+  body.attorney-classic.nav-open .sidebar-backdrop {
+    display: block;
+  }
+
+  body.attorney-classic .sidebar-toggle {
+    display: inline-flex;
+    position: fixed;
+    top: 14px;
+    left: 14px;
+  }
+
+  body.attorney-classic .settings-nav {
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+
+  body.attorney-classic .settings-nav button {
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+    flex: initial;
+  }
+
+  body.attorney-classic .settings-item {
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 0.95rem;
+  }
+
+  body.attorney-classic #dashboardReturnLink {
+    width: 100%;
+    text-align: left;
+  }
+
+  body.attorney-classic .topbar {
+    margin-bottom: 1.25rem;
+    min-height: 56px;
+    justify-content: flex-end;
+    gap: 12px;
+    order: -1;
+  }
+
+  body.attorney-classic .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
       .sidebar {
         position: relative;
         width: 100%;
@@ -3518,10 +3610,14 @@ input[type="number"],
       }
       .content {
         padding: 28px 20px 60px;
+        overflow-y: visible;
       }
       .unified-header {
         flex-direction: column;
         gap: 20px;
+      }
+      #accountSettingsTitle {
+        text-align: center;
       }
     }
   </style>
@@ -3575,7 +3671,7 @@ input[type="number"],
                     <span id="attorneyAvatarInitials">A</span>
                   </div>
                 </div>
-                <input type="file" id="attorneyAvatarInput" accept="image/*" hidden />
+                <input type="file" id="attorneyAvatarInput" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden />
                 <div class="avatar-actions">
                   <button type="button" class="btn btn-outline avatar-edit-btn hidden" id="editAttorneyAvatarBtn">Edit photo</button>
                 </div>
@@ -3703,7 +3799,7 @@ input[type="number"],
                   </div>
                 </div>
                 <div id="photoReviewStatus" class="photo-review-status hidden" role="status" aria-live="polite"></div>
-                <input type="file" id="avatarInput" accept="image/*" hidden />
+                <input type="file" id="avatarInput" accept=".jpg,.jpeg,.png,image/jpeg,image/png" hidden />
                 <div class="avatar-actions">
                   <button type="button" class="btn btn-outline avatar-edit-btn hidden" id="editAvatarBtn">Edit photo</button>
                   <button type="button" class="btn btn-outline avatar-remove-btn hidden" id="removeAvatarBtn">Remove photo</button>
