@@ -72,6 +72,7 @@ const state = {
   filter: "active",
   search: "",
   pendingAttachments: [],
+  optimisticDocuments: [],
   sending: false,
   completing: false,
   disputing: false,
@@ -298,9 +299,82 @@ function normalizeMessages(payload) {
 function normalizeDocuments(payload) {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.files)) return payload.files;
+  if (Array.isArray(payload?.caseFiles)) return payload.caseFiles;
   if (Array.isArray(payload?.documents)) return payload.documents;
   if (Array.isArray(payload?.items)) return payload.items;
   return [];
+}
+
+function getDocumentCaseId(documentData) {
+  if (!documentData) return "";
+  return String(documentData?.caseId || documentData?.case_id || documentData?.case || "");
+}
+
+function getDocumentKey(documentData) {
+  if (!documentData) return "";
+  const id = documentData?.id || documentData?._id;
+  if (id) return `id:${id}`;
+  const storageKey = documentData?.storageKey || documentData?.key || documentData?.previewKey;
+  if (storageKey) return `key:${storageKey}`;
+  const name = documentData?.originalName || documentData?.filename || documentData?.name || "";
+  const created = documentData?.createdAt || documentData?.uploadedAt || documentData?.created || "";
+  if (name || created) return `meta:${name}:${created}`;
+  return "";
+}
+
+function mergeDocuments(primary = [], secondary = []) {
+  const output = [];
+  const seen = new Set();
+  const pushUnique = (doc) => {
+    if (!doc) return;
+    const key = getDocumentKey(doc);
+    if (key) {
+      if (seen.has(key)) return;
+      seen.add(key);
+    }
+    output.push(doc);
+  };
+  (primary || []).forEach(pushUnique);
+  (secondary || []).forEach(pushUnique);
+  return output;
+}
+
+function addOptimisticDocument(documentData, caseId) {
+  if (!documentData) return;
+  const normalized = {
+    ...documentData,
+    caseId: documentData.caseId || caseId,
+  };
+  const key = getDocumentKey(normalized);
+  if (!key) return;
+  if (!Array.isArray(state.optimisticDocuments)) {
+    state.optimisticDocuments = [];
+  }
+  if (state.optimisticDocuments.some((doc) => getDocumentKey(doc) === key)) return;
+  state.optimisticDocuments.unshift(normalized);
+}
+
+function getOptimisticDocumentsForCase(caseId) {
+  if (!Array.isArray(state.optimisticDocuments) || !state.optimisticDocuments.length) return [];
+  const targetId = String(caseId || "");
+  return state.optimisticDocuments.filter((doc) => getDocumentCaseId(doc) === targetId);
+}
+
+function pruneOptimisticDocuments(optimistic = [], serverDocuments = [], caseId) {
+  if (!optimistic.length) return optimistic;
+  const targetId = String(caseId || "");
+  const serverKeys = new Set(
+    (serverDocuments || [])
+      .map((doc) => getDocumentKey(doc))
+      .filter(Boolean)
+  );
+  return optimistic.filter((doc) => {
+    const docCaseId = getDocumentCaseId(doc);
+    if (targetId && docCaseId && docCaseId !== targetId) return true;
+    const key = getDocumentKey(doc);
+    if (!key) return true;
+    return !serverKeys.has(key);
+  });
 }
 
 function normalizeCaseStatus(value) {
@@ -1094,6 +1168,18 @@ async function getSignedViewUrl({ caseId, storageKey } = {}) {
   }
 }
 
+async function getSignedDownloadUrl({ caseId, storageKey } = {}) {
+  if (!caseId || !storageKey) return "";
+  try {
+    const data = await fetchJSON(
+      `/api/uploads/signed-get?caseId=${encodeURIComponent(caseId)}&key=${encodeURIComponent(storageKey)}`
+    );
+    return data?.url || "";
+  } catch {
+    return "";
+  }
+}
+
 async function syncThemeFromSession() {
   if (typeof window.checkSession !== "function") return;
   try {
@@ -1116,12 +1202,16 @@ function syncRoleVisibility() {
     const role = String(user?.role || "").toLowerCase();
     if (role) {
       applyRoleVisibility(role);
+      document.body.classList.toggle("role-attorney", role === "attorney");
       return;
     }
   } catch (_) {}
   const cachedUser = window.getStoredUser?.();
   const cachedRole = String(cachedUser?.role || "").toLowerCase();
-  if (cachedRole) applyRoleVisibility(cachedRole);
+  if (cachedRole) {
+    applyRoleVisibility(cachedRole);
+    document.body.classList.toggle("role-attorney", cachedRole === "attorney");
+  }
 }
 
 function resolveUploader(documentData) {
@@ -1219,13 +1309,19 @@ function uploadAttachment(entry, caseId, note) {
       });
       xhr.addEventListener("load", () => {
         if (xhr.status >= 200 && xhr.status < 300) {
+          let uploadedFile = null;
+          try {
+            const parsed = JSON.parse(xhr.responseText || "{}");
+            uploadedFile = parsed?.file || parsed?.document || parsed?.item || null;
+          } catch {}
           entry.status = "uploaded";
           entry.progress = 100;
           entry.xhr = null;
           entry.error = "";
           renderPendingAttachment();
           removeAttachmentRecord(entry.id).catch(() => {});
-          resolve();
+          if (uploadedFile) addOptimisticDocument(uploadedFile, caseId);
+          resolve(uploadedFile);
           return;
         }
         let errorMessage = `Upload failed (${xhr.status}).`;
@@ -1264,7 +1360,7 @@ function uploadAttachment(entry, caseId, note) {
       throw new Error("Upload failed");
     }
     try {
-      await sendWithEndpoint(endpoints[index]);
+      return await sendWithEndpoint(endpoints[index]);
     } catch (err) {
       if (err.code === "canceled") {
         entry.status = "canceled";
@@ -1667,12 +1763,27 @@ async function updateCaseFileStatus(caseId, fileId, status) {
   });
 }
 
-async function queueDocumentForResend({ caseId, docId, fileName, mimeType }) {
-  if (!caseId || !docId || typeof File === "undefined") return false;
-  const downloadUrl = `/api/uploads/case/${encodeURIComponent(caseId)}/${encodeURIComponent(docId)}/download`;
+async function queueDocumentForResend({ caseId, docId, fileName, mimeType, storageKey }) {
+  if (!caseId || typeof File === "undefined") return false;
+  const attempts = [];
+  if (docId) {
+    const downloadUrl = `/api/uploads/case/${encodeURIComponent(caseId)}/${encodeURIComponent(docId)}/download`;
+    attempts.push(async () => secureFetch(downloadUrl, { method: "GET" }));
+  }
+  if (storageKey) {
+    attempts.push(async () => {
+      const signedUrl = await getSignedDownloadUrl({ caseId, storageKey });
+      if (!signedUrl) return null;
+      return fetch(signedUrl);
+    });
+  }
   try {
-    const res = await secureFetch(downloadUrl, { method: "GET" });
-    if (!res.ok) {
+    let res = null;
+    for (const attempt of attempts) {
+      res = await attempt();
+      if (res && res.ok) break;
+    }
+    if (!res || !res.ok) {
       throw new Error("Unable to fetch document for resend.");
     }
     const blob = await res.blob();
@@ -2087,14 +2198,8 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
   emptyNode(caseSharedDocuments);
   const list = Array.isArray(documents) ? documents.filter(Boolean) : [];
   const currentRole = getCurrentUserRole();
-  const counterpartyRole =
-    currentRole === "attorney" ? "paralegal" : currentRole === "paralegal" ? "attorney" : "";
-  const filtered = counterpartyRole
-    ? list.filter(
-        (doc) => normalizeRole(doc?.uploadedByRole || doc?.uploaderRole) === counterpartyRole
-      )
-    : list;
-  if (!filtered.length) {
+  caseSharedDocuments.classList.toggle("case-documents-attorney", currentRole === "attorney");
+  if (!list.length) {
     caseSharedDocuments.hidden = true;
     caseSharedDocumentsEmpty.textContent = emptyMessage || "No documents shared yet.";
     caseSharedDocumentsEmpty.hidden = false;
@@ -2104,7 +2209,7 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
   caseSharedDocuments.hidden = false;
   caseSharedDocumentsEmpty.hidden = true;
 
-  const sorted = [...filtered].sort((a, b) => {
+  const sorted = [...list].sort((a, b) => {
     const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
     const bTime = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
     return bTime - aTime;
@@ -2236,7 +2341,7 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
           documentData.status = nextStatus;
           setActionState(nextStatus);
           if (nextStatus === "attorney_revision") {
-            await queueDocumentForResend({ caseId, docId, fileName, mimeType });
+            await queueDocumentForResend({ caseId, docId, fileName, mimeType, storageKey });
             applyRevisionMessageTemplate(fileName);
           }
         } catch (err) {
@@ -2406,35 +2511,33 @@ async function loadCase(caseId) {
 
     let messages = [];
     let documents = [];
+    let serverDocuments = [];
+    const optimisticDocuments = getOptimisticDocumentsForCase(caseId);
 
     try {
-      const messagesData = await fetchWithFallback(
-        [
-          `/api/chat/${encodeURIComponent(caseId)}`,
-          `/api/messages?caseId=${encodeURIComponent(caseId)}`,
-          `/api/messages/${encodeURIComponent(caseId)}`,
-        ],
-        { cache: "no-store" }
-      );
+      const messagesData = await fetchJSON(`/api/messages/${encodeURIComponent(caseId)}`, {
+        cache: "no-store",
+      });
       messages = normalizeMessages(messagesData);
     } catch (err) {
       showMsg(messageStatus, err.message || "Unable to load messages.");
     }
 
+    renderThreadItems(messages, optimisticDocuments, caseId);
+
     try {
-      const documentsData = await fetchWithFallback(
-        [
-          `/api/uploads/case/${encodeURIComponent(caseId)}`,
-          `/api/uploads?caseId=${encodeURIComponent(caseId)}`,
-        ],
-        { cache: "no-store" }
-      );
-      documents = normalizeDocuments(documentsData);
+      const documentsData = await fetchJSON(`/api/uploads/case/${encodeURIComponent(caseId)}`, {
+        cache: "no-store",
+      });
+      serverDocuments = normalizeDocuments(documentsData);
     } catch {
-      documents = [];
+      serverDocuments = [];
     }
 
-    renderSharedDocuments(documents, caseId);
+    documents = mergeDocuments(serverDocuments, optimisticDocuments);
+    state.optimisticDocuments = pruneOptimisticDocuments(state.optimisticDocuments, serverDocuments, caseId);
+
+    renderSharedDocuments(serverDocuments, caseId);
     renderThreadItems(messages, documents, caseId);
     markCaseMessagesRead(caseId, messages);
     if (state.unreadByCase.has(caseId)) {
@@ -2512,18 +2615,10 @@ async function handleSendMessage(event) {
 
     if (text) {
       showMsg(messageStatus, "Sending message...");
-      await fetchWithFallback(
-        [
-          `/api/chat/${encodeURIComponent(caseId)}`,
-          "/api/messages",
-          `/api/messages?caseId=${encodeURIComponent(caseId)}`,
-          `/api/messages/${encodeURIComponent(caseId)}`,
-        ],
-        {
-          method: "POST",
-          body: { text, content: text, caseId },
-        }
-      );
+      await fetchJSON(`/api/messages/${encodeURIComponent(caseId)}`, {
+        method: "POST",
+        body: { text, content: text, caseId },
+      });
       messageInput.value = "";
       autoResizeMessageInput();
     }

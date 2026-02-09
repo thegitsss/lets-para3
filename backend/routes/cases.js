@@ -114,7 +114,7 @@ const PLATFORM_FEE_ATTORNEY_PERCENT = Number(
   process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 22
 );
 const PLATFORM_FEE_PARALEGAL_PERCENT = Number(
-  process.env.PLATFORM_FEE_PARALEGAL_PERCENT || process.env.PLATFORM_FEE_PERCENT || 18
+  process.env.PLATFORM_FEE_PARALEGAL_PERCENT || 18
 );
 const WORK_STARTED_STATUSES = new Set([
   "active",
@@ -326,18 +326,50 @@ function computeParalegalFeeAmount(baseAmount, doc = {}) {
   return Math.max(0, Math.round(baseAmount * (resolveParalegalFeePct(doc) / 100)));
 }
 
+function resolveDisputeSettlement(doc = {}) {
+  const settlement = doc.disputeSettlement || {};
+  const action = String(settlement.action || "");
+  if (!["release_full", "release_partial"].includes(action)) return null;
+  const grossAmount = Number(settlement.grossAmount);
+  if (!Number.isFinite(grossAmount) || grossAmount <= 0) return null;
+  const feeAttorneyPct = Number.isFinite(settlement.feeAttorneyPct)
+    ? settlement.feeAttorneyPct
+    : resolveAttorneyFeePct(doc);
+  const feeParalegalPct = Number.isFinite(settlement.feeParalegalPct)
+    ? settlement.feeParalegalPct
+    : resolveParalegalFeePct(doc);
+  const feeAttorneyAmount = Number.isFinite(settlement.feeAttorneyAmount)
+    ? settlement.feeAttorneyAmount
+    : Math.max(0, Math.round(grossAmount * (feeAttorneyPct / 100)));
+  const feeParalegalAmount = Number.isFinite(settlement.feeParalegalAmount)
+    ? settlement.feeParalegalAmount
+    : Math.max(0, Math.round(grossAmount * (feeParalegalPct / 100)));
+  const payoutAmount = Number.isFinite(settlement.payoutAmount)
+    ? settlement.payoutAmount
+    : Math.max(0, grossAmount - feeParalegalAmount);
+  return {
+    grossAmount,
+    feeAttorneyAmount,
+    feeParalegalAmount,
+    feeAttorneyPct,
+    feeParalegalPct,
+    payoutAmount,
+  };
+}
+
 async function generateReceiptDocuments(caseDoc, { payoutAmount, paymentMethodLabel } = {}) {
   if (!caseDoc?._id) return;
-  const baseAmount = Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
-  const attorneyFee = computeAttorneyFeeAmount(baseAmount, caseDoc);
-  const paralegalFee = computeParalegalFeeAmount(baseAmount, caseDoc);
+  const settlement = resolveDisputeSettlement(caseDoc);
+  const baseAmount = settlement?.grossAmount ?? Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
+  const attorneyFee = settlement?.feeAttorneyAmount ?? computeAttorneyFeeAmount(baseAmount, caseDoc);
+  const paralegalFee = settlement?.feeParalegalAmount ?? computeParalegalFeeAmount(baseAmount, caseDoc);
   const payout =
     Number.isFinite(payoutAmount) && payoutAmount >= 0
       ? payoutAmount
-      : Math.max(0, baseAmount - paralegalFee);
+      : settlement?.payoutAmount ?? Math.max(0, baseAmount - paralegalFee);
   const issuedAt = caseDoc.completedAt || caseDoc.paidOutAt || new Date();
-  const attorneyPct = resolveAttorneyFeePct(caseDoc);
-  const paralegalPct = resolveParalegalFeePct(caseDoc);
+  const attorneyPct = settlement?.feeAttorneyPct ?? resolveAttorneyFeePct(caseDoc);
+  const paralegalPct = settlement?.feeParalegalPct ?? resolveParalegalFeePct(caseDoc);
 
   const attorneyName =
     caseDoc.attorneyNameSnapshot ||
@@ -684,7 +716,8 @@ function seedLegacyInvite(caseDoc) {
   }
 }
 
-function caseSummary(doc, { includeFiles = false } = {}) {
+function caseSummary(doc, { includeFiles = false, viewerRole = "" } = {}) {
+  const isAdmin = String(viewerRole || "").toLowerCase() === "admin";
   const paralegal = summarizeUser(doc.paralegal || doc.paralegalId);
   const pendingParalegal = summarizeUser(doc.pendingParalegal || doc.pendingParalegalId);
   const attorney = summarizeUser(doc.attorney || doc.attorneyId);
@@ -713,7 +746,7 @@ function caseSummary(doc, { includeFiles = false } = {}) {
     assignedTo: paralegal,
     acceptedParalegal: !!paralegal,
     applicants: Array.isArray(doc.applicants) ? doc.applicants.length : 0,
-    filesCount: Array.isArray(doc.files) ? doc.files.length : 0,
+    filesCount: !isAdmin && Array.isArray(doc.files) ? doc.files.length : 0,
     jobId: doc.jobId || null,
     attorney,
     paralegal,
@@ -726,7 +759,7 @@ function caseSummary(doc, { includeFiles = false } = {}) {
     completedAt: doc.completedAt || null,
     briefSummary: doc.briefSummary || "",
     archived: !!doc.archived,
-    downloadUrl: Array.isArray(doc.downloadUrl) ? doc.downloadUrl : [],
+    downloadUrl: !isAdmin && Array.isArray(doc.downloadUrl) ? doc.downloadUrl : [],
     readOnly: !!doc.readOnly,
     paralegalAccessRevokedAt: doc.paralegalAccessRevokedAt || null,
     archiveReadyAt: doc.archiveReadyAt || null,
@@ -748,8 +781,7 @@ function caseSummary(doc, { includeFiles = false } = {}) {
       terminatedAt: doc.terminatedAt || null,
     },
   };
-  summary.filesCount = Array.isArray(doc.files) ? doc.files.length : 0;
-  if (includeFiles) {
+  if (includeFiles && !isAdmin) {
     summary.files = Array.isArray(doc.files) ? doc.files.map(normalizeFile) : [];
   }
   return summary;
@@ -1232,7 +1264,7 @@ router.post(
       { actorUserId: req.user.id }
     );
 
-    return res.json(caseSummary(caseDoc));
+    return res.json(caseSummary(caseDoc, { viewerRole: req.user?.role }));
   })
 );
 
@@ -1404,7 +1436,7 @@ router.post(
       );
     }
 
-    return res.json(caseSummary(caseDoc));
+    return res.json(caseSummary(caseDoc, { viewerRole: req.user?.role }));
   })
 );
 
@@ -1569,7 +1601,7 @@ router.post(
       await logAction(req, "case.create", { targetType: "case", targetId: created._id });
     } catch {}
 
-    res.status(201).json(caseSummary(created));
+    res.status(201).json(caseSummary(created, { viewerRole: req.user?.role }));
   })
 );
 
@@ -1638,7 +1670,7 @@ router.get(
       .populate("attorney", "firstName lastName email role");
 
     const cases = docs.map((doc) => {
-      const summary = caseSummary(doc);
+      const summary = caseSummary(doc, { viewerRole: req.user?.role });
       const attorney = summary.attorney;
       const authorName =
         attorney?.name ||
@@ -1672,7 +1704,7 @@ router.get(
     const role = user.role;
     const userId = user.id;
 
-    const includeFiles = String(req.query.withFiles || "").toLowerCase() === "true";
+    const includeFiles = role !== "admin" && String(req.query.withFiles || "").toLowerCase() === "true";
     const userObjectId = mongoose.Types.ObjectId.isValid(userId)
       ? new mongoose.Types.ObjectId(userId)
       : null;
@@ -1750,7 +1782,7 @@ router.get(
     }
 
     const payload = docs.map((doc) => {
-      const summary = caseSummary(doc, { includeFiles: false });
+      const summary = caseSummary(doc, { includeFiles: false, viewerRole: role });
       if (includeFiles) {
         const files = filesByCase.get(String(doc._id)) || [];
         summary.files = files;
@@ -1786,7 +1818,7 @@ router.get(
       .populate("pendingParalegalId", "firstName lastName email role avatarURL")
       .lean();
 
-    res.json({ items: docs.map((doc) => caseSummary(doc)) });
+    res.json({ items: docs.map((doc) => caseSummary(doc, { viewerRole: req.user?.role })) });
   })
 );
 
@@ -1818,7 +1850,7 @@ router.get(
       .lean();
 
     const items = docs.map((doc) => {
-      const summary = caseSummary(doc);
+      const summary = caseSummary(doc, { viewerRole: req.user?.role });
       const invite = listCaseInvites(doc).find(
         (entry) => entry.status === "pending" && String(entry.paralegalId) === String(req.user.id)
       );
@@ -2088,7 +2120,7 @@ router.patch(
       });
     } catch {}
 
-    res.json(caseSummary(doc));
+    res.json(caseSummary(doc, { viewerRole: req.user?.role }));
   })
 );
 
@@ -2262,7 +2294,7 @@ router.post(
     const payload = {
       ok: true,
       requiresAdmin: workStarted,
-      case: caseSummary(doc),
+      case: caseSummary(doc, { viewerRole: req.user?.role }),
     };
     res.status(workStarted ? 202 : 200).json(payload);
   })
@@ -2278,6 +2310,9 @@ router.post(
   csrfProtection,
   requireCaseAccess("caseId", { project: "files" }),
   asyncHandler(async (req, res) => {
+    if (req.acl?.isAdmin) {
+      return res.status(403).json({ error: "Admins can only access the case archive." });
+    }
     const { key, original, mime, size } = req.body || {};
     if (!key || typeof key !== "string") return res.status(400).json({ error: "key is required" });
     const doc = req.case;
@@ -2325,6 +2360,9 @@ router.delete(
   csrfProtection,
   requireCaseAccess("caseId", { project: "files" }),
   asyncHandler(async (req, res) => {
+    if (req.acl?.isAdmin) {
+      return res.status(403).json({ error: "Admins can only access the case archive." });
+    }
     const { key } = req.body || {};
     if (!key || typeof key !== "string") return res.status(400).json({ error: "key is required" });
     const doc = req.case;
@@ -2372,6 +2410,9 @@ router.get(
   "/:caseId/files/signed-get",
   requireCaseAccess("caseId", { project: "files paymentReleased" }),
   asyncHandler(async (req, res) => {
+    if (req.acl?.isAdmin) {
+      return res.status(403).json({ error: "Admins can only access the case archive." });
+    }
     const { key } = req.query;
     if (!key || typeof key !== "string") return res.status(400).json({ error: "key query param required" });
     const doc = req.case;
@@ -2399,6 +2440,9 @@ router.patch(
   csrfProtection,
   requireCaseAccess("caseId", { project: "files" }),
   asyncHandler(async (req, res) => {
+    if (req.acl?.isAdmin) {
+      return res.status(403).json({ error: "Admins can only access the case archive." });
+    }
     if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
       return res.status(403).json({ error: "Only the case attorney can update file status" });
     }
@@ -2445,6 +2489,9 @@ router.post(
   csrfProtection,
   requireCaseAccess("caseId", { project: "files" }),
   asyncHandler(async (req, res) => {
+    if (req.acl?.isAdmin) {
+      return res.status(403).json({ error: "Admins can only access the case archive." });
+    }
     if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
       return res.status(403).json({ error: "Only the attorney can request revisions" });
     }
@@ -2477,6 +2524,9 @@ router.post(
   csrfProtection,
   requireCaseAccess("caseId", { project: "files" }),
   asyncHandler(async (req, res) => {
+    if (req.acl?.isAdmin) {
+      return res.status(403).json({ error: "Admins can only access the case archive." });
+    }
     if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
       return res.status(403).json({ error: "Only the attorney can replace a document" });
     }
@@ -3092,7 +3142,7 @@ router.post(
       });
     } catch {}
 
-    res.json({ ok: true, case: caseSummary(caseDoc) });
+    res.json({ ok: true, case: caseSummary(caseDoc, { viewerRole: req.user?.role }) });
   })
 );
 
@@ -3383,7 +3433,7 @@ router.post(
       );
     } catch {}
 
-    res.json(caseSummary(selectedCase));
+    res.json(caseSummary(selectedCase, { viewerRole: req.user?.role }));
   })
 );
 
@@ -3431,7 +3481,7 @@ router.patch(
       });
     } catch {}
 
-    res.json(caseSummary(doc));
+    res.json(caseSummary(doc, { viewerRole: req.user?.role }));
   })
 );
 
@@ -3645,7 +3695,8 @@ router.get(
       .lean();
     if (!doc) return res.status(404).json({ error: "Case not found" });
     const role = String(req.user?.role || "").toLowerCase();
-    const canSeeStars = role === "attorney" || role === "admin";
+    const isAdmin = role === "admin";
+    const canSeeStars = role === "attorney" || isAdmin;
     const statusKey = String(doc.status || "").toLowerCase();
     if (role === "paralegal" && (statusKey === "completed" || doc.paymentReleased === true)) {
       return res.status(403).json({ error: "Completed cases are no longer accessible." });
@@ -3751,7 +3802,7 @@ router.get(
       tasks: serializeScopeTasks(doc.tasks),
       tasksLocked: !!doc.tasksLocked,
       archived: !!doc.archived,
-      downloadUrl: Array.isArray(doc.downloadUrl) ? doc.downloadUrl : [],
+      downloadUrl: isAdmin ? [] : Array.isArray(doc.downloadUrl) ? doc.downloadUrl : [],
       readOnly: !!doc.readOnly,
       paralegalAccessRevokedAt: doc.paralegalAccessRevokedAt || null,
       archiveReadyAt: doc.archiveReadyAt || null,
@@ -3760,7 +3811,7 @@ router.get(
       attorney: doc.attorney || null,
       paralegal: doc.paralegal || null,
       paralegalNameSnapshot: doc.paralegalNameSnapshot || "",
-      files: Array.isArray(doc.files) ? doc.files.map(normalizeFile) : [],
+      files: isAdmin ? [] : Array.isArray(doc.files) ? doc.files.map(normalizeFile) : [],
       applicants,
       termination: {
         status: doc.terminationStatus || "none",

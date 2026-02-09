@@ -720,6 +720,21 @@
       min-height: 0;
     }
 
+    body.role-attorney .case-main {
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    body.role-attorney .case-workspace {
+      height: 100%;
+      min-height: 0;
+    }
+
+    body.role-attorney .case-thread {
+      height: 100%;
+      min-height: 0;
+    }
+
     .case-thread-header {
       display: none;
     }
@@ -895,6 +910,12 @@
     .case-participants h2,
     .case-documents-panel h2 {
       text-align: center;
+    }
+
+    .case-documents-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
     }
 
     .case-participants-header {
@@ -1726,6 +1747,9 @@
     .case-documents-list {
       display: grid;
       gap: 10px;
+      max-height: clamp(220px, 42vh, 520px);
+      overflow-y: auto;
+      padding-right: 4px;
     }
 
     .case-documents-item {
@@ -1739,12 +1763,22 @@
       background: var(--app-surface-contrast);
     }
 
+    .case-documents-list.case-documents-attorney .case-documents-item {
+      min-width: 0;
+    }
+
     .case-documents-meta {
       display: flex;
       flex-direction: column;
       gap: 4px;
       font-size: 0.85rem;
       color: var(--app-text);
+    }
+
+    .case-documents-list.case-documents-attorney .case-documents-meta {
+      min-width: 0;
+      flex: 1 1 auto;
+      overflow-wrap: anywhere;
     }
 
     .case-documents-sub {

@@ -20,6 +20,20 @@ let recentUsersCache = [];
 const NEW_USERS_PAGE_SIZE = 5;
 let newUsersPage = 1;
 const newUsersPageSelect = document.getElementById("newUsersPageSelect");
+const disputeCountEl = document.getElementById("disputeCount");
+const disputeCardEl = document.getElementById("disputeCard");
+const disputesBody = document.getElementById("disputesBody");
+const disputeSearchInput = document.getElementById("disputeSearch");
+const disputeStatusFilter = document.getElementById("disputeStatusFilter");
+const refreshDisputesBtn = document.getElementById("refreshDisputes");
+const disputesHeaderRow = document.getElementById("disputesHeaderRow");
+const disputeTabs = Array.from(document.querySelectorAll("[data-dispute-tab]"));
+
+const CURRENCY = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+});
 
 async function loadAnalytics() {
 if (analyticsInFlight) return null;
@@ -81,6 +95,89 @@ if (!value) return "";
 const date = new Date(value);
 if (Number.isNaN(date.getTime())) return value;
 return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function formatCurrencyValue(value) {
+  const cents = Number(value);
+  if (!Number.isFinite(cents)) return "—";
+  return CURRENCY.format(cents / 100);
+}
+
+function buildPersonLabel(person = {}) {
+  if (!person) return "—";
+  const name = `${person.firstName || ""} ${person.lastName || ""}`.trim();
+  return name || person.email || "—";
+}
+
+function resolveDisputeAmounts(item = {}) {
+  const settlement = item.disputeSettlement || null;
+  const settlementAction = String(settlement?.action || "");
+  const hasSettlement = settlementAction === "release_full" || settlementAction === "release_partial";
+  const baseAmount = hasSettlement
+    ? Number(settlement?.grossAmount)
+    : Number(item.lockedTotalAmount ?? item.totalAmount ?? 0);
+  const feePct = Number(
+    hasSettlement ? settlement?.feeParalegalPct : item.feeParalegalPct
+  );
+  const safeFeePct = Number.isFinite(feePct) ? feePct : 18;
+  const rawFeeAmount = hasSettlement ? settlement?.feeParalegalAmount : item.feeParalegalAmount;
+  const feeAmount = Number.isFinite(Number(rawFeeAmount))
+    ? Number(rawFeeAmount)
+    : Math.round(baseAmount * (safeFeePct / 100));
+  const payoutAmount = hasSettlement
+    ? Number.isFinite(Number(settlement?.payoutAmount))
+      ? Number(settlement.payoutAmount)
+      : Math.max(0, baseAmount - feeAmount)
+    : Math.max(0, baseAmount - feeAmount);
+  return {
+    baseAmount,
+    feePct: safeFeePct,
+    feeAmount,
+    payoutAmount,
+  };
+}
+
+function resolveDisputeResolution(item = {}) {
+  const settlement = item.disputeSettlement || {};
+  const action = String(settlement.action || "");
+  const disputeId = String(item.dispute?.disputeId || item.dispute?._id || "");
+  if (!action) return null;
+  if (settlement.disputeId && disputeId && String(settlement.disputeId) !== disputeId) return null;
+  const label =
+    action === "refund"
+      ? "Refund"
+      : action === "release_partial"
+      ? "Partial"
+      : action === "release_full"
+      ? "Full"
+      : action;
+  return { action, label, resolvedAt: settlement.resolvedAt || null };
+}
+
+function getDisputeColspan(status) {
+  return status === "resolved" ? 5 : 6;
+}
+
+function renderDisputeHeader(status) {
+  if (!disputesHeaderRow) return;
+  if (status === "resolved") {
+    disputesHeaderRow.innerHTML = `
+      <th>Case</th>
+      <th>Parties</th>
+      <th>Resolution</th>
+      <th>Resolved</th>
+      <th>Notes</th>
+    `;
+    return;
+  }
+  disputesHeaderRow.innerHTML = `
+    <th>Case</th>
+    <th>Parties</th>
+    <th>Dispute</th>
+    <th>Status</th>
+    <th>Escrow</th>
+    <th>Actions</th>
+  `;
 }
 
 function getNewUsersTotalPages(total) {
@@ -758,6 +855,376 @@ const certificate = certificateHref
 list.innerHTML = cards;
 }
 
+function renderOpenDisputes(items = []) {
+  if (!disputesBody) return;
+  if (!items.length) {
+    disputesBody.innerHTML = '<tr><td colspan="6" class="pending-empty">No disputes found.</td></tr>';
+    return;
+  }
+  disputesBody.innerHTML = items
+    .map((item) => {
+      const caseId = String(item.caseId || "");
+      const dispute = item.dispute || {};
+      const disputeId = String(dispute.disputeId || dispute._id || "");
+      const status = String(dispute.status || "open").toLowerCase();
+      const isResolved = status !== "open" || item.paymentReleased || item.payoutTransferId;
+      const reason = escapeHTML(dispute.message || dispute.reason || "—");
+      const createdAt = dispute.createdAt ? formatDate(dispute.createdAt) : "—";
+      const attorneyLabel = buildPersonLabel(item.attorney);
+      const paralegalLabel = buildPersonLabel(item.paralegal);
+      const amounts = resolveDisputeAmounts(item);
+      const baseAmount = Number.isFinite(amounts.baseAmount) ? amounts.baseAmount : 0;
+      const grossLabel = formatCurrencyValue(baseAmount);
+      const feeLabel = formatCurrencyValue(amounts.feeAmount);
+      const payoutLabel = formatCurrencyValue(amounts.payoutAmount);
+      const actionDisabled = isResolved ? ' disabled aria-disabled="true"' : "";
+      const actionNote = isResolved ? '<div class="dispute-meta">Resolved</div>' : "";
+      return `
+        <tr data-case-id="${escapeAttribute(caseId)}" data-dispute-id="${escapeAttribute(disputeId)}" data-gross-max="${baseAmount}">
+          <td>
+            <div>
+              <a class="btn-link" href="/api/cases/${escapeAttribute(caseId)}/archive/download" target="_blank" rel="noopener">
+                ${escapeHTML(item.caseTitle || "Case")}
+              </a>
+            </div>
+            <div class="dispute-meta">${escapeHTML(caseId)}</div>
+          </td>
+          <td>
+            <div>${escapeHTML(attorneyLabel)}</div>
+            <div class="dispute-meta">${escapeHTML(paralegalLabel)}</div>
+          </td>
+          <td>
+            <div>${reason}</div>
+            <div class="dispute-meta">${escapeHTML(createdAt)}</div>
+          </td>
+          <td><span class="dispute-status">${escapeHTML(status)}</span></td>
+          <td>
+            <div>${grossLabel}</div>
+            <div class="dispute-meta">Fee ${amounts.feePct}%: ${feeLabel} · Net: ${payoutLabel}</div>
+          </td>
+          <td>
+            <div class="dispute-actions">
+              <button class="btn secondary" type="button" data-dispute-action="refund" data-case-id="${escapeAttribute(
+                caseId
+              )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Refund attorney</button>
+              <button class="btn primary" type="button" data-dispute-action="release-full" data-case-id="${escapeAttribute(
+                caseId
+              )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Full release</button>
+              <input type="number" min="0" step="0.01" placeholder="Partial $" data-dispute-amount${actionDisabled} />
+              <button class="btn secondary" type="button" data-dispute-action="release-partial" data-case-id="${escapeAttribute(
+                caseId
+              )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Partial release</button>
+            </div>
+            ${actionNote}
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+function renderResolvedDisputes(items = []) {
+  if (!disputesBody) return;
+  if (!items.length) {
+    disputesBody.innerHTML = '<tr><td colspan="5" class="pending-empty">No resolved disputes found.</td></tr>';
+    return;
+  }
+  disputesBody.innerHTML = items
+    .map((item) => {
+      const caseId = String(item.caseId || "");
+      const dispute = item.dispute || {};
+      const disputeId = String(dispute.disputeId || dispute._id || "");
+      const resolution = resolveDisputeResolution(item);
+      if (!resolution) return "";
+      const attorneyLabel = buildPersonLabel(item.attorney);
+      const paralegalLabel = buildPersonLabel(item.paralegal);
+      const resolvedAt = resolution.resolvedAt ? formatDate(resolution.resolvedAt) : "—";
+      const notesValue = escapeHTML(dispute.adminNotes || "");
+      const detailId = `dispute-detail-${escapeAttribute(caseId)}-${escapeAttribute(disputeId)}`;
+      return `
+        <tr data-case-id="${escapeAttribute(caseId)}" data-dispute-id="${escapeAttribute(
+        disputeId
+      )}" data-dispute-row>
+          <td>
+            <div>
+              <a class="btn-link" href="/api/cases/${escapeAttribute(caseId)}/archive/download" target="_blank" rel="noopener">
+                ${escapeHTML(item.caseTitle || "Case")}
+              </a>
+            </div>
+            <div class="dispute-meta">${escapeHTML(caseId)}</div>
+          </td>
+          <td>
+            <div>${escapeHTML(attorneyLabel)}</div>
+            <div class="dispute-meta">${escapeHTML(paralegalLabel)}</div>
+          </td>
+          <td><span class="dispute-status">${escapeHTML(resolution.label)}</span></td>
+          <td>${escapeHTML(resolvedAt)}</td>
+          <td>
+            <button class="dispute-row-toggle" type="button" data-dispute-toggle="${detailId}" aria-expanded="false">
+              View internal notes
+            </button>
+          </td>
+        </tr>
+        <tr class="dispute-details hidden" id="${detailId}">
+          <td colspan="5">
+            <div class="dispute-notes">
+              <div class="dispute-notes-label">Internal Notes</div>
+              <textarea data-dispute-notes placeholder="Add internal notes…">${notesValue}</textarea>
+              <button class="btn secondary" type="button" data-dispute-notes-save data-case-id="${escapeAttribute(
+                caseId
+              )}" data-dispute-id="${escapeAttribute(disputeId)}">Save notes</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+function renderDisputes(items = [], status = "open") {
+  renderDisputeHeader(status);
+  if (!disputesBody) return;
+  if (!items.length) {
+    disputesBody.innerHTML = `<tr><td colspan="${getDisputeColspan(status)}" class="pending-empty">No disputes found.</td></tr>`;
+    return;
+  }
+  if (status === "resolved") {
+    renderResolvedDisputes(items.filter((item) => resolveDisputeResolution(item)));
+    return;
+  }
+  renderOpenDisputes(items);
+}
+
+async function loadDisputeSummary() {
+  if (!disputeCountEl) return;
+  try {
+    const params = new URLSearchParams({ status: "open", limit: "1" });
+    const res = await secureFetch(`/api/disputes/admin?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload?.error || "Unable to load disputes.");
+    const total = Number(payload.total || 0);
+    disputeCountEl.textContent = total.toLocaleString();
+  } catch (err) {
+    disputeCountEl.textContent = "—";
+  }
+}
+
+function getActiveDisputeStatus() {
+  const activeTab = disputeTabs.find((btn) => btn.classList.contains("active"));
+  return activeTab?.dataset?.disputeTab || disputeStatusFilter?.value || "open";
+}
+
+function setActiveDisputeStatus(status) {
+  const value = status || "open";
+  if (disputeStatusFilter) {
+    disputeStatusFilter.value = value;
+  }
+  disputeTabs.forEach((btn) => {
+    const isActive = btn.dataset.disputeTab === value;
+    btn.classList.toggle("active", isActive);
+  });
+}
+
+async function loadDisputes() {
+  if (!disputesBody) return;
+  const status = getActiveDisputeStatus();
+  renderDisputeHeader(status);
+  disputesBody.innerHTML = `<tr><td colspan="${getDisputeColspan(status)}" class="pending-empty">Loading disputes…</td></tr>`;
+  try {
+    const q = String(disputeSearchInput?.value || "").trim();
+    const params = new URLSearchParams({ status, limit: "50" });
+    if (status === "resolved") params.set("finalized", "true");
+    if (q) params.set("q", q);
+    const res = await secureFetch(`/api/disputes/admin?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload?.error || "Unable to load disputes.");
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+    renderDisputes(items, status);
+  } catch (err) {
+    disputesBody.innerHTML = `<tr><td colspan="${getDisputeColspan(getActiveDisputeStatus())}" class="pending-empty">${escapeHTML(
+      err?.message || "Unable to load disputes."
+    )}</td></tr>`;
+  }
+}
+
+async function settleDispute({ action, caseId, disputeId, grossAmountCents }) {
+  if (!caseId || !disputeId) return;
+  try {
+    await fetchCSRF();
+  } catch (_) {}
+  const body = { action, disputeId };
+  if (Number.isFinite(grossAmountCents)) {
+    body.grossAmountCents = grossAmountCents;
+  }
+  const res = await secureFetch(`/api/payments/dispute/settle/${encodeURIComponent(caseId)}`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+    body,
+  });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload?.error || payload?.msg || "Unable to settle dispute.");
+  }
+  return payload;
+}
+
+async function saveDisputeNotes({ caseId, disputeId, notes }) {
+  if (!caseId || !disputeId) return;
+  try {
+    await fetchCSRF();
+  } catch (_) {}
+  const res = await secureFetch(
+    `/api/disputes/${encodeURIComponent(caseId)}/${encodeURIComponent(disputeId)}/admin-notes`,
+    {
+      method: "PATCH",
+      headers: { Accept: "application/json" },
+      body: { notes },
+    }
+  );
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload?.error || "Unable to save notes.");
+  }
+  return payload;
+}
+
+if (disputeCardEl) {
+  const openDisputes = () => window.activateAdminSection?.("disputes");
+  disputeCardEl.addEventListener("click", openDisputes);
+  disputeCardEl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openDisputes();
+    }
+  });
+}
+
+if (refreshDisputesBtn) {
+  refreshDisputesBtn.addEventListener("click", () => {
+    loadDisputes();
+  });
+}
+
+if (disputeTabs.length) {
+  disputeTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const status = tab.dataset.disputeTab || "open";
+      setActiveDisputeStatus(status);
+      loadDisputes();
+    });
+  });
+}
+
+if (disputeStatusFilter) {
+  disputeStatusFilter.addEventListener("change", () => {
+    setActiveDisputeStatus(disputeStatusFilter.value || "open");
+    loadDisputes();
+  });
+}
+
+if (disputeSearchInput) {
+  disputeSearchInput.addEventListener("input", () => {
+    loadDisputes();
+  });
+}
+
+if (disputesBody) {
+  disputesBody.addEventListener("click", async (event) => {
+    const toggleBtn = event.target?.closest?.("[data-dispute-toggle]");
+    if (toggleBtn) {
+      const targetId = toggleBtn.dataset.disputeToggle;
+      const detailRow = targetId ? document.getElementById(targetId) : null;
+      if (detailRow) {
+        const isHidden = detailRow.classList.contains("hidden");
+        detailRow.classList.toggle("hidden", !isHidden);
+        toggleBtn.setAttribute("aria-expanded", String(isHidden));
+        toggleBtn.textContent = isHidden ? "Hide internal notes" : "View internal notes";
+      }
+      return;
+    }
+
+    const notesButton = event.target?.closest?.("[data-dispute-notes-save]");
+    if (notesButton) {
+      const caseId = notesButton.dataset.caseId;
+      const disputeId = notesButton.dataset.disputeId;
+      const row = notesButton.closest("tr");
+      const notesInput = row?.querySelector("[data-dispute-notes]");
+      const notes = String(notesInput?.value || "").trim();
+      if (!caseId || !disputeId) return;
+      try {
+        notesButton.disabled = true;
+        await saveDisputeNotes({ caseId, disputeId, notes });
+        showToast("Notes saved.", "success");
+      } catch (err) {
+        showToast(err?.message || "Unable to save notes.", "err");
+      } finally {
+        notesButton.disabled = false;
+      }
+      return;
+    }
+
+    const button = event.target?.closest?.("[data-dispute-action]");
+    if (!button) return;
+    const actionKey = button.dataset.disputeAction;
+    const caseId = button.dataset.caseId;
+    const disputeId = button.dataset.disputeId;
+    if (!actionKey || !caseId || !disputeId) return;
+
+    const row = button.closest("tr");
+    let grossAmountCents;
+    if (actionKey === "release-partial") {
+      const input = row?.querySelector("[data-dispute-amount]");
+      const amountUsd = Number(input?.value || 0);
+      if (!Number.isFinite(amountUsd) || amountUsd <= 0) {
+        showToast("Enter a valid partial amount.", "info");
+        return;
+      }
+      grossAmountCents = Math.round(amountUsd * 100);
+      const max = Number(row?.dataset?.grossMax || 0);
+      if (Number.isFinite(max) && max > 0 && grossAmountCents > max) {
+        showToast("Partial amount exceeds escrow total.", "info");
+        return;
+      }
+    }
+
+    const confirmText =
+      actionKey === "refund"
+        ? "Refund the attorney and close this dispute?"
+        : actionKey === "release-full"
+        ? "Release full payout to the paralegal and close this dispute?"
+        : "Release the partial payout to the paralegal and close this dispute?";
+    if (!window.confirm(confirmText)) return;
+
+    const action =
+      actionKey === "refund"
+        ? "refund"
+        : actionKey === "release-full"
+        ? "release_full"
+        : "release_partial";
+
+    try {
+      button.disabled = true;
+      const payload = await settleDispute({ action, caseId, disputeId, grossAmountCents });
+      if (payload?.refundId) {
+        showToast("Dispute settled. Refund issued.", "success");
+      } else {
+        showToast("Dispute settled. Payout released.", "success");
+      }
+      await Promise.all([loadDisputes(), loadDisputeSummary(), hydrateAnalytics()]);
+    } catch (err) {
+      showToast(err?.message || "Unable to settle dispute.", "err");
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+window.loadDisputes = loadDisputes;
+
 function applyRoleVisibility(user) {
 const role = String(user?.role || "").toLowerCase();
 if (role === "paralegal") {
@@ -791,6 +1258,7 @@ if (!user) return;
 bindSettingsActions();
 await loadAdminSettings();
 await hydrateAnalytics();
+await loadDisputeSummary();
 
 const taxReportBtn = document.getElementById("taxReportBtn");
 if (taxReportBtn) {

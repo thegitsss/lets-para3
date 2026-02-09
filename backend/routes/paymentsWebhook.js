@@ -334,7 +334,6 @@ router.post("/", async (req, res) => {
           actorRole: "system",
           action: event.type,
           targetType: "payment",
-          targetId: obj.id,
           case: caseForRefund?._id || null,
           ip: req.ip,
           ua: req.headers["user-agent"],
@@ -342,6 +341,7 @@ router.post("/", async (req, res) => {
           path: "/api/webhooks/stripe",
           meta: {
             eventId: event.id,
+            externalRef: obj.id,
             amount: obj.amount,
             currency: obj.currency,
             payment_intent: obj.payment_intent || null,
@@ -377,7 +377,6 @@ router.post("/", async (req, res) => {
           actorRole: "system",
           action: event.type,
           targetType: "payment",
-          targetId: tr.id,
           case: caseObj?._id || null,
           ip: req.ip,
           ua: req.headers["user-agent"],
@@ -385,6 +384,7 @@ router.post("/", async (req, res) => {
           path: "/api/webhooks/stripe",
           meta: {
             eventId: event.id,
+            externalRef: tr.id,
             amount: tr.amount,
             currency: tr.currency,
             destination: tr.destination || null,

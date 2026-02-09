@@ -229,6 +229,17 @@ function emailTemplate(type, payload) {
         subject: `New document on ${payload.caseTitle || "your case"}`,
         html: `<p>${payload.fileName || "A document"} was uploaded${payload.caseTitle ? ` to <strong>${payload.caseTitle}</strong>` : ""}.</p><p>${payload.link ? `<a href="${payload.link}">Open the case</a>` : "Log in to view the document."}</p>`,
       };
+    case "dispute_resolved": {
+      const title = payload.caseTitle || "the case";
+      const resolution = payload.resolutionLabel || payload.resolution || "Resolution";
+      const refundLine = payload.refundAmount ? `<li>Refund: ${payload.refundAmount}</li>` : "";
+      const payoutLine = payload.payoutAmount ? `<li>Payout: ${payload.payoutAmount}</li>` : "";
+      const details = refundLine || payoutLine ? `<ul>${refundLine}${payoutLine}</ul>` : "";
+      return {
+        subject: `Dispute resolved${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
+        html: `<p>${payload.message || `The dispute for <strong>${title}</strong> was resolved.`}</p><p>Resolution: ${resolution}.</p>${details}`,
+      };
+    }
     default:
       return {
         subject: "LPC Notification",
@@ -257,6 +268,7 @@ const CASE_EMAIL_TYPES = new Set([
   "application_accepted",
   "application_denied",
   "payout_released",
+  "dispute_resolved",
 ]);
 
 function shouldSendEmailForType(user, type) {

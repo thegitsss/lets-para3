@@ -210,7 +210,13 @@ async function ensureKeyAccess(req, key, explicitCaseId) {
   if (!req.user) return false;
   const cleaned = normalizeKeyPath(key);
   if (!cleaned || cleaned.includes("..")) return false;
-  if (req.user.role === "admin") return true;
+  const role = String(req.user.role || "").toLowerCase();
+  if (role === "admin") {
+    if (cleaned.startsWith("cases/")) {
+      return /^cases\/[a-f0-9]{24}\/archive-v2\.zip$/i.test(cleaned);
+    }
+    return true;
+  }
 
   if (cleaned.startsWith("cases/")) {
     const caseId = explicitCaseId || extractCaseIdFromKey(cleaned);
@@ -807,7 +813,10 @@ router.post(
   ensureCaseParticipant(),
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
-    const { caseDoc } = await loadCaseForUser(req, req.params.caseId);
+    const { caseDoc, isAdmin } = await loadCaseForUser(req, req.params.caseId);
+    if (isAdmin) {
+      return res.status(403).json({ msg: "Admins can only access the case archive." });
+    }
     if (!assertWorkspaceReady(caseDoc, res)) return;
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
     if (!req.file) return res.status(400).json({ msg: "File is required" });
@@ -917,7 +926,10 @@ router.get(
   "/case/:caseId",
   ensureCaseParticipant(),
   asyncHandler(async (req, res) => {
-    const { caseDoc } = await loadCaseForUser(req, req.params.caseId);
+    const { caseDoc, isAdmin } = await loadCaseForUser(req, req.params.caseId);
+    if (isAdmin) {
+      return res.status(403).json({ msg: "Admins can only access the case archive." });
+    }
     if (!assertWorkspaceReady(caseDoc, res)) return;
     const files = await CaseFile.find({ caseId: caseDoc._id }).sort({ createdAt: -1 }).lean();
     res.json({ files: files.map(serializeCaseFile) });
@@ -930,6 +942,9 @@ router.delete(
   csrfProtection,
   asyncHandler(async (req, res) => {
     const { caseDoc, isAdmin, isAttorney } = await loadCaseForUser(req, req.params.caseId);
+    if (isAdmin) {
+      return res.status(403).json({ msg: "Admins can only access the case archive." });
+    }
     if (!assertWorkspaceReady(caseDoc, res)) return;
     if (!isAdmin && !isAttorney) {
       return res.status(403).json({ msg: "Only the case attorney can delete documents." });
@@ -973,7 +988,10 @@ router.get(
   "/case/:caseId/:fileId/download",
   ensureCaseParticipant(),
   asyncHandler(async (req, res) => {
-    const { caseDoc } = await loadCaseForUser(req, req.params.caseId);
+    const { caseDoc, isAdmin } = await loadCaseForUser(req, req.params.caseId);
+    if (isAdmin) {
+      return res.status(403).json({ msg: "Admins can only access the case archive." });
+    }
     if (!assertWorkspaceReady(caseDoc, res)) return;
     if (!isObjId(req.params.fileId)) {
       return res.status(400).json({ msg: "Invalid file id" });

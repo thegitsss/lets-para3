@@ -311,6 +311,20 @@ font-weight:300;
 .tax-summary li,.payout-schedule li{padding:.4rem 0;border-bottom:1px solid var(--line);font-size:.95rem;}
 .tax-summary strong{color:var(--ink);}
 .payout-schedule li:last-child,.tax-summary li:last-child{border-bottom:none;}
+.dispute-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.dispute-actions input{width:120px;}
+.dispute-meta{font-size:.85rem;color:var(--muted);}
+.dispute-status{font-size:.85rem;text-transform:capitalize;}
+.dispute-actions .btn{white-space:nowrap;}
+.dispute-tabs{display:flex;flex-wrap:wrap;gap:8px;}
+.dispute-tabs .tab-btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:6px 12px;border-radius:999px;font-size:.85rem;cursor:pointer;transition:all .2s ease;}
+.dispute-tabs .tab-btn.active{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 1px rgba(166,142,95,.2);}
+.dispute-notes{display:flex;flex-direction:column;gap:8px;}
+.dispute-notes textarea{width:100%;min-width:180px;min-height:70px;padding:8px;border:1px solid var(--line);border-radius:8px;font-family:var(--font-sans);font-size:.9rem;resize:vertical;}
+.dispute-row-toggle{border:none;background:transparent;color:var(--accent);cursor:pointer;font-size:.85rem;padding:0;text-decoration:underline;}
+.dispute-details{background:#faf7f1;}
+.dispute-details.hidden{display:none;}
+.dispute-notes-label{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
 .metric h3{font-family:var(--font-serif);font-weight:300;font-size:1.1rem;margin-bottom:.25rem;}
 .metric p{font-size:1.6rem;color:var(--accent);font-weight:200;}
 #section-overview .grid-four .card h3{
@@ -593,6 +607,7 @@ font-size:.95rem;
 <a href="#" data-section="user-management">User Management</a>
 <a href="#" data-section="photo-reviews">Photo Reviews</a>
 <a href="#" data-section="escrow">Escrow</a>
+<a href="#" data-section="disputes">Disputes</a>
 <a href="#" data-section="revenue">Revenue</a>
 <a href="#" data-section="posts">Posts</a>
 <a href="#" data-section="activity-logs">Activity Logs</a>
@@ -629,6 +644,11 @@ font-size:.95rem;
 <h3>Platform Income</h3>
 <p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="incomeTotal">—</p>
 <p class="small" id="incomeCount">0 income records</p>
+</div>
+<div class="card" id="disputeCard" role="button" tabindex="0" aria-label="Open disputes">
+<h3>Disputes</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="disputeCount">0</p>
+<p class="small">Open disputes</p>
 </div>
 </div>
 
@@ -1010,6 +1030,51 @@ font-size:.95rem;
 </div>
 </section>
 
+<!-- DISPUTES -->
+<section id="section-disputes" class="section">
+<header>
+<h1>Disputes</h1>
+<p>Review disputed cases and resolve payouts or refunds.</p>
+</header>
+
+<div class="panel">
+<div class="panel-header">
+<h2>Disputed Cases</h2>
+</div>
+<div class="pending-controls">
+<div class="dispute-tabs" id="disputeTabs">
+<button class="tab-btn active" type="button" data-dispute-tab="open">Open</button>
+<button class="tab-btn" type="button" data-dispute-tab="resolved">Resolved</button>
+<button class="tab-btn" type="button" data-dispute-tab="rejected">Rejected</button>
+</div>
+<input type="search" id="disputeSearch" class="search" placeholder="Search case or dispute…" aria-label="Search disputes" />
+<select id="disputeStatusFilter" aria-label="Filter dispute status">
+<option value="open">Open disputes</option>
+<option value="resolved">Resolved disputes</option>
+<option value="rejected">Rejected disputes</option>
+</select>
+<button class="btn secondary" type="button" id="refreshDisputes">Refresh</button>
+</div>
+<div class="table-wrap">
+<table class="pending-users-table">
+<thead>
+<tr id="disputesHeaderRow">
+<th>Case</th>
+<th>Parties</th>
+<th>Dispute</th>
+<th>Status</th>
+<th>Escrow</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="disputesBody">
+<tr><td colspan="6" class="pending-empty">Loading disputes…</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+
 <!-- REVENUE -->
 <section id="section-revenue" class="section">
 <header>
@@ -1385,6 +1450,9 @@ loadMassEmailUsers?.();
 }
 if(sectionName==="photo-reviews"){
 window.loadProfilePhotoReviews?.();
+}
+if(sectionName==="disputes"){
+window.loadDisputes?.();
 }
 requestAnimationFrame(refreshCharts);
 }

@@ -40,6 +40,63 @@ function trimSlash(value) {
   return String(value).replace(/\/$/, "");
 }
 
+function buildDisputeResolutionMessage(caseTitle, action) {
+  const title = caseTitle || "the case";
+  switch (String(action || "")) {
+    case "refund":
+      return `The dispute for ${title} was resolved. Funds were refunded to the attorney.`;
+    case "release_partial":
+      return `The dispute for ${title} was resolved. A partial payment was released.`;
+    case "release_full":
+      return `The dispute for ${title} was resolved. Funds were released to the paralegal.`;
+    default:
+      return `The dispute for ${title} was resolved.`;
+  }
+}
+
+function buildDisputeReceiptPayloads({
+  caseDoc,
+  disputeId,
+  action,
+  payoutAmount = 0,
+  refundAmount = 0,
+}) {
+  const caseTitle = caseDoc?.title || "Case";
+  const resolutionLabel =
+    action === "refund" ? "Refund" : action === "release_partial" ? "Partial release" : "Full release";
+  const refundLabel = refundAmount > 0 ? formatCurrency(refundAmount) : "";
+  const payoutLabel = payoutAmount > 0 ? formatCurrency(payoutAmount) : "";
+  const basePayload = {
+    title: "Dispute resolved",
+    caseId: String(caseDoc?._id || ""),
+    disputeId: String(disputeId || ""),
+    resolution: action,
+    resolutionLabel,
+    caseTitle,
+    refundAmount: refundLabel,
+    payoutAmount: payoutLabel,
+  };
+
+  const refundDetail = refundLabel ? ` Refund amount: ${refundLabel}.` : "";
+  const payoutDetail = payoutLabel ? ` Payout released: ${payoutLabel}.` : "";
+  const attorneyMessage =
+    action === "refund"
+      ? `Dispute resolved for ${caseTitle}. Resolution: Refund.${refundDetail}`
+      : action === "release_partial"
+      ? `Dispute resolved for ${caseTitle}. Resolution: Partial release.${refundDetail}`
+      : `Dispute resolved for ${caseTitle}. Resolution: Full release.`;
+
+  const paralegalMessage =
+    action === "refund"
+      ? `Dispute resolved for ${caseTitle}. No payout was released.`
+      : `Dispute resolved for ${caseTitle}.${payoutDetail}`;
+
+  return {
+    attorneyPayload: { ...basePayload, message: attorneyMessage },
+    paralegalPayload: { ...basePayload, message: paralegalMessage },
+  };
+}
+
 function ensureAbsoluteUrl(value, defaultScheme = "https") {
   const trimmed = String(value || "").trim();
   if (!trimmed) return "";
@@ -81,7 +138,7 @@ const PLATFORM_FEE_ATTORNEY_PERCENT = Number(
   process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 22
 );
 const PLATFORM_FEE_PARALEGAL_PERCENT = Number(
-  process.env.PLATFORM_FEE_PARALEGAL_PERCENT || process.env.PLATFORM_FEE_PERCENT || 18
+  process.env.PLATFORM_FEE_PARALEGAL_PERCENT || 18
 );
 const MAX_HISTORY_ROWS = Number(process.env.BILLING_HISTORY_LIMIT || 500);
 const MAX_EXPORT_ROWS = Number(process.env.BILLING_EXPORT_LIMIT || 2000);
@@ -144,6 +201,37 @@ function computeParalegalFee(doc = {}) {
   const pct = resolveParalegalFeePct(doc);
   const base = doc.lockedTotalAmount ?? doc.totalAmount;
   return Math.max(0, Math.round(cents(base) * (pct / 100)));
+}
+
+function resolveDisputeSettlement(doc = {}) {
+  const settlement = doc.disputeSettlement || {};
+  const action = String(settlement.action || "");
+  if (!["release_full", "release_partial"].includes(action)) return null;
+  const grossAmount = cents(settlement.grossAmount);
+  if (!Number.isFinite(grossAmount) || grossAmount <= 0) return null;
+  const feeAttorneyPct = Number.isFinite(settlement.feeAttorneyPct)
+    ? settlement.feeAttorneyPct
+    : resolveAttorneyFeePct(doc);
+  const feeParalegalPct = Number.isFinite(settlement.feeParalegalPct)
+    ? settlement.feeParalegalPct
+    : resolveParalegalFeePct(doc);
+  const feeAttorneyAmount = Number.isFinite(settlement.feeAttorneyAmount)
+    ? cents(settlement.feeAttorneyAmount)
+    : Math.max(0, Math.round(grossAmount * (feeAttorneyPct / 100)));
+  const feeParalegalAmount = Number.isFinite(settlement.feeParalegalAmount)
+    ? cents(settlement.feeParalegalAmount)
+    : Math.max(0, Math.round(grossAmount * (feeParalegalPct / 100)));
+  const payoutAmount = Number.isFinite(settlement.payoutAmount)
+    ? cents(settlement.payoutAmount)
+    : Math.max(0, grossAmount - feeParalegalAmount);
+  return {
+    grossAmount,
+    feeAttorneyAmount,
+    feeParalegalAmount,
+    feeAttorneyPct,
+    feeParalegalPct,
+    payoutAmount,
+  };
 }
 
 function isFinalCaseDoc(doc) {
@@ -604,9 +692,10 @@ async function resolvePaymentMethodLabel(caseDoc) {
 }
 
 function buildAttorneyReceiptPayload(caseDoc, paymentMethodLabel) {
-  const baseAmount = Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
-  const platformFee = computePlatformFee(caseDoc);
-  const attorneyPct = resolveAttorneyFeePct(caseDoc);
+  const settlement = resolveDisputeSettlement(caseDoc);
+  const baseAmount = settlement?.grossAmount ?? Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
+  const platformFee = settlement?.feeAttorneyAmount ?? computePlatformFee(caseDoc);
+  const attorneyPct = settlement?.feeAttorneyPct ?? resolveAttorneyFeePct(caseDoc);
   const attorneyName = fullName(caseDoc.attorney || {}) || caseDoc.attorneyNameSnapshot || "Attorney";
   const issuedAt = caseDoc.completedAt || caseDoc.paidOutAt || caseDoc.updatedAt || new Date();
   return {
@@ -628,13 +717,14 @@ function buildAttorneyReceiptPayload(caseDoc, paymentMethodLabel) {
 }
 
 function buildParalegalReceiptPayload(caseDoc, payoutDoc) {
-  const baseAmount = Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
-  const platformFee = computeParalegalFee(caseDoc);
-  const paralegalPct = resolveParalegalFeePct(caseDoc);
+  const settlement = resolveDisputeSettlement(caseDoc);
+  const baseAmount = settlement?.grossAmount ?? Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
+  const platformFee = settlement?.feeParalegalAmount ?? computeParalegalFee(caseDoc);
+  const paralegalPct = settlement?.feeParalegalPct ?? resolveParalegalFeePct(caseDoc);
   const payoutAmount =
     Number.isFinite(payoutDoc?.amountPaid) && payoutDoc.amountPaid >= 0
       ? payoutDoc.amountPaid
-      : Math.max(0, baseAmount - platformFee);
+      : settlement?.payoutAmount ?? Math.max(0, baseAmount - platformFee);
   const attorneyName = fullName(caseDoc.attorney || {}) || caseDoc.attorneyNameSnapshot || "Attorney";
   const paralegalName = fullName(caseDoc.paralegal || {}) || caseDoc.paralegalNameSnapshot || "Paralegal";
   const issuedAt = caseDoc.paidOutAt || caseDoc.completedAt || caseDoc.updatedAt || new Date();
@@ -1166,13 +1256,14 @@ router.post(
 
     await AuditLog.logFromReq(req, "payment.release.transfer", {
       targetType: "payment",
-      targetId: transfer.id,
+      targetId: c._id,
       caseId: c._id,
       meta: {
         payout,
         feeAmount: paralegalFee,
         currency: c.currency || "usd",
         destination: c.paralegal.stripeAccountId,
+        externalRef: transfer.id,
       },
     });
 
@@ -1832,6 +1923,305 @@ router.post(
 );
 
 /**
+ * POST /api/payments/dispute/settle/:caseId
+ * Admin-only dispute settlement actions: refund, full release, partial release.
+ * Body: { action: 'refund'|'release_full'|'release_partial', disputeId?, grossAmountCents? }
+ */
+router.post(
+  "/dispute/settle/:caseId",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const { caseId } = req.params;
+    const { action, disputeId, grossAmountCents } = req.body || {};
+    const allowed = new Set(["refund", "release_full", "release_partial"]);
+    if (!allowed.has(String(action || ""))) {
+      return res.status(400).json({ error: "Invalid dispute action." });
+    }
+
+    const c = await Case.findById(caseId).populate(
+      "paralegal",
+      "stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled firstName lastName email role"
+    );
+    if (!c) return res.status(404).json({ error: "Case not found" });
+
+    const disputes = Array.isArray(c.disputes) ? c.disputes : [];
+    let targetDispute = null;
+    if (disputeId) {
+      targetDispute = disputes.find(
+        (d) => String(d.disputeId || d._id) === String(disputeId)
+      );
+    }
+    if (!targetDispute) {
+      targetDispute = disputes.find((d) => String(d.status || "").toLowerCase() === "open") || disputes[0];
+    }
+    if (!targetDispute) {
+      return res.status(400).json({ error: "No dispute found for this case." });
+    }
+
+    if (!hasActiveDispute(c) && !hasResolvedDispute(c)) {
+      return res.status(400).json({ error: "Case does not have an active dispute." });
+    }
+
+    const existingPayout = await Payout.findOne({ caseId: c._id })
+      .select("amountPaid transferId")
+      .lean();
+    if (existingPayout || c.payoutTransferId) {
+      return res.status(400).json({ error: "Payout already exists for this case." });
+    }
+
+    const baseAmount = Number(c.lockedTotalAmount ?? c.totalAmount ?? 0);
+    if (!Number.isFinite(baseAmount) || baseAmount <= 0) {
+      return res.status(400).json({ error: "Case amount is invalid." });
+    }
+
+    const disputeKey = String(targetDispute.disputeId || targetDispute._id || "");
+    const resolvedAt = new Date();
+
+    if (action === "refund") {
+      if (!c.escrowIntentId) return res.status(400).json({ error: "No funded escrow" });
+
+      const refund = await stripe.refunds.create({ payment_intent: c.escrowIntentId });
+
+      c.paymentReleased = false;
+      if (typeof c.canTransitionTo === "function" && c.canTransitionTo("closed")) {
+        c.transitionTo?.("closed");
+      } else {
+        c.status = "closed";
+      }
+      targetDispute.status = "resolved";
+      if (c.terminationDisputeId && String(c.terminationDisputeId) === disputeKey) {
+        c.terminationStatus = "resolved";
+      }
+      c.disputeSettlement = {
+        action,
+        refundAmount: refund.amount || 0,
+        resolvedAt,
+        disputeId: disputeKey,
+      };
+      await c.save();
+
+      await AuditLog.logFromReq(req, "dispute.settlement.refund", {
+        targetType: "payment",
+        targetId: c._id,
+        caseId: c._id,
+        meta: { refundId: refund.id, disputeId: disputeKey, externalRef: c.escrowIntentId },
+      });
+
+      try {
+        const attorneyId = c.attorney?._id || c.attorneyId || c.attorney;
+        const paralegalId = c.paralegal?._id || c.paralegalId || c.paralegal;
+        const { attorneyPayload, paralegalPayload } = buildDisputeReceiptPayloads({
+          caseDoc: c,
+          disputeId: disputeKey,
+          action,
+          payoutAmount: 0,
+          refundAmount: refund.amount || 0,
+        });
+        await Promise.all([
+          attorneyId
+            ? notifyUser(attorneyId, "dispute_resolved", attorneyPayload, { actorUserId: req.user.id })
+            : Promise.resolve(null),
+          paralegalId
+            ? notifyUser(paralegalId, "dispute_resolved", paralegalPayload, { actorUserId: req.user.id })
+            : Promise.resolve(null),
+        ]);
+      } catch (err) {
+        console.warn("[payments] dispute resolution notification failed", err?.message || err);
+      }
+
+      return res.json({ ok: true, refundId: refund.id, refundAmount: refund.amount || 0 });
+    }
+
+    if (!c.escrowIntentId) return res.status(400).json({ error: "No funded escrow" });
+
+    let pi;
+    try {
+      pi = await stripe.paymentIntents.retrieve(c.escrowIntentId);
+    } catch (err) {
+      console.error("[payments] dispute intent lookup failed", err?.message || err);
+      return res.status(502).json({ error: "Unable to verify escrow funding." });
+    }
+    if (pi.status !== "succeeded") {
+      return res.status(400).json({ error: "Escrow payment is not ready to release yet." });
+    }
+
+    if (!c.paralegal || !c.paralegal.stripeAccountId) {
+      return res.status(400).json({ error: "Paralegal not onboarded for payouts" });
+    }
+    if (!c.paralegal.stripeOnboarded || !c.paralegal.stripePayoutsEnabled) {
+      const refreshed = await ensureStripeOnboarded(c.paralegal);
+      if (!refreshed) {
+        return res.status(400).json({ error: "Paralegal must complete Stripe Connect onboarding before payouts" });
+      }
+    }
+
+    const settlementBase =
+      action === "release_partial" ? Number(grossAmountCents) : baseAmount;
+    if (!Number.isFinite(settlementBase) || settlementBase <= 0) {
+      return res.status(400).json({ error: "Settlement amount is invalid." });
+    }
+    if (settlementBase > baseAmount) {
+      return res.status(400).json({ error: "Settlement amount exceeds escrow." });
+    }
+
+    const feeParalegalPct = resolveParalegalFeePct(c);
+    const feeAttorneyPct = resolveAttorneyFeePct(c);
+    const paralegalFee = Math.max(0, Math.round((settlementBase * feeParalegalPct) / 100));
+    const attorneyFee = Math.max(0, Math.round((settlementBase * feeAttorneyPct) / 100));
+    const payout = Math.max(0, settlementBase - paralegalFee);
+    if (payout <= 0) {
+      return res.status(400).json({ error: "Calculated payout must be positive." });
+    }
+
+    let refund = null;
+    if (action === "release_partial") {
+      const originalAttorneyFee = Math.max(0, Math.round((baseAmount * feeAttorneyPct) / 100));
+      const refundAmount = Math.max(
+        0,
+        Math.round((baseAmount + originalAttorneyFee) - (settlementBase + attorneyFee))
+      );
+      if (refundAmount > 0) {
+        refund = await stripe.refunds.create({
+          payment_intent: c.escrowIntentId,
+          amount: refundAmount,
+        });
+      }
+    }
+
+    let transfer;
+    try {
+      transfer = await stripe.transfers.create({
+        amount: payout,
+        currency: c.currency || "usd",
+        destination: c.paralegal.stripeAccountId,
+        transfer_group: `case_${c._id.toString()}`,
+        metadata: {
+          caseId: c._id.toString(),
+          disputeId: disputeKey,
+          action,
+        },
+      });
+    } catch (err) {
+      console.error("[payments] dispute payout transfer failed", err?.message || err);
+      const message = stripe.sanitizeStripeError(
+        err,
+        "We couldn't release funds right now. Please try again shortly."
+      );
+      return res.status(400).json({ error: message });
+    }
+
+    c.paymentReleased = true;
+    c.payoutTransferId = transfer.id;
+    c.paidOutAt = resolvedAt;
+    c.completedAt = c.completedAt || resolvedAt;
+    targetDispute.status = "resolved";
+    if (c.terminationDisputeId && String(c.terminationDisputeId) === disputeKey) {
+      c.terminationStatus = "resolved";
+    }
+    if (typeof c.canTransitionTo === "function" && c.canTransitionTo("closed")) {
+      c.transitionTo?.("closed");
+    } else {
+      c.status = "closed";
+    }
+    if (!Number.isFinite(c.feeAttorneyPct)) c.feeAttorneyPct = feeAttorneyPct;
+    if (!Number.isFinite(c.feeParalegalPct)) c.feeParalegalPct = feeParalegalPct;
+    if (!Number.isFinite(c.feeAttorneyAmount)) c.feeAttorneyAmount = attorneyFee;
+    if (!Number.isFinite(c.feeParalegalAmount)) c.feeParalegalAmount = paralegalFee;
+    c.disputeSettlement = {
+      action,
+      grossAmount: settlementBase,
+      feeAttorneyAmount: attorneyFee,
+      feeParalegalAmount: paralegalFee,
+      feeAttorneyPct,
+      feeParalegalPct,
+      payoutAmount: payout,
+      refundAmount: refund?.amount || 0,
+      resolvedAt,
+      disputeId: disputeKey,
+    };
+    await c.save();
+
+    await Payout.updateOne(
+      { caseId: c._id },
+      {
+        $setOnInsert: {
+          paralegalId: c.paralegal._id || c.paralegalId,
+          caseId: c._id,
+          amountPaid: payout,
+          transferId: transfer.id,
+        },
+      },
+      { upsert: true }
+    ).catch((err) => {
+      if (err?.code === 11000) return null;
+      throw err;
+    });
+
+    const existingIncome = await PlatformIncome.findOne({ caseId: c._id }).select("_id").lean();
+    if (!existingIncome) {
+      const attorneyObjectId = c.attorney?._id || c.attorneyId || c.attorney;
+      const paralegalObjectId = c.paralegal?._id || c.paralegalId || c.paralegal;
+      if (attorneyObjectId && paralegalObjectId) {
+        await PlatformIncome.create({
+          caseId: c._id,
+          attorneyId: attorneyObjectId,
+          paralegalId: paralegalObjectId,
+          feeAmount: Math.max(0, attorneyFee + paralegalFee),
+        }).catch((err) => {
+          if (err?.code === 11000) return null;
+          throw err;
+        });
+      }
+    }
+
+    await AuditLog.logFromReq(req, "dispute.settlement.release", {
+      targetType: "payment",
+      targetId: c._id,
+      caseId: c._id,
+      meta: {
+        action,
+        payout,
+        feeA: attorneyFee,
+        feeP: paralegalFee,
+        refundId: refund?.id || null,
+        disputeId: disputeKey,
+        externalRef: transfer.id,
+      },
+    });
+
+    try {
+      const attorneyId = c.attorney?._id || c.attorneyId || c.attorney;
+      const paralegalId = c.paralegal?._id || c.paralegalId || c.paralegal;
+      const { attorneyPayload, paralegalPayload } = buildDisputeReceiptPayloads({
+        caseDoc: c,
+        disputeId: disputeKey,
+        action,
+        payoutAmount: payout,
+        refundAmount: refund?.amount || 0,
+      });
+      await Promise.all([
+        attorneyId
+          ? notifyUser(attorneyId, "dispute_resolved", attorneyPayload, { actorUserId: req.user.id })
+          : Promise.resolve(null),
+        paralegalId
+          ? notifyUser(paralegalId, "dispute_resolved", paralegalPayload, { actorUserId: req.user.id })
+          : Promise.resolve(null),
+      ]);
+    } catch (err) {
+      console.warn("[payments] dispute resolution notification failed", err?.message || err);
+    }
+
+    res.json({
+      ok: true,
+      transferId: transfer.id,
+      payout,
+      refundId: refund?.id || null,
+      refundAmount: refund?.amount || 0,
+    });
+  })
+);
+
+/**
  * POST /api/payments/refund/:caseId
  * Issues a full refund (admin only).
  */
@@ -1860,9 +2250,9 @@ router.post(
 
     await AuditLog.logFromReq(req, "payment.refund", {
       targetType: "payment",
-      targetId: c.escrowIntentId,
+      targetId: c._id,
       caseId: c._id,
-      meta: { refundId: refund.id },
+      meta: { refundId: refund.id, externalRef: c.escrowIntentId },
     });
 
     res.json({ ok: true, msg: "Refund issued", refundId: refund.id });

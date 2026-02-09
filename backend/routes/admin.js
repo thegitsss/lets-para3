@@ -37,11 +37,21 @@ const APPROVAL_EMAIL_SUBJECT =
 "Welcome to Let’s-ParaConnect";
 const DENIAL_EMAIL_SUBJECT =
 "Your application to join Let's-ParaConnect has been reviewed and was unfortunately not approved.";
+const PLATFORM_FEE_PARALEGAL_PERCENT = Number(process.env.PLATFORM_FEE_PARALEGAL_PERCENT || 18);
 
 // -----------------------------------------
 // Helpers
 // -----------------------------------------
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+function sanitizeCaseForAdmin(caseDoc) {
+  if (!caseDoc || typeof caseDoc !== "object") return caseDoc;
+  const sanitized = { ...caseDoc };
+  if ("files" in sanitized) delete sanitized.files;
+  if ("downloadUrl" in sanitized) delete sanitized.downloadUrl;
+  if ("filesCount" in sanitized) delete sanitized.filesCount;
+  return sanitized;
+}
 
 const formatFullName = (u = {}) => {
 const joined = `${u.firstName || ""} ${u.lastName || ""}`.trim();
@@ -92,6 +102,43 @@ return /@[^@\s]+\.con$/i.test(String(value).trim());
 }
 
 const CASE_AMOUNT_EXPR = { $ifNull: ["$lockedTotalAmount", "$totalAmount"] };
+const CASE_PARALEGAL_PCT_EXPR = { $ifNull: ["$feeParalegalPct", PLATFORM_FEE_PARALEGAL_PERCENT] };
+const CASE_PARALEGAL_FEE_EXPR = {
+$ifNull: [
+"$feeParalegalAmount",
+{
+$floor: {
+$add: [
+{ $multiply: [CASE_AMOUNT_EXPR, { $divide: [CASE_PARALEGAL_PCT_EXPR, 100] }] },
+0.5,
+],
+},
+},
+],
+};
+const CASE_PAYOUT_EXPR = { $max: [0, { $subtract: [CASE_AMOUNT_EXPR, CASE_PARALEGAL_FEE_EXPR] }] };
+
+function resolveParalegalFeePct(doc = {}) {
+return typeof doc.feeParalegalPct === "number" && Number.isFinite(doc.feeParalegalPct)
+? doc.feeParalegalPct
+: PLATFORM_FEE_PARALEGAL_PERCENT;
+}
+
+function computeParalegalFeeAmount(baseAmount, doc = {}) {
+if (Number.isFinite(doc.feeParalegalAmount) && doc.feeParalegalAmount >= 0) {
+return doc.feeParalegalAmount;
+}
+const base = Number(baseAmount || 0);
+if (!Number.isFinite(base) || base <= 0) return 0;
+return Math.max(0, Math.round(base * (resolveParalegalFeePct(doc) / 100)));
+}
+
+function computeParalegalPayoutAmount(baseAmount, doc = {}) {
+const base = Number(baseAmount || 0);
+if (!Number.isFinite(base) || base <= 0) return 0;
+const fee = computeParalegalFeeAmount(base, doc);
+return Math.max(0, base - fee);
+}
 
 function toFileViewUrl(value) {
 const raw = String(value || "").trim();
@@ -1096,7 +1143,7 @@ Case.aggregate(
 ),
 Case.aggregate(
   buildApprovedCasePipeline({ paymentReleased: { $ne: true }, status: { $in: COMPLETED_CASE_STATUSES } }).concat([
-    { $group: { _id: null, total: { $sum: CASE_AMOUNT_EXPR }, count: { $sum: 1 } } },
+    { $group: { _id: null, total: { $sum: CASE_PAYOUT_EXPR }, count: { $sum: 1 } } },
   ])
 ),
 Payout.aggregate([{ $group: { _id: null, total: { $sum: "$amountPaid" }, count: { $sum: 1 } } }]),
@@ -1123,7 +1170,7 @@ Case.find({
 })
 .sort({ deadline: 1, createdAt: 1 })
 .limit(5)
-.select("deadline totalAmount lockedTotalAmount paralegalNameSnapshot paralegal createdAt")
+.select("deadline totalAmount lockedTotalAmount feeParalegalAmount feeParalegalPct paralegalNameSnapshot paralegal createdAt")
 .populate("paralegal", "firstName lastName")
 .lean(),
 User.find()
@@ -1309,9 +1356,10 @@ const recipient =
 caseDoc.paralegalNameSnapshot ||
 [caseDoc.paralegal?.firstName, caseDoc.paralegal?.lastName].filter(Boolean).join(" ") ||
 "Paralegal";
+const baseAmount = Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
 return {
 date: rawDate ? rawDate.toISOString().split("T")[0] : "",
-amount: caseDoc.lockedTotalAmount || caseDoc.totalAmount || 0,
+amount: computeParalegalPayoutAmount(baseAmount, caseDoc),
 recipient,
 };
 });
@@ -1789,7 +1837,7 @@ Case.countDocuments(filter),
 
 res.json({
 page, limit, total, pages: Math.ceil(total / limit),
-cases: items,
+cases: items.map(sanitizeCaseForAdmin),
 });
 }));
 
@@ -1833,7 +1881,7 @@ meta: { paralegalId },
 });
 
 const populated = await Case.findById(c._id).populate("attorney paralegal", "firstName lastName email role status").lean();
-res.json({ ok: true, msg: "Paralegal assigned", case: populated });
+res.json({ ok: true, msg: "Paralegal assigned", case: sanitizeCaseForAdmin(populated) });
 }));
 
 /**
@@ -1874,7 +1922,7 @@ meta: { status },
 const populated = await Case.findById(id)
 .populate("attorney paralegal", "firstName lastName email role")
 .lean();
-res.json({ ok: true, msg: "Case updated", case: populated });
+res.json({ ok: true, msg: "Case updated", case: sanitizeCaseForAdmin(populated) });
 }));
 
 /**

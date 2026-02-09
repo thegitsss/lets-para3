@@ -33,7 +33,7 @@ const DEFAULT_ATTORNEY_FEE_PCT = Number(
   process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 22
 );
 const DEFAULT_PARALEGAL_FEE_PCT = Number(
-  process.env.PLATFORM_FEE_PARALEGAL_PERCENT || process.env.PLATFORM_FEE_PERCENT || 18
+  process.env.PLATFORM_FEE_PARALEGAL_PERCENT || 18
 );
 
 function cents(n) {
@@ -69,6 +69,9 @@ const disputeSchema = new Schema(
     message: { type: String, required: true, trim: true, maxlength: 20_000 },
     raisedBy: { type: Types.ObjectId, ref: "User", required: true, index: true },
     status: { type: String, enum: DISPUTE_STATUS, default: "open", index: true },
+    adminNotes: { type: String, trim: true, maxlength: 4000, default: "" },
+    adminNotesUpdatedAt: { type: Date, default: null },
+    adminNotesUpdatedBy: { type: Types.ObjectId, ref: "User", default: null },
     comments: [commentSchema],
   },
   { timestamps: { createdAt: true, updatedAt: true } }
@@ -242,6 +245,20 @@ const caseSchema = new Schema(
     feeAttorneyAmount: { type: Number, default: 0, min: 0 }, // cents
     feeParalegalAmount: { type: Number, default: 0, min: 0 }, // cents
 
+    // Dispute settlement snapshots (optional)
+    disputeSettlement: {
+      action: { type: String, enum: ["refund", "release_full", "release_partial"], default: null },
+      grossAmount: { type: Number, default: null, min: 0 }, // cents
+      feeAttorneyAmount: { type: Number, default: null, min: 0 }, // cents
+      feeParalegalAmount: { type: Number, default: null, min: 0 }, // cents
+      feeAttorneyPct: { type: Number, default: null, min: 0, max: 100 }, // %
+      feeParalegalPct: { type: Number, default: null, min: 0, max: 100 }, // %
+      payoutAmount: { type: Number, default: null, min: 0 }, // cents (net paid)
+      refundAmount: { type: Number, default: null, min: 0 }, // cents
+      resolvedAt: { type: Date, default: null },
+      disputeId: { type: String, default: null },
+    },
+
     // Transfer ID when funds are paid out to paralegal
     payoutTransferId: { type: String, default: null, index: true },
   },
@@ -322,6 +339,13 @@ caseSchema.pre("save", function (next) {
   }
   this.feeAttorneyAmount = cents(this.feeAttorneyAmount);
   this.feeParalegalAmount = cents(this.feeParalegalAmount);
+  if (this.disputeSettlement) {
+    this.disputeSettlement.grossAmount = cents(this.disputeSettlement.grossAmount);
+    this.disputeSettlement.feeAttorneyAmount = cents(this.disputeSettlement.feeAttorneyAmount);
+    this.disputeSettlement.feeParalegalAmount = cents(this.disputeSettlement.feeParalegalAmount);
+    this.disputeSettlement.payoutAmount = cents(this.disputeSettlement.payoutAmount);
+    this.disputeSettlement.refundAmount = cents(this.disputeSettlement.refundAmount);
+  }
   next();
 });
 

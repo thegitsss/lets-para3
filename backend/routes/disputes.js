@@ -5,7 +5,9 @@ const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const Case = require("../models/Case");
+const User = require("../models/User");
 const AuditLog = require("../models/AuditLog");
+const { notifyUser } = require("../utils/notifyUser");
 
 // ----------------------------------------
 // Helpers
@@ -38,11 +40,22 @@ router.get(
   asyncHandler(async (req, res) => {
     const { status, q = "" } = req.query;
     const { page, limit, skip } = parsePagination(req);
+    const finalized = ["1", "true", "yes"].includes(String(req.query.finalized || "").toLowerCase());
 
     // Unwind disputes for admin-wide view
-    const pipeline = [
+    const basePipeline = [
       { $match: { "disputes.0": { $exists: true } } },
       { $unwind: "$disputes" },
+      {
+        $addFields: {
+          attorneyRef: { $ifNull: ["$attorney", "$attorneyId"] },
+          paralegalRef: { $ifNull: ["$paralegal", "$paralegalId"] },
+        },
+      },
+      { $lookup: { from: "users", localField: "attorneyRef", foreignField: "_id", as: "attorneyDoc" } },
+      { $lookup: { from: "users", localField: "paralegalRef", foreignField: "_id", as: "paralegalDoc" } },
+      { $unwind: { path: "$attorneyDoc", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: "$paralegalDoc", preserveNullAndEmptyArrays: true } },
     ];
 
     const match = {};
@@ -55,9 +68,14 @@ router.get(
         { title: { $regex: q.trim(), $options: "i" } },
       ];
     }
-    if (Object.keys(match).length) pipeline.push({ $match: match });
+    if (finalized) {
+      match["disputeSettlement.action"] = { $in: ["refund", "release_full", "release_partial"] };
+      match.$expr = { $eq: ["$disputeSettlement.disputeId", "$disputes.disputeId"] };
+    }
 
-    pipeline.push(
+    if (Object.keys(match).length) basePipeline.push({ $match: match });
+
+    const dataPipeline = basePipeline.concat([
       { $sort: { "disputes.createdAt": -1 } },
       { $skip: skip },
       { $limit: limit },
@@ -66,20 +84,40 @@ router.get(
           _id: 0,
           caseId: "$_id",
           caseTitle: "$title",
-          attorney: "$attorney",
-          paralegal: "$paralegal",
+          caseStatus: "$status",
+          attorney: {
+            id: "$attorneyDoc._id",
+            firstName: "$attorneyDoc.firstName",
+            lastName: "$attorneyDoc.lastName",
+            email: "$attorneyDoc.email",
+          },
+          paralegal: {
+            id: "$paralegalDoc._id",
+            firstName: "$paralegalDoc.firstName",
+            lastName: "$paralegalDoc.lastName",
+            email: "$paralegalDoc.email",
+          },
+          lockedTotalAmount: "$lockedTotalAmount",
+          totalAmount: "$totalAmount",
+          currency: "$currency",
+          feeParalegalPct: "$feeParalegalPct",
+          feeParalegalAmount: "$feeParalegalAmount",
+          feeAttorneyPct: "$feeAttorneyPct",
+          feeAttorneyAmount: "$feeAttorneyAmount",
+          escrowStatus: "$escrowStatus",
+          paymentReleased: "$paymentReleased",
+          payoutTransferId: "$payoutTransferId",
+          disputeSettlement: "$disputeSettlement",
           dispute: "$disputes",
         },
       }
-    );
+    ]);
+
+    const countPipeline = basePipeline.concat([{ $count: "n" }]);
 
     const [items, count] = await Promise.all([
-      Case.aggregate(pipeline),
-      Case.aggregate([
-        { $match: { "disputes.0": { $exists: true } } },
-        ...(Object.keys(match).length ? [{ $match: match }] : []),
-        { $count: "n" },
-      ]),
+      Case.aggregate(dataPipeline),
+      Case.aggregate(countPipeline),
     ]);
 
     const total = count[0]?.n || 0;
@@ -149,10 +187,19 @@ router.get(
       .lean();
     if (!c) return res.status(404).json({ error: "Case not found" });
 
-    const disputes = (c.disputes || []).map((d) => ({
-      ...d,
-      id: d.disputeId || String(d._id),
-    }));
+    const isAdmin = String(req.user?.role || "").toLowerCase() === "admin";
+    const disputes = (c.disputes || []).map((d) => {
+      const shaped = {
+        ...d,
+        id: d.disputeId || String(d._id),
+      };
+      if (!isAdmin) {
+        delete shaped.adminNotes;
+        delete shaped.adminNotesUpdatedAt;
+        delete shaped.adminNotesUpdatedBy;
+      }
+      return shaped;
+    });
 
     res.json({
       case: { id: c._id, title: c.title, status: c.status },
@@ -206,6 +253,36 @@ router.post(
       caseId: c._id,
       meta: { disputeId: last?.disputeId || String(last?._id) },
     });
+
+    try {
+      const disputeId = last?.disputeId || (last?._id ? String(last._id) : "");
+      const caseTitle = c.title || "Case";
+      const payload = {
+        title: "Dispute opened",
+        message: `A dispute has been opened for the case: ${caseTitle}.`,
+        caseId: String(c._id),
+        disputeId,
+        caseTitle,
+      };
+      const recipients = new Set();
+      const attorneyId = c.attorney || c.attorneyId;
+      const paralegalId = c.paralegal || c.paralegalId;
+      if (attorneyId) recipients.add(String(attorneyId));
+      if (paralegalId) recipients.add(String(paralegalId));
+
+      const admins = await User.find({ role: "admin", status: "approved" }).select("_id").lean();
+      admins.forEach((admin) => {
+        if (admin?._id) recipients.add(String(admin._id));
+      });
+
+      await Promise.all(
+        Array.from(recipients).map((userId) =>
+          notifyUser(userId, "dispute_opened", payload, { actorUserId: req.user.id })
+        )
+      );
+    } catch (err) {
+      console.warn("[disputes] notify dispute opened failed", err?.message || err);
+    }
 
     res.status(201).json({
       ok: true,
@@ -301,6 +378,53 @@ router.patch(
     });
 
     res.json({ ok: true });
+  })
+);
+
+/**
+ * PATCH /api/disputes/:caseId/:disputeId/admin-notes
+ * Admin-only internal notes for resolved disputes.
+ * Body: { notes }
+ */
+router.patch(
+  "/:caseId/:disputeId/admin-notes",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const { caseId, disputeId } = req.params;
+    if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid caseId" });
+    if (!disputeId) return res.status(400).json({ error: "disputeId required" });
+
+    const c = await Case.findById(caseId);
+    if (!c) return res.status(404).json({ error: "Case not found" });
+
+    const d = (c.disputes || []).find(
+      (x) => String(x.disputeId || x._id) === String(disputeId)
+    );
+    if (!d) return res.status(404).json({ error: "Dispute not found" });
+
+    const settlement = c.disputeSettlement || {};
+    const action = String(settlement.action || "");
+    const isFinalized =
+      ["refund", "release_full", "release_partial"].includes(action) &&
+      String(settlement.disputeId || "") === String(d.disputeId || d._id);
+    if (!isFinalized || String(d.status || "").toLowerCase() !== "resolved") {
+      return res.status(400).json({ error: "Dispute is not finalized." });
+    }
+
+    const notes = String(req.body?.notes || "").trim().slice(0, 4000);
+    d.adminNotes = notes;
+    d.adminNotesUpdatedAt = new Date();
+    d.adminNotesUpdatedBy = req.user.id;
+    await c.save();
+
+    await AuditLog.logFromReq(req, "dispute.admin_notes.update", {
+      targetType: "case",
+      targetId: c._id,
+      caseId: c._id,
+      meta: { disputeId: String(disputeId) },
+    });
+
+    res.json({ ok: true, notes, updatedAt: d.adminNotesUpdatedAt });
   })
 );
 
