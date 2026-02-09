@@ -25,6 +25,7 @@ const STRIPE_APPROVAL_BYPASS_EMAILS = new Set([
   "samanthasider+11@gmail.com",
   "samanthasider+56@gmail.com",
 ]);
+const STRIPE_PAYOUT_BYPASS_EMAILS = new Set(["samanthasider+11@gmail.com"]);
 
 // CSRF (enabled in production or when ENABLE_CSRF=true)
 const noop = (_req, _res, next) => next();
@@ -38,6 +39,19 @@ if (REQUIRE_CSRF) {
 function trimSlash(value) {
   if (!value) return "";
   return String(value).replace(/\/$/, "");
+}
+
+function normalizeEmail(value) {
+  return String(value || "").toLowerCase().trim();
+}
+
+function isRefundAlreadyProcessed(err) {
+  const code = err?.code || err?.raw?.code || err?.rawType || "";
+  return (
+    code === "charge_already_refunded" ||
+    code === "payment_intent_already_refunded" ||
+    code === "charge_refunded"
+  );
 }
 
 function buildDisputeResolutionMessage(caseTitle, action) {
@@ -64,8 +78,6 @@ function buildDisputeReceiptPayloads({
   const caseTitle = caseDoc?.title || "Case";
   const resolutionLabel =
     action === "refund" ? "Refund" : action === "release_partial" ? "Partial release" : "Full release";
-  const refundLabel = refundAmount > 0 ? formatCurrency(refundAmount) : "";
-  const payoutLabel = payoutAmount > 0 ? formatCurrency(payoutAmount) : "";
   const basePayload = {
     title: "Dispute resolved",
     caseId: String(caseDoc?._id || ""),
@@ -73,27 +85,42 @@ function buildDisputeReceiptPayloads({
     resolution: action,
     resolutionLabel,
     caseTitle,
-    refundAmount: refundLabel,
-    payoutAmount: payoutLabel,
+    refundAmount: refundAmount > 0 ? formatCurrency(refundAmount) : "",
+    payoutAmount: payoutAmount > 0 ? formatCurrency(payoutAmount) : "",
   };
 
-  const refundDetail = refundLabel ? ` Refund amount: ${refundLabel}.` : "";
-  const payoutDetail = payoutLabel ? ` Payout released: ${payoutLabel}.` : "";
   const attorneyMessage =
     action === "refund"
-      ? `Dispute resolved for ${caseTitle}. Resolution: Refund.${refundDetail}`
+      ? `The dispute for ${caseTitle} was resolved with a refund issued to you.`
       : action === "release_partial"
-      ? `Dispute resolved for ${caseTitle}. Resolution: Partial release.${refundDetail}`
-      : `Dispute resolved for ${caseTitle}. Resolution: Full release.`;
+      ? `The dispute for ${caseTitle} was resolved with a partial release.`
+      : `The dispute for ${caseTitle} was resolved with funds released to the paralegal.`;
 
   const paralegalMessage =
     action === "refund"
-      ? `Dispute resolved for ${caseTitle}. No payout was released.`
-      : `Dispute resolved for ${caseTitle}.${payoutDetail}`;
+      ? `The dispute for ${caseTitle} was resolved. No payout was released.`
+      : action === "release_partial"
+      ? `The dispute for ${caseTitle} was resolved with a partial payout.`
+      : `The dispute for ${caseTitle} was resolved and your payout was released.`;
+
+  const attorneyReceiptNote =
+    "A receipt is available in your dashboard with refund and platform fee details.";
+  const paralegalReceiptNote =
+    "A receipt is available in your dashboard with payout, refund, and platform fee details.";
 
   return {
-    attorneyPayload: { ...basePayload, message: attorneyMessage },
-    paralegalPayload: { ...basePayload, message: paralegalMessage },
+    attorneyPayload: {
+      ...basePayload,
+      message: attorneyMessage,
+      receiptNote: attorneyReceiptNote,
+      link: "dashboard-attorney.html#billing",
+    },
+    paralegalPayload: {
+      ...basePayload,
+      message: paralegalMessage,
+      receiptNote: paralegalReceiptNote,
+      link: "dashboard-paralegal.html#cases-completed",
+    },
   };
 }
 
@@ -1837,13 +1864,21 @@ router.post(
     }
     if (pi.status !== "succeeded") return res.status(400).json({ error: "Escrow not captured yet" });
 
+    const bypassPayouts = STRIPE_PAYOUT_BYPASS_EMAILS.has(normalizeEmail(c.paralegal?.email));
+    if (!c.paralegal || !c.paralegal.stripeAccountId) {
+      if (bypassPayouts && c.paralegal) {
+        await ensureConnectAccount(c.paralegal);
+      }
+    }
     if (!c.paralegal || !c.paralegal.stripeAccountId) {
       return res.status(400).json({ error: "Paralegal not onboarded for payouts" });
     }
-    if (!c.paralegal.stripeOnboarded || !c.paralegal.stripePayoutsEnabled) {
-      const refreshed = await ensureStripeOnboarded(c.paralegal);
-      if (!refreshed) {
-        return res.status(400).json({ error: "Paralegal must complete Stripe Connect onboarding before payouts" });
+    if (!bypassPayouts) {
+      if (!c.paralegal.stripeOnboarded || !c.paralegal.stripePayoutsEnabled) {
+        const refreshed = await ensureStripeOnboarded(c.paralegal);
+        if (!refreshed) {
+          return res.status(400).json({ error: "Paralegal must complete Stripe Connect onboarding before payouts" });
+        }
       }
     }
 
@@ -1981,7 +2016,20 @@ router.post(
     if (action === "refund") {
       if (!c.escrowIntentId) return res.status(400).json({ error: "No funded escrow" });
 
-      const refund = await stripe.refunds.create({ payment_intent: c.escrowIntentId });
+      let refund = null;
+      try {
+        refund = await stripe.refunds.create({ payment_intent: c.escrowIntentId });
+      } catch (err) {
+        if (!isRefundAlreadyProcessed(err)) {
+          console.error("[payments] dispute refund failed", err?.message || err);
+          const message = stripe.sanitizeStripeError(
+            err,
+            "We couldn't release funds right now. Please try again shortly."
+          );
+          return res.status(400).json({ error: message });
+        }
+        refund = { id: `already_refunded_${Date.now()}`, amount: baseAmount };
+      }
 
       c.paymentReleased = false;
       if (typeof c.canTransitionTo === "function" && c.canTransitionTo("closed")) {
@@ -1995,7 +2043,7 @@ router.post(
       }
       c.disputeSettlement = {
         action,
-        refundAmount: refund.amount || 0,
+        refundAmount: refund?.amount || 0,
         resolvedAt,
         disputeId: disputeKey,
       };
@@ -2046,13 +2094,21 @@ router.post(
       return res.status(400).json({ error: "Escrow payment is not ready to release yet." });
     }
 
+    const bypassPayouts = STRIPE_PAYOUT_BYPASS_EMAILS.has(normalizeEmail(c.paralegal?.email));
+    if (!c.paralegal || !c.paralegal.stripeAccountId) {
+      if (bypassPayouts && c.paralegal) {
+        await ensureConnectAccount(c.paralegal);
+      }
+    }
     if (!c.paralegal || !c.paralegal.stripeAccountId) {
       return res.status(400).json({ error: "Paralegal not onboarded for payouts" });
     }
-    if (!c.paralegal.stripeOnboarded || !c.paralegal.stripePayoutsEnabled) {
-      const refreshed = await ensureStripeOnboarded(c.paralegal);
-      if (!refreshed) {
-        return res.status(400).json({ error: "Paralegal must complete Stripe Connect onboarding before payouts" });
+    if (!bypassPayouts) {
+      if (!c.paralegal.stripeOnboarded || !c.paralegal.stripePayoutsEnabled) {
+        const refreshed = await ensureStripeOnboarded(c.paralegal);
+        if (!refreshed) {
+          return res.status(400).json({ error: "Paralegal must complete Stripe Connect onboarding before payouts" });
+        }
       }
     }
 
@@ -2082,33 +2138,49 @@ router.post(
         Math.round((baseAmount + originalAttorneyFee) - (settlementBase + attorneyFee))
       );
       if (refundAmount > 0) {
-        refund = await stripe.refunds.create({
-          payment_intent: c.escrowIntentId,
-          amount: refundAmount,
-        });
+        try {
+          refund = await stripe.refunds.create({
+            payment_intent: c.escrowIntentId,
+            amount: refundAmount,
+          });
+        } catch (err) {
+          if (!isRefundAlreadyProcessed(err)) {
+            console.error("[payments] dispute partial refund failed", err?.message || err);
+            const message = stripe.sanitizeStripeError(
+              err,
+              "We couldn't release funds right now. Please try again shortly."
+            );
+            return res.status(400).json({ error: message });
+          }
+          refund = { id: `already_refunded_${Date.now()}`, amount: refundAmount };
+        }
       }
     }
 
     let transfer;
-    try {
-      transfer = await stripe.transfers.create({
-        amount: payout,
-        currency: c.currency || "usd",
-        destination: c.paralegal.stripeAccountId,
-        transfer_group: `case_${c._id.toString()}`,
-        metadata: {
-          caseId: c._id.toString(),
-          disputeId: disputeKey,
-          action,
-        },
-      });
-    } catch (err) {
-      console.error("[payments] dispute payout transfer failed", err?.message || err);
-      const message = stripe.sanitizeStripeError(
-        err,
-        "We couldn't release funds right now. Please try again shortly."
-      );
-      return res.status(400).json({ error: message });
+    if (bypassPayouts) {
+      transfer = { id: `bypass_${Date.now()}` };
+    } else {
+      try {
+        transfer = await stripe.transfers.create({
+          amount: payout,
+          currency: c.currency || "usd",
+          destination: c.paralegal.stripeAccountId,
+          transfer_group: `case_${c._id.toString()}`,
+          metadata: {
+            caseId: c._id.toString(),
+            disputeId: disputeKey,
+            action,
+          },
+        });
+      } catch (err) {
+        console.error("[payments] dispute payout transfer failed", err?.message || err);
+        const message = stripe.sanitizeStripeError(
+          err,
+          "We couldn't release funds right now. Please try again shortly."
+        );
+        return res.status(400).json({ error: message });
+      }
     }
 
     c.paymentReleased = true;

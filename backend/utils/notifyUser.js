@@ -232,12 +232,12 @@ function emailTemplate(type, payload) {
     case "dispute_resolved": {
       const title = payload.caseTitle || "the case";
       const resolution = payload.resolutionLabel || payload.resolution || "Resolution";
-      const refundLine = payload.refundAmount ? `<li>Refund: ${payload.refundAmount}</li>` : "";
-      const payoutLine = payload.payoutAmount ? `<li>Payout: ${payload.payoutAmount}</li>` : "";
-      const details = refundLine || payoutLine ? `<ul>${refundLine}${payoutLine}</ul>` : "";
+      const receiptNote =
+        payload.receiptNote || "A receipt is available in your dashboard with full payment details.";
+      const link = payload.link ? `<p><a href="${payload.link}">View receipt</a></p>` : "";
       return {
         subject: `Dispute resolved${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
-        html: `<p>${payload.message || `The dispute for <strong>${title}</strong> was resolved.`}</p><p>Resolution: ${resolution}.</p>${details}`,
+        html: `<p>${payload.message || `The dispute for <strong>${title}</strong> was resolved.`}</p><p>Resolution: ${resolution}.</p><p>${receiptNote}</p>${link}`,
       };
     }
     default:
@@ -248,10 +248,43 @@ function emailTemplate(type, payload) {
   }
 }
 
+function shouldWrapNotificationEmail(html = "") {
+  const lower = String(html || "").toLowerCase();
+  if (!lower) return false;
+  if (lower.includes("data-lpc-template=\"full\"")) return false;
+  if (lower.includes("<table") || lower.includes("<style") || lower.includes("<body")) return false;
+  return true;
+}
+
+function wrapNotificationEmail(subject, bodyHtml) {
+  const title = subject || "LPC Notification";
+  return `
+  <div style="margin:0;padding:24px 12px;background:#f5f6f8;">
+    <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #e6e8ee;border-radius:14px;overflow:hidden;">
+      <div style="padding:18px 24px;border-bottom:1px solid #eceff4;background:#fafbfc;">
+        <div style="font-family:Georgia, 'Times New Roman', serif;font-size:20px;letter-spacing:0.02em;color:#111827;">
+          Let's-ParaConnect
+        </div>
+      </div>
+      <div style="padding:22px 24px;font-family:Arial, Helvetica, sans-serif;font-size:15px;line-height:1.6;color:#111827;">
+        <div style="font-weight:600;margin-bottom:10px;">${title}</div>
+        ${bodyHtml || "<p>You have a new notification.</p>"}
+      </div>
+      <div style="padding:14px 24px;border-top:1px solid #eceff4;font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#6b7280;">
+        This is an automated notification from Let's-ParaConnect.
+      </div>
+    </div>
+  </div>
+  `;
+}
+
 async function safeSendEmail(to, subject, html) {
   if (!to || !subject) return;
   try {
-    await sendEmail(to, subject, html);
+    const finalHtml = shouldWrapNotificationEmail(html)
+      ? wrapNotificationEmail(subject, html)
+      : html;
+    await sendEmail(to, subject, finalHtml);
   } catch (err) {
     console.error("[notifyUser] Email failed:", err);
   }

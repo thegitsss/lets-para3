@@ -390,8 +390,19 @@ function renderAssignments(assignments = []) {
   if (!container || !selectors.assignmentTemplate) return;
   const usableAssignments = assignments.filter((assignment) => assignment && assignment.caseId);
   if (!usableAssignments.length) {
+    container.removeAttribute("hidden");
     container.innerHTML = "";
-    container.setAttribute("hidden", "hidden");
+    const emptyCard = document.createElement("div");
+    emptyCard.className = "case-card empty-state";
+    emptyCard.innerHTML = `
+      <div class="case-header">
+        <div>
+          <h2>Assignments</h2>
+          <div class="case-subinfo">No assignments yet.</div>
+        </div>
+      </div>
+    `;
+    container.appendChild(emptyCard);
     return;
   }
   container.removeAttribute("hidden");

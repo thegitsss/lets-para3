@@ -72,7 +72,10 @@ function wrapHtml(html) {
 
 function defaultFrom() {
   const name = process.env.SMTP_FROM_NAME || "ParaConnect";
-  const email = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "admin@lets-paraconnect.com";
+  let email = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "admin@lets-paraconnect.com";
+  if (String(email || "").toLowerCase() === "admin@letsparaconnect.com") {
+    email = "admin@lets-paraconnect.com";
+  }
   return `"${name}" <${email}>`;
 }
 

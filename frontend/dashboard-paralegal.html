@@ -1182,6 +1182,10 @@
       border-top: 1px solid var(--line);
     }
 
+    .completed-cases-section .section-title {
+      margin-bottom: 0.35rem;
+    }
+
     .apps-column {
       padding-left: 2rem;
       border-left: 1px solid var(--line);
@@ -2006,9 +2010,9 @@
     .page-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       gap: 16px;
-      margin-bottom: 2rem;
+      margin-bottom: 0.75rem;
     }
 
     .page-header h1 {
@@ -2022,6 +2026,20 @@
       color: var(--muted);
       font-size: 0.95rem;
     }
+
+    .cases-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 0.5rem;
+    }
+
+    .cases-hairline {
+      width: 100%;
+      height: 1px;
+      background: var(--line);
+      margin: 0 0 1.25rem;
+    }
+
 
     .filters {
       display: flex;
@@ -2108,6 +2126,45 @@
     .file-actions {
       display: flex;
       gap: 0.75rem;
+    }
+
+    .completed-pagination {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 0.85rem;
+      flex-wrap: wrap;
+    }
+
+    .completed-page-btn {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 0.4rem 0.9rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      font-family: var(--font-serif);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease;
+    }
+
+    #browseJobsBtn {
+      padding: 0.6rem 1.4rem;
+      font-size: 0.95rem;
+      border-color: var(--accent);
+    }
+
+    .completed-page-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .completed-page-info {
+      font-size: 0.85rem;
+      color: var(--muted);
     }
 
     .btn-link {
@@ -2429,6 +2486,10 @@
           <p>Track your applications and manage active cases.</p>
         </div>
       </header>
+      <div class="cases-actions">
+        <button type="button" class="completed-page-btn" id="browseJobsBtn">Browse cases</button>
+      </div>
+      <div class="cases-hairline" aria-hidden="true"></div>
 
       <div class="cases-apps-grid">
         <section class="cases-column" aria-label="Cases">
@@ -2440,6 +2501,11 @@
           </div>
           <div class="cases-section completed-cases-section">
             <div class="section-title">Completed Cases</div>
+            <div class="completed-pagination" id="completedCasesPagination" aria-label="Completed cases pagination">
+              <button type="button" class="completed-page-btn" id="completedPrevBtn" disabled>Back</button>
+              <span class="completed-page-info" id="completedPageInfo"></span>
+              <button type="button" class="completed-page-btn" id="completedNextBtn" disabled>Next</button>
+            </div>
             <div class="case-files" id="completedCasesContainer">
               <p class="case-files-empty">Loading completed cases…</p>
             </div>
@@ -2643,8 +2709,14 @@
 
       const filesContainer = document.getElementById("filesContainer");
       const completedCasesContainer = document.getElementById("completedCasesContainer");
+      const completedPagination = document.getElementById("completedCasesPagination");
+      const completedPrevBtn = document.getElementById("completedPrevBtn");
+      const completedNextBtn = document.getElementById("completedNextBtn");
+      const completedPageInfo = document.getElementById("completedPageInfo");
       let activeCasesCache = [];
       let completedCasesCache = [];
+      let completedPageIndex = 0;
+      const COMPLETED_PAGE_SIZE = 3;
 
       function escapeHTML(value) {
         return String(value ?? "")
@@ -2713,13 +2785,34 @@
           .join("");
       }
 
+      function updateCompletedPagination(totalCount) {
+        if (!completedPagination) return;
+        const totalPages = Math.max(1, Math.ceil(totalCount / COMPLETED_PAGE_SIZE));
+        const safeIndex = Math.min(completedPageIndex, totalPages - 1);
+        completedPageIndex = safeIndex;
+        const start = totalCount === 0 ? 0 : safeIndex * COMPLETED_PAGE_SIZE + 1;
+        const end = Math.min(totalCount, (safeIndex + 1) * COMPLETED_PAGE_SIZE);
+        if (completedPageInfo) {
+          completedPageInfo.textContent = totalCount
+            ? `${start}–${end} of ${totalCount}`
+            : "0 of 0";
+        }
+        if (completedPrevBtn) completedPrevBtn.disabled = safeIndex <= 0;
+        if (completedNextBtn) completedNextBtn.disabled = safeIndex >= totalPages - 1;
+        completedPagination.style.display = totalCount > COMPLETED_PAGE_SIZE ? "flex" : "none";
+      }
+
       function renderCompletedCases(items = completedCasesCache) {
         if (!completedCasesContainer) return;
         if (!items.length) {
           completedCasesContainer.innerHTML = `<p class="case-files-empty">No completed cases yet.</p>`;
+          updateCompletedPagination(0);
           return;
         }
-        completedCasesContainer.innerHTML = items
+        const totalCount = items.length;
+        const start = completedPageIndex * COMPLETED_PAGE_SIZE;
+        const pageItems = items.slice(start, start + COMPLETED_PAGE_SIZE);
+        completedCasesContainer.innerHTML = pageItems
           .map((item) => {
             const caseId = item.caseId || item.id || item._id || "";
             const title = item.title || "Case";
@@ -2750,6 +2843,7 @@
             `;
           })
           .join("");
+        updateCompletedPagination(totalCount);
       }
 
       async function loadActiveCases() {
@@ -2784,11 +2878,13 @@
             throw new Error(payload?.error || "Unable to load completed cases.");
           }
           completedCasesCache = Array.isArray(payload?.items) ? payload.items : [];
+          completedPageIndex = 0;
           renderCompletedCases(completedCasesCache);
         } catch (err) {
           completedCasesContainer.innerHTML = `<p class="case-files-empty">${escapeHTML(
             err?.message || "Unable to load completed cases."
           )}</p>`;
+          updateCompletedPagination(0);
         }
       }
 
@@ -2850,6 +2946,28 @@
       });
 
       setActiveView(resolveViewFromHash());
+
+      if (completedPrevBtn) {
+        completedPrevBtn.addEventListener("click", () => {
+          if (completedPageIndex <= 0) return;
+          completedPageIndex -= 1;
+          renderCompletedCases(completedCasesCache);
+        });
+      }
+      if (completedNextBtn) {
+        completedNextBtn.addEventListener("click", () => {
+          const totalPages = Math.max(1, Math.ceil(completedCasesCache.length / COMPLETED_PAGE_SIZE));
+          if (completedPageIndex >= totalPages - 1) return;
+          completedPageIndex += 1;
+          renderCompletedCases(completedCasesCache);
+        });
+      }
+      const browseJobsBtn = document.getElementById("browseJobsBtn");
+      if (browseJobsBtn) {
+        browseJobsBtn.addEventListener("click", () => {
+          window.location.href = "browse-jobs.html";
+        });
+      }
     });
   </script>
   <script>

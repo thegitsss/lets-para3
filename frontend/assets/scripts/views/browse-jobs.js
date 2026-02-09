@@ -612,7 +612,7 @@ function renderJobs() {
     const empty = document.createElement("p");
     empty.className = "area";
     empty.style.textAlign = "center";
-    empty.textContent = "No jobs match your filters yet. Try adjusting filters or check back soon.";
+    empty.textContent = "No matters match your filters yet. Try adjusting filters or check back soon.";
     jobsGrid.appendChild(empty);
     if (pagination) pagination.textContent = "";
     return;

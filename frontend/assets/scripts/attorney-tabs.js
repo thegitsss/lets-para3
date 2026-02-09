@@ -805,7 +805,8 @@ async function initOverviewPage() {
 
 async function initWeeklyNotes(grid, rangeEl) {
   if (!grid) return;
-  const modalReady = Boolean(weeklyNoteModalRef && weeklyNoteTextarea && weeklyNoteSaveBtn);
+  setupWeeklyNoteModal();
+  const modalReady = Boolean(weeklyNoteModalRef && weeklyNoteTextarea);
   const start = getWeekStart(new Date());
   const weekKey = formatDateKey(start);
   const notes = await fetchWeeklyNotes(weekKey);
@@ -910,10 +911,38 @@ let weeklyNoteCancelBtn = null;
 let weeklyNoteModalBound = false;
 let weeklyNoteModalOnSave = null;
 
+function ensureWeeklyNoteModal() {
+  if (document.getElementById("weeklyNoteModal")) {
+    return;
+  }
+  const modal = document.createElement("div");
+  modal.id = "weeklyNoteModal";
+  modal.className = "note-modal hidden";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-labelledby", "weeklyNoteModalTitle");
+  modal.innerHTML = `
+    <div class="note-modal-card">
+      <h3 id="weeklyNoteModalTitle" style="font-family:var(--font-serif);font-weight:300;">Weekly Note</h3>
+      <div class="weekly-note-modal-date" id="weeklyNoteModalDate"></div>
+      <textarea id="weeklyNoteModalTextarea" placeholder="Add a note for this day."></textarea>
+      <div class="note-modal-actions">
+        <button type="button" class="btn secondary" data-weekly-note-cancel>Cancel</button>
+        <button type="button" class="btn primary" data-weekly-note-save>Save Note</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+}
+
 function setupWeeklyNoteModal() {
   if (weeklyNoteModalBound) return;
+  ensureWeeklyNoteModal();
   weeklyNoteModalRef = document.getElementById("weeklyNoteModal");
   if (!weeklyNoteModalRef) return;
+  if (weeklyNoteModalRef.parentElement !== document.body) {
+    document.body.appendChild(weeklyNoteModalRef);
+  }
   weeklyNoteModalBound = true;
   weeklyNoteModalTitle = document.getElementById("weeklyNoteModalTitle");
   weeklyNoteModalDate = document.getElementById("weeklyNoteModalDate");
@@ -941,6 +970,7 @@ function setupWeeklyNoteModal() {
 }
 
 function openWeeklyNoteModal({ date, note, onSave }) {
+  setupWeeklyNoteModal();
   if (!weeklyNoteModalRef) return;
   weeklyNoteModalOnSave = onSave;
   if (weeklyNoteModalTitle) {
