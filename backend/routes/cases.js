@@ -363,10 +363,11 @@ async function generateReceiptDocuments(caseDoc, { payoutAmount, paymentMethodLa
   const baseAmount = settlement?.grossAmount ?? Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
   const attorneyFee = settlement?.feeAttorneyAmount ?? computeAttorneyFeeAmount(baseAmount, caseDoc);
   const paralegalFee = settlement?.feeParalegalAmount ?? computeParalegalFeeAmount(baseAmount, caseDoc);
+  const computedNet = settlement?.payoutAmount ?? Math.max(0, baseAmount - paralegalFee);
   const payout =
     Number.isFinite(payoutAmount) && payoutAmount >= 0
-      ? payoutAmount
-      : settlement?.payoutAmount ?? Math.max(0, baseAmount - paralegalFee);
+      ? Math.min(payoutAmount, computedNet)
+      : computedNet;
   const issuedAt = caseDoc.completedAt || caseDoc.paidOutAt || new Date();
   const attorneyPct = settlement?.feeAttorneyPct ?? resolveAttorneyFeePct(caseDoc);
   const paralegalPct = settlement?.feeParalegalPct ?? resolveParalegalFeePct(caseDoc);
@@ -1008,7 +1009,8 @@ async function ensureFundsReleased(req, caseDoc) {
     throw new Error("Case total amount is invalid.");
   }
   const attorneyFee = computeAttorneyFeeAmount(budgetCents, caseDoc);
-  const paralegalFee = computeParalegalFeeAmount(budgetCents, caseDoc);
+  const paralegalFeePct = 18;
+  const paralegalFee = Math.max(0, Math.round((budgetCents * paralegalFeePct) / 100));
   const payout = Math.max(0, budgetCents - paralegalFee);
   if (payout <= 0) {
     throw new Error("Calculated payout must be positive.");
@@ -1055,8 +1057,8 @@ async function ensureFundsReleased(req, caseDoc) {
   caseDoc.briefSummary = `${caseDoc.title} – ${paralegalName} – completed ${completedAt.toISOString().split("T")[0]}`;
   if (!Number.isFinite(caseDoc.feeAttorneyPct)) caseDoc.feeAttorneyPct = resolveAttorneyFeePct(caseDoc);
   if (!Number.isFinite(caseDoc.feeAttorneyAmount)) caseDoc.feeAttorneyAmount = attorneyFee;
-  if (!Number.isFinite(caseDoc.feeParalegalPct)) caseDoc.feeParalegalPct = resolveParalegalFeePct(caseDoc);
-  if (!Number.isFinite(caseDoc.feeParalegalAmount)) caseDoc.feeParalegalAmount = paralegalFee;
+  caseDoc.feeParalegalPct = paralegalFeePct;
+  caseDoc.feeParalegalAmount = paralegalFee;
 
   const attorneyObjectId = caseDoc.attorney?._id || caseDoc.attorneyId || caseDoc.attorney;
   const paralegalObjectId = paralegal._id || caseDoc.paralegalId || caseDoc.paralegal;
@@ -1095,8 +1097,12 @@ async function ensureFundsReleased(req, caseDoc) {
 
   const payoutDisplay = `$${(payout / 100).toFixed(2)}`;
   try {
-    const link = buildCaseLink(caseDoc);
-    const payload = { amount: payoutDisplay, link };
+    const link = "dashboard-paralegal.html#cases-completed";
+    const payload = {
+      amount: payoutDisplay,
+      link,
+      message: `Case "${caseDoc.title || "Case"}" completed. Funds released.`,
+    };
     const alreadySent = await hasCaseNotification(paralegalObjectId, "payout_released", caseDoc, payload);
     if (!alreadySent) {
       await sendCaseNotification(
@@ -2319,7 +2325,7 @@ router.post(
     const storageKey = String(key).trim();
     const filename = cleanString(original || "", { len: 400 }) || storageKey.split("/").pop();
     const uploadRole = req.user.role || "attorney";
-    const defaultStatus = req.acl?.isAttorney || uploadRole === "attorney" ? "attorney_revision" : "pending_review";
+    const defaultStatus = "pending_review";
     const status = FILE_STATUS.includes(defaultStatus) ? defaultStatus : "pending_review";
 
     const exists = await CaseFile.findOne({ caseId: doc._id, storageKey }).select("_id").lean();

@@ -788,11 +788,13 @@ async function getCompletedCaseIds(role = "") {
 
 async function filterCompletedCaseNotifications(items = []) {
   if (!Array.isArray(items) || !items.length) return items;
+  const allowCompletedTypes = new Set(["payout_released"]);
   const role = String(items.find((item) => item?.userRole)?.userRole || "").toLowerCase();
   if (role !== "attorney" && role !== "paralegal") return items;
   const completedIds = await getCompletedCaseIds(role);
   if (!completedIds.size) return items;
   return items.filter((item) => {
+    if (allowCompletedTypes.has(String(item?.type || "").toLowerCase())) return true;
     const caseId = getNotificationCaseId(item);
     if (!caseId) return true;
     return !completedIds.has(String(caseId));
@@ -834,7 +836,6 @@ function resolveNotificationLink(item = {}) {
   const payload = item.payload || {};
   const type = String(item.type || "").toLowerCase();
   const role = String(item.userRole || "").toLowerCase();
-  if (type === "payout_released" && role === "paralegal") return "";
   const caseId = extractId(
     item.caseId ||
       payload.caseId ||
@@ -858,6 +859,9 @@ function resolveNotificationLink(item = {}) {
   const payloadUrl = typeof payload.url === "string" ? payload.url.trim() : "";
   const explicitLink = primaryLink || payloadLink || payloadUrl;
   if (explicitLink) return explicitLink;
+  if (type === "payout_released" && role === "paralegal") {
+    return "dashboard-paralegal.html#cases-completed";
+  }
   if (caseId) {
     const base = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
     if (type === "message") return `${base}#case-messages`;

@@ -1767,6 +1767,11 @@
       min-width: 0;
     }
 
+    .case-documents-list.case-documents-attorney .case-documents-item.has-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
     .case-documents-meta {
       display: flex;
       flex-direction: column;
@@ -1781,6 +1786,11 @@
       overflow-wrap: anywhere;
     }
 
+    .case-documents-list.case-documents-attorney .case-documents-item.has-actions .case-documents-meta {
+      width: 100%;
+      align-self: flex-start;
+    }
+
     .case-documents-sub {
       font-size: 0.78rem;
       color: var(--app-muted);
@@ -1792,6 +1802,13 @@
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
+    }
+
+    .case-documents-list.case-documents-attorney .case-documents-item.has-actions .case-documents-actions {
+      width: 100%;
+      margin-top: auto;
+      justify-content: flex-end;
+      padding-top: 6px;
     }
 
     .case-documents-approve {

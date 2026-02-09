@@ -721,10 +721,11 @@ function buildParalegalReceiptPayload(caseDoc, payoutDoc) {
   const baseAmount = settlement?.grossAmount ?? Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
   const platformFee = settlement?.feeParalegalAmount ?? computeParalegalFee(caseDoc);
   const paralegalPct = settlement?.feeParalegalPct ?? resolveParalegalFeePct(caseDoc);
+  const computedNet = settlement?.payoutAmount ?? Math.max(0, baseAmount - platformFee);
   const payoutAmount =
     Number.isFinite(payoutDoc?.amountPaid) && payoutDoc.amountPaid >= 0
-      ? payoutDoc.amountPaid
-      : settlement?.payoutAmount ?? Math.max(0, baseAmount - platformFee);
+      ? Math.min(payoutDoc.amountPaid, computedNet)
+      : computedNet;
   const attorneyName = fullName(caseDoc.attorney || {}) || caseDoc.attorneyNameSnapshot || "Attorney";
   const paralegalName = fullName(caseDoc.paralegal || {}) || caseDoc.paralegalNameSnapshot || "Paralegal";
   const issuedAt = caseDoc.paidOutAt || caseDoc.completedAt || caseDoc.updatedAt || new Date();

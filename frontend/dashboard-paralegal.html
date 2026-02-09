@@ -647,6 +647,18 @@
       gap: 0.35rem;
     }
 
+    .info-box-link {
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+      transition: background 0.25s ease, transform 0.15s ease;
+    }
+
+    .info-box-link:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
     .info-value {
       font-size: 1.45rem;
       font-weight: 300;
@@ -2368,10 +2380,10 @@
           </div>
           <div class="info-label">next deadline</div>
         </div>
-        <div class="info-box">
+        <a class="info-box info-box-link" id="earnedThisMonthCard" href="dashboard-paralegal.html#cases-completed" aria-label="View completed cases">
           <div class="info-value">$<span data-field="monthEarnings"><span class="skeleton-line short"></span></span></div>
           <div class="info-label">earned this month</div>
-        </div>
+        </a>
       </section>
 
       <section class="quick-actions">
@@ -2804,6 +2816,11 @@
             console.warn("Completed cases load failed", error)
           );
         }
+        if (key === "cases" && window.location.hash.includes("completed")) {
+          requestAnimationFrame(() => {
+            document.querySelector(".completed-cases-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        }
         if (key === "cases") {
           history.replaceState(null, "", `${basePath}#cases`);
         } else {
@@ -2826,11 +2843,13 @@
         });
       });
 
+      const resolveViewFromHash = () => (window.location.hash.startsWith("#cases") ? "cases" : "home");
+
       window.addEventListener("hashchange", () => {
-        setActiveView(window.location.hash === "#cases" ? "cases" : "home");
+        setActiveView(resolveViewFromHash());
       });
 
-      setActiveView(window.location.hash === "#cases" ? "cases" : "home");
+      setActiveView(resolveViewFromHash());
     });
   </script>
   <script>

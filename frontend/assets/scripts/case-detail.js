@@ -73,6 +73,7 @@ const state = {
   search: "",
   pendingAttachments: [],
   optimisticDocuments: [],
+  caseDocumentsById: new Map(),
   sending: false,
   completing: false,
   disputing: false,
@@ -386,12 +387,16 @@ function normalizeCaseStatus(value) {
   return lower;
 }
 
+function isEscrowFunded(caseData) {
+  const escrowStatus = String(caseData?.escrowStatus || "").toLowerCase();
+  return !!caseData?.escrowIntentId && escrowStatus === "funded";
+}
+
 function formatCaseStatus(value, caseData = {}) {
   const key = normalizeCaseStatus(value);
   if (!key) return "Open";
   const hasParalegal = !!(caseData?.paralegal || caseData?.paralegalId);
-  const escrowFunded =
-    !!caseData?.escrowIntentId && String(caseData?.escrowStatus || "").toLowerCase() === "funded";
+  const escrowFunded = isEscrowFunded(caseData);
   if (key === "awaiting_funding" || (hasParalegal && !escrowFunded && key !== "open")) {
     return "Hired - Pending Funding";
   }
@@ -699,8 +704,7 @@ function resolveCaseState(caseData) {
   if (status === CASE_STATES.FUNDED_IN_PROGRESS) return CASE_STATES.FUNDED_IN_PROGRESS;
 
   const hasParalegal = !!(caseData?.paralegal || caseData?.paralegalId);
-  const escrowFunded =
-    !!caseData?.escrowIntentId && String(caseData?.escrowStatus || "").toLowerCase() === "funded";
+  const escrowFunded = isEscrowFunded(caseData);
   if (hasParalegal && escrowFunded && FUNDED_WORKSPACE_STATUSES.has(status)) {
     return CASE_STATES.FUNDED_IN_PROGRESS;
   }
@@ -799,7 +803,7 @@ function removeWorkspaceActions() {
 
 function getWorkspaceState(caseData, caseStateOverride) {
   const caseState = caseStateOverride || resolveCaseState(caseData);
-  if (caseState !== CASE_STATES.FUNDED_IN_PROGRESS) {
+  if (caseState !== CASE_STATES.FUNDED_IN_PROGRESS || !isEscrowFunded(caseData)) {
     return {
       ready: false,
       reason: workspaceLockCopy(caseState, caseData),
@@ -849,10 +853,10 @@ async function loadCases() {
   const data = await fetchWithFallback(["/api/cases/my?limit=200", "/api/cases/my", "/api/cases"]);
   const allCases = normalizeCaseList(data);
   state.caseOptions = allCases.filter((item) => isSelectableCase(item));
-  state.cases = allCases.filter((item) => isWorkspaceEligibleCase(item));
-  if (!state.cases.length) {
+  state.cases = state.caseOptions;
+  if (!state.caseOptions.length) {
     showMsg(caseListStatus, "");
-    setCaseNavStatus("No in-progress cases.");
+    setCaseNavStatus("No active cases.");
   } else {
     showMsg(caseListStatus, "");
     setCaseNavStatus("");
@@ -877,7 +881,8 @@ function renderCaseList() {
   if (!caseList) return;
   emptyNode(caseList);
   const search = state.search.trim().toLowerCase();
-  const filtered = state.cases.filter((item) => {
+  const source = state.caseOptions.length ? state.caseOptions : state.cases;
+  const filtered = source.filter((item) => {
     const title = String(item?.title || "");
     const matchesSearch = !search || title.toLowerCase().includes(search);
     const unread = state.unreadByCase.get(String(getCaseId(item))) || 0;
@@ -1675,7 +1680,7 @@ function getCaseTasks(caseData) {
 
 function areAllTasksComplete(caseData) {
   const tasks = getCaseTasks(caseData);
-  if (!tasks.length) return true;
+  if (!tasks.length) return false;
   return tasks.every((task) => isTaskCompleted(task));
 }
 
@@ -1752,6 +1757,17 @@ function clearCompleteLockMessage() {
 
 function normalizeRole(value) {
   return String(value || "").toLowerCase();
+}
+
+function getDocumentUploadRole(documentData) {
+  return normalizeRole(
+    documentData?.uploadedByRole ||
+      documentData?.uploaderRole ||
+      documentData?.uploadedBy?.role ||
+      documentData?.uploader?.role ||
+      documentData?.userRole ||
+      ""
+  );
 }
 
 async function updateCaseFileStatus(caseId, fileId, status) {
@@ -2266,7 +2282,9 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
         openPreview();
       }
     });
-    if (currentRole === "attorney") {
+    const uploadRole = getDocumentUploadRole(documentData);
+    if (currentRole === "attorney" && uploadRole === "paralegal") {
+      li.classList.add("has-actions");
       const actions = document.createElement("div");
       actions.className = "case-documents-actions";
       const approveLabel = document.createElement("label");
@@ -2493,11 +2511,6 @@ async function loadCase(caseId) {
       return;
     }
     const caseState = resolveCaseState(caseData);
-    if (shouldRedirectFromWorkspace(caseState)) {
-      showMsg(messageStatus, workspaceLockCopy(caseState, caseData));
-      redirectFromWorkspace();
-      return;
-    }
     renderParticipants(caseData);
     renderCaseOverview(caseData);
     updateCompleteAction(caseData, caseState);
@@ -2512,6 +2525,7 @@ async function loadCase(caseId) {
     let messages = [];
     let documents = [];
     let serverDocuments = [];
+    const cachedDocuments = state.caseDocumentsById.get(caseId) || [];
     const optimisticDocuments = getOptimisticDocumentsForCase(caseId);
 
     try {
@@ -2530,14 +2544,15 @@ async function loadCase(caseId) {
         cache: "no-store",
       });
       serverDocuments = normalizeDocuments(documentsData);
+      state.caseDocumentsById.set(caseId, serverDocuments);
     } catch {
-      serverDocuments = [];
+      serverDocuments = cachedDocuments;
     }
 
     documents = mergeDocuments(serverDocuments, optimisticDocuments);
     state.optimisticDocuments = pruneOptimisticDocuments(state.optimisticDocuments, serverDocuments, caseId);
 
-    renderSharedDocuments(serverDocuments, caseId);
+    renderSharedDocuments(documents, caseId);
     renderThreadItems(messages, documents, caseId);
     markCaseMessagesRead(caseId, messages);
     if (state.unreadByCase.has(caseId)) {
@@ -2685,7 +2700,7 @@ function populateCaseSelect() {
     caseSelect.innerHTML = "";
     const emptyOption = document.createElement("option");
     emptyOption.value = "";
-    emptyOption.textContent = "No in-progress cases";
+    emptyOption.textContent = "No active cases";
     caseSelect.appendChild(emptyOption);
     caseSelect.disabled = true;
     return;
@@ -2731,7 +2746,8 @@ function updateCaseSelectSelection() {
 
 function renderCaseNavList() {
   if (!caseNavLists.length) return;
-  let activeCases = getActiveCases(state.cases);
+  const source = state.caseOptions.length ? state.caseOptions : state.cases;
+  let activeCases = getActiveCases(source);
   const currentCase = state.activeCase;
   if (currentCase) {
     const currentId = getCaseId(currentCase);
@@ -2934,13 +2950,14 @@ function init() {
   loadCases()
     .then(loadUnreadCounts)
     .then(() => {
-      const initial = fromQuery || (state.cases[0] ? getCaseId(state.cases[0]) : "");
+      const source = state.caseOptions.length ? state.caseOptions : state.cases;
+      const initial = fromQuery || (source[0] ? getCaseId(source[0]) : "");
       if (initial) {
         loadCase(initial);
         return;
       }
       showMsg(caseListStatus, "");
-      setCaseNavStatus("No funded cases.");
+      setCaseNavStatus("No active cases.");
     })
     .catch((err) => {
       showMsg(caseListStatus, err.message || "Unable to load cases.");

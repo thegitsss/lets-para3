@@ -828,7 +828,7 @@ router.post(
     const safeName = safeSegment(originalName) || `case-file-${Date.now()}`;
     const key = `${buildCasePrefix(caseDoc._id)}documents/${Date.now()}-${safeName}`.replace(/\/+/g, "/");
     const uploadRole = String(req.user?.role || "attorney").toLowerCase();
-    const defaultStatus = uploadRole === "attorney" || uploadRole === "admin" ? "attorney_revision" : "pending_review";
+    const defaultStatus = "pending_review";
     const version = await nextCaseFileVersion(caseDoc._id, originalName);
     const putParams = {
       Bucket: BUCKET,
