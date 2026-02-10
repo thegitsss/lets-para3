@@ -159,6 +159,7 @@ const onboardingSchema = new Schema(
     paralegalWelcomeDismissed: { type: Boolean, default: false },
     paralegalTourCompleted: { type: Boolean, default: false },
     paralegalProfileTourCompleted: { type: Boolean, default: false },
+    attorneyTourCompleted: { type: Boolean, default: false },
   },
   { _id: false }
 );

@@ -258,6 +258,7 @@ function serializeOnboarding(onboarding = {}) {
     paralegalWelcomeDismissed: Boolean(onboarding?.paralegalWelcomeDismissed),
     paralegalTourCompleted: Boolean(onboarding?.paralegalTourCompleted),
     paralegalProfileTourCompleted: Boolean(onboarding?.paralegalProfileTourCompleted),
+    attorneyTourCompleted: Boolean(onboarding?.attorneyTourCompleted),
   };
 }
 
@@ -415,7 +416,7 @@ router.get(
 router.get(
   "/me/onboarding",
   requireApprovedUser,
-  requireRole("paralegal", "admin"),
+  requireRole("paralegal", "attorney", "admin"),
   asyncHandler(async (req, res) => {
     const me = await User.findById(req.user.id).select("onboarding").lean();
     if (!me) return res.status(404).json({ error: "Not found" });
@@ -427,7 +428,7 @@ router.patch(
   "/me/onboarding",
   csrfProtection,
   requireApprovedUser,
-  requireRole("paralegal", "admin"),
+  requireRole("paralegal", "attorney", "admin"),
   asyncHandler(async (req, res) => {
     const body = req.body || {};
     const updates = {};
@@ -435,6 +436,7 @@ router.patch(
       "paralegalWelcomeDismissed",
       "paralegalTourCompleted",
       "paralegalProfileTourCompleted",
+      "attorneyTourCompleted",
     ];
     allowed.forEach((key) => {
       if (typeof body[key] === "boolean") {

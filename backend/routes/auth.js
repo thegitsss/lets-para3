@@ -147,6 +147,7 @@ function serializeOnboarding(onboarding = {}) {
     paralegalWelcomeDismissed: Boolean(onboarding?.paralegalWelcomeDismissed),
     paralegalTourCompleted: Boolean(onboarding?.paralegalTourCompleted),
     paralegalProfileTourCompleted: Boolean(onboarding?.paralegalProfileTourCompleted),
+    attorneyTourCompleted: Boolean(onboarding?.attorneyTourCompleted),
   };
 }
 

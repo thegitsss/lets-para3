@@ -1054,8 +1054,34 @@ function applyParalegalWelcomeNotice(user) {
 }
 
 let tourInitialized = false;
+let paralegalTourApi = null;
 
-async function initParalegalTour(user) {
+function consumeReplayFlag() {
+  let replay = false;
+  try {
+    if (sessionStorage.getItem("lpc_paralegal_replay_tour") === "1") {
+      replay = true;
+      sessionStorage.removeItem("lpc_paralegal_replay_tour");
+    }
+  } catch (_) {}
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("replayTour") === "1") {
+      replay = true;
+      params.delete("replayTour");
+      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash}`;
+      window.history.replaceState(null, "", next);
+    }
+  } catch (_) {}
+  return replay;
+}
+
+async function initParalegalTour(user, options = {}) {
+  const force = Boolean(options.force);
+  if (paralegalTourApi) {
+    if (force) paralegalTourApi.start();
+    return;
+  }
   if (tourInitialized) return;
   tourInitialized = true;
 
@@ -1085,10 +1111,10 @@ async function initParalegalTour(user) {
   const shouldShow =
     role === "paralegal" &&
     (!status || status === "approved") &&
-    isFirstLogin &&
-    !onboarding?.paralegalTourCompleted;
+    (force || isFirstLogin) &&
+    (force || !onboarding?.paralegalTourCompleted);
   if (!shouldShow) return;
-  markTourCompleted();
+  if (!force) markTourCompleted();
 
   const showOverlay = () => {
     overlay.classList.add("is-active");
@@ -1215,6 +1241,12 @@ async function initParalegalTour(user) {
       showProfileStep();
     }
   });
+
+  paralegalTourApi = {
+    start: showIntro,
+    showProfile: showProfileStep,
+    complete: completeTour,
+  };
 
   showIntro();
 }
@@ -2033,7 +2065,7 @@ async function bootParalegalDashboard() {
   applyRoleVisibility(user);
   updateProfile(user || {});
   applyParalegalWelcomeNotice(user || {});
-  initParalegalTour(user || {});
+  initParalegalTour(user || {}, { force: consumeReplayFlag() });
   window.hydrateParalegalCluster?.(user || {});
   window.initNotificationCenters?.();
   if (window.state) {

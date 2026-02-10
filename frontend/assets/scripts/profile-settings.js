@@ -130,6 +130,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const themeSelect = document.getElementById("themePreference");
   const themePreviewButtons = document.querySelectorAll("[data-theme-preview]");
   const emailToggle = document.getElementById("emailNotificationsToggle");
+  const replayTourBtn = document.getElementById("replayAttorneyTourBtn");
+  const replayParalegalTourBtn = document.getElementById("replayParalegalTourBtn");
   const fontSizeSelect = document.getElementById("fontSizePreference");
   const hideProfileToggle = document.getElementById("paralegalHideProfile");
   statePreferenceSelect = document.getElementById("statePreference");
@@ -142,6 +144,24 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.classList.toggle("is-active", isActive);
     });
   };
+
+  if (replayTourBtn) {
+    replayTourBtn.addEventListener("click", () => {
+      try {
+        sessionStorage.setItem("lpc_attorney_replay_tour", "1");
+      } catch (_) {}
+      window.location.href = "dashboard-attorney.html?replayTour=1#home";
+    });
+  }
+
+  if (replayParalegalTourBtn) {
+    replayParalegalTourBtn.addEventListener("click", () => {
+      try {
+        sessionStorage.setItem("lpc_paralegal_replay_tour", "1");
+      } catch (_) {}
+      window.location.href = "dashboard-paralegal.html?replayTour=1";
+    });
+  }
 
   async function persistThemePreference(themeValue, fontSizeValue) {
     try {

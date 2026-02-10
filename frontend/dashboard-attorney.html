@@ -423,6 +423,215 @@
       min-height: 1.1em;
     }
 
+    .tour-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      z-index: 12000;
+      pointer-events: none;
+      --spot-x: 0px;
+      --spot-y: 0px;
+      --spot-w: 0px;
+      --spot-h: 0px;
+    }
+
+    .tour-overlay.is-active {
+      display: block;
+    }
+
+    .tour-overlay::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 15, 25, 0.6);
+    }
+
+    .tour-overlay.spotlight::before {
+      background: transparent;
+    }
+
+    .tour-overlay.spotlight::after {
+      content: "";
+      position: absolute;
+      left: var(--spot-x);
+      top: var(--spot-y);
+      width: var(--spot-w);
+      height: var(--spot-h);
+      border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(10, 15, 25, 0.6);
+    }
+
+    .tour-modal {
+      width: min(420px, 92vw);
+      background: #ffffff;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+      text-align: center;
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      display: none;
+      z-index: 12001;
+    }
+
+    .tour-modal.is-active {
+      display: block;
+    }
+
+    .tour-hero {
+      height: 150px;
+      background-image: url("hero-mountain.jpg");
+      background-size: cover;
+      background-position: center;
+    }
+
+    .tour-content {
+      padding: 22px 26px 28px;
+    }
+
+    .tour-title {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      color: var(--ink);
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .tour-text {
+      color: var(--muted);
+      font-size: 0.98rem;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+
+    .tour-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .tour-btn {
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--ink);
+      padding: 10px 20px;
+      border-radius: 999px;
+      font-weight: 300;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .tour-btn.primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: transparent;
+      box-shadow: 0 12px 24px rgba(182, 164, 122, 0.35);
+    }
+
+    .tour-btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .tour-btn.ghost {
+      background: transparent;
+      color: var(--muted);
+    }
+
+    .tour-tooltip {
+      position: fixed;
+      max-width: 260px;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 16px 35px rgba(15, 23, 42, 0.25);
+      display: none;
+      z-index: 12001;
+    }
+
+    .tour-tooltip.is-active {
+      display: block;
+    }
+
+    .tour-tooltip::after {
+      content: "";
+      position: absolute;
+      border-width: 8px;
+      border-style: solid;
+    }
+
+    .tour-tooltip.arrow-left::after {
+      left: -8px;
+      top: var(--arrow-top, 18px);
+      border-color: transparent #ffffff transparent transparent;
+    }
+
+    .tour-tooltip.arrow-right::after {
+      right: -8px;
+      top: var(--arrow-top, 18px);
+      border-color: transparent transparent transparent #ffffff;
+    }
+
+    .tour-tooltip.arrow-top::after {
+      top: -8px;
+      left: var(--arrow-left, 32px);
+      border-color: transparent transparent #ffffff transparent;
+    }
+
+    .tour-tooltip.arrow-bottom::after {
+      bottom: -8px;
+      left: var(--arrow-left, 32px);
+      border-color: #ffffff transparent transparent transparent;
+    }
+
+    .tour-tooltip-title {
+      font-family: var(--font-serif);
+      color: var(--ink);
+      font-weight: 500;
+      margin: 0 0 6px;
+    }
+
+    .tour-tooltip p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    .tour-step-actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .tour-highlight {
+      position: relative;
+      z-index: 12002;
+      color: #f8fafc;
+      text-shadow: 0 6px 18px rgba(15, 23, 42, 0.6);
+    }
+
+    .sidebar nav a.tour-highlight {
+      color: #f8fafc !important;
+    }
+
+    .tour-close {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      border: none;
+      background: transparent;
+      color: #8a94a6;
+      font-size: 1.1rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .tour-close:hover {
+      color: #4b5563;
+    }
+
     .summary {
       display: flex;
       flex-wrap: wrap;
@@ -4220,6 +4429,29 @@
         </div>
       </section>
     </section>
+    <div class="tour-overlay" id="attorneyTourOverlay" aria-hidden="true"></div>
+    <div class="tour-modal" id="attorneyTourModal" role="dialog" aria-modal="true" aria-labelledby="attorneyTourTitle" aria-describedby="attorneyTourText">
+      <button type="button" class="tour-close" id="attorneyTourCloseBtn" aria-label="Close tour">×</button>
+      <div class="tour-hero" role="presentation"></div>
+      <div class="tour-content">
+        <div class="tour-title" id="attorneyTourTitle">Welcome to Let’s-ParaConnect</div>
+        <p class="tour-text" id="attorneyTourText">
+          Here’s a quick walkthrough of the dashboard. We’ll start with the actions that matter most.
+        </p>
+        <div class="tour-actions">
+          <button type="button" class="tour-btn primary" id="attorneyTourStartBtn">Start tour</button>
+        </div>
+      </div>
+    </div>
+    <div class="tour-tooltip" id="attorneyTourTooltip" role="dialog" aria-live="polite" aria-labelledby="attorneyTourStepTitle" aria-describedby="attorneyTourStepText">
+      <button type="button" class="tour-close" id="attorneyTourTooltipCloseBtn" aria-label="Close tour">×</button>
+      <div class="tour-tooltip-title" id="attorneyTourStepTitle"></div>
+      <p id="attorneyTourStepText"></p>
+      <div class="tour-step-actions">
+        <button type="button" class="tour-btn ghost" id="attorneyTourBackBtn">Back</button>
+        <button type="button" class="tour-btn primary" id="attorneyTourNextBtn">Next</button>
+      </div>
+    </div>
   </main>
 
   <div id="paymentMethodModal" class="payment-modal hidden" aria-hidden="true">
@@ -4378,5 +4610,6 @@
 <script type="module" src="assets/scripts/attorney-tabs.js"></script>
 <script type="module" src="assets/scripts/attorney-settings.js"></script>
 <script type="module" src="assets/scripts/billing-lite.js"></script>
+<script type="module" src="assets/scripts/attorney-dashboard.js"></script>
 </body>
 </html>
