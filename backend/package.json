@@ -14,6 +14,18 @@
     "seed:admin": "node scripts/seedAdmin.js",
     "backup:db": "node scripts/backup-db.js",
     "health": "node -e \"console.log('ok')\"",
+    "test": "jest --runInBand",
+    "test:watch": "jest --watch",
+    "test:e2e": "node scripts/e2e-auth.js && node scripts/e2e-profile.js && node scripts/e2e-validation.js && node scripts/e2e-job-escrow.js && node scripts/e2e-matching.js && node scripts/e2e-messaging.js && node scripts/e2e-admin.js && node scripts/e2e-error-handling.js && node scripts/e2e-payouts.js",
+    "test:e2e:auth": "node scripts/e2e-auth.js",
+    "test:e2e:profile": "node scripts/e2e-profile.js",
+    "test:e2e:validation": "node scripts/e2e-validation.js",
+    "test:e2e:job-escrow": "node scripts/e2e-job-escrow.js",
+    "test:e2e:matching": "node scripts/e2e-matching.js",
+    "test:e2e:messaging": "node scripts/e2e-messaging.js",
+    "test:e2e:admin": "node scripts/e2e-admin.js",
+    "test:e2e:error-handling": "node scripts/e2e-error-handling.js",
+    "test:e2e:payouts": "node scripts/e2e-payouts.js",
     "postinstall": "npm prune --production=false || true"
   },
   "dependencies": {
@@ -43,7 +55,10 @@
     "web-push": "^3.6.2"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "jest": "^29.7.0",
+    "mongodb-memory-server": "^10.0.0",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.0.0"
   },
   "overrides": {
     "follow-redirects": "^1.15.6"

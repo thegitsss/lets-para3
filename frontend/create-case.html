@@ -1996,8 +1996,8 @@ body.theme-dark .select-field select{
       },
       {
         field: fields.comp,
-        check: (value) => Number(value) > 0,
-        message: "Enter the compensation amount.",
+        check: (value) => Number(value) >= 400,
+        message: "Enter a compensation amount of at least $400.",
       },
     ];
 

@@ -304,8 +304,16 @@ const CASE_EMAIL_TYPES = new Set([
   "dispute_resolved",
 ]);
 
+function normalizePrefs(user) {
+  const prefs = user?.notificationPrefs;
+  if (!prefs) return {};
+  if (typeof prefs.toObject === "function") return prefs.toObject();
+  if (typeof prefs.toJSON === "function") return prefs.toJSON();
+  return prefs;
+}
+
 function shouldSendEmailForType(user, type) {
-  const prefs = user?.notificationPrefs || {};
+  const prefs = normalizePrefs(user);
   if (type === "case_budget_locked") return false;
   if (type === "profile_photo_rejected") return false;
   if (prefs.email === false) return false;
@@ -319,7 +327,7 @@ function shouldSendEmailForType(user, type) {
 }
 
 function shouldCreateInAppNotification(user, type) {
-  const prefs = user?.notificationPrefs || {};
+  const prefs = normalizePrefs(user);
   if (prefs.inApp === false) return false;
   if (type === "message") {
     if (Object.prototype.hasOwnProperty.call(prefs, "inAppMessages")) {

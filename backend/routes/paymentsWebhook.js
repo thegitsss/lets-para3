@@ -33,8 +33,8 @@ async function claimWebhookEvent(event) {
         ],
       },
       {
-        $setOnInsert: { provider: "stripe", eventId: event.id, type: event.type, status: "received" },
-        $set: { type: event.type, status: "processing", lastAttemptAt: now },
+        $setOnInsert: { provider: "stripe", eventId: event.id, type: event.type },
+        $set: { status: "processing", lastAttemptAt: now },
         $inc: { attempts: 1 },
       },
       { upsert: true, new: true }

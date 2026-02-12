@@ -29,12 +29,14 @@ const STRIPE_PAYOUT_BYPASS_EMAILS = new Set(["samanthasider+11@gmail.com"]);
 
 // CSRF (enabled in production or when ENABLE_CSRF=true)
 const noop = (_req, _res, next) => next();
-let csrfProtection = noop;
-const REQUIRE_CSRF = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
-if (REQUIRE_CSRF) {
-  const csrf = require("csurf");
-  csrfProtection = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
-}
+const csrf = require("csurf");
+const csrfMiddleware = csrf({ cookie: { httpOnly: true, sameSite: "strict", secure: true } });
+const csrfProtection = (req, res, next) => {
+  const requireCsrf =
+    process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+  if (!requireCsrf) return noop(req, res, next);
+  return csrfMiddleware(req, res, next);
+};
 
 function trimSlash(value) {
   if (!value) return "";
@@ -66,6 +68,16 @@ function buildDisputeResolutionMessage(caseTitle, action) {
     default:
       return `The dispute for ${title} was resolved.`;
   }
+}
+
+function resolveAttorneyId(caseDoc) {
+  const attorney = caseDoc?.attorney;
+  if (attorney && typeof attorney === "object" && attorney._id) {
+    return String(attorney._id);
+  }
+  if (caseDoc?.attorneyId) return String(caseDoc.attorneyId);
+  if (attorney) return String(attorney);
+  return "";
 }
 
 function buildDisputeReceiptPayloads({
@@ -1477,7 +1489,8 @@ router.patch(
     const c = await Case.findById(caseId);
     if (!c) return res.status(404).json({ msg: "Case not found" });
 
-    if (String(c.attorney) !== String(req.user.id) && req.user.role !== "admin") {
+    const attorneyRef = resolveAttorneyId(c);
+    if (attorneyRef && String(attorneyRef) !== String(req.user.id) && req.user.role !== "admin") {
       return res.status(403).json({ msg: "Only the case attorney or admin can update budget" });
     }
 
@@ -1502,8 +1515,8 @@ router.patch(
     }
 
     const cents = Math.round(Number(amountUsd || 0) * 100);
-    if (!Number.isFinite(cents) || cents < 50) {
-      return res.status(400).json({ msg: "Amount must be at least $0.50" });
+    if (!Number.isFinite(cents) || cents < 40000) {
+      return res.status(400).json({ msg: "Amount must be at least $400." });
     }
 
     const before = c.totalAmount;
@@ -1545,7 +1558,8 @@ router.post(
     if (!c) return res.status(404).json({ error: "Case not found" });
 
     // Only the attorney who owns the case (or admin) can fund escrow
-    if (String(c.attorney) !== String(req.user.id) && req.user.role !== "admin") {
+    const attorneyRef = resolveAttorneyId(c);
+    if (attorneyRef && String(attorneyRef) !== String(req.user.id) && req.user.role !== "admin") {
       return res.status(403).json({ error: "Only the attorney can fund escrow" });
     }
 
@@ -1648,7 +1662,8 @@ router.post(
       .populate("attorney", "firstName lastName email role");
     if (!c) return res.status(404).json({ error: "Case not found" });
 
-    if (String(c.attorney) !== String(req.user.id) && req.user.role !== "admin") {
+    const attorneyRef = resolveAttorneyId(c);
+    if (attorneyRef && String(attorneyRef) !== String(req.user.id) && req.user.role !== "admin") {
       return res.status(403).json({ error: "Only the attorney can confirm escrow" });
     }
     if (!c.escrowIntentId) {
@@ -1705,7 +1720,8 @@ router.post(
       .populate("attorney", "firstName lastName email role");
     if (!c) return res.status(404).json({ error: "Case not found" });
 
-    if (String(c.attorney) !== String(req.user.id) && req.user.role !== "admin") {
+    const attorneyRef = resolveAttorneyId(c);
+    if (attorneyRef && String(attorneyRef) !== String(req.user.id) && req.user.role !== "admin") {
       return res.status(403).json({ error: "Only the attorney can reconcile this case" });
     }
 
@@ -1779,7 +1795,8 @@ router.post(
       return res.status(400).json({ error: "Completed cases cannot be released outside dispute resolution." });
     }
 
-    if (String(c.attorney) !== String(req.user.id) && req.user.role !== "admin") {
+    const attorneyRef = resolveAttorneyId(c);
+    if (attorneyRef && String(attorneyRef) !== String(req.user.id) && req.user.role !== "admin") {
       return res.status(403).json({ error: "Only the attorney can release funds" });
     }
     if (!c.escrowIntentId) return res.status(400).json({ error: "No funded escrow" });

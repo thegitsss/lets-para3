@@ -36,7 +36,7 @@ function cleanFilename(str, max = 255) {
   return cleaned.slice(0, max) || "file";
 }
 
-function cleanBudget(value, { min = 50, max = 30000 } = {}) {
+function cleanBudget(value, { min = 400, max = 30000 } = {}) {
   const parsed =
     typeof value === "number"
       ? value

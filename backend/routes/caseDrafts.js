@@ -40,6 +40,28 @@ function normalizeDraftPayload(body = {}) {
   };
 }
 
+function parseCompAmount(value) {
+  if (value === null || value === undefined) return null;
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return null;
+  const parsed = parseFloat(trimmed.replace(/[^0-9.]/g, ""));
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+function assertMinComp(res, compAmount) {
+  const parsed = parseCompAmount(compAmount);
+  if (parsed == null) return true;
+  if (!Number.isFinite(parsed)) {
+    res.status(400).json({ error: "Compensation amount must be a number." });
+    return false;
+  }
+  if (parsed < 400) {
+    res.status(400).json({ error: "Compensation amount must be at least $400." });
+    return false;
+  }
+  return true;
+}
+
 function toResponse(draft) {
   if (!draft) return null;
   return {
@@ -92,6 +114,7 @@ router.post(
   "/",
   asyncHandler(async (req, res) => {
     const payload = normalizeDraftPayload(req.body || {});
+    if (!assertMinComp(res, payload.compAmount)) return;
     const draft = await CaseDraft.create({ owner: req.user.id, ...payload });
     res.status(201).json({ draft: toResponse(draft) });
   })
@@ -105,6 +128,7 @@ router.put(
       return res.status(400).json({ error: "Invalid draft id" });
     }
     const payload = normalizeDraftPayload(req.body || {});
+    if (!assertMinComp(res, payload.compAmount)) return;
     const draft = await CaseDraft.findOneAndUpdate(
       { _id: draftId, owner: req.user.id },
       { $set: { ...payload, updatedAt: new Date() } },

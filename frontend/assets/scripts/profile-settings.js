@@ -1205,6 +1205,7 @@ function initAttorneySettings(user = {}) {
   hydrateAttorneyProfileForm(user);
   bindAttorneyPracticeEditor();
   bindAttorneySaveButton();
+  bindAttorneyPublicationsToggle();
   bindAttorneyNotificationToggles();
   syncCluster(user);
 }
@@ -2448,6 +2449,26 @@ function bindAttorneyPracticeEditor() {
     updateAttorneyPracticeCount();
   });
   updateAttorneyPracticeCount();
+}
+
+function bindAttorneyPublicationsToggle() {
+  const toggle = document.getElementById("attorneyPublicationsToggle");
+  const panel = document.getElementById("attorneyPublicationsPanel");
+  if (!toggle || !panel) return;
+
+  const setExpanded = (isExpanded) => {
+    toggle.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+    panel.hidden = !isExpanded;
+  };
+
+  setExpanded(toggle.getAttribute("aria-expanded") === "true");
+
+  if (toggle.dataset.bound === "true") return;
+  toggle.addEventListener("click", () => {
+    const isExpanded = toggle.getAttribute("aria-expanded") === "true";
+    setExpanded(!isExpanded);
+  });
+  toggle.dataset.bound = "true";
 }
 
 function renderAttorneyPracticeAreas(selected = []) {

@@ -1,6 +1,7 @@
 (function (global) {
   const STORAGE_KEY = "lpDashboardToast";
   let hideTimer;
+  const AUTO_TOAST_DISABLED = Boolean(global && global.__toastDisableAutoFetch);
   const STATUS_MESSAGES = {
     401: "Your session expired. Please sign in again.",
     403: "You don’t have permission to perform this action.",
@@ -65,7 +66,7 @@
 
   const originalFetch =
     typeof global.fetch === "function" ? global.fetch.bind(global) : null;
-  if (originalFetch && !global.__toastFetchPatched) {
+  if (originalFetch && !global.__toastFetchPatched && !AUTO_TOAST_DISABLED) {
     global.fetch = async (...args) => {
       const response = await originalFetch(...args);
       try {

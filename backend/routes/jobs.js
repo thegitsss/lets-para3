@@ -116,7 +116,7 @@ router.post("/", auth, requireApproved, requireRole("attorney"), async (req, res
 
     let budget;
     try {
-      budget = cleanBudget(req.body.budget, { min: 50, max: 30000 });
+      budget = cleanBudget(req.body.budget, { min: 400, max: 30000 });
     } catch (err) {
       return res.status(400).json({ error: err.message });
     }

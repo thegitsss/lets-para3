@@ -7,51 +7,49 @@ const clearLocalSession = () => {
   } catch {}
 };
 
-let skipInit = false;
-try {
-  const rawUser = localStorage.getItem("lpc_user");
-  const parsedUser = rawUser ? JSON.parse(rawUser) : null;
+const resolveDashboardTarget = (role) => {
+  const normalizedRole = String(role || "").toLowerCase();
+  if (normalizedRole === "admin") return "admin-dashboard.html";
+  if (normalizedRole === "paralegal") return "dashboard-paralegal.html";
+  return "dashboard-attorney.html";
+};
+
+const maybeRedirectFromStoredUser = async () => {
+  let parsedUser = null;
+  try {
+    const rawUser = localStorage.getItem("lpc_user");
+    parsedUser = rawUser ? JSON.parse(rawUser) : null;
+  } catch {
+    clearLocalSession();
+    return false;
+  }
   const role = (parsedUser?.role || "").toLowerCase();
   const status = (parsedUser?.status || "").toLowerCase();
-  if (role && status === "approved") {
-    if (window.redirectUserDashboard) {
-      window.redirectUserDashboard(role);
-    } else {
-      window.location.href =
-        role === "admin"
-          ? "admin-dashboard.html"
-          : role === "paralegal"
-          ? "dashboard-paralegal.html"
-          : "dashboard-attorney.html";
-    }
-    skipInit = true;
-  } else {
+  if (!role || status !== "approved") {
     clearLocalSession();
+    return false;
   }
-} catch {
+
+  if (typeof window.checkSession === "function") {
+    try {
+      const session = await window.checkSession(undefined, { redirectOnFail: false });
+      if (session?.user) {
+        const targetRole = session.role || role;
+        if (window.redirectUserDashboard) {
+          window.redirectUserDashboard(targetRole);
+        } else {
+          window.location.href = resolveDashboardTarget(targetRole);
+        }
+        return true;
+      }
+    } catch {
+      // fall through to clear local session
+    }
+  }
+
   clearLocalSession();
-}
-
-const toastHelper = window.toastUtils;
-const stagedSignupToast = sessionStorage.getItem("signupToast");
-if (stagedSignupToast) {
-  sessionStorage.removeItem("signupToast");
-  if (toastHelper) {
-    toastHelper.show(stagedSignupToast, { targetId: "toastBanner", type: "info" });
-  } else {
-    alert(stagedSignupToast);
-  }
-}
-
-const disabledMsg = sessionStorage.getItem("disabledAccountMsg");
-if (disabledMsg) {
-  sessionStorage.removeItem("disabledAccountMsg");
-  if (toastHelper) {
-    toastHelper.show(disabledMsg, { targetId: "toastBanner", type: "err" });
-  } else {
-    alert(disabledMsg);
-  }
-}
+  return false;
+};
 
 async function fetchCsrfToken() {
   try {
@@ -64,7 +62,28 @@ async function fetchCsrfToken() {
   }
 }
 
-if (!skipInit) {
+const initLogin = () => {
+  const toastHelper = window.toastUtils;
+  const stagedSignupToast = sessionStorage.getItem("signupToast");
+  if (stagedSignupToast) {
+    sessionStorage.removeItem("signupToast");
+    if (toastHelper) {
+      toastHelper.show(stagedSignupToast, { targetId: "toastBanner", type: "info" });
+    } else {
+      alert(stagedSignupToast);
+    }
+  }
+
+  const disabledMsg = sessionStorage.getItem("disabledAccountMsg");
+  if (disabledMsg) {
+    sessionStorage.removeItem("disabledAccountMsg");
+    if (toastHelper) {
+      toastHelper.show(disabledMsg, { targetId: "toastBanner", type: "err" });
+    } else {
+      alert(disabledMsg);
+    }
+  }
+
   clearLocalSession();
 
   const loginForm = document.getElementById("loginForm");
@@ -258,4 +277,11 @@ if (!skipInit) {
       }
     });
   }
-}
+};
+
+(async () => {
+  const redirected = await maybeRedirectFromStoredUser();
+  if (!redirected) {
+    initLogin();
+  }
+})();

@@ -16,7 +16,8 @@ const AuditLogSchema = new Schema(
 
     // What it was about (optional polymorphic target)
     targetType: { type: String, enum: TARGET_ENUM, default: "other", index: true },
-    targetId: { type: Types.ObjectId, index: true },
+    // Allow ObjectId or external identifiers (e.g., Stripe ids) by storing as string.
+    targetId: { type: String, index: true },
 
     // Convenience link to a case if applicable (speeds up admin queries)
     case: { type: Types.ObjectId, ref: "Case", index: true },
@@ -62,7 +63,7 @@ AuditLogSchema.statics.logFromReq = async function logFromReq(req, action, opts 
     actorRole,
     action,
     targetType: targetType || "other",
-    targetId: targetId || undefined,
+    targetId: targetId ? String(targetId) : undefined,
     case: caseId || undefined,
     ip: req.ip,
     ua: req.headers["user-agent"],
