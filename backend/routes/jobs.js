@@ -15,6 +15,8 @@ const createApplicationForJob = applicationsRouter?.createApplicationForJob;
 const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
   "samanthasider+attorney@gmail.com",
   "samanthasider+56@gmail.com",
+  "game4funwithme1+1@gmail.com",
+  "game4funwithme1@gmail.com",
 ]);
 const PRACTICE_AREAS = [
   "administrative law",

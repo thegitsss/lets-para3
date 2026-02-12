@@ -13,6 +13,8 @@ const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../uti
 const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
   "samanthasider+attorney@gmail.com",
   "samanthasider+56@gmail.com",
+  "game4funwithme1+1@gmail.com",
+  "game4funwithme1@gmail.com",
 ]);
 
 function sanitizeMessage(value, { min = 0, max = 2000 } = {}) {

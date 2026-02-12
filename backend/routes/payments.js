@@ -24,6 +24,8 @@ const isObjId = (id) => mongoose.isValidObjectId(id);
 const STRIPE_APPROVAL_BYPASS_EMAILS = new Set([
   "samanthasider+11@gmail.com",
   "samanthasider+56@gmail.com",
+  "game4funwithme1+1@gmail.com",
+  "game4funwithme1@gmail.com",
 ]);
 const STRIPE_PAYOUT_BYPASS_EMAILS = new Set(["samanthasider+11@gmail.com"]);
 
@@ -808,7 +810,21 @@ async function tryStreamReceipt(res, key, filename) {
 
 async function ensureStripeCustomer(user) {
   if (!user) throw new Error("User not found");
-  if (user.stripeCustomerId) return user.stripeCustomerId;
+  if (user.stripeCustomerId) {
+    try {
+      const existing = await stripe.customers.retrieve(user.stripeCustomerId);
+      if (existing && !existing.deleted) return user.stripeCustomerId;
+    } catch (err) {
+      const code = err?.code || err?.raw?.code;
+      if (code !== "resource_missing") {
+        throw err;
+      }
+      console.warn("[payments] stripe customer missing; recreating", {
+        userId: String(user._id || ""),
+        stripeCustomerId: user.stripeCustomerId,
+      });
+    }
+  }
   const customer = await stripe.customers.create({
     email: user.email || undefined,
     name: fullName(user) || undefined,
