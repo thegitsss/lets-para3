@@ -27,7 +27,11 @@ const STRIPE_APPROVAL_BYPASS_EMAILS = new Set([
   "game4funwithme1+1@gmail.com",
   "game4funwithme1@gmail.com",
 ]);
-const STRIPE_PAYOUT_BYPASS_EMAILS = new Set(["samanthasider+11@gmail.com"]);
+const STRIPE_PAYOUT_BYPASS_EMAILS = new Set([
+  "samanthasider+11@gmail.com",
+  "game4funwithme1+1@gmail.com",
+  "game4funwithme1@gmail.com",
+]);
 
 // CSRF (enabled in production or when ENABLE_CSRF=true)
 const noop = (_req, _res, next) => next();

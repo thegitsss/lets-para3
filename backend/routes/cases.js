@@ -27,6 +27,8 @@ const STRIPE_BYPASS_PARALEGAL_EMAILS = new Set([
   "samanthasider+11@gmail.com",
   "samanthasider+paralegal@gmail.com",
   "samanthasider+56@gmail.com",
+  "game4funwithme1+1@gmail.com",
+  "game4funwithme1@gmail.com",
 ]);
 const STRIPE_BYPASS_ATTORNEY_EMAILS = new Set([
   "samanthasider+attorney@gmail.com",
