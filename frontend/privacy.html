@@ -90,6 +90,41 @@
     p {
       margin-bottom: 20px;
     }
+
+    main strong {
+      font-weight: 250;
+    }
+
+    ul, ol {
+      margin-bottom: 20px;
+      padding-left: 20px;
+    }
+
+    ul:not(.toc-list) {
+      list-style: none;
+      padding-left: 0;
+      margin-left: 0;
+    }
+
+    ul:not(.toc-list) li {
+      position: relative;
+      padding-left: 18px;
+      margin: 0.55rem 0;
+    }
+
+    ul:not(.toc-list) li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      top: 0.2em;
+      color: var(--gold);
+      font-size: 0.45em;
+    }
+
+    ol li::marker {
+      color: var(--gold);
+      font-weight: 250;
+    }
     .toc-list {
   list-style: none;
   padding-left: 0;
@@ -209,7 +244,7 @@ html {
         <li><strong>AWS S3</strong> – private file storage for uploads.</li>
         <li><strong>Stripe</strong> – Checkout/PaymentIntents for funding; Connect for payouts.</li>
         <li><strong>Email (SMTP via Nodemailer)</strong> – transactional emails.</li>
-        <li><strong>Google reCAPTCHA</strong> – bot mitigation on auth flows.</li>
+        <li><strong>Cloudflare</strong> – bot mitigation and security protections on auth flows.</li>
       </ul>
       <p>We may disclose data to comply with law, protect rights/safety, or in connection with a business transaction (e.g., merger). We do not allow third parties to use your data for their own marketing.</p>
     </section>
