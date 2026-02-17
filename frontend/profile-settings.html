@@ -321,6 +321,16 @@
       0% { background-position: 200% 0; }
       100% { background-position: -200% 0; }
     }
+    @keyframes onboardingPulse {
+      0% { box-shadow: 0 0 0 0 rgba(182, 164, 122, 0.35); }
+      70% { box-shadow: 0 0 0 12px rgba(182, 164, 122, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(182, 164, 122, 0); }
+    }
+    .onboarding-pulse {
+      position: relative;
+      box-shadow: 0 0 0 0 rgba(182, 164, 122, 0.35);
+      animation: onboardingPulse 1.6s ease-out infinite;
+    }
 
     .unified-header {
       display: flex;
@@ -3034,6 +3044,104 @@ input[type="number"],
       margin-bottom: 24px;
       color: var(--muted);
     }
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: transparent;
+      border: none;
+      font-size: 1.4rem;
+      color: var(--muted);
+      cursor: pointer;
+      line-height: 1;
+    }
+    .modal-card {
+      position: relative;
+    }
+    .attorney-onboarding-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      z-index: 60;
+      background: rgba(10, 15, 25, 0.6);
+    }
+    .attorney-onboarding-overlay.is-active {
+      display: block;
+    }
+    .attorney-onboarding-modal {
+      width: min(420px, 92vw);
+      background: #ffffff;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+      text-align: center;
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      display: none;
+      z-index: 61;
+    }
+    .attorney-onboarding-modal.is-active {
+      display: block;
+    }
+    .attorney-onboarding-hero {
+      height: 150px;
+      background-image: url("hero-mountain.jpg");
+      background-size: cover;
+      background-position: center;
+    }
+    .attorney-onboarding-content {
+      padding: 22px 26px 28px;
+    }
+    .attorney-onboarding-title {
+      font-family: var(--font-serif);
+      font-size: 1.6rem;
+      color: var(--ink);
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+    .attorney-onboarding-text {
+      color: var(--muted);
+      font-size: 0.98rem;
+      line-height: 1.5;
+      margin-bottom: 20px;
+    }
+    .attorney-onboarding-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+    .attorney-onboarding-btn {
+      border: 1px solid var(--line);
+      background: #ffffff;
+      color: var(--ink);
+      padding: 10px 20px;
+      border-radius: 999px;
+      font-weight: 300;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .attorney-onboarding-btn.primary {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: transparent;
+      box-shadow: 0 12px 24px rgba(182, 164, 122, 0.35);
+    }
+    .attorney-onboarding-btn:hover {
+      transform: translateY(-1px);
+    }
+    .attorney-onboarding-close {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
 
     .photo-crop-card {
       max-width: 720px;
@@ -4029,7 +4137,7 @@ input[type="number"],
     <section id="securitySection" class="settings-section">
       <div class="security-grid">
         <div class="security-column">
-          <div class="settings-block">
+          <div class="settings-block" data-paralegal-only>
             <h3>Payouts Setup</h3>
             <p>Connect your Stripe account to receive payouts.</p>
             <p class="muted"><strong>Stripe setup isn’t available yet. We’ll email you as soon as you can connect your account.</strong></p>
@@ -4368,6 +4476,19 @@ input[type="number"],
       <div class="btn-row" style="justify-content:center;">
         <button class="btn btn-outline" type="button" id="cancelDeleteBtn">Cancel</button>
         <button class="btn danger-btn" type="button" id="confirmDeleteBtn">Delete account</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="attorney-onboarding-overlay" id="attorneyOnboardingOverlay" aria-hidden="true"></div>
+  <div class="attorney-onboarding-modal" id="attorneyOnboardingModal" role="dialog" aria-modal="true" aria-labelledby="attorneyOnboardingTitle" aria-hidden="true">
+    <button type="button" class="attorney-onboarding-close" data-onboarding-close aria-label="Close">×</button>
+    <div class="attorney-onboarding-hero" role="presentation"></div>
+    <div class="attorney-onboarding-content">
+      <div class="attorney-onboarding-title" id="attorneyOnboardingTitle">Let’s Get Started</div>
+      <p class="attorney-onboarding-text" id="attorneyOnboardingText">Step 1 of 3: Complete your profile, then click Save changes.</p>
+      <div class="attorney-onboarding-actions">
+        <button type="button" class="attorney-onboarding-btn primary" data-onboarding-continue>Continue</button>
       </div>
     </div>
   </div>

@@ -86,6 +86,15 @@ const casesRateLimiter = rateLimit({
 app.use("/api/cases", casesRateLimiter);
 app.use("/api/", rateLimit({ windowMs: 60 * 1000, max: 300 }));
 
+app.use("/api", (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res
+      .status(503)
+      .json({ error: "Service temporarily unavailable. Please try again shortly." });
+  }
+  next();
+});
+
 // 4) Routers
 const waitlistRouter = require("./routes/waitlist");
 const authRouter = require("./routes/auth");
@@ -156,6 +165,14 @@ app.get("/ping", (_req, res) => {
   res.json({ ping: "pong" });
 });
 
+app.get("/api/health", (_req, res) => {
+  const dbState = mongoose.connection.readyState;
+  res.status(dbState === 1 ? 200 : 503).json({
+    ok: dbState === 1,
+    db: dbState === 1 ? "connected" : "disconnected",
+  });
+});
+
 app.use((req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Pragma", "no-cache");
@@ -166,9 +183,6 @@ app.use((req, res, next) => {
 // 6) Static + SPA fallback
 app.use(express.static(PUBLIC_DIR));
 app.use(express.static(FRONTEND_DIR));
-app.get("/cases/:caseId/fund-escrow", (_req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/fund-escrow.html"));
-});
 app.get(/.*/, (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/index.html"));
 });
@@ -188,7 +202,11 @@ function connectWithRetry() {
     return;
   }
   mongoose
-    .connect(uri)
+    .connect(uri, {
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+      socketTimeoutMS: 20000,
+    })
     .then(() => console.log("✅ Connected to MongoDB Atlas"))
     .catch((err) => {
       console.error("❌ MongoDB Error:", err);

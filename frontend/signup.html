@@ -825,11 +825,44 @@
       }
       if (r === 'paralegal') attachResumeHandler();
     }
+    function resetSignupForm(nextRole) {
+      role = nextRole;
+      if (pendingTurnstileSignup) {
+        pendingTurnstileSignup = null;
+      }
+      submitLocked = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = defaultSubmitText;
+      }
+      if (form) {
+        form.reset();
+      }
+      if (emailEl) emailEl.value = localStorage.getItem('lastEmail') || '';
+      if (pw) pw.type = 'password';
+      if (pwConfirm) pwConfirm.type = 'password';
+      if (togglePw) togglePw.textContent = 'Show';
+      const tokenInput = form?.querySelector('input[name="cf-turnstile-response"]');
+      if (tokenInput) tokenInput.value = '';
+      if (window.turnstile?.reset) {
+        window.turnstile.reset();
+      }
+      say('');
+      setRole(nextRole);
+      goToStep(1);
+      updateSubmitState();
+    }
     setRole(role);
     goToStep(1);
 
-    btnA.addEventListener('click', () => setRole('attorney'));
-    btnP.addEventListener('click', () => setRole('paralegal'));
+    btnA.addEventListener('click', () => {
+      if (role === 'attorney') return;
+      resetSignupForm('attorney');
+    });
+    btnP.addEventListener('click', () => {
+      if (role === 'paralegal') return;
+      resetSignupForm('paralegal');
+    });
 
     togglePw.addEventListener('click', (e) => {
       e.preventDefault();

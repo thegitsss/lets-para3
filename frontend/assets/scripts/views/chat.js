@@ -6,12 +6,8 @@ import { requireAuth } from "../auth.js";
 
 let stylesInjected = false;
 const FUNDED_WORKSPACE_STATUSES = new Set([
-  "funded_in_progress",
   "in progress",
   "in_progress",
-  "active",
-  "awaiting_documents",
-  "reviewing",
 ]);
 
 export async function render(el, { escapeHTML, params: routeParams } = {}) {
@@ -114,6 +110,9 @@ function normalizeCaseStatus(value) {
   if (!trimmed) return "";
   const lower = trimmed.toLowerCase();
   if (lower === "in_progress") return "in progress";
+  if (["cancelled", "canceled"].includes(lower)) return "closed";
+  if (["assigned", "awaiting_funding"].includes(lower)) return "open";
+  if (["active", "awaiting_documents", "reviewing", "funded_in_progress"].includes(lower)) return "in progress";
   return lower;
 }
 

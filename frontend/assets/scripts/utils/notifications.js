@@ -9,6 +9,10 @@ const NOTIF_FADE_ITEM_KEY = "notifFadeItemBound";
 let lastKnownUnread = 0;
 let viewportResizeBound = false;
 let completedCaseCache = { role: "", ids: new Set(), ts: 0 };
+let notificationEventSource = null;
+let notificationStreamActive = false;
+let notificationRefreshTimer = null;
+let notificationReconnectTimer = null;
 
 function ensureNotificationStyles() {
   return;
@@ -380,6 +384,53 @@ function refreshNotificationCenters() {
   });
 }
 
+function scheduleNotificationRefresh() {
+  if (notificationRefreshTimer) return;
+  notificationRefreshTimer = window.setTimeout(() => {
+    notificationRefreshTimer = null;
+    if (centers.length) {
+      refreshNotificationCenters();
+    } else {
+      loadNotifications();
+    }
+  }, 200);
+}
+
+function stopNotificationStream() {
+  if (notificationEventSource) {
+    notificationEventSource.close();
+    notificationEventSource = null;
+  }
+  notificationStreamActive = false;
+  if (notificationReconnectTimer) {
+    clearTimeout(notificationReconnectTimer);
+    notificationReconnectTimer = null;
+  }
+}
+
+function startNotificationStream() {
+  if (notificationEventSource || typeof EventSource === "undefined") return false;
+  const source = new EventSource("/api/notifications/stream");
+  notificationEventSource = source;
+
+  const onError = () => {
+    notificationStreamActive = false;
+    stopNotificationStream();
+    if (!document.hidden) {
+      notificationReconnectTimer = window.setTimeout(startNotificationStream, 5000);
+    }
+  };
+
+  source.addEventListener("open", () => {
+    notificationStreamActive = true;
+  });
+  source.addEventListener("error", onError);
+  source.addEventListener("notifications", () => scheduleNotificationRefresh());
+  source.addEventListener("ping", () => {});
+
+  return true;
+}
+
 function createCenter(root) {
   const toggle = root.querySelector("[data-notification-toggle]");
   const panel = root.querySelector("[data-notification-panel]");
@@ -459,16 +510,21 @@ function togglePanel(center) {
   document.querySelectorAll("[data-notification-panel].show").forEach((panel) => {
     if (panel !== center.panel) panel.classList.remove("show");
   });
-  center.panel.classList.toggle("show", willShow);
-  center.panel.classList.toggle("hidden", !willShow);
-  if (willShow) {
-    scheduleNotificationListViewportSync(center.list);
-    if (!center.loaded) {
-      fetchNotifications(center, { markReadOnLoad: true });
-    } else {
-      markNotificationsRead(center);
-    }
+  if (!willShow) {
+    center.panel.classList.remove("show");
+    center.panel.classList.add("hidden");
+    center.panel.dataset.pendingShow = "";
+    return;
   }
+  if (!center.loaded) {
+    center.panel.classList.add("hidden");
+    center.panel.classList.remove("show");
+    center.panel.dataset.pendingShow = "true";
+    fetchNotifications(center, { markReadOnLoad: true, openAfterLoad: true });
+    return;
+  }
+  showPanel(center);
+  markNotificationsRead(center);
 }
 
 function preload(center) {
@@ -504,6 +560,11 @@ async function fetchNotifications(center, options = {}) {
     const total = totalUnread();
     lastKnownUnread = total;
     syncNotificationBadges(total);
+    if (options.openAfterLoad && center.panel?.dataset?.pendingShow === "true") {
+      center.panel.dataset.pendingShow = "";
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      showPanel(center);
+    }
     if (options.markReadOnLoad && center.unread > 0 && center.panel.classList.contains("show")) {
       await markNotificationsRead(center);
     }
@@ -512,7 +573,25 @@ async function fetchNotifications(center, options = {}) {
     renderEmpty(center, "Notifications unavailable.");
   } finally {
     center.loading = false;
+    if (center.panel?.dataset?.pendingShow === "true") {
+      center.panel.dataset.pendingShow = "";
+      requestAnimationFrame(() => requestAnimationFrame(() => showPanel(center)));
+    }
   }
+}
+
+function showPanel(center) {
+  if (!center?.panel) return;
+  document.querySelectorAll("[data-notification-panel].show").forEach((panel) => {
+    if (panel !== center.panel) {
+      panel.classList.remove("show");
+      panel.classList.add("hidden");
+      panel.dataset.pendingShow = "";
+    }
+  });
+  scheduleNotificationListViewportSync(center.list);
+  center.panel.classList.add("show");
+  center.panel.classList.remove("hidden");
 }
 
 function renderNotifications(center) {
@@ -681,13 +760,14 @@ function bindGlobalDismiss() {
 function bindMinimalToggleHandler() {
   document.addEventListener("click", (event) => {
     const toggle = event.target.closest("[data-notification-toggle]");
+    const root = toggle?.closest("[data-notification-center]");
+    if (root?.dataset?.boundNotificationCenter === "true") return;
     if (!toggle) {
       const panel = event.target.closest("[data-notification-panel]");
       if (panel) return;
       closeAllNotificationPanels();
       return;
     }
-    const root = toggle.closest("[data-notification-center]") || document;
     const panel =
       root.querySelector("[data-notification-panel]") ||
       toggle.parentElement?.querySelector("[data-notification-panel]");
@@ -828,7 +908,7 @@ function isEscrowLockedNotice(item = {}) {
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
-  return text.includes("escrow amount locked");
+  return text.includes("Case amount locked");
 }
 
 function resolveNotificationLink(item = {}) {
@@ -895,12 +975,29 @@ function resolveNotificationLink(item = {}) {
 }
 
 if (!notificationsOptOut) {
-  document.addEventListener("DOMContentLoaded", () => {
+  let notificationsBooted = false;
+  const bootNotifications = () => {
+    if (notificationsBooted) return;
+    notificationsBooted = true;
     ensureNotificationStyles();
     loadNotifications();
     initPushNotifications();
     bindMinimalToggleHandler();
-  });
+    startNotificationStream();
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && !notificationStreamActive) {
+        startNotificationStream();
+      }
+    });
+    window.addEventListener("beforeunload", () => {
+      stopNotificationStream();
+    });
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootNotifications);
+  } else {
+    bootNotifications();
+  }
 }
 
 async function initPushNotifications() {

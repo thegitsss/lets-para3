@@ -29,6 +29,7 @@ const STRIPE_APPROVAL_BYPASS_EMAILS = new Set([
 ]);
 const STRIPE_PAYOUT_BYPASS_EMAILS = new Set([
   "samanthasider+11@gmail.com",
+  "samanthasider+56@gmail.com",
   "game4funwithme1+1@gmail.com",
   "game4funwithme1@gmail.com",
 ]);
@@ -788,7 +789,7 @@ function buildParalegalReceiptPayload(caseDoc, payoutDoc) {
     ],
     totalLabel: "Net paid",
     totalAmount: formatCurrency(payoutAmount),
-    paymentMethod: "Escrow release",
+    paymentMethod: "Stripe release",
     paymentStatus: "Paid",
   };
 }
@@ -1028,11 +1029,11 @@ router.post(
       selectedCase.attorneyId ||
       selectedCase.attorney;
     if (String(attorneyId) !== String(req.user.id)) {
-      return res.status(403).json({ error: "Only the case attorney can fund escrow" });
+      return res.status(403).json({ error: "Only the case attorney can fund cases" });
     }
 
     if (!selectedCase.paralegal) {
-      return res.status(400).json({ error: "Hire a paralegal before funding escrow" });
+      return res.status(400).json({ error: "Hire a paralegal before funding the case" });
     }
     if (!selectedCase.attorney || !selectedCase.attorney.email) {
       return res.status(400).json({ error: "Attorney email is required to send the payment receipt" });
@@ -1041,7 +1042,7 @@ router.post(
     const amountToCharge = selectedCase.lockedTotalAmount;
     if (!amountToCharge || amountToCharge < 50) {
       return res.status(400).json({
-        error: "Escrow amount is not locked. Invite/accept/hire first.",
+        error: "Amount is not locked. Invite/accept/hire first.",
       });
     }
 
@@ -1065,7 +1066,7 @@ router.post(
         const tgMatches = existing.transfer_group && existing.transfer_group === `case_${selectedCase._id.toString()}`;
         if (!amountMatches || !tgMatches) {
           return res.status(400).json({
-            error: "Existing escrow intent does not match locked amount. Please cancel and retry.",
+            error: "Existing payment intent does not match locked amount. Please cancel and retry.",
           });
         }
         return res.json({ clientSecret: existing.client_secret, intentId: existing.id });
@@ -1173,11 +1174,11 @@ router.post(
     if (!c.paralegal.stripeOnboarded || !c.paralegal.stripePayoutsEnabled) {
       const refreshed = await ensureStripeOnboarded(c.paralegal);
       if (!refreshed) {
-        return res.status(400).json({ error: "Paralegal must complete Stripe Connect onboarding before payouts" });
+        return res.status(400).json({ error: "Payment method needs to be updated before funds can be released." });
       }
     }
     if (!c.paralegal.stripeOnboarded || !c.paralegal.stripePayoutsEnabled) {
-      return res.status(400).json({ error: "Paralegal must complete Stripe Connect onboarding before payouts" });
+      return res.status(400).json({ error: "Payment method needs to be updated before funds can be released." });
     }
 
     const budgetCents = Number((c.lockedTotalAmount ?? c.totalAmount) || 0);
@@ -1222,7 +1223,7 @@ router.post(
 
     const { transferable, charge } = stripe.isTransferablePaymentIntent(paymentIntent, { caseId: c._id });
     if (!transferable) {
-      return res.status(400).json({ error: "Escrow payment is not ready to release yet." });
+      return res.status(400).json({ error: "Payment is not ready to release yet." });
     }
 
     const transferPayload = {
@@ -1516,7 +1517,7 @@ router.patch(
 
     if (c.lockedTotalAmount != null) {
       return res.status(403).json({
-        error: "Escrow amount is locked and cannot be modified.",
+        error: "Case amount is locked and cannot be modified.",
       });
     }
     if (!isAdmin) {
@@ -1529,7 +1530,7 @@ router.patch(
         );
       if (c.paralegalId || c.pendingParalegalId || hasPendingInvites) {
         return res.status(403).json({
-          error: "Escrow amount is locked and cannot be modified.",
+          error: "Case amount is locked and cannot be modified.",
         });
       }
     }
@@ -1580,12 +1581,12 @@ router.post(
     // Only the attorney who owns the case (or admin) can fund escrow
     const attorneyRef = resolveAttorneyId(c);
     if (attorneyRef && String(attorneyRef) !== String(req.user.id) && req.user.role !== "admin") {
-      return res.status(403).json({ error: "Only the attorney can fund escrow" });
+      return res.status(403).json({ error: "Only the attorney can fund cases" });
     }
 
     const baseAmount = c.lockedTotalAmount;
     if (!baseAmount || baseAmount < 50) {
-      return res.status(400).json({ error: "Escrow amount is not locked. Cannot fund escrow." });
+      return res.status(400).json({ error: "Case amount is not locked. Cannot fund case." });
     }
     const attorneyPct = resolveAttorneyFeePct(c);
     const paralegalPct = resolveParalegalFeePct(c);
@@ -1684,10 +1685,10 @@ router.post(
 
     const attorneyRef = resolveAttorneyId(c);
     if (attorneyRef && String(attorneyRef) !== String(req.user.id) && req.user.role !== "admin") {
-      return res.status(403).json({ error: "Only the attorney can confirm escrow" });
+      return res.status(403).json({ error: "Only the attorney can confirm payments" });
     }
     if (!c.escrowIntentId) {
-      return res.status(400).json({ error: "No escrow payment intent found." });
+      return res.status(400).json({ error: "No payment intent found." });
     }
 
     let pi;
@@ -1819,7 +1820,7 @@ router.post(
     if (attorneyRef && String(attorneyRef) !== String(req.user.id) && req.user.role !== "admin") {
       return res.status(403).json({ error: "Only the attorney can release funds" });
     }
-    if (!c.escrowIntentId) return res.status(400).json({ error: "No funded escrow" });
+    if (!c.escrowIntentId) return res.status(400).json({ error: "No funded Stripe" });
     if (c.paymentReleased) return res.status(400).json({ error: "Already released" });
 
     let pi;
@@ -1827,9 +1828,9 @@ router.post(
       pi = await stripe.paymentIntents.retrieve(c.escrowIntentId);
     } catch (err) {
       console.error("[payments] release lookup failed", err?.message || err);
-      return res.status(502).json({ error: "Unable to verify escrow funding." });
+      return res.status(502).json({ error: "Unable to verify Stripe funding." });
     }
-    if (pi.status !== "succeeded") return res.status(400).json({ error: "Escrow not captured yet" });
+    if (pi.status !== "succeeded") return res.status(400).json({ error: "Stripe not captured yet" });
 
     const base = c.lockedTotalAmount ?? c.totalAmount;
     const attorneyFee = Math.max(0, Math.round((base * resolveAttorneyFeePct(c)) / 100));
@@ -1890,7 +1891,7 @@ router.post(
     if (finalCase && !hasActiveDispute(c)) {
       return res.status(400).json({ error: "Completed cases cannot be released outside dispute resolution." });
     }
-    if (!c.escrowIntentId) return res.status(400).json({ error: "No funded escrow" });
+    if (!c.escrowIntentId) return res.status(400).json({ error: "Not funded" });
 
     let pi;
     try {
@@ -1899,7 +1900,7 @@ router.post(
       console.error("[payments] payout intent lookup failed", err?.message || err);
       return res.status(502).json({ error: "Unable to verify escrow funding." });
     }
-    if (pi.status !== "succeeded") return res.status(400).json({ error: "Escrow not captured yet" });
+    if (pi.status !== "succeeded") return res.status(400).json({ error: "Stripe funding not captured yet" });
 
     const bypassPayouts = STRIPE_PAYOUT_BYPASS_EMAILS.has(normalizeEmail(c.paralegal?.email));
     if (!c.paralegal || !c.paralegal.stripeAccountId) {
@@ -1914,7 +1915,7 @@ router.post(
       if (!c.paralegal.stripeOnboarded || !c.paralegal.stripePayoutsEnabled) {
         const refreshed = await ensureStripeOnboarded(c.paralegal);
         if (!refreshed) {
-          return res.status(400).json({ error: "Paralegal must complete Stripe Connect onboarding before payouts" });
+          return res.status(400).json({ error: "Payment method needs to be updated before funds can be released." });
         }
       }
     }
@@ -2051,7 +2052,7 @@ router.post(
     const resolvedAt = new Date();
 
     if (action === "refund") {
-      if (!c.escrowIntentId) return res.status(400).json({ error: "No funded escrow" });
+      if (!c.escrowIntentId) return res.status(400).json({ error: "Not funded" });
 
       let refund = null;
       try {
@@ -2118,17 +2119,17 @@ router.post(
       return res.json({ ok: true, refundId: refund.id, refundAmount: refund.amount || 0 });
     }
 
-    if (!c.escrowIntentId) return res.status(400).json({ error: "No funded escrow" });
+    if (!c.escrowIntentId) return res.status(400).json({ error: "Not fundedd" });
 
     let pi;
     try {
       pi = await stripe.paymentIntents.retrieve(c.escrowIntentId);
     } catch (err) {
       console.error("[payments] dispute intent lookup failed", err?.message || err);
-      return res.status(502).json({ error: "Unable to verify escrow funding." });
+      return res.status(502).json({ error: "Unable to verify case funding." });
     }
     if (pi.status !== "succeeded") {
-      return res.status(400).json({ error: "Escrow payment is not ready to release yet." });
+      return res.status(400).json({ error: "Stripe payment is not ready to release yet." });
     }
 
     const bypassPayouts = STRIPE_PAYOUT_BYPASS_EMAILS.has(normalizeEmail(c.paralegal?.email));
@@ -2144,7 +2145,7 @@ router.post(
       if (!c.paralegal.stripeOnboarded || !c.paralegal.stripePayoutsEnabled) {
         const refreshed = await ensureStripeOnboarded(c.paralegal);
         if (!refreshed) {
-          return res.status(400).json({ error: "Paralegal must complete Stripe Connect onboarding before payouts" });
+          return res.status(400).json({ error: "Payment method needs to be updated before funds can be released." });
         }
       }
     }
@@ -2155,7 +2156,7 @@ router.post(
       return res.status(400).json({ error: "Settlement amount is invalid." });
     }
     if (settlementBase > baseAmount) {
-      return res.status(400).json({ error: "Settlement amount exceeds escrow." });
+      return res.status(400).json({ error: "Settlement amount exceeds case funding." });
     }
 
     const feeParalegalPct = resolveParalegalFeePct(c);
@@ -2346,7 +2347,7 @@ router.post(
     if (!hasResolvedDispute(c)) {
       return res.status(400).json({ error: "Refunds require admin-approved dispute resolution." });
     }
-    if (!c.escrowIntentId) return res.status(400).json({ error: "No funded escrow" });
+    if (!c.escrowIntentId) return res.status(400).json({ error: "Not funded" });
 
     const refund = await stripe.refunds.create({ payment_intent: c.escrowIntentId });
 

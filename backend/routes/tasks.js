@@ -20,7 +20,7 @@ function assertEscrowFunded(req, res) {
   const escrowId = req.case?.escrowIntentId;
   const escrowStatus = String(req.case?.escrowStatus || "").toLowerCase();
   if (escrowId && escrowStatus === "funded") return true;
-  res.status(403).json({ error: "Fund escrow to create or update tasks for this case." });
+  res.status(403).json({ error: "Fund case to create or update tasks for this case." });
   return false;
 }
 

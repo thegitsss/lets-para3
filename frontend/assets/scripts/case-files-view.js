@@ -6,12 +6,8 @@ let gatedEmpty = false;
 let actionsBound = false;
 
 const FUNDED_WORKSPACE_STATUSES = new Set([
-  "funded_in_progress",
   "in progress",
   "in_progress",
-  "active",
-  "awaiting_documents",
-  "reviewing",
 ]);
 
 export async function initCaseFilesView(config = {}) {
@@ -54,8 +50,12 @@ function normalizeCaseListPayload(payload) {
 function normalizeCaseStatus(status) {
   const value = String(status || "").trim();
   if (!value) return "";
-  if (value.toLowerCase() === "in_progress") return "in progress";
-  return value.toLowerCase();
+  const lower = value.toLowerCase();
+  if (lower === "in_progress") return "in progress";
+  if (["cancelled", "canceled"].includes(lower)) return "closed";
+  if (["assigned", "awaiting_funding"].includes(lower)) return "open";
+  if (["active", "awaiting_documents", "reviewing", "funded_in_progress"].includes(lower)) return "in progress";
+  return lower;
 }
 
 function isFundedWorkspaceCase(caseItem) {
@@ -307,8 +307,12 @@ function defaultFormatStatus(status) {
 function normalizeStatus(status) {
   const value = String(status || "").trim();
   if (!value) return "";
-  if (value.toLowerCase() === "in_progress") return "in progress";
-  return value;
+  const lower = value.toLowerCase();
+  if (lower === "in_progress") return "in progress";
+  if (["cancelled", "canceled"].includes(lower)) return "closed";
+  if (["assigned", "awaiting_funding"].includes(lower)) return "open";
+  if (["active", "awaiting_documents", "reviewing", "funded_in_progress"].includes(lower)) return "in progress";
+  return lower;
 }
 
 function getFileExtension(name) {

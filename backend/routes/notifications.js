@@ -3,10 +3,48 @@ const Notification = require("../models/Notification");
 const User = require("../models/User");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved } = require("../utils/authz");
+const { addSubscriber, publishNotificationEvent } = require("../utils/notificationEvents");
 
 const router = express.Router();
 
 router.use(verifyToken, requireApproved);
+
+// SSE stream for live notifications
+router.get("/stream", (req, res) => {
+  res.status(200);
+  res.set({
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  if (typeof res.flushHeaders === "function") {
+    res.flushHeaders();
+  }
+  if (req.socket) {
+    req.socket.setTimeout(0);
+    req.socket.setNoDelay(true);
+    req.socket.setKeepAlive(true);
+  }
+
+  res.write(`event: ready\ndata: ${JSON.stringify({ at: new Date().toISOString() })}\n\n`);
+  const unsubscribe = addSubscriber(req.user.id, res);
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(`event: ping\ndata: {}\n\n`);
+    } catch {
+      /* ignore */
+    }
+  }, 25000);
+
+  const cleanup = () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+  };
+  req.on("close", cleanup);
+  req.on("aborted", cleanup);
+  res.on("error", cleanup);
+});
 
 // Get all notifications for logged-in user
 router.get("/", async (req, res) => {
@@ -50,6 +88,7 @@ router.post("/:id/read", async (req, res) => {
       { _id: req.params.id, userId: req.user.id },
       { read: true, isRead: true }
     );
+    publishNotificationEvent(req.user.id, "notifications", { at: new Date().toISOString() });
     res.json({ success: true });
   } catch (err) {
     console.error("Failed to mark notification read:", err);
@@ -61,6 +100,7 @@ router.post("/:id/read", async (req, res) => {
 router.post("/read-all", async (req, res) => {
   try {
     await Notification.updateMany({ userId: req.user.id }, { read: true, isRead: true });
+    publishNotificationEvent(req.user.id, "notifications", { at: new Date().toISOString() });
     res.json({ success: true });
   } catch (err) {
     console.error("Failed to mark notifications read:", err);
@@ -72,6 +112,7 @@ router.post("/read-all", async (req, res) => {
 router.delete("/", async (req, res) => {
   try {
     await Notification.deleteMany({ userId: req.user.id });
+    publishNotificationEvent(req.user.id, "notifications", { at: new Date().toISOString() });
     res.json({ success: true });
   } catch (err) {
     console.error("Failed to clear notifications:", err);
@@ -84,6 +125,7 @@ router.delete("/:id", async (req, res) => {
   try {
     const result = await Notification.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
     if (!result) return res.status(404).json({ message: "Notification not found" });
+    publishNotificationEvent(req.user.id, "notifications", { at: new Date().toISOString() });
     res.json({ success: true });
   } catch (err) {
     console.error("Failed to delete notification:", err);

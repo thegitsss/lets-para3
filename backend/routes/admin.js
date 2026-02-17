@@ -326,7 +326,7 @@ function buildApprovalEmailHtml(user, opts = {}) {
             <td align="center" style="padding:0 32px 28px;">
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
                 Let's-ParaConnect was built to create a more reliable way for attorneys and paralegals to work together.
-                Every interaction on the platform is supported by verification and escrow-secured payments, helping set
+                Every interaction on the platform is supported by verification and Stripe-secured payments, helping set
                 clear expectations and protect both sides.
               </div>
             </td>

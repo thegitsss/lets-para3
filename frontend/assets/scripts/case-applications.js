@@ -95,8 +95,8 @@ function renderCase(data) {
     const hiredName = resolveParalegalName(data);
     setNotice(
       escrowFunded
-        ? `${hiredName} has been hired. Escrow is funded and work can begin.`
-        : `${hiredName} has been hired. Escrow funding is pending.`,
+        ? `${hiredName} has been hired. Case is funded and work can begin.`
+        : `${hiredName} has been hired. Case funding is pending.`,
       "success"
     );
   } else if (!isOpenCase) {
@@ -245,7 +245,7 @@ function bindApplicantActions() {
       if (!paralegalId || !state.caseId) return;
       const amountCents = Number(state.caseAmountCents || 0);
       if (!Number.isFinite(amountCents) || amountCents <= 0) {
-        setNotice("Escrow amount is unavailable for this case.", "error");
+        setNotice("Payment amount is unavailable for this case.", "error");
         return;
       }
       openHireConfirmModal({
@@ -262,7 +262,7 @@ function bindApplicantActions() {
           }
           try {
             await hireParalegal(state.caseId, paralegalId);
-            setNotice(`${paralegalName} has been hired. Escrow funded.`, "success");
+            setNotice(`${paralegalName} has been hired. Case funded through Stripe.`, "success");
           } catch (err) {
             if (hireBtn) {
               hireBtn.removeAttribute("disabled");
@@ -376,6 +376,13 @@ function ensureHireModalStyles() {
     .hire-confirm-row{display:flex;justify-content:space-between;gap:16px;font-size:0.95rem}
     .hire-confirm-row strong{font-weight:600}
     .hire-confirm-total{font-weight:600}
+    .hire-confirm-help{display:flex;justify-content:flex-end;margin-top:-4px}
+    .hire-confirm-info{width:24px;height:24px;border-radius:50%;border:1px solid rgba(15,23,42,.12);background:#fff;color:#6b7280;font-size:0.75rem;font-weight:250;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0;transition:border-color .2s ease,color .2s ease,transform .15s ease}
+    .hire-confirm-info:hover,
+    .hire-confirm-info:focus-visible{border-color:#b6a47a;color:#111827;transform:translateY(-1px)}
+    .hire-confirm-tooltip{position:absolute;right:0;bottom:calc(100% + 8px);width:min(320px,80vw);padding:10px 12px;border-radius:12px;background:#fff;border:1px solid rgba(15,23,42,.12);box-shadow:0 18px 40px rgba(0,0,0,.16);font-size:0.78rem;line-height:1.45;color:#111827;opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .15s ease,transform .15s ease;z-index:2}
+    .hire-confirm-info:hover .hire-confirm-tooltip,
+    .hire-confirm-info:focus-visible .hire-confirm-tooltip{opacity:1;pointer-events:auto;transform:translateY(0)}
     .hire-confirm-error{border:1px solid rgba(185,28,28,.4);background:rgba(254,242,242,.9);color:#991b1b;border-radius:10px;padding:8px 10px;font-size:0.9rem}
     .hire-confirm-success{border:1px solid rgba(22,163,74,.35);background:rgba(240,253,244,.9);color:#166534;border-radius:10px;padding:8px 10px;font-size:0.9rem}
     .hire-confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
@@ -386,6 +393,8 @@ function ensureHireModalStyles() {
 function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref, onConfirm }) {
   ensureHireModalStyles();
   const safeName = escapeHTML(paralegalName || "Paralegal");
+  const feeNote =
+    "Platform fee includes Stripe security, dispute protection, payment processing, and vetted paralegal access.";
   const feeRate = Number(feePct || 0);
   const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
   const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
@@ -394,7 +403,7 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   overlay.innerHTML = `
     <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
       <div class="hire-confirm-title" id="hireConfirmTitle">Confirm Hire</div>
-      <p>You’re about to hire ${safeName}. This will fund escrow immediately.</p>
+      <p>You’re about to hire ${safeName}. This will fund Stripe immediately.</p>
       <div class="hire-confirm-summary">
         <div class="hire-confirm-row">
           <span>Case amount</span>
@@ -409,8 +418,14 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
           <strong>${escapeHTML(formatCurrency(totalCents / 100))}</strong>
         </div>
       </div>
+      <div class="hire-confirm-help">
+        <button class="hire-confirm-info" type="button" aria-label="${escapeAttribute(feeNote)}">
+          ?
+          <span class="hire-confirm-tooltip" aria-hidden="true">${escapeHTML(feeNote)}</span>
+        </button>
+      </div>
       <div class="hire-confirm-error" data-hire-error hidden></div>
-      <div class="hire-confirm-success" data-hire-success hidden>Escrow funded. Work can begin.</div>
+      <div class="hire-confirm-success" data-hire-success hidden>Case funded. Work can begin.</div>
       <div class="hire-confirm-actions" data-hire-actions>
         <button class="btn ghost" type="button" data-hire-cancel>Cancel</button>
         <button class="btn primary" type="button" data-hire-confirm>Confirm &amp; Hire</button>
@@ -480,10 +495,15 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
 
 function formatCaseStatus(statusRaw, { hasParalegal = false, escrowFunded = false } = {}) {
   const key = String(statusRaw || "").trim().toLowerCase();
-  if (key === "awaiting_funding" || (hasParalegal && !escrowFunded && key !== "open")) {
-    return "Hired - Pending Funding";
+  if (!key) return "Posted";
+  if (["assigned", "awaiting_funding"].includes(key)) return "Posted";
+  if (["active", "awaiting_documents", "reviewing", "in_progress", "funded_in_progress"].includes(key)) {
+    return "In Progress";
   }
-  if (!key) return "Open";
+  if (key === "in progress") return "In Progress";
+  if (key === "completed") return "Completed";
+  if (key === "disputed") return "Disputed";
+  if (key === "closed") return "Closed";
   return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 

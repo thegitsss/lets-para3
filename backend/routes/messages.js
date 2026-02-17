@@ -12,6 +12,7 @@ const { notifyUser } = require("../utils/notifyUser");
 const { containsProfanity, maskProfanity } = require("../utils/badWords");
 const { CASE_STATE, normalizeCaseStatus, canUseWorkspace } = require("../utils/caseState");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
+const { publishCaseEvent } = require("../utils/caseEvents");
 
 // ----------------------------------------
 // CSRF (enabled in production or when ENABLE_CSRF=true)
@@ -229,10 +230,10 @@ function assertMessagingOpen(req, res) {
   if (!escrowFunded) {
     return res.status(403).json({ error: "Work begins once payment is secured." });
   }
-  if (!canUseWorkspace(caseDoc, { viewerId: req.user?.id })) {
-    if (["completed", "closed", "cancelled", "disputed"].includes(status)) {
-      return res.status(403).json({ error: "Messaging is closed for this case." });
-    }
+    if (!canUseWorkspace(caseDoc, { viewerId: req.user?.id })) {
+      if (["completed", "closed", "disputed"].includes(status)) {
+        return res.status(403).json({ error: "Messaging is closed for this case." });
+      }
     return res.status(403).json({ error: "Messaging unlocks once the case is funded and in progress." });
   }
   return null;
@@ -484,6 +485,7 @@ router.post(
       console.warn("[messages] notification creation failed", err);
     }
 
+    publishCaseEvent(caseId, "messages", { at: new Date().toISOString() });
     return res.status(201).json({ message: msg });
   })
 );
@@ -528,6 +530,7 @@ router.post(
       caseId: req.params.caseId,
     });
 
+    publishCaseEvent(req.params.caseId, "messages", { at: new Date().toISOString() });
     res.status(201).json({ message: msg });
   })
 );
@@ -572,6 +575,7 @@ router.post(
       caseId: req.params.caseId,
     });
 
+    publishCaseEvent(req.params.caseId, "messages", { at: new Date().toISOString() });
     res.status(201).json({ message: msg });
   })
 );
@@ -689,6 +693,7 @@ router.patch(
       meta: { edited: typeof content === "string", pinned: msg.pinned },
     });
 
+    publishCaseEvent(caseId, "messages", { at: new Date().toISOString() });
     res.json({ ok: true });
   })
 );
@@ -725,6 +730,7 @@ router.post(
       meta: { emoji },
     });
 
+    publishCaseEvent(caseId, "messages", { at: new Date().toISOString() });
     res.status(201).json({ ok: true });
   })
 );
@@ -756,6 +762,7 @@ router.delete(
       meta: { emoji: emoji || null },
     });
 
+    publishCaseEvent(caseId, "messages", { at: new Date().toISOString() });
     res.json({ ok: true });
   })
 );
@@ -795,6 +802,7 @@ router.delete(
       caseId,
     });
 
+    publishCaseEvent(caseId, "messages", { at: new Date().toISOString() });
     res.json({ ok: true });
   })
 );

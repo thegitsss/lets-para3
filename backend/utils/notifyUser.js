@@ -1,6 +1,7 @@
 const Notification = require("../models/Notification");
 const User = require("../models/User");
 const sendEmail = require("./email");
+const { publishNotificationEvent } = require("./notificationEvents");
 
 function buildDisplayMessage(type, payload = {}) {
   if (payload.message && typeof payload.message === "string") {
@@ -59,7 +60,7 @@ function buildDisplayMessage(type, payload = {}) {
       return `${actorName || "Someone"} uploaded ${fileName}${caseFragment || ""}`.trim();
     }
     case "case_budget_locked":
-      return `Escrow amount locked${caseFragment || ""}.`.trim();
+      return `Case amount locked${caseFragment || ""}.`.trim();
     default:
       return "You have a new notification.";
   }
@@ -119,7 +120,6 @@ function emailTemplate(type, payload) {
           process.env.EMAIL_BASE_URL || process.env.APP_BASE_URL || "https://www.lets-paraconnect.com";
         const assetBase = String(baseUrl).replace(/\/+$/, "").replace(/\/profile-settings\.html$/, "");
         const logoUrl = `${assetBase}/Cleanfav.png`;
-        const loginUrl = `${assetBase}/login.html`;
         const html = `
         <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
           <tr>
@@ -144,23 +144,10 @@ function emailTemplate(type, payload) {
                     <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;text-align:left;">
                       Hi &mdash;<br><br>
                       Great news — your profile photo was approved and is now live on your attorney-facing profile.<br><br>
-                      Your profile is now visible to attorneys, and you can log in anytime to make updates.<br><br>
+                      Your profile is now visible to attorneys. Log in anytime to make updates.<br><br>
                       Best,<br>
                       Let&rsquo;s-ParaConnect Team
                     </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td align="center" style="padding:8px 32px 28px;">
-                    <table cellpadding="0" cellspacing="0" border="0">
-                      <tr>
-                        <td bgcolor="#ffbd59" style="border-radius:999px;">
-                          <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
-                            Login
-                          </a>
-                        </td>
-                      </tr>
-                    </table>
                   </td>
                 </tr>
               </table>
@@ -202,42 +189,41 @@ function emailTemplate(type, payload) {
     case "application_accepted":
       return {
         subject: "Application accepted",
-        html: `<p>Your application${payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>` : ""} was accepted.</p><p>${payload.link ? `<a href="${payload.link}">Open the case</a>` : "Log in to view details."}</p>`,
+        html: `<p>Your application${payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>` : ""} was accepted.</p><p>Log in to view details.</p>`,
       };
     case "application_denied":
       return {
         subject: "Application update",
-        html: `<p>Your application${payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>` : ""} was not selected.</p><p>${payload.link ? `<a href="${payload.link}">Browse jobs</a>` : "Log in to explore other opportunities."}</p>`,
+        html: `<p>Your application${payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>` : ""} was not selected.</p><p>Log in to explore other opportunities.</p>`,
       };
     case "case_awaiting_funding":
       return {
         subject: `Fund ${payload.caseTitle || "your case"}`,
-        html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is awaiting funding.</p><p>${payload.link ? `<a href="${payload.link}">Open the case to fund now.</a>` : "Please fund the case to continue."}</p>`,
+        html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is awaiting funding.</p><p>Please fund the case to continue.</p>`,
       };
     case "payout_released":
       return {
         subject: "Your payout is on the way",
-        html: `<p>Your payout${payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>` : ""} is on the way${payload.amount ? ` (${payload.amount})` : ""}.</p><p>${payload.link ? `<a href="${payload.link}">Open the case</a>` : "Log in to view details."}</p>`,
+        html: `<p>Your payout${payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>` : ""} is on the way${payload.amount ? ` (${payload.amount})` : ""}.</p><p>Log in to view details.</p>`,
       };
     case "case_work_ready":
       return {
         subject: `Work can begin on ${payload.caseTitle || "your case"}`,
-        html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is funded and ready to begin.</p><p>${payload.link ? `<a href="${payload.link}">Open the case</a>` : "Log in to get started."}</p>`,
+        html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is funded and ready to begin.</p><p>Log in to get started.</p>`,
       };
     case "case_file_uploaded":
       return {
         subject: `New document on ${payload.caseTitle || "your case"}`,
-        html: `<p>${payload.fileName || "A document"} was uploaded${payload.caseTitle ? ` to <strong>${payload.caseTitle}</strong>` : ""}.</p><p>${payload.link ? `<a href="${payload.link}">Open the case</a>` : "Log in to view the document."}</p>`,
+        html: `<p>${payload.fileName || "A document"} was uploaded${payload.caseTitle ? ` to <strong>${payload.caseTitle}</strong>` : ""}.</p><p>Log in to view the document.</p>`,
       };
     case "dispute_resolved": {
       const title = payload.caseTitle || "the case";
       const resolution = payload.resolutionLabel || payload.resolution || "Resolution";
       const receiptNote =
         payload.receiptNote || "A receipt is available in your dashboard with full payment details.";
-      const link = payload.link ? `<p><a href="${payload.link}">View receipt</a></p>` : "";
       return {
         subject: `Dispute resolved${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
-        html: `<p>${payload.message || `The dispute for <strong>${title}</strong> was resolved.`}</p><p>Resolution: ${resolution}.</p><p>${receiptNote}</p>${link}`,
+        html: `<p>${payload.message || `The dispute for <strong>${title}</strong> was resolved.`}</p><p>Resolution: ${resolution}.</p><p>${receiptNote}</p>`,
       };
     }
     default:
@@ -304,6 +290,12 @@ const CASE_EMAIL_TYPES = new Set([
   "dispute_resolved",
 ]);
 
+const MESSAGE_EMAIL_SUPPRESS_MINUTES = Number(process.env.MESSAGE_EMAIL_SUPPRESS_MINUTES || 120);
+const MESSAGE_EMAIL_SUPPRESS_MS =
+  Number.isFinite(MESSAGE_EMAIL_SUPPRESS_MINUTES) && MESSAGE_EMAIL_SUPPRESS_MINUTES > 0
+    ? MESSAGE_EMAIL_SUPPRESS_MINUTES * 60 * 1000
+    : 120 * 60 * 1000;
+
 function normalizePrefs(user) {
   const prefs = user?.notificationPrefs;
   if (!prefs) return {};
@@ -312,12 +304,35 @@ function normalizePrefs(user) {
   return prefs;
 }
 
-function shouldSendEmailForType(user, type) {
+function getLastViewedAt(user, caseId) {
+  if (!user || !caseId) return null;
+  const map = user.messageLastViewedAt;
+  if (map && typeof map.get === "function") {
+    return map.get(String(caseId)) || null;
+  }
+  if (map && typeof map === "object") {
+    return map[String(caseId)] || null;
+  }
+  return null;
+}
+
+function shouldSuppressMessageEmail(user, payload = {}) {
+  if (!payload?.caseId) return false;
+  const lastViewed = getLastViewedAt(user, payload.caseId);
+  if (!lastViewed) return false;
+  const viewedAt = new Date(lastViewed).getTime();
+  if (Number.isNaN(viewedAt)) return false;
+  return Date.now() - viewedAt < MESSAGE_EMAIL_SUPPRESS_MS;
+}
+
+function shouldSendEmailForType(user, type, payload = {}) {
   const prefs = normalizePrefs(user);
   if (type === "case_budget_locked") return false;
   if (type === "profile_photo_rejected") return false;
   if (prefs.email === false) return false;
   if (type === "message") {
+    if (payload?.suppressEmail) return false;
+    if (shouldSuppressMessageEmail(user, payload)) return false;
     return prefs.emailMessages !== false;
   }
   if (CASE_EMAIL_TYPES.has(type)) {
@@ -382,9 +397,10 @@ async function notifyUser(userId, type, payload = {}, options = {}) {
       isRead: false,
       createdAt: new Date(),
     });
+    publishNotificationEvent(userId, "notifications", { at: new Date().toISOString() });
   }
 
-  if (shouldSendEmailForType(user, type)) {
+  if (shouldSendEmailForType(user, type, payload)) {
     const { subject, html } = emailTemplate(type, payload);
     await safeSendEmail(user.email, subject, html);
   }
@@ -425,6 +441,7 @@ async function createNotification({
     isRead: false,
     createdAt: new Date(),
   });
+  publishNotificationEvent(userId, "notifications", { at: new Date().toISOString() });
   return notif;
 }
 

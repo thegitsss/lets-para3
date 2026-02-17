@@ -50,7 +50,7 @@ function draw(root, payload, escapeHTML) {
     { label: "Active cases", value: metrics.activeCases ?? 0 },
     { label: "Open postings", value: metrics.openJobs ?? 0 },
     { label: "Pending applications", value: metrics.pendingApplications ?? 0 },
-    { label: "Funds in escrow", value: formatCurrency(metrics.escrowTotal) },
+    { label: "Funds in Stripe", value: formatCurrency(metrics.escrowTotal) },
   ]
     .map(
       (m) => `

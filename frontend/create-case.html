@@ -689,6 +689,46 @@ body.theme-dark .select-field select{
       gap:0.35rem;
     }
 
+    .compliance-note{
+      border:1px solid rgba(180,151,90,0.25);
+      border-radius:var(--radius);
+      padding:1.35rem;
+      background:#f7f4ec;
+      display:grid;
+      gap:0.85rem;
+    }
+
+    .compliance-note h3{
+      margin:0;
+      font-family:var(--font-serif);
+      font-size:1.1rem;
+      font-weight:300;
+      color:var(--ink);
+    }
+
+    .compliance-note ul{
+      margin:0 0 0 1.1rem;
+      padding:0;
+      display:flex;
+      flex-direction:column;
+      gap:0.4rem;
+      font-size:0.92rem;
+      line-height:1.5;
+      color:#5f5542;
+    }
+
+    .compliance-ack{
+      display:flex;
+      gap:0.65rem;
+      align-items:flex-start;
+      font-size:0.92rem;
+      color:var(--ink);
+    }
+
+    .compliance-ack input{
+      margin-top:2px;
+    }
+
     .case-title-preview{
       display:flex;
       flex-direction:column;
@@ -1378,6 +1418,16 @@ body.theme-dark .select-field select{
         <p>Gathering your case details…</p>
       </section>
 
+      <section class="compliance-note" aria-label="Platform disclosures">
+        <h3>Platform Disclosures</h3>
+        <ul>
+          <li>No clients are permitted on the platform. Communication here is attorney-to-paralegal only.</li>
+          <li>Paralegal work must be supervised by the attorney. The attorney remains responsible for all work product.</li>
+          <li>Let&rsquo;s-ParaConnect does not provide legal services or legal advice.</li>
+          <li>Payments are handled by Stripe; Let&rsquo;s-ParaConnect does not hold client funds.</li>
+        </ul>
+      </section>
+
       <div class="actions">
         <button type="button" class="btn secondary" data-step-switch="description">Back</button>
         <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html#cases:draft" data-save-draft="true">Save &amp; Exit</button>
@@ -1906,6 +1956,7 @@ body.theme-dark .select-field select{
     let currentDraftId = !isEditing ? draftIdParam : "";
     const DRAFT_AUTOSAVE_MS = 1600;
     const DRAFT_SAVE_ERROR_BACKOFF_MS = 3000;
+    const EDIT_PREFILL_KEY = "lpc_case_edit_prefill";
     let draftLoaded = false;
     let draftSaveTimer = null;
     let draftSavePending = false;
@@ -2953,13 +3004,13 @@ body.theme-dark .select-field select{
         const caseId = created?.id || created?._id || editingCaseId;
         // Jobs are now mirrored automatically when a case is created on the backend.
         const href = caseId
-          ? isEditing
-            ? `case-detail.html?caseId=${encodeURIComponent(caseId)}`
-            : `dashboard-attorney.html?previewCaseId=${encodeURIComponent(caseId)}#cases`
+          ? `dashboard-attorney.html?previewCaseId=${encodeURIComponent(caseId)}#cases`
           : "dashboard-attorney.html#cases";
         showToast(
           isEditing ? "Your changes have been saved." : "Your case has been posted and is now open to applications.",
-          href
+          href,
+          false,
+          isEditing ? "View Details" : "View Case"
         );
       } catch (err) {
         console.error(err);
@@ -3007,13 +3058,99 @@ body.theme-dark .select-field select{
       if (previewBtn) previewBtn.textContent = "Preview Updates";
     }
 
+    function titleCaseWords(value = "") {
+      return String(value)
+        .toLowerCase()
+        .split(/\s+/)
+        .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : ""))
+        .join(" ")
+        .trim();
+    }
+
     function setSelectValue(select, value) {
       if (!select || !value) return;
-      const target = value.toString().toLowerCase();
+      const raw = value.toString().trim();
+      const target = raw.toLowerCase();
       const match = Array.from(select.options).find(
         (opt) => opt.value.toLowerCase() === target || opt.textContent.toLowerCase() === target
       );
-      if (match) select.value = match.value;
+      if (match) {
+        select.value = match.value;
+        return;
+      }
+      const option = document.createElement("option");
+      option.value = raw;
+      option.textContent = /[a-z]/i.test(raw) ? titleCaseWords(raw) : raw;
+      select.appendChild(option);
+      select.value = option.value;
+    }
+
+    function extractDescriptionFromCase(caseData = {}) {
+      const raw = caseData.details || caseData.description || "";
+      if (raw) return raw;
+      const summary = String(caseData.briefSummary || "").trim();
+      if (!summary) return "";
+      if (/^state:/i.test(summary) || summary.includes("Engagement:") || summary.includes("Experience:")) {
+        return "";
+      }
+      return summary;
+    }
+
+    function extractStateFromSummary(summary = "") {
+      const match = String(summary).match(/State:\s*([^•]+)/i);
+      if (!match) return "";
+      return String(match[1] || "").trim();
+    }
+
+    function consumeEditPrefill(caseId) {
+      if (!caseId) return null;
+      try {
+        const raw = sessionStorage.getItem(EDIT_PREFILL_KEY);
+        if (!raw) return null;
+        const payload = JSON.parse(raw);
+        if (!payload || String(payload.caseId) !== String(caseId)) return null;
+        sessionStorage.removeItem(EDIT_PREFILL_KEY);
+        return payload.payload || null;
+      } catch {
+        return null;
+      }
+    }
+
+    function mergeEditPrefill(prefill, data) {
+      if (!prefill) return data;
+      const summary = data?.briefSummary || prefill?.briefSummary || "";
+      const merged = {
+        ...prefill,
+        ...data,
+      };
+      merged.practiceArea = data?.practiceArea || prefill?.practiceArea || "";
+      const stateValue =
+        data?.locationState ||
+        data?.state ||
+        prefill?.locationState ||
+        prefill?.state ||
+        extractStateFromSummary(summary);
+      merged.state = stateValue;
+      merged.locationState = stateValue;
+      merged.details =
+        data?.details ||
+        data?.description ||
+        prefill?.details ||
+        prefill?.description ||
+        "";
+      merged.tasks =
+        Array.isArray(data?.tasks) && data.tasks.length
+          ? data.tasks
+          : Array.isArray(prefill?.tasks)
+          ? prefill.tasks
+          : [];
+      merged.totalAmount =
+        typeof data?.totalAmount === "number"
+          ? data.totalAmount
+          : typeof prefill?.totalAmount === "number"
+          ? prefill.totalAmount
+          : data?.totalAmount || prefill?.totalAmount || 0;
+      return merged;
     }
 
     function applyCaseDataToForm(caseData = {}) {
@@ -3022,7 +3159,9 @@ body.theme-dark .select-field select{
         updateTitlePreview(fields.title.value);
       }
       setSelectValue(fields.specialty, caseData.practiceArea || caseData.field);
-      setSelectValue(fields.state, caseData.locationState || caseData.state);
+      const stateValue =
+        caseData.locationState || caseData.state || extractStateFromSummary(caseData.briefSummary || "");
+      setSelectValue(fields.state, stateValue);
       const amountCents = Number.isFinite(caseData.lockedTotalAmount)
         ? caseData.lockedTotalAmount
         : Number(caseData.totalAmount) || 0;
@@ -3040,7 +3179,7 @@ body.theme-dark .select-field select{
       if (fields.experience && caseData.experience) {
         setSelectValue(fields.experience, caseData.experience);
       }
-      const details = caseData.details || caseData.description || "";
+      const details = extractDescriptionFromCase(caseData);
       if (descriptionInput) {
         descriptionInput.value = details;
         updateDescriptionCount();
@@ -3064,6 +3203,10 @@ body.theme-dark .select-field select{
 
     async function loadExistingCase() {
       if (!editingCaseId) return;
+      const prefill = consumeEditPrefill(editingCaseId);
+      if (prefill) {
+        applyCaseDataToForm(prefill);
+      }
       try {
         const token = (window.getSessionToken && window.getSessionToken()) || "";
         const res = await fetch(`/api/cases/${encodeURIComponent(editingCaseId)}`, {
@@ -3076,10 +3219,13 @@ body.theme-dark .select-field select{
           const statusNote = res.status ? ` (HTTP ${res.status})` : "";
           throw new Error(message || `Unable to load this case for editing.${statusNote}`);
         }
-        applyCaseDataToForm(data);
+        const merged = mergeEditPrefill(prefill, data);
+        applyCaseDataToForm(merged);
       } catch (err) {
         console.warn("Edit case load failed", err);
-        showToastBanner(err?.message || "Unable to load this case for editing.", "error");
+        if (!prefill) {
+          showToastBanner(err?.message || "Unable to load this case for editing.", "error");
+        }
       }
     }
 

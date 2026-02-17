@@ -9,17 +9,11 @@ const STATUS_IN_PROGRESS = "in progress";
 const LEGACY_STATUS_IN_PROGRESS = "in_progress";
 
 const CASE_STATUS = [
-  "open",                // posted and visible
-  "assigned",            // paralegal chosen, not started
-  "awaiting_funding",    // paralegal accepted, funding pending
-  "active",              // work started (legacy alias)
-  "awaiting_documents",  // pending uploads/info
-  "reviewing",           // under review
-  STATUS_IN_PROGRESS,     // work underway
-  "completed",           // work marked complete
-  "disputed",            // dispute opened
-  "cancelled",           // cancelled matter
-  "closed",              // final closed state
+  "open",            // posted and visible
+  STATUS_IN_PROGRESS, // work underway
+  "completed",       // work marked complete
+  "disputed",        // dispute opened
+  "closed",          // final closed state
 ];
 
 const CASE_STATUS_ENUM = [...CASE_STATUS, LEGACY_STATUS_IN_PROGRESS];
@@ -48,6 +42,9 @@ function normalizeCaseStatus(value) {
   if (!normalized) return "";
   const lower = normalized.toLowerCase();
   if (lower === LEGACY_STATUS_IN_PROGRESS) return STATUS_IN_PROGRESS;
+  if (["cancelled", "canceled"].includes(lower)) return "closed";
+  if (["assigned", "awaiting_funding"].includes(lower)) return "open";
+  if (["active", "awaiting_documents", "reviewing"].includes(lower)) return STATUS_IN_PROGRESS;
   return lower;
 }
 
@@ -354,16 +351,10 @@ caseSchema.pre("save", function (next) {
  * -----------------------------------------*/
 // Enforce simple status transitions to avoid accidental jumps
 const ALLOWED_TRANSITIONS = {
-  open: ["assigned", "awaiting_funding", "active", "awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
-  assigned: ["awaiting_funding", "active", "awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
-  awaiting_funding: ["active", "awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "cancelled", "closed"],
-  active: ["awaiting_documents", "reviewing", STATUS_IN_PROGRESS, "completed", "cancelled", "closed"],
-  awaiting_documents: ["reviewing", STATUS_IN_PROGRESS, "completed", "cancelled", "closed"],
-  reviewing: [STATUS_IN_PROGRESS, "completed", "cancelled", "closed"],
-  [STATUS_IN_PROGRESS]: ["completed", "disputed", "cancelled", "closed"],
+  open: [STATUS_IN_PROGRESS, "closed"],
+  [STATUS_IN_PROGRESS]: ["completed", "disputed", "closed"],
   completed: ["disputed", "closed"],
   disputed: ["closed"],
-  cancelled: [],
   closed: [],
 };
 
@@ -416,8 +407,6 @@ caseSchema.methods.acceptApplicant = function (paralegalId) {
   if (idx === -1) throw new Error("Applicant not found.");
   this.applicants[idx].status = "accepted";
   this.paralegal = paralegalId;
-  // Move to assigned if not already beyond
-  if (["open"].includes(this.status)) this.status = "assigned";
   return this;
 };
 

@@ -15,6 +15,7 @@ const Notification = require("../models/Notification");
 const AuditLog = require("../models/AuditLog"); // audit trail hooks
 const sendEmail = require("../utils/email");
 const { getAppSettings } = require("../utils/appSettings");
+const { publishNotificationEvent } = require("../utils/notificationEvents");
 
 const IS_PROD = process.env.NODE_ENV === "production" || process.env.PROD === "true";
 const TWO_FACTOR_ENABLED = String(process.env.ENABLE_TWO_FACTOR || "").toLowerCase() === "true";
@@ -396,6 +397,7 @@ async function ensureParalegalWelcomeNotification(user) {
     isRead: false,
     createdAt: new Date(),
   });
+  publishNotificationEvent(user._id, "notifications", { at: new Date().toISOString() });
 }
 
 function signAccess(user) {
@@ -638,6 +640,9 @@ router.post(
       password: String(password),
       role: roleLc,
       status: "pending",
+      preferences: {
+        theme: roleLc === "attorney" ? "light" : "mountain",
+      },
       barNumber: roleLc === "attorney" ? String(barNumber || "") : "",
       resumeURL: roleLc === "paralegal" ? "" : "",
       certificateURL: roleLc === "paralegal" ? String(certificateURL || "") : "",

@@ -198,12 +198,13 @@
     <p>These Terms & Conditions (“Terms”) govern your use of the Let’s‑ParaConnect platform (the “Platform”) operated by Let’s‑ParaConnect (“Company,” “we,” “us,” or “our”). By creating an account or using the Platform, you agree to these Terms and to our <a class="privacy-inline-link" href="privacy.html" style="text-decoration:none;">Privacy Policy</a>.</p>
 
     <p><em>We are not a law firm and do not provide legal services or legal advice.</em> The Platform enables Attorneys to engage independent Paralegals. All legal work and outcomes are solely between those users.</p>
+    <p>No clients are permitted on the Platform, and communication here is strictly attorney‑to‑paralegal. Attorneys remain responsible for supervising all paralegal work and work product.</p>
 
     <h2>Table of Contents</h2>
     <ul class="toc-list">
       <li><a href="#eligibility">1. Eligibility & Accounts</a></li>
       <li><a href="#roles">2. Roles & Responsibilities</a></li>
-      <li><a href="#payments">3. Jobs, Escrow & Payments (Stripe)</a></li>
+      <li><a href="#payments">3. Jobs,Stripe & Payments (Stripe)</a></li>
       <li><a href="#delivery">4. Delivery, Approval & Disputes</a></li>
       <li><a href="#fees">5. Fees, Taxes & Chargebacks</a></li>
       <li><a href="#files">6. Confidentiality, Files & IP</a></li>
@@ -235,10 +236,10 @@
     </section>
 
     <section id="payments" class="card">
-      <h2>3) Jobs, Escrow & Payments (Stripe)</h2>
+      <h2>3) Cases & Payments (Stripe)</h2>
       <p>The Platform uses Stripe to process and disburse funds:</p>
       <ol class="alpha">
-        <li><strong>Funding Escrow.</strong> When an Attorney posts a flat-fee job, payment is authorized via Stripe Checkout. Funds are charged and held for that job (“Escrow”). We store Stripe IDs and set a shared transfer to link later payout.</li>
+        <li><strong>Funding Stripe.</strong> When an Attorney posts a flat-fee job, payment is authorized via Stripe Checkout. Funds are charged and held for that job ("Payment"). We store Stripe IDs and set a shared transfer to link later payout.</li>
         <li><strong>Release & Payout.</strong> On Attorney approval/marking complete, we create a Stripe <em>Transfer</em> to the Paralegal’s Stripe Connect account (less applicable platform fees) using the same <code class="small">transfer_group</code>. If the Paralegal hasn’t completed Connect onboarding, payout is delayed until completion.</li>
         <li><strong>Payment Model.</strong> Jobs are flat-fee by default unless expressly offered otherwise in the posting flow.</li>
         <li><strong>Currency & Timing.</strong> Charges are processed in the currency shown at checkout (typically USD). Stripe processing and banking timelines apply.</li>
@@ -295,7 +296,7 @@
         Attorneys and Paralegal Professionals may not collaborate outside of
         Let’s-ParaConnect without written authorization. A mandatory buyout fee
         of $10,000 applies to any off-platform engagement, of which $5,000 is
-        credited to the attorney’s escrow balance for on-platform use for one
+        credited to the attorney’s Stripe balance for on-platform use for one
         calendar year. Violations may result in legal action and account suspension.
       </p>
     </section>

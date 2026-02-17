@@ -164,7 +164,7 @@ export async function render(el) {
           <details>
             <summary>Payments or release issues</summary>
             <div class="muted" style="margin-top:8px;">
-              If a case was marked complete but payout hasn’t appeared, include the Case ID in your email. We’ll confirm the escrow and transfer status.
+              If a case was marked complete but payout hasn’t appeared, include the Case ID in your email. We’ll confirm the funds and transfer status.
             </div>
           </details>
 

@@ -62,6 +62,13 @@ async function fetchCsrfToken() {
   }
 }
 
+function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  const signal = options.signal || controller.signal;
+  return fetch(url, { ...options, signal }).finally(() => clearTimeout(id));
+}
+
 const initLogin = () => {
   const toastHelper = window.toastUtils;
   const stagedSignupToast = sessionStorage.getItem("signupToast");
@@ -106,6 +113,19 @@ const initLogin = () => {
     }
   };
 
+  const checkHealth = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/health`, { credentials: "include" });
+      if (!res.ok) {
+        notify("Service is temporarily unavailable. Please try again shortly.");
+      }
+    } catch {
+      notify("Unable to reach the server. Please check your connection.");
+    }
+  };
+
+  checkHealth();
+
   const showTwoFactorPanel = (email) => {
     pendingTwoFactorEmail = email || pendingTwoFactorEmail;
     if (twoFactorMessage) {
@@ -147,7 +167,7 @@ const initLogin = () => {
         loginButton.textContent = "Logging in…";
       }
       const csrfToken = await fetchCsrfToken();
-      const res = await fetch(`${API_BASE}/auth/login`, {
+      const res = await fetchWithTimeout(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -188,7 +208,11 @@ const initLogin = () => {
     } catch (err) {
       console.error(err);
       clearLocalSession();
-      notify("Network error during login");
+      if (err?.name === "AbortError") {
+        notify("Login timed out. Please try again.");
+      } else {
+        notify("Network error during login");
+      }
     } finally {
       if (shouldRestoreButton) {
         restoreLoginButton(originalLabel);
@@ -241,7 +265,7 @@ const initLogin = () => {
       try {
         const csrfToken = await fetchCsrfToken();
         const endpoint = useBackupCode ? "/auth/2fa-backup" : "/auth/2fa-verify";
-        const res = await fetch(`${API_BASE}${endpoint}`, {
+        const res = await fetchWithTimeout(`${API_BASE}${endpoint}`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -269,6 +293,14 @@ const initLogin = () => {
           window.location.href = "dashboard-attorney.html";
         }
       } catch (err) {
+        if (err?.name === "AbortError") {
+          if (toastHelper) {
+            toastHelper.show("Verification timed out. Try again.", { targetId: "toastBanner", type: "err" });
+          } else {
+            alert("Verification timed out. Try again.");
+          }
+          return;
+        }
         if (toastHelper) {
           toastHelper.show("Verification error. Try again.", { targetId: "toastBanner", type: "err" });
         } else {

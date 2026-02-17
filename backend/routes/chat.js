@@ -51,7 +51,7 @@ function assertMessagingOpen(caseDoc) {
   if (!escrowFunded) return "Work begins once payment is secured.";
   if (!canUseWorkspace(caseDoc)) {
     const status = normalizeCaseStatus(caseDoc.status);
-    if (["completed", "closed", "cancelled", "disputed"].includes(status)) {
+    if (["completed", "closed", "disputed"].includes(status)) {
       return "Messaging is closed for this case.";
     }
     return "Messaging unlocks once the case is funded and in progress.";

@@ -1789,7 +1789,7 @@ async function handleHireForCase() {
   }
   const amountCents = Number(caseDetails?.lockedTotalAmount ?? caseDetails?.totalAmount ?? 0);
   if (!Number.isFinite(amountCents) || amountCents <= 0) {
-    showToast("Escrow amount is unavailable for this case.", "error");
+    showToast("Payment amount is unavailable for this case.", "error");
     return;
   }
   const paralegalName = formatName(state.profileUser || {});
@@ -1885,6 +1885,13 @@ function ensureHireModalStyles() {
     .hire-confirm-row span{text-transform:uppercase;font-size:0.75rem;letter-spacing:0.08em;color:#6b7280;font-weight:300}
     .hire-confirm-row strong{font-size:1.3rem;font-weight:300;color:#1a1a1a}
     .hire-confirm-total strong{font-weight:400}
+    .hire-confirm-help{display:flex;justify-content:flex-end;margin-top:-6px}
+    .hire-confirm-info{width:26px;height:26px;border-radius:50%;border:1px solid rgba(0,0,0,0.08);background:#fff;color:#94a3b8;font-size:0.8rem;font-weight:250;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0;transition:border-color .2s ease,color .2s ease,transform .15s ease}
+    .hire-confirm-info:hover,
+    .hire-confirm-info:focus-visible{border-color:#b6a47a;color:#1a1a1a;transform:translateY(-1px)}
+    .hire-confirm-tooltip{position:absolute;right:0;bottom:calc(100% + 10px);width:min(320px,80vw);padding:12px 14px;border-radius:12px;background:#fff;border:1px solid rgba(0,0,0,0.08);box-shadow:0 18px 40px rgba(0,0,0,.18);font-size:0.78rem;line-height:1.45;color:#1a1a1a;opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .15s ease,transform .15s ease;z-index:2}
+    .hire-confirm-info:hover .hire-confirm-tooltip,
+    .hire-confirm-info:focus-visible .hire-confirm-tooltip{opacity:1;pointer-events:auto;transform:translateY(0)}
     .hire-confirm-error{border:1px solid rgba(185,28,28,.4);background:rgba(254,242,242,.9);color:#991b1b;border-radius:10px;padding:8px 10px;font-size:0.9rem}
     .hire-confirm-success{border:1px solid rgba(22,163,74,.35);background:rgba(240,253,244,.9);color:#166534;border-radius:10px;padding:8px 10px;font-size:0.9rem}
     .hire-confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:4px;flex-wrap:wrap}
@@ -1899,6 +1906,8 @@ function ensureHireModalStyles() {
 function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref, onConfirm }) {
   ensureHireModalStyles();
   const safeName = escapeHtml(paralegalName || "Paralegal");
+  const feeNote =
+    "Platform fee includes Stripe security, dispute protection, payment processing, and vetted paralegal access.";
   const feeRate = Number(feePct || 0);
   const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
   const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
@@ -1907,7 +1916,7 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   overlay.innerHTML = `
     <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
       <div class="hire-confirm-title" id="hireConfirmTitle">Confirm Hire</div>
-      <p>You're about to hire ${safeName}. This will fund escrow immediately.</p>
+      <p>You're about to hire ${safeName}. This will fund the case immediately.</p>
       <div class="hire-confirm-summary">
         <div class="hire-confirm-row">
           <span>Case amount</span>
@@ -1922,8 +1931,14 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
           <strong>${escapeHtml(formatCurrency(totalCents))}</strong>
         </div>
       </div>
+      <div class="hire-confirm-help">
+        <button class="hire-confirm-info" type="button" aria-label="${escapeAttribute(feeNote)}">
+          ?
+          <span class="hire-confirm-tooltip" aria-hidden="true">${escapeHtml(feeNote)}</span>
+        </button>
+      </div>
       <div class="hire-confirm-error" data-hire-error hidden></div>
-      <div class="hire-confirm-success" data-hire-success hidden>Escrow funded. Work can begin.</div>
+      <div class="hire-confirm-success" data-hire-success hidden>Case funded. Work can begin.</div>
       <div class="hire-confirm-actions" data-hire-continue hidden>
         <a class="btn primary" href="${escapeAttribute(continueHref || "#")}">Continue to case</a>
       </div>

@@ -7,12 +7,8 @@ import {
 } from "./utils/stripe-connect.js";
 
 const FUNDED_WORKSPACE_STATUSES = new Set([
-  "funded_in_progress",
   "in progress",
   "in_progress",
-  "active",
-  "awaiting_documents",
-  "reviewing",
 ]);
 
 const PLACEHOLDER_AVATAR = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
@@ -65,6 +61,9 @@ function normalizeCaseStatus(value) {
   if (!trimmed) return "";
   const lower = trimmed.toLowerCase();
   if (lower === "in_progress") return "in progress";
+  if (["cancelled", "canceled"].includes(lower)) return "closed";
+  if (["assigned", "awaiting_funding"].includes(lower)) return "open";
+  if (["active", "awaiting_documents", "reviewing", "funded_in_progress"].includes(lower)) return "in progress";
   return lower;
 }
 
@@ -88,11 +87,14 @@ function navigateToCase(caseId, { messages = false } = {}) {
 }
 
 function formatStatusLabel(value) {
-  const cleaned = String(value || "").trim();
+  const cleaned = normalizeCaseStatus(value);
   if (!cleaned) return "";
-  const lower = cleaned.toLowerCase();
-  if (lower === "assigned") return "Invited";
-  return cleaned.replace(/_/g, " ");
+  if (cleaned === "in progress") return "In Progress";
+  if (cleaned === "open") return "Posted";
+  if (cleaned === "completed") return "Completed";
+  if (cleaned === "disputed") return "Disputed";
+  if (cleaned === "closed") return "Closed";
+  return cleaned.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function deriveAttorneyId(invite = {}) {
@@ -697,7 +699,6 @@ function renderAssignedCases(items = []) {
         const statusValue = String(c.status || 'Active');
         const statusLabel = formatStatusLabel(statusValue).replace(/\s+/g, ' ').trim() || 'Active';
         const statusKey = statusValue.toLowerCase().replace(/\s+/g, '_');
-        const canWithdraw = !!caseId && !eligible && statusKey === 'awaiting_funding';
       return `
       <div class="case-item" data-id="${safeCaseId}">
         <div class="case-title">${escapeHTML(c.title || 'Untitled Case')}</div>
@@ -708,11 +709,6 @@ function renderAssignedCases(items = []) {
         </div>
         <div class="case-actions">
           <button class="open-case-btn" data-id="${safeCaseId}"${disabledAttr}>${buttonLabel}</button>
-          ${
-            canWithdraw
-              ? `<button class="withdraw-application-btn" data-id="${safeCaseId}">Withdraw application</button>`
-              : ''
-          }
         </div>
       </div>`;
       }

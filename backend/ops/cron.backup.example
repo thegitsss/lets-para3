@@ -1,0 +1,1 @@
+0 2 * * * /usr/bin/env MONGO_URI="__MONGO_URI__" BACKUP_DIR="__BACKUP_DIR__" BACKUP_RETENTION_DAYS=14 node __PROJECT_ROOT__/backend/scripts/backup-db.js >> __LOG_PATH__ 2>&1

@@ -18,8 +18,19 @@ function normalizeSessionPayload(raw) {
   };
 }
 
+function normalizeCaseStatus(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  const lower = trimmed.toLowerCase();
+  if (lower === "in_progress") return "in progress";
+  if (["cancelled", "canceled"].includes(lower)) return "closed";
+  if (["assigned", "awaiting_funding"].includes(lower)) return "open";
+  if (["active", "awaiting_documents", "reviewing"].includes(lower)) return "in progress";
+  return lower;
+}
+
 function isCompletedCase(data) {
-  const status = String(data?.status || "").toLowerCase();
+  const status = normalizeCaseStatus(data?.status);
   if (["completed", "closed"].includes(status)) return true;
   return !!(data?.readOnly && data?.paymentReleased);
 }
@@ -239,7 +250,7 @@ function draw(root, data, escapeHTML, caseId, session, hasPaymentMethod) {
     paralegalOnCase && !escrowFunded
       ? `<div class="notice">${
           isOwner || isAdmin
-            ? `${escapeHTML(paralegalName)} has been hired. Fund escrow to start work.`
+            ? `${escapeHTML(paralegalName)} has been hired. Secure payment to begin work.`
             : `${escapeHTML(paralegalName)} has been hired. Awaiting attorney funding.`
         }</div>`
       : "";
@@ -298,7 +309,7 @@ function draw(root, data, escapeHTML, caseId, session, hasPaymentMethod) {
         note = "An attorney has already hired a paralegal for this case.";
       } else if (data?.paymentReleased) {
         note = "This case has been completed.";
-      } else if (statusRaw.toLowerCase() !== "open") {
+      } else if (normalizeCaseStatus(statusRaw) !== "open") {
         note = "Applications for this case are currently closed.";
       }
       if (note) {
@@ -312,12 +323,13 @@ function draw(root, data, escapeHTML, caseId, session, hasPaymentMethod) {
     }
   }
 
+  const normalizedStatus = normalizeCaseStatus(statusRaw);
   const canTerminate =
     !caseLocked &&
     (isOwner || isAdmin) &&
     paralegalOnCase &&
     !readOnly &&
-    !["cancelled", "closed"].includes(statusRaw) &&
+    !["closed", "completed"].includes(normalizedStatus) &&
     termination.status === "none";
   const actionsSection =
     showPayment || showCompleteButton || canTerminate
@@ -415,6 +427,13 @@ function draw(root, data, escapeHTML, caseId, session, hasPaymentMethod) {
       checklistHost.innerHTML = `<div class="empty">Checklist unavailable.</div>`;
     });
   }
+  const completeBtn = root.querySelector("[data-complete-case]");
+  if (completeBtn) {
+    scheduleCompleteButtonLock(caseId, completeBtn);
+  }
+  if (checklistHost && completeBtn) {
+    bindChecklistLock(checklistHost, caseId, completeBtn);
+  }
   if (viewerRole === "paralegal") {
     hideAttorneyOnlyControls(root);
   }
@@ -443,7 +462,7 @@ function ensureStyles() {
     .btn{padding:10px 16px;border-radius:999px;border:1px solid #d1d5db;cursor:pointer;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
     .btn.primary{background:#111827;color:#fff;border-color:#111827}
     .btn.success{background:#047857;color:#fff;border-color:#047857}
-    .btn.primary[disabled]{opacity:.6;cursor:not-allowed}
+    .btn[disabled]{opacity:.6;cursor:not-allowed}
     .payment-panel{border:1px solid #e5e7eb;border-radius:12px;padding:14px;background:#fff;min-width:260px}
     .payment-panel p{margin:0 0 6px;font-weight:600}
     .payment-panel [data-card-element]{padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}
@@ -526,10 +545,15 @@ function formatCurrency(amount) {
 
 function formatCaseStatus(statusRaw, { hasParalegal = false, escrowFunded = false } = {}) {
   const key = String(statusRaw || "").trim().toLowerCase();
-  if (key === "awaiting_funding" || (hasParalegal && !escrowFunded && key !== "open")) {
-    return "Hired - Pending Funding";
+  if (!key) return "Posted";
+  if (["assigned", "awaiting_funding"].includes(key)) return "Posted";
+  if (["active", "awaiting_documents", "reviewing", "in_progress", "funded_in_progress"].includes(key)) {
+    return "In Progress";
   }
-  if (!key) return "Open";
+  if (key === "in progress") return "In Progress";
+  if (key === "completed") return "Completed";
+  if (key === "disputed") return "Disputed";
+  if (key === "closed") return "Closed";
   return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -567,7 +591,7 @@ function renderApplicant(applicant, escapeHTML, { canHire, paymentBlocked } = {}
   const appliedAt = applicant?.appliedAt ? new Date(applicant.appliedAt).toLocaleDateString() : "";
   const showHire = canHire && paralegalId;
   const hireDisabledAttr = paymentBlocked && showHire
-    ? ' disabled aria-disabled="true" title="Add a payment method to fund escrow."'
+    ? ' disabled aria-disabled="true" title="Add a payment method to fund Stripe."'
     : "";
   const snapshot = applicant?.profileSnapshot && typeof applicant.profileSnapshot === "object" ? applicant.profileSnapshot : {};
   const languages = Array.isArray(snapshot.languages) ? snapshot.languages.filter(Boolean) : [];
@@ -593,7 +617,7 @@ function renderApplicant(applicant, escapeHTML, { canHire, paymentBlocked } = {}
       </div>`
     : "";
   const paymentHelperHtml =
-    paymentBlocked && showHire ? `<div class="notice">Payment method required to fund escrow.</div>` : "";
+    paymentBlocked && showHire ? `<div class="notice">Payment method required to fund case.</div>` : "";
   const resumeURL = applicant?.resumeURL || "";
   const resumeIsHttp = isHttpUrl(resumeURL);
   const resumeKey = resumeIsHttp ? "" : normalizeDocKey(resumeURL);
@@ -690,7 +714,7 @@ function renderTerminationNotice(termination, escapeHTML) {
   if (termination.status === "auto_cancelled") {
     const reason = termination.reason
       ? escapeHTML(termination.reason)
-      : "The case was cancelled before work began.";
+      : "The case was closed before work began.";
     return `
       <div class="case-section notice">
         <div class="case-section-title">Engagement ended</div>
@@ -705,7 +729,7 @@ function bindHireButtons(root, caseId) {
   root.querySelectorAll("[data-hire-paralegal]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       if (!hasPaymentMethodOnFile) {
-        notify("Add a payment method to fund escrow before hiring.", "error");
+        notify("Add a payment method before hiring.", "error");
         return;
       }
       const paralegalId = btn.dataset.paralegalId || "";
@@ -730,10 +754,26 @@ function bindEscrowButton(root, caseId) {
 function bindCompleteButton(root, caseId) {
   const btn = root.querySelector("[data-complete-case]");
   if (!btn) return;
-  btn.addEventListener("click", () => {
+  btn.addEventListener("click", async () => {
     if (btn.disabled) return;
     btn.setAttribute("disabled", "disabled");
-    showCompletionModal(caseId, btn);
+    try {
+      const { total, open } = await fetchChecklistCompletionState(caseId);
+      if (!total) {
+        notify("Add at least one task before releasing funds.", "error");
+        btn.removeAttribute("disabled");
+        return;
+      }
+      if (open > 0) {
+        notify("Check all task boxes before releasing funds.", "error");
+        btn.removeAttribute("disabled");
+        return;
+      }
+      showCompletionModal(caseId, btn);
+    } catch (err) {
+      notify(err?.message || "Unable to verify tasks. Please try again.", "error");
+      btn.removeAttribute("disabled");
+    }
   });
 }
 
@@ -745,6 +785,78 @@ function bindTerminationButton(root, caseId) {
     if (!confirmed) return;
     const reason = window.prompt("Share any context for the admin team (optional):", "") || "";
     submitTerminationRequest(caseId, btn, reason);
+  });
+}
+
+let checklistLockTimer = null;
+let checklistLockInFlight = null;
+
+async function fetchChecklistCount(caseId, status) {
+  if (!caseId) return 0;
+  const params = new URLSearchParams({
+    caseId: String(caseId),
+    status,
+    limit: "1",
+  });
+  const payload = await j(`/api/checklist?${params.toString()}`);
+  return Number(payload?.total || 0);
+}
+
+async function fetchChecklistCompletionState(caseId) {
+  if (!caseId) return { total: 0, open: 0 };
+  const [total, open] = await Promise.all([
+    fetchChecklistCount(caseId, "all"),
+    fetchChecklistCount(caseId, "open"),
+  ]);
+  return { total, open };
+}
+
+function setCompleteButtonLocked(btn, locked, reason) {
+  if (!btn) return;
+  const isLocked = !!locked;
+  btn.disabled = isLocked;
+  btn.setAttribute("aria-disabled", isLocked ? "true" : "false");
+  btn.dataset.locked = isLocked ? "true" : "false";
+  if (reason) {
+    btn.title = reason;
+  } else if (btn.title) {
+    btn.title = "";
+  }
+}
+
+async function refreshCompleteButtonLock(caseId, btn) {
+  if (!btn || !caseId) return;
+  if (checklistLockInFlight) return checklistLockInFlight;
+  checklistLockInFlight = (async () => {
+    try {
+      const { total, open } = await fetchChecklistCompletionState(caseId);
+      const locked = total === 0 || open > 0;
+      const reason =
+        total === 0 ? "Add at least one task before releasing funds." : open > 0 ? "Complete all tasks first." : "";
+      setCompleteButtonLocked(btn, locked, reason);
+    } catch (err) {
+      setCompleteButtonLocked(btn, true, "Unable to verify tasks.");
+    } finally {
+      checklistLockInFlight = null;
+    }
+  })();
+  return checklistLockInFlight;
+}
+
+function scheduleCompleteButtonLock(caseId, btn) {
+  if (!btn) return;
+  if (checklistLockTimer) clearTimeout(checklistLockTimer);
+  checklistLockTimer = setTimeout(() => {
+    refreshCompleteButtonLock(caseId, btn);
+  }, 120);
+}
+
+function bindChecklistLock(checklistHost, caseId, btn) {
+  if (!checklistHost || checklistHost.dataset.lockBound === "true") return;
+  checklistHost.dataset.lockBound = "true";
+  checklistHost.addEventListener("change", (event) => {
+    if (!event.target || event.target.type !== "checkbox") return;
+    scheduleCompleteButtonLock(caseId, btn);
   });
 }
 
@@ -988,7 +1100,7 @@ async function inviteParalegal(caseId, paralegalId, button) {
       button.classList.add("success");
       button.removeAttribute("data-btn-text");
     }
-    notify("Invitation sent. Escrow amount locked for this case.", "success");
+    notify("Invitation sent. Payment amount locked for this case.", "success");
   } catch (err) {
     if (button) {
       button.removeAttribute("disabled");
@@ -1055,13 +1167,11 @@ async function hireParalegal(caseId, paralegalId, paralegalName, button) {
     }
     notify(
       funded
-        ? `${displayName} has been hired. Escrow funded. Opening workspace...`
-        : `${displayName} has been hired. Redirecting to fund escrow...`,
+        ? `${displayName} has been hired. Case funded. Opening workspace...`
+        : `${displayName} has been hired. Redirecting to fund case...`,
       "success"
     );
-    const target = funded
-      ? `case-detail.html?caseId=${encodeURIComponent(caseId)}`
-      : `fund-escrow.html?caseId=${encodeURIComponent(caseId)}`;
+    const target = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
     setTimeout(() => {
       window.location.href = target;
     }, 400);
@@ -1150,7 +1260,7 @@ async function startEscrow(caseId, button) {
     return;
   }
   if (!paymentEnabled) {
-    notify("Escrow funding is currently unavailable.", "error");
+    notify("Case funding is currently unavailable.", "error");
     return;
   }
   const originalText = button?.textContent || "Hire & Start Work";
@@ -1197,7 +1307,7 @@ async function startEscrow(caseId, button) {
     if (result.paymentIntent?.status !== "succeeded") {
       throw new Error("Payment not completed.");
     }
-    notify("Escrow funded successfully.", "success");
+    notify("Case funded successfully.", "success");
     window.location.reload();
   } catch (err) {
     button?.removeAttribute("disabled");
@@ -1206,7 +1316,7 @@ async function startEscrow(caseId, button) {
       button.removeAttribute("aria-busy");
       delete button.dataset.btnText;
     }
-    notify(err?.message || "Unable to fund escrow.", "error");
+    notify(err?.message || "Unable to fund case.", "error");
   }
 }
 
@@ -1216,7 +1326,7 @@ function showCompletionModal(caseId, triggerButton) {
   overlay.innerHTML = `
     <div class="case-modal">
       <div class="case-modal-title">Mark case complete?</div>
-      <p>Confirming will release the escrow payment, lock all uploads and messages, revoke paralegal access, generate a ZIP archive, and start a 6-month purge timer.</p>
+      <p>Confirming will release the case payment, lock all uploads and messages, revoke paralegal access, and generate a ZIP file you may download in your archive. This case's archive will expire after six (6) months.</p>
       <div class="case-modal-actions">
         <button class="btn" data-modal-cancel>Cancel</button>
         <button class="btn primary" data-modal-confirm>Confirm</button>
@@ -1385,8 +1495,27 @@ async function fetchCaseForHire(caseId) {
   return payload;
 }
 
+function ensureHireConfirmTooltipStyles() {
+  if (document.getElementById("hire-confirm-tooltip-styles")) return;
+  const style = document.createElement("style");
+  style.id = "hire-confirm-tooltip-styles";
+  style.textContent = `
+    .hire-confirm-help{display:flex;justify-content:flex-end;margin-top:6px}
+    .hire-confirm-info{width:24px;height:24px;border-radius:50%;border:1px solid var(--line,rgba(0,0,0,0.08));background:var(--panel,#fff);color:var(--muted,#6b7280);font-size:0.75rem;font-weight:250;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0;transition:border-color .2s ease,color .2s ease,transform .15s ease}
+    .hire-confirm-info:hover,
+    .hire-confirm-info:focus-visible{border-color:var(--accent,#b6a47a);color:var(--ink,#111827);transform:translateY(-1px)}
+    .hire-confirm-tooltip{position:absolute;right:0;bottom:calc(100% + 8px);width:min(320px,80vw);padding:10px 12px;border-radius:12px;background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));box-shadow:0 18px 40px rgba(0,0,0,.16);font-size:0.78rem;line-height:1.45;color:var(--ink,#111827);opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .15s ease,transform .15s ease;z-index:2}
+    .hire-confirm-info:hover .hire-confirm-tooltip,
+    .hire-confirm-info:focus-visible .hire-confirm-tooltip{opacity:1;pointer-events:auto;transform:translateY(0)}
+  `;
+  document.head.appendChild(style);
+}
+
 function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref, onConfirm }) {
+  ensureHireConfirmTooltipStyles();
   const safeName = String(paralegalName || "Paralegal");
+  const feeNote =
+    "Platform fee includes Stripe security, dispute protection, payment processing, and vetted paralegal access.";
   const feeRate = Number(feePct || 0);
   const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
   const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
@@ -1395,7 +1524,7 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   overlay.innerHTML = `
     <div class="case-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
       <div class="case-modal-title" id="hireConfirmTitle">Confirm Hire</div>
-      <p>You’re about to hire ${safeName}. This will fund escrow immediately.</p>
+      <p>You’re about to hire ${safeName}. This will fund the case immediately.</p>
       <div style="border:1px solid rgba(15,23,42,.08);border-radius:12px;padding:12px 14px;display:grid;gap:8px;">
         <div style="display:flex;justify-content:space-between;gap:16px;">
           <span>Case amount</span>
@@ -1410,8 +1539,14 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
           <strong>${formatCurrency(totalCents / 100)}</strong>
         </div>
       </div>
+      <div class="hire-confirm-help">
+        <button class="hire-confirm-info" type="button" aria-label="${escapeAttribute(feeNote)}">
+          ?
+          <span class="hire-confirm-tooltip" aria-hidden="true">${feeNote}</span>
+        </button>
+      </div>
       <div class="case-modal-alert" data-hire-error hidden style="border:1px solid rgba(185,28,28,.4);background:rgba(254,242,242,.9);color:#991b1b;border-radius:10px;padding:8px 10px;font-size:0.9rem;"></div>
-      <div class="case-modal-alert success" data-hire-success hidden style="border:1px solid rgba(22,163,74,.35);background:rgba(240,253,244,.9);color:#166534;border-radius:10px;padding:8px 10px;font-size:0.9rem;">Escrow funded. Work can begin.</div>
+      <div class="case-modal-alert success" data-hire-success hidden style="border:1px solid rgba(22,163,74,.35);background:rgba(240,253,244,.9);color:#166534;border-radius:10px;padding:8px 10px;font-size:0.9rem;">Case funded. Work can begin.</div>
       <div class="case-modal-actions" data-hire-actions>
         <button class="btn" data-hire-cancel>Cancel</button>
         <button class="btn primary" data-hire-confirm>Confirm &amp; Hire</button>
@@ -1528,7 +1663,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const caseDetails = await fetchCaseForHire(caseId);
       const amountCents = Number(caseDetails?.lockedTotalAmount ?? caseDetails?.totalAmount ?? 0);
       if (!Number.isFinite(amountCents) || amountCents <= 0) {
-        notify("Escrow amount is unavailable for this case.", "error");
+        notify("Held amount is unavailable for this case.", "error");
         return;
       }
       openHireConfirmModal({

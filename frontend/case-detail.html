@@ -78,6 +78,15 @@
       --sidebar-bg: rgba(255, 255, 255, 0.15);
     }
 
+    html.theme-mountain body.role-attorney,
+    body.role-attorney.theme-mountain {
+      --bg: #ffffff;
+      --panel: #fcfcfc;
+      --muted: #8a8a8a;
+      --sidebar-text: #1a1a1a;
+      --sidebar-bg: #f5f5f5e6;
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
@@ -717,21 +726,6 @@
       min-width: 0;
       padding: 12px 22px 20px;
       border-right: 1px solid var(--app-border-soft);
-      min-height: 0;
-    }
-
-    body.role-attorney .case-main {
-      min-height: 0;
-      overflow: hidden;
-    }
-
-    body.role-attorney .case-workspace {
-      height: 100%;
-      min-height: 0;
-    }
-
-    body.role-attorney .case-thread {
-      height: 100%;
       min-height: 0;
     }
 
@@ -1422,11 +1416,11 @@
 
     .composer-row textarea {
       flex: 1;
-      min-height: 24px;
+      min-height: 28px;
       max-height: 88px;
-      padding: 4px 0;
+      padding: 6px 0;
       font-size: 0.95rem;
-      line-height: 1.4;
+      line-height: 1.5;
       border: none;
       box-shadow: none;
       background: transparent;
@@ -1875,6 +1869,14 @@
       margin-right: 28px;
     }
 
+    .case-overview-actions {
+      position: relative;
+    }
+
+    .case-overview-actions h3 {
+      margin-right: 28px;
+    }
+
     .case-tasks-help {
       position: absolute;
       top: 0;
@@ -1929,6 +1931,29 @@
       text-align: center;
     }
 
+    .case-status-link {
+      color: inherit;
+      text-decoration: none;
+      outline: none;
+      box-shadow: none;
+    }
+
+    .case-status-link:hover,
+    .case-status-link:focus-visible {
+      color: var(--app-accent);
+      text-decoration: none;
+    }
+
+    #caseCompleteStatus {
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      padding: 0;
+      margin-top: 6px;
+      text-align: center;
+      align-self: center;
+    }
+
     .case-action-btn {
       align-self: flex-start;
       border: none;
@@ -1958,15 +1983,25 @@
 
     @media (max-width: 1200px) {
       .case-workspace {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      }
-
-      .case-overview-panel {
-        grid-column: 1 / -1;
+        grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.9fr);
+        grid-template-rows: auto auto;
       }
 
       .case-thread {
+        border-right: 1px solid var(--app-border-soft);
+        grid-column: 1;
+        grid-row: 1 / span 2;
+      }
+
+      .case-rail-stack {
+        grid-column: 2;
+        grid-row: 1;
         border-right: none;
+      }
+
+      .case-overview-panel {
+        grid-column: 2;
+        grid-row: 2;
       }
 
       .case-overview-panel {
@@ -2118,6 +2153,13 @@
         overflow-y: visible;
       }
 
+      .case-thread,
+      .case-rail-stack,
+      .case-overview-panel {
+        grid-column: 1 / -1;
+        grid-row: auto;
+      }
+
       .case-rail {
         order: 1;
       }
@@ -2237,7 +2279,7 @@
           <div class="case-nav-status" data-case-nav-status>Loading cases...</div>
           <ul class="case-nav-list" data-case-nav-list></ul>
         </div>
-        <a href="dashboard-attorney.html#billing" data-view-target="billing">Billing &amp; Escrow</a>
+        <a href="dashboard-attorney.html#billing" data-view-target="billing">Billing &amp; Funds</a>
         <a href="help.html">Help</a>
       </nav>
       <nav aria-label="Paralegal navigation" data-visible="paralegal">
@@ -2389,8 +2431,14 @@
 
             <section class="case-overview-actions" id="caseCompleteSection" data-visible="attorney" hidden>
               <h3>Complete &amp; release</h3>
+              <details class="case-tasks-help case-release-help">
+                <summary aria-label="Complete &amp; release help">?</summary>
+                <div class="case-tasks-help-panel">
+                  All tasks must be checked off before payment may be released to the paralegal.
+                </div>
+              </details>
               <p class="case-overview-note" id="caseCompleteNote">
-                Mark work complete and release escrow to the paralegal.
+                Mark work complete and release payment to the paralegal.
               </p>
               <button type="button" class="case-action-btn" id="caseCompleteButton">Complete &amp; Release Funds</button>
               <p class="case-overview-note" id="caseCompleteStatus" role="status" aria-live="polite"></p>
@@ -2418,7 +2466,7 @@
                   <dd id="caseMatterType">-</dd>
                 </div>
                 <div>
-                  <dt>Escrow amount</dt>
+                  <dt>Case amount</dt>
                   <dd id="caseEscrowAmount">-</dd>
                 </div>
               </dl>

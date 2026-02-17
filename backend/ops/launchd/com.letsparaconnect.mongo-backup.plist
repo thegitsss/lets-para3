@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.letsparaconnect.mongo-backup</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/usr/bin/env</string>
+      <string>node</string>
+      <string>__PROJECT_ROOT__/backend/scripts/backup-db.js</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>MONGO_URI</key>
+      <string>__MONGO_URI__</string>
+      <key>BACKUP_DIR</key>
+      <string>__BACKUP_DIR__</string>
+      <key>BACKUP_RETENTION_DAYS</key>
+      <string>14</string>
+    </dict>
+    <key>StartCalendarInterval</key>
+    <dict>
+      <key>Hour</key>
+      <integer>2</integer>
+      <key>Minute</key>
+      <integer>0</integer>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>__LOG_PATH__</string>
+    <key>StandardErrorPath</key>
+    <string>__LOG_PATH__</string>
+  </dict>
+</plist>

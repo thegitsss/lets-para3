@@ -1186,7 +1186,7 @@ if (disputesBody) {
       grossAmountCents = Math.round(amountUsd * 100);
       const max = Number(row?.dataset?.grossMax || 0);
       if (Number.isFinite(max) && max > 0 && grossAmountCents > max) {
-        showToast("Partial amount exceeds escrow total.", "info");
+        showToast("Partial amount exceeds case total.", "info");
         return;
       }
     }

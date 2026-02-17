@@ -1,6 +1,26 @@
 import { secureFetch } from "./auth.js";
 import { createElements, mountPaymentElement, confirmSetup } from "./payments.js";
 
+const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
+
+function getAttorneyOnboardingStep() {
+  try {
+    return sessionStorage.getItem(ATTORNEY_ONBOARDING_STEP_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setAttorneyOnboardingStep(step) {
+  try {
+    if (!step) {
+      sessionStorage.removeItem(ATTORNEY_ONBOARDING_STEP_KEY);
+      return;
+    }
+    sessionStorage.setItem(ATTORNEY_ONBOARDING_STEP_KEY, step);
+  } catch {}
+}
+
 function initBillingLite() {
   const surface = document.querySelector("[data-billing-surface]");
   if (!surface) return;
@@ -42,6 +62,13 @@ function initBillingLite() {
       showToast(pendingHire.message, "info");
     }
     const paymentStatus = await loadPaymentMethodStatus();
+    if (getAttorneyOnboardingStep() === "payment") {
+      const targetBtn = addCardBtn && !addCardBtn.hidden ? addCardBtn : replaceCardBtn;
+      if (targetBtn) {
+        targetBtn.classList.add("onboarding-pulse");
+        targetBtn.addEventListener("click", () => targetBtn.classList.remove("onboarding-pulse"), { once: true });
+      }
+    }
     if (pendingHire && paymentStatus?.paymentMethod) {
       resumePendingHire(pendingHire);
     }
@@ -69,7 +96,11 @@ function bindEvents() {
         sessionStorage.removeItem(CASE_PREVIEW_RECEIPT_KEY);
       } catch {}
     }
-    viewArchivedCase(caseId);
+    if (typeof window.openCasePreview === "function") {
+      window.openCasePreview(caseId, { keepView: true });
+      return;
+    }
+    showToast("Unable to load details right now.", "info");
   });
   refreshEscrowsBtn?.addEventListener("click", () => {
     loadActiveEscrows(true, { syncAlerts: true });
@@ -101,7 +132,7 @@ async function loadActiveEscrows(showLoading = false, { syncAlerts = false } = {
     const items = Array.isArray(payload?.items) ? payload.items : [];
     cachedEscrows = items;
     if (!items.length) {
-      escrowTableBody.innerHTML = `<tr><td colspan="5" class="history-empty">No funds currently held in escrow.</td></tr>`;
+      escrowTableBody.innerHTML = `<tr><td colspan="5" class="history-empty">No funds currently held in Stripe.</td></tr>`;
     } else {
       escrowTableBody.innerHTML = items.map(renderEscrowRow).join("");
     }
@@ -110,8 +141,8 @@ async function loadActiveEscrows(showLoading = false, { syncAlerts = false } = {
     }
     return items;
   } catch (err) {
-    console.warn("Unable to load active escrows", err);
-    escrowTableBody.innerHTML = `<tr><td colspan="5" class="history-empty error">Unable to load active escrow records.</td></tr>`;
+    console.warn("Unable to load active funds", err);
+    escrowTableBody.innerHTML = `<tr><td colspan="5" class="history-empty error">Unable to load active Stripe records.</td></tr>`;
     return [];
   }
 }
@@ -161,7 +192,7 @@ function buildFinanceAlerts({ active = [], pending = [] } = {}) {
     const first = pending[0];
     const count = pending.length;
     const label = count === 1 ? first.caseName || "This case" : `${count} cases`;
-    const summary = count === 1 ? `${first.paralegalName || "Your paralegal"} is ready to start.` : "Fund escrow to unblock your assignments.";
+    const summary = count === 1 ? `${first.paralegalName || "Your paralegal"} is ready to start.` : "Fund Stripe to unblock your assignments.";
     alerts.push({
       id: `fund-${first.caseId}`,
       type: "fund",
@@ -383,7 +414,6 @@ function renderPaymentMethodSummary(payload = {}) {
         <div>
           <div class="pm-label">Primary payment method</div>
           <div class="pm-meta">${escapeHtml(brand)} ending in ${escapeHtml(last4)}${escapeHtml(exp)}</div>
-          <div class="pm-helper">This card is used to fund escrow when you hire a paralegal. Funds are held securely and released only after you approve completed work.</div>
         </div>
       </div>
     `;
@@ -466,6 +496,11 @@ async function savePaymentMethod() {
     showToast("Card saved and set as default.", "success");
     await loadPaymentMethodStatus();
     cancelPaymentFlow();
+    if (getAttorneyOnboardingStep() === "payment") {
+      setAttorneyOnboardingStep("case");
+      window.location.href = "dashboard-attorney.html#cases";
+      return;
+    }
     if (!pendingHire) pendingHire = await loadPendingHire(true);
     if (pendingHire?.caseId) {
       resumePendingHire(pendingHire);
@@ -534,8 +569,8 @@ function resumePendingHire(pending) {
   if (!pending?.caseId) return;
   pendingHire = null;
   void clearPendingHire();
-  const target = pending.fundUrl || `fund-escrow.html?caseId=${encodeURIComponent(pending.caseId)}`;
-  showToast("Payment method ready. Redirecting to fund escrow...", "success");
+  const target = pending.fundUrl || `dashboard-attorney.html?openApplicants=1&caseId=${encodeURIComponent(pending.caseId)}#cases:inquiries`;
+  showToast("Payment method ready. Return to the case to hire the paralegal.", "success");
   setTimeout(() => {
     window.location.href = target;
   }, 600);
@@ -693,7 +728,11 @@ function renderHistorySkeleton(count = 2) {
 
 function viewCase(caseId) {
   if (!caseId) return;
-  window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
+  if (typeof window.openCasePreview === "function") {
+    window.openCasePreview(caseId, { keepView: true });
+    return;
+  }
+  window.location.href = `dashboard-attorney.html?previewCaseId=${encodeURIComponent(caseId)}#cases`;
 }
 
 function viewArchivedCase(caseId) {

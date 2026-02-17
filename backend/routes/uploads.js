@@ -19,6 +19,7 @@ const CaseFile = require("../models/CaseFile");
 const User = require("../models/User");
 const { logAction } = require("../utils/audit");
 const { notifyUser } = require("../utils/notifyUser");
+const { publishCaseEvent } = require("../utils/caseEvents");
 const sendEmail = require("../utils/email");
 const { normalizeCaseStatus, canUseWorkspace } = require("../utils/caseState");
 
@@ -73,7 +74,7 @@ function buildCasePrefix(caseId) {
   return `cases/${caseId}/`;
 }
 
-const CLOSED_CASE_STATUSES = new Set(["completed", "closed", "cancelled", "disputed"]);
+const CLOSED_CASE_STATUSES = new Set(["completed", "closed", "disputed"]);
 
 function isCaseClosedForAccess(caseDoc) {
   if (!caseDoc) return false;
@@ -918,6 +919,7 @@ router.post(
       console.warn("[uploads] notifyUser case_file_uploaded failed", err?.message || err);
     }
 
+    publishCaseEvent(caseDoc._id, "documents", { at: new Date().toISOString() });
     res.status(201).json({ file: serializeCaseFile(entry) });
   })
 );
@@ -980,6 +982,7 @@ router.delete(
     } catch (err) {
       console.warn("[uploads] file delete audit failed", err?.message || err);
     }
+    publishCaseEvent(caseDoc._id, "documents", { at: new Date().toISOString() });
     res.json({ ok: true });
   })
 );
@@ -1061,7 +1064,7 @@ function assertWorkspaceReady(caseDoc, res) {
   }
   if (!canUseWorkspace(caseDoc)) {
     const status = normalizeCaseStatus(caseDoc?.status);
-    const closedStatuses = ["completed", "closed", "cancelled", "disputed"];
+    const closedStatuses = ["completed", "closed", "disputed"];
     const msg = closedStatuses.includes(status)
       ? "Uploads are closed for this case."
       : "Uploads unlock once the case is funded and in progress.";

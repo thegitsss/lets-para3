@@ -317,7 +317,7 @@ router.post("/:jobId/apply", auth, requireApproved, requireRole("paralegal"), as
 // POST /jobs/:jobId/hire/:paralegalId — disabled to avoid hiring without funded escrow
 router.post("/:jobId/hire/:paralegalId", auth, requireRole(["attorney"]), async (_req, res) => {
   return res.status(410).json({
-    error: "Direct job-to-paralegal hire is disabled. Use the case hire + funding flow to ensure escrow is funded.",
+    error: "Direct job-to-paralegal hire is disabled. Use the case hire + funding flow to ensure the case is funded.",
   });
 });
 

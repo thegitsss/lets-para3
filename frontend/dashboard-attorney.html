@@ -460,6 +460,16 @@
       border-radius: 12px;
       box-shadow: 0 0 0 9999px rgba(10, 15, 25, 0.6);
     }
+    .onboarding-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      z-index: 12000;
+      background: rgba(10, 15, 25, 0.6);
+    }
+    .onboarding-overlay.is-active {
+      display: block;
+    }
 
     .tour-modal {
       width: min(420px, 92vw);
@@ -477,6 +487,23 @@
     }
 
     .tour-modal.is-active {
+      display: block;
+    }
+    .onboarding-modal {
+      width: min(420px, 92vw);
+      background: #ffffff;
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+      text-align: center;
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      display: none;
+      z-index: 12001;
+    }
+    .onboarding-modal.is-active {
       display: block;
     }
 
@@ -529,6 +556,9 @@
       color: #ffffff;
       border-color: transparent;
       box-shadow: 0 12px 24px rgba(182, 164, 122, 0.35);
+    }
+    #attorneyTourStartBtn {
+      box-shadow: none;
     }
 
     .tour-btn:hover {
@@ -1040,17 +1070,76 @@
       color: var(--muted);
       font-weight: 400;
     }
+    .weekly-notes-header {
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 0.85rem;
+    }
+    .weekly-notes-title {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
     .weekly-notes-range {
       font-size: 0.72em;
       letter-spacing: 0.12em;
       text-transform: uppercase;
       color: var(--muted);
     }
+    .weekly-notes-month-header {
+      display: none;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 0.6rem;
+      padding-top: 0.75rem;
+    }
+    .weekly-notes-month-header.is-visible {
+      display: grid;
+    }
+    .weekly-notes-month-header .weekday {
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-align: left;
+    }
+    .weekly-notes-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .weekly-notes-btn {
+      appearance: none;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.35rem 0.95rem;
+      font-family: var(--font-sans);
+      font-size: 0.72em;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--panel);
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease, transform 0.15s ease, background 0.2s ease;
+    }
+    .weekly-notes-btn:hover {
+      border-color: var(--accent);
+      color: var(--ink);
+      transform: translateY(-1px);
+    }
+    .weekly-notes-btn.is-active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
     .weekly-notes-grid {
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 0.75rem;
       padding-top: 0.8rem;
+    }
+    .weekly-notes-grid.month-view {
+      gap: 0.6rem;
     }
     .weekly-note-day {
       border: 1px solid var(--line);
@@ -1062,6 +1151,12 @@
       background: transparent;
       min-height: 120px;
       cursor: pointer;
+    }
+    .weekly-notes-grid.month-view .weekly-note-day {
+      min-height: 92px;
+    }
+    .weekly-note-day.is-outside {
+      opacity: 0.45;
     }
     .weekly-note-day:focus {
       outline: 2px solid rgba(182, 164, 122, 0.35);
@@ -1100,8 +1195,13 @@
       overflow: hidden;
       display: -webkit-box;
       -webkit-line-clamp: 4;
+      line-clamp: 4;
       -webkit-box-orient: vertical;
       white-space: pre-wrap;
+    }
+    .weekly-notes-grid.month-view .weekly-note-body {
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
     }
     .weekly-note-input::placeholder {
       color: var(--muted);
@@ -1321,6 +1421,10 @@
       .weekly-notes-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+      .weekly-notes-controls {
+        width: 100%;
+        justify-content: flex-start;
+      }
     }
 
     .btn-group {
@@ -1380,6 +1484,16 @@
     .btn-group button:not(.secondary):hover {
       background: #9d895c;
       border-color: #9d895c;
+    }
+    @keyframes onboardingPulse {
+      0% { box-shadow: 0 0 0 0 rgba(182, 164, 122, 0.35); }
+      70% { box-shadow: 0 0 0 12px rgba(182, 164, 122, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(182, 164, 122, 0); }
+    }
+    .onboarding-pulse {
+      position: relative;
+      box-shadow: 0 0 0 0 rgba(182, 164, 122, 0.35);
+      animation: onboardingPulse 1.6s ease-out infinite;
     }
 
     .case-list {
@@ -1903,6 +2017,18 @@
       border-bottom: 1px solid var(--line);
       text-align: left;
       font-size: 0.9rem;
+    }
+
+    .view-cases tbody td {
+      transition: background-color 0.8s ease;
+    }
+
+    .view-cases tbody tr.case-highlight td {
+      background-color: rgba(182, 164, 122, 0.2);
+    }
+
+    .view-cases tbody tr.case-highlight td:first-child {
+      box-shadow: inset 4px 0 0 var(--accent);
     }
 
     .view-cases .case-select {
@@ -2891,6 +3017,13 @@
       gap:1rem;
     }
 
+    .case-preview-actions{
+      display:flex;
+      align-items:center;
+      gap:0.75rem;
+    }
+
+
     .case-preview-header h3{
       margin:0;
       font-family:var(--font-serif);
@@ -3132,6 +3265,68 @@
       flex-wrap:wrap;
       align-items:center;
       margin-bottom:0.9rem;
+    }
+    .payment-method-panel {
+      position: relative;
+    }
+    .payment-method-panel .panel-actions {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+    .payment-method-panel #replacePaymentMethodBtn {
+      margin-left: auto;
+    }
+    .info-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 0.85rem;
+      font-weight: 250;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      transition: border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+    }
+    .info-btn:hover,
+    .info-btn:focus-visible {
+      border-color: var(--accent);
+      color: var(--ink);
+      transform: translateY(-1px);
+    }
+    .info-tooltip {
+      position: absolute;
+      right: 0;
+      bottom: calc(100% + 10px);
+      width: min(320px, 80vw);
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--card-shadow-soft);
+      font-size: 0.78rem;
+      line-height: 1.45;
+      color: var(--ink);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(6px);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      z-index: 2;
+    }
+    .info-btn:focus-visible .info-tooltip,
+    .info-btn:hover .info-tooltip {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
     }
 
     .view-billing .panel-header h2 {
@@ -4038,7 +4233,7 @@
     <nav>
       <a href="#home" class="active" data-view-target="home">Home</a>
       <a href="#cases" data-view-target="cases">Cases &amp; Files</a>
-      <a href="#billing" data-view-target="billing">Billing &amp; Escrow</a>
+      <a href="#billing" data-view-target="billing">Funds &amp; Payments</a>
       <a href="help.html">Help</a>
     </nav>
     <div class="sidebar-bottom">
@@ -4098,10 +4293,18 @@
 
 
             <section class="ledger-shell weekly-notes" aria-labelledby="weeklyNotesTitle">
-              <div class="ledger-header">
-                <div class="ledger-title" id="weeklyNotesTitle">Weekly Notes</div>
-                <div class="weekly-notes-range" id="weeklyNotesRange"></div>
+              <div class="ledger-header weekly-notes-header">
+                <div class="weekly-notes-title">
+                  <div class="ledger-title" id="weeklyNotesTitle">Weekly Notes</div>
+                  <div class="weekly-notes-range" id="weeklyNotesRange"></div>
+                </div>
+                <div class="weekly-notes-controls" aria-label="Weekly notes navigation">
+                  <button type="button" class="weekly-notes-btn" id="weeklyNotesPrev" aria-label="Previous week">Prev</button>
+                  <button type="button" class="weekly-notes-btn" id="weeklyNotesNext" aria-label="Next week">Next</button>
+                  <button type="button" class="weekly-notes-btn weekly-notes-toggle" id="weeklyNotesToggle">Full Month</button>
+                </div>
               </div>
+              <div class="weekly-notes-month-header" id="weeklyNotesMonthHeader" aria-hidden="true"></div>
               <div class="weekly-notes-grid" id="weeklyNotesGrid" aria-label="Weekly notes">
                 <div class="weekly-note-day">
                   <div class="weekly-note-header">
@@ -4160,7 +4363,7 @@
                 <div class="skeleton-line long"></div>
                 <div class="skeleton-line medium"></div>
               </div>
-              <div class="info-line" id="attorneyEscrowEmpty" hidden>&bull; Escrow metrics unavailable.</div>
+              <div class="info-line" id="attorneyEscrowEmpty" hidden>&bull; Payment metrics unavailable.</div>
             </div>
           </section>
         </div>
@@ -4314,44 +4517,6 @@
           </div>
         </div>
       </div>
-      <div id="casePreviewModal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="casePreviewTitle">
-        <div class="note-modal-card case-preview-card">
-          <header class="case-preview-header">
-            <h3 id="casePreviewTitle">Case Preview</h3>
-            <button type="button" class="case-preview-close" aria-label="Close case preview" data-case-preview-close>&times;</button>
-          </header>
-          <div class="case-preview-meta">
-            <div>
-              <span class="case-preview-label">Field of Law</span>
-              <span data-case-preview-field>—</span>
-            </div>
-            <div>
-              <span class="case-preview-label">Location</span>
-              <span data-case-preview-location>—</span>
-            </div>
-            <div>
-              <span class="case-preview-label">Compensation</span>
-              <span data-case-preview-comp>—</span>
-            </div>
-            <div>
-              <span class="case-preview-label">Experience</span>
-              <span data-case-preview-experience>—</span>
-            </div>
-          </div>
-          <div class="case-preview-desc">
-            <span class="case-preview-label">Description</span>
-            <p data-case-preview-description>—</p>
-          </div>
-          <div class="case-preview-desc case-preview-tasks">
-            <span class="case-preview-label">Tasks</span>
-            <div data-case-preview-tasks>—</div>
-          </div>
-          <div class="note-modal-actions">
-            <a class="btn secondary" data-case-preview-receipt target="_blank" rel="noopener" hidden>Receipt</a>
-            <button type="button" class="btn secondary" data-case-preview-close>Close</button>
-          </div>
-        </div>
-      </div>
       <div id="caseInvitesModal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="caseInvitesTitle">
         <div class="note-modal-card case-invites-card">
           <header class="case-preview-header">
@@ -4371,15 +4536,15 @@
     <section class="view-panel view-billing" data-view="billing" hidden data-billing-surface>
       <header class="page-header">
         <div>
-          <h1>Billing &amp; Escrow</h1>
-          <p>Manage invoices, receipts, and escrow releases without leaving your dashboard.</p>
+          <h1>Billing &amp; Payments</h1>
+          <p>Manage invoices, receipts, and Stripe releases without leaving your dashboard.</p>
         </div>
         <div class="actions">
           <button type="button" class="primary-btn" id="openPortalBtn">Open Stripe Billing Portal</button>
         </div>
       </header>
 
-      <section class="panel" aria-labelledby="payment-method-heading">
+      <section class="panel payment-method-panel" aria-labelledby="payment-method-heading">
         <div class="panel-header">
           <div>
             <h2 id="payment-method-heading">Payment Method</h2>
@@ -4390,12 +4555,18 @@
           </div>
         </div>
         <div id="paymentMethodSummary" class="payment-method-summary"></div>
+        <button type="button" class="info-btn" aria-label="Payment method info">
+          i
+          <span class="info-tooltip" role="tooltip">
+            This card is used to fund Stripe when you hire a paralegal. Funds are held securely and released only after you approve completed work. Cards are securely stored by Stripe, not Let’s-ParaConnect.
+          </span>
+        </button>
       </section>
 
       <section class="panel" aria-labelledby="escrow-heading">
         <div class="panel-header">
           <div>
-            <h2 id="escrow-heading">Active Escrow</h2>
+            <h2 id="escrow-heading">Active Funds</h2>
             <p>Funds currently held in trust for ongoing cases.</p>
           </div>
         </div>
@@ -4411,7 +4582,7 @@
               </tr>
             </thead>
             <tbody id="escrowTableBody">
-              <tr><td colspan="5" class="history-empty">Loading active escrows…</td></tr>
+              <tr><td colspan="5" class="history-empty">Loading active funds...</td></tr>
             </tbody>
           </table>
         </div>
@@ -4429,6 +4600,47 @@
         </div>
       </section>
     </section>
+
+    <div id="casePreviewModal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="casePreviewTitle">
+      <div class="note-modal-card case-preview-card">
+        <header class="case-preview-header">
+          <h3 id="casePreviewTitle">Case Preview</h3>
+          <div class="case-preview-actions">
+            <button type="button" class="case-preview-close" aria-label="Close case preview" data-case-preview-close>&times;</button>
+          </div>
+        </header>
+        <div class="case-preview-meta">
+          <div>
+            <span class="case-preview-label">Field of Law</span>
+            <span data-case-preview-field>—</span>
+          </div>
+          <div>
+            <span class="case-preview-label">Location</span>
+            <span data-case-preview-location>—</span>
+          </div>
+          <div>
+            <span class="case-preview-label">Compensation</span>
+            <span data-case-preview-comp>—</span>
+          </div>
+          <div>
+            <span class="case-preview-label">Experience</span>
+            <span data-case-preview-experience>—</span>
+          </div>
+        </div>
+        <div class="case-preview-desc">
+          <span class="case-preview-label">Description</span>
+          <p data-case-preview-description>—</p>
+        </div>
+        <div class="case-preview-desc case-preview-tasks">
+          <span class="case-preview-label">Tasks</span>
+          <div data-case-preview-tasks>—</div>
+        </div>
+        <div class="note-modal-actions">
+          <a class="btn secondary" data-case-preview-receipt target="_blank" rel="noopener" hidden>Receipt</a>
+          <button type="button" class="btn secondary" data-case-preview-close>Close</button>
+        </div>
+      </div>
+    </div>
     <div class="tour-overlay" id="attorneyTourOverlay" aria-hidden="true"></div>
     <div class="tour-modal" id="attorneyTourModal" role="dialog" aria-modal="true" aria-labelledby="attorneyTourTitle" aria-describedby="attorneyTourText">
       <button type="button" class="tour-close" id="attorneyTourCloseBtn" aria-label="Close tour">×</button>
@@ -4440,6 +4652,18 @@
         </p>
         <div class="tour-actions">
           <button type="button" class="tour-btn primary" id="attorneyTourStartBtn">Start tour</button>
+        </div>
+      </div>
+    </div>
+    <div class="onboarding-overlay" id="attorneyCaseOnboardingOverlay" aria-hidden="true"></div>
+    <div class="onboarding-modal" id="attorneyCaseOnboardingModal" role="dialog" aria-modal="true" aria-labelledby="attorneyCaseOnboardingTitle" aria-describedby="attorneyCaseOnboardingText">
+      <button type="button" class="tour-close" data-case-onboarding-close aria-label="Close">×</button>
+      <div class="tour-hero" role="presentation"></div>
+      <div class="tour-content">
+        <div class="tour-title" id="attorneyCaseOnboardingTitle">Let’s Post Your First Case</div>
+        <p class="tour-text" id="attorneyCaseOnboardingText">Step 3 of 3: Click “+ New Case” to create a matter for paralegals to apply to.</p>
+        <div class="tour-actions">
+          <button type="button" class="tour-btn primary" data-case-onboarding-continue>Continue</button>
         </div>
       </div>
     </div>
@@ -4457,7 +4681,7 @@
   <div id="paymentMethodModal" class="payment-modal hidden" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="paymentModalTitle">
       <h3 id="paymentModalTitle">Add a card</h3>
-      <p>Save a card on file for faster escrow funding.</p>
+      <p>Save a card on file for faster funding.</p>
       <div id="paymentMethodForm" class="payment-method-form" hidden>
         <div id="paymentMethodElement" class="payment-element-host"></div>
         <div class="payment-errors" id="paymentMethodErrors" role="alert"></div>

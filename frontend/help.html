@@ -352,7 +352,7 @@
     <nav id="helpNav" aria-label="Primary">
       <a href="dashboard-attorney.html">Home</a>
       <a href="dashboard-attorney.html#cases">Cases &amp; Files</a>
-      <a href="dashboard-attorney.html#billing">Escrow</a>
+      <a href="dashboard-attorney.html#billing">Funds</a>
       <a href="help.html" class="active">Help</a>
     </nav>
     <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
@@ -362,11 +362,12 @@
   <main id="main" tabindex="-1" aria-labelledby="help-title">
     <h1 id="help-title">Help &amp; Support</h1>
     <p class="muted">Browse common questions about accounts, cases, messaging, and payouts.</p>
+    <p class="muted">Need help fast? <a href="contact.html">Contact Support</a>.</p>
 
     <section id="account">
       <h2>1) Account &amp; Login</h2>
       <p>Forgot your password? <a href="reset-password.html">Reset it here</a>. Still locked out? Make sure your browser isn’t auto-filling an old verification code if two-factor auth is on.</p>
-      <p>Need to update your email, profile, or security settings? Visit your <a href="settings.html">Settings</a> page or contact support.</p>
+      <p>Need to update your email, profile, or security settings? Visit your <a href="profile-settings.html">Settings</a> page or contact support.</p>
     </section>
 
     <section id="cases">
@@ -382,12 +383,12 @@
     </section>
 
     <section id="payments">
-      <h2>4) Payments &amp; Escrow</h2>
+      <h2>4) Payments &amp; Stripe</h2>
       <p class="lead">How funds move safely between attorneys and paralegals using Stripe.</p>
 
       <h3>Funding the job</h3>
       <p>When an attorney posts a flat-fee job, Stripe charges their card or bank method at checkout. We store only the necessary Stripe IDs, never full card numbers.</p>
-      <p>Funds remain in escrow until the attorney marks the work complete or a dispute is resolved.</p>
+      <p>Funds remain in Stripe until the attorney marks the work complete or a dispute is resolved.</p>
 
       <h3>Release &amp; payout</h3>
       <p>Once approved, a Stripe Transfer is sent to your Stripe Connect account.</p>
@@ -398,11 +399,11 @@
       <ul>
         <li>Platform fees are displayed in the case flow and are deducted automatically.</li>
         <li>All Stripe fees are paid for and covered by Let's-ParaConnect except in cases involving a dispute resulting in refund or partial refund.</li>
-        <li>Let's-ParaConnect charges a 22% platform fee to attorneys during the funding of escrow and is reflected on the receipt after job completion.</li>
-        <li>Let's-ParaConnect charges an 18% platform fee to paralegals that is automatically deducted out of the funds released by escrow after job completion.</li>
+        <li>Let's-ParaConnect charges a 22% platform fee to attorneys during the funding of Stripe and is reflected on the receipt after job completion.</li>
+        <li>Let's-ParaConnect charges an 18% platform fee to paralegals that is automatically deducted out of the funds released by Stripe after job completion.</li>
         <li>Let's-ParaConnect does not have subscription fees.</li>
         <li>Users are responsible for their own taxes. Stripe may collect additional forms when required.</li>
-        <li>Refunds can be processed before release. After release, refunds are handled between the client and paralegal unless otherwise required.</li>
+        <li>Refunds can be processed before release. After release, refunds are handled between the attorney and paralegal unless otherwise required.</li>
         <li>If a payment is reversed (chargeback), future payouts may be withheld or offset.</li>
       </ul>
 
@@ -457,7 +458,7 @@
         attorney: [
           { href: 'dashboard-attorney.html', label: 'Home' },
           { href: 'dashboard-attorney.html#cases', label: 'Cases & Files' },
-          { href: 'dashboard-attorney.html#billing', label: 'Escrow' },
+          { href: 'dashboard-attorney.html#billing', label: 'Funds' },
           { href: 'help.html', label: 'Help', active: true },
         ],
         paralegal: [

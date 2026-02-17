@@ -9,12 +9,8 @@ const CASE_STATE = Object.freeze({
 });
 
 const FUNDED_WORKSPACE_STATUSES = new Set([
-  "funded_in_progress",
   "in progress",
   "in_progress",
-  "active",
-  "awaiting_documents",
-  "reviewing",
 ]);
 
 function normalizeCaseStatus(value) {
@@ -23,6 +19,9 @@ function normalizeCaseStatus(value) {
   if (!trimmed) return "";
   const lower = trimmed.toLowerCase();
   if (lower === "in_progress") return "in progress";
+  if (["cancelled", "canceled"].includes(lower)) return "closed";
+  if (["assigned", "awaiting_funding"].includes(lower)) return "open";
+  if (["active", "awaiting_documents", "reviewing", "funded_in_progress"].includes(lower)) return "in progress";
   return lower;
 }
 
@@ -52,8 +51,6 @@ function viewerApplied(caseDoc, viewerId) {
 function resolveCaseState(caseDoc, { viewerId } = {}) {
   const status = normalizeCaseStatus(caseDoc?.status);
   if (!status) return "";
-  if (status === CASE_STATE.FUNDED_IN_PROGRESS) return CASE_STATE.FUNDED_IN_PROGRESS;
-
   const funded = isEscrowFunded(caseDoc);
   const hired = hasParalegal(caseDoc);
   if (funded && hired && FUNDED_WORKSPACE_STATUSES.has(status)) {
@@ -62,7 +59,7 @@ function resolveCaseState(caseDoc, { viewerId } = {}) {
 
   if (status === CASE_STATE.DRAFT) return CASE_STATE.DRAFT;
   if (status === CASE_STATE.APPLIED) return CASE_STATE.APPLIED;
-  if (status === CASE_STATE.OPEN || status === "assigned" || status === "awaiting_funding") {
+  if (status === CASE_STATE.OPEN) {
     return viewerApplied(caseDoc, viewerId) ? CASE_STATE.APPLIED : CASE_STATE.OPEN;
   }
 

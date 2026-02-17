@@ -98,6 +98,35 @@ function isVisibleForTour(target) {
 }
 
 let tourApi = null;
+const ATTORNEY_TOUR_STEP_KEY = "lpc_attorney_tour_step";
+const ATTORNEY_TOUR_ACTIVE_KEY = "lpc_attorney_tour_active";
+
+function getStoredTourProgress() {
+  try {
+    const active = sessionStorage.getItem(ATTORNEY_TOUR_ACTIVE_KEY) === "1";
+    if (!active) return null;
+    const rawStep = sessionStorage.getItem(ATTORNEY_TOUR_STEP_KEY);
+    const step = Number.parseInt(rawStep, 10);
+    if (Number.isNaN(step)) return { step: 0 };
+    return { step };
+  } catch {
+    return null;
+  }
+}
+
+function setTourProgress(stepIndex) {
+  try {
+    sessionStorage.setItem(ATTORNEY_TOUR_ACTIVE_KEY, "1");
+    sessionStorage.setItem(ATTORNEY_TOUR_STEP_KEY, String(stepIndex));
+  } catch {}
+}
+
+function clearTourProgress() {
+  try {
+    sessionStorage.removeItem(ATTORNEY_TOUR_ACTIVE_KEY);
+    sessionStorage.removeItem(ATTORNEY_TOUR_STEP_KEY);
+  } catch {}
+}
 
 function resolveStepTarget(step, { visibleOnly = false } = {}) {
   const candidates = [];
@@ -138,9 +167,13 @@ function consumeReplayFlag() {
 }
 
 async function initAttorneyTour(user = {}, options = {}) {
-  const force = Boolean(options.force);
+  const resumeStep = Number.isInteger(options.resumeStep) ? options.resumeStep : null;
+  const force = Boolean(options.force) || resumeStep !== null;
   if (tourApi) {
-    if (force) tourApi.start();
+    if (force) {
+      if (resumeStep !== null) tourApi.showStep(resumeStep);
+      else tourApi.start();
+    }
     return;
   }
 
@@ -192,8 +225,8 @@ async function initAttorneyTour(user = {}, options = {}) {
         "#paymentMethodSummary",
       ],
       view: "billing",
-      title: "Fund escrow",
-      text: "Add a payment method so escrow can be funded when you hire. Let's-ParaConnect is partnered with Stripe, and all payments flow through Stripe to hold escrow.",
+      title: "Fund Cases",
+      text: "Add a payment method so cases can be funded when you hire. Let's-ParaConnect is partnered with Stripe, and all funds flow through Stripe to hold and release payment.",
     },
     {
       selectors: ['[data-case-quick="create"]', '[data-quick-link="create-case"]'],
@@ -205,7 +238,7 @@ async function initAttorneyTour(user = {}, options = {}) {
       selector: '[data-quick-link="browse-paralegals"]',
       view: "home",
       title: "Browse paralegals",
-      text: "Find vetted paralegals and invite the right fit for your case. Paralegals can also apply to matters if you prefer not to invite directly.",
+      text: "Find vetted paralegals and invite the right fit to your case. Paralegals can also apply to matters if you prefer not to invite directly.",
     },
   ];
 
@@ -344,6 +377,7 @@ async function initAttorneyTour(user = {}, options = {}) {
   };
 
   const showIntro = () => {
+    setTourProgress(-1);
     showOverlay();
     ensureSidebarVisibleForTarget(null);
     overlay.classList.remove("spotlight");
@@ -377,6 +411,7 @@ async function initAttorneyTour(user = {}, options = {}) {
   const showStep = (index) => {
     if (!tourSteps[index]) return;
     stepIndex = index;
+    setTourProgress(stepIndex);
     const step = tourSteps[index];
     const run = () => {
       setProfileMenuOpen(Boolean(step.openProfileMenu));
@@ -389,7 +424,7 @@ async function initAttorneyTour(user = {}, options = {}) {
       stepTextEl.textContent = step.text || "";
       backBtn.disabled = index === 0;
       backBtn.style.visibility = index === 0 ? "hidden" : "visible";
-      nextBtn.textContent = index === tourSteps.length - 1 ? "Finish" : "Next";
+      nextBtn.textContent = index === tourSteps.length - 1 ? "Let's Get Started" : "Next";
 
       showOverlay();
       ensureSidebarVisibleForTarget(target);
@@ -431,11 +466,45 @@ async function initAttorneyTour(user = {}, options = {}) {
     tooltip.classList.remove("is-active");
     setProfileMenuOpen(false);
     hideOverlay();
+    clearTourProgress();
+  };
+
+  const startAttorneyOnboarding = () => {
+    try {
+      sessionStorage.setItem("lpc_attorney_onboarding_step", "profile");
+      sessionStorage.removeItem("lpc_attorney_onboarding_modal_seen_profile");
+      sessionStorage.removeItem("lpc_attorney_onboarding_modal_seen_payment");
+      sessionStorage.removeItem("lpc_attorney_onboarding_modal_seen_case");
+    } catch (_) {}
+  };
+
+  const buildProfileTourUrl = (href = "profile-settings.html", options = {}) => {
+    const { prompt = false, step = "profile" } = options;
+    try {
+      const url = new URL(href, window.location.href);
+      url.searchParams.set("tour", "1");
+      url.searchParams.set("onboardingStep", step);
+      if (prompt) {
+        url.searchParams.set("profilePrompt", "1");
+      }
+      return `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      const suffix = `?tour=1&onboardingStep=${encodeURIComponent(step)}`;
+      return prompt ? `profile-settings.html${suffix}&profilePrompt=1` : `profile-settings.html${suffix}`;
+    }
   };
 
   startBtn.addEventListener("click", () => showStep(0));
-  closeBtn?.addEventListener("click", completeTour);
-  tooltipCloseBtn?.addEventListener("click", completeTour);
+  closeBtn?.addEventListener("click", () => {
+    completeTour();
+    startAttorneyOnboarding();
+    window.location.href = buildProfileTourUrl("profile-settings.html", { prompt: true, step: "profile" });
+  });
+  tooltipCloseBtn?.addEventListener("click", () => {
+    completeTour();
+    startAttorneyOnboarding();
+    window.location.href = buildProfileTourUrl("profile-settings.html", { prompt: true, step: "profile" });
+  });
   backBtn.addEventListener("click", () => {
     if (stepIndex <= 0) return showIntro();
     showStep(stepIndex - 1);
@@ -443,6 +512,8 @@ async function initAttorneyTour(user = {}, options = {}) {
   nextBtn.addEventListener("click", () => {
     if (stepIndex < tourSteps.length - 1) return showStep(stepIndex + 1);
     completeTour();
+    startAttorneyOnboarding();
+    window.location.href = buildProfileTourUrl("profile-settings.html", { prompt: true, step: "profile" });
   });
 
   window.addEventListener("resize", () => {
@@ -457,7 +528,15 @@ async function initAttorneyTour(user = {}, options = {}) {
     complete: completeTour,
   };
 
-  showIntro();
+  if (resumeStep !== null) {
+    if (resumeStep === -1) {
+      showIntro();
+    } else {
+      showStep(Math.max(0, Math.min(resumeStep, tourSteps.length - 1)));
+    }
+  } else {
+    showIntro();
+  }
 }
 
 async function bootAttorneyTour() {
@@ -470,7 +549,16 @@ async function bootAttorneyTour() {
     user = stored || {};
   }
   const forceReplay = consumeReplayFlag();
-  setTimeout(() => initAttorneyTour(user || {}, { force: forceReplay }), 300);
+  const resume = forceReplay ? null : getStoredTourProgress();
+  if (forceReplay) clearTourProgress();
+  setTimeout(
+    () =>
+      initAttorneyTour(user || {}, {
+        force: Boolean(forceReplay || resume),
+        resumeStep: resume?.step ?? null,
+      }),
+    300
+  );
 }
 
 async function replayAttorneyTour() {

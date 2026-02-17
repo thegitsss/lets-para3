@@ -47,6 +47,7 @@ const caseNavStatuses = document.querySelectorAll("[data-case-nav-status]");
 
 const ATTACHMENT_DB = "lpc_case_attachments";
 const ATTACHMENT_STORE = "attachments";
+const MESSAGE_POLL_INTERVAL = 3000;
 const CASE_STATES = {
   DRAFT: "draft",
   OPEN: "open",
@@ -54,12 +55,8 @@ const CASE_STATES = {
   FUNDED_IN_PROGRESS: "funded_in_progress",
 };
 const FUNDED_WORKSPACE_STATUSES = new Set([
-  CASE_STATES.FUNDED_IN_PROGRESS,
   "in progress",
   "in_progress",
-  "active",
-  "awaiting_documents",
-  "reviewing",
 ]);
 let attachmentDbPromise = null;
 let dragDepth = 0;
@@ -74,6 +71,15 @@ const state = {
   pendingAttachments: [],
   optimisticDocuments: [],
   caseDocumentsById: new Map(),
+  messageCacheByCase: new Map(),
+  messageSnapshots: new Map(),
+  documentSnapshots: new Map(),
+  taskSnapshots: new Map(),
+  pendingRealtime: { messages: false, documents: false, tasks: false },
+  caseEventSource: null,
+  caseStreamActive: false,
+  messagePollTimer: null,
+  messagePolling: false,
   sending: false,
   completing: false,
   disputing: false,
@@ -84,6 +90,7 @@ const state = {
 
 let taskUpdateInFlight = false;
 let releaseFundsAnimationTimer = null;
+let taskLockWatcherBound = false;
 
 const timeFormatter = new Intl.DateTimeFormat(undefined, {
   hour: "numeric",
@@ -97,6 +104,8 @@ const dateFormatter = new Intl.DateTimeFormat(undefined, {
 const weekdayFormatter = new Intl.DateTimeFormat(undefined, {
   weekday: "long",
 });
+
+const PAYMENT_METHOD_UPDATE_MESSAGE = "Payment method needs to be updated before funds can be released.";
 
 function formatTime(value) {
   if (!value) return "";
@@ -384,6 +393,9 @@ function normalizeCaseStatus(value) {
   if (!trimmed) return "";
   const lower = trimmed.toLowerCase();
   if (lower === "in_progress") return "in progress";
+  if (["cancelled", "canceled"].includes(lower)) return "closed";
+  if (["assigned", "awaiting_funding"].includes(lower)) return "open";
+  if (["active", "awaiting_documents", "reviewing", "funded_in_progress"].includes(lower)) return "in progress";
   return lower;
 }
 
@@ -392,14 +404,18 @@ function isEscrowFunded(caseData) {
   return !!caseData?.escrowIntentId && escrowStatus === "funded";
 }
 
+function hasAssignedParalegal(caseData) {
+  return !!(caseData?.paralegal || caseData?.paralegalId);
+}
+
 function formatCaseStatus(value, caseData = {}) {
   const key = normalizeCaseStatus(value);
-  if (!key) return "Open";
-  const hasParalegal = !!(caseData?.paralegal || caseData?.paralegalId);
-  const escrowFunded = isEscrowFunded(caseData);
-  if (key === "awaiting_funding" || (hasParalegal && !escrowFunded && key !== "open")) {
-    return "Hired - Pending Funding";
-  }
+  const isDisputed = key === "disputed" || caseData?.terminationStatus === "disputed";
+  if (isDisputed) return "Disputed";
+  if (key === "in progress") return "In Progress";
+  if (key === "completed") return "Completed";
+  if (key === "closed") return "Closed";
+  if (!key || key === "open") return "Posted";
   return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
@@ -435,6 +451,7 @@ function ensureCompleteModalStyles() {
       font-weight:300;
       font-size:1.3rem;
       letter-spacing:.02em;
+      text-align:center;
     }
     .case-complete-modal p{
       margin:0;
@@ -444,7 +461,7 @@ function ensureCompleteModalStyles() {
     }
     .case-complete-actions{
       display:flex;
-      justify-content:flex-end;
+      justify-content:center;
       gap:10px;
       margin-top:8px;
       flex-wrap:wrap;
@@ -599,7 +616,7 @@ function openCompleteConfirmModal() {
     overlay.innerHTML = `
       <div class="case-complete-modal" role="dialog" aria-modal="true" aria-labelledby="caseCompleteTitle">
         <div class="case-complete-title" id="caseCompleteTitle">Complete &amp; Release Funds</div>
-        <p>Confirming will release escrow to the paralegal, lock messaging and file uploads, and archive the case.</p>
+        <p>Confirming will release escrow to the paralegal, lock messaging and file uploads, and archive the case. You can view the case and its contents in your Archive.</p>
         <div class="case-complete-actions">
           <button class="case-action-btn secondary" type="button" data-complete-cancel>Cancel</button>
           <button class="case-action-btn" type="button" data-complete-confirm>Complete &amp; Release Funds</button>
@@ -701,8 +718,6 @@ function viewerApplied(caseData) {
 function resolveCaseState(caseData) {
   const status = normalizeCaseStatus(caseData?.status);
   if (!status) return "";
-  if (status === CASE_STATES.FUNDED_IN_PROGRESS) return CASE_STATES.FUNDED_IN_PROGRESS;
-
   const hasParalegal = !!(caseData?.paralegal || caseData?.paralegalId);
   const escrowFunded = isEscrowFunded(caseData);
   if (hasParalegal && escrowFunded && FUNDED_WORKSPACE_STATUSES.has(status)) {
@@ -710,7 +725,7 @@ function resolveCaseState(caseData) {
   }
   if (status === CASE_STATES.DRAFT) return CASE_STATES.DRAFT;
   if (status === CASE_STATES.APPLIED) return CASE_STATES.APPLIED;
-  if (status === CASE_STATES.OPEN || status === "assigned" || status === "awaiting_funding") {
+  if (status === CASE_STATES.OPEN) {
     return viewerApplied(caseData) ? CASE_STATES.APPLIED : CASE_STATES.OPEN;
   }
   return status;
@@ -722,6 +737,8 @@ function isWorkspaceEligibleCase(caseData) {
   if (caseData.paymentReleased === true) return false;
   const status = normalizeCaseStatus(caseData?.status);
   if (!status || !FUNDED_WORKSPACE_STATUSES.has(status)) return false;
+  if (!isEscrowFunded(caseData)) return false;
+  if (!hasAssignedParalegal(caseData)) return false;
   return true;
 }
 
@@ -729,8 +746,6 @@ const CASE_SELECT_EXCLUDE_STATUSES = new Set([
   "draft",
   "completed",
   "closed",
-  "cancelled",
-  "canceled",
   "disputed",
   "archived",
 ]);
@@ -760,7 +775,7 @@ function workspaceLockCopy(caseState, caseData) {
     }
     return "Workspace is closed for this case.";
   }
-  if (["cancelled", "disputed"].includes(normalized)) {
+  if (["disputed"].includes(normalized)) {
     return "Workspace is closed for this case.";
   }
   return "Workspace unlocks once the case is funded and in progress.";
@@ -787,9 +802,21 @@ function isCompletedCase(caseData) {
 function getCompletionRedirect(caseData) {
   if (!isCompletedCase(caseData)) return "";
   const role = getCurrentUserRole();
-  if (role === "paralegal") return "dashboard-paralegal.html";
+  if (role === "paralegal") return "dashboard-paralegal.html#cases-completed";
   if (role === "admin") return "admin-dashboard.html";
-  return "dashboard-attorney.html#cases:archived";
+  const caseId = caseData?.id || caseData?.caseId || caseData?._id || "";
+  const highlightParam = caseId ? `?highlightCase=${encodeURIComponent(caseId)}` : "";
+  return `dashboard-attorney.html${highlightParam}#cases:archived`;
+}
+
+function getWorkspaceRedirect(caseData) {
+  const role = getCurrentUserRole();
+  if (role === "paralegal") return "dashboard-paralegal.html#cases";
+  if (role === "admin") return "admin-dashboard.html";
+  const caseId = caseData?.id || caseData?.caseId || caseData?._id || "";
+  return caseId
+    ? `dashboard-attorney.html?previewCaseId=${encodeURIComponent(caseId)}#cases`
+    : "dashboard-attorney.html#cases";
 }
 
 function removeWorkspaceActions() {
@@ -1217,6 +1244,25 @@ function syncRoleVisibility() {
     applyRoleVisibility(cachedRole);
     document.body.classList.toggle("role-attorney", cachedRole === "attorney");
   }
+}
+
+function normalizeAttorneyCaseTheme() {
+  const body = document.body;
+  const root = document.documentElement;
+  if (!body || !root) return;
+  if (!body.classList.contains("role-attorney")) return;
+  const overrides = {
+    "--bg": "#ffffff",
+    "--panel": "#fcfcfc",
+    "--muted": "#8a8a8a",
+    "--sidebar-text": "#1a1a1a",
+    "--sidebar-bg": "#f5f5f5e6",
+    "--app-background": "#ffffff",
+  };
+  Object.entries(overrides).forEach(([key, value]) => {
+    body.style.setProperty(key, value);
+    root.style.setProperty(key, value);
+  });
 }
 
 function resolveUploader(documentData) {
@@ -1706,6 +1752,16 @@ function setCompleteButtonLock(locked) {
   caseCompleteButton.disabled = isLocked || state.completing;
 }
 
+function bindTaskCompletionWatcher() {
+  if (!caseTaskList || taskLockWatcherBound) return;
+  taskLockWatcherBound = true;
+  caseTaskList.addEventListener("change", (event) => {
+    if (!event.target || event.target.type !== "checkbox") return;
+    if (!state.activeCase) return;
+    updateCompleteAction(state.activeCase, resolveCaseState(state.activeCase));
+  });
+}
+
 function ensureCompleteButtonBinding() {
   if (!caseCompleteButton || caseCompleteButton.dataset.bound === "true") return;
   caseCompleteButton.dataset.bound = "true";
@@ -1839,7 +1895,7 @@ function canEditTasks(caseData) {
   if (caseData?.readOnly) return false;
   if (isCompletedCase(caseData)) return false;
   const statusKey = normalizeCaseStatus(caseData?.status);
-  if (["cancelled", "disputed"].includes(statusKey)) return false;
+  if (["disputed"].includes(statusKey)) return false;
   return true;
 }
 
@@ -1884,7 +1940,10 @@ async function updateTaskCompletion(taskIndex, checked) {
   } finally {
     taskUpdateInFlight = false;
     if (caseTaskList) caseTaskList.setAttribute("aria-busy", "false");
-    if (state.activeCase) renderCaseOverview(state.activeCase);
+    if (state.activeCase) {
+      renderCaseOverview(state.activeCase);
+      state.taskSnapshots.set(caseId, getTaskSnapshot(state.activeCase));
+    }
   }
   return true;
 }
@@ -1978,9 +2037,14 @@ function renderCaseOverview(data) {
               checkbox.checked = !checkbox.checked;
               return;
             }
+            const refreshCompleteState = () => {
+              updateCompleteAction(state.activeCase || data, resolveCaseState(state.activeCase || data));
+            };
+            refreshCompleteState();
             const updated = await updateTaskCompletion(taskIndex, checkbox.checked);
             if (!updated) {
               checkbox.checked = !checkbox.checked;
+              refreshCompleteState();
             }
           });
         }
@@ -1989,6 +2053,7 @@ function renderCaseOverview(data) {
   }
 
   updateDisputeAction(data);
+  bindTaskCompletionWatcher();
   updateCompleteAction(data, resolveCaseState(data));
 }
 
@@ -2028,18 +2093,58 @@ function updateDisputeAction(caseData) {
   if (!caseDisputeButton) return;
   const statusKey = normalizeCaseStatus(caseData?.status);
   const isDisputed = statusKey === "disputed" || caseData?.terminationStatus === "disputed";
-  const isClosed = ["completed", "closed", "cancelled"].includes(statusKey);
+  const isClosed = ["completed", "closed"].includes(statusKey);
   caseDisputeButton.disabled = isDisputed || isClosed;
   if (caseDisputeStatus) {
     caseDisputeStatus.textContent = isDisputed ? "Dispute opened. Workspace paused." : "";
   }
 }
 
+function setCompletionStatusMessage(message) {
+  if (!caseCompleteStatus) return;
+  if (message === PAYMENT_METHOD_UPDATE_MESSAGE) {
+    caseCompleteStatus.innerHTML = `<a class="case-status-link" href="dashboard-attorney.html#billing">${message}</a>`;
+    return;
+  }
+  caseCompleteStatus.textContent = message || "";
+}
+
+function resolveCompletionIneligibleReason(caseData, caseState) {
+  const statusKey = normalizeCaseStatus(caseData?.status);
+  if (caseData?.paymentReleased || statusKey === "completed") {
+    return "This case is already completed and payment has been released.";
+  }
+  if (caseData?.readOnly || statusKey === "closed") {
+    return "This case is closed and read-only.";
+  }
+  if (statusKey === "disputed" || caseData?.terminationStatus === "disputed") {
+    return "This case is in dispute and cannot be completed.";
+  }
+  if (!hasAssignedParalegal(caseData)) {
+    return "Assign a paralegal before completing this case.";
+  }
+  if (!isEscrowFunded(caseData)) {
+    const fundingStatus = String(caseData?.escrowStatus || "").toLowerCase();
+    if (caseData?.escrowIntentId || fundingStatus) {
+      return "Funding isn't in place. Update the payment method if needed, then fund the case before releasing funds.";
+    }
+    return "Funding hasn't been added yet. Fund the case before releasing funds.";
+  }
+  if (caseState !== CASE_STATES.FUNDED_IN_PROGRESS) {
+    const label = formatCaseStatus(caseData?.status, caseData);
+    if (label && label !== "In Progress") {
+      return `Case must be In Progress to complete. Current status: ${label}.`;
+    }
+    return "Case must be in progress to complete.";
+  }
+  return "This case is not eligible for completion right now.";
+}
+
 async function handleCompleteCase() {
   if (state.completing) return;
   const caseId = state.activeCaseId;
   if (!caseId) {
-    showMsg(caseCompleteStatus, "Select a case before completing.");
+    setCompletionStatusMessage("Select a case before completing.");
     return;
   }
   const caseData = state.activeCase || {};
@@ -2056,7 +2161,7 @@ async function handleCompleteCase() {
     caseData?.paymentReleased ||
     statusKey === "completed"
   ) {
-    showMsg(caseCompleteStatus, "This case is not eligible for completion right now.");
+    setCompletionStatusMessage(resolveCompletionIneligibleReason(caseData, caseState));
     return;
   }
   const originalText = caseCompleteButton?.textContent || "";
@@ -2078,7 +2183,7 @@ async function handleCompleteCase() {
     await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/complete`, { method: "POST" });
     stopReleaseFundsAnimation();
     const confirmation = "Payment released. Case completed and archived.";
-    showMsg(caseCompleteStatus, confirmation);
+    setCompletionStatusMessage(confirmation);
     showMsg(messageStatus, confirmation);
     completionSucceeded = true;
     if (caseCompleteButton) {
@@ -2098,7 +2203,7 @@ async function handleCompleteCase() {
     await loadCase(caseId);
   } catch (err) {
     stopReleaseFundsAnimation();
-    showMsg(caseCompleteStatus, err.message || "Unable to complete this case.");
+    setCompletionStatusMessage(err.message || "Unable to complete this case.");
   } finally {
     stopReleaseFundsAnimation();
     state.completing = false;
@@ -2115,7 +2220,7 @@ async function handleDisputeCase() {
   if (!caseId) return;
   const caseData = state.activeCase || {};
   const statusKey = normalizeCaseStatus(caseData?.status);
-  if (["disputed", "closed", "cancelled", "completed"].includes(statusKey)) {
+  if (["disputed", "closed", "completed"].includes(statusKey)) {
     updateDisputeAction(caseData);
     return;
   }
@@ -2496,6 +2601,8 @@ function buildDefinition(term, value) {
 
 async function loadCase(caseId) {
   if (!caseId) return;
+  stopMessagePolling();
+  stopCaseStream();
   setActiveCase(caseId);
   state.forceScrollToBottom = true;
   await restorePendingAttachments(caseId);
@@ -2508,6 +2615,10 @@ async function loadCase(caseId) {
     if (completionRedirect) {
       removeWorkspaceActions();
       window.location.href = completionRedirect;
+      return;
+    }
+    if (!isWorkspaceEligibleCase(caseData)) {
+      window.location.href = getWorkspaceRedirect(caseData);
       return;
     }
     const caseState = resolveCaseState(caseData);
@@ -2527,6 +2638,7 @@ async function loadCase(caseId) {
     let serverDocuments = [];
     const cachedDocuments = state.caseDocumentsById.get(caseId) || [];
     const optimisticDocuments = getOptimisticDocumentsForCase(caseId);
+    state.taskSnapshots.set(caseId, getTaskSnapshot(caseData));
 
     try {
       const messagesData = await fetchJSON(`/api/messages/${encodeURIComponent(caseId)}`, {
@@ -2537,6 +2649,8 @@ async function loadCase(caseId) {
       showMsg(messageStatus, err.message || "Unable to load messages.");
     }
 
+    state.messageCacheByCase.set(caseId, messages);
+    state.messageSnapshots.set(caseId, getMessageSnapshot(messages));
     renderThreadItems(messages, optimisticDocuments, caseId);
 
     try {
@@ -2555,9 +2669,14 @@ async function loadCase(caseId) {
     renderSharedDocuments(documents, caseId);
     renderThreadItems(messages, documents, caseId);
     markCaseMessagesRead(caseId, messages);
+    state.documentSnapshots.set(caseId, getDocumentSnapshot(serverDocuments));
     if (state.unreadByCase.has(caseId)) {
       state.unreadByCase.set(caseId, 0);
       renderCaseList();
+    }
+    const streamStarted = startCaseStream(caseId);
+    if (!streamStarted) {
+      startMessagePolling();
     }
     showMsg(messageStatus, "");
   } catch (err) {
@@ -2590,6 +2709,294 @@ async function markCaseMessagesRead(caseId, messages = []) {
   } catch (err) {
     console.warn("Unable to mark messages read", err);
   }
+}
+
+function getMessageSnapshot(messages = []) {
+  let latestTime = 0;
+  let latestId = "";
+  messages.forEach((msg) => {
+    const stamp = msg?.updatedAt || msg?.createdAt || msg?.created;
+    if (!stamp) return;
+    const time = new Date(stamp).getTime();
+    if (Number.isNaN(time)) return;
+    if (time >= latestTime) {
+      latestTime = time;
+      latestId = msg?._id || msg?.id || latestId;
+    }
+  });
+  return { count: Array.isArray(messages) ? messages.length : 0, latestTime, latestId };
+}
+
+function getDocumentSnapshot(documents = []) {
+  let latestTime = 0;
+  let latestKey = "";
+  documents.forEach((doc) => {
+    const stamp = doc?.createdAt || doc?.uploadedAt || doc?.created;
+    if (!stamp) return;
+    const time = new Date(stamp).getTime();
+    if (Number.isNaN(time)) return;
+    if (time >= latestTime) {
+      latestTime = time;
+      latestKey = doc?.id || doc?._id || getDocumentKey(doc) || latestKey;
+    }
+  });
+  return { count: Array.isArray(documents) ? documents.length : 0, latestTime, latestKey };
+}
+
+function getTaskSnapshot(caseData) {
+  const tasks = getCaseTasks(caseData);
+  const signature = tasks
+    .map((task) => {
+      const title = String(getTaskTitle(task) || "").trim();
+      if (!title) return "";
+      const completed = isTaskCompleted(task) ? "1" : "0";
+      return `${title}:${completed}`;
+    })
+    .filter(Boolean)
+    .join("|");
+  return { count: tasks.length, signature };
+}
+
+function hasMessageSnapshotChanged(previous, next) {
+  if (!previous) return true;
+  return (
+    previous.count !== next.count ||
+    previous.latestTime !== next.latestTime ||
+    previous.latestId !== next.latestId
+  );
+}
+
+function hasDocumentSnapshotChanged(previous, next) {
+  if (!previous) return true;
+  return (
+    previous.count !== next.count ||
+    previous.latestTime !== next.latestTime ||
+    previous.latestKey !== next.latestKey
+  );
+}
+
+function hasTaskSnapshotChanged(previous, next) {
+  if (!previous) return true;
+  return previous.count !== next.count || previous.signature !== next.signature;
+}
+
+function stopMessagePolling() {
+  if (state.messagePollTimer) {
+    clearInterval(state.messagePollTimer);
+    state.messagePollTimer = null;
+  }
+}
+
+function startMessagePolling() {
+  stopMessagePolling();
+  if (!state.activeCaseId) return;
+  state.messagePollTimer = setInterval(() => refreshCaseRealtime(), MESSAGE_POLL_INTERVAL);
+}
+
+function stopCaseStream() {
+  if (state.caseEventSource) {
+    state.caseEventSource.close();
+    state.caseEventSource = null;
+  }
+  state.caseStreamActive = false;
+}
+
+function startCaseStream(caseId) {
+  stopCaseStream();
+  if (!caseId || typeof EventSource === "undefined") return false;
+  const source = new EventSource(`/api/cases/${encodeURIComponent(caseId)}/stream`);
+  state.caseEventSource = source;
+
+  const handleRefresh = (scope) => {
+    void queueRealtimeRefresh(scope);
+  };
+
+  source.addEventListener("open", () => {
+    state.caseStreamActive = true;
+    stopMessagePolling();
+  });
+
+  source.addEventListener("error", () => {
+    state.caseStreamActive = false;
+    if (!state.messagePollTimer) startMessagePolling();
+  });
+
+  source.addEventListener("messages", () => handleRefresh({ messages: true }));
+  source.addEventListener("documents", () => handleRefresh({ documents: true }));
+  source.addEventListener("tasks", () => handleRefresh({ tasks: true }));
+  source.addEventListener("case", () =>
+    handleRefresh({ messages: true, documents: true, tasks: true })
+  );
+  source.addEventListener("ping", () => {});
+
+  return true;
+}
+
+function mergeRealtimeFlags(base, next) {
+  const safeBase = base || {};
+  const safeNext = next || {};
+  return {
+    messages: Boolean(safeBase.messages || safeNext.messages),
+    documents: Boolean(safeBase.documents || safeNext.documents),
+    tasks: Boolean(safeBase.tasks || safeNext.tasks),
+  };
+}
+
+function normalizeRealtimeScope(scope) {
+  if (!scope) return { messages: true, documents: true, tasks: true };
+  return {
+    messages: Boolean(scope.messages),
+    documents: Boolean(scope.documents),
+    tasks: Boolean(scope.tasks),
+  };
+}
+
+async function queueRealtimeRefresh(scope) {
+  const normalized = normalizeRealtimeScope(scope);
+  state.pendingRealtime = mergeRealtimeFlags(state.pendingRealtime, normalized);
+  if (state.messagePolling) return;
+  const pending = { ...state.pendingRealtime };
+  state.pendingRealtime = { messages: false, documents: false, tasks: false };
+  await refreshCaseRealtime(pending);
+}
+
+async function refreshCaseRealtime(options = null) {
+  const fetchMessages = options ? !!options.messages : true;
+  const fetchDocuments = options ? !!options.documents : true;
+  const fetchTasks = options ? !!options.tasks : true;
+  const caseId = state.activeCaseId;
+  if (!caseId || state.sending || state.messagePolling) {
+    if (options) {
+      state.pendingRealtime = mergeRealtimeFlags(state.pendingRealtime, options);
+    }
+    return false;
+  }
+  if (!state.workspaceEnabled && (fetchMessages || fetchDocuments)) {
+    if (options) {
+      state.pendingRealtime = mergeRealtimeFlags(state.pendingRealtime, options);
+    }
+    return false;
+  }
+  if (document.hidden) {
+    if (options) {
+      state.pendingRealtime = mergeRealtimeFlags(state.pendingRealtime, options);
+    }
+    return false;
+  }
+  state.messagePolling = true;
+  try {
+    let messages = null;
+    let documents = null;
+    let caseData = null;
+    let messagesOk = false;
+    let documentsOk = false;
+
+    if (fetchMessages) {
+      try {
+        const messagesData = await fetchJSON(`/api/messages/${encodeURIComponent(caseId)}`, {
+          cache: "no-store",
+        });
+        messages = normalizeMessages(messagesData);
+        messagesOk = true;
+      } catch (err) {
+        console.warn("Unable to refresh messages", err);
+      }
+    }
+
+    if (fetchDocuments) {
+      try {
+        const documentsData = await fetchJSON(`/api/uploads/case/${encodeURIComponent(caseId)}`, {
+          cache: "no-store",
+        });
+        documents = normalizeDocuments(documentsData);
+        documentsOk = true;
+      } catch (err) {
+        console.warn("Unable to refresh documents", err);
+      }
+    }
+
+    if (fetchTasks && !taskUpdateInFlight) {
+      try {
+        caseData = await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}`, {
+          cache: "no-store",
+        });
+      } catch (err) {
+        console.warn("Unable to refresh case data", err);
+      }
+    }
+
+    if (caseId !== state.activeCaseId) return;
+
+    const cachedMessages = state.messageCacheByCase.get(caseId) || [];
+    const cachedDocuments = state.caseDocumentsById.get(caseId) || [];
+    const optimisticDocuments = getOptimisticDocumentsForCase(caseId);
+    const threadMessages = messagesOk ? messages : cachedMessages;
+    const serverDocuments = documentsOk ? documents : cachedDocuments;
+    const mergedDocuments = mergeDocuments(serverDocuments, optimisticDocuments);
+
+    const messageSnapshot = getMessageSnapshot(threadMessages);
+    const previousMessage = state.messageSnapshots.get(caseId);
+    const documentSnapshot = getDocumentSnapshot(serverDocuments);
+    const previousDocument = state.documentSnapshots.get(caseId);
+
+    const messagesChanged =
+      messagesOk && hasMessageSnapshotChanged(previousMessage, messageSnapshot);
+    const documentsChanged =
+      documentsOk && hasDocumentSnapshotChanged(previousDocument, documentSnapshot);
+
+    if (messagesOk) {
+      state.messageCacheByCase.set(caseId, threadMessages);
+      if (messagesChanged) {
+        state.messageSnapshots.set(caseId, messageSnapshot);
+      }
+    }
+    if (documentsOk) {
+      state.caseDocumentsById.set(caseId, serverDocuments);
+      if (documentsChanged) {
+        state.documentSnapshots.set(caseId, documentSnapshot);
+      }
+    }
+
+    if (messagesChanged || documentsChanged) {
+      if (documentsChanged) {
+        renderSharedDocuments(mergedDocuments, caseId);
+      }
+      renderThreadItems(threadMessages, mergedDocuments, caseId);
+      if (messagesOk) {
+        markCaseMessagesRead(caseId, threadMessages);
+        if (state.unreadByCase.has(caseId)) {
+          state.unreadByCase.set(caseId, 0);
+          renderCaseList();
+        }
+      }
+    }
+
+    if (caseData && !taskUpdateInFlight) {
+      const completionRedirect = getCompletionRedirect(caseData);
+      if (completionRedirect) {
+        removeWorkspaceActions();
+        window.location.href = completionRedirect;
+        return true;
+      }
+      const taskSnapshot = getTaskSnapshot(caseData);
+      const previousTask = state.taskSnapshots.get(caseId);
+      if (hasTaskSnapshotChanged(previousTask, taskSnapshot)) {
+        state.activeCase = { ...state.activeCase, ...caseData };
+        state.taskSnapshots.set(caseId, taskSnapshot);
+        renderCaseOverview(state.activeCase);
+      }
+    }
+  } catch (err) {
+    console.warn("Unable to refresh messages", err);
+  } finally {
+    state.messagePolling = false;
+    const pending = state.pendingRealtime;
+    if (pending && (pending.messages || pending.documents || pending.tasks)) {
+      state.pendingRealtime = { messages: false, documents: false, tasks: false };
+      await refreshCaseRealtime(pending);
+    }
+  }
+  return true;
 }
 
 async function handleSendMessage(event) {
@@ -2896,6 +3303,7 @@ function initTasksHelpPopover() {
 function init() {
   syncThemeFromSession();
   syncRoleVisibility();
+  normalizeAttorneyCaseTheme();
   loadUserHeaderInfo().catch(() => {});
   initBackButton();
   initProfileMenu();
@@ -2926,6 +3334,15 @@ function init() {
     messagePanel.addEventListener("dragleave", handleDragLeave);
     messagePanel.addEventListener("drop", handleDrop);
   }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      refreshCaseRealtime({ messages: true, documents: true, tasks: true });
+    }
+  });
+  window.addEventListener("beforeunload", () => {
+    stopCaseStream();
+    stopMessagePolling();
+  });
   if (caseList) {
     caseList.addEventListener("click", handleCaseListClick);
   }

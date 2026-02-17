@@ -1,6 +1,9 @@
 import { secureFetch, persistSession, getStoredSession } from "./auth.js";
 import { STRIPE_GATE_MESSAGE } from "./utils/stripe-connect.js";
 
+const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
+const ATTORNEY_ONBOARDING_MODAL_SEEN_KEY = "lpc_attorney_onboarding_modal_seen";
+
 const DEFAULT_AVATAR_DATA = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
   `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'>
     <rect width='220' height='220' rx='110' fill='#f1f5f9'/>
@@ -9,7 +12,73 @@ const DEFAULT_AVATAR_DATA = `data:image/svg+xml;charset=UTF-8,${encodeURICompone
   </svg>`
 )}`;
 
+function getAttorneyOnboardingStep() {
+  try {
+    return sessionStorage.getItem(ATTORNEY_ONBOARDING_STEP_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setAttorneyOnboardingStep(step) {
+  try {
+    if (!step) {
+      sessionStorage.removeItem(ATTORNEY_ONBOARDING_STEP_KEY);
+      return;
+    }
+    sessionStorage.setItem(ATTORNEY_ONBOARDING_STEP_KEY, step);
+  } catch {}
+}
+
+function clearAttorneyOnboardingStep() {
+  try {
+    sessionStorage.removeItem(ATTORNEY_ONBOARDING_STEP_KEY);
+  } catch {}
+}
+
+function getAttorneyOnboardingModalSeen(step = "profile") {
+  try {
+    return sessionStorage.getItem(`${ATTORNEY_ONBOARDING_MODAL_SEEN_KEY}_${step}`) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setAttorneyOnboardingModalSeen(step = "profile") {
+  try {
+    sessionStorage.setItem(`${ATTORNEY_ONBOARDING_MODAL_SEEN_KEY}_${step}`, "1");
+  } catch {}
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  let suppressProfileToast = false;
+  let showOnboardingModal = false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const onboardingStep = params.get("onboardingStep");
+    const shouldPrompt = params.get("profilePrompt") === "1";
+    const onboardingStatus = params.get("onboarding");
+    if (onboardingStep) {
+      setAttorneyOnboardingStep(onboardingStep);
+      params.delete("onboardingStep");
+    } else if (shouldPrompt) {
+      setAttorneyOnboardingStep("profile");
+      suppressProfileToast = true;
+      showOnboardingModal = true;
+    }
+    if (onboardingStatus === "success" && getAttorneyOnboardingStep() === "security" && isAttorneyRole()) {
+      setAttorneyOnboardingStep("case");
+      window.location.href = "dashboard-attorney.html#cases";
+      return;
+    }
+    if (onboardingStep || shouldPrompt) {
+      params.delete("profilePrompt");
+      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}${window.location.hash}`;
+      window.history.replaceState(null, "", next);
+    }
+  } catch (_) {
+    /* noop */
+  }
   const navItems = {
     navProfile: "profileSection",
     navSecurity: "securitySection",
@@ -63,6 +132,16 @@ document.addEventListener("DOMContentLoaded", () => {
     ? navItems[initialNav.id]
     : navItems.navProfile;
   setActiveSection(initialSectionId);
+  const stepToRun = getAttorneyOnboardingStep();
+  runAttorneyOnboardingStep(stepToRun, { silent: suppressProfileToast && stepToRun === "profile" });
+  if (showOnboardingModal || (stepToRun === "profile" && !getAttorneyOnboardingModalSeen("profile"))) {
+    bindAttorneyOnboardingModal();
+    showAttorneyOnboardingModal(
+      "Step 1 of 3: Complete your profile, then click Save changes.",
+      "profile",
+      "Let’s Get Started"
+    );
+  }
 
   const dashboardLink = document.getElementById("dashboardReturnLink");
   if (dashboardLink) {
@@ -2837,6 +2916,26 @@ async function handleAttorneyProfileSave() {
     saveBtn.textContent = "Saving…";
   }
   try {
+    const hadStagedPhoto = Boolean(settingsState.stagedProfilePhotoFile);
+    const preservedPhoto =
+      currentUser?.profileImage ||
+      currentUser?.avatarURL ||
+      settingsState.profileImage ||
+      settingsState.stagedProfilePhotoUrl ||
+      "";
+    if (settingsState.stagedProfilePhotoFile) {
+      try {
+        const uploadPayload = await uploadProfilePhotoFile(
+          settingsState.stagedProfilePhotoFile,
+          settingsState.stagedProfilePhotoOriginalFile
+        );
+        applyProfilePhotoUploadResult(uploadPayload, { suppressToast: true });
+      } catch (err) {
+        console.error("Unable to upload profile photo", err);
+        showToast("Unable to upload photo. Please try again.", "err");
+        return;
+      }
+    }
     const payload = collectAttorneyPayload();
     const res = await secureFetch("/api/users/me", {
       method: "PATCH",
@@ -2846,10 +2945,16 @@ async function handleAttorneyProfileSave() {
     if (!res.ok) {
       throw new Error(updatedUser?.error || "Unable to save profile");
     }
-    currentUser = mergeSessionPreferences(updatedUser);
+    if (preservedPhoto && !updatedUser.profileImage && !updatedUser.avatarURL) {
+      updatedUser.profileImage = preservedPhoto;
+      updatedUser.avatarURL = preservedPhoto;
+    }
+    const baseUser = currentUser || getCachedUser() || {};
+    currentUser = mergeSessionPreferences({ ...baseUser, ...updatedUser });
     persistSession({ user: currentUser });
     window.updateSessionUser?.(currentUser);
-    settingsState.profileImage = updatedUser.profileImage || settingsState.profileImage;
+    settingsState.profileImage =
+      updatedUser.profileImage || updatedUser.avatarURL || settingsState.profileImage || preservedPhoto;
     settingsState.profileImageOriginal = updatedUser.profileImageOriginal || settingsState.profileImageOriginal;
     settingsState.pendingProfileImage = updatedUser.pendingProfileImage || settingsState.pendingProfileImage;
     settingsState.pendingProfileImageOriginal =
@@ -2866,6 +2971,28 @@ async function handleAttorneyProfileSave() {
     hydrateAttorneyProfileForm(updatedUser);
     updatePhotoReviewStatus(updatedUser);
     showToast("Profile updated!", "ok");
+    if (hadStagedPhoto) {
+      try {
+        const verifyRes = await secureFetch("/api/users/me", {
+          headers: { Accept: "application/json" },
+          noRedirect: true
+        });
+        if (verifyRes.ok) {
+          const verifiedUser = await verifyRes.json().catch(() => ({}));
+          currentUser = mergeSessionPreferences({ ...(currentUser || {}), ...(verifiedUser || {}) });
+          persistSession({ user: currentUser });
+          window.updateSessionUser?.(currentUser);
+          applyAvatar(currentUser);
+          updateAttorneyAvatarPreview(currentUser);
+        }
+      } catch (err) {
+        console.warn("Unable to verify profile photo save", err);
+      }
+    }
+    if (getAttorneyOnboardingStep() === "profile" && isAttorneyRole()) {
+      setAttorneyOnboardingStep("payment");
+      runAttorneyOnboardingStep("payment");
+    }
   } catch (err) {
     console.error("Failed to save attorney profile", err);
     showToast("Unable to save profile right now.", "err");
@@ -3391,6 +3518,139 @@ function showToast(message, type = "info") {
     } else {
       console.log(`[toast:${type}] ${message}`);
     }
+  }
+}
+
+function isAttorneyRole() {
+  const cachedUser = getCachedUser();
+  const session = getStoredSession?.();
+  const role = String(cachedUser?.role || session?.role || session?.user?.role || "").toLowerCase();
+  return role === "attorney";
+}
+
+function clearOnboardingHighlights() {
+  document.querySelectorAll(".onboarding-pulse").forEach((el) => el.classList.remove("onboarding-pulse"));
+}
+
+let attorneyOnboardingModalBound = false;
+let attorneyOnboardingScrollY = 0;
+let attorneyOnboardingBodyOverflow = "";
+
+function bindAttorneyOnboardingModal() {
+  if (attorneyOnboardingModalBound) return;
+  const modal = document.getElementById("attorneyOnboardingModal");
+  if (!modal) return;
+  attorneyOnboardingModalBound = true;
+  const overlay = document.getElementById("attorneyOnboardingOverlay");
+  const closeBtn = modal.querySelector("[data-onboarding-close]");
+  const continueBtn = modal.querySelector("[data-onboarding-continue]");
+
+  const handleClose = () => {
+    hideAttorneyOnboardingModal();
+  };
+
+  closeBtn?.addEventListener("click", handleClose);
+  continueBtn?.addEventListener("click", () => {
+    const step = modal.dataset.onboardingStep || "profile";
+    hideAttorneyOnboardingModal();
+    runAttorneyOnboardingStep(step, { silent: true });
+    if (step === "profile") {
+      const saveBtn = document.getElementById("saveAttorneyProfile") || document.getElementById("attorneyProfileSaveBtn");
+      saveBtn?.focus?.();
+    } else if (step === "payment") {
+      window.location.href = "dashboard-attorney.html#billing";
+    }
+  });
+  overlay?.addEventListener("click", (event) => {
+    event.preventDefault();
+    handleClose();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && modal.classList.contains("is-active")) {
+      handleClose();
+    }
+  });
+}
+
+function showAttorneyOnboardingModal(message, step = "profile", title) {
+  const modal = document.getElementById("attorneyOnboardingModal");
+  const overlay = document.getElementById("attorneyOnboardingOverlay");
+  if (!modal || !overlay) return;
+  const text = document.getElementById("attorneyOnboardingText");
+  const titleEl = document.getElementById("attorneyOnboardingTitle");
+  if (text && message) text.textContent = message;
+  if (titleEl && title) titleEl.textContent = title;
+  modal.dataset.onboardingStep = step;
+  attorneyOnboardingScrollY = window.scrollY || 0;
+  attorneyOnboardingBodyOverflow = document.body.style.overflow || "";
+  document.body.style.overflow = "hidden";
+  overlay.classList.add("is-active");
+  overlay.setAttribute("aria-hidden", "false");
+  modal.classList.add("is-active");
+  modal.setAttribute("aria-hidden", "false");
+  setAttorneyOnboardingModalSeen(step);
+}
+
+function hideAttorneyOnboardingModal() {
+  const modal = document.getElementById("attorneyOnboardingModal");
+  const overlay = document.getElementById("attorneyOnboardingOverlay");
+  if (!modal || !overlay) return;
+  overlay.classList.remove("is-active");
+  overlay.setAttribute("aria-hidden", "true");
+  modal.classList.remove("is-active");
+  modal.setAttribute("aria-hidden", "true");
+  document.body.style.overflow = attorneyOnboardingBodyOverflow;
+  window.scrollTo({ top: attorneyOnboardingScrollY, left: 0, behavior: "instant" });
+}
+
+function ensureAttorneyBillingCTA() {
+  const stripeBtn = document.getElementById("connectStripeBtn");
+  if (!stripeBtn) return null;
+  const block = stripeBtn.closest(".settings-block");
+  if (!block) return null;
+  let billingBtn = document.getElementById("attorneyBillingSetupBtn");
+  if (!billingBtn) {
+    billingBtn = document.createElement("button");
+    billingBtn.type = "button";
+    billingBtn.id = "attorneyBillingSetupBtn";
+    billingBtn.className = "btn btn-outline";
+    billingBtn.textContent = "Go to Billing & Add Card";
+    block.appendChild(billingBtn);
+  }
+  billingBtn.onclick = () => {
+    setAttorneyOnboardingStep("payment");
+    window.location.href = "dashboard-attorney.html#billing";
+  };
+  return billingBtn;
+}
+
+function runAttorneyOnboardingStep(step, options = {}) {
+  const silent = Boolean(options.silent);
+  if (!step || !isAttorneyRole()) return;
+  clearOnboardingHighlights();
+
+  if (step === "profile") {
+    const saveBtn = document.getElementById("saveAttorneyProfile") || document.getElementById("attorneyProfileSaveBtn");
+    if (saveBtn) saveBtn.classList.add("onboarding-pulse");
+    return;
+  }
+
+  if (step === "payment") {
+    if (!silent && !getAttorneyOnboardingModalSeen("payment")) {
+      bindAttorneyOnboardingModal();
+      showAttorneyOnboardingModal(
+        "Step 2 of 3: Set up payments for Stripe.",
+        "payment",
+        "Set Up Payments"
+      );
+      return;
+    }
+    window.location.href = "dashboard-attorney.html#billing";
+    return;
+  }
+
+  if (step === "payment") {
+    window.location.href = "dashboard-attorney.html#billing";
   }
 }
 

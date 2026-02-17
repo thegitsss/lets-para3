@@ -7,12 +7,8 @@ const API_CASE_FILE_DOWNLOAD = (caseId, fileId) =>
   `/api/uploads/case/${encodeURIComponent(caseId)}/${encodeURIComponent(fileId)}/download`;
 const FIELD_FALLBACK = "—";
 const FUNDED_WORKSPACE_STATUSES = new Set([
-  "funded_in_progress",
   "in progress",
   "in_progress",
-  "active",
-  "awaiting_documents",
-  "reviewing",
 ]);
 
 let CSRF = null;
@@ -463,6 +459,9 @@ function normalizeCaseStatus(value) {
   if (!trimmed) return "";
   const lower = trimmed.toLowerCase();
   if (lower === "in_progress") return "in progress";
+  if (["cancelled", "canceled"].includes(lower)) return "closed";
+  if (["assigned", "awaiting_funding"].includes(lower)) return "open";
+  if (["active", "awaiting_documents", "reviewing", "funded_in_progress"].includes(lower)) return "in progress";
   return lower;
 }
 

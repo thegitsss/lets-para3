@@ -180,6 +180,57 @@ flex:1;
 padding:40px;
 overflow-y:auto;
 }
+
+.health-banner{
+display:flex;
+align-items:center;
+gap:0.6rem;
+padding:0.65rem 0.9rem;
+border:1px solid var(--line);
+border-radius:12px;
+background:#f7f4ec;
+color:var(--ink);
+font-size:0.92rem;
+margin:0.4rem 0 1.2rem;
+}
+
+.health-dot{
+width:10px;
+height:10px;
+border-radius:50%;
+background:#94a3b8;
+box-shadow:0 0 0 4px rgba(148,163,184,0.12);
+}
+
+.health-banner.is-ok{
+border-color:rgba(16,185,129,0.3);
+background:#ecfdf3;
+}
+
+.health-banner.is-ok .health-dot{
+background:#10b981;
+box-shadow:0 0 0 4px rgba(16,185,129,0.18);
+}
+
+.health-banner.is-warn{
+border-color:rgba(234,179,8,0.3);
+background:#fffbeb;
+}
+
+.health-banner.is-warn .health-dot{
+background:#eab308;
+box-shadow:0 0 0 4px rgba(234,179,8,0.18);
+}
+
+.health-banner.is-bad{
+border-color:rgba(239,68,68,0.3);
+background:#fef2f2;
+}
+
+.health-banner.is-bad .health-dot{
+background:#ef4444;
+box-shadow:0 0 0 4px rgba(239,68,68,0.18);
+}
 html.js .main{
 opacity:0.85;
 transform:translateY(4px);
@@ -606,7 +657,7 @@ font-size:.95rem;
 <a href="#" class="active" data-section="overview">Overview</a>
 <a href="#" data-section="user-management">User Management</a>
 <a href="#" data-section="photo-reviews">Photo Reviews</a>
-<a href="#" data-section="escrow">Escrow</a>
+<a href="#" data-section="escrow">Stripe</a>
 <a href="#" data-section="disputes">Disputes</a>
 <a href="#" data-section="revenue">Revenue</a>
 <a href="#" data-section="posts">Posts</a>
@@ -627,9 +678,14 @@ font-size:.95rem;
 <h1>Welcome, Admin</h1>
 </header>
 
+<div class="health-banner" id="healthBanner" role="status" aria-live="polite">
+  <span class="health-dot" aria-hidden="true"></span>
+  <span id="healthBannerText">System status: Checking…</span>
+</div>
+
 <div class="metrics">
 <div class="metric"><h3>Total Users</h3><p id="totalUsers">0</p></div>
-<div class="metric"><h3>Funds in Escrow</h3><p id="escrowTotal">—</p></div>
+<div class="metric"><h3>Funds in Stripe</h3><p id="escrowTotal">—</p></div>
 <div class="metric"><h3>Active Cases</h3><p id="activeCases">0</p></div>
 <div class="metric"><h3>Pending Approvals</h3><p id="pendingUsers">0</p></div>
 </div>
@@ -656,13 +712,13 @@ font-size:.95rem;
 
 <!-- Escrow -->
 <div class="panel" id="escrowPanel">
-<h2 onclick="togglePanel('escrowPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('escrowPanel');}" role="button" tabindex="0" aria-expanded="true">Escrow Overview <span>▾</span></h2>
+<h2 onclick="togglePanel('escrowPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('escrowPanel');}" role="button" tabindex="0" aria-expanded="true">Payment Overview <span>▾</span></h2>
 <div class="panel-content">
 <canvas id="escrowChart" height="90"></canvas>
 <table>
 <thead><tr><th>Case</th><th>Attorney</th><th>Paralegal</th><th>Held</th><th>Status</th></tr></thead>
 <tbody id="escrowBody">
-<tr><td colspan="5" style="text-align:center;color:var(--muted)">No escrow data yet</td></tr>
+<tr><td colspan="5" style="text-align:center;color:var(--muted)">No payment data yet</td></tr>
 </tbody>
 </table>
 <button class="btn secondary" onclick="pauseReportActivity(0)">Pause & Report Activity</button>
@@ -928,14 +984,14 @@ font-size:.95rem;
 <!-- ESCROW -->
 <section id="section-escrow" class="section">
 <header>
-<h1>Escrow Dashboard</h1>
-<p>Monitor all escrow activities — deposits, withdrawals, charges, and tickets.</p>
+<h1>Funds Dashboard</h1>
+<p>Monitor all Stripe activities — deposits, withdrawals, charges, and tickets.</p>
 </header>
 
 <!-- Top Chart Row -->
 <div class="grid-two escrow-chart-row">
 <div class="panel">
-<h2>Monthly Escrow Report</h2>
+<h2>Monthly Funds Report</h2>
 <canvas id="escrowReportChart" height="90"></canvas>
 </div>
 
@@ -967,7 +1023,7 @@ font-size:.95rem;
 <!-- Tickets -->
 <div class="panel">
 <h2>Recent Tickets</h2>
-<p class="small">Escrow support requests and dispute tickets.</p>
+<p class="small">Funds support requests and dispute tickets.</p>
 <button class="btn secondary" type="button" id="recentTicketsBtn">View Recent Tickets</button>
 </div>
 </div>
@@ -998,11 +1054,11 @@ font-size:.95rem;
 <div id="escrowDetails" class="details-modal hidden">
 <div class="details-content">
 <div class="details-header">
-<h2>Escrow Details</h2>
+<h2>Payment Details</h2>
 <button class="btn secondary" data-escrow-close>Close ✕</button>
 </div>
 <div class="breadcrumb">
-<a href="#" onclick="closeEscrowDetails()">🏠 Home</a> → Escrow Details
+<a href="#" onclick="closeEscrowDetails()">🏠 Home</a> → Funds Details
 </div>
 
 <div class="detail-panel">
@@ -1013,7 +1069,7 @@ font-size:.95rem;
 <tr><td><strong>Title</strong></td><td>Website Development</td></tr>
 <tr><td><strong>Attorney</strong></td><td>John Doe</td></tr>
 <tr><td><strong>Paralegal</strong></td><td>Jane Smith</td></tr>
-<tr><td><strong>Buyer’s Email</strong></td><td>client@email.com</td></tr>
+<tr><td><strong>Attorney Email</strong></td><td>attorney@email.com</td></tr>
 <tr><td><strong>Charge Payer</strong></td><td><span class="highlight-text">Buyer(50%) - Seller(50%)</span></td></tr>
 <tr><td><strong>Status</strong></td><td>Active</td></tr>
 <tr><td><strong>Amount</strong></td><td>—</td></tr>
@@ -1063,7 +1119,7 @@ font-size:.95rem;
 <th>Parties</th>
 <th>Dispute</th>
 <th>Status</th>
-<th>Escrow</th>
+<th>Funds</th>
 <th>Actions</th>
 </tr>
 </thead>
@@ -1397,9 +1453,31 @@ const sidebarNav=document.getElementById("sidebarNav");
 const sidebarBackdrop=document.getElementById("sidebarBackdrop");
 const ACTIVE_SECTION_KEY="adminActiveSection";
 const SCROLL_POS_KEY="adminScrollY";
+const healthBanner=document.getElementById("healthBanner");
+const healthBannerText=document.getElementById("healthBannerText");
 const refreshCharts=()=>{
 if(!window.dashboardCharts?.length) return;
 window.dashboardCharts.forEach(chart=>chart.resize());
+};
+
+const refreshHealth=async()=>{
+if(!healthBanner||!healthBannerText) return;
+healthBanner.classList.remove("is-ok","is-warn","is-bad");
+try{
+const res=await fetch("/api/health",{cache:"no-store"});
+const payload=await res.json().catch(()=>({}));
+if(res.ok&&payload?.ok){
+healthBanner.classList.add("is-ok");
+healthBannerText.textContent="System status: Healthy";
+}else{
+healthBanner.classList.add("is-bad");
+const dbStatus=payload?.db?`DB ${payload.db}`:"DB unavailable";
+healthBannerText.textContent=`System status: Degraded (${dbStatus})`;
+}
+}catch(err){
+healthBanner.classList.add("is-warn");
+healthBannerText.textContent="System status: Unable to check";
+}
 };
 
 const closeSidebar=()=>{
@@ -1426,6 +1504,8 @@ closeSidebar();
 }
 });
 }
+refreshHealth();
+setInterval(refreshHealth,60000);
 window.addEventListener("resize",()=>{
 if(window.innerWidth>1024) closeSidebar();
 });
@@ -1882,7 +1962,7 @@ approved:postsSummaryCards[2]?.querySelector("p"),
 flagged:postsSummaryCards[3]?.querySelector("p")
 };
 const pendingPostStatuses=new Set();
-const flaggedPostStatuses=new Set(["disputed","cancelled"]);
+const flaggedPostStatuses=new Set(["disputed"]);
 let adminPosts=[];
 
 const postCategoryCtx=document.getElementById("postCategoryChart");
