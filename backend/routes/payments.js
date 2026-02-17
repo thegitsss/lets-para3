@@ -1218,7 +1218,7 @@ router.post(
       });
     } catch (err) {
       console.error("[payments] release intent lookup failed", err?.message || err);
-      return res.status(502).json({ error: "Unable to verify escrow funding." });
+      return res.status(502).json({ error: "Unable to verify case funding." });
     }
 
     const { transferable, charge } = stripe.isTransferablePaymentIntent(paymentIntent, { caseId: c._id });
@@ -1235,7 +1235,7 @@ router.post(
         caseId: c._id.toString(),
         attorneyId: attorneyMetaId,
         paralegalId: paralegalMetaId,
-        description: "LPC Escrow Release",
+        description: "LPC Payment Release",
       },
     };
     if (charge?.id) {
@@ -1367,7 +1367,7 @@ router.post(
         "Your LPC payout is complete",
         `<p>Hi ${paraName},</p>
          <p>Your payout for \"<strong>${c.title}</strong>\" is complete.</p>
-         <p>Job amount (escrow): ${totalDisplay}<br/>Platform fee (${resolveParalegalFeePct(c)}%) deducted: ${feeDisplay}<br/>Payout: <strong>${payoutDisplay}</strong></p>
+         <p>Case amount (payment): ${totalDisplay}<br/>Platform fee (${resolveParalegalFeePct(c)}%) deducted: ${feeDisplay}<br/>Payout: <strong>${payoutDisplay}</strong></p>
          <p>Funds have been transferred to your connected Stripe account.</p>`
       ).catch(() => {});
     }
@@ -1612,7 +1612,7 @@ router.post(
         const tgMatches = existing.transfer_group && existing.transfer_group === transferGroup;
         if (!amountMatches || !tgMatches) {
           return res.status(400).json({
-            error: "Existing escrow intent does not match locked amount. Please cancel and retry.",
+            error: "Existing payment intent does not match locked amount. Please cancel and retry.",
           });
         }
 
@@ -1698,7 +1698,7 @@ router.post(
       });
     } catch (err) {
       console.error("[payments] confirm intent lookup failed", err?.message || err);
-      return res.status(502).json({ error: "Unable to verify escrow funding." });
+      return res.status(502).json({ error: "Unable to verify case funding." });
     }
     if (!pi || pi.status !== "succeeded") {
       if (pi) {
@@ -1898,7 +1898,7 @@ router.post(
       pi = await stripe.paymentIntents.retrieve(c.escrowIntentId);
     } catch (err) {
       console.error("[payments] payout intent lookup failed", err?.message || err);
-      return res.status(502).json({ error: "Unable to verify escrow funding." });
+      return res.status(502).json({ error: "Unable to verify case funding." });
     }
     if (pi.status !== "succeeded") return res.status(400).json({ error: "Stripe funding not captured yet" });
 
