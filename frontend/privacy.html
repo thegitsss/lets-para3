@@ -193,7 +193,7 @@ html {
       <ul>
         <li>Provide and improve the platform (case creation, messaging, file transfers, deadlines, summaries).</li>
         <li>Authenticate users; enforce roles and access controls.</li>
-        <li>Process payments and automate releases to paralegals on job completion.</li>
+        <li>Process payments through Stripe and facilitate payouts to paralegals upon job completion.</li>
         <li>Detect/prevent fraud, abuse, and policy violations (rate limits, CSRF, content checks).</li>
         <li>Send transactional emails (approvals, resets, receipts, dispute updates).</li>
         <li>Comply with legal obligations and enforce our <a href="terms.html">Terms</a>.</li>
@@ -216,7 +216,7 @@ html {
 
     <section id="payments" class="card">
       <h2>4) Payments &amp; Stripe</h2>
-      <p>Payments are processed by Stripe. Card information is handled by Stripe directly; we do not store full card numbers. We store Stripe identifiers and metadata (e.g., <code class="small">payment_intent</code>, <code class="small">checkout.session</code>, <code class="small">transfer</code>, <code class="small">transfer_group</code>) to coordinate payments and automate payouts to paralegals via Stripe Connect.</p>
+      <p>Payments are processed by Stripe. Card information is handled by Stripe directly; we do not store full card numbers. We store Stripe identifiers and related metadata to coordinate payment records and support Stripe Connect payouts.</p>
       <p>Stripe’s own privacy practices apply; see <a href="https://stripe.com/privacy" target="_blank" rel="noopener">stripe.com/privacy</a>.</p>
     </section>
 
@@ -276,7 +276,7 @@ html {
 
  <footer class="footer">
   <div class="footer-inner">
-    <p>© 2025 Let’s-ParaConnect. All rights reserved.</p>
+    <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
     <nav>
       <a href="privacy.html">Privacy Policy</a>
       <span>|</span>

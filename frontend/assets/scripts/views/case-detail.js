@@ -1663,7 +1663,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const caseDetails = await fetchCaseForHire(caseId);
       const amountCents = Number(caseDetails?.lockedTotalAmount ?? caseDetails?.totalAmount ?? 0);
       if (!Number.isFinite(amountCents) || amountCents <= 0) {
-        notify("Held amount is unavailable for this case.", "error");
+        notify("Payment amount is unavailable for this case.", "error");
         return;
       }
       openHireConfirmModal({

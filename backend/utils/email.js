@@ -216,7 +216,7 @@ function sendNotAcceptedEmail(lastName) {
     "Our team reviews every submission carefully, and if you believe we may have missed important information in your application, you’re welcome to reply to this email.",
     "Thank you again for your interest in the community.",
   ]);
-  return `${body}<p>For more information about our admissions process, please see our <a href="/paralegal-admission.html">Paralegal Admission Requirements</a>.</p>`;
+  return `${body}<p>For more information about our admissions process, please see our Paralegal Admission Requirements page.</p>`;
 }
 
 async function sendWelcomePacket(user) {
@@ -251,7 +251,6 @@ async function sendProfilePhotoRejectedEmail(user, opts = {}) {
     (process.env.EMAIL_BASE_URL || process.env.APP_BASE_URL || "https://www.lets-paraconnect.com");
   const assetBase = String(baseUrl).replace(/\/+$/, "").replace(/\/profile-settings\.html$/, "");
   const logoUrl = `${assetBase}/Cleanfav.png`;
-  const loginUrl = `${assetBase}/login.html`;
 
   const subject = "Action required: update your profile photo";
   const html = `
@@ -285,19 +284,6 @@ async function sendProfilePhotoRejectedEmail(user, opts = {}) {
                 Best,<br>
                 Let&rsquo;s-ParaConnect Team
               </div>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:8px 32px 28px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td bgcolor="#ffbd59" style="border-radius:999px;">
-                    <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
-                      Login
-                    </a>
-                  </td>
-                </tr>
-              </table>
             </td>
           </tr>
         </table>
