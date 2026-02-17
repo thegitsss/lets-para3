@@ -616,7 +616,7 @@ function openCompleteConfirmModal() {
     overlay.innerHTML = `
       <div class="case-complete-modal" role="dialog" aria-modal="true" aria-labelledby="caseCompleteTitle">
         <div class="case-complete-title" id="caseCompleteTitle">Complete &amp; Release Funds</div>
-        <p>Confirming will release escrow to the paralegal, lock messaging and file uploads, and archive the case. You can view the case and its contents in your Archive.</p>
+        <p>Confirming will release case funds to the paralegal, lock messaging and file uploads, and archive the case. You can view the case and its contents in your Archive.</p>
         <div class="case-complete-actions">
           <button class="case-action-btn secondary" type="button" data-complete-cancel>Cancel</button>
           <button class="case-action-btn" type="button" data-complete-confirm>Complete &amp; Release Funds</button>

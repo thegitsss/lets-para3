@@ -175,7 +175,7 @@ function renderDisputeHeader(status) {
     <th>Parties</th>
     <th>Dispute</th>
     <th>Status</th>
-    <th>Escrow</th>
+    <th>Payment</th>
     <th>Actions</th>
   `;
 }
@@ -495,8 +495,8 @@ const configs = [
 { label: "Pending Approvals", value: formatNumber(userMetrics.pendingApprovals) },
 { label: "Active Cases", value: formatNumber(caseMetrics.activeCases) },
 { label: "Completed Cases", value: formatNumber(caseMetrics.completedCases) },
-{ label: "Escrow In Progress", value: formatCurrency(escrowMetrics.totalEscrowHeld) },
-{ label: "Escrow Released", value: formatCurrency(escrowMetrics.totalEscrowReleased) },
+  { label: "Case funding in progress", value: formatCurrency(escrowMetrics.totalEscrowHeld) },
+  { label: "Funds released", value: formatCurrency(escrowMetrics.totalEscrowReleased) },
 ];
 nodes.forEach((node, index) => {
 const strong = node.querySelector("strong") || node.appendChild(document.createElement("strong"));
@@ -653,7 +653,7 @@ function populateEscrowReportChart(data) {
 
   if (!chart.data.datasets[0]) {
     chart.data.datasets[0] = {
-      label: "Held",
+      label: "In Stripe",
       data: [],
       borderColor: "#b6a47a",
       backgroundColor: "rgba(182,164,122,0.15)",

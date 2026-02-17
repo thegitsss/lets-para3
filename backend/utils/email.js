@@ -231,7 +231,7 @@ async function sendWelcomePacket(user) {
   We would like to welcome you to Let’s-ParaConnect as one of our vetted,
   elite paralegals.
 
-  Your acceptance signifies trust in your professionalism, verified credentials,
+  Your acceptance signifies confidence in your professionalism, verified credentials,
   and commitment to excellence. Your profile will appear to attorneys upon launch.
 
   Respectfully,

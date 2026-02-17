@@ -716,7 +716,7 @@ font-size:.95rem;
 <div class="panel-content">
 <canvas id="escrowChart" height="90"></canvas>
 <table>
-<thead><tr><th>Case</th><th>Attorney</th><th>Paralegal</th><th>Held</th><th>Status</th></tr></thead>
+<thead><tr><th>Case</th><th>Attorney</th><th>Paralegal</th><th>In Stripe</th><th>Status</th></tr></thead>
 <tbody id="escrowBody">
 <tr><td colspan="5" style="text-align:center;color:var(--muted)">No payment data yet</td></tr>
 </tbody>
@@ -1065,7 +1065,7 @@ font-size:.95rem;
 <h3>Web Application</h3>
 <button class="btn primary" style="float:right;">See Milestones →</button>
 <table class="details-table">
-<tr><td><strong>Escrow Number</strong></td><td>CBS50QN7F8JEM</td></tr>
+<tr><td><strong>Payment ID</strong></td><td>CBS50QN7F8JEM</td></tr>
 <tr><td><strong>Title</strong></td><td>Website Development</td></tr>
 <tr><td><strong>Attorney</strong></td><td>John Doe</td></tr>
 <tr><td><strong>Paralegal</strong></td><td>Jane Smith</td></tr>
@@ -1141,7 +1141,7 @@ font-size:.95rem;
 <!-- Overview Row -->
 <div class="grid-four">
 <div class="card"><h3>Total Revenue</h3><p>—</p></div>
-<div class="card highlight"><h3>Escrow Released</h3><p>—</p></div>
+<div class="card highlight"><h3>Funds Released</h3><p>—</p></div>
 <div class="card"><h3>Pending Payouts</h3><p>—</p></div>
 <div class="card highlight"><h3>Platform Fees Collected</h3><p>—</p></div>
 </div>
@@ -1279,7 +1279,7 @@ font-size:.95rem;
 <ul class="flagged-list" id="flaggedList">
 <li><strong>Contract Drafting Assistance</strong> – flagged for missing pay rate</li>
 <li><strong>Discovery Review Needed</strong> – contains vague requirements</li>
-<li><strong>Client Communication Post</strong> – unprofessional language detected</li>
+<li><strong>Case Communication Post</strong> – unprofessional language detected</li>
 </ul>
 </div>
 </div>
@@ -1744,7 +1744,7 @@ incomeCountEl.textContent = "Unable to load income";
 
 /* -------- Charts (0 until data) -------- */
 pushChart(document.getElementById("revChart"),{type:"bar",data:{labels:["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],datasets:[{data:[0,0,0,0,0,0,0],backgroundColor:"#b6a47a"}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
-pushChart(document.getElementById("escrowChart"),{type:"doughnut",data:{labels:["Held","Released","Pending"],datasets:[{data:[0,0,0],backgroundColor:["#b6a47a","#e6d9b8","#dcd5c0"]}]},options:{plugins:{legend:{position:"bottom"}}}});
+pushChart(document.getElementById("escrowChart"),{type:"doughnut",data:{labels:["In Stripe","Released","Pending"],datasets:[{data:[0,0,0],backgroundColor:["#b6a47a","#e6d9b8","#dcd5c0"]}]},options:{plugins:{legend:{position:"bottom"}}}});
 
 /* -------- User Management Combo Chart -------- */
 const ctx = document.getElementById("userMgmtComboChart");
@@ -2457,7 +2457,7 @@ const statusLabel = payload.status || "—";
 const escrowLabel = payload.escrowStatus || "—";
 const paymentLabel = payload.paymentStatus || payload.paymentIntentStatus || "—";
 if (reconcileStatus) {
-reconcileStatus.textContent = `Status: ${statusLabel} · Escrow: ${escrowLabel} · Payment: ${paymentLabel}`;
+reconcileStatus.textContent = `Status: ${statusLabel} · Case funding: ${escrowLabel} · Payment: ${paymentLabel}`;
 }
 showToast("Reconciliation complete.", "info");
 } catch (err) {

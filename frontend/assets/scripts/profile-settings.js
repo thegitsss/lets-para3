@@ -925,6 +925,7 @@ const FIELD_OF_LAW_OPTIONS = [
   "Torts",
   "Transportation Law",
   "Trusts & Estates",
+  "Estate Planning",
   "White Collar Crime",
   "Workers’ Compensation"
 ];
@@ -1900,7 +1901,7 @@ const BEST_FOR_SUGGESTIONS = [
   "Ongoing litigation support",
   "Family law matters",
   "Document drafting and research",
-  "Client-facing case management"
+  "Case management support"
 ];
 
 const EXPERIENCE_TITLE = "Paralegal";

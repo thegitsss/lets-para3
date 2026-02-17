@@ -102,7 +102,7 @@ function draw(root, me, escapeHTML) {
             </label>
             <div>
               <div class="pref-title">Dark mode</div>
-              <div class="pref-desc">Use a dark color scheme (client-side only).</div>
+              <div class="pref-desc">Use a dark color scheme (browser-only).</div>
             </div>
           </div>
 
@@ -113,7 +113,7 @@ function draw(root, me, escapeHTML) {
             </label>
             <div>
               <div class="pref-title">Compact UI</div>
-              <div class="pref-desc">Reduce paddings for dense screens (client-side only).</div>
+              <div class="pref-desc">Reduce paddings for dense screens (browser-only).</div>
             </div>
           </div>
         </div>

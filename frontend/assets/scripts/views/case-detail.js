@@ -1127,7 +1127,7 @@ async function hireParalegal(caseId, paralegalId, paralegalName, button) {
   try {
     const paymentReady = await hasDefaultPaymentMethod();
     if (!paymentReady) {
-      notify("Add a payment method to fund escrow before hiring.", "error");
+      notify("Add a payment method to start case funding before hiring.", "error");
       if (button) {
         button.removeAttribute("disabled");
         button.textContent = button.dataset.btnText || "Hire";
@@ -1515,7 +1515,7 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   ensureHireConfirmTooltipStyles();
   const safeName = String(paralegalName || "Paralegal");
   const feeNote =
-    "Platform fee includes Stripe security, dispute protection, payment processing, and vetted paralegal access.";
+    "Platform fee includes Stripe security, dispute support, payment processing, and vetted paralegal access.";
   const feeRate = Number(feePct || 0);
   const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
   const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));

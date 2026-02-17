@@ -6760,7 +6760,7 @@ function updateMetrics(metrics = {}, overdueCount = 0) {
     } else if (key === "overdueTasks") {
       text = `${overdueCount} overdue task${overdueCount === 1 ? "" : "s"}`;
     } else if (key === "escrowTotal") {
-      text = `${formatCurrency(metrics.escrowTotal || 0)} held in Stripe`;
+      text = `${formatCurrency(metrics.escrowTotal || 0)} pending in Stripe`;
     }
     el.textContent = text;
   });
@@ -7333,7 +7333,7 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   ensureHireModalStyles();
   const safeName = sanitize(paralegalName || "Paralegal");
   const feeNote =
-    "Platform fee includes Stripe security, dispute protection, payment processing, and vetted paralegal access.";
+    "Platform fee includes Stripe security, dispute support, payment processing, and vetted paralegal access.";
   const feeRate = Number(feePct || 0);
   const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
   const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));

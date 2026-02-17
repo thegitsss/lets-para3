@@ -400,7 +400,7 @@ function renderExperience(entries = []) {
   if (!Array.isArray(entries) || !entries.length) {
     const item = document.createElement("li");
     item.className = "muted";
-    item.textContent = "Share notable roles or cases to build trust.";
+    item.textContent = "Share notable roles or cases to build confidence.";
     list.appendChild(item);
     return;
   }

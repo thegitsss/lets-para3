@@ -1907,7 +1907,7 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   ensureHireModalStyles();
   const safeName = escapeHtml(paralegalName || "Paralegal");
   const feeNote =
-    "Platform fee includes Stripe security, dispute protection, payment processing, and vetted paralegal access.";
+    "Platform fee includes Stripe security, dispute support, payment processing, and vetted paralegal access.";
   const feeRate = Number(feePct || 0);
   const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
   const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));

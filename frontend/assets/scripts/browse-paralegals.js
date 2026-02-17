@@ -10,7 +10,7 @@ const states = [
 ];
 
 const specialties = [
-  "Administrative Law","Admiralty / Maritime Law","Appellate Law","Banking & Finance Law","Bankruptcy Law",
+  "Administrative Law","Admiralty / Maritime Law","Antitrust Law","Appellate Law","Banking & Finance Law","Bankruptcy Law",
   "Business / Corporate Law","Civil Rights Law","Class Action Law","Commercial Law","Constitutional Law",
   "Construction Law","Consumer Law","Contract Law","Criminal Defense","Education Law","Elder Law",
   "Employment / Labor Law","Energy Law","Entertainment Law","Environmental Law","Family Law","Government Law",

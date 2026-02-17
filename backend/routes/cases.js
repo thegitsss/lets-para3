@@ -59,6 +59,7 @@ const FILE_STATUS = ["pending_review", "approved", "attorney_revision"];
 const MIN_CASE_AMOUNT_CENTS = 40000;
 const PRACTICE_AREAS = [
   "administrative law",
+  "antitrust law",
   "bankruptcy",
   "business law",
   "civil litigation",
@@ -68,6 +69,7 @@ const PRACTICE_AREAS = [
   "criminal defense",
   "employment law",
   "estate planning",
+  "trusts & estates",
   "family law",
   "immigration",
   "intellectual property",
@@ -76,7 +78,6 @@ const PRACTICE_AREAS = [
   "real estate",
   "tax law",
   "technology",
-  "trusts & estates",
 ];
 const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
   acc[name.toLowerCase()] = name;

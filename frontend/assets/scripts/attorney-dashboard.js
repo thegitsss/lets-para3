@@ -226,7 +226,7 @@ async function initAttorneyTour(user = {}, options = {}) {
       ],
       view: "billing",
       title: "Fund Cases",
-      text: "Add a payment method so cases can be funded when you hire. Let's-ParaConnect is partnered with Stripe, and all funds flow through Stripe to hold and release payment.",
+      text: "Add a payment method so cases can be funded when you hire. Let's-ParaConnect is partnered with Stripe, and payments are processed through Stripe. Funds remain within Stripe's infrastructure until you approve release.",
     },
     {
       selectors: ['[data-case-quick="create"]', '[data-quick-link="create-case"]'],

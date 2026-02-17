@@ -132,7 +132,7 @@ async function loadActiveEscrows(showLoading = false, { syncAlerts = false } = {
     const items = Array.isArray(payload?.items) ? payload.items : [];
     cachedEscrows = items;
     if (!items.length) {
-      escrowTableBody.innerHTML = `<tr><td colspan="5" class="history-empty">No funds currently held in Stripe.</td></tr>`;
+      escrowTableBody.innerHTML = `<tr><td colspan="5" class="history-empty">No funds currently pending in Stripe.</td></tr>`;
     } else {
       escrowTableBody.innerHTML = items.map(renderEscrowRow).join("");
     }

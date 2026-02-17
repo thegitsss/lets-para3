@@ -1123,7 +1123,7 @@ body.theme-dark .select-field select{
     <nav>
       <a href="dashboard-attorney.html">Home</a>
       <a href="dashboard-attorney.html#cases">Cases &amp; Files</a>
-      <a href="dashboard-attorney.html#billing">Escrow</a>
+      <a href="dashboard-attorney.html#billing">Payments</a>
       <a href="help.html">Help</a>
     </nav>
     <div class="sidebar-bottom">
@@ -1241,7 +1241,8 @@ body.theme-dark .select-field select{
     <option>Telecommunications Law</option>
     <option>Torts</option>
     <option>Transportation Law</option>
-    <option>Trusts & Estates</option>
+    <option>Trusts &amp; Estates</option>
+    <option>Estate Planning</option>
     <option>White Collar Crime</option>
     <option>Workers’ Compensation</option>
   </select>
@@ -1421,10 +1422,10 @@ body.theme-dark .select-field select{
       <section class="compliance-note" aria-label="Platform disclosures">
         <h3>Platform Disclosures</h3>
         <ul>
-          <li>No clients are permitted on the platform. Communication here is attorney-to-paralegal only.</li>
+          <li>No case parties are permitted on the platform. Communication here is attorney-to-paralegal only.</li>
           <li>Paralegal work must be supervised by the attorney. The attorney remains responsible for all work product.</li>
           <li>Let&rsquo;s-ParaConnect does not provide legal services or legal advice.</li>
-          <li>Payments are handled by Stripe; Let&rsquo;s-ParaConnect does not hold client funds.</li>
+          <li>Payments are processed through Stripe. Funds remain within Stripe&rsquo;s infrastructure and are released upon attorney approval.</li>
         </ul>
       </section>
 
@@ -2754,6 +2755,7 @@ body.theme-dark .select-field select{
       // Must align exactly with backend PRACTICE_AREAS (lowercase)
       const allowed = [
         "administrative law",
+        "antitrust law",
         "bankruptcy",
         "business law",
         "civil litigation",
@@ -2763,6 +2765,7 @@ body.theme-dark .select-field select{
         "criminal defense",
         "employment law",
         "estate planning",
+        "trusts & estates",
         "family law",
         "immigration",
         "intellectual property",
@@ -2771,11 +2774,10 @@ body.theme-dark .select-field select{
         "real estate",
         "tax law",
         "technology",
-        "trusts & estates",
       ];
       const aliases = {
         "admiralty & maritime law": "civil litigation",
-        "antitrust law": "commercial litigation",
+        "competition law": "antitrust law",
         "appellate law": "civil litigation",
         "banking law": "business law",
         "bankruptcy law": "bankruptcy",
@@ -2819,7 +2821,7 @@ body.theme-dark .select-field select{
         "telecommunications law": "technology",
         "torts": "civil litigation",
         "transportation law": "business law",
-        "trusts & estates": "trusts & estates",
+        "trusts and estates": "trusts & estates",
         "white collar crime": "criminal defense",
         "workers’ compensation": "employment law",
       };
@@ -2847,6 +2849,7 @@ body.theme-dark .select-field select{
         return "personal injury";
       if (cleaned.includes("estate")) return "estate planning";
       if (cleaned.includes("trust")) return "trusts & estates";
+      if (cleaned.includes("antitrust")) return "antitrust law";
       if (cleaned.includes("criminal") || cleaned.includes("white collar")) return "criminal defense";
       if (cleaned.includes("bankruptcy")) return "bankruptcy";
       // Default to a safe allowed value

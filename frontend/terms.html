@@ -198,7 +198,7 @@
     <p>These Terms & Conditions (“Terms”) govern your use of the Let’s‑ParaConnect platform (the “Platform”) operated by Let’s‑ParaConnect (“Company,” “we,” “us,” or “our”). By creating an account or using the Platform, you agree to these Terms and to our <a class="privacy-inline-link" href="privacy.html" style="text-decoration:none;">Privacy Policy</a>.</p>
 
     <p><em>We are not a law firm and do not provide legal services or legal advice.</em> The Platform enables Attorneys to engage independent Paralegals. All legal work and outcomes are solely between those users.</p>
-    <p>No clients are permitted on the Platform, and communication here is strictly attorney‑to‑paralegal. Attorneys remain responsible for supervising all paralegal work and work product.</p>
+    <p>No case parties are permitted on the Platform, and communication here is strictly attorney‑to‑paralegal. Attorneys remain responsible for supervising all paralegal work and work product.</p>
 
     <h2>Table of Contents</h2>
     <ul class="toc-list">
@@ -232,19 +232,19 @@
       <h2>2) Roles & Responsibilities</h2>
       <p><strong>Attorneys.</strong> You supervise legal work; ensure compliance with jurisdictional rules; define accurate scopes, deadlines, and deliverables; and review outputs.</p>
       <p><strong>Paralegals.</strong> You act as independent contractors—not employees or agents of the Company. You are responsible for quality, timeliness, lawful conduct, and Stripe Connect onboarding (KYC) for payouts.</p>
-      <p><strong>Company.</strong> We provide Platform tooling and payment facilitation. We do not control or guarantee any user’s identity, credentials, quality, or performance.</p>
+      <p><strong>Company.</strong> We provide Platform tooling and payment facilitation. Attorneys and paralegals contract directly with one another. Let’s‑ParaConnect is a technology platform and does not provide legal services or act as a fiduciary. We do not control or guarantee any user’s identity, credentials, quality, or performance.</p>
     </section>
 
     <section id="payments" class="card">
       <h2>3) Cases & Payments (Stripe)</h2>
       <p>The Platform uses Stripe to process and disburse funds:</p>
       <ol class="alpha">
-        <li><strong>Funding Stripe.</strong> When an Attorney posts a flat-fee job, payment is authorized via Stripe Checkout. Funds are charged and held for that job ("Payment"). We store Stripe IDs and set a shared transfer to link later payout.</li>
+        <li><strong>Funding Stripe.</strong> When an Attorney posts a flat-fee job, payment is authorized via Stripe Checkout. Payments are processed through Stripe, and funds remain within Stripe’s infrastructure until the attorney approves release. We store Stripe IDs and set a shared transfer to link later payout.</li>
         <li><strong>Release & Payout.</strong> On Attorney approval/marking complete, we create a Stripe <em>Transfer</em> to the Paralegal’s Stripe Connect account (less applicable platform fees) using the same <code class="small">transfer_group</code>. If the Paralegal hasn’t completed Connect onboarding, payout is delayed until completion.</li>
         <li><strong>Payment Model.</strong> Jobs are flat-fee by default unless expressly offered otherwise in the posting flow.</li>
         <li><strong>Currency & Timing.</strong> Charges are processed in the currency shown at checkout (typically USD). Stripe processing and banking timelines apply.</li>
       </ol>
-      <p>By using the Platform, you authorize us and Stripe to process, hold, and disburse funds as described. All payments are subject to Stripe’s terms and risk controls.</p>
+      <p>By using the Platform, you authorize us to initiate Stripe processing and disbursement as described. Funds remain within Stripe’s infrastructure and are subject to Stripe’s terms and risk controls.</p>
     </section>
 
     <section id="delivery" class="card">
@@ -252,8 +252,8 @@
       <ul>
         <li><strong>Delivery & Review.</strong> After delivery, the Attorney should review promptly.</li>
         <li><strong>Approval.</strong> Approval/“complete” triggers payout per Section 3.</li>
-        <li><strong>Disputes.</strong> If there’s an issue, the Attorney must open an in-platform dispute within <strong>7 days</strong> of delivery (or the period shown in the job flow). We may request information from both sides.</li>
-        <li><strong>Resolution.</strong> Our role is limited to platform coordination (not legal adjudication). Before release, we may recommend revisions or refunds. After release, resolution typically requires a mutual arrangement between users. We may offset future payouts to address chargebacks or clear errors.</li>
+        <li><strong>Disputes.</strong> If there’s an issue, the Attorney must open an in-platform dispute within <strong>7 days</strong> of delivery (or the period shown in the job flow). We may review platform-related disputes for platform compliance and request information from both sides.</li>
+        <li><strong>Resolution.</strong> Our role is limited to platform compliance review and coordination (not legal adjudication). Before release, we may recommend revisions or refunds. After release, resolution typically requires a mutual arrangement between users. Stripe or the payment networks may adjust future payouts to address chargebacks or clear errors.</li>
       </ul>
     </section>
 
@@ -263,7 +263,7 @@
         <li><strong>Service/Platform Fees.</strong> Fees are shown in the posting/acceptance flow and may vary by job or account. We may change fees prospectively.</li>
         <li><strong>Stripe Processing Fees.</strong> Let’s‑ParaConnect covers Stripe processing fees except in cases involving a dispute, refund, or reversal, where those fees may be deducted or offset.</li>
         <li><strong>Taxes.</strong> Each user is responsible for applicable taxes (e.g., income, sales/use, VAT/GST). Stripe/Connect may collect tax details for payouts.</li>
-        <li><strong>Chargebacks & Reversals.</strong> If a payment is reversed, we may debit, withhold, or offset amounts against your balance or future payouts.</li>
+        <li><strong>Chargebacks & Reversals.</strong> If a payment is reversed, Stripe or the payment networks may debit or offset amounts against your balance or future payouts.</li>
         <li><strong>Refunds.</strong> Before release, we may process full/partial refunds in our discretion or as required by law/Stripe. After release, refunds are between users unless otherwise required.</li>
       </ul>
     </section>
@@ -271,7 +271,7 @@
     <section id="files" class="card">
       <h2>6) Confidentiality, Files & IP</h2>
       <ul>
-        <li><strong>Confidentiality.</strong> Attorney and Paralegal are responsible for confidentiality and ethical handling of client information. Users may attach NDAs to jobs; the Company is not a party to user NDAs.</li>
+        <li><strong>Confidentiality.</strong> Attorney and Paralegal are responsible for confidentiality and ethical handling of case information. Users may attach NDAs to jobs; the Company is not a party to user NDAs.</li>
         <li><strong>Uploads & Storage.</strong> Files are stored privately in AWS S3 and accessed via presigned URLs. Upload only content you have rights to share.</li>
         <li><strong>Work Product & IP.</strong> Unless a different written agreement exists between Attorney and Paralegal, ownership/licensing terms are those stated in the job posting or attached agreement. The Company claims no ownership in work product.</li>
         <li><strong>Operating License.</strong> You grant us a limited license to host, process, and transmit your content solely to operate and improve the Platform.</li>

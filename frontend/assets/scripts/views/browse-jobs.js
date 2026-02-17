@@ -1508,7 +1508,7 @@ function renderExpandedJob(job) {
             <div>
               <div class="posted-name" data-posted-name></div>
               <div class="posted-firm" data-posted-firm></div>
-              <div class="posted-trust" data-posted-trust></div>
+              <div class="posted-count" data-posted-count></div>
             </div>
           </a>
         </div>
@@ -1607,7 +1607,7 @@ function updatePostedBy(card, job) {
   const avatar = root.querySelector(".posted-avatar");
   const nameEl = root.querySelector("[data-posted-name]");
   const firmEl = root.querySelector("[data-posted-firm]");
-  const trustEl = root.querySelector("[data-posted-trust]");
+  const countEl = root.querySelector("[data-posted-count]");
   const linkEl = root.querySelector("[data-attorney-link]");
   const attorney = job?.attorney || {};
   const displayName = [attorney.firstName, attorney.lastName].filter(Boolean).join(" ") || "Attorney";
@@ -1618,14 +1618,14 @@ function updatePostedBy(card, job) {
   }
   if (nameEl) nameEl.textContent = displayName;
   if (firmEl) firmEl.textContent = attorney.lawFirm || "Firm undisclosed";
-  if (trustEl) {
+  if (countEl) {
     const count = getCompletedJobsCount(job);
     if (count >= 2) {
-      trustEl.textContent = `${count} completed jobs`;
-      trustEl.style.display = "";
+      countEl.textContent = `${count} completed jobs`;
+      countEl.style.display = "";
     } else {
-      trustEl.textContent = "";
-      trustEl.style.display = "none";
+      countEl.textContent = "";
+      countEl.style.display = "none";
     }
   }
   if (linkEl) {
