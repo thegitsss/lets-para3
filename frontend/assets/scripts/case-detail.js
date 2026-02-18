@@ -2147,7 +2147,21 @@ async function handleCompleteCase() {
     setCompletionStatusMessage("Select a case before completing.");
     return;
   }
-  const caseData = state.activeCase || {};
+  let caseData = state.activeCase || {};
+  try {
+    const latest = await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}`, {
+      cache: "no-store",
+    });
+    if (latest) {
+      caseData = latest;
+      state.activeCase = latest;
+      const caseState = resolveCaseState(latest);
+      updateCompleteAction(latest, caseState);
+      renderCaseOverview(latest);
+    }
+  } catch (err) {
+    console.warn("Unable to refresh case status", err);
+  }
   if (!areCompletionTasksComplete(caseData)) {
     showCompleteLockMessage();
     return;

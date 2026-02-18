@@ -27,13 +27,10 @@ const { addSubscriber, publishCaseEvent } = require("../utils/caseEvents");
 const STRIPE_BYPASS_PARALEGAL_EMAILS = new Set([
   "samanthasider+11@gmail.com",
   "samanthasider+paralegal@gmail.com",
-  "samanthasider+56@gmail.com",
   "game4funwithme1+1@gmail.com",
   "game4funwithme1@gmail.com",
 ]);
 const STRIPE_BYPASS_ATTORNEY_EMAILS = new Set([
-  "samanthasider+attorney@gmail.com",
-  "samanthasider+56@gmail.com",
   "game4funwithme1+1@gmail.com",
   "game4funwithme1@gmail.com",
 ]);
@@ -3570,15 +3567,19 @@ router.post(
     doc.downloadUrl = [];
     doc.applicants = [];
 
-    let archiveMeta;
+    let archiveMeta = null;
     try {
       archiveMeta = await generateArchiveZip(doc);
     } catch (err) {
       console.error("[cases] archive error", err);
-      return res.status(500).json({ error: "Unable to generate archive" });
     }
-    doc.archiveZipKey = archiveMeta.key;
-    doc.archiveReadyAt = archiveMeta.readyAt;
+    if (archiveMeta) {
+      doc.archiveZipKey = archiveMeta.key;
+      doc.archiveReadyAt = archiveMeta.readyAt;
+    } else {
+      doc.archiveZipKey = doc.archiveZipKey || "";
+      doc.archiveReadyAt = null;
+    }
     await doc.save();
 
     try {
