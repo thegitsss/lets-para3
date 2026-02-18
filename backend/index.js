@@ -12,6 +12,7 @@ const csrf = require("csurf");
 
 // 2) App Init + Config
 const app = express();
+app.use("/api/webhooks/stripe", require("./routes/paymentsWebhook"));
 app.set("trust proxy", 1);
 const PROD = process.env.NODE_ENV === "production";
 const PORT = 5050;
@@ -94,8 +95,6 @@ app.use("/api", (req, res, next) => {
   }
   next();
 });
-
-app.use("/api/webhooks/stripe", require("./routes/paymentsWebhook"));
 
 // 4) Routers
 const waitlistRouter = require("./routes/waitlist");
