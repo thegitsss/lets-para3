@@ -682,8 +682,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- STRIPE CONNECT ---
   const connectStripeBtn = document.getElementById("connectStripeBtn");
   const stripeStatus = document.getElementById("stripeStatus");
-  const cachedRole = String(getCachedUser()?.role || "").toLowerCase();
+  const cachedUser = getCachedUser();
+  const cachedRole = String(cachedUser?.role || "").toLowerCase();
   const isParalegal = cachedRole === "paralegal";
+  const allowStripeConnect =
+    String(cachedUser?.email || "").toLowerCase().trim() === "samanthasider+0@gmail.com";
 
   const updateStripeStatus = (data = {}) => {
     const connected = !!data.details_submitted && !!data.payouts_enabled;
@@ -703,8 +706,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (connectStripeBtn) {
       connectStripeBtn.textContent = connected ? "Update Stripe Details" : "Connect Stripe Account →";
-      connectStripeBtn.disabled = !connected;
-      if (!connected) {
+      connectStripeBtn.disabled = !connected && !allowStripeConnect;
+      if (connectStripeBtn.disabled) {
         connectStripeBtn.setAttribute("aria-disabled", "true");
       } else {
         connectStripeBtn.removeAttribute("aria-disabled");
@@ -725,8 +728,12 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       if (stripeStatus) stripeStatus.textContent = "Stripe status unavailable.";
       if (connectStripeBtn) {
-        connectStripeBtn.disabled = true;
-        connectStripeBtn.setAttribute("aria-disabled", "true");
+        connectStripeBtn.disabled = !allowStripeConnect;
+        if (connectStripeBtn.disabled) {
+          connectStripeBtn.setAttribute("aria-disabled", "true");
+        } else {
+          connectStripeBtn.removeAttribute("aria-disabled");
+        }
         connectStripeBtn.removeAttribute("title");
       }
     }
