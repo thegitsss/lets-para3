@@ -94,9 +94,9 @@ body:not(.theme-dark) .notification-icon {
   font-family: var(--font-serif);
   font-weight: 300;
   font-size: 1.2rem;
-  padding: 14px 18px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  background: var(--panel);
+  padding: 12px 12px 0;
+  border-bottom: none;
+  background: transparent;
 }
 
 body.theme-dark [data-notification-panel],
@@ -109,7 +109,7 @@ body.theme-dark .notifications-panel {
 
 body.theme-dark .notif-header {
   background: transparent;
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: transparent;
   color: #f8fbff;
 }
 

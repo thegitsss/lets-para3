@@ -104,7 +104,6 @@ const caseDraftsRouter = require("./routes/caseDrafts");
 const messagesRouter = require("./routes/messages");
 const uploadsRouter = require("./routes/uploads");
 const paymentsRouter = require("./routes/payments");
-const paymentsWebhookHandler = require("./routes/paymentsWebhook");
 const usersRouter = require("./routes/users");
 const disputesRouter = require("./routes/disputes");
 const caseTasksRouter = require("./routes/caseTasks");
@@ -124,7 +123,7 @@ const notificationRouter = require("./routes/notifications");
 const blocksRouter = require("./routes/blocks");
 const { startPurgeWorker } = require("./services/caseLifecycle");
 
-app.use("/api/payments/webhook", express.raw({ type: "application/json" }), paymentsWebhookHandler);
+app.use("/api/webhooks/stripe", require("./routes/paymentsWebhook"));
 app.use(express.json({ limit: "1mb" }));
 app.use("/api/waitlist", waitlistRouter);
 app.use("/api/auth", authRouter);
