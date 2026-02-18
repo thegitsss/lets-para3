@@ -8,7 +8,8 @@
  *
  * Do NOT JSON-parse this endpoint before constructEvent().
  */
-const router = require("express").Router();
+const express = require("express");
+const router = express.Router();
 const stripe = require("../utils/stripe");
 const mongoose = require("mongoose");
 const Case = require("../models/Case");
@@ -110,7 +111,7 @@ function buildCaseLink(caseDoc) {
 // ----------------------------------------
 // Core webhook endpoint
 // ----------------------------------------
-router.post("/", async (req, res) => {
+router.post("/", express.raw({ type: "application/json" }), async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const secret = pickSecret(req);
 
