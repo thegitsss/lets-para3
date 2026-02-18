@@ -95,6 +95,8 @@ app.use("/api", (req, res, next) => {
   next();
 });
 
+app.use("/api/webhooks/stripe", require("./routes/paymentsWebhook"));
+
 // 4) Routers
 const waitlistRouter = require("./routes/waitlist");
 const authRouter = require("./routes/auth");
@@ -123,7 +125,6 @@ const notificationRouter = require("./routes/notifications");
 const blocksRouter = require("./routes/blocks");
 const { startPurgeWorker } = require("./services/caseLifecycle");
 
-app.use("/api/webhooks/stripe", require("./routes/paymentsWebhook"));
 app.use(express.json({ limit: "1mb" }));
 app.use("/api/waitlist", waitlistRouter);
 app.use("/api/auth", authRouter);
