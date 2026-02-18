@@ -114,6 +114,10 @@ function buildCaseLink(caseDoc) {
 router.post("/", express.raw({ type: "application/json" }), async (req, res) => {
   const sig = req.headers["stripe-signature"];
   const secret = pickSecret(req);
+  console.log("[stripe] webhook received", {
+    hasSignature: Boolean(sig),
+    type: req.headers["stripe-signature"] ? "signed" : "unsigned",
+  });
 
   let event;
   try {
