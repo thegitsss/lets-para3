@@ -86,6 +86,11 @@ const state = {
   workspaceEnabled: false,
   activeCase: null,
   forceScrollToBottom: false,
+  completionOverlayActive: false,
+  completionOverlayCaseId: "",
+  completionOverlayTimer: null,
+  completionOverlayCountdown: null,
+  completionOverlayNode: null,
 };
 
 let taskUpdateInFlight = false;
@@ -507,6 +512,87 @@ function ensureCompleteModalStyles() {
   document.head.appendChild(style);
 }
 
+function ensureParalegalCompletionOverlayStyles() {
+  if (document.getElementById("paralegal-completion-overlay-styles")) return;
+  const style = document.createElement("style");
+  style.id = "paralegal-completion-overlay-styles";
+  style.textContent = `
+    .case-completion-overlay{
+      position:fixed;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:2400;
+      padding:24px;
+    }
+    .case-completion-overlay::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:rgba(10, 15, 25, 0.6);
+    }
+    .case-completion-modal{
+      width:min(420px,92vw);
+      background:#ffffff;
+      border-radius:18px;
+      overflow:hidden;
+      box-shadow:0 24px 60px rgba(15,23,42,.35);
+      text-align:center;
+      position:relative;
+      z-index:1;
+    }
+    .case-completion-hero{
+      height:150px;
+      background-image:url("hero-mountain.jpg");
+      background-size:cover;
+      background-position:center;
+    }
+    .case-completion-content{
+      padding:22px 26px 26px;
+    }
+    .case-completion-title{
+      margin:0 0 8px;
+      font-family:var(--font-serif);
+      font-size:1.6rem;
+      color:#102c50;
+      font-weight:500;
+    }
+    .case-completion-body{
+      margin:0 0 18px;
+      color:var(--app-muted);
+      font-size:.98rem;
+      line-height:1.5;
+    }
+    .case-completion-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      justify-content:center;
+    }
+    .case-completion-btn{
+      border:1px solid transparent;
+      background:var(--app-accent);
+      color:#ffffff;
+      padding:10px 20px;
+      border-radius:999px;
+      font-weight:300;
+      cursor:pointer;
+      transition:transform .2s ease, box-shadow .2s ease, background .2s ease;
+      box-shadow:0 12px 24px rgba(182, 164, 122, 0.35);
+    }
+    .case-completion-btn:hover{
+      transform:translateY(-1px);
+    }
+    .case-completion-timer{
+      margin:12px 0 0;
+      color:var(--app-muted);
+      font-size:.85rem;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 function ensureDocumentPreviewStyles() {
   if (document.getElementById("document-preview-styles")) return;
   const style = document.createElement("style");
@@ -807,6 +893,92 @@ function getCompletionRedirect(caseData) {
   const caseId = caseData?.id || caseData?.caseId || caseData?._id || "";
   const highlightParam = caseId ? `?highlightCase=${encodeURIComponent(caseId)}` : "";
   return `dashboard-attorney.html${highlightParam}#cases:archived`;
+}
+
+function clearCompletionOverlay() {
+  if (state.completionOverlayTimer) {
+    clearTimeout(state.completionOverlayTimer);
+    state.completionOverlayTimer = null;
+  }
+  if (state.completionOverlayCountdown) {
+    clearInterval(state.completionOverlayCountdown);
+    state.completionOverlayCountdown = null;
+  }
+  if (state.completionOverlayNode) {
+    state.completionOverlayNode.remove();
+    state.completionOverlayNode = null;
+  }
+  state.completionOverlayActive = false;
+  state.completionOverlayCaseId = "";
+}
+
+function getParalegalDashboardRedirect(caseData) {
+  return getWorkspaceRedirect(caseData) || "dashboard-paralegal.html";
+}
+
+function showParalegalCompletionOverlay(caseData) {
+  if (getCurrentUserRole() !== "paralegal") return false;
+  if (!isCompletedCase(caseData)) return false;
+  const caseId = caseData?.id || caseData?.caseId || caseData?._id || "";
+  if (state.completionOverlayActive && state.completionOverlayCaseId === caseId) return true;
+
+  clearCompletionOverlay();
+  ensureParalegalCompletionOverlayStyles();
+
+  const overlay = document.createElement("div");
+  overlay.className = "case-completion-overlay";
+  overlay.innerHTML = `
+    <div class="case-completion-modal" role="dialog" aria-modal="true" aria-labelledby="caseCompletionTitle">
+      <div class="case-completion-hero" role="presentation"></div>
+      <div class="case-completion-content">
+        <h2 class="case-completion-title" id="caseCompletionTitle">Case Complete</h2>
+        <p class="case-completion-body">You can view your payment confirmation in Completed Cases in your Cases &amp; Applications tab.</p>
+        <div class="case-completion-actions">
+          <button type="button" class="case-completion-btn" data-return-dashboard>Return to dashboard</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const redirectToDashboard = () => {
+    clearCompletionOverlay();
+    window.location.href = getParalegalDashboardRedirect(caseData);
+  };
+
+  const returnBtn = overlay.querySelector("[data-return-dashboard]");
+  const timerEl = overlay.querySelector("[data-completion-timer]");
+  let remainingSeconds = 10;
+  if (timerEl) {
+    timerEl.textContent = `Returning to your dashboard in ${remainingSeconds} seconds.`;
+    state.completionOverlayCountdown = setInterval(() => {
+      remainingSeconds -= 1;
+      if (remainingSeconds <= 0) {
+        clearInterval(state.completionOverlayCountdown);
+        state.completionOverlayCountdown = null;
+        return;
+      }
+      timerEl.textContent = `Returning to your dashboard in ${remainingSeconds} seconds.`;
+    }, 1000);
+  }
+
+  state.completionOverlayTimer = setTimeout(() => {
+    redirectToDashboard();
+  }, 10000);
+
+  returnBtn?.addEventListener("click", redirectToDashboard);
+
+  document.body.appendChild(overlay);
+  state.completionOverlayActive = true;
+  state.completionOverlayCaseId = caseId;
+  state.completionOverlayNode = overlay;
+
+  stopCaseStream();
+  stopMessagePolling();
+  setWorkspaceEnabled(false, "Case complete. Returning to dashboard.");
+  removeWorkspaceActions();
+
+  returnBtn?.focus();
+  return true;
 }
 
 function getWorkspaceRedirect(caseData) {
@@ -2625,6 +2797,9 @@ async function loadCase(caseId) {
     const caseData = await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}`);
     state.activeCase = caseData;
     renderCaseNavList();
+    if (showParalegalCompletionOverlay(caseData)) {
+      return;
+    }
     const completionRedirect = getCompletionRedirect(caseData);
     if (completionRedirect) {
       removeWorkspaceActions();
@@ -2986,6 +3161,9 @@ async function refreshCaseRealtime(options = null) {
     }
 
     if (caseData && !taskUpdateInFlight) {
+      if (showParalegalCompletionOverlay(caseData)) {
+        return true;
+      }
       const completionRedirect = getCompletionRedirect(caseData);
       if (completionRedirect) {
         removeWorkspaceActions();

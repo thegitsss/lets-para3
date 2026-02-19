@@ -199,6 +199,9 @@ const applicationDetail = applicationModal?.querySelector('[data-application-det
 let applicationModalBound = false;
 let appliedPreviewBound = false;
 let appliedQueryHandled = false;
+let dashboardRefreshInFlight = false;
+let lastDashboardRefreshAt = 0;
+const DASHBOARD_REFRESH_COOLDOWN_MS = 4000;
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -290,8 +293,13 @@ async function loadStripeStatus() {
   return data;
 }
 
-async function fetchParalegalData() {
-  return fetchJson('/api/paralegal/dashboard');
+async function fetchParalegalData({ fresh = false } = {}) {
+  const url = fresh
+    ? `/api/paralegal/dashboard?ts=${Date.now()}`
+    : '/api/paralegal/dashboard';
+  const headers = fresh ? { 'Cache-Control': 'no-store' } : undefined;
+  const cache = fresh ? 'no-store' : undefined;
+  return fetchJson(url, { headers, cache });
 }
 
 async function loadDeadlineEvents(limit = 5) {
@@ -368,6 +376,49 @@ function updateStats(stats = {}) {
   setField('monthEarnings', earningsDisplay);
   setField('payout30Days', payoutDisplay);
   setField('nextPayout', nextPayout);
+}
+
+async function refreshDashboardFromServer(reason = '') {
+  if (dashboardRefreshInFlight) return;
+  const now = Date.now();
+  if (now - lastDashboardRefreshAt < DASHBOARD_REFRESH_COOLDOWN_MS) return;
+  dashboardRefreshInFlight = true;
+  lastDashboardRefreshAt = now;
+  try {
+    const dashboard = await fetchParalegalData({ fresh: true });
+    const caseDeadlines = buildCaseDeadlines(dashboard?.activeCases || []);
+    updateStats({
+      activeCases: dashboard?.metrics?.activeCases,
+      unreadMessages: unreadMessageCount,
+      nextDeadline: deriveNextDeadline(caseDeadlines),
+      monthEarnings: dashboard?.metrics?.earnings,
+      payout30Days: dashboard?.metrics?.earningsLast30Days,
+      nextPayout: dashboard?.metrics?.nextPayoutDate,
+    });
+    renderAssignments(mapActiveCasesToAssignments(dashboard?.activeCases || []));
+    renderDeadlines(caseDeadlines);
+  } catch (err) {
+    console.warn('Paralegal dashboard refresh failed', reason || '', err);
+  } finally {
+    dashboardRefreshInFlight = false;
+  }
+}
+
+function setupDashboardAutoRefresh() {
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+      refreshDashboardFromServer('pageshow');
+    }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      refreshDashboardFromServer('visible');
+    }
+  });
+  window.addEventListener('lpc:notifications-refreshed', () => {
+    if (document.visibilityState !== 'visible') return;
+    refreshDashboardFromServer('notifications');
+  });
 }
 
 function renderDeadlines(deadlines = []) {
@@ -1578,7 +1629,7 @@ function clearApplicationQuery() {
 function openApplicationModal(app) {
   if (!applicationModal || !applicationDetail) return;
   if (window.location.hash !== '#cases') return;
-  if (isRejectedApplication(app)) {
+  if (!isActiveApplication(app)) {
     closeApplicationModal();
     return;
   }
@@ -1587,7 +1638,9 @@ function openApplicationModal(app) {
   if (revokeBtn) {
     const statusKey = getApplicationStatusKey(app);
     const hasId = Boolean(app?._id || app?.id);
-    const disabled = !hasId || statusKey === 'accepted';
+    const jobStatus = String(app?.jobId?.status || '').toLowerCase();
+    const locked = jobStatus && jobStatus !== 'open';
+    const disabled = !hasId || statusKey === 'accepted' || locked;
     revokeBtn.disabled = disabled;
     revokeBtn.textContent = disabled ? 'Revoke unavailable' : 'Revoke application';
   }
@@ -1738,11 +1791,7 @@ async function loadAppliedJobs() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json().catch(() => []);
     const apps = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
-    const visibleApps = apps.filter((app) => {
-      if (!hasApplicationJob(app)) return false;
-      const status = getApplicationStatusKey(app);
-      return status !== 'accepted' && status !== 'rejected';
-    });
+    const visibleApps = apps.filter((app) => isActiveApplication(app));
     appliedAppsCache = visibleApps;
     appliedPage = 1;
     bindAppliedFilters();
@@ -1839,8 +1888,7 @@ function applyAppliedFilters({ resetPage = false } = {}) {
   const practiceFilter = String(practice?.value || 'all');
   const rangeFilter = String(dateRange ? dateRange.value : 'all');
 
-  let filtered = appliedAppsCache.filter((app) => hasApplicationJob(app));
-  filtered = filtered.filter((app) => !isRejectedApplication(app));
+  let filtered = appliedAppsCache.filter((app) => isActiveApplication(app));
 
   if (query) {
     filtered = filtered.filter((app) => {
@@ -2001,6 +2049,15 @@ function isRejectedApplication(app) {
   return getApplicationStatusKey(app) === 'rejected';
 }
 
+function isActiveApplication(app) {
+  if (!hasApplicationJob(app)) return false;
+  const statusKey = getApplicationStatusKey(app);
+  if (statusKey === 'accepted' || statusKey === 'rejected') return false;
+  const jobStatus = String(app?.jobId?.status || '').toLowerCase();
+  if (jobStatus && jobStatus !== 'open') return false;
+  return true;
+}
+
 function formatApplicationStatus(value) {
   const cleaned = String(value || 'submitted').replace(/_/g, ' ').toLowerCase();
   return cleaned ? cleaned.charAt(0).toUpperCase() + cleaned.slice(1) : 'Submitted';
@@ -2068,6 +2125,7 @@ async function bootParalegalDashboard() {
     window.state.viewerRole = String(user.role || '').toLowerCase();
   }
   await initDashboard();
+  setupDashboardAutoRefresh();
   selectors.assignedCasesList?.addEventListener('click', (event) => {
     const withdrawBtn = event.target.closest('.withdraw-application-btn');
     if (withdrawBtn) {

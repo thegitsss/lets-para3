@@ -22,6 +22,10 @@ const { notifyUser } = require("../utils/notifyUser");
 const { publishCaseEvent } = require("../utils/caseEvents");
 const sendEmail = require("../utils/email");
 const { normalizeCaseStatus, canUseWorkspace } = require("../utils/caseState");
+const {
+  decryptCaseFilePayload,
+  buildCaseFileNameQuery,
+} = require("../utils/dataEncryption");
 
 const execFileAsync = util.promisify(execFile);
 const ENABLE_DOC_PREVIEW_CONVERSION = process.env.ENABLE_DOC_PREVIEW_CONVERSION === "true";
@@ -178,7 +182,7 @@ function normalizeFileName(value = "", fallback = "") {
 
 async function nextCaseFileVersion(caseId, filename) {
   if (!caseId || !filename) return 1;
-  const recent = await CaseFile.find({ caseId, originalName: filename })
+  const recent = await CaseFile.find(buildCaseFileNameQuery({ caseId, originalName: filename }))
     .sort({ version: -1, createdAt: -1 })
     .limit(1)
     .lean();
@@ -958,16 +962,17 @@ router.delete(
     if (!record) {
       return res.status(404).json({ msg: "File not found" });
     }
-    if (BUCKET && record.storageKey) {
+    const plainRecord = decryptCaseFilePayload(record);
+    if (BUCKET && plainRecord.storageKey) {
       try {
-        await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(record.storageKey) }));
+        await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(plainRecord.storageKey) }));
       } catch (err) {
         console.warn("[uploads] delete object failed", err?.message || err);
       }
     }
-    if (BUCKET && record.previewKey) {
+    if (BUCKET && plainRecord.previewKey) {
       try {
-        await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(record.previewKey) }));
+        await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(plainRecord.previewKey) }));
       } catch (err) {
         console.warn("[uploads] delete preview object failed", err?.message || err);
       }
@@ -977,7 +982,7 @@ router.delete(
       await logAction(req, "file_deleted", {
         targetType: "case",
         targetId: caseDoc._id,
-        meta: { fileId: record._id, filename: record.originalName },
+        meta: { fileId: record._id, filename: plainRecord.originalName },
       });
     } catch (err) {
       console.warn("[uploads] file delete audit failed", err?.message || err);
@@ -1004,12 +1009,13 @@ router.get(
       return res.status(404).json({ msg: "File not found" });
     }
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
-    const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(record.storageKey) });
+    const plainRecord = decryptCaseFilePayload(record);
+    const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: normalizeKeyPath(plainRecord.storageKey) });
     const data = await s3.send(getCmd);
-    const filename = record.originalName || `case-file-${record._id}`;
-    res.setHeader("Content-Type", record.mimeType || "application/octet-stream");
-    if (record.size) {
-      res.setHeader("Content-Length", String(record.size));
+    const filename = plainRecord.originalName || `case-file-${record._id}`;
+    res.setHeader("Content-Type", plainRecord.mimeType || "application/octet-stream");
+    if (plainRecord.size) {
+      res.setHeader("Content-Length", String(plainRecord.size));
     }
     res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(filename)}"`);
     data.Body.on("error", (err) => {
@@ -1106,31 +1112,32 @@ async function loadCaseForUser(req, caseId) {
 }
 
 function serializeCaseFile(doc) {
+  const plain = decryptCaseFilePayload(doc);
   return {
-    id: String(doc._id),
-    caseId: String(doc.caseId),
-    userId: String(doc.userId),
-    originalName: doc.originalName,
-    storageKey: doc.storageKey,
-    previewKey: doc.previewKey || "",
-    key: doc.storageKey,
-    original: doc.originalName,
-    filename: doc.originalName,
-    mimeType: doc.mimeType || null,
-    mime: doc.mimeType || null,
-    previewMimeType: doc.previewMimeType || null,
-    previewMime: doc.previewMimeType || null,
-    size: doc.size || 0,
-    previewSize: doc.previewSize || 0,
-    createdAt: doc.createdAt,
-    uploadedAt: doc.createdAt,
-    uploadedByRole: doc.uploadedByRole || null,
-    status: doc.status || "pending_review",
-    version: typeof doc.version === "number" ? doc.version : 1,
-    revisionNotes: doc.revisionNotes || "",
-    revisionRequestedAt: doc.revisionRequestedAt || null,
-    approvedAt: doc.approvedAt || null,
-    replacedAt: doc.replacedAt || null,
+    id: String(plain._id),
+    caseId: String(plain.caseId),
+    userId: String(plain.userId),
+    originalName: plain.originalName,
+    storageKey: plain.storageKey,
+    previewKey: plain.previewKey || "",
+    key: plain.storageKey,
+    original: plain.originalName,
+    filename: plain.originalName,
+    mimeType: plain.mimeType || null,
+    mime: plain.mimeType || null,
+    previewMimeType: plain.previewMimeType || null,
+    previewMime: plain.previewMimeType || null,
+    size: plain.size || 0,
+    previewSize: plain.previewSize || 0,
+    createdAt: plain.createdAt,
+    uploadedAt: plain.createdAt,
+    uploadedByRole: plain.uploadedByRole || null,
+    status: plain.status || "pending_review",
+    version: typeof plain.version === "number" ? plain.version : 1,
+    revisionNotes: plain.revisionNotes || "",
+    revisionRequestedAt: plain.revisionRequestedAt || null,
+    approvedAt: plain.approvedAt || null,
+    replacedAt: plain.replacedAt || null,
   };
 }
 

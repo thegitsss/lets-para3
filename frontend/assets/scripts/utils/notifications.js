@@ -13,6 +13,24 @@ let notificationEventSource = null;
 let notificationStreamActive = false;
 let notificationRefreshTimer = null;
 let notificationReconnectTimer = null;
+let lastNotificationEventAt = 0;
+
+function emitNotificationRefresh(payload = {}) {
+  if (typeof window === "undefined" || typeof CustomEvent === "undefined") return;
+  const now = Date.now();
+  if (now - lastNotificationEventAt < 300) return;
+  lastNotificationEventAt = now;
+  window.dispatchEvent(new CustomEvent("lpc:notifications-refreshed", { detail: payload }));
+}
+
+function summarizeNotificationTypes(items = []) {
+  const types = new Set();
+  (items || []).forEach((item) => {
+    const type = item?.type || item?.payload?.type;
+    if (type) types.add(String(type));
+  });
+  return Array.from(types);
+}
 
 function ensureNotificationStyles() {
   return;
@@ -204,6 +222,12 @@ export async function loadNotifications() {
     const unreadCount = getUnreadCount(items);
     lastKnownUnread = unreadCount;
     syncNotificationBadges(unreadCount);
+    emitNotificationRefresh({
+      source: "list",
+      unread: unreadCount,
+      totalUnread: unreadCount,
+      types: summarizeNotificationTypes(items),
+    });
   } catch (err) {
     console.warn("[notifications] loadNotifications failed", err);
   }
@@ -268,7 +292,9 @@ function formatNotificationBody(item = {}) {
     case "application_accepted":
       return `Your application for "${payload.caseTitle || "the case"}" was accepted.`;
     case "application_denied":
-      return `Your application for "${payload.caseTitle || "the case"}" was not selected.`;
+      return payload.caseTitle
+        ? `This role has been filled for "${payload.caseTitle}".`
+        : "This role has been filled.";
     case "resume_uploaded":
       return "Your resume has been successfully uploaded.";
     case "profile_approved":
@@ -557,6 +583,12 @@ async function fetchNotifications(center, options = {}) {
     center.unread = getUnreadCount(center.notifications);
     center.loaded = true;
     renderNotifications(center);
+    emitNotificationRefresh({
+      source: "center",
+      unread: center.unread,
+      totalUnread: totalUnread(),
+      types: summarizeNotificationTypes(center.notifications),
+    });
     const total = totalUnread();
     lastKnownUnread = total;
     syncNotificationBadges(total);

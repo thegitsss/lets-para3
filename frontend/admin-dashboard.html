@@ -292,10 +292,14 @@ background:#fff;
 #section-escrow .escrow-action-row{grid-template-columns:repeat(2,minmax(0,1fr));}
 .post-category-compact{width:50%;margin:0 auto;}
 .quality-chart-compact{width:50%;margin:0 auto;}
+.deadline-chart-compact{width:70%;margin:0 auto;}
 .escrow-summary {display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1.5rem;}
 .card {background:#fff;border:1px solid var(--line);border-radius:10px;padding:1rem;text-align:center;}
 .card.highlight {background:#1abc9c;color:#fff;}
 .card.highlight h3,.card.highlight p{color:#fff;}
+.card.clickable{cursor:pointer;transition:transform .2s ease,box-shadow .2s ease;}
+.card.clickable:hover{transform:translateY(-2px);box-shadow:0 16px 30px rgba(15,23,42,0.12);}
+.card.clickable:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
 .quick-stats {display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1rem;text-align:center;margin-bottom:2rem;}
 .quick-stats div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:.8rem;}
 .quick-stats strong{display:block;color:var(--accent);font-size:1.2rem;}
@@ -1209,16 +1213,17 @@ font-size:.95rem;
 <div class="card"><h3>Total Posts</h3><p>1,248</p></div>
 <div class="card highlight"><h3>Active</h3><p>—</p></div>
 <div class="card"><h3>Archived</h3><p>—</p></div>
-<div class="card"><h3>Flagged</h3><p>—</p></div>
+<div class="card clickable" data-posts-flagged-card role="button" tabindex="0"><h3>Flagged</h3><p>—</p></div>
 </div>
 
 <!-- Charts Row -->
 <div class="grid-two" style="margin-top:2rem;">
 <div class="panel">
-<h2>Posts by Category</h2>
-<div class="post-category-compact">
-<canvas id="postCategoryChart" height="90"></canvas>
+<h2>Deadlines (Next 90 Days)</h2>
+<div class="deadline-chart-compact">
+<canvas id="deadlineChart" height="70"></canvas>
 </div>
+<p style="margin-top:1rem;color:var(--muted);">Attorney case deadlines grouped by month.</p>
 </div>
 <div class="panel">
 <h2>Posts by State</h2>
@@ -1267,11 +1272,10 @@ font-size:.95rem;
 
 <div class="grid-two" style="margin-top:2rem;">
 <div class="panel">
-<h2>Content Quality Overview</h2>
-<div class="quality-chart-compact">
-<canvas id="qualityScoreChart" height="50"></canvas>
+<h2>Posts by Category</h2>
+<div class="post-category-compact">
+<canvas id="postCategoryChart" height="90"></canvas>
 </div>
-<p style="margin-top:1rem;">Average quality score for all reviewed posts this week.</p>
 </div>
 
 <div class="panel">
@@ -1964,6 +1968,7 @@ flagged:postsSummaryCards[3]?.querySelector("p")
 const pendingPostStatuses=new Set();
 const flaggedPostStatuses=new Set(["disputed"]);
 let adminPosts=[];
+let adminPostsSource=[];
 
 const postCategoryCtx=document.getElementById("postCategoryChart");
 const postCategoryChart=pushChart(postCategoryCtx,{
@@ -1979,11 +1984,11 @@ data:{labels:[],datasets:[{label:"Posts",data:[],backgroundColor:"rgba(182,164,1
 options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
 });
 
-const qualityScoreCtx=document.getElementById("qualityScoreChart");
-const qualityScoreChart=pushChart(qualityScoreCtx,{
+const deadlineCtx=document.getElementById("deadlineChart");
+const deadlineChart=pushChart(deadlineCtx,{
 type:"bar",
-data:{labels:[],datasets:[{label:"Quality Score",data:[],backgroundColor:[],borderRadius:6}]},
-options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,title:{display:true,text:"Score"}},x:{ticks:{autoSkip:false}}}}
+data:{labels:[],datasets:[{label:"Deadlines",data:[],backgroundColor:"rgba(16,44,80,0.5)",borderRadius:8}]},
+options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
 });
 
 function escapeHtml(value=""){
@@ -2030,11 +2035,30 @@ score=Math.max(20,Math.min(100,score));
 return{score,reasons};
 }
 
+function formatFlagReason(reason="",details=""){
+const normalized=String(reason||"").toLowerCase().trim();
+const labelMap={
+inappropriate:"Inappropriate content",
+spam:"Spam or misleading",
+compensation:"Compensation issue",
+duplicate:"Duplicate posting",
+other:"Other",
+};
+const base=labelMap[normalized]||"Reported";
+const snippet=String(details||"").trim();
+if(!snippet)return base;
+return `${base}: ${snippet}`;
+}
+
 function shapeAdminPost(entry={}){
 const status=String(entry.status||"open").toLowerCase();
 const quality=evaluatePostQuality(entry.details||entry.briefSummary||"",entry.title||"");
 const flaggedByStatus=flaggedPostStatuses.has(status);
-const isFlagged=flaggedByStatus||quality.score<75;
+const flagCount=Number(entry.flagCount||0);
+const flagReasons=Array.isArray(entry.flagReasons)?entry.flagReasons:[];
+const flagDetails=entry.flagDetails||"";
+const flaggedByReports=flagCount>0;
+const isFlagged=flaggedByStatus||flaggedByReports||quality.score<75;
 const attorney=entry.attorney||{};
 const author=entry.authorName||attorney.name||`${attorney.firstName||""} ${attorney.lastName||""}`.trim()||attorney.email||"Unknown";
 const state=deriveState(entry);
@@ -2047,14 +2071,23 @@ authorName:author,
 category:entry.category||entry.practiceArea||"General",
 state:state||"—",
 createdAt:entry.createdAt||entry.created_at||null,
+flaggedAt:entry.flaggedAt||null,
 status,
 statusLabel,
 statusClass,
 isFlagged,
-flaggedReason:flaggedByStatus?"Status requires admin review":quality.reasons[0]||"Low quality description",
+flaggedReason:flaggedByReports
+? formatFlagReason(flagReasons[0]||"",flagDetails)
+: flaggedByStatus
+? "Status requires admin review"
+: quality.reasons[0]||"Low quality description",
 qualityScore:quality.score,
 qualityReasons:quality.reasons,
-details:entry.details||entry.briefSummary||""
+details:entry.details||entry.briefSummary||"",
+archived:!!entry.archived,
+flagCount,
+flagReasons,
+flagDetails
 };
 }
 
@@ -2148,14 +2181,51 @@ postStateChart.update("none");
 }
 }
 
-function updatePostsSummary(records=[]){
+function updateDeadlineChart(source=[]){
+if(!deadlineChart)return;
+const now=new Date();
+const end=new Date(now.getTime()+90*24*60*60*1000);
+const buckets=new Map();
+const allowedStatuses=new Set(["open","in progress","in_progress","active","awaiting_documents","reviewing","disputed"]);
+source.forEach((entry)=>{
+const status=String(entry.status||"").toLowerCase();
+if(entry.archived) return;
+if(status==="completed"||status==="closed") return;
+if(status && !allowedStatuses.has(status)) return;
+const raw=entry.deadline;
+if(!raw) return;
+const date=new Date(raw);
+if(Number.isNaN(date.getTime())) return;
+if(date<now||date>end) return;
+const key=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`;
+buckets.set(key,(buckets.get(key)||0)+1);
+});
+const labels=[];
+const values=[];
+const cursor=new Date(now.getFullYear(),now.getMonth(),1);
+const last=new Date(end.getFullYear(),end.getMonth(),1);
+while(cursor<=last){
+const label=cursor.toLocaleDateString(undefined,{month:"short",year:"numeric"});
+const key=`${cursor.getFullYear()}-${String(cursor.getMonth()+1).padStart(2,"0")}`;
+labels.push(label);
+values.push(buckets.get(key)||0);
+cursor.setMonth(cursor.getMonth()+1);
+}
+deadlineChart.data.labels=labels;
+deadlineChart.data.datasets[0].data=values;
+deadlineChart.update("none");
+}
+
+function updatePostsSummary(records=[],overrides={}){
 const stats={total:records.length,active:0,archived:0,flagged:0};
 records.forEach((record)=>{
 if(record.isFlagged)stats.flagged+=1;
-const status=(record.status||"").toLowerCase();
-if(status==="archived")stats.archived+=1;
+if(record.archived)stats.archived+=1;
 else stats.active+=1;
 });
+if(typeof overrides.total==="number")stats.total=overrides.total;
+if(typeof overrides.active==="number")stats.active=overrides.active;
+if(typeof overrides.archived==="number")stats.archived=overrides.archived;
 if(postSummaryTargets.total)postSummaryTargets.total.textContent=stats.total.toLocaleString();
 if(postSummaryTargets.pending)postSummaryTargets.pending.textContent=stats.active.toLocaleString();
 if(postSummaryTargets.approved)postSummaryTargets.approved.toLocaleString();
@@ -2164,7 +2234,15 @@ if(postSummaryTargets.flagged)postSummaryTargets.flagged.textContent=stats.flagg
 
 function updateFlaggedList(records=[]){
 if(!flaggedList)return;
-const flaggedEntries=records.filter((record)=>record.isFlagged).sort((a,b)=>a.qualityScore-b.qualityScore||new Date(b.createdAt||0)-new Date(a.createdAt||0)).slice(0,5);
+const flaggedEntries=records
+.filter((record)=>record.isFlagged)
+.sort((a,b)=>{
+const aFlag=a.flaggedAt?new Date(a.flaggedAt).getTime():0;
+const bFlag=b.flaggedAt?new Date(b.flaggedAt).getTime():0;
+if(aFlag!==bFlag)return bFlag-aFlag;
+return a.qualityScore-b.qualityScore||new Date(b.createdAt||0)-new Date(a.createdAt||0);
+})
+.slice(0,5);
 if(!flaggedEntries.length){
 flaggedList.innerHTML="<li>All posts look good right now.</li>";
 return;
@@ -2180,19 +2258,24 @@ flaggedList.appendChild(li);
 
 function updateQualityOutputs(records=[]){
 updateFlaggedList(records);
-if(!qualityScoreChart)return;
-if(!records.length){
-qualityScoreChart.data.labels=[];
-qualityScoreChart.data.datasets[0].data=[];
-qualityScoreChart.data.datasets[0].backgroundColor=[];
-qualityScoreChart.update("none");
-return;
 }
-const sample=records.slice().sort((a,b)=>a.qualityScore-b.qualityScore).slice(0,6);
-qualityScoreChart.data.labels=sample.map((entry)=>entry.title);
-qualityScoreChart.data.datasets[0].data=sample.map((entry)=>entry.qualityScore);
-qualityScoreChart.data.datasets[0].backgroundColor=sample.map((entry)=>entry.qualityScore>=85?"#1abc9c":"#e67e22");
-qualityScoreChart.update("none");
+
+function isInProgressStatus(value){
+const normalized=String(value||"").toLowerCase();
+return [
+"in progress",
+"in_progress",
+"active",
+"awaiting_documents",
+"reviewing"
+].includes(normalized);
+}
+
+function computePostSummaryOverrides(source=[]){
+const total=source.length;
+const active=source.filter((entry)=>isInProgressStatus(entry.status)).length;
+const archived=source.filter((entry)=>!!entry.archived).length;
+return {total,active,archived};
 }
 
 async function loadAdminPosts(){
@@ -2203,25 +2286,32 @@ const res=await secureFetch("/api/cases/admin",{headers:{Accept:"application/jso
 if(!res.ok) throw new Error("Unable to load posts");
 const payload=await res.json().catch(()=>({}));
 const source=Array.isArray(payload?.cases)?payload.cases:[];
-const openCases=source.filter((entry)=>String(entry.status||"").toLowerCase()==="open");
+adminPostsSource=source;
+const openCases=source.filter((entry)=>{
+const status=String(entry.status||"").toLowerCase();
+return status==="open";
+});
 adminPosts=openCases.map((entry)=>shapeAdminPost(entry));
+const summaryOverrides=computePostSummaryOverrides(adminPostsSource);
 if(!adminPosts.length){
 setPostsTableMessage("No posts found.");
-updatePostsSummary([]);
+updatePostsSummary([],summaryOverrides);
 updatePostsCharts([]);
 updateQualityOutputs([]);
 return;
 }
 renderPostsTable(adminPosts);
-updatePostsSummary(adminPosts);
+updatePostsSummary(adminPosts,summaryOverrides);
 updatePostsCharts(adminPosts);
 updateQualityOutputs(adminPosts);
+updateDeadlineChart(adminPostsSource);
 }catch(err){
 console.error("Unable to load admin posts",err);
 setPostsTableMessage("Unable to load posts.");
-updatePostsSummary([]);
+updatePostsSummary([],{total:0,active:0,archived:0});
 updatePostsCharts([]);
 updateQualityOutputs([]);
+updateDeadlineChart([]);
 }
 }
 
@@ -2255,9 +2345,11 @@ throw new Error(payload?.error||"Unable to delete post.");
 }
 row.remove();
 adminPosts=adminPosts.filter((entry)=>String(entry.id)!==String(caseId));
-updatePostsSummary(adminPosts);
+adminPostsSource=adminPostsSource.filter((entry)=>String(entry.id||entry._id)!==String(caseId));
+updatePostsSummary(adminPosts,computePostSummaryOverrides(adminPostsSource));
 updatePostsCharts(adminPosts);
 updateQualityOutputs(adminPosts);
+updateDeadlineChart(adminPostsSource);
 showToast("Post deleted.","info");
 postsTableState.refresh();
 }catch(err){
@@ -2320,9 +2412,19 @@ window.activateAdminSection?.("posts");
 setTimeout(()=>postsSection?.scrollIntoView({behavior:"smooth",block:"start"}),60);
 }
 const pendingReviewCard=postsSummaryCards.find(card=>/pending review/i.test(card.textContent));
-const flaggedCard=postsSummaryCards.find(card=>/flagged/i.test(card.textContent));
-pendingReviewCard?.addEventListener("click",()=>focusPostsSection("pending"));
-flaggedCard?.addEventListener("click",()=>focusPostsSection("flagged"));
+const flaggedCard=postsSection?.querySelector("[data-posts-flagged-card]")||postsSummaryCards.find(card=>/flagged/i.test(card.textContent));
+const bindCardClick=(card,mode)=>{
+if(!card)return;
+card.addEventListener("click",()=>focusPostsSection(mode));
+card.addEventListener("keydown",(event)=>{
+if(event.key==="Enter"||event.key===" "){
+event.preventDefault();
+focusPostsSection(mode);
+}
+});
+};
+bindCardClick(pendingReviewCard,"pending");
+bindCardClick(flaggedCard,"flagged");
 postsTableState.apply();
 
 Promise.all([loadAdminPosts(), loadFinanceCards()]).finally(() => {
@@ -2771,12 +2873,6 @@ viewBtn.className = 'btn secondary';
 viewBtn.textContent = 'View';
 viewBtn.addEventListener('click', () => openPendingModal(user.id));
 actionsTd.appendChild(viewBtn);
-const removeBtn = document.createElement('button');
-removeBtn.type = 'button';
-removeBtn.className = 'btn danger';
-removeBtn.textContent = 'Remove';
-removeBtn.addEventListener('click', () => deactivateUser(String(user.id || user._id || '')));
-actionsTd.appendChild(removeBtn);
 actionsTd.setAttribute('data-label', 'Actions');
 
 [nameTd, roleTd, submittedTd, actionsTd].forEach((td) =>
@@ -3250,6 +3346,10 @@ if (!activeUserId) return;
 const isApprove = action === 'approve';
 const btn = isApprove ? approveBtn : denyBtn;
 if (!btn) return;
+if (!isApprove) {
+const confirmed = window.confirm('Are you sure you want to deny this applicant?');
+if (!confirmed) return;
+}
 const originalText = btn.textContent;
 btn.disabled = true;
 btn.textContent = isApprove ? 'Approving…' : 'Denying…';

@@ -52,6 +52,15 @@ const STRIPE_BYPASS_EMAILS = new Set([
   "samanthasider+56@gmail.com",
 ]);
 let viewerEmail = "";
+const FLAG_REASONS = [
+  { value: "inappropriate", label: "Inappropriate content" },
+  { value: "spam", label: "Spam or misleading" },
+  { value: "compensation", label: "Compensation issue" },
+  { value: "duplicate", label: "Duplicate posting" },
+  { value: "other", label: "Other" },
+];
+let openFlagMenu = null;
+let flagMenuHandlersBound = false;
 
 const STATE_NAME_MAP = {
   AL: "Alabama",
@@ -343,7 +352,7 @@ function clampExperienceValue(raw) {
 
 function updateExperienceLabel(value) {
   if (!minExpValue) return;
-  const label = value >= 10 ? "10+ years" : `${value} year${value === 1 ? "" : "s"}`;
+  const label = value <= 0 ? "Any" : value >= 10 ? "10+ years" : `${value} year${value === 1 ? "" : "s"}`;
   minExpValue.textContent = label;
 }
 
@@ -442,6 +451,12 @@ function applyDefaultStateFilter() {
   stateSelect.value = preferred;
   autoStateFilterApplied = true;
   applyFilters({ render: false });
+  if (!filteredJobs.length) {
+    stateSelect.value = "";
+    autoStateFilterApplied = false;
+    applyFilters({ render: false });
+    return false;
+  }
   return true;
 }
 
@@ -454,8 +469,8 @@ function clearFilters() {
     updatePayLabel(0);
   }
   if (minExpSlider) {
-    minExpSlider.value = 10;
-    updateExperienceLabel(10);
+    minExpSlider.value = 0;
+    updateExperienceLabel(0);
   }
   if (sortSelect) sortSelect.value = "";
 
@@ -633,14 +648,25 @@ function renderJobs() {
     const appliedAt = getAppliedAt(job);
 
     card.innerHTML = `
-      <h3>${title}</h3>
-      <div class="area">${practice}</div>
+      <div class="job-card-header">
+        <div>
+          <h3>${title}</h3>
+          <div class="area">${practice}</div>
+        </div>
+      </div>
       <div class="meta">
         <span>${escapeHtml(jobState || "—")}</span>
         <span>$${formatPay(payUSD)}</span>
         <span>${escapeHtml(when)}</span>
       </div>
     `;
+
+    const header = card.querySelector(".job-card-header");
+    if (header) {
+      const { button: flagButton, menu: flagMenu } = buildFlagButton(job);
+      header.appendChild(flagButton);
+      card.appendChild(flagMenu);
+    }
 
     const actions = document.createElement("div");
     actions.className = "job-actions";
@@ -1288,6 +1314,167 @@ function showToast(message, type = "info") {
   }
 }
 
+function closeFlagMenu(menu, button = null) {
+  if (!menu) return;
+  menu.hidden = true;
+  menu.setAttribute("aria-hidden", "true");
+  if (button) {
+    button.setAttribute("aria-expanded", "false");
+  }
+  if (openFlagMenu === menu) openFlagMenu = null;
+}
+
+function bindFlagMenuHandlers() {
+  if (flagMenuHandlersBound) return;
+  flagMenuHandlersBound = true;
+  document.addEventListener("click", (event) => {
+    if (!openFlagMenu) return;
+    const target = event.target;
+    if (target?.closest?.(".flag-menu") || target?.closest?.(".flag-button")) return;
+    closeFlagMenu(openFlagMenu);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && openFlagMenu) {
+      closeFlagMenu(openFlagMenu);
+    }
+  });
+}
+
+function toggleFlagMenu(menu, button) {
+  if (!menu || !button) return;
+  if (openFlagMenu && openFlagMenu !== menu) {
+    closeFlagMenu(openFlagMenu);
+  }
+  const willOpen = menu.hidden;
+  if (!willOpen) {
+    closeFlagMenu(menu, button);
+    return;
+  }
+  menu.hidden = false;
+  menu.setAttribute("aria-hidden", "false");
+  button.setAttribute("aria-expanded", "true");
+  openFlagMenu = menu;
+}
+
+function buildFlagMenu(job) {
+  const menu = document.createElement("div");
+  menu.className = "flag-menu";
+  menu.hidden = true;
+  menu.setAttribute("role", "dialog");
+  menu.setAttribute("aria-modal", "false");
+  menu.setAttribute("aria-label", "Flag case");
+  const groupName = `flag-reason-${escapeAttr(getJobUniqueId(job) || "case")}`;
+
+  const optionsMarkup = FLAG_REASONS.map(
+    (reason) => `
+      <label class="flag-option">
+        <input type="radio" name="${groupName}" value="${reason.value}" />
+        <span>${reason.label}</span>
+      </label>
+    `
+  ).join("");
+
+  menu.innerHTML = `
+    <div class="flag-menu-title">Flag this case</div>
+    <div class="flag-menu-subtitle">Why are you reporting this case?</div>
+    <form class="flag-menu-form">
+      ${optionsMarkup}
+      <div class="flag-menu-other" data-flag-other hidden>
+        <textarea rows="3" placeholder="Optional details"></textarea>
+      </div>
+      <div class="flag-menu-actions">
+        <button type="button" class="flag-cancel">Cancel</button>
+        <button type="submit" class="flag-submit" disabled>Submit flag</button>
+      </div>
+    </form>
+  `;
+
+  const form = menu.querySelector(".flag-menu-form");
+  const submitBtn = menu.querySelector(".flag-submit");
+  const cancelBtn = menu.querySelector(".flag-cancel");
+  const otherWrap = menu.querySelector("[data-flag-other]");
+  const otherInput = otherWrap?.querySelector("textarea");
+  const reasonInputs = Array.from(menu.querySelectorAll(`input[name="${groupName}"]`));
+
+  const updateState = () => {
+    const selected = reasonInputs.find((input) => input.checked);
+    const selectedValue = selected?.value || "";
+    if (otherWrap) {
+      otherWrap.hidden = selectedValue !== "other";
+    }
+    if (submitBtn) submitBtn.disabled = !selectedValue;
+  };
+
+  reasonInputs.forEach((input) => {
+    input.addEventListener("change", updateState);
+  });
+
+  cancelBtn?.addEventListener("click", (event) => {
+    event.preventDefault();
+    closeFlagMenu(menu);
+  });
+
+  form?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const selected = reasonInputs.find((input) => input.checked);
+    if (!selected) return;
+    const detail = otherInput?.value?.trim() || "";
+    const caseId = job?.caseId || job?.contextCaseId || "";
+    if (!caseId) {
+      showToast("Unable to flag this posting right now.", "error");
+      return;
+    }
+    if (submitBtn) submitBtn.disabled = true;
+    secureFetch(`/api/cases/${encodeURIComponent(caseId)}/flag`, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      body: {
+        reason: selected.value,
+        details: detail,
+      },
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          throw new Error(payload?.error || "Unable to submit flag.");
+        }
+        showToast("Thanks for letting us know. We'll review this case.", "info");
+        closeFlagMenu(menu);
+      })
+      .catch((err) => {
+        showToast(err?.message || "Unable to submit flag.", "error");
+      })
+      .finally(() => {
+        if (submitBtn) submitBtn.disabled = false;
+      });
+  });
+
+  menu.addEventListener("click", (event) => event.stopPropagation());
+  bindFlagMenuHandlers();
+  return menu;
+}
+
+function buildFlagButton(job) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "flag-button";
+  button.setAttribute("aria-label", "Flag this case");
+  button.setAttribute("title", "Flag this case");
+  button.setAttribute("aria-expanded", "false");
+  button.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M5 3v18"></path>
+      <path d="M5 4h11l-2 4 2 4H5"></path>
+    </svg>
+  `;
+  const menu = buildFlagMenu(job);
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleFlagMenu(menu, button);
+  });
+  return { button, menu };
+}
+
 function escapeAttr(value) {
   if (window.CSS && typeof window.CSS.escape === "function") {
     return window.CSS.escape(value);
@@ -1467,9 +1654,9 @@ function renderExpandedJob(job) {
           <div class="apply-info-title">What Happens After You Apply</div>
           <ul class="apply-info-list">
             <li>The attorney reviews applications</li>
-            <li>Selected paralegals receive full case details</li>
-            <li>Work is completed through Let’s ParaConnect</li>
-            <li>Payment is released upon approval</li>
+            <li>Selected applicants are invited to the workspace</li>
+            <li>Scope is confirmed and work begins</li>
+            <li>Compensation is released after attorney approval and case completion</li>
           </ul>
         </div>
       `
@@ -1520,6 +1707,13 @@ function renderExpandedJob(job) {
 
   // Ensure no legacy attorney card markup lingers in this view.
   card.querySelectorAll(".attorney-block, .attorney-card, .job-sidebar-card").forEach((node) => node.remove());
+
+  const expandedActions = card.querySelector(".expanded-actions");
+  if (expandedActions) {
+    const { button: flagButton, menu: flagMenu } = buildFlagButton(job);
+    expandedActions.appendChild(flagButton);
+    card.appendChild(flagMenu);
+  }
 
   const buttonsHost = card.querySelector("[data-expanded-buttons]");
   const footerActions = card.querySelector("[data-footer-actions]");

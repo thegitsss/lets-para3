@@ -7,6 +7,7 @@ const Message = require("../models/Message");
 const Case = require("../models/Case");
 const { normalizeCaseStatus, canUseWorkspace } = require("../utils/caseState");
 const { BLOCKED_MESSAGE, isBlockedBetween } = require("../utils/blocks");
+const { decryptMessagePayload } = require("../utils/dataEncryption");
 
 // CSRF (enabled in production or when ENABLE_CSRF=true)
 const noop = (_req, _res, next) => next();
@@ -95,7 +96,7 @@ router.get("/:caseId", async (req, res) => {
       .sort({ createdAt: 1 })
       .populate("senderId", "firstName lastName email role");
 
-    res.json(messages);
+    res.json(messages.map((msg) => decryptMessagePayload(msg)));
   } catch (err) {
     console.error("Chat history error:", err);
     res.status(500).json({ error: "Internal server error" });
@@ -136,7 +137,7 @@ router.post("/:caseId", csrfProtection, async (req, res) => {
       content: safeText,
     });
 
-    res.json(message);
+    res.json(decryptMessagePayload(message));
   } catch (err) {
     console.error("Chat send error:", err);
     res.status(500).json({ error: "Internal server error" });

@@ -56,12 +56,27 @@ const templates = {
   },
   payoutReleased: (payload = {}) => {
     const caseTitle = payload.caseTitle || "your case";
+    const totalDisplay = payload.totalDisplay || "";
+    const feeDisplay = payload.feeDisplay || "";
+    const feePct = payload.feePct;
+    const recipientName = payload.recipientName || "";
     const amountLine = payload.amount
       ? `<div style="font-size:18px;color:${GOLD};font-weight:600;margin-top:6px;">${payload.amount}</div>`
       : `<div style="font-size:18px;color:${GOLD};font-weight:600;margin-top:6px;">Payout complete</div>`;
+    const greeting = recipientName ? `<p>Hi ${recipientName},</p>` : "";
+    const breakdown =
+      totalDisplay || feeDisplay
+        ? `
+        <div style="margin-top:12px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8a8373;">Breakdown</div>
+        <div style="margin-top:6px;font-size:14px;color:${INK};line-height:1.5;">
+          ${totalDisplay ? `<div>Case total: ${totalDisplay}</div>` : ""}
+          ${feeDisplay ? `<div>Platform fee${Number.isFinite(feePct) ? ` (${feePct}%)` : ""}: ${feeDisplay}</div>` : ""}
+        </div>
+      `
+        : "";
     const html = frameEmail(
       "Your payout is complete",
-      `<p>Great news&mdash;your payout for <strong>${caseTitle}</strong> has been completed.</p>
+      `${greeting}<p>Great news&mdash;your payout for <strong>${caseTitle}</strong> has been completed.</p>
       <div style="margin:16px 0 18px;padding:16px;border:1px solid rgba(0,0,0,0.06);border-radius:14px;background:#fbfaf7;">
         <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8a8373;">Status</div>
         <div style="font-size:16px;font-weight:600;color:${INK};margin-top:4px;">Complete</div>
@@ -69,10 +84,31 @@ const templates = {
         <div style="font-size:15px;color:${INK};margin-top:4px;">${caseTitle}</div>
         <div style="margin-top:12px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8a8373;">Payout</div>
         ${amountLine}
+        ${breakdown}
       </div>
       <p style="margin:0;">You will see the deposit in your bank per Stripe&rsquo;s normal timeline.</p>`
     );
     return { subject: "Your payout is complete", html };
+  },
+  caseCompletedAttorney: (payload = {}) => {
+    const caseTitle = payload.caseTitle || "your case";
+    const attorneyName = payload.attorneyName || "there";
+    const completedDate = payload.completedDate || "today";
+    const html = frameEmail(
+      "Your case has been completed",
+      `<p>Hi ${attorneyName},</p>
+       <p>Your case <strong>${caseTitle}</strong> was completed on <strong>${completedDate}</strong>.</p>
+       <div style="margin:16px 0 18px;padding:16px;border:1px solid rgba(0,0,0,0.06);border-radius:14px;background:#fbfaf7;">
+         <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8a8373;">Status</div>
+         <div style="font-size:16px;font-weight:600;color:${INK};margin-top:4px;">Completed</div>
+         <div style="margin-top:12px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8a8373;">Case</div>
+         <div style="font-size:15px;color:${INK};margin-top:4px;">${caseTitle}</div>
+         <div style="margin-top:12px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8a8373;">Completed on</div>
+         <div style="font-size:15px;color:${INK};margin-top:4px;">${completedDate}</div>
+       </div>
+       <p style="margin:0;">Deliverables remain available for the next 6 months.</p>`
+    );
+    return { subject: "Your case has been completed", html };
   },
   documentUploaded: (payload = {}) => {
     const doc = payload.documentName || "A document";

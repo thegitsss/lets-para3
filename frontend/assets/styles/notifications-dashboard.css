@@ -423,26 +423,24 @@ body.theme-mountain-dark .topbar .lpc-shared-header .notification-icon {
 [data-notification-panel].hidden,
 [data-notification-panel]{
   opacity: 0 !important;
-  transform: translateY(-14px) !important;
+  transform: none !important;
   pointer-events: none !important;
   visibility: hidden !important;
   display: flex !important;
   transition:
-    opacity 0.52s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.52s cubic-bezier(0.22, 1, 0.36, 1),
-    visibility 0s linear 0.52s !important;
+    opacity 0.18s ease,
+    visibility 0s linear 0.18s !important;
 }
 
 .topbar .lpc-shared-header .notifications-panel.show,
 .topbar .lpc-shared-header .notif-panel.show,
 [data-notification-panel].show{
   opacity: 1 !important;
-  transform: translateY(0) !important;
+  transform: none !important;
   pointer-events: auto !important;
   visibility: visible !important;
   transition:
-    opacity 0.52s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.52s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.18s ease,
     visibility 0s linear 0s !important;
 }
 
@@ -451,7 +449,7 @@ body.theme-mountain-dark .topbar .lpc-shared-header .notification-icon {
 [data-notification-panel].hidden{
   display: flex !important;
   opacity: 0 !important;
-  transform: translateY(-14px) !important;
+  transform: none !important;
   pointer-events: none !important;
   visibility: hidden !important;
 }
@@ -493,10 +491,10 @@ body.theme-mountain .topbar .lpc-shared-header .notifications-panel .notif-scrol
 body.theme-mountain .topbar .lpc-shared-header .notif-panel .notif-scroll,
 body.theme-mountain .topbar .lpc-shared-header [data-notification-list] {
   background: transparent !important;
-  gap: 14px !important;
-  padding: 2px 0 !important;
-  scroll-snap-type: y proximity;
-  scroll-behavior: smooth;
+  gap: var(--notif-gap, 12px) !important;
+  padding: 2px !important;
+  scroll-snap-type: none !important;
+  scroll-behavior: auto !important;
 }
 
 [data-notification-panel] .notif-scroll,
@@ -512,32 +510,17 @@ body.theme-mountain .topbar .lpc-shared-header [data-notification-list] {
 .topbar .lpc-shared-header .notifications-panel .notif-card,
 .topbar .lpc-shared-header .notif-panel .notif-item,
 .topbar .lpc-shared-header .notif-panel .notif-card {
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
+  scroll-snap-align: none;
+  scroll-snap-stop: normal;
   transform: none !important;
 }
 
-/* Smoother dropdown: avoid translate while keeping per-card blur */
+/* Keep dropdown stable to avoid stutter */
 .topbar .lpc-shared-header [data-notification-panel],
 .topbar .lpc-shared-header .notifications-panel,
 .topbar .lpc-shared-header .notif-panel {
-  transform: scaleY(0.98) !important;
-  transform-origin: top;
-  will-change: opacity, transform;
-  transition:
-    opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    visibility 0s linear 0.28s !important;
-}
-
-.topbar .lpc-shared-header [data-notification-panel].show,
-.topbar .lpc-shared-header .notifications-panel.show,
-.topbar .lpc-shared-header .notif-panel.show {
-  transform: scaleY(1) !important;
-  transition:
-    opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    visibility 0s linear 0s !important;
+  transform: none !important;
+  will-change: opacity;
 }
 
 [data-notification-panel] .notif-item,
@@ -551,9 +534,10 @@ body.theme-mountain .topbar .lpc-shared-header [data-notification-list] {
 .topbar .lpc-shared-header .notifications-panel .notif-card.notif-fade-ready,
 .topbar .lpc-shared-header .notif-panel .notif-item.notif-fade-ready,
 .topbar .lpc-shared-header .notif-panel .notif-card.notif-fade-ready {
-  opacity: 0;
+  opacity: 1 !important;
   transform: none !important;
-  will-change: opacity, transform;
+  transition: none !important;
+  will-change: auto !important;
 }
 
 [data-notification-panel] .notif-item.notif-fade-ready,
@@ -567,9 +551,9 @@ body.theme-mountain .topbar .lpc-shared-header [data-notification-list] {
 .topbar .lpc-shared-header .notifications-panel .notif-card.notif-fade-ready.notif-fade-in,
 .topbar .lpc-shared-header .notif-panel .notif-item.notif-fade-ready.notif-fade-in,
 .topbar .lpc-shared-header .notif-panel .notif-card.notif-fade-ready.notif-fade-in {
-  opacity: 1;
+  opacity: 1 !important;
   transform: none !important;
-  transition: opacity 0.62s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: none !important;
 }
 
 [data-notification-panel] .notif-item.notif-fade-ready.notif-fade-in,

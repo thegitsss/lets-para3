@@ -16,6 +16,7 @@ const { Upload } = require("@aws-sdk/lib-storage");
 const Case = require("../models/Case");
 const CaseFile = require("../models/CaseFile");
 const Message = require("../models/Message");
+const { decryptMessagePayload, decryptCaseFilePayload } = require("../utils/dataEncryption");
 
 const BUCKET = process.env.S3_BUCKET || "";
 const REGION = process.env.S3_REGION || process.env.AWS_REGION || "us-east-1";
@@ -855,11 +856,14 @@ async function generateArchiveZip(caseDoc) {
     .populate("userId", "firstName lastName role")
     .lean();
 
-  const fileMessages = (caseFiles || [])
+  const decryptedMessages = (messages || []).map((msg) => decryptMessagePayload(msg));
+  const decryptedCaseFiles = (caseFiles || []).map((file) => decryptCaseFilePayload(file));
+
+  const fileMessages = (decryptedCaseFiles || [])
     .map(buildFileMessage)
     .filter((entry) => entry && entry.fileName);
 
-  const combinedMessages = [...(messages || []), ...fileMessages];
+  const combinedMessages = [...(decryptedMessages || []), ...fileMessages];
 
   const sortedMessages = combinedMessages.slice().sort((a, b) => {
     const aTime = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -880,8 +884,8 @@ async function generateArchiveZip(caseDoc) {
       });
     }
   }
-  if (Array.isArray(caseFiles)) {
-    for (const file of caseFiles) {
+  if (Array.isArray(decryptedCaseFiles)) {
+    for (const file of decryptedCaseFiles) {
       if (!file?.storageKey) continue;
       documentEntries.push({
         key: file.storageKey,
@@ -889,8 +893,8 @@ async function generateArchiveZip(caseDoc) {
       });
     }
   }
-  if (Array.isArray(messages)) {
-    for (const msg of messages) {
+  if (Array.isArray(decryptedMessages)) {
+    for (const msg of decryptedMessages) {
       if (!msg?.fileKey) continue;
       documentEntries.push({
         key: msg.fileKey,

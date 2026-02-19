@@ -1536,7 +1536,18 @@ function setupDashboardViewRouter() {
 
 function showDashboardView(target, { skipHash = false, caseFilter = null } = {}) {
   if (!dashboardViewState.viewMap.has(target)) target = "home";
-  if (dashboardViewState.currentView === target) return;
+  const normalizedFilter = (caseFilter || "").toLowerCase();
+  const wantsFilter = normalizedFilter && CASE_VIEW_FILTERS.includes(normalizedFilter);
+  if (dashboardViewState.currentView === target) {
+    if (target === "cases" && wantsFilter && state.casesViewFilter !== normalizedFilter) {
+      void ensureCasesViewReady().then(() => {
+        if (state.casesViewFilter !== normalizedFilter) {
+          setCaseFilter(normalizedFilter);
+        }
+      });
+    }
+    return;
+  }
 
   dashboardViewState.viewMap.forEach((panel, key) => {
     if (!panel) return;
@@ -1559,13 +1570,12 @@ function showDashboardView(target, { skipHash = false, caseFilter = null } = {})
   }
 
   if (target === "cases") {
-    const wantsFilter = caseFilter && CASE_VIEW_FILTERS.includes(caseFilter);
     if (wantsFilter && !dashboardViewState.casesInitialized) {
-      setCaseFilter(caseFilter, { render: false });
+      setCaseFilter(normalizedFilter, { render: false });
     }
     void ensureCasesViewReady().then(() => {
-      if (wantsFilter && state.casesViewFilter !== caseFilter) {
-        setCaseFilter(caseFilter);
+      if (wantsFilter && state.casesViewFilter !== normalizedFilter) {
+        setCaseFilter(normalizedFilter);
       }
       maybeOpenCasePreviewFromQuery();
       maybeOpenApplicantFromQuery();

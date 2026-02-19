@@ -13,6 +13,7 @@ const Notification = require("../models/Notification");
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
 const sendEmail = require("../utils/email");
+const emailTemplates = require("../email/templates");
 const { buildReceiptPdfBuffer, uploadPdfToS3, getReceiptKey } = require("../services/caseLifecycle");
 const { notifyUser } = require("../utils/notifyUser");
 
@@ -1349,26 +1350,25 @@ router.post(
 
     if (c.attorney?.email) {
       const attorneyName = `${c.attorney.firstName || ""} ${c.attorney.lastName || ""}`.trim() || "there";
-      await sendEmail(
-        c.attorney.email,
-        "Your LPC job is officially complete",
-        `<p>Hi ${attorneyName},</p>
-         <p>Your case \"<strong>${c.title}</strong>\" was completed on <strong>${completedDateStr}</strong>.</p>
-         <p>Deliverables are available for download in your dashboard.</p>
-         <p>Thanks for using Let’s-ParaConnect.</p>`
-      ).catch(() => {});
+      const template = emailTemplates.caseCompletedAttorney({
+        attorneyName,
+        caseTitle: c.title || "your case",
+        completedDate: completedDateStr,
+      });
+      await sendEmail(c.attorney.email, template.subject, template.html).catch(() => {});
     }
 
     if (c.paralegal?.email) {
       const paraName = `${c.paralegal.firstName || ""} ${c.paralegal.lastName || ""}`.trim() || "there";
-      await sendEmail(
-        c.paralegal.email,
-        "Your LPC payout is complete",
-        `<p>Hi ${paraName},</p>
-         <p>Your payout for \"<strong>${c.title}</strong>\" is complete.</p>
-         <p>Case amount (payment): ${totalDisplay}<br/>Platform fee (${resolveParalegalFeePct(c)}%) deducted: ${feeDisplay}<br/>Payout: <strong>${payoutDisplay}</strong></p>
-         <p>Funds have been transferred to your connected Stripe account.</p>`
-      ).catch(() => {});
+      const template = emailTemplates.payoutReleased({
+        recipientName: paraName,
+        caseTitle: c.title || "Case",
+        amount: payoutDisplay,
+        totalDisplay,
+        feeDisplay,
+        feePct: resolveParalegalFeePct(c),
+      });
+      await sendEmail(c.paralegal.email, template.subject, template.html).catch(() => {});
     }
 
     res.json({ ok: true, payout, transferId: transfer.id });

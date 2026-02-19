@@ -326,6 +326,14 @@
       padding: 1.4rem 1.6rem;
       border-radius: 18px;
       box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+      position: relative;
+    }
+
+    .job-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
     }
 
     .job-card h3 {
@@ -354,6 +362,113 @@
       display: flex;
       flex-wrap: wrap;
       gap: 0.6rem;
+    }
+
+    .flag-button {
+      border: 1px solid rgba(26, 34, 48, 0.15);
+      background: #fff;
+      color: #8b6a2f;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+      flex: 0 0 auto;
+    }
+
+    .flag-button svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .flag-button:hover {
+      background: rgba(180, 151, 90, 0.12);
+      border-color: rgba(180, 151, 90, 0.45);
+    }
+
+    .flag-menu {
+      position: absolute;
+      top: 48px;
+      right: 16px;
+      width: min(260px, 82vw);
+      background: #ffffff;
+      border: 1px solid rgba(26, 34, 48, 0.12);
+      border-radius: 16px;
+      box-shadow: 0 24px 50px rgba(15, 23, 42, 0.16);
+      padding: 8px 10px;
+      z-index: 4;
+    }
+
+    .flag-menu-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.1rem;
+      font-weight: 300;
+      margin-bottom: 4px;
+    }
+
+    .flag-menu-subtitle {
+      color: #6b7280;
+      font-size: 0.85rem;
+      margin-bottom: 10px;
+    }
+
+    .flag-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.92rem;
+      color: #1a2230;
+      margin-bottom: 8px;
+    }
+
+    .flag-option input {
+      margin-top: 3px;
+    }
+
+    .flag-menu-other textarea {
+      width: 100%;
+      min-height: 70px;
+      border: 1px solid rgba(26, 34, 48, 0.12);
+      border-radius: 12px;
+      padding: 8px 10px;
+      font-family: 'Sarabun', sans-serif;
+      font-size: 0.9rem;
+      resize: vertical;
+    }
+
+    .flag-menu-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .flag-cancel {
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      color: #6b7280;
+      padding: 6px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .flag-submit {
+      border: 1px solid #887244;
+      background: #887244;
+      color: #ffffff;
+      padding: 6px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    .flag-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
     .clear-button,
@@ -495,7 +610,7 @@
     .apply-info-block {
       border: 1px solid rgba(26, 34, 48, 0.08);
       border-radius: 16px;
-      padding: 1.2rem 1.3rem;
+      padding: 0.8rem 1rem;
       background: #fbfcff;
       box-sizing: border-box;
       max-width: 520px;
@@ -506,7 +621,7 @@
       font-family: 'Cormorant Garamond', serif;
       font-weight: 300;
       font-size: 0.95rem;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
     .apply-info-list {
       list-style: disc;
@@ -514,14 +629,14 @@
       text-align: left;
       margin: 0;
       display: grid;
-      gap: 6px;
+      gap: 3px;
     }
     .apply-info-list li {
       font-family: 'Cormorant Garamond', serif;
       font-weight: 300;
       font-size: 0.95rem;
       color: #0f172a;
-      line-height: 1.5;
+      line-height: 1.35;
     }
     .posted-by {
       display: grid;
@@ -693,17 +808,17 @@
           </select>
         </div>
         <div class="filter-group">
-          <label for="filterMinPay">Minimum Pay</label>
+          <label for="filterMinPay">Minimum Compensation</label>
           <div class="slider-field">
             <input type="range" id="filterMinPay" min="0" max="500" step="10" value="0" />
             <span id="minPayValue">$0</span>
           </div>
         </div>
         <div class="filter-group">
-          <label for="filterMinExp">Max Experience Required</label>
+          <label for="filterMinExp">Experience Required</label>
           <div class="slider-field">
             <input type="range" id="filterMinExp" min="0" max="10" step="1" value="0" />
-            <span id="minExpValue">0 years</span>
+            <span id="minExpValue">Any</span>
           </div>
         </div>
         <div class="filter-actions">

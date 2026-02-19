@@ -2262,10 +2262,11 @@
       border-radius:8px;
       background:#fff;
       overflow:hidden;
-      max-height:1600px;
+      max-height:none;
       opacity:1;
       transform:translateY(0);
-      transition:max-height 0.35s ease, opacity 0.2s ease, transform 0.2s ease, margin 0.35s ease;
+      transition:opacity 0.2s ease, transform 0.2s ease, margin 0.2s ease;
+      will-change:opacity, transform;
     }
 
     .view-cases .applicant-drawer.no-transition {
@@ -4777,60 +4778,6 @@
   </script>
   <script>
     window.__ATTORNEY_PAGE__ = "overview";
-  </script>
-  <script>
-    (function enhanceNotificationScrollExperience() {
-      const ATTACHED_KEY = "notifScrollEnhanced";
-      const ITEM_BOUND_KEY = "notifFadeBound";
-
-      const initList = (list) => {
-        if (!list || list.dataset[ATTACHED_KEY] === "true") return;
-        list.dataset[ATTACHED_KEY] = "true";
-
-        const observer = new IntersectionObserver(
-          (entries) => {
-            entries.forEach((entry) => {
-              const item = entry.target;
-              if (!(item instanceof HTMLElement)) return;
-              if (entry.isIntersecting) {
-                item.classList.add("notif-fade-in");
-                observer.unobserve(item);
-              }
-            });
-          },
-          { root: list, threshold: 0.2, rootMargin: "0px 0px -4% 0px" }
-        );
-
-        const bindItems = () => {
-          const items = list.querySelectorAll(".notif-item, .notif-card");
-          items.forEach((item) => {
-            if (!(item instanceof HTMLElement)) return;
-            if (item.dataset[ITEM_BOUND_KEY] === "true") return;
-            item.dataset[ITEM_BOUND_KEY] = "true";
-            item.classList.add("notif-fade-ready");
-            observer.observe(item);
-          });
-        };
-
-        const itemObserver = new MutationObserver(() => bindItems());
-        itemObserver.observe(list, { childList: true, subtree: true });
-        bindItems();
-      };
-
-      const scan = () => {
-        document
-          .querySelectorAll(".topbar .lpc-shared-header [data-notification-list]")
-          .forEach((list) => initList(list));
-      };
-
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", scan, { once: true });
-      } else {
-        scan();
-      }
-      const rootObserver = new MutationObserver(() => scan());
-      rootObserver.observe(document.body, { childList: true, subtree: true });
-    })();
   </script>
 <script src="assets/libs/cropper/cropper.main.js"></script>
 <script src="https://js.stripe.com/v3/"></script>

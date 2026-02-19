@@ -13,6 +13,7 @@ const { containsProfanity, maskProfanity } = require("../utils/badWords");
 const { CASE_STATE, normalizeCaseStatus, canUseWorkspace } = require("../utils/caseState");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
 const { publishCaseEvent } = require("../utils/caseEvents");
+const { decryptMessagePayload, decryptString } = require("../utils/dataEncryption");
 
 // ----------------------------------------
 // CSRF (enabled in production or when ENABLE_CSRF=true)
@@ -364,8 +365,10 @@ router.get(
       const last = lastByCase.get(String(c._id));
       let snippet = "";
       if (last) {
-        if (last.type === "text") snippet = (last.text || "").slice(0, 140);
-        else if (last.type === "file") snippet = last.fileName ? `[file] ${last.fileName}` : "[file]";
+        const lastText = last.text ? decryptString(last.text) : "";
+        const lastFileName = last.fileName ? decryptString(last.fileName) : "";
+        if (last.type === "text") snippet = (lastText || "").slice(0, 140);
+        else if (last.type === "file") snippet = lastFileName ? `[file] ${lastFileName}` : "[file]";
         else if (last.type === "audio") snippet = "[audio message]";
         else snippet = `[${last.type}]`;
       }
@@ -433,7 +436,8 @@ router.get(
       await viewer.save();
     }
 
-    return res.json({ messages: items });
+    const messages = items.map((item) => decryptMessagePayload(item));
+    return res.json({ messages });
   })
 );
 
@@ -486,7 +490,7 @@ router.post(
     }
 
     publishCaseEvent(caseId, "messages", { at: new Date().toISOString() });
-    return res.status(201).json({ message: msg });
+    return res.status(201).json({ message: decryptMessagePayload(msg) });
   })
 );
 
@@ -531,7 +535,7 @@ router.post(
     });
 
     publishCaseEvent(req.params.caseId, "messages", { at: new Date().toISOString() });
-    res.status(201).json({ message: msg });
+    res.status(201).json({ message: decryptMessagePayload(msg) });
   })
 );
 
@@ -576,7 +580,7 @@ router.post(
     });
 
     publishCaseEvent(req.params.caseId, "messages", { at: new Date().toISOString() });
-    res.status(201).json({ message: msg });
+    res.status(201).json({ message: decryptMessagePayload(msg) });
   })
 );
 

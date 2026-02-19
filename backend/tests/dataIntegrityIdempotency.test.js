@@ -9,6 +9,7 @@ const User = require("../models/User");
 const Case = require("../models/Case");
 const CaseFile = require("../models/CaseFile");
 const casesRouter = require("../routes/cases");
+const { buildCaseFileKeyQuery } = require("../utils/dataEncryption");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 const app = (() => {
@@ -86,7 +87,9 @@ describe("Data integrity + idempotency", () => {
       .send({ key, original: "duplicate.pdf", mime: "application/pdf", size: 1234 });
     expect(res2.status).toBe(200);
 
-    const count = await CaseFile.countDocuments({ caseId: caseDoc._id, storageKey: key });
+    const count = await CaseFile.countDocuments(
+      buildCaseFileKeyQuery({ caseId: caseDoc._id, storageKey: key })
+    );
     expect(count).toBe(1);
   });
 });

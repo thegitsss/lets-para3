@@ -145,6 +145,16 @@ const scopeTaskSchema = new Schema(
   { _id: false }
 );
 
+const flagSchema = new Schema(
+  {
+    by: { type: Types.ObjectId, ref: "User", required: true, index: true },
+    reason: { type: String, trim: true, maxlength: 200, required: true },
+    details: { type: String, trim: true, maxlength: 2000, default: "" },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 /** ----------------------------------------
  * Main Case Schema
  * -----------------------------------------*/
@@ -213,6 +223,7 @@ const caseSchema = new Schema(
     applicants: [applicantSchema],
     files: [fileSchema],
     disputes: [disputeSchema],
+    flags: { type: [flagSchema], default: [] },
 
     // Lightweight progress updates/changelog
     updates: [

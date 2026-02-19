@@ -189,7 +189,6 @@ html {
         <span class="pill">AWS S3 (private uploads)</span>
         <span class="pill">Stripe (Checkout, PaymentIntents &amp; Connect)</span>
         <span class="pill">Nodemailer (SMTP email)</span>
-        <span class="pill">Google reCAPTCHA</span>
         <span class="pill">JWT auth + CSRF</span>
       </p>
     </div>
@@ -219,7 +218,6 @@ html {
         <li><strong>Uploads:</strong> files you upload via <em>presigned S3 URLs</em> (e.g., resumes, certificates, case documents). Files are stored privately in AWS S3; we keep object keys and metadata in the app database.</li>
         <li><strong>Payments:</strong> Stripe identifiers like <code class="small">checkout.session</code> IDs, <code class="small">payment_intent</code> IDs, transfer IDs/metadata (e.g., <code class="small">transfer_group</code>). <em>We never store full card numbers.</em></li>
         <li><strong>System &amp; Security:</strong> hashed passwords, session/JWT identifiers, CSRF tokens, IP addresses, user-agent, timestamps, rate-limit counters, audit logs (e.g., approvals, status changes).</li>
-        <li><strong>reCAPTCHA:</strong> we use Google reCAPTCHA on sign-up/sign-in to reduce abuse. Google may collect device and usage data per Google’s policies.</li>
       </ul>
     </section>
 

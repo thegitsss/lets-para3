@@ -2564,7 +2564,12 @@
     }
     const notifToggle = document.querySelector('[data-notification-toggle]');
     const notifPanel = document.querySelector('[data-notification-panel]');
-    if (notifToggle && notifPanel) {
+    const bindNotifFallback = () => {
+      if (!notifToggle || !notifPanel) return;
+      const center = notifToggle.closest('[data-notification-center]');
+      if (center?.dataset?.boundNotificationCenter === 'true') return;
+      if (notifToggle.dataset.boundNotifFallback === 'true') return;
+      notifToggle.dataset.boundNotifFallback = 'true';
       const toggleNotifPanel = () => {
         const willShow = !notifPanel.classList.contains('show');
         notifPanel.classList.toggle('show', willShow);
@@ -2579,6 +2584,19 @@
         event.preventDefault();
         toggleNotifPanel();
       });
+    };
+    const initNotifFallback = () => {
+      if (typeof window.scanNotificationCenters === 'function') {
+        window.scanNotificationCenters();
+      } else if (typeof window.initNotificationCenters === 'function') {
+        window.initNotificationCenters();
+      }
+      window.requestAnimationFrame(() => window.requestAnimationFrame(bindNotifFallback));
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initNotifFallback, { once: true });
+    } else {
+      initNotifFallback();
     }
     const notifList = document.querySelector('.case-topbar-controls [data-notification-list]');
     if (notifList) {

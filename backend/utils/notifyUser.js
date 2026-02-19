@@ -1,6 +1,7 @@
 const Notification = require("../models/Notification");
 const User = require("../models/User");
 const sendEmail = require("./email");
+const emailTemplates = require("../email/templates");
 const { publishNotificationEvent } = require("./notificationEvents");
 
 function buildDisplayMessage(type, payload = {}) {
@@ -50,7 +51,9 @@ function buildDisplayMessage(type, payload = {}) {
     case "application_accepted":
       return `Your application for ${caseTitle || "the case"} was accepted.`;
     case "application_denied":
-      return `Your application for ${caseTitle || "the case"} was not selected.`;
+      return caseTitle
+        ? `This role has been filled for ${caseTitle}.`
+        : "This role has been filled.";
     case "case_awaiting_funding":
       return `${payload.caseTitle || "A case"} is awaiting funding`;
     case "case_work_ready":
@@ -194,7 +197,7 @@ function emailTemplate(type, payload) {
     case "application_denied":
       return {
         subject: "Application update",
-        html: `<p>Your application${payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>` : ""} was not selected.</p><p>Log in to explore other opportunities.</p>`,
+        html: `<p>${payload.caseTitle ? `This role has been filled for <strong>${payload.caseTitle}</strong>.` : "This role has been filled."}</p><p>Log in to explore other opportunities.</p>`,
       };
     case "case_awaiting_funding":
       return {
@@ -202,10 +205,14 @@ function emailTemplate(type, payload) {
         html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is awaiting funding.</p><p>Please fund the case to continue.</p>`,
       };
     case "payout_released":
-      return {
-        subject: "Your payout is on the way",
-        html: `<p>Your payout${payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>` : ""} is on the way${payload.amount ? ` (${payload.amount})` : ""}.</p><p>Log in to view details.</p>`,
-      };
+      return emailTemplates.payoutReleased({
+        caseTitle: payload.caseTitle || payload.title || "your case",
+        amount: payload.amount,
+        totalDisplay: payload.totalDisplay,
+        feeDisplay: payload.feeDisplay,
+        feePct: payload.feePct,
+        recipientName: payload.recipientName || payload.paralegalName || payload.userName || "",
+      });
     case "case_work_ready":
       return {
         subject: `Work can begin on ${payload.caseTitle || "your case"}`,
@@ -329,6 +336,9 @@ function shouldSendEmailForType(user, type, payload = {}) {
   const prefs = normalizePrefs(user);
   if (type === "case_budget_locked") return false;
   if (type === "profile_photo_rejected") return false;
+  if (type === "application_denied") return false;
+  if (type === "payout_released") return false;
+  if (type === "case_update") return false;
   if (prefs.email === false) return false;
   if (type === "message") {
     if (payload?.suppressEmail) return false;
@@ -400,8 +410,16 @@ async function notifyUser(userId, type, payload = {}, options = {}) {
     publishNotificationEvent(userId, "notifications", { at: new Date().toISOString() });
   }
 
-  if (shouldSendEmailForType(user, type, payload)) {
-    const { subject, html } = emailTemplate(type, payload);
+  let emailPayload = payload;
+  if (type === "payout_released") {
+    const name = `${user.firstName || ""} ${user.lastName || ""}`.trim();
+    if (name && !payload.recipientName) {
+      emailPayload = { ...payload, recipientName: name };
+    }
+  }
+
+  if (shouldSendEmailForType(user, type, emailPayload)) {
+    const { subject, html } = emailTemplate(type, emailPayload);
     await safeSendEmail(user.email, subject, html);
   }
 

@@ -47,6 +47,7 @@ const Case = require("../models/Case");
 const CaseFile = require("../models/CaseFile");
 const uploadsRouter = require("../routes/uploads");
 const casesRouter = require("../routes/cases");
+const { buildCaseFileKeyQuery } = require("../utils/dataEncryption");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 const app = (() => {
@@ -347,7 +348,7 @@ describe("File uploads + downloads", () => {
       .send({ key, original: "sample.pdf", mime: "application/pdf", size: 1234 });
     expect(res.status).toBe(201);
 
-    const record = await CaseFile.findOne({ caseId: caseDoc._id, storageKey: key }).lean();
+    const record = await CaseFile.findOne(buildCaseFileKeyQuery({ caseId: caseDoc._id, storageKey: key })).lean();
     expect(record).toBeTruthy();
   });
 });

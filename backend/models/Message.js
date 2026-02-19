@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { encryptMessageFields } = require("../utils/dataEncryption");
 
 const { Schema, Types } = mongoose;
 
@@ -63,8 +64,13 @@ const MessageSchema = new Schema(
 );
 
 MessageSchema.pre("save", function (next) {
-  this.updatedAt = new Date();
-  next();
+  try {
+    encryptMessageFields(this);
+    this.updatedAt = new Date();
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
 
 MessageSchema.methods.markEdited = function () {

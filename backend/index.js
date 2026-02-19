@@ -74,8 +74,24 @@ const csrfProtection = csrf({
 
 app.use("/api/auth/login", rateLimit({ windowMs: 60 * 1000, max: 10 }));
 app.use("/api/auth/signup", rateLimit({ windowMs: 60 * 1000, max: 10 }));
-app.use("/api/messages", rateLimit({ windowMs: 10 * 1000, max: 5 }));
-app.use("/api/uploads", rateLimit({ windowMs: 10 * 1000, max: 2 }));
+app.use(
+  "/api/messages",
+  rateLimit({
+    windowMs: 10 * 1000,
+    max: (req) => (req.method === "GET" ? 40 : 15),
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
+app.use(
+  "/api/uploads",
+  rateLimit({
+    windowMs: 10 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
 const casesRateLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: PROD ? 120 : 10000,

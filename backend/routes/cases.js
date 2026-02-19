@@ -15,6 +15,7 @@ const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
 const Notification = require("../models/Notification");
 const sendEmail = require("../utils/email");
+const emailTemplates = require("../email/templates");
 const { notifyUser } = require("../utils/notifyUser");
 const stripe = require("../utils/stripe");
 const { cleanText, cleanTitle, cleanMessage } = require("../utils/sanitize");
@@ -23,6 +24,12 @@ const { generateArchiveZip, buildReceiptPdfBuffer, uploadPdfToS3, getReceiptKey 
 const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
 const { addSubscriber, publishCaseEvent } = require("../utils/caseEvents");
+const {
+  decryptCaseFilePayload,
+  decryptString,
+  buildCaseFileNameQuery,
+  buildCaseFileKeyQuery,
+} = require("../utils/dataEncryption");
 
 const STRIPE_BYPASS_PARALEGAL_EMAILS = new Set([
   "samanthasider+11@gmail.com",
@@ -739,6 +746,8 @@ function caseSummary(doc, { includeFiles = false, viewerRole = "" } = {}) {
   const paralegal = summarizeUser(doc.paralegal || doc.paralegalId);
   const pendingParalegal = summarizeUser(doc.pendingParalegal || doc.pendingParalegalId);
   const attorney = summarizeUser(doc.attorney || doc.attorneyId);
+  const flags = Array.isArray(doc.flags) ? doc.flags : [];
+  const lastFlag = flags.length ? flags[flags.length - 1] : null;
   const stateValue = doc.state || doc.locationState || "";
   const normalizedStatus = normalizeCaseStatusValue(doc.status);
   const invites = listCaseInvites(doc);
@@ -799,6 +808,12 @@ function caseSummary(doc, { includeFiles = false, viewerRole = "" } = {}) {
       terminatedAt: doc.terminatedAt || null,
     },
   };
+  if (isAdmin) {
+    summary.flagCount = flags.length;
+    summary.flagReasons = flags.map((flag) => flag?.reason).filter(Boolean);
+    summary.flagDetails = lastFlag?.details || "";
+    summary.flaggedAt = lastFlag?.createdAt || null;
+  }
   if (includeFiles && !isAdmin) {
     summary.files = Array.isArray(doc.files) ? doc.files.map(normalizeFile) : [];
   }
@@ -806,15 +821,17 @@ function caseSummary(doc, { includeFiles = false, viewerRole = "" } = {}) {
 }
 
 function normalizeFile(file) {
-  const original = file.original || file.filename || file.originalName || "";
-  const key = file.key || file.storageKey || "";
+  const originalRaw = file.original || file.filename || file.originalName || "";
+  const keyRaw = file.key || file.storageKey || "";
+  const original = decryptString(originalRaw);
+  const key = decryptString(keyRaw);
   return {
     id: file._id ? String(file._id) : undefined,
     key,
     storageKey: key,
-    previewKey: file.previewKey || "",
+    previewKey: decryptString(file.previewKey || ""),
     original,
-    filename: file.filename || original,
+    filename: decryptString(file.filename || original),
     mime: file.mime || file.mimeType || null,
     previewMime: file.previewMime || file.previewMimeType || null,
     size: file.size || null,
@@ -824,7 +841,7 @@ function normalizeFile(file) {
     uploadedAt: file.createdAt || file.updatedAt || file.uploadedAt || null,
     status: file.status || "pending_review",
     version: typeof file.version === "number" ? file.version : 1,
-    revisionNotes: file.revisionNotes || "",
+    revisionNotes: decryptString(file.revisionNotes || ""),
     revisionRequestedAt: file.revisionRequestedAt || null,
     approvedAt: file.approvedAt || null,
     replacedAt: file.replacedAt || null,
@@ -931,7 +948,7 @@ function nextFileVersion(doc, filename) {
 
 async function nextCaseFileVersion(caseId, filename) {
   if (!caseId || !filename) return 1;
-  const recent = await CaseFile.find({ caseId, originalName: filename })
+  const recent = await CaseFile.find(buildCaseFileNameQuery({ caseId, originalName: filename }))
     .sort({ version: -1, createdAt: -1 })
     .limit(1)
     .lean();
@@ -1138,23 +1155,24 @@ async function ensureFundsReleased(req, caseDoc) {
     const totalDisplay = `$${(budgetCents / 100).toFixed(2)}`;
     if (caseDoc.attorney?.email) {
       const attorneyName = `${caseDoc.attorney.firstName || ""} ${caseDoc.attorney.lastName || ""}`.trim() || "there";
-      await sendEmail(
-        caseDoc.attorney.email,
-        "Your case has been completed",
-        `<p>Hi ${attorneyName},</p>
-         <p>Your case "<strong>${caseDoc.title}</strong>" was completed on <strong>${completedDateStr}</strong>.</p>
-         <p>Deliverables will be available for the next 6 months.</p>`
-      );
+      const template = emailTemplates.caseCompletedAttorney({
+        attorneyName,
+        caseTitle: caseDoc.title || "your case",
+        completedDate: completedDateStr,
+      });
+      await sendEmail(caseDoc.attorney.email, template.subject, template.html);
     }
     if (paralegal.email) {
       const paraName = `${paralegal.firstName || ""} ${paralegal.lastName || ""}`.trim() || "there";
-      await sendEmail(
-        paralegal.email,
-        "Your payout is complete",
-        `<p>Hi ${paraName},</p>
-         <p>Your payout for "<strong>${caseDoc.title}</strong>" is complete.</p>
-         <p>Case amount (Stripe): ${totalDisplay}<br/>Platform fee (${resolveParalegalFeePct(caseDoc)}%) deducted: ${feeDisplay}<br/>Payout: <strong>${payoutDisplay}</strong></p>`
-      );
+      const template = emailTemplates.payoutReleased({
+        caseTitle: caseDoc.title || "your case",
+        amount: payoutDisplay,
+        totalDisplay,
+        feeDisplay,
+        feePct: resolveParalegalFeePct(caseDoc),
+        recipientName: paraName,
+      });
+      await sendEmail(paralegal.email, template.subject, template.html);
     }
   } catch (err) {
     console.warn("[cases] payout email error", err?.message || err);
@@ -2379,7 +2397,9 @@ router.post(
     const defaultStatus = "pending_review";
     const status = FILE_STATUS.includes(defaultStatus) ? defaultStatus : "pending_review";
 
-    const exists = await CaseFile.findOne({ caseId: doc._id, storageKey }).select("_id").lean();
+    const exists = await CaseFile.findOne(buildCaseFileKeyQuery({ caseId: doc._id, storageKey }))
+      .select("_id")
+      .lean();
     if (!exists) {
       const version = await nextCaseFileVersion(doc._id, filename);
       await CaseFile.create({
@@ -2424,21 +2444,22 @@ router.delete(
     if (!key || typeof key !== "string") return res.status(400).json({ error: "key is required" });
     const doc = req.case;
     const storageKey = String(key).trim();
-    const record = await CaseFile.findOne({ caseId: doc._id, storageKey });
+    const record = await CaseFile.findOne(buildCaseFileKeyQuery({ caseId: doc._id, storageKey }));
     if (!record) {
       return res.status(404).json({ error: "File not found on case" });
     }
-    if (S3_BUCKET && record.storageKey) {
+    const plainRecord = decryptCaseFilePayload(record);
+    if (S3_BUCKET && plainRecord.storageKey) {
       try {
-        const keyPath = String(record.storageKey).replace(/^\/+/, "");
+        const keyPath = String(plainRecord.storageKey).replace(/^\/+/, "");
         await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: keyPath }));
       } catch (err) {
         console.warn("[cases] file delete error", err?.message || err);
       }
     }
-    if (S3_BUCKET && record.previewKey) {
+    if (S3_BUCKET && plainRecord.previewKey) {
       try {
-        const keyPath = String(record.previewKey).replace(/^\/+/, "");
+        const keyPath = String(plainRecord.previewKey).replace(/^\/+/, "");
         await s3.send(new DeleteObjectCommand({ Bucket: S3_BUCKET, Key: keyPath }));
       } catch (err) {
         console.warn("[cases] file preview delete error", err?.message || err);
@@ -2476,12 +2497,15 @@ router.get(
     if (!req.acl?.isAdmin && isCaseClosedForFiles(doc)) {
       return res.status(403).json({ error: "Files are no longer available. Download the archive instead." });
     }
-    const file = await CaseFile.findOne({ caseId: doc._id, storageKey: String(key).trim() }).lean();
+    const file = await CaseFile.findOne(
+      buildCaseFileKeyQuery({ caseId: doc._id, storageKey: String(key).trim() })
+    ).lean();
     if (!file) return res.status(404).json({ error: "File not found" });
 
     try {
-      const url = await signDownload(file.storageKey);
-      res.json({ url, filename: file.originalName || null });
+      const plainFile = decryptCaseFilePayload(file);
+      const url = await signDownload(plainFile.storageKey);
+      res.json({ url, filename: plainFile.originalName || null });
     } catch (e) {
       console.error("[cases] signed-get error:", e);
       if (e?.code === "NoSuchKey") {
@@ -3476,6 +3500,69 @@ router.patch(
 );
 
 /**
+ * POST /api/cases/:caseId/flag
+ * Paralegal-only. Flags a case posting for admin review.
+ */
+router.post(
+  "/:caseId/flag",
+  verifyToken,
+  requireApproved,
+  requireRole("paralegal"),
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const { caseId } = req.params;
+    if (!isObjId(caseId)) {
+      return res.status(400).json({ error: "Invalid case id" });
+    }
+    const allowedReasons = new Set([
+      "inappropriate",
+      "spam",
+      "compensation",
+      "duplicate",
+      "other",
+    ]);
+    const rawReason = String(req.body?.reason || "").trim().toLowerCase();
+    const reason = allowedReasons.has(rawReason) ? rawReason : "";
+    if (!reason) {
+      return res.status(400).json({ error: "Select a valid reason." });
+    }
+    const details = cleanText(req.body?.details || "", { max: 2000 });
+    const doc = await Case.findById(caseId).select("flags status archived");
+    if (!doc) return res.status(404).json({ error: "Case not found" });
+    if (doc.archived || ["closed", "completed"].includes(String(doc.status || "").toLowerCase())) {
+      return res.status(400).json({ error: "This case cannot be flagged." });
+    }
+    const reporterId = req.user?._id || req.user?.id;
+    const existing = Array.isArray(doc.flags)
+      ? doc.flags.find((entry) => String(entry.by) === String(reporterId))
+      : null;
+    if (existing) {
+      existing.reason = reason;
+      existing.details = details || "";
+      existing.createdAt = new Date();
+    } else {
+      doc.flags = Array.isArray(doc.flags) ? doc.flags : [];
+      doc.flags.push({
+        by: reporterId,
+        reason,
+        details: details || "",
+        createdAt: new Date(),
+      });
+    }
+    await doc.save();
+    try {
+      await logAction(req, "case.flagged", {
+        targetType: "case",
+        targetId: doc._id,
+        caseId: doc._id,
+        meta: { reason, details: details || "" },
+      });
+    } catch {}
+    res.json({ ok: true, flagCount: doc.flags.length });
+  })
+);
+
+/**
  * POST /api/cases/:caseId/complete
  * Attorney-only. Releases funds, locks case, generates archive, and schedules purge.
  */
@@ -3619,6 +3706,7 @@ router.post(
       caseId: doc._id,
       meta: { purgeScheduledFor: doc.purgeScheduledFor },
     });
+    publishCaseEvent(doc._id, "case", { at: new Date().toISOString() });
 
     res.json({
       ok: true,
