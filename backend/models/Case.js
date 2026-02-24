@@ -11,6 +11,7 @@ const LEGACY_STATUS_IN_PROGRESS = "in_progress";
 const CASE_STATUS = [
   "open",            // posted and visible
   STATUS_IN_PROGRESS, // work underway
+  "paused",          // paused (paralegal withdrawal / admin pause)
   "completed",       // work marked complete
   "disputed",        // dispute opened
   "closed",          // final closed state
@@ -184,6 +185,24 @@ const caseSchema = new Schema(
     deadline: { type: Date, default: null }, // optional target date
     hiredAt: { type: Date, default: null },  // when a paralegal was hired
     completedAt: { type: Date, default: null },
+    pausedReason: {
+      type: String,
+      enum: ["paralegal_withdrew", "attorney_paused", "dispute", null],
+      default: null,
+    },
+    pausedAt: { type: Date, default: null },
+    disputeDeadlineAt: { type: Date, default: null },
+    partialPayoutAmount: { type: Number, default: null, min: 0 }, // cents (gross before paralegal fee)
+    payoutFinalizedAt: { type: Date, default: null },
+    payoutFinalizedType: {
+      type: String,
+      enum: ["zero_auto", "partial_attorney", "full", "admin", "expired_zero", null],
+      default: null,
+    },
+    withdrawnParalegalId: { type: Types.ObjectId, ref: "User", default: null },
+    relistRequestedAt: { type: Date, default: null },
+    relistPending: { type: Boolean, default: false },
+    remainingAmount: { type: Number, default: null, min: 0 }, // cents remaining for relist
     briefSummary: { type: String, trim: true, maxlength: 1000, default: "" },
     archived: { type: Boolean, default: false, index: true },
     downloadUrl: [{ type: String, trim: true }],
@@ -345,6 +364,12 @@ caseSchema.pre("save", function (next) {
   if (this.lockedTotalAmount != null) {
     this.lockedTotalAmount = cents(this.lockedTotalAmount);
   }
+  if (this.partialPayoutAmount != null) {
+    this.partialPayoutAmount = cents(this.partialPayoutAmount);
+  }
+  if (this.remainingAmount != null) {
+    this.remainingAmount = cents(this.remainingAmount);
+  }
   this.feeAttorneyAmount = cents(this.feeAttorneyAmount);
   this.feeParalegalAmount = cents(this.feeParalegalAmount);
   if (this.disputeSettlement) {
@@ -363,7 +388,8 @@ caseSchema.pre("save", function (next) {
 // Enforce simple status transitions to avoid accidental jumps
 const ALLOWED_TRANSITIONS = {
   open: [STATUS_IN_PROGRESS, "closed"],
-  [STATUS_IN_PROGRESS]: ["completed", "disputed", "closed"],
+  [STATUS_IN_PROGRESS]: ["paused", "completed", "disputed", "closed"],
+  paused: [STATUS_IN_PROGRESS, "disputed", "closed"],
   completed: ["disputed", "closed"],
   disputed: ["closed"],
   closed: [],

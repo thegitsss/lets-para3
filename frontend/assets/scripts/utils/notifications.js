@@ -183,6 +183,14 @@ function isAdminNotification(item = {}) {
 function getNotificationAvatar(item = {}, actorName = "") {
   if (isAdminNotification(item)) return ADMIN_NOTIFICATION_IMAGE;
   if (item.actorProfileImage) return item.actorProfileImage;
+  const hasActor =
+    Boolean(actorName) ||
+    Boolean(item.actorUserId) ||
+    Boolean(item.payload?.actorFirstName) ||
+    Boolean(item.payload?.fromName) ||
+    Boolean(item.payload?.actorName) ||
+    Boolean(item.payload?.paralegalName);
+  if (!hasActor) return ADMIN_NOTIFICATION_IMAGE;
   return getAvatarFallback(actorName);
 }
 

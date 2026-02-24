@@ -16,6 +16,7 @@ const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
   "game4funwithme1+1@gmail.com",
   "game4funwithme1@gmail.com",
 ]);
+const REAPPLY_BYPASS_EMAILS = new Set(["samanthasider+0@gmail.com"]);
 
 function sanitizeMessage(value, { min = 0, max = 2000 } = {}) {
   if (typeof value !== "string") return "";
@@ -146,10 +147,12 @@ async function createApplicationForJob(jobId, user, coverLetter) {
     err.status = 400;
     throw err;
   }
+  const requestEmail = String(user?.email || "").toLowerCase().trim();
+  const allowReapply = REAPPLY_BYPASS_EMAILS.has(requestEmail);
   let caseDoc = null;
   if (job.caseId) {
     caseDoc = await Case.findById(job.caseId).select(
-      "status archived paralegal paralegalId totalAmount lockedTotalAmount amountLockedAt title attorney attorneyId"
+      "status archived paralegal paralegalId totalAmount lockedTotalAmount amountLockedAt title attorney attorneyId relistRequestedAt payoutFinalizedAt"
     );
     if (!caseDoc) {
       const err = new Error("Case not found");
@@ -167,15 +170,16 @@ async function createApplicationForJob(jobId, user, coverLetter) {
       throw err;
     }
     const statusKey = String(caseDoc.status || "").toLowerCase();
-    if (statusKey !== "open") {
+    const relisted = statusKey === "paused" && caseDoc.relistRequestedAt && caseDoc.payoutFinalizedAt;
+    if (statusKey !== "open" && !relisted) {
       const err = new Error("Applications are closed for this case");
       err.status = 400;
       throw err;
     }
   }
 
-  const existing = await Application.findOne({ jobId, paralegalId: user._id });
-  if (existing) {
+  const existingCount = await Application.countDocuments({ jobId, paralegalId: user._id });
+  if (existingCount && !allowReapply) {
     const err = new Error("You have already applied to this job");
     err.status = 400;
     throw err;
@@ -211,6 +215,21 @@ async function createApplicationForJob(jobId, user, coverLetter) {
         const err = new Error("Complete Stripe onboarding before applying to jobs.");
         err.status = 403;
         throw err;
+      }
+    }
+  }
+
+  if (allowReapply && existingCount) {
+    const deleteResult = await Application.deleteMany({ jobId, paralegalId: user._id });
+    const decBy = deleteResult?.deletedCount ?? existingCount;
+    if (decBy) {
+      const updatedJob = await Job.findByIdAndUpdate(
+        jobId,
+        { $inc: { applicantsCount: -decBy } },
+        { new: true, select: "applicantsCount" }
+      );
+      if (updatedJob && typeof updatedJob.applicantsCount === "number" && updatedJob.applicantsCount < 0) {
+        await Job.findByIdAndUpdate(jobId, { applicantsCount: 0 });
       }
     }
   }

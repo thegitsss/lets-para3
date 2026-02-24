@@ -18,6 +18,7 @@ const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
   "game4funwithme1+1@gmail.com",
   "game4funwithme1@gmail.com",
 ]);
+const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const PRACTICE_AREAS = [
   "administrative law",
   "antitrust law",
@@ -172,7 +173,9 @@ function normalizeId(source) {
 function shapeListing({ job = null, caseDoc = null }) {
   const totalAmount = typeof caseDoc?.totalAmount === "number" ? caseDoc.totalAmount : null;
   const lockedTotalAmount = typeof caseDoc?.lockedTotalAmount === "number" ? caseDoc.lockedTotalAmount : null;
-  const amountForCase = lockedTotalAmount != null ? lockedTotalAmount : totalAmount;
+  const remainingAmount = typeof caseDoc?.remainingAmount === "number" ? caseDoc.remainingAmount : null;
+  const amountForCase =
+    remainingAmount != null ? remainingAmount : lockedTotalAmount != null ? lockedTotalAmount : totalAmount;
   const budgetFromCase = amountForCase != null ? Math.round(amountForCase / 100) : null;
   const attorneySource = job?.attorneyId || caseDoc?.attorney || null;
   const normalizedAttorneyId =
@@ -193,6 +196,7 @@ function shapeListing({ job = null, caseDoc = null }) {
     description: job?.description || caseDoc?.details || "",
     totalAmount,
     lockedTotalAmount,
+    remainingAmount,
     budget: typeof job?.budget === "number" ? job.budget : budgetFromCase,
     currency: caseDoc?.currency || "usd",
     state: resolvedState,
@@ -204,17 +208,22 @@ function shapeListing({ job = null, caseDoc = null }) {
     status: caseDoc?.status || job?.status || "open",
     contextCaseId: caseDoc?._id || job?.caseId || null,
     tasks: Array.isArray(caseDoc?.tasks) ? caseDoc.tasks : [],
+    relistRequestedAt: caseDoc?.relistRequestedAt || null,
   };
 }
 
 // GET /jobs/open — paralegals view available jobs
 router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req, res) => {
   try {
+    const limit = clamp(parseInt(req.query.limit, 10) || 200, 1, 500);
     const blockedIds = await getBlockedUserIds(req.user.id);
     const jobFilter = { status: "open" };
     const caseFilter = {
       archived: { $ne: true },
-      status: "open",
+      $or: [
+        { status: "open" },
+        { status: "paused", relistRequestedAt: { $ne: null }, payoutFinalizedAt: { $ne: null } },
+      ],
       paralegal: null,
       paralegalId: null,
     };
@@ -226,19 +235,41 @@ router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req,
 
     const [jobs, cases] = await Promise.all([
       Job.find(jobFilter)
+        .sort({ createdAt: -1 })
+        .limit(limit)
         .populate({
           path: "attorneyId",
           select: "firstName lastName lawFirm firmName profileImage avatarURL",
         })
         .lean(),
       Case.find(caseFilter)
-        .select("title practiceArea details briefSummary totalAmount lockedTotalAmount currency state locationState status applicants attorney attorneyId jobId createdAt tasks")
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .select("title practiceArea details briefSummary totalAmount lockedTotalAmount remainingAmount currency state locationState status applicants attorney attorneyId jobId createdAt tasks relistRequestedAt")
         .populate({
           path: "attorney",
           select: "firstName lastName lawFirm firmName profileImage avatarURL",
         })
         .lean(),
     ]);
+
+    const jobIds = jobs.map((job) => String(job?._id || "")).filter(Boolean);
+    const jobCaseLinks = jobIds.length
+      ? await Case.find({ jobId: { $in: jobIds } })
+          .select("jobId status archived relistRequestedAt payoutFinalizedAt")
+          .lean()
+      : [];
+    const linkedJobEligibility = new Map();
+    jobCaseLinks.forEach((doc) => {
+      const jobId = String(doc.jobId || "");
+      if (!jobId) return;
+      const status = String(doc.status || "").toLowerCase();
+      const eligible =
+        doc.archived !== true &&
+        (status === "open" ||
+          (status === "paused" && doc.relistRequestedAt && doc.payoutFinalizedAt));
+      linkedJobEligibility.set(jobId, eligible);
+    });
 
     const activeCaseIds = new Set(cases.map((doc) => String(doc._id)));
     const jobByCaseId = new Map();
@@ -251,6 +282,10 @@ router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req,
             jobByCaseId.set(caseKey, job);
           }
         }
+        return;
+      }
+      const jobId = String(job?._id || "");
+      if (jobId && linkedJobEligibility.has(jobId) && !linkedJobEligibility.get(jobId)) {
         return;
       }
       orphanJobs.push(shapeListing({ job, caseDoc: null }));
@@ -266,6 +301,9 @@ router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req,
     });
 
     const items = [...shapedCases, ...orphanJobs];
+    if (items.length > limit) {
+      items.length = limit;
+    }
     if (items.length) {
       const jobIds = items.map((item) => item.jobId).filter(Boolean);
       if (jobIds.length) {

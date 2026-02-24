@@ -18,6 +18,21 @@ const PLATFORM_FEE_PCT = 22;
 const DEFAULT_HIRE_ERROR = "Unable to hire paralegal.";
 const MISSING_DOCUMENT_MESSAGE = "This document is no longer available for download.";
 
+function isDisputeWindowActive(caseData) {
+  if (!caseData?.disputeDeadlineAt) return false;
+  const deadline = new Date(caseData.disputeDeadlineAt).getTime();
+  if (Number.isNaN(deadline)) return false;
+  return Date.now() < deadline;
+}
+
+function resolveBudgetCents(caseData) {
+  if (!caseData) return 0;
+  if (Number.isFinite(caseData?.remainingAmount)) return caseData.remainingAmount;
+  if (Number.isFinite(caseData?.lockedTotalAmount)) return caseData.lockedTotalAmount;
+  if (Number.isFinite(caseData?.totalAmount)) return caseData.totalAmount;
+  return 0;
+}
+
 function formatHireErrorMessage(message) {
   if (!message || typeof message !== "string") return DEFAULT_HIRE_ERROR;
   const normalized = message.toLowerCase();
@@ -71,12 +86,10 @@ function renderCase(data) {
   const title = data?.title || "Case Applications";
   const statusRaw = String(data?.status || "open");
   const statusKey = statusRaw.toLowerCase();
-  const budgetCents = Number.isFinite(data?.lockedTotalAmount)
-    ? data.lockedTotalAmount
-    : Number(data?.totalAmount) || 0;
+  const budgetCents = resolveBudgetCents(data);
   state.caseAmountCents = budgetCents;
   state.caseCurrency = data?.currency || "USD";
-  const budget = budgetCents ? formatCurrency(budgetCents / 100) : "—";
+  const budget = Number.isFinite(budgetCents) ? formatCurrency(budgetCents / 100) : "—";
   const practice = data?.practiceArea || "General";
   const escrowFunded =
     !!data?.escrowIntentId && String(data?.escrowStatus || "").toLowerCase() === "funded";
@@ -89,7 +102,12 @@ function renderCase(data) {
 
   const hasParalegal = !!(data?.paralegal || data?.paralegalId);
   const isOpenCase = statusKey === "open";
-  state.canHire = isOpenCase && !hasParalegal && !data?.readOnly;
+  const isRelisted = statusKey === "paused" && !!data?.relistRequestedAt;
+  const disputeActive = isDisputeWindowActive(data);
+  const payoutFinalized = !!data?.payoutFinalizedAt;
+  const relistLocked = disputeActive || (isRelisted && !payoutFinalized);
+  const hasBudget = Number.isFinite(budgetCents) && budgetCents > 0;
+  state.canHire = (isOpenCase || isRelisted) && !hasParalegal && !data?.readOnly && !relistLocked && hasBudget;
 
   if (hasParalegal) {
     const hiredName = resolveParalegalName(data);
@@ -99,6 +117,21 @@ function renderCase(data) {
         : `${hiredName} has been hired. Case funding is pending.`,
       "success"
     );
+  } else if (isRelisted) {
+    if (relistLocked) {
+      if (!payoutFinalized) {
+        setNotice("Case relist is locked until payout is finalized.", "error");
+      } else {
+        const deadlineText = data?.disputeDeadlineAt
+          ? new Date(data.disputeDeadlineAt).toLocaleString()
+          : "after the 24-hour hold ends";
+        setNotice(`Case relisted. Hiring is locked until ${deadlineText}.`, "error");
+      }
+    } else if (!hasBudget) {
+      setNotice("Remaining case balance is $0. Hiring is unavailable.", "error");
+    } else {
+      setNotice("Case relisted and ready for hiring.", "success");
+    }
   } else if (!isOpenCase) {
     setNotice("Applications are available while the case is open.", "error");
   } else if (!state.canHire) {

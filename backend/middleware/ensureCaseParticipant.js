@@ -17,7 +17,7 @@ async function evaluateCaseParticipant(req, caseId) {
   }
 
   const caseDoc = await Case.findById(caseId).select(
-    "_id title status escrowStatus escrowIntentId paymentReleased attorney attorneyId paralegal paralegalId pendingParalegalId invites readOnly tasksLocked hiredAt"
+    "_id title status escrowStatus escrowIntentId paymentReleased attorney attorneyId paralegal paralegalId withdrawnParalegalId pendingParalegalId invites readOnly tasksLocked hiredAt"
   );
   if (!caseDoc) {
     const err = new Error("Case not found");
@@ -38,6 +38,8 @@ async function evaluateCaseParticipant(req, caseId) {
   const isParalegal =
     (caseDoc.paralegal && String(caseDoc.paralegal) === uid) ||
     (caseDoc.paralegalId && String(caseDoc.paralegalId) === uid);
+  const isWithdrawnParalegal =
+    caseDoc.withdrawnParalegalId && String(caseDoc.withdrawnParalegalId) === uid;
   const isPendingParalegal =
     (caseDoc.pendingParalegalId && String(caseDoc.pendingParalegalId) === uid) ||
     (Array.isArray(caseDoc.invites) &&
@@ -49,6 +51,15 @@ async function evaluateCaseParticipant(req, caseId) {
       ));
 
   if (!isAttorney && !isParalegal) {
+    const baseUrl = String(req.baseUrl || "");
+    const allowWithdrawn =
+      isWithdrawnParalegal && baseUrl.includes("/disputes");
+    if (allowWithdrawn) {
+      return {
+        caseDoc,
+        acl: { isAdmin: false, isAttorney: false, isParalegal: false, isPendingParalegal: false, isWithdrawnParalegal: true },
+      };
+    }
     if (isPendingParalegal && String(req.method || "").toUpperCase() === "GET") {
       return {
         caseDoc,

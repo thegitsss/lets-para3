@@ -3486,13 +3486,7 @@ function buildApplicantDrawerRow(applicant, index, caseId) {
 
 function buildApplicantDetail(applicant, { caseId } = {}) {
   const caseItem = caseId ? state.caseLookup.get(String(caseId)) : null;
-  const statusKey = normalizeCaseStatus(caseItem?.status);
-  const canHire =
-    !!caseId &&
-    !!applicant.paralegalId &&
-    statusKey === "open" &&
-    !hasAssignedParalegal(caseItem) &&
-    !caseItem?.readOnly;
+  const canHire = !!caseId && !!applicant.paralegalId && canHireForCase(caseItem);
   const returnTo = caseId && applicant.paralegalId ? buildApplicantReturnUrl(caseId, applicant.paralegalId) : "";
   const profileLink = applicant.paralegalId
     ? buildParalegalProfileUrl(applicant.paralegalId, { returnTo })
@@ -5033,7 +5027,7 @@ async function handleCaseAction(action, caseId) {
     } else if (action === "download") {
       await downloadCaseDeliverables(caseId);
     } else if (action === "download-receipt") {
-      window.open(`/api/payments/receipt/attorney/${encodeURIComponent(caseId)}?regen=1`, "_blank");
+      window.open(`/api/payments/receipt/attorney/${encodeURIComponent(caseId)}`, "_blank");
     } else if (action === "download-archive") {
       window.open(`/api/cases/${encodeURIComponent(caseId)}/archive/download`, "_blank");
     } else if (action === "archive") {
@@ -5223,10 +5217,50 @@ function formatCaseDate(value) {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function formatCaseAmount(item) {
-  const cents = Number(
-    item?.lockedTotalAmount ?? item?.totalAmount ?? item?.paymentAmount ?? item?.budget ?? 0
+function resolveCaseBudgetCents(item) {
+  return Number(
+    item?.remainingAmount ??
+      item?.lockedTotalAmount ??
+      item?.totalAmount ??
+      item?.paymentAmount ??
+      item?.budget ??
+      0
   );
+}
+
+function isDisputeWindowActiveCase(item) {
+  if (!item?.disputeDeadlineAt) return false;
+  const deadline = new Date(item.disputeDeadlineAt).getTime();
+  if (Number.isNaN(deadline)) return false;
+  return Date.now() < deadline;
+}
+
+function isRelistedCase(item) {
+  const statusKey = normalizeCaseStatus(item?.status);
+  return statusKey === "paused" && !!item?.relistRequestedAt;
+}
+
+function isRelistHireLocked(item) {
+  if (!isRelistedCase(item)) return false;
+  if (!item?.payoutFinalizedAt) return true;
+  return !!item?.relistPending || isDisputeWindowActiveCase(item);
+}
+
+function canHireForCase(item) {
+  if (!item || item.readOnly) return false;
+  if (hasAssignedParalegal(item)) return false;
+  const statusKey = normalizeCaseStatus(item?.status);
+  const isOpen = statusKey === "open";
+  const relisted = isRelistedCase(item);
+  if (!isOpen && !relisted) return false;
+  if (relisted && isRelistHireLocked(item)) return false;
+  const amountCents = resolveCaseBudgetCents(item);
+  if (!Number.isFinite(amountCents) || amountCents <= 0) return false;
+  return true;
+}
+
+function formatCaseAmount(item) {
+  const cents = resolveCaseBudgetCents(item);
   if (!Number.isFinite(cents) || cents <= 0) return "—";
   return formatCurrency(cents);
 }
@@ -7131,14 +7165,24 @@ function renderApplications(apps = [], hasPaymentMethod = true) {
           "Paralegal"
       );
       const statusKey = String(primaryApp?.status || "").toLowerCase();
-      const canHire = !!caseId && !!paralegalId && !["accepted", "rejected"].includes(statusKey);
+      const canHire =
+        !!caseId &&
+        !!paralegalId &&
+        !["accepted", "rejected"].includes(statusKey) &&
+        canHireForCase(caseEntry);
       const paymentBlocked = hasPaymentMethod === false;
       const showPaymentGate = paymentBlocked && canHire;
       let hireDisabledAttr = "";
       if (showPaymentGate) {
         hireDisabledAttr = ' disabled aria-disabled="true" title="Add a payment method to hire."';
       } else if (!canHire) {
-        hireDisabledAttr = ' disabled aria-disabled="true" title="Select an applicant to hire."';
+        let reason = "Select an applicant to hire.";
+        if (caseEntry && isRelistHireLocked(caseEntry)) {
+          reason = "Hiring locked until the case becomes eligible to be relisted.";
+        } else if (caseEntry && !canHireForCase(caseEntry)) {
+          reason = "Case is not ready for hiring.";
+        }
+        hireDisabledAttr = ` disabled aria-disabled="true" title="${sanitize(reason)}"`;
       }
       const viewApplicantsHref = caseId
         ? `dashboard-attorney.html?openApplicants=1&caseId=${encodeURIComponent(caseId)}#cases:inquiries`
@@ -7218,7 +7262,35 @@ async function handleHireFromApplications({ caseId, paralegalId, paralegalName, 
     notifyCases(err?.message || "Unable to load case details.", "error");
     return;
   }
-  const amountCents = Number(caseDetails?.lockedTotalAmount ?? caseDetails?.totalAmount ?? 0);
+  if (!canHireForCase(caseDetails)) {
+    if (isRelistHireLocked(caseDetails)) {
+      if (!caseDetails?.payoutFinalizedAt) {
+        notifyCases("Payout must be finalized before hiring a new paralegal.", "error");
+      } else {
+        const deadlineText = caseDetails?.disputeDeadlineAt
+          ? new Date(caseDetails.disputeDeadlineAt).toLocaleString()
+          : "after the 24-hour hold ends";
+        notifyCases(`Hiring is locked until ${deadlineText}.`, "error");
+      }
+      return;
+    }
+    if (normalizeCaseStatus(caseDetails?.status) === "paused" && !caseDetails?.relistRequestedAt) {
+      notifyCases("Relist the case before hiring a new paralegal.", "error");
+      return;
+    }
+    if (hasAssignedParalegal(caseDetails)) {
+      notifyCases("A paralegal is already hired for this case.", "error");
+      return;
+    }
+    const fallbackAmount = resolveCaseBudgetCents(caseDetails);
+    if (!Number.isFinite(fallbackAmount) || fallbackAmount <= 0) {
+      notifyCases("Remaining case balance is $0. Hiring is unavailable.", "error");
+      return;
+    }
+    notifyCases("Hiring is unavailable for this case right now.", "error");
+    return;
+  }
+  const amountCents = resolveCaseBudgetCents(caseDetails);
   if (!Number.isFinite(amountCents) || amountCents <= 0) {
     notifyCases("Payment amount is unavailable for this case.", "error");
     return;

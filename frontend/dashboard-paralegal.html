@@ -2565,6 +2565,18 @@
         </div>
       </div>
     </div>
+    <div class="tour-overlay" id="withdrawalSuccessOverlay" aria-hidden="true"></div>
+    <div class="tour-modal" id="withdrawalSuccessModal" role="dialog" aria-modal="true" aria-labelledby="withdrawalSuccessTitle" aria-describedby="withdrawalSuccessText">
+      <button type="button" class="tour-close" id="withdrawalSuccessCloseBtn" aria-label="Close withdrawal notice">×</button>
+      <div class="tour-hero" role="presentation"></div>
+      <div class="tour-content">
+        <div class="tour-title" id="withdrawalSuccessTitle">Withdrawal Successful</div>
+        <p class="tour-text" id="withdrawalSuccessText">Your withdrawal has been recorded.</p>
+        <div class="tour-actions">
+          <button type="button" class="tour-btn primary" id="withdrawalSuccessOkBtn">Close</button>
+        </div>
+      </div>
+    </div>
     <div class="tour-tooltip" id="profileTourTooltip" role="dialog" aria-live="polite">
       <button type="button" class="tour-close" id="tourTooltipCloseBtn" aria-label="Close tour">×</button>
       <p>Set up your profile here.</p>
@@ -2696,7 +2708,7 @@
   </script>
   <script type="module" src="assets/scripts/paralegal-dashboard.js"></script>
   <script type="module">
-    import { secureFetch } from "./assets/scripts/auth.js";
+    import { secureFetch, fetchCSRF } from "./assets/scripts/auth.js";
 
     document.addEventListener("DOMContentLoaded", () => {
       const homeView = document.getElementById("paralegalHomeView");
@@ -2739,11 +2751,33 @@
         return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
       }
 
+      function formatDateTime(value) {
+        if (!value) return "";
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return "";
+        return parsed.toLocaleString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        });
+      }
+
       function formatStatus(value) {
         const raw = String(value || "").trim();
         if (!raw) return "";
         const cleaned = raw.replace(/_/g, " ");
         return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+      }
+
+      function notifyCase(message, type = "info") {
+        const helper = window.toastUtils;
+        if (helper?.show) {
+          helper.show(message, { targetId: "toastBanner", type });
+        } else {
+          alert(message);
+        }
       }
 
       function renderActiveCases(items = activeCasesCache) {
@@ -2818,18 +2852,37 @@
             const title = item.title || "Case";
             const attorney = item.attorneyName || "Attorney";
             const completed = formatDate(item.completedAt);
+            const isWithdrawn = !!item.isWithdrawn;
+            const completedLabel = completed
+              ? isWithdrawn
+                ? `Withdrawn: ${completed}`
+                : `Completed: ${completed}`
+              : "";
             const hasPaymentAmount = Number.isFinite(Number(item.paymentAmount));
+            const disputeSentence = "You may open a dispute within 24 hours of case closure.";
+            const payoutLine =
+              item.receiptAvailable && hasPaymentAmount
+                ? `Payout: ${formatCurrency(item.paymentAmount)}`
+                : "";
             const meta = [
               `Attorney: ${attorney}`,
-              completed ? `Completed: ${completed}` : "",
-              hasPaymentAmount ? `Payout: ${formatCurrency(item.paymentAmount)}` : "",
+              completedLabel,
+              payoutLine,
             ]
               .filter(Boolean)
               .map((line) => `<span>${escapeHTML(line)}</span>`)
               .join("");
             const receiptLink = caseId
-              ? `/api/payments/receipt/paralegal/${encodeURIComponent(caseId)}?regen=1`
+              ? `/api/payments/receipt/paralegal/${encodeURIComponent(caseId)}`
               : "#";
+            const receiptAction = item.receiptAvailable
+              ? `<a href="${receiptLink}" class="btn-link" target="_blank" rel="noopener">Download Payout Details</a>`
+              : "";
+            const disputeAction = isWithdrawn && item.canDispute
+              ? `<button type="button" class="btn-link" data-dispute-withdrawn data-case-id="${escapeHTML(
+                  caseId
+                )}">${escapeHTML(disputeSentence)}</button>`
+              : "";
             return `
               <article class="file-card" data-case-id="${escapeHTML(caseId)}">
                 <div class="file-line">
@@ -2837,7 +2890,8 @@
                 </div>
                 <div class="file-meta">${meta}</div>
                 <div class="file-actions">
-                  <a href="${receiptLink}" class="btn-link" target="_blank" rel="noopener">Download Payout Details</a>
+                  ${disputeAction}
+                  ${receiptAction}
                 </div>
               </article>
             `;
@@ -2947,6 +3001,38 @@
 
       setActiveView(resolveViewFromHash());
 
+      (function showWithdrawalToast() {
+        try {
+          const stored = sessionStorage.getItem("lpc-withdrawal-toast");
+          if (!stored) return;
+          sessionStorage.removeItem("lpc-withdrawal-toast");
+          const payload = JSON.parse(stored || "{}");
+          const message = payload?.message || "Withdrawal recorded.";
+          const type = payload?.type || "success";
+          notifyCase(message, type);
+          const overlay = document.getElementById("withdrawalSuccessOverlay");
+          const modal = document.getElementById("withdrawalSuccessModal");
+          const textNode = document.getElementById("withdrawalSuccessText");
+          if (textNode) textNode.textContent = message;
+          if (overlay && modal) {
+            overlay.classList.add("is-active");
+            overlay.setAttribute("aria-hidden", "false");
+            modal.classList.add("is-active");
+            const close = () => {
+              overlay.classList.remove("is-active");
+              overlay.setAttribute("aria-hidden", "true");
+              modal.classList.remove("is-active");
+            };
+            const closeBtn = document.getElementById("withdrawalSuccessCloseBtn");
+            const okBtn = document.getElementById("withdrawalSuccessOkBtn");
+            closeBtn?.addEventListener("click", close, { once: true });
+            okBtn?.addEventListener("click", close, { once: true });
+          }
+        } catch (err) {
+          sessionStorage.removeItem("lpc-withdrawal-toast");
+        }
+      })();
+
       if (completedPrevBtn) {
         completedPrevBtn.addEventListener("click", () => {
           if (completedPageIndex <= 0) return;
@@ -2960,6 +3046,39 @@
           if (completedPageIndex >= totalPages - 1) return;
           completedPageIndex += 1;
           renderCompletedCases(completedCasesCache);
+        });
+      }
+
+      if (completedCasesContainer) {
+        completedCasesContainer.addEventListener("click", async (event) => {
+          const btn = event.target.closest("[data-dispute-withdrawn]");
+          if (!btn) return;
+          const caseId = btn.dataset.caseId || "";
+          if (!caseId) return;
+          const noteRaw = window.prompt("Please provide details (required).");
+          if (noteRaw === null) return;
+          const note = String(noteRaw || "").trim();
+          if (!note) {
+            notifyCase("Details are required.", "error");
+            return;
+          }
+          btn.disabled = true;
+          try {
+            await fetchCSRF().catch(() => "");
+            const res = await secureFetch(`/api/disputes/${encodeURIComponent(caseId)}`, {
+              method: "POST",
+              body: { message: note },
+            });
+            if (!res.ok) {
+              throw new Error("Unable to submit request.");
+            }
+            notifyCase("Request submitted.", "success");
+            await loadCompletedCases();
+          } catch (err) {
+            notifyCase("Unable to submit request.", "error");
+          } finally {
+            btn.disabled = false;
+          }
         });
       }
       const browseJobsBtn = document.getElementById("browseJobsBtn");

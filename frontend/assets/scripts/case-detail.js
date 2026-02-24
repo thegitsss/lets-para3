@@ -32,6 +32,15 @@ const caseDisputeStatus = document.getElementById("caseDisputeStatus");
 const caseCompleteSection = document.getElementById("caseCompleteSection");
 const caseCompleteButton = document.getElementById("caseCompleteButton");
 const caseCompleteStatus = document.getElementById("caseCompleteStatus");
+const caseWithdrawSection = document.getElementById("caseWithdrawSection");
+const caseWithdrawNote = document.getElementById("caseWithdrawNote");
+const caseWithdrawButton = document.getElementById("caseWithdrawButton");
+const caseWithdrawStatus = document.getElementById("caseWithdrawStatus");
+const casePausedSection = document.getElementById("casePausedSection");
+const casePausedBanner = document.getElementById("casePausedBanner");
+const casePartialPayoutButton = document.getElementById("casePartialPayoutButton");
+const caseRelistButton = document.getElementById("caseRelistButton");
+const casePausedStatus = document.getElementById("casePausedStatus");
 const caseThread = document.getElementById("case-messages");
 const caseSelect = document.getElementById("case-select");
 const caseTabs = document.querySelectorAll(".case-rail-tabs button");
@@ -91,6 +100,10 @@ const state = {
   completionOverlayTimer: null,
   completionOverlayCountdown: null,
   completionOverlayNode: null,
+  withdrawing: false,
+  rejecting: false,
+  partialPayoutSubmitting: false,
+  relisting: false,
 };
 
 let taskUpdateInFlight = false;
@@ -111,6 +124,22 @@ const weekdayFormatter = new Intl.DateTimeFormat(undefined, {
 });
 
 const PAYMENT_METHOD_UPDATE_MESSAGE = "Payment method needs to be updated before funds can be released.";
+const POPUP_ANIMATION_MS = 180;
+
+function mountPopupOverlay(overlay) {
+  if (!overlay) return;
+  requestAnimationFrame(() => {
+    if (overlay.isConnected) overlay.classList.add("is-visible");
+  });
+}
+
+function dismissPopupOverlay(overlay) {
+  if (!overlay || !overlay.isConnected) return;
+  overlay.classList.remove("is-visible");
+  window.setTimeout(() => {
+    if (overlay.isConnected) overlay.remove();
+  }, POPUP_ANIMATION_MS);
+}
 
 function formatTime(value) {
   if (!value) return "";
@@ -413,6 +442,75 @@ function hasAssignedParalegal(caseData) {
   return !!(caseData?.paralegal || caseData?.paralegalId);
 }
 
+function resolveRemainingAmount(caseData) {
+  if (!caseData) return 0;
+  if (Number.isFinite(caseData?.remainingAmount)) return Math.max(0, Math.round(caseData.remainingAmount));
+  const base = Number(caseData?.lockedTotalAmount ?? caseData?.totalAmount ?? 0);
+  if (!Number.isFinite(base) || base <= 0) return null;
+  const paid = Number(caseData?.partialPayoutAmount ?? 0);
+  if (!Number.isFinite(paid) || paid <= 0) return Math.round(base);
+  return Math.max(0, Math.round(base - paid));
+}
+
+function getWithdrawnParalegalId(caseData) {
+  if (!caseData) return "";
+  const raw = caseData.withdrawnParalegalId;
+  if (!raw) return "";
+  if (typeof raw === "string") return raw;
+  return String(raw._id || raw.id || "");
+}
+
+function isWithdrawalCase(caseData) {
+  if (!caseData) return false;
+  const reason = String(caseData?.pausedReason || "").toLowerCase();
+  if (reason === "paralegal_withdrew" || reason === "dispute") return true;
+  const statusKey = normalizeCaseStatus(caseData?.status);
+  if (statusKey === "paused" || statusKey === "disputed") {
+    return !!getWithdrawnParalegalId(caseData);
+  }
+  return false;
+}
+
+function isDisputeWindowActive(caseData) {
+  if (!caseData?.disputeDeadlineAt) return false;
+  const deadline = new Date(caseData.disputeDeadlineAt).getTime();
+  if (Number.isNaN(deadline)) return false;
+  return Date.now() < deadline;
+}
+
+function isWithdrawnViewer(caseData) {
+  const viewerId = getCurrentUserId();
+  const withdrawnId = getWithdrawnParalegalId(caseData);
+  if (!viewerId || !withdrawnId) return false;
+  if (String(viewerId) !== String(withdrawnId)) return false;
+  const assignedId = normalizeUserId(caseData?.paralegal || caseData?.paralegalId);
+  if (assignedId && String(assignedId) === String(viewerId)) return false;
+  const statusKey = normalizeCaseStatus(caseData?.status);
+  if (["paused", "disputed"].includes(statusKey)) return true;
+  if (caseData?.pausedReason === "paralegal_withdrew" || caseData?.pausedReason === "dispute") return true;
+  return false;
+}
+
+function countCompletedTasks(caseData) {
+  const tasks = getCaseTasks(caseData);
+  return tasks.reduce((count, task) => count + (isTaskCompleted(task) ? 1 : 0), 0);
+}
+
+function canRequestWithdrawal(caseData) {
+  if (getCurrentUserRole() !== "paralegal") return false;
+  const statusKey = normalizeCaseStatus(caseData?.status);
+  if (["paused", "disputed", "completed", "closed"].includes(statusKey)) return false;
+  const viewerId = getCurrentUserId();
+  const assignedId = normalizeUserId(caseData?.paralegal || caseData?.paralegalId);
+  if (!viewerId || !assignedId || String(viewerId) !== String(assignedId)) return false;
+  if (areAllTasksComplete(caseData)) return false;
+  return true;
+}
+
+function canOpenDisputeFromCase(caseData) {
+  return false;
+}
+
 function formatCaseStatus(value, caseData = {}) {
   const key = normalizeCaseStatus(value);
   const isDisputed = key === "disputed" || caseData?.terminationStatus === "disputed";
@@ -438,6 +536,8 @@ function ensureCompleteModalStyles() {
       justify-content:center;
       z-index:2300;
       padding:18px;
+      opacity:0;
+      transition:opacity .18s ease;
     }
     .case-complete-modal{
       width:min(520px,92vw);
@@ -449,6 +549,16 @@ function ensureCompleteModalStyles() {
       box-shadow:0 24px 50px rgba(0,0,0,.2);
       display:grid;
       gap:12px;
+      opacity:0;
+      transform:translateY(4px);
+      transition:opacity .18s ease, transform .18s ease;
+    }
+    .case-complete-overlay.is-visible{
+      opacity:1;
+    }
+    .case-complete-overlay.is-visible .case-complete-modal{
+      opacity:1;
+      transform:translateY(0) scale(1);
     }
     .case-complete-title{
       margin:0;
@@ -525,6 +635,8 @@ function ensureParalegalCompletionOverlayStyles() {
       justify-content:center;
       z-index:2400;
       padding:24px;
+      opacity:0;
+      transition:opacity .2s ease;
     }
     .case-completion-overlay::before{
       content:"";
@@ -541,6 +653,16 @@ function ensureParalegalCompletionOverlayStyles() {
       text-align:center;
       position:relative;
       z-index:1;
+      opacity:0;
+      transform:translateY(6px);
+      transition:opacity .2s ease, transform .2s ease;
+    }
+    .case-completion-overlay.is-visible{
+      opacity:1;
+    }
+    .case-completion-overlay.is-visible .case-completion-modal{
+      opacity:1;
+      transform:translateY(0) scale(1);
     }
     .case-completion-hero{
       height:150px;
@@ -598,8 +720,10 @@ function ensureDocumentPreviewStyles() {
   const style = document.createElement("style");
   style.id = "document-preview-styles";
   style.textContent = `
-    .document-preview-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:2300;padding:18px}
-    .document-preview-modal{background:var(--app-surface);color:var(--app-text);border:1px solid var(--app-border);border-radius:16px;width:min(420px,92vw);box-shadow:0 24px 50px rgba(0,0,0,.2);display:flex;flex-direction:column;gap:16px;padding:18px}
+    .document-preview-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:2300;padding:18px;opacity:0;transition:opacity .18s ease}
+    .document-preview-modal{background:var(--app-surface);color:var(--app-text);border:1px solid var(--app-border);border-radius:16px;width:min(420px,92vw);box-shadow:0 24px 50px rgba(0,0,0,.2);display:flex;flex-direction:column;gap:16px;padding:18px;opacity:0;transform:translateY(4px);transition:opacity .18s ease, transform .18s ease}
+    .document-preview-overlay.is-visible{opacity:1}
+    .document-preview-overlay.is-visible .document-preview-modal{opacity:1;transform:translateY(0) scale(1)}
     .document-preview-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
     .document-preview-title{font-weight:300;font-size:1.05rem;word-break:break-word}
     .document-preview-close{border:1px solid var(--app-border-soft);background:var(--app-surface);color:var(--app-muted);border-radius:10px;padding:6px 10px;cursor:pointer}
@@ -672,7 +796,7 @@ function openDocumentPreview({
 
   const close = () => {
     document.removeEventListener("keydown", handleKeydown);
-    overlay.remove();
+    dismissPopupOverlay(overlay);
   };
   const handleKeydown = (event) => {
     if (event.key === "Escape") close();
@@ -684,6 +808,7 @@ function openDocumentPreview({
   document.addEventListener("keydown", handleKeydown);
 
   document.body.appendChild(overlay);
+  mountPopupOverlay(overlay);
 
   if (!viewUrl && caseId && storageKey) {
     getSignedViewUrl({ caseId, storageKey }).then((signedUrl) => {
@@ -710,7 +835,7 @@ function openCompleteConfirmModal() {
       </div>
     `;
     const close = (confirmed) => {
-      overlay.remove();
+      dismissPopupOverlay(overlay);
       resolve(confirmed);
     };
     overlay.addEventListener("click", (event) => {
@@ -726,6 +851,7 @@ function openCompleteConfirmModal() {
       { once: true }
     );
     document.body.appendChild(overlay);
+    mountPopupOverlay(overlay);
   });
 }
 
@@ -734,8 +860,10 @@ function ensureDisputeModalStyles() {
   const style = document.createElement("style");
   style.id = "case-dispute-modal-styles";
   style.textContent = `
-    .case-dispute-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:1500}
-    .case-dispute-modal{background:var(--app-surface);color:var(--app-text);border:1px solid var(--app-border);border-radius:16px;padding:24px;max-width:520px;width:92%;box-shadow:0 24px 50px rgba(0,0,0,.2);display:grid;gap:12px}
+    .case-dispute-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:1500;opacity:0;transition:opacity .18s ease}
+    .case-dispute-modal{background:var(--app-surface);color:var(--app-text);border:1px solid var(--app-border);border-radius:16px;padding:24px;max-width:520px;width:92%;box-shadow:0 24px 50px rgba(0,0,0,.2);display:grid;gap:12px;opacity:0;transform:translateY(4px);transition:opacity .18s ease, transform .18s ease}
+    .case-dispute-overlay.is-visible{opacity:1}
+    .case-dispute-overlay.is-visible .case-dispute-modal{opacity:1;transform:translateY(0) scale(1)}
     .case-dispute-title{font-weight:600;font-size:1.2rem}
     .case-dispute-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
     .case-dispute-modal textarea{width:100%;min-height:88px;border-radius:12px;border:1px solid var(--app-border-soft);padding:10px 12px;font-family:var(--font-sans);resize:vertical}
@@ -763,7 +891,7 @@ function openDisputeConfirmModal() {
       </div>
     `;
     const close = (confirmed) => {
-      overlay.remove();
+      dismissPopupOverlay(overlay);
       if (!confirmed) {
         resolve({ confirmed: false, message: "" });
         return;
@@ -784,7 +912,578 @@ function openDisputeConfirmModal() {
       { once: true }
     );
     document.body.appendChild(overlay);
+    mountPopupOverlay(overlay);
   });
+}
+
+function ensureWithdrawalModalStyles() {
+  if (document.getElementById("case-withdraw-modal-styles")) return;
+  const style = document.createElement("style");
+  style.id = "case-withdraw-modal-styles";
+  style.textContent = `
+    .case-withdraw-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:1500;opacity:0;transition:opacity .18s ease}
+    .case-withdraw-modal{background:var(--app-surface);color:var(--app-text);border:1px solid var(--app-border);border-radius:16px;padding:24px;max-width:520px;width:92%;box-shadow:0 24px 50px rgba(0,0,0,.2);display:grid;gap:12px;opacity:0;transform:translateY(4px);transition:opacity .18s ease, transform .18s ease}
+    .case-withdraw-overlay.is-visible{opacity:1}
+    .case-withdraw-overlay.is-visible .case-withdraw-modal{opacity:1;transform:translateY(0) scale(1)}
+    .case-withdraw-title{font-weight:600;font-size:1.2rem}
+    .case-withdraw-title{text-align:center}
+    .case-withdraw-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
+  `;
+  document.head.appendChild(style);
+}
+
+function openWithdrawalConfirmModal({ completedCount = 0, totalTasks = 0 } = {}) {
+  return new Promise((resolve) => {
+    ensureWithdrawalModalStyles();
+    const overlay = document.createElement("div");
+    overlay.className = "case-withdraw-overlay";
+    const bodyCopy =
+      completedCount === 0
+        ? "Withdrawing will pause the case. A $0 payout will be issued since no tasks were completed."
+        : "Withdrawing will close this case for you. You will no longer be able to submit work on this matter.";
+    overlay.innerHTML = `
+      <div class="case-withdraw-modal" role="dialog" aria-modal="true" aria-labelledby="caseWithdrawTitle">
+        <div class="case-withdraw-title" id="caseWithdrawTitle">Withdraw from Case</div>
+        <p>${bodyCopy}</p>
+        <div class="case-withdraw-actions">
+          <button class="case-action-btn secondary" type="button" data-withdraw-cancel>Cancel</button>
+          <button class="case-action-btn" type="button" data-withdraw-confirm>Withdraw from Case</button>
+        </div>
+      </div>
+    `;
+    const close = (confirmed) => {
+      dismissPopupOverlay(overlay);
+      resolve(confirmed);
+    };
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) close(false);
+    });
+    overlay.querySelector("[data-withdraw-cancel]")?.addEventListener("click", () => close(false));
+    overlay.querySelector("[data-withdraw-confirm]")?.addEventListener("click", () => close(true));
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key === "Escape") close(false);
+      },
+      { once: true }
+    );
+    document.body.appendChild(overlay);
+    mountPopupOverlay(overlay);
+  });
+}
+
+function ensurePartialPayoutModalStyles() {
+  if (document.getElementById("case-payout-modal-styles")) return;
+  const style = document.createElement("style");
+  style.id = "case-payout-modal-styles";
+  style.textContent = `
+    .case-payout-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:1500;opacity:0;transition:opacity .18s ease}
+    .case-payout-modal{background:var(--app-surface);color:var(--app-text);border:1px solid var(--app-border);border-radius:16px;padding:24px;max-width:520px;width:92%;box-shadow:0 24px 50px rgba(0,0,0,.2);display:grid;gap:12px;opacity:0;transform:translateY(4px);transition:opacity .18s ease, transform .18s ease}
+    .case-payout-overlay.is-visible{opacity:1}
+    .case-payout-overlay.is-visible .case-payout-modal{opacity:1;transform:translateY(0) scale(1)}
+    .case-payout-title{font-weight:600;font-size:1.2rem}
+    .case-payout-input{display:grid;gap:6px}
+    .case-payout-input input{width:100%;border-radius:10px;border:1px solid var(--app-border-soft);padding:10px 12px;font-family:var(--font-sans)}
+    .case-payout-hint{font-size:.82rem;color:var(--app-muted)}
+    .case-payout-error{font-size:.82rem;color:#b91c1c;min-height:1.1em}
+    .case-payout-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
+  `;
+  document.head.appendChild(style);
+}
+
+function parseCurrencyInput(value) {
+  if (value == null) return NaN;
+  const cleaned = String(value).replace(/[^0-9.]/g, "");
+  if (!cleaned) return NaN;
+  const amount = Number(cleaned);
+  if (!Number.isFinite(amount)) return NaN;
+  return Math.round(amount * 100);
+}
+
+function openPartialPayoutModal({ maxCents = 0, currency = "USD" } = {}) {
+  return new Promise((resolve) => {
+    ensurePartialPayoutModalStyles();
+    const overlay = document.createElement("div");
+    overlay.className = "case-payout-overlay";
+    const maxLabel = formatCurrency(maxCents / 100, currency);
+    overlay.innerHTML = `
+      <div class="case-payout-modal" role="dialog" aria-modal="true" aria-labelledby="casePayoutTitle">
+        <div class="case-payout-title" id="casePayoutTitle">Enter Partial Payout</div>
+        <p>Enter the payout amount for the withdrawn paralegal. This will finalize their withdrawal.</p>
+        <label class="case-payout-input">
+          <span class="case-payout-hint">Max available: ${maxLabel}</span>
+          <input type="text" inputmode="decimal" placeholder="0.00" data-payout-input />
+        </label>
+        <div class="case-payout-error" data-payout-error></div>
+        <div class="case-payout-actions">
+          <button class="case-action-btn secondary" type="button" data-payout-cancel>Cancel</button>
+          <button class="case-action-btn" type="button" data-payout-confirm>Confirm Payout</button>
+        </div>
+      </div>
+    `;
+    const input = overlay.querySelector("[data-payout-input]");
+    const error = overlay.querySelector("[data-payout-error]");
+    const confirmBtn = overlay.querySelector("[data-payout-confirm]");
+
+    const updateState = () => {
+      const amountCents = parseCurrencyInput(input?.value || "");
+      let message = "";
+      if (!Number.isFinite(amountCents)) {
+        message = "Enter a valid amount.";
+      } else if (amountCents < 0) {
+        message = "Amount cannot be negative.";
+      } else if (amountCents > maxCents) {
+        message = "Amount exceeds the remaining case balance.";
+      }
+      if (error) error.textContent = message;
+      if (confirmBtn) confirmBtn.disabled = !!message;
+    };
+
+    const close = (amountCents) => {
+      dismissPopupOverlay(overlay);
+      resolve(amountCents);
+    };
+
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) close(null);
+    });
+    overlay.querySelector("[data-payout-cancel]")?.addEventListener("click", () => close(null));
+    overlay.querySelector("[data-payout-confirm]")?.addEventListener("click", () => {
+      const amountCents = parseCurrencyInput(input?.value || "");
+      if (!Number.isFinite(amountCents)) {
+        updateState();
+        return;
+      }
+      if (amountCents < 0 || amountCents > maxCents) {
+        updateState();
+        return;
+      }
+      close(amountCents);
+    });
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key === "Escape") close(null);
+      },
+      { once: true }
+    );
+    if (input) {
+      input.addEventListener("input", updateState);
+      input.addEventListener("blur", updateState);
+      input.focus();
+    }
+    updateState();
+    document.body.appendChild(overlay);
+    mountPopupOverlay(overlay);
+  });
+}
+
+function ensureRejectPayoutModalStyles() {
+  if (document.getElementById("case-reject-modal-styles")) return;
+  const style = document.createElement("style");
+  style.id = "case-reject-modal-styles";
+  style.textContent = `
+    .case-reject-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;z-index:1500;opacity:0;transition:opacity .18s ease}
+    .case-reject-modal{background:var(--app-surface);color:var(--app-text);border:1px solid var(--app-border);border-radius:16px;padding:24px;max-width:520px;width:92%;box-shadow:0 24px 50px rgba(0,0,0,.2);display:grid;gap:12px;opacity:0;transform:translateY(4px);transition:opacity .18s ease, transform .18s ease}
+    .case-reject-overlay.is-visible{opacity:1}
+    .case-reject-overlay.is-visible .case-reject-modal{opacity:1;transform:translateY(0)}
+    .case-reject-title{font-weight:600;font-size:1.2rem;text-align:center}
+    .case-reject-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
+  `;
+  document.head.appendChild(style);
+}
+
+function openRejectPayoutConfirmModal() {
+  return new Promise((resolve) => {
+    ensureRejectPayoutModalStyles();
+    const overlay = document.createElement("div");
+    overlay.className = "case-reject-overlay";
+    overlay.innerHTML = `
+      <div class="case-reject-modal" role="dialog" aria-modal="true" aria-labelledby="caseRejectTitle">
+        <div class="case-reject-title" id="caseRejectTitle">Close Without Release</div>
+        <p>Closing without release will pause the case for 24 hours before it becomes eligible to be relisted.</p>
+        <div class="case-reject-actions">
+          <button class="case-action-btn secondary" type="button" data-reject-cancel>Cancel</button>
+          <button class="case-action-btn" type="button" data-reject-confirm>Close Without Release</button>
+        </div>
+      </div>
+    `;
+    const close = (confirmed) => {
+      dismissPopupOverlay(overlay);
+      resolve(confirmed);
+    };
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) close(false);
+    });
+    overlay.querySelector("[data-reject-cancel]")?.addEventListener("click", () => close(false));
+    overlay.querySelector("[data-reject-confirm]")?.addEventListener("click", () => close(true));
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key === "Escape") close(false);
+      },
+      { once: true }
+    );
+    document.body.appendChild(overlay);
+    mountPopupOverlay(overlay);
+  });
+}
+
+function ensureFlagMenuStyles() {
+  if (document.getElementById("case-flag-menu-styles")) return;
+  const style = document.createElement("style");
+  style.id = "case-flag-menu-styles";
+  style.textContent = `
+    .case-flag-overlay{
+      position:fixed;
+      inset:0;
+      background:radial-gradient(circle at top, rgba(15,23,42,.35), rgba(15,23,42,.65));
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      z-index:1500;
+      padding:18px;
+      opacity:0;
+      transition:opacity .2s ease;
+    }
+    .case-flag-modal{
+      background:var(--app-surface, #ffffff);
+      color:var(--app-text, #111827);
+      border:1px solid var(--app-border, rgba(15,23,42,.12));
+      border-radius:18px;
+      padding:22px 22px 18px;
+      max-width:420px;
+      width:100%;
+      box-shadow:0 24px 60px rgba(0,0,0,.28);
+      display:grid;
+      gap:12px;
+      position:relative;
+      opacity:0;
+      transform:translateY(6px);
+      transition:opacity .2s ease, transform .2s ease;
+    }
+    .case-flag-modal::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      border-radius:inherit;
+      background:linear-gradient(135deg, rgba(197,168,117,.08), transparent 55%);
+      pointer-events:none;
+    }
+    .case-flag-title{
+      font-weight:600;
+      font-size:1.15rem;
+      letter-spacing:.01em;
+      text-align:center;
+    }
+    .case-flag-actions{
+      display:grid;
+      gap:10px;
+    }
+    .case-flag-actions .case-action-btn{
+      text-align:left;
+      padding:12px 14px;
+      border-radius:12px;
+      font-weight:600;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      background:var(--app-surface-contrast, rgba(15,23,42,.04));
+      border:1px solid var(--app-border-soft, rgba(15,23,42,.08));
+      color:inherit;
+      transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+    .case-flag-actions .case-action-btn.secondary{
+      background:transparent;
+    }
+    .case-flag-actions .case-action-btn:hover{
+      transform:translateY(-1px);
+      box-shadow:0 10px 24px rgba(15,23,42,.12);
+    }
+    .case-flag-actions .case-action-btn:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+      transform:none;
+      box-shadow:none;
+    }
+    .case-flag-actions .case-action-btn::after{
+      content:"→";
+      font-size:.95rem;
+      opacity:.7;
+    }
+    .case-flag-actions .case-action-btn.secondary::after{
+      content:"";
+    }
+    .case-flag-muted{
+      font-size:.86rem;
+      color:var(--app-muted, rgba(15,23,42,.6));
+      line-height:1.45;
+    }
+    .case-flag-info{
+      font-size:.9rem;
+      color:var(--app-muted, rgba(15,23,42,.65));
+      line-height:1.5;
+    }
+    .case-flag-overlay.is-visible{
+      opacity:1;
+    }
+    .case-flag-overlay.is-visible .case-flag-modal{
+      opacity:1;
+      transform:translateY(0) scale(1);
+    }
+    @media (prefers-reduced-motion: reduce){
+      .case-flag-actions .case-action-btn{
+        transition:none;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function openParalegalFlagMenu(caseData) {
+  return new Promise((resolve) => {
+    ensureFlagMenuStyles();
+    const canWithdraw = canRequestWithdrawal(caseData);
+    const canDispute = canOpenDisputeFromCase(caseData);
+    const overlay = document.createElement("div");
+    overlay.className = "case-flag-overlay";
+    const options = [];
+    if (canWithdraw) {
+      options.push(
+        `<button type="button" class="case-action-btn" data-flag-action="withdraw">Withdraw from Case</button>`
+      );
+    }
+    if (canDispute) {
+      options.push(
+        `<button type="button" class="case-action-btn secondary" data-flag-action="dispute">Open Dispute</button>`
+      );
+    }
+    const emptyCopy = !options.length
+      ? `<p class="case-flag-muted">No actions are available right now.</p>`
+      : "";
+    overlay.innerHTML = `
+      <div class="case-flag-modal" role="dialog" aria-modal="true" aria-labelledby="caseFlagTitle">
+        <div class="case-flag-title" id="caseFlagTitle">Case Actions</div>
+        ${emptyCopy}
+        <div class="case-flag-actions">
+          ${options.join("")}
+          <button type="button" class="case-action-btn secondary" data-flag-action="cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+    const close = (action) => {
+      dismissPopupOverlay(overlay);
+      resolve(action);
+    };
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) close("cancel");
+    });
+    overlay.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-flag-action]");
+      if (!btn) return;
+      const action = btn.dataset.flagAction || "cancel";
+      close(action);
+    });
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key === "Escape") close("cancel");
+      },
+      { once: true }
+    );
+    document.body.appendChild(overlay);
+    mountPopupOverlay(overlay);
+  });
+}
+
+function getAttorneyWithdrawalActionState(caseData) {
+  const statusKey = normalizeCaseStatus(caseData?.status);
+  const eligible = isWithdrawalCase(caseData) && (statusKey === "paused" || statusKey === "disputed");
+  if (!eligible) {
+    return {
+      eligible: false,
+      bannerText: "",
+      statusText: "",
+      showPartial: false,
+      showReject: false,
+      showRelist: false,
+      disablePartial: false,
+      disableReject: false,
+      disableRelist: false,
+    };
+  }
+  const completedCount = countCompletedTasks(caseData);
+  const totalTasks = getCaseTasks(caseData).length;
+  const holdActive = isDisputeWindowActive(caseData);
+  const payoutFinalized = !!caseData?.payoutFinalizedAt;
+  const partialCents = Number(caseData?.partialPayoutAmount || 0);
+  const currency = String(caseData?.currency || "USD").toUpperCase();
+  let remainingCents = resolveRemainingAmount(caseData);
+  if (!Number.isFinite(remainingCents)) {
+    remainingCents = Number(caseData?.lockedTotalAmount ?? caseData?.totalAmount ?? 0);
+  }
+  const remainingLabel = formatCurrency(remainingCents / 100, currency);
+
+  let bannerText = "";
+  let statusText = "";
+  let showPartial = false;
+  let showReject = false;
+  let disablePartial = false;
+  let disableReject = false;
+  let disableRelist = false;
+
+  if (statusKey === "disputed" || caseData?.pausedReason === "dispute") {
+    bannerText = "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours.";
+    disablePartial = true;
+    disableReject = true;
+    disableRelist = true;
+  } else if (payoutFinalized) {
+    const payoutLabel = formatCurrency(partialCents / 100, currency);
+    bannerText = `Withdrawal finalized. Payout: ${payoutLabel}. Remaining balance: ${remainingLabel}.`;
+    statusText = caseData?.relistRequestedAt
+      ? "Case relisted and ready for hiring."
+      : "Relist the case to invite new applicants.";
+  } else if (holdActive) {
+    bannerText =
+      "Closing without release will pause the case for 24 hours before it becomes eligible to be relisted.";
+    disablePartial = true;
+    disableReject = true;
+  } else if (completedCount === 0) {
+    bannerText = "Paralegal withdrew before any tasks were completed. A $0 payout was issued.";
+    statusText = caseData?.relistRequestedAt
+      ? "Case relisted and ready for hiring."
+      : "Relist the case to invite new applicants.";
+  } else if (completedCount > 0 && completedCount < totalTasks) {
+    bannerText =
+      "Paralegal withdrew. Please choose a partial payout or close without release. Case will relist automatically with adjusted balance, if applicable.";
+    showPartial = true;
+    showReject = true;
+  } else {
+    bannerText = "Paralegal withdrew.";
+  }
+
+  return {
+    eligible: true,
+    bannerText,
+    statusText,
+    showPartial,
+    showReject,
+    showRelist: payoutFinalized && !caseData?.relistRequestedAt,
+    disablePartial,
+    disableReject,
+    disableRelist,
+  };
+}
+
+function openAttorneyFlagMenu(caseData, actionState) {
+  return new Promise((resolve) => {
+    ensureFlagMenuStyles();
+    const state = actionState?.eligible ? actionState : getAttorneyWithdrawalActionState(caseData);
+    const overlay = document.createElement("div");
+    overlay.className = "case-flag-overlay";
+    const options = [];
+    if (state.showPartial) {
+      options.push(
+        `<button type="button" class="case-action-btn" data-flag-action="partial" ${
+          state.disablePartial ? "disabled" : ""
+        }>Enter Partial Payout</button>`
+      );
+    }
+    if (state.showReject) {
+      options.push(
+        `<button type="button" class="case-action-btn secondary" data-flag-action="reject" ${
+          state.disableReject ? "disabled" : ""
+        }>Close Without Release</button>`
+      );
+    }
+    if (state.showRelist) {
+      options.push(
+        `<button type="button" class="case-action-btn secondary" data-flag-action="relist" ${
+          state.disableRelist ? "disabled" : ""
+        }>Relist Case</button>`
+      );
+    }
+    const infoParts = [state.bannerText, state.statusText].filter(Boolean);
+    const infoCopy = infoParts.length ? `<p class="case-flag-info">${infoParts.join(" ")}</p>` : "";
+    const emptyCopy = !options.length
+      ? `<p class="case-flag-muted">No actions are available right now.</p>`
+      : "";
+    overlay.innerHTML = `
+      <div class="case-flag-modal" role="dialog" aria-modal="true" aria-labelledby="caseFlagTitle">
+        <div class="case-flag-title" id="caseFlagTitle">Paralegal Withdrawal</div>
+        ${infoCopy}
+        ${emptyCopy}
+        <div class="case-flag-actions">
+          ${options.join("")}
+          <button type="button" class="case-action-btn secondary" data-flag-action="cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+    const close = (action) => {
+      dismissPopupOverlay(overlay);
+      resolve(action);
+    };
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) close("cancel");
+    });
+    overlay.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-flag-action]");
+      if (!btn || btn.disabled) return;
+      const action = btn.dataset.flagAction || "cancel";
+      close(action);
+    });
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key === "Escape") close("cancel");
+      },
+      { once: true }
+    );
+    document.body.appendChild(overlay);
+    mountPopupOverlay(overlay);
+  });
+}
+
+function maybePromptAttorneyWithdrawalDecision(caseData) {
+  if (getCurrentUserRole() !== "attorney") return;
+  if (!caseData) return;
+  if (!isWithdrawalCase(caseData)) return;
+  const statusKey = normalizeCaseStatus(caseData?.status);
+  if (statusKey === "disputed" || caseData?.pausedReason === "dispute") return;
+  if (caseData?.payoutFinalizedAt) return;
+  if (isDisputeWindowActive(caseData)) return;
+
+  const tasks = getCaseTasks(caseData);
+  if (!tasks.length) return;
+  const completedCount = countCompletedTasks(caseData);
+  if (completedCount <= 0 || completedCount >= tasks.length) return;
+
+  const caseId = caseData?.id || caseData?.caseId || caseData?._id || state.activeCaseId;
+  if (!caseId) return;
+  const promptStamp =
+    caseData?.pausedAt || caseData?.updatedAt || caseData?.createdAt || "";
+  const promptKey = `lpc-withdrawal-prompt:${caseId}:${promptStamp}`;
+  if (sessionStorage.getItem(promptKey)) return;
+  sessionStorage.setItem(promptKey, "1");
+
+  const actionState = getAttorneyWithdrawalActionState(caseData);
+  if (!actionState?.eligible) return;
+
+  setTimeout(async () => {
+    if (state.activeCaseId && String(state.activeCaseId) !== String(caseId)) return;
+    const action = await openAttorneyFlagMenu(caseData, actionState);
+    if (action === "partial") {
+      await handlePartialPayout();
+      return;
+    }
+    if (action === "reject") {
+      await handleRejectPayout();
+      return;
+    }
+    if (action === "relist") {
+      await handleRelistCase();
+    }
+  }, 0);
 }
 
 function viewerApplied(caseData) {
@@ -828,6 +1527,12 @@ function isWorkspaceEligibleCase(caseData) {
   return true;
 }
 
+function shouldAllowCaseDetail(caseData) {
+  if (!caseData) return false;
+  const status = normalizeCaseStatus(caseData?.status);
+  return status === "paused" || status === "disputed";
+}
+
 const CASE_SELECT_EXCLUDE_STATUSES = new Set([
   "draft",
   "completed",
@@ -861,10 +1566,20 @@ function workspaceLockCopy(caseState, caseData) {
     }
     return "Workspace is closed for this case.";
   }
-  if (["disputed"].includes(normalized)) {
-    return "Workspace is closed for this case.";
+  if (normalized === "disputed") {
+    return "Case is locked. Workspace is paused until an admin resolves it.";
+  }
+  if (normalized === "paused") {
+    if (caseData?.pausedReason === "paralegal_withdrew") {
+      return "Case is paused after a withdrawal. Workspace will reopen once the next paralegal is hired.";
+    }
+    return "Case is paused. Workspace is currently locked.";
   }
   return "Workspace unlocks once the case is funded and in progress.";
+}
+
+function isWithdrawalPause(caseData) {
+  return normalizeCaseStatus(caseData?.status) === "paused" && caseData?.pausedReason === "paralegal_withdrew";
 }
 
 function shouldRedirectFromWorkspace(caseState) {
@@ -968,6 +1683,7 @@ function showParalegalCompletionOverlay(caseData) {
   returnBtn?.addEventListener("click", redirectToDashboard);
 
   document.body.appendChild(overlay);
+  mountPopupOverlay(overlay);
   state.completionOverlayActive = true;
   state.completionOverlayCaseId = caseId;
   state.completionOverlayNode = overlay;
@@ -1025,7 +1741,13 @@ function setWorkspaceEnabled(enabled, message) {
     messagePanel.classList.toggle("is-locked", !enabled);
   }
   if (!enabled && messagePanelBanner) {
-    messagePanelBanner.textContent = message || "Workspace is locked.";
+    if (message === null) {
+      messagePanelBanner.textContent = "";
+      messagePanelBanner.hidden = true;
+    } else {
+      messagePanelBanner.hidden = false;
+      messagePanelBanner.textContent = message || "Workspace is locked.";
+    }
   }
 }
 
@@ -2125,7 +2847,10 @@ function renderCaseOverview(data) {
   const status = formatCaseStatus(data?.status, data);
   const summaryText = data?.briefSummary || data?.details || "";
 
-  const escrowAmountRaw = Number.isFinite(data?.lockedTotalAmount)
+  const remainingCents = resolveRemainingAmount(data);
+  const escrowAmountRaw = Number.isFinite(remainingCents)
+    ? remainingCents / 100
+    : Number.isFinite(data?.lockedTotalAmount)
     ? data.lockedTotalAmount / 100
     : Number.isFinite(data?.totalAmount)
     ? data.totalAmount / 100
@@ -2160,10 +2885,21 @@ function renderCaseOverview(data) {
   if (messagePanelBanner) {
     const opened = formatDate(hireDateValue);
     const normalized = normalizeCaseStatus(data?.status);
-    if (["completed", "closed"].includes(normalized) && data?.paymentReleased) {
-      messagePanelBanner.textContent = "Payment released. Workspace is now read-only.";
+    if (isWithdrawalPause(data)) {
+      messagePanelBanner.textContent = "";
+      messagePanelBanner.hidden = true;
     } else {
-      messagePanelBanner.textContent = opened ? `Opened on ${opened}` : "Case updates will appear here.";
+      messagePanelBanner.hidden = false;
+      if (["completed", "closed"].includes(normalized) && data?.paymentReleased) {
+        messagePanelBanner.textContent = "Payment released. Workspace is now read-only.";
+      } else if (normalized === "disputed") {
+        messagePanelBanner.textContent =
+          "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours.";
+      } else if (normalized === "paused") {
+        messagePanelBanner.textContent = "Case is paused. Workspace is locked.";
+      } else {
+        messagePanelBanner.textContent = opened ? `Opened on ${opened}` : "Case updates will appear here.";
+      }
     }
   }
 
@@ -2224,6 +2960,8 @@ function renderCaseOverview(data) {
     }
   }
 
+  updateWithdrawalSection(data);
+  updatePausedActions(data);
   updateDisputeAction(data);
   bindTaskCompletionWatcher();
   updateCompleteAction(data, resolveCaseState(data));
@@ -2266,10 +3004,171 @@ function updateDisputeAction(caseData) {
   const statusKey = normalizeCaseStatus(caseData?.status);
   const isDisputed = statusKey === "disputed" || caseData?.terminationStatus === "disputed";
   const isClosed = ["completed", "closed"].includes(statusKey);
-  caseDisputeButton.disabled = isDisputed || isClosed;
-  if (caseDisputeStatus) {
-    caseDisputeStatus.textContent = isDisputed ? "Dispute opened. Workspace paused." : "";
+  const role = getCurrentUserRole();
+  const isWithdrawal = isWithdrawalCase(caseData);
+  const isWithdrawn = isWithdrawnViewer(caseData);
+  const disputeActive = isDisputeWindowActive(caseData);
+  let disabled = isDisputed || isClosed;
+  let hidden = false;
+  let message = "";
+  let attorneyActionState = null;
+
+  if (isWithdrawal) {
+    if (role === "paralegal") {
+      if (!isWithdrawn) {
+        hidden = true;
+      } else {
+        disabled = true;
+        message = "";
+      }
+    } else if (role === "attorney") {
+      hidden = false;
+      disabled = isClosed;
+      attorneyActionState = getAttorneyWithdrawalActionState(caseData);
+      const infoParts = [attorneyActionState.bannerText, attorneyActionState.statusText].filter(Boolean);
+      if (infoParts.length) {
+        message = infoParts.join(" ");
+      } else if (isDisputed) {
+        message = "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours.";
+      }
+    } else {
+      hidden = true;
+      if (isDisputed) {
+        message = "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours.";
+      }
+    }
+  } else if (isDisputed) {
+    message = "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours.";
   }
+
+  const flagLabel =
+    role === "paralegal" || (role === "attorney" && isWithdrawal) ? "Case actions" : "Flag dispute";
+  caseDisputeButton.setAttribute("aria-label", flagLabel);
+  const flagLabelNode = caseDisputeButton.querySelector("span");
+  if (flagLabelNode) flagLabelNode.textContent = flagLabel;
+
+  caseDisputeButton.disabled = disabled;
+  caseDisputeButton.hidden = hidden;
+  if (caseDisputeStatus) {
+    if (
+      role === "attorney" &&
+      attorneyActionState?.showPartial &&
+      attorneyActionState?.showReject
+    ) {
+      const partialLabel = `<button type="button" class="case-inline-action" data-withdraw-action="partial"${
+        attorneyActionState.disablePartial ? " disabled" : ""
+      }>partial payout</button>`;
+      const rejectLabel = `<button type="button" class="case-inline-action" data-withdraw-action="reject"${
+        attorneyActionState.disableReject ? " disabled" : ""
+      }>close without release</button>`;
+      const suffix = attorneyActionState.statusText ? ` ${attorneyActionState.statusText}` : "";
+      caseDisputeStatus.innerHTML = `Paralegal withdrew. Please choose a ${partialLabel} or ${rejectLabel}. Case will relist automatically with adjusted balance, if applicable.${suffix}`;
+      const partialBtn = caseDisputeStatus.querySelector('[data-withdraw-action="partial"]');
+      if (partialBtn && !attorneyActionState.disablePartial) {
+        partialBtn.onclick = (event) => {
+          event.preventDefault();
+          handlePartialPayout();
+        };
+      }
+      const rejectBtn = caseDisputeStatus.querySelector('[data-withdraw-action="reject"]');
+      if (rejectBtn && !attorneyActionState.disableReject) {
+        rejectBtn.onclick = (event) => {
+          event.preventDefault();
+          handleRejectPayout();
+        };
+      }
+    } else {
+      caseDisputeStatus.textContent = message;
+    }
+  }
+}
+
+function updateWithdrawalSection(caseData) {
+  if (!caseWithdrawSection) return;
+  const role = getCurrentUserRole();
+  if (role !== "paralegal") {
+    caseWithdrawSection.hidden = true;
+    return;
+  }
+  const statusKey = normalizeCaseStatus(caseData?.status);
+  const viewerId = getCurrentUserId();
+  const assignedId = normalizeUserId(caseData?.paralegal || caseData?.paralegalId);
+  const isAssignedViewer = viewerId && assignedId && String(viewerId) === String(assignedId);
+  const isWithdrawn = isWithdrawnViewer(caseData);
+  const totalTasks = getCaseTasks(caseData).length;
+  const completedCount = countCompletedTasks(caseData);
+
+  let showSection = false;
+  let showButton = false;
+  let note = "";
+  let statusMessage = "";
+
+  if (isWithdrawn) {
+    showSection = true;
+    if (caseData?.payoutFinalizedAt) {
+      const payoutLabel = formatCurrency(
+        Number(caseData?.partialPayoutAmount || 0) / 100,
+        String(caseData?.currency || "USD").toUpperCase()
+      );
+      statusMessage = `Withdrawal finalized with a payout of ${payoutLabel}.`;
+    } else {
+      statusMessage = "Withdrawal recorded.";
+    }
+  } else if (isAssignedViewer) {
+    if (
+      statusKey !== "paused" &&
+      !["disputed", "completed", "closed"].includes(statusKey) &&
+      !areAllTasksComplete(caseData)
+    ) {
+      showSection = true;
+      showButton = statusKey !== "paused";
+      note = "Withdrawing will close this case for you. You will no longer be able to submit work on this matter.";
+    }
+  }
+
+  caseWithdrawSection.hidden = !showSection;
+  if (caseWithdrawButton) {
+    caseWithdrawButton.hidden = !showButton;
+    caseWithdrawButton.disabled = state.withdrawing;
+  }
+  if (caseWithdrawNote) caseWithdrawNote.textContent = note || "";
+  if (caseWithdrawStatus) caseWithdrawStatus.textContent = statusMessage || "";
+}
+
+function updatePausedActions(caseData) {
+  if (!casePausedSection) return;
+  const role = getCurrentUserRole();
+  if (role !== "attorney") {
+    casePausedSection.hidden = true;
+    return;
+  }
+  const actionState = getAttorneyWithdrawalActionState(caseData);
+  if (!actionState.eligible) {
+    casePausedSection.hidden = true;
+    return;
+  }
+  casePausedSection.hidden = false;
+  if (casePausedBanner) {
+    casePausedBanner.textContent = actionState.bannerText;
+    casePausedBanner.hidden = !actionState.bannerText;
+  }
+  if (casePartialPayoutButton) {
+    casePartialPayoutButton.hidden = true;
+    casePartialPayoutButton.disabled = actionState.disablePartial || state.partialPayoutSubmitting;
+  }
+  if (caseRelistButton) {
+    caseRelistButton.hidden = true;
+    caseRelistButton.disabled = actionState.disableRelist || state.relisting;
+  }
+  if (casePausedStatus) casePausedStatus.textContent = actionState.statusText || "";
+}
+
+function resolveCaseActionStatusNode() {
+  if (casePausedSection && !casePausedSection.hidden && casePausedStatus) {
+    return casePausedStatus;
+  }
+  if (caseDisputeStatus) return caseDisputeStatus;
+  return messageStatus;
 }
 
 function setCompletionStatusMessage(message) {
@@ -2290,7 +3189,7 @@ function resolveCompletionIneligibleReason(caseData, caseState) {
     return "This case is closed and read-only.";
   }
   if (statusKey === "disputed" || caseData?.terminationStatus === "disputed") {
-    return "This case is in dispute and cannot be completed.";
+    return "This case is locked and cannot be completed.";
   }
   if (!hasAssignedParalegal(caseData)) {
     return "Assign a paralegal before completing this case.";
@@ -2400,6 +3299,160 @@ async function handleCompleteCase() {
   }
 }
 
+async function handleRequestWithdrawal() {
+  if (state.withdrawing) return;
+  const caseId = state.activeCaseId;
+  if (!caseId) return;
+  const caseData = state.activeCase || {};
+  const tasks = getCaseTasks(caseData);
+  const completedCount = countCompletedTasks(caseData);
+  const confirmed = await openWithdrawalConfirmModal({
+    completedCount,
+    totalTasks: tasks.length,
+  });
+  if (!confirmed) return;
+  state.withdrawing = true;
+  if (caseWithdrawButton) caseWithdrawButton.disabled = true;
+  showMsg(caseWithdrawStatus, "Submitting withdrawal request...");
+  try {
+    await fetchCSRF().catch(() => "");
+    await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/withdraw`, { method: "POST" });
+    try {
+      const title = caseData?.title || "this case";
+      sessionStorage.setItem(
+        "lpc-withdrawal-toast",
+        JSON.stringify({ message: "You have successfully withdrawn from this case.", type: "success" })
+      );
+    } catch {}
+    showMsg(caseWithdrawStatus, "You have successfully withdrawn from this case.");
+    window.location.href = "dashboard-paralegal.html#cases";
+    return;
+  } catch (err) {
+    showMsg(caseWithdrawStatus, err.message || "Unable to withdraw from case.");
+  } finally {
+    state.withdrawing = false;
+    if (caseWithdrawButton) caseWithdrawButton.disabled = false;
+  }
+}
+
+async function handlePartialPayout() {
+  if (state.partialPayoutSubmitting) return;
+  const caseId = state.activeCaseId;
+  if (!caseId) return;
+  const caseData = state.activeCase || {};
+  const statusNode = resolveCaseActionStatusNode();
+  let remainingCents = resolveRemainingAmount(caseData);
+  if (!Number.isFinite(remainingCents)) {
+    remainingCents = Number(caseData?.lockedTotalAmount ?? caseData?.totalAmount ?? 0);
+  }
+  if (!Number.isFinite(remainingCents) || remainingCents < 0) {
+    if (statusNode) showMsg(statusNode, "Remaining case amount is unavailable.");
+    return;
+  }
+  const currency = String(caseData?.currency || "USD").toUpperCase();
+  const amountCents = await openPartialPayoutModal({ maxCents: remainingCents, currency });
+  if (!Number.isFinite(amountCents)) return;
+  state.partialPayoutSubmitting = true;
+  if (casePartialPayoutButton) casePartialPayoutButton.disabled = true;
+  if (statusNode) showMsg(statusNode, "Finalizing partial payout...");
+  try {
+    await fetchCSRF().catch(() => "");
+    await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/partial-payout`, {
+      method: "POST",
+      body: { amountCents },
+    });
+    if (statusNode) showMsg(statusNode, "Partial payout finalized. Case relisted.");
+    await loadCase(caseId);
+  } catch (err) {
+    if (statusNode) showMsg(statusNode, err.message || "Unable to finalize partial payout.");
+  } finally {
+    state.partialPayoutSubmitting = false;
+    if (casePartialPayoutButton) casePartialPayoutButton.disabled = false;
+  }
+}
+
+async function handleRejectPayout() {
+  if (state.rejecting) return;
+  const caseId = state.activeCaseId;
+  if (!caseId) return;
+  const confirmed = await openRejectPayoutConfirmModal();
+  if (!confirmed) return;
+  state.rejecting = true;
+  const statusNode = resolveCaseActionStatusNode();
+  if (statusNode) showMsg(statusNode, "Closing without release...");
+  try {
+    await fetchCSRF().catch(() => "");
+    await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/reject-payout`, { method: "POST" });
+    if (statusNode) {
+      showMsg(
+        statusNode,
+        "Closing without release will pause the case for 24 hours before it becomes eligible to be relisted."
+      );
+    }
+    await loadCase(caseId);
+  } catch (err) {
+    if (statusNode) showMsg(statusNode, err.message || "Unable to close without release.");
+  } finally {
+    state.rejecting = false;
+  }
+}
+
+async function handleRelistCase() {
+  if (state.relisting) return;
+  const caseId = state.activeCaseId;
+  if (!caseId) return;
+  const statusNode = resolveCaseActionStatusNode();
+  state.relisting = true;
+  if (caseRelistButton) caseRelistButton.disabled = true;
+  if (statusNode) showMsg(statusNode, "Relisting case...");
+  try {
+    await fetchCSRF().catch(() => "");
+    await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/relist`, { method: "POST" });
+    if (statusNode) showMsg(statusNode, "Case relisted.");
+    await loadCase(caseId);
+  } catch (err) {
+    if (statusNode) showMsg(statusNode, err.message || "Unable to relist case.");
+  } finally {
+    state.relisting = false;
+    if (caseRelistButton) caseRelistButton.disabled = false;
+  }
+}
+
+async function handleFlagAction() {
+  const role = getCurrentUserRole();
+  const caseData = state.activeCase || {};
+  if (role === "paralegal") {
+    const action = await openParalegalFlagMenu(caseData);
+    if (action === "withdraw") {
+      await handleRequestWithdrawal();
+      return;
+    }
+    if (action === "dispute") {
+      await handleDisputeCase();
+    }
+    return;
+  }
+  if (role === "attorney") {
+    const actionState = getAttorneyWithdrawalActionState(caseData);
+    if (actionState.eligible) {
+      const action = await openAttorneyFlagMenu(caseData, actionState);
+    if (action === "partial") {
+      await handlePartialPayout();
+      return;
+    }
+    if (action === "reject") {
+      await handleRejectPayout();
+      return;
+    }
+    if (action === "relist") {
+      await handleRelistCase();
+    }
+    return;
+  }
+  }
+  await handleDisputeCase();
+}
+
 async function handleDisputeCase() {
   if (state.disputing) return;
   const caseId = state.activeCaseId;
@@ -2422,8 +3475,14 @@ async function handleDisputeCase() {
       method: "POST",
       body: { message: note },
     });
-    showMsg(caseDisputeStatus, "Dispute opened. Workspace paused.");
-    showMsg(messageStatus, "Dispute opened. Workspace paused.");
+    showMsg(
+      caseDisputeStatus,
+      "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours."
+    );
+    showMsg(
+      messageStatus,
+      "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours."
+    );
     await loadCase(caseId);
   } catch (err) {
     showMsg(caseDisputeStatus, err.message || "Unable to open dispute.");
@@ -2795,6 +3854,10 @@ async function loadCase(caseId) {
   showMsg(messageStatus, "Loading case data...");
   try {
     const caseData = await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}`);
+    if (getCurrentUserRole() === "paralegal" && isWithdrawnViewer(caseData)) {
+      window.location.href = "dashboard-paralegal.html#cases";
+      return;
+    }
     state.activeCase = caseData;
     renderCaseNavList();
     if (showParalegalCompletionOverlay(caseData)) {
@@ -2806,7 +3869,7 @@ async function loadCase(caseId) {
       window.location.href = completionRedirect;
       return;
     }
-    if (!isWorkspaceEligibleCase(caseData)) {
+    if (!isWorkspaceEligibleCase(caseData) && !shouldAllowCaseDetail(caseData)) {
       window.location.href = getWorkspaceRedirect(caseData);
       return;
     }
@@ -2814,11 +3877,13 @@ async function loadCase(caseId) {
     renderParticipants(caseData);
     renderCaseOverview(caseData);
     updateCompleteAction(caseData, caseState);
+    maybePromptAttorneyWithdrawalDecision(caseData);
     const workspace = getWorkspaceState(caseData, caseState);
-    setWorkspaceEnabled(workspace.ready, workspace.reason);
+    const suppressLockStatus = !workspace.ready && isWithdrawalPause(caseData);
+    setWorkspaceEnabled(workspace.ready, suppressLockStatus ? null : workspace.reason);
     if (!workspace.ready) {
       renderWorkspaceLocked(workspace.reason);
-      showMsg(messageStatus, workspace.reason);
+      showMsg(messageStatus, suppressLockStatus ? "" : workspace.reason);
       return;
     }
 
@@ -2869,6 +3934,10 @@ async function loadCase(caseId) {
     }
     showMsg(messageStatus, "");
   } catch (err) {
+    if ((err?.status === 403 || err?.status === 404) && getCurrentUserRole() === "paralegal") {
+      window.location.href = "dashboard-paralegal.html#cases";
+      return;
+    }
     showMsg(messageStatus, err.message || "Unable to load case.");
   }
 }
@@ -3542,7 +4611,16 @@ function init() {
     caseSelect.addEventListener("change", handleCaseSelect);
   }
   if (caseDisputeButton) {
-    caseDisputeButton.addEventListener("click", handleDisputeCase);
+    caseDisputeButton.addEventListener("click", handleFlagAction);
+  }
+  if (caseWithdrawButton) {
+    caseWithdrawButton.addEventListener("click", handleRequestWithdrawal);
+  }
+  if (casePartialPayoutButton) {
+    casePartialPayoutButton.addEventListener("click", handlePartialPayout);
+  }
+  if (caseRelistButton) {
+    caseRelistButton.addEventListener("click", handleRelistCase);
   }
   caseTabs.forEach((tab) => tab.addEventListener("click", handleTabClick));
   if (messageList) {

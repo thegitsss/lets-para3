@@ -530,6 +530,76 @@ body.theme-mountain .topbar .lpc-shared-header [data-notification-list] {
   transform: none !important;
 }
 
+/* Clear notification shadows (flat UI) */
+.notification-icon,
+body.theme-dark .notification-icon,
+body:not(.theme-dark) .notification-icon,
+[data-notification-panel],
+.notif-panel,
+.notifications-panel,
+.notification-dropdown,
+[data-notification-panel] .notif-item,
+.notifications-panel .notif-item,
+.notif-panel .notif-item,
+.notification-dropdown .notif-item,
+[data-notification-panel] .notif-card,
+.notifications-panel .notif-card,
+.notif-panel .notif-card,
+.notification-dropdown .notif-card,
+[data-notification-panel] .notif-item:hover,
+.notifications-panel .notif-item:hover,
+.notif-panel .notif-item:hover,
+.notification-dropdown .notif-item:hover,
+[data-notification-panel] .notif-card:hover,
+.notifications-panel .notif-card:hover,
+.notif-panel .notif-card:hover,
+.notification-dropdown .notif-card:hover,
+.notif-actions .notif-markall,
+.notif-actions .notif-clear,
+.notif-header .notif-markall,
+.notif-header .notif-clear,
+body.theme-dark .notif-actions .notif-markall,
+body.theme-dark .notif-actions .notif-clear,
+body.theme-dark .notif-header .notif-markall,
+body.theme-dark .notif-header .notif-clear,
+body.theme-mountain-dark .notif-actions .notif-markall,
+body.theme-mountain-dark .notif-actions .notif-clear,
+body.theme-mountain-dark .notif-header .notif-markall,
+body.theme-mountain-dark .notif-header .notif-clear{
+  box-shadow:none !important;
+}
+
+/* Remove gradients from notification bubbles */
+[data-notification-panel] .notif-item,
+.notifications-panel .notif-item,
+.notif-panel .notif-item,
+.notification-dropdown .notif-item,
+[data-notification-panel] .notif-card,
+.notifications-panel .notif-card,
+.notif-panel .notif-card,
+.notification-dropdown .notif-card{
+  background: #e6f0ff !important;
+}
+
+body.theme-dark [data-notification-panel] .notif-item,
+body.theme-dark .notifications-panel .notif-item,
+body.theme-dark .notif-panel .notif-item,
+body.theme-dark .notification-dropdown .notif-item,
+body.theme-mountain-dark [data-notification-panel] .notif-item,
+body.theme-mountain-dark .notifications-panel .notif-item,
+body.theme-mountain-dark .notif-panel .notif-item,
+body.theme-mountain-dark .notification-dropdown .notif-item,
+body.theme-dark [data-notification-panel] .notif-card,
+body.theme-dark .notifications-panel .notif-card,
+body.theme-dark .notif-panel .notif-card,
+body.theme-dark .notification-dropdown .notif-card,
+body.theme-mountain-dark [data-notification-panel] .notif-card,
+body.theme-mountain-dark .notifications-panel .notif-card,
+body.theme-mountain-dark .notif-panel .notif-card,
+body.theme-mountain-dark .notification-dropdown .notif-card{
+  background: rgba(30, 64, 124, 0.92) !important;
+}
+
 .topbar .lpc-shared-header .notifications-panel .notif-item.notif-fade-ready,
 .topbar .lpc-shared-header .notifications-panel .notif-card.notif-fade-ready,
 .topbar .lpc-shared-header .notif-panel .notif-item.notif-fade-ready,

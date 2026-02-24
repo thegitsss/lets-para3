@@ -273,9 +273,11 @@ async function ensureAttorneyPreview(job) {
 }
 
 function shapeJobFromCase(caseData = {}) {
+  const remainingAmount = typeof caseData.remainingAmount === "number" ? caseData.remainingAmount : null;
   const totalAmount = typeof caseData.totalAmount === "number" ? caseData.totalAmount : null;
   const lockedTotalAmount = typeof caseData.lockedTotalAmount === "number" ? caseData.lockedTotalAmount : null;
-  const amountForCase = lockedTotalAmount != null ? lockedTotalAmount : totalAmount;
+  const amountForCase =
+    remainingAmount != null ? remainingAmount : lockedTotalAmount != null ? lockedTotalAmount : totalAmount;
   const budgetFromCase = amountForCase != null ? Math.round(amountForCase / 100) : null;
   const attorney = caseData.attorney || null;
   const attorneyId =
@@ -295,6 +297,7 @@ function shapeJobFromCase(caseData = {}) {
     description: caseData.details || caseData.description || "",
     totalAmount,
     lockedTotalAmount,
+    remainingAmount,
     budget: typeof budgetFromCase === "number" ? budgetFromCase : null,
     currency: caseData.currency || "usd",
     createdAt: caseData.createdAt || null,

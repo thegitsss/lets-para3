@@ -109,13 +109,26 @@ function buildPersonLabel(person = {}) {
   return name || person.email || "—";
 }
 
+function isWithdrawalDispute(item = {}) {
+  const status = String(item?.caseStatus || "").toLowerCase();
+  return (
+    item?.pausedReason === "dispute" ||
+    (item?.withdrawnParalegalId && status === "disputed")
+  );
+}
+
 function resolveDisputeAmounts(item = {}) {
+  const withdrawal = isWithdrawalDispute(item);
   const settlement = item.disputeSettlement || null;
   const settlementAction = String(settlement?.action || "");
   const hasSettlement = settlementAction === "release_full" || settlementAction === "release_partial";
   const baseAmount = hasSettlement
     ? Number(settlement?.grossAmount)
-    : Number(item.lockedTotalAmount ?? item.totalAmount ?? 0);
+    : Number(
+        withdrawal
+          ? item.remainingAmount ?? item.lockedTotalAmount ?? item.totalAmount ?? 0
+          : item.lockedTotalAmount ?? item.totalAmount ?? 0
+      );
   const feePct = Number(
     hasSettlement ? settlement?.feeParalegalPct : item.feeParalegalPct
   );
@@ -138,9 +151,19 @@ function resolveDisputeAmounts(item = {}) {
 }
 
 function resolveDisputeResolution(item = {}) {
+  const withdrawal = isWithdrawalDispute(item);
   const settlement = item.disputeSettlement || {};
   const action = String(settlement.action || "");
   const disputeId = String(item.dispute?.disputeId || item.dispute?._id || "");
+  if (!action && withdrawal) {
+    const payoutType = String(item.payoutFinalizedType || "");
+    if (!payoutType) return null;
+    return {
+      action: payoutType,
+      label: payoutType === "expired_zero" || payoutType === "zero_auto" ? "Zero" : "Payout",
+      resolvedAt: item.payoutFinalizedAt || null,
+    };
+  }
   if (!action) return null;
   if (settlement.disputeId && disputeId && String(settlement.disputeId) !== disputeId) return null;
   const label =
@@ -863,11 +886,13 @@ function renderOpenDisputes(items = []) {
   }
   disputesBody.innerHTML = items
     .map((item) => {
+      const withdrawal = isWithdrawalDispute(item);
       const caseId = String(item.caseId || "");
       const dispute = item.dispute || {};
       const disputeId = String(dispute.disputeId || dispute._id || "");
       const status = String(dispute.status || "open").toLowerCase();
-      const isResolved = status !== "open" || item.paymentReleased || item.payoutTransferId;
+      const isResolved =
+        status !== "open" || item.paymentReleased || item.payoutTransferId || item.payoutFinalizedAt;
       const reason = escapeHTML(dispute.message || dispute.reason || "—");
       const createdAt = dispute.createdAt ? formatDate(dispute.createdAt) : "—";
       const attorneyLabel = buildPersonLabel(item.attorney);
@@ -879,6 +904,35 @@ function renderOpenDisputes(items = []) {
       const payoutLabel = formatCurrencyValue(amounts.payoutAmount);
       const actionDisabled = isResolved ? ' disabled aria-disabled="true"' : "";
       const actionNote = isResolved ? '<div class="dispute-meta">Resolved</div>' : "";
+      const actionDisabled = isResolved ? ' disabled aria-disabled="true"' : "";
+      const actionNote = isResolved ? '<div class="dispute-meta">Resolved</div>' : "";
+      const withdrawalActions = `
+            <div class="dispute-actions">
+              <button class="btn secondary" type="button" data-dispute-action="refund" data-case-id="${escapeAttribute(
+                caseId
+              )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Zero payout</button>
+              <input type="number" min="0" step="0.01" placeholder="Payout $" data-dispute-amount${actionDisabled} />
+              <button class="btn primary" type="button" data-dispute-action="release-partial" data-case-id="${escapeAttribute(
+                caseId
+              )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Finalize payout</button>
+            </div>
+            ${actionNote}
+      `;
+      const standardActions = `
+            <div class="dispute-actions">
+              <button class="btn secondary" type="button" data-dispute-action="refund" data-case-id="${escapeAttribute(
+                caseId
+              )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Refund attorney</button>
+              <button class="btn primary" type="button" data-dispute-action="release-full" data-case-id="${escapeAttribute(
+                caseId
+              )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Full release</button>
+              <input type="number" min="0" step="0.01" placeholder="Partial $" data-dispute-amount${actionDisabled} />
+              <button class="btn secondary" type="button" data-dispute-action="release-partial" data-case-id="${escapeAttribute(
+                caseId
+              )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Partial release</button>
+            </div>
+            ${actionNote}
+      `;
       return `
         <tr data-case-id="${escapeAttribute(caseId)}" data-dispute-id="${escapeAttribute(disputeId)}" data-gross-max="${baseAmount}">
           <td>
@@ -903,19 +957,7 @@ function renderOpenDisputes(items = []) {
             <div class="dispute-meta">Fee ${amounts.feePct}%: ${feeLabel} · Net: ${payoutLabel}</div>
           </td>
           <td>
-            <div class="dispute-actions">
-              <button class="btn secondary" type="button" data-dispute-action="refund" data-case-id="${escapeAttribute(
-                caseId
-              )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Refund attorney</button>
-              <button class="btn primary" type="button" data-dispute-action="release-full" data-case-id="${escapeAttribute(
-                caseId
-              )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Full release</button>
-              <input type="number" min="0" step="0.01" placeholder="Partial $" data-dispute-amount${actionDisabled} />
-              <button class="btn secondary" type="button" data-dispute-action="release-partial" data-case-id="${escapeAttribute(
-                caseId
-              )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Partial release</button>
-            </div>
-            ${actionNote}
+            ${withdrawal ? withdrawalActions : standardActions}
           </td>
         </tr>
       `;

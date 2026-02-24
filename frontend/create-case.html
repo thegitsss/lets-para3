@@ -716,6 +716,53 @@ body.theme-dark .select-field select{
       line-height:1.5;
       color:#5f5542;
     }
+    .fee-info{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:18px;
+      height:18px;
+      margin-left:6px;
+      border-radius:50%;
+      border:1px solid rgba(26,34,48,0.25);
+      color:rgba(26,34,48,0.7);
+      font-size:0.75rem;
+      font-weight:600;
+      position:relative;
+      cursor:default;
+      transition:border-color 0.2s ease,color 0.2s ease,transform 0.2s ease;
+    }
+    .fee-info::after{
+      content:attr(data-tooltip);
+      position:absolute;
+      left:50%;
+      bottom:calc(100% + 10px);
+      transform:translateX(-50%) translateY(4px);
+      width:min(300px, 80vw);
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(26,34,48,0.12);
+      background:#ffffff;
+      color:#1a2230;
+      font-size:0.78rem;
+      line-height:1.4;
+      box-shadow:0 16px 32px rgba(15,23,42,0.18);
+      opacity:0;
+      pointer-events:none;
+      z-index:5;
+      transition:opacity 0.2s ease,transform 0.2s ease;
+    }
+    .fee-info:hover,
+    .fee-info:focus-visible{
+      border-color:rgba(182,164,122,0.8);
+      color:#1a2230;
+      transform:translateY(-1px);
+    }
+    .fee-info:hover::after,
+    .fee-info:focus-visible::after{
+      opacity:1;
+      transform:translateX(-50%) translateY(0);
+    }
 
     .compliance-ack{
       display:flex;
@@ -1444,6 +1491,8 @@ body.theme-dark .select-field select{
       <p><strong>Field of Law:</strong> <span id="previewField">—</span></p>
       <p><strong>Location:</strong> <span id="previewState">—</span></p>
       <p><strong>Compensation:</strong> <span id="previewComp">—</span></p>
+      <p><strong>Platform fee (22%):</strong> <span id="previewPlatformFee">—</span><span class="fee-info" tabindex="0" data-tooltip="Platform fee includes Stripe security, dispute support, payment processing, and vetted paralegal access.">?</span></p>
+      <p><strong>Estimated total due at hire:</strong> <span id="previewTotalDue">—</span></p>
       <p><strong>Experience:</strong> <span id="previewExperience">—</span></p>
       <p id="previewDeadlineRow" hidden><strong>Deadline:</strong> <span id="previewDeadline">—</span></p>
       <hr>
@@ -2011,6 +2060,8 @@ body.theme-dark .select-field select{
       field: document.getElementById("previewField"),
       state: document.getElementById("previewState"),
       comp: document.getElementById("previewComp"),
+      platformFee: document.getElementById("previewPlatformFee"),
+      totalDue: document.getElementById("previewTotalDue"),
       experience: document.getElementById("previewExperience"),
       deadline: document.getElementById("previewDeadline"),
       deadlineRow: document.getElementById("previewDeadlineRow"),
@@ -2019,6 +2070,9 @@ body.theme-dark .select-field select{
     };
     const previewAutoNote = document.getElementById("previewAutoNote");
     const autoNoteCopy = "Applicants automatically include their résumé, cover letter (if available), and LinkedIn profile.";
+    const PLATFORM_FEE_PCT = 22;
+    const PLATFORM_FEE_NOTE =
+      "Platform fee includes Stripe security, dispute support, payment processing, and vetted paralegal access.";
     const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
       "samanthasider+attorney@gmail.com",
       "samanthasider+56@gmail.com",
@@ -2447,6 +2501,30 @@ body.theme-dark .select-field select{
       return numeric.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
     }
 
+    function formatMoney(value) {
+      if (value == null || Number.isNaN(Number(value))) return "—";
+      const numeric = Number(value);
+      return numeric.toLocaleString("en-US", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    }
+
+    function parseCompAmount(value) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric <= 0) return null;
+      return numeric;
+    }
+
+    function computePlatformFee(amount) {
+      const cents = Math.round(amount * 100);
+      const feeCents = Math.round((cents * PLATFORM_FEE_PCT) / 100);
+      const totalCents = cents + feeCents;
+      return { fee: feeCents / 100, total: totalCents / 100 };
+    }
+
     function escapeHTML(value) {
       return String(value ?? "")
         .replace(/&/g, "&amp;")
@@ -2530,6 +2608,22 @@ body.theme-dark .select-field select{
       const safeComp = escapeHTML(data.comp || "—");
       const safeExperience = escapeHTML(data.experience || "Not specified");
       const safeDeadline = escapeHTML(deadlineText);
+      const compAmount = parseCompAmount(data.compAmount);
+      const feeEstimate = compAmount ? computePlatformFee(compAmount) : null;
+      const feeInfoHtml = feeEstimate
+        ? `<span class="fee-info" tabindex="0" data-tooltip="${escapeHTML(PLATFORM_FEE_NOTE)}">?</span>`
+        : "";
+      const feeLine = feeEstimate
+        ? `<p><strong>Platform fee (${PLATFORM_FEE_PCT}%):</strong> ${formatMoney(
+            feeEstimate.fee
+          )} ${feeInfoHtml}</p>`
+        : "";
+      const totalLine = feeEstimate
+        ? `<p><strong>Estimated total due at hire:</strong> ${formatMoney(feeEstimate.total)}</p>`
+        : "";
+      const estimateNoteLine = feeEstimate
+        ? `<p class="auto-note">Estimated total due at hire = case amount + ${PLATFORM_FEE_PCT}% platform fee.</p>`
+        : "";
       const rawDescription = data.description || "No description provided yet.";
       const safeDescription = escapeHTML(rawDescription);
       const truncated =
@@ -2541,6 +2635,9 @@ body.theme-dark .select-field select{
         <h2>${safeTitle}</h2>
         <p><small>${safeField} • ${safeState}</small></p>
         <p><strong>Compensation:</strong> ${safeComp}</p>
+        ${feeLine}
+        ${totalLine}
+        ${estimateNoteLine}
         <p><strong>Experience:</strong> ${safeExperience}</p>
         <p><strong>Deadline:</strong> ${safeDeadline}</p>
         <hr>
@@ -2574,6 +2671,18 @@ body.theme-dark .select-field select{
       previewFields.field && (previewFields.field.textContent = data.field || "—");
       previewFields.state && (previewFields.state.textContent = data.state || "—");
       previewFields.comp && (previewFields.comp.textContent = data.comp || "—");
+      const previewCompAmount = parseCompAmount(data.compAmount);
+      const previewFeeEstimate = previewCompAmount ? computePlatformFee(previewCompAmount) : null;
+      if (previewFields.platformFee) {
+        previewFields.platformFee.textContent = previewFeeEstimate
+          ? formatMoney(previewFeeEstimate.fee)
+          : "—";
+      }
+      if (previewFields.totalDue) {
+        previewFields.totalDue.textContent = previewFeeEstimate
+          ? formatMoney(previewFeeEstimate.total)
+          : "—";
+      }
       previewFields.experience && (previewFields.experience.textContent = data.experience || "—");
       previewFields.description && (previewFields.description.textContent = data.description || "No description provided yet.");
       previewFields.tasks && (previewFields.tasks.innerHTML = tasksMarkup);

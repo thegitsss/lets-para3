@@ -25,6 +25,7 @@ let allJobs = [];
 let filteredJobs = [];
 const APPLY_MAX_CHARS = 2000;
 const APPLIED_STORAGE_KEY = "lpc_applied_jobs";
+const REAPPLY_BYPASS_EMAILS = new Set(["samanthasider+0@gmail.com"]);
 const appliedJobs = new Map(); // applyKey -> appliedAt ISO
 let viewerId = "";
 let applyModal = null;
@@ -170,6 +171,10 @@ function readStoredUserEmail() {
   } catch {
     return "";
   }
+}
+
+function isReapplyBypassUser() {
+  return REAPPLY_BYPASS_EMAILS.has(viewerEmail);
 }
 
 function readStoredState() {
@@ -419,7 +424,7 @@ function applyFilters(options = {}) {
   const expLimit = maxExpValue >= 10 ? Infinity : maxExpValue;
 
   filteredJobs = allJobs.filter((job) => {
-    if (isAppliedJob(job)) return false;
+    if (shouldHideAppliedJob(job)) return false;
     const payUSD = getJobPayUSD(job);
     const exp = getJobExperience(job);
     const jobState = getJobState(job);
@@ -474,7 +479,7 @@ function clearFilters() {
   }
   if (sortSelect) sortSelect.value = "";
 
-  filteredJobs = allJobs.filter((job) => !isAppliedJob(job));
+  filteredJobs = allJobs.filter((job) => !shouldHideAppliedJob(job));
   applySort();
   renderJobs();
   filterMenu?.classList.remove("active");
@@ -485,6 +490,9 @@ clearFiltersBtn?.addEventListener("click", clearFilters);
 // Helpers
 function getJobPayUSD(job) {
   if (!job) return 0;
+  if (typeof job.remainingAmount === "number" && job.remainingAmount > 0) {
+    return Math.max(0, job.remainingAmount / 100);
+  }
   if (typeof job.lockedTotalAmount === "number" && job.lockedTotalAmount > 0) {
     return Math.max(0, job.lockedTotalAmount / 100);
   }
@@ -532,6 +540,15 @@ function isHiddenJob(job) {
   const title = String(job?.title || job?.caseTitle || "").trim().toLowerCase();
   const jobId = getJobIdForApply(job);
   return title.includes("job not found") || !jobId;
+}
+
+function isRelistedJob(job) {
+  return Boolean(job?.relistRequestedAt);
+}
+
+function shouldHideAppliedJob(job) {
+  if (!isAppliedJob(job)) return false;
+  return !isRelistedJob(job);
 }
 
 function normalizeContentLines(raw) {
@@ -723,7 +740,7 @@ async function fetchJobs() {
       allJobs = [];
     }
     allJobs = allJobs.filter((job) => !isHiddenJob(job));
-    allJobs = allJobs.filter((job) => !isAppliedJob(job));
+    allJobs = allJobs.filter((job) => !shouldHideAppliedJob(job));
     filteredJobs = [...allJobs];
 
     populateFilters();
@@ -1016,6 +1033,7 @@ async function submitApplication() {
 }
 
 function markJobAsApplied(jobId) {
+  if (isReapplyBypassUser()) return;
   const now = new Date().toISOString();
   const normalizedJobId = normalizeId(jobId);
   if (normalizedJobId) appliedJobs.set(normalizedJobId, now);
@@ -1363,7 +1381,8 @@ function buildFlagMenu(job) {
   menu.setAttribute("role", "dialog");
   menu.setAttribute("aria-modal", "false");
   menu.setAttribute("aria-label", "Flag case");
-  const groupName = `flag-reason-${escapeAttr(getJobUniqueId(job) || "case")}`;
+  const rawGroup = `flag-reason-${normalizeId(getJobUniqueId(job) || "case") || "case"}`;
+  const groupName = rawGroup.replace(/[^a-zA-Z0-9_-]/g, "") || "flag-reason-case";
 
   const optionsMarkup = FLAG_REASONS.map(
     (reason) => `
@@ -1530,6 +1549,7 @@ function getApplyKey(job) {
 
 function getAppliedAt(job) {
   if (!job) return null;
+  if (isReapplyBypassUser()) return null;
   if (job.appliedAt) return job.appliedAt;
   const jobKey = getApplyKey(job);
   if (jobKey && appliedJobs.has(jobKey)) return appliedJobs.get(jobKey);

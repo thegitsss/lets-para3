@@ -324,6 +324,22 @@ background:#fff;
 .flagged-list{list-style:none;padding:0;margin:0;}
 .flagged-list li{padding:.6rem .4rem;border-bottom:1px solid var(--line);font-size:.95rem;}
 .flagged-list li:last-child{border-bottom:none;}
+.author-link{background:none;border:none;color:var(--accent);cursor:pointer;font:inherit;padding:0;text-decoration:underline;}
+.author-link:hover{color:#0f766e;}
+.author-posts-meta{color:var(--muted);font-size:.9rem;margin-bottom:.6rem;}
+.author-posts-pager{display:flex;align-items:center;justify-content:center;gap:.75rem;margin-top:1rem;}
+.author-posts-pager span{color:var(--muted);font-size:.9rem;}
+.author-posts-table th{color:var(--muted);font-weight:300;}
+.action-menu{position:relative;display:inline-flex;}
+.action-menu-toggle{display:inline-flex;align-items:center;gap:.35rem;}
+.action-menu-list{position:absolute;right:0;top:calc(100% + 6px);min-width:190px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 40px rgba(15,23,42,0.12);padding:6px;z-index:20;}
+.action-menu-list[hidden]{display:none;}
+.action-menu-item{background:none;border:none;text-align:left;width:100%;padding:8px 10px;border-radius:8px;font:inherit;cursor:pointer;color:var(--ink);}
+.action-menu-item:hover{background:#fbf7ef;}
+.action-menu-item.danger{color:#b91c1c;}
+.action-menu-item.danger:hover{background:#fdecea;}
+.suspend-helper{color:var(--muted);font-size:.9rem;margin:0 0 .8rem;}
+.flag-menu-actions{display:flex;justify-content:flex-end;gap:.75rem;margin-top:1.5rem;}
 #section-user-management,
 #section-user-management *{
 font-family:var(--font-sans);
@@ -1293,7 +1309,7 @@ font-size:.95rem;
 <div class="details-content">
 <div class="details-header">
 <h2>Edit Job Post</h2>
-<button class="btn secondary" onclick="closeEditModal()">Close ✕</button>
+<button type="button" class="btn secondary" data-edit-post-close>Close ✕</button>
 </div>
 <form id="editPostForm">
 <label>Title</label><input type="text" id="editTitle" class="input-field">
@@ -1314,6 +1330,68 @@ font-size:.95rem;
 </select>
 <button type="button" class="btn primary" onclick="savePostEdits()">Save Changes</button>
 </form>
+</div>
+</div>
+
+<div id="authorPostsModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="authorPostsTitle">
+<div class="details-content">
+<div class="details-header">
+<h2 id="authorPostsTitle">Author posts</h2>
+<button type="button" class="btn secondary" data-author-posts-close>Close ✕</button>
+</div>
+<div class="author-posts-meta" id="authorPostsMeta"></div>
+<table class="details-table author-posts-table">
+<thead>
+<tr>
+<th>Title</th>
+<th>Status</th>
+<th>Pay</th>
+<th>Date</th>
+</tr>
+</thead>
+<tbody id="authorPostsBody"></tbody>
+</table>
+<div class="author-posts-pager">
+<button type="button" class="btn secondary" data-author-prev>Previous</button>
+<span data-author-page>Page 1</span>
+<button type="button" class="btn secondary" data-author-next>Next</button>
+</div>
+</div>
+</div>
+
+<div id="suspendUserModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="suspendUserTitle">
+<div class="details-content">
+<div class="details-header">
+<h2 id="suspendUserTitle">Suspend attorney</h2>
+<button type="button" class="btn secondary" data-suspend-close>Close ✕</button>
+</div>
+<p class="suspend-helper">This will disable the account and send a suspension email to the attorney.</p>
+<label for="suspendReason">Reason (required)</label>
+<textarea id="suspendReason" class="input-field" rows="3" placeholder="Explain why this account is being suspended"></textarea>
+<label for="suspendMessage">Custom note in email (optional)</label>
+<textarea id="suspendMessage" class="input-field" rows="4" placeholder="Optional additional context for the attorney"></textarea>
+<div class="flag-menu-actions">
+<button type="button" class="btn secondary" data-suspend-cancel>Cancel</button>
+<button type="button" class="btn danger" data-suspend-confirm>Send suspension</button>
+</div>
+</div>
+</div>
+
+<div id="deletePostModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="deletePostTitle">
+<div class="details-content">
+<div class="details-header">
+<h2 id="deletePostTitle">Delete post</h2>
+<button type="button" class="btn secondary" data-delete-close>Close ✕</button>
+</div>
+<p class="suspend-helper">This will permanently delete the post and notify the attorney.</p>
+<label for="deleteReason">Reason (required)</label>
+<textarea id="deleteReason" class="input-field" rows="3" placeholder="Explain why this post is being deleted"></textarea>
+<label for="deleteMessage">Custom note in email (optional)</label>
+<textarea id="deleteMessage" class="input-field" rows="4" placeholder="Optional additional context for the attorney"></textarea>
+<div class="flag-menu-actions">
+<button type="button" class="btn secondary" data-delete-cancel>Cancel</button>
+<button type="button" class="btn danger" data-delete-confirm>Delete post</button>
+</div>
 </div>
 </div>
 </section>
@@ -1969,6 +2047,16 @@ const pendingPostStatuses=new Set();
 const flaggedPostStatuses=new Set(["disputed"]);
 let adminPosts=[];
 let adminPostsSource=[];
+const AUTHOR_POSTS_PAGE_SIZE=5;
+const authorPostsModal=document.getElementById("authorPostsModal");
+const authorPostsBody=document.getElementById("authorPostsBody");
+const authorPostsMeta=document.getElementById("authorPostsMeta");
+const authorPostsTitle=document.getElementById("authorPostsTitle");
+const authorPostsPage=document.querySelector("[data-author-page]");
+const authorPostsPrev=document.querySelector("[data-author-prev]");
+const authorPostsNext=document.querySelector("[data-author-next]");
+const authorPostsClose=document.querySelector("[data-author-posts-close]");
+const authorPostsState={id:"",name:"",page:1,total:0,pages:1};
 
 const postCategoryCtx=document.getElementById("postCategoryChart");
 const postCategoryChart=pushChart(postCategoryCtx,{
@@ -2050,6 +2138,81 @@ if(!snippet)return base;
 return `${base}: ${snippet}`;
 }
 
+function formatCurrencyCents(value,currency="USD"){
+const cents=Number(value);
+if(!Number.isFinite(cents)||cents<=0)return "—";
+const amount=cents/100;
+try{
+return new Intl.NumberFormat(undefined,{style:"currency",currency:String(currency||"USD").toUpperCase(),maximumFractionDigits:0}).format(amount);
+}catch{
+return `$${amount.toFixed(0)}`;
+}
+}
+
+function openAuthorPosts(record){
+if(!record||!record.authorId||!authorPostsModal)return;
+authorPostsState.id=String(record.authorId);
+authorPostsState.name=record.authorName||"Author";
+authorPostsState.page=1;
+authorPostsState.total=0;
+authorPostsState.pages=1;
+authorPostsModal.classList.remove("hidden");
+loadAuthorPosts();
+}
+
+function closeAuthorPosts(){
+if(authorPostsModal)authorPostsModal.classList.add("hidden");
+}
+
+async function loadAuthorPosts(){
+if(!authorPostsBody||!authorPostsState.id)return;
+authorPostsBody.innerHTML=`<tr><td colspan="4" class="pending-empty">Loading posts...</td></tr>`;
+try{
+const params=new URLSearchParams({
+attorney:authorPostsState.id,
+limit:String(AUTHOR_POSTS_PAGE_SIZE),
+page:String(authorPostsState.page),
+});
+const res=await secureFetch(`/api/cases/admin?${params.toString()}`,{headers:{Accept:"application/json"}});
+if(!res.ok)throw new Error("Unable to load author posts.");
+const payload=await res.json().catch(()=>({}));
+const entries=Array.isArray(payload?.cases)?payload.cases:[];
+const total=Number(payload?.total)||entries.length;
+authorPostsState.total=total;
+authorPostsState.pages=Math.max(1,Math.ceil(total/AUTHOR_POSTS_PAGE_SIZE));
+authorPostsTitle.textContent=`${authorPostsState.name} · Posts`;
+authorPostsMeta.textContent=`${authorPostsState.total} total post${authorPostsState.total===1?"":"s"}`;
+authorPostsPage.textContent=`Page ${authorPostsState.page} of ${authorPostsState.pages}`;
+authorPostsPrev.disabled=authorPostsState.page<=1;
+authorPostsNext.disabled=authorPostsState.page>=authorPostsState.pages;
+
+if(!entries.length){
+authorPostsBody.innerHTML=`<tr><td colspan="4" class="pending-empty">No posts found.</td></tr>`;
+return;
+}
+authorPostsBody.innerHTML="";
+entries.forEach((entry)=>{
+const tr=document.createElement("tr");
+const titleTd=document.createElement("td");
+titleTd.textContent=entry.title||"Untitled Post";
+const statusTd=document.createElement("td");
+statusTd.textContent=toTitle(String(entry.status||"").replace(/_/g," "))||"—";
+const payTd=document.createElement("td");
+const payCents=Number(entry.totalAmount??entry.lockedTotalAmount??entry.remainingAmount??0);
+payTd.textContent=formatCurrencyCents(payCents,entry.currency||"USD");
+const dateTd=document.createElement("td");
+dateTd.textContent=formatDate(entry.createdAt);
+tr.append(titleTd,statusTd,payTd,dateTd);
+authorPostsBody.appendChild(tr);
+});
+}catch(err){
+authorPostsBody.innerHTML=`<tr><td colspan="4" class="pending-empty">${err?.message||"Unable to load posts."}</td></tr>`;
+authorPostsPage.textContent="Page 1";
+authorPostsPrev.disabled=true;
+authorPostsNext.disabled=true;
+}
+}
+
 function shapeAdminPost(entry={}){
 const status=String(entry.status||"open").toLowerCase();
 const quality=evaluatePostQuality(entry.details||entry.briefSummary||"",entry.title||"");
@@ -2061,6 +2224,7 @@ const flaggedByReports=flagCount>0;
 const isFlagged=flaggedByStatus||flaggedByReports||quality.score<75;
 const attorney=entry.attorney||{};
 const author=entry.authorName||attorney.name||`${attorney.firstName||""} ${attorney.lastName||""}`.trim()||attorney.email||"Unknown";
+const authorId=attorney.id||attorney._id||entry.attorneyId||entry.attorney||"";
 const state=deriveState(entry);
 const statusLabel=isFlagged?"Flagged":toTitle(status.replace(/_/g," "))||"Pending";
 const statusClass=isFlagged?"pending":"approved";
@@ -2068,6 +2232,7 @@ return{
 id:entry.id||entry._id,
 title:entry.title||"Untitled Post",
 authorName:author,
+authorId,
 category:entry.category||entry.practiceArea||"General",
 state:state||"—",
 createdAt:entry.createdAt||entry.created_at||null,
@@ -2106,6 +2271,81 @@ btn.addEventListener("click",handler);
 return btn;
 }
 
+let openActionMenu = null;
+function closeActionMenu(menu){
+if(!menu)return;
+menu.hidden = true;
+menu.setAttribute("aria-hidden","true");
+if(openActionMenu===menu) openActionMenu=null;
+}
+function toggleActionMenu(menu){
+if(!menu)return;
+if(openActionMenu && openActionMenu!==menu) closeActionMenu(openActionMenu);
+const willOpen = menu.hidden;
+if(!willOpen){
+closeActionMenu(menu);
+return;
+}
+menu.hidden = false;
+menu.setAttribute("aria-hidden","false");
+openActionMenu = menu;
+}
+document.addEventListener("click",(event)=>{
+if(!openActionMenu)return;
+if(event.target.closest(".action-menu"))return;
+closeActionMenu(openActionMenu);
+});
+document.addEventListener("keydown",(event)=>{
+if(event.key==="Escape" && openActionMenu){
+closeActionMenu(openActionMenu);
+}
+});
+
+function createActionMenu(record){
+const wrapper=document.createElement("div");
+wrapper.className="action-menu";
+const toggle=document.createElement("button");
+toggle.type="button";
+toggle.className="btn secondary action-menu-toggle";
+toggle.textContent="Actions ▾";
+const menu=document.createElement("div");
+menu.className="action-menu-list";
+menu.hidden=true;
+menu.setAttribute("aria-hidden","true");
+
+const addItem=(label,classes,handler)=>{
+const item=document.createElement("button");
+item.type="button";
+item.className=`action-menu-item ${classes||""}`.trim();
+item.textContent=label;
+item.addEventListener("click",(event)=>{
+event.preventDefault();
+closeActionMenu(menu);
+handler();
+});
+menu.appendChild(item);
+};
+
+addItem("Edit","",()=>editPost({ closest: () => wrapper.closest("tr") }));
+addItem("Delete","danger",()=>deletePost(record));
+if(record.isFlagged){
+addItem("Resolve Flag","",()=>resolveFlag(record));
+}
+addItem("Request Edits","",()=>requestEdits(record));
+addItem("Archive","",()=>archivePost(record));
+addItem("Suspend","danger",()=>suspendAuthor(record));
+
+toggle.addEventListener("click",(event)=>{
+event.preventDefault();
+event.stopPropagation();
+toggleActionMenu(menu);
+});
+menu.addEventListener("click",(event)=>event.stopPropagation());
+wrapper.appendChild(toggle);
+wrapper.appendChild(menu);
+return wrapper;
+}
+
 function renderPostsTable(records=[]){
 if(!postsTableBody)return;
 if(!records.length){
@@ -2121,7 +2361,16 @@ tr.dataset.flagged=record.isFlagged?"true":"false";
 const titleCell=document.createElement("td");
 titleCell.textContent=record.title;
 const authorCell=document.createElement("td");
+if(record.authorId){
+const authorBtn=document.createElement("button");
+authorBtn.type="button";
+authorBtn.className="author-link";
+authorBtn.textContent=record.authorName;
+authorBtn.addEventListener("click",()=>openAuthorPosts(record));
+authorCell.appendChild(authorBtn);
+}else{
 authorCell.textContent=record.authorName;
+}
 const categoryCell=document.createElement("td");
 categoryCell.textContent=record.category||"—";
 const stateCell=document.createElement("td");
@@ -2134,8 +2383,7 @@ statusSpan.className=`status ${record.statusClass}`;
 statusSpan.textContent=record.statusLabel;
 statusCell.appendChild(statusSpan);
 const actionCell=document.createElement("td");
-actionCell.appendChild(createActionButton("Edit","secondary",(event)=>editPost(event.currentTarget)));
-actionCell.appendChild(createActionButton("Delete","danger",(event)=>deletePost(event.currentTarget)));
+actionCell.appendChild(createActionMenu(record));
 tr.append(titleCell,authorCell,categoryCell,stateCell,dateCell,statusCell,actionCell);
 fragment.appendChild(tr);
 });
@@ -2287,11 +2535,15 @@ if(!res.ok) throw new Error("Unable to load posts");
 const payload=await res.json().catch(()=>({}));
 const source=Array.isArray(payload?.cases)?payload.cases:[];
 adminPostsSource=source;
-const openCases=source.filter((entry)=>{
+const postedCases=source.filter((entry)=>{
 const status=String(entry.status||"").toLowerCase();
-return status==="open";
+if(status==="open") return true;
+if(status==="paused"){
+return !!entry.relistRequestedAt && !!entry.payoutFinalizedAt;
+}
+return false;
 });
-adminPosts=openCases.map((entry)=>shapeAdminPost(entry));
+adminPosts=postedCases.map((entry)=>shapeAdminPost(entry));
 const summaryOverrides=computePostSummaryOverrides(adminPostsSource);
 if(!adminPosts.length){
 setPostsTableMessage("No posts found.");
@@ -2326,35 +2578,299 @@ document.getElementById("editStatus").value=row.children[5].innerText;
 function closeEditModal(){
 document.getElementById("editPostModal").classList.add("hidden");
 }
-function savePostEdits(){
-alert("Post updated successfully!");
-closeEditModal();
+
+function resolveDeleteTarget(target){
+if(!target)return null;
+if(target.id)return target;
+if(typeof target.closest==="function"){
+const row=target.closest("tr");
+if(!row)return null;
+return{
+id:row.dataset.caseId||"",
+title:row.children?.[0]?.innerText||"Post",
+authorName:row.children?.[1]?.innerText||"Attorney",
+};
 }
-async function deletePost(btn){
-const row=btn.closest("tr");
-const caseId=row?.dataset.caseId;
-if(!row||!caseId)return;
-const confirmed=window.confirm("Delete this post?");
+return null;
+}
+
+async function resolveFlag(record){
+if(!record?.id)return;
+const note=window.prompt("Optional internal note for resolving this flag:","")??null;
+if(note===null)return;
+try{
+await fetchCSRF?.();
+const res=await secureFetch(`/api/cases/${encodeURIComponent(record.id)}/flags/resolve`,{
+method:"POST",
+headers:{Accept:"application/json"},
+body:{note}
+});
+if(!res.ok){
+const payload=await res.json().catch(()=>({}));
+throw new Error(payload?.error||"Unable to resolve flag.");
+}
+showToast("Flag resolved.","info");
+loadAdminPosts();
+}catch(err){
+showToast(err?.message||"Unable to resolve flag.","err");
+}
+}
+
+async function requestEdits(record){
+if(!record?.id)return;
+const message=window.prompt("Enter the edit request for the attorney (required):","")??"";
+if(!message.trim())return;
+try{
+await fetchCSRF?.();
+const res=await secureFetch(`/api/cases/${encodeURIComponent(record.id)}/flags/request-edits`,{
+method:"POST",
+headers:{Accept:"application/json"},
+body:{message}
+});
+if(!res.ok){
+const payload=await res.json().catch(()=>({}));
+throw new Error(payload?.error||"Unable to request edits.");
+}
+showToast("Edit request sent to attorney.","info");
+}catch(err){
+showToast(err?.message||"Unable to request edits.","err");
+}
+}
+
+async function archivePost(record){
+if(!record?.id)return;
+const confirmed=window.confirm("Archive this post? It will be removed from public listings.");
 if(!confirmed)return;
 try{
 await fetchCSRF?.();
-const res=await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`,{method:"DELETE",headers:{Accept:"application/json"}});
+const res=await secureFetch(`/api/cases/${encodeURIComponent(record.id)}/archive`,{
+method:"PATCH",
+headers:{Accept:"application/json"},
+body:{archived:true}
+});
+if(!res.ok){
+const payload=await res.json().catch(()=>({}));
+throw new Error(payload?.error||"Unable to archive post.");
+}
+showToast("Post archived.","info");
+loadAdminPosts();
+}catch(err){
+showToast(err?.message||"Unable to archive post.","err");
+}
+}
+
+function deletePost(target){
+const record=resolveDeleteTarget(target);
+if(!record?.id)return;
+openDeleteModal(record);
+}
+
+async function suspendAuthor(record){
+openSuspendModal(record);
+}
+
+const editPostModal=document.getElementById("editPostModal");
+const editPostCloseBtn=editPostModal?.querySelector("[data-edit-post-close]");
+editPostCloseBtn?.addEventListener("click",(event)=>{
+event.preventDefault();
+closeEditModal();
+});
+editPostModal?.addEventListener("click",(event)=>{
+if(event.target===editPostModal) closeEditModal();
+});
+document.addEventListener("keydown",(event)=>{
+if(event.key==="Escape"&&editPostModal&&!editPostModal.classList.contains("hidden")){
+closeEditModal();
+}
+});
+const suspendUserModal=document.getElementById("suspendUserModal");
+const suspendUserTitle=document.getElementById("suspendUserTitle");
+const suspendReasonInput=document.getElementById("suspendReason");
+const suspendMessageInput=document.getElementById("suspendMessage");
+const suspendCloseBtn=suspendUserModal?.querySelector("[data-suspend-close]");
+const suspendCancelBtn=suspendUserModal?.querySelector("[data-suspend-cancel]");
+const suspendConfirmBtn=suspendUserModal?.querySelector("[data-suspend-confirm]");
+let suspendTarget=null;
+
+function openSuspendModal(record){
+if(!record?.authorId||!suspendUserModal)return;
+suspendTarget={ id: record.authorId, name: record.authorName || "Attorney" };
+if(suspendUserTitle) suspendUserTitle.textContent=`Suspend ${suspendTarget.name}`;
+if(suspendReasonInput) suspendReasonInput.value="";
+if(suspendMessageInput) suspendMessageInput.value="";
+suspendUserModal.classList.remove("hidden");
+suspendReasonInput?.focus();
+}
+
+function closeSuspendModal(){
+if(!suspendUserModal)return;
+suspendUserModal.classList.add("hidden");
+suspendTarget=null;
+}
+
+async function submitSuspend(){
+if(!suspendTarget?.id)return;
+const reason=(suspendReasonInput?.value||"").trim();
+const message=(suspendMessageInput?.value||"").trim();
+if(!reason){
+showToast("Please add a suspension reason.","err");
+suspendReasonInput?.focus();
+return;
+}
+if(suspendConfirmBtn){
+suspendConfirmBtn.disabled=true;
+suspendConfirmBtn.textContent="Sending...";
+}
+try{
+await fetchCSRF?.();
+const res=await secureFetch(`/api/admin/disable/${encodeURIComponent(suspendTarget.id)}`,{
+method:"POST",
+headers:{Accept:"application/json"},
+body:{reason,message}
+});
+if(!res.ok){
+const payload=await res.json().catch(()=>({}));
+throw new Error(payload?.error||"Unable to suspend attorney.");
+}
+showToast("Attorney suspended and email sent.","info");
+closeSuspendModal();
+}catch(err){
+showToast(err?.message||"Unable to suspend attorney.","err");
+}finally{
+if(suspendConfirmBtn){
+suspendConfirmBtn.disabled=false;
+suspendConfirmBtn.textContent="Send suspension";
+}
+}
+}
+
+suspendCloseBtn?.addEventListener("click",(event)=>{
+event.preventDefault();
+closeSuspendModal();
+});
+suspendCancelBtn?.addEventListener("click",(event)=>{
+event.preventDefault();
+closeSuspendModal();
+});
+suspendConfirmBtn?.addEventListener("click",(event)=>{
+event.preventDefault();
+submitSuspend();
+});
+suspendUserModal?.addEventListener("click",(event)=>{
+if(event.target===suspendUserModal) closeSuspendModal();
+});
+document.addEventListener("keydown",(event)=>{
+if(event.key==="Escape"&&suspendUserModal&&!suspendUserModal.classList.contains("hidden")){
+closeSuspendModal();
+}
+});
+const deletePostModal=document.getElementById("deletePostModal");
+const deletePostTitle=document.getElementById("deletePostTitle");
+const deleteReasonInput=document.getElementById("deleteReason");
+const deleteMessageInput=document.getElementById("deleteMessage");
+const deleteCloseBtn=deletePostModal?.querySelector("[data-delete-close]");
+const deleteCancelBtn=deletePostModal?.querySelector("[data-delete-cancel]");
+const deleteConfirmBtn=deletePostModal?.querySelector("[data-delete-confirm]");
+let deleteTarget=null;
+
+function openDeleteModal(record){
+if(!record?.id||!deletePostModal)return;
+deleteTarget={ id: record.id, title: record.title || "Post", authorName: record.authorName || "Attorney" };
+if(deletePostTitle) deletePostTitle.textContent=`Delete ${deleteTarget.title}`;
+if(deleteReasonInput) deleteReasonInput.value="";
+if(deleteMessageInput) deleteMessageInput.value="";
+deletePostModal.classList.remove("hidden");
+deleteReasonInput?.focus();
+}
+
+function closeDeleteModal(){
+if(!deletePostModal)return;
+deletePostModal.classList.add("hidden");
+deleteTarget=null;
+}
+
+async function submitDelete(){
+if(!deleteTarget?.id)return;
+const reason=(deleteReasonInput?.value||"").trim();
+const message=(deleteMessageInput?.value||"").trim();
+if(!reason){
+showToast("Please add a deletion reason.","err");
+deleteReasonInput?.focus();
+return;
+}
+if(deleteConfirmBtn){
+deleteConfirmBtn.disabled=true;
+deleteConfirmBtn.textContent="Deleting...";
+}
+try{
+await fetchCSRF?.();
+const res=await secureFetch(`/api/cases/${encodeURIComponent(deleteTarget.id)}`,{
+method:"DELETE",
+headers:{Accept:"application/json"},
+body:{reason,message}
+});
 if(!res.ok){
 const payload=await res.json().catch(()=>({}));
 throw new Error(payload?.error||"Unable to delete post.");
 }
-row.remove();
-adminPosts=adminPosts.filter((entry)=>String(entry.id)!==String(caseId));
-adminPostsSource=adminPostsSource.filter((entry)=>String(entry.id||entry._id)!==String(caseId));
-updatePostsSummary(adminPosts,computePostSummaryOverrides(adminPostsSource));
-updatePostsCharts(adminPosts);
-updateQualityOutputs(adminPosts);
-updateDeadlineChart(adminPostsSource);
-showToast("Post deleted.","info");
-postsTableState.refresh();
+showToast("Post deleted and email sent.","info");
+closeDeleteModal();
+loadAdminPosts();
 }catch(err){
 showToast(err?.message||"Unable to delete post.","err");
+}finally{
+if(deleteConfirmBtn){
+deleteConfirmBtn.disabled=false;
+deleteConfirmBtn.textContent="Delete post";
 }
+}
+}
+
+deleteCloseBtn?.addEventListener("click",(event)=>{
+event.preventDefault();
+closeDeleteModal();
+});
+deleteCancelBtn?.addEventListener("click",(event)=>{
+event.preventDefault();
+closeDeleteModal();
+});
+deleteConfirmBtn?.addEventListener("click",(event)=>{
+event.preventDefault();
+submitDelete();
+});
+deletePostModal?.addEventListener("click",(event)=>{
+if(event.target===deletePostModal) closeDeleteModal();
+});
+document.addEventListener("keydown",(event)=>{
+if(event.key==="Escape"&&deletePostModal&&!deletePostModal.classList.contains("hidden")){
+closeDeleteModal();
+}
+});
+authorPostsClose?.addEventListener("click",(event)=>{
+event.preventDefault();
+closeAuthorPosts();
+});
+authorPostsModal?.addEventListener("click",(event)=>{
+if(event.target===authorPostsModal) closeAuthorPosts();
+});
+authorPostsPrev?.addEventListener("click",()=>{
+if(authorPostsState.page<=1)return;
+authorPostsState.page-=1;
+loadAuthorPosts();
+});
+authorPostsNext?.addEventListener("click",()=>{
+if(authorPostsState.page>=authorPostsState.pages)return;
+authorPostsState.page+=1;
+loadAuthorPosts();
+});
+document.addEventListener("keydown",(event)=>{
+if(event.key==="Escape"&&authorPostsModal&&!authorPostsModal.classList.contains("hidden")){
+closeAuthorPosts();
+}
+});
+function savePostEdits(){
+alert("Post updated successfully!");
+closeEditModal();
 }
 const postsTableState=(() => {
 let rows=[];

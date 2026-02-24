@@ -935,6 +935,7 @@ if (user.role !== "paralegal") return res.status(400).json({ error: "Only parale
 
 router.post(
 "/disable/:id",
+csrfProtection,
 asyncHandler(async (req, res) => {
 const { id } = req.params;
 if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
@@ -942,6 +943,33 @@ const user = await User.findById(id);
 if (!user) return res.status(404).json({ error: "User not found" });
 user.disabled = true;
 await user.save();
+const reasonRaw = typeof req.body?.reason === "string" ? req.body.reason : "";
+const messageRaw = typeof req.body?.message === "string" ? req.body.message : "";
+const reason = reasonRaw.trim().slice(0, 2000);
+const message = messageRaw.trim().slice(0, 4000);
+if (reason || message) {
+  const recipientName = formatFullName(user) || "";
+  const payload = {
+    message: message || `Your account has been suspended. Reason: ${reason || "Policy review"}.`,
+    reason: reason || "Policy review",
+    customNote: message || "",
+    recipientName,
+  };
+  try {
+    await notifyUser(user._id, "account_suspended", payload, { actorUserId: req.user?.id || null });
+  } catch (err) {
+    console.warn("[admin] notifyUser account_suspended failed", err?.message || err);
+  }
+}
+try {
+  await AuditLog.logFromReq(req, "admin.user.suspended", {
+    targetType: "user",
+    targetId: user._id,
+    meta: { reason: reason || "", message: message || "" },
+  });
+} catch (err) {
+  console.warn("[admin] Failed to log suspension", err?.message || err);
+}
 res.json({ ok: true, disabled: true });
 })
 );

@@ -14,8 +14,10 @@ const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
 const sendEmail = require("../utils/email");
 const emailTemplates = require("../email/templates");
-const { buildReceiptPdfBuffer, uploadPdfToS3, getReceiptKey } = require("../services/caseLifecycle");
+const { buildReceiptPdfBuffer, uploadPdfToS3, getReceiptKey, generateArchiveZip } = require("../services/caseLifecycle");
 const { notifyUser } = require("../utils/notifyUser");
+const Message = require("../models/Message");
+const CaseFile = require("../models/CaseFile");
 
 // ----------------------------------------
 // Helpers
@@ -794,6 +796,65 @@ function buildParalegalReceiptPayload(caseDoc, payoutDoc) {
   };
 }
 
+function computeParalegalFeeFromGross(grossCents, caseDoc) {
+  const gross = Math.max(0, Math.round(Number(grossCents || 0)));
+  const pct = resolveParalegalFeePct(caseDoc);
+  const fee = Math.max(0, Math.round((gross * (Number(pct) || 0)) / 100));
+  const net = Math.max(0, gross - fee);
+  return { gross, feePct: pct, feeAmount: fee, net };
+}
+
+function getWithdrawalReceiptKey(caseId, kind, paralegalId) {
+  const safeKind = kind === "paralegal" ? "paralegal" : "attorney";
+  const suffix =
+    safeKind === "paralegal" && paralegalId ? `paralegal-${String(paralegalId)}` : safeKind;
+  return `cases/${caseId}/receipt-withdrawal-${suffix}.pdf`;
+}
+
+function buildWithdrawalReceiptPayloads(caseDoc, grossAmount) {
+  const { gross, feePct, feeAmount, net } = computeParalegalFeeFromGross(grossAmount, caseDoc);
+  const issuedAt = caseDoc.payoutFinalizedAt || caseDoc.updatedAt || new Date();
+  const attorneyName = fullName(caseDoc.attorney || {}) || caseDoc.attorneyNameSnapshot || "Attorney";
+  const paralegalName = fullName(caseDoc.paralegal || {}) || caseDoc.paralegalNameSnapshot || "Paralegal";
+  const receiptId = `${caseDoc._id}-withdrawal-${new Date(issuedAt).getTime()}`;
+  return {
+    attorneyPayload: {
+      title: "Payout Receipt",
+      receiptId,
+      issuedAt: new Date(issuedAt).toLocaleDateString("en-US"),
+      partyLabel: "Attorney",
+      partyName: attorneyName,
+      caseTitle: caseDoc.title || "Case",
+      lineItems: [
+        { label: "Partial payout released", value: formatCurrency(gross) },
+        { label: "Attorney fee", value: "$0.00" },
+      ],
+      totalLabel: "Total released",
+      totalAmount: formatCurrency(gross),
+      paymentMethod: "Escrow release",
+      paymentStatus: gross > 0 ? "Released" : "No payout",
+    },
+    paralegalPayload: {
+      title: "Payout Receipt",
+      receiptId,
+      issuedAt: new Date(issuedAt).toLocaleDateString("en-US"),
+      partyLabel: "Payee",
+      partyName: paralegalName,
+      attorneyName,
+      caseTitle: caseDoc.title || "Case",
+      lineItems: [
+        { label: "Gross amount", value: formatCurrency(gross) },
+        { label: `Platform fee (${feePct}%)`, value: formatCurrency(feeAmount) },
+      ],
+      totalLabel: "Net paid",
+      totalAmount: formatCurrency(net),
+      paymentMethod: "Stripe release",
+      paymentStatus: gross > 0 ? "Paid" : "No payout",
+    },
+    netAmount: net,
+  };
+}
+
 async function tryStreamReceipt(res, key, filename) {
   if (!S3_BUCKET) return false;
   try {
@@ -988,18 +1049,35 @@ router.post(
   asyncHandler(async (req, res) => {
     const user = await User.findById(req.user.id).select("stripeCustomerId firstName lastName email");
     if (!user) return res.status(404).json({ error: "User not found" });
-    if (!user.stripeCustomerId) {
-      return res.status(400).json({ error: "Stripe billing portal is not enabled for this account yet." });
+    let customerId = user.stripeCustomerId;
+    try {
+      customerId = await ensureStripeCustomer(user);
+    } catch (err) {
+      console.error("[payments] stripe customer lookup failed", err?.message || err);
+      return res.status(502).json({ error: "Unable to access Stripe customer. Please try again shortly." });
     }
-    const returnUrl = `${resolveClientBase(req)}/dashboard-attorney.html`;
-    const session = await stripe.billingPortal.sessions.create({
-      customer: user.stripeCustomerId,
-      return_url: returnUrl,
-    });
-    if (!session?.url) {
-      return res.status(502).json({ error: "Unable to create billing portal session." });
+    const returnUrl = `${resolveClientBase(req)}/dashboard-attorney.html#billing`;
+    try {
+      const session = await stripe.billingPortal.sessions.create({
+        customer: customerId,
+        return_url: returnUrl,
+      });
+      if (!session?.url) {
+        return res.status(502).json({ error: "Unable to create billing portal session." });
+      }
+      return res.json({ url: session.url, sessionId: session.id });
+    } catch (err) {
+      console.error("[payments] billing portal create failed", err?.message || err);
+      const raw = String(err?.message || "");
+      const lowered = raw.toLowerCase();
+      let message = "Unable to open the Stripe billing portal right now.";
+      if (lowered.includes("portal") && (lowered.includes("enable") || lowered.includes("configuration"))) {
+        message = "Stripe billing portal is not enabled for this account yet.";
+      } else if (lowered.includes("no such customer") || lowered.includes("resource missing")) {
+        message = "Stripe customer could not be found. Please try again shortly.";
+      }
+      return res.status(502).json({ error: message });
     }
-    res.json({ url: session.url, sessionId: session.id });
   })
 );
 
@@ -2015,6 +2093,10 @@ router.post(
       "paralegal",
       "stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled firstName lastName email role"
     );
+    await c?.populate?.(
+      "withdrawnParalegalId",
+      "stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled firstName lastName email role"
+    );
     if (!c) return res.status(404).json({ error: "Case not found" });
 
     const disputes = Array.isArray(c.disputes) ? c.disputes : [];
@@ -2029,6 +2111,183 @@ router.post(
     }
     if (!targetDispute) {
       return res.status(400).json({ error: "No dispute found for this case." });
+    }
+
+    const isWithdrawalDispute =
+      c.withdrawnParalegalId &&
+      (String(c.pausedReason || "") === "dispute" || String(c.status || "").toLowerCase() === "disputed");
+
+    if (isWithdrawalDispute) {
+      const resolvedAt = new Date();
+      const baseAmount = Number(c.remainingAmount ?? c.lockedTotalAmount ?? c.totalAmount ?? 0);
+      if (!Number.isFinite(baseAmount) || baseAmount < 0) {
+        return res.status(400).json({ error: "Case amount is invalid." });
+      }
+      let gross = 0;
+      if (action === "refund") {
+        gross = 0;
+      } else if (action === "release_full") {
+        gross = baseAmount;
+      } else {
+        gross = Number(grossAmountCents);
+      }
+      if (!Number.isFinite(gross) || gross < 0) {
+        return res.status(400).json({ error: "Settlement amount is invalid." });
+      }
+      if (gross > baseAmount) {
+        return res.status(400).json({ error: "Settlement amount exceeds remaining case funds." });
+      }
+
+      const payoutParalegal =
+        c.withdrawnParalegalId && typeof c.withdrawnParalegalId === "object"
+          ? c.withdrawnParalegalId
+          : null;
+      if (!payoutParalegal) {
+        return res.status(400).json({ error: "Withdrawn paralegal not found." });
+      }
+
+      const { net, feePct, feeAmount } = computeParalegalFeeFromGross(gross, c);
+      let transferId = null;
+      let pending = false;
+      if (gross > 0 && net > 0) {
+        if (!c.escrowIntentId) return res.status(400).json({ error: "Not funded" });
+        let pi;
+        try {
+          pi = await stripe.paymentIntents.retrieve(c.escrowIntentId);
+        } catch (err) {
+          console.error("[payments] withdrawal dispute intent lookup failed", err?.message || err);
+          return res.status(502).json({ error: "Unable to verify case funding." });
+        }
+        if (pi.status !== "succeeded") {
+          return res.status(400).json({ error: "Stripe payment is not ready to release yet." });
+        }
+
+        const bypassPayouts = STRIPE_PAYOUT_BYPASS_EMAILS.has(normalizeEmail(payoutParalegal?.email));
+        if (!payoutParalegal.stripeAccountId) {
+          if (bypassPayouts) {
+            await ensureConnectAccount(payoutParalegal);
+          }
+        }
+        if (!payoutParalegal.stripeAccountId) {
+          pending = true;
+        } else if (!bypassPayouts) {
+          if (!payoutParalegal.stripeOnboarded || !payoutParalegal.stripePayoutsEnabled) {
+            const refreshed = await ensureStripeOnboarded(payoutParalegal);
+            if (!refreshed) {
+              pending = true;
+            }
+          }
+        }
+
+        if (!pending) {
+          let transfer;
+          try {
+            transfer = bypassPayouts
+              ? { id: `bypass_${Date.now()}` }
+              : await stripe.transfers.create({
+                  amount: net,
+                  currency: c.currency || "usd",
+                  destination: payoutParalegal.stripeAccountId,
+                  transfer_group: `case_${c._id.toString()}`,
+                  metadata: {
+                    caseId: c._id.toString(),
+                    disputeId: String(targetDispute.disputeId || targetDispute._id || ""),
+                    action: "withdrawal_admin",
+                  },
+                });
+          } catch (err) {
+            console.error("[payments] withdrawal dispute payout transfer failed", err?.message || err);
+            const message = stripe.sanitizeStripeError(
+              err,
+              "We couldn't release funds right now. Please try again shortly."
+            );
+            return res.status(400).json({ error: message });
+          }
+          transferId = transfer?.id || null;
+        }
+      }
+
+      c.partialPayoutAmount = gross;
+      c.payoutFinalizedType = "admin";
+      c.payoutFinalizedAt = resolvedAt;
+      c.disputeDeadlineAt = null;
+      c.relistRequestedAt = null;
+      c.relistPending = false;
+      c.remainingAmount = Math.max(0, Math.round(baseAmount - gross));
+      c.pausedReason = "paralegal_withdrew";
+      c.status = "paused";
+      targetDispute.status = "resolved";
+      let archiveMeta = null;
+      if (gross === 0) {
+        try {
+          archiveMeta = await generateArchiveZip(c);
+        } catch (err) {
+          console.warn("[payments] archive generation failed during withdrawal reset", err?.message || err);
+        }
+        c.tasks = Array.isArray(c.tasks)
+          ? c.tasks.map((task) => ({
+              ...task,
+              completed: false,
+            }))
+          : [];
+        c.tasksLocked = false;
+        c.hiredAt = null;
+        if (archiveMeta?.key) {
+          c.archiveZipKey = archiveMeta.key;
+          c.archiveReadyAt = archiveMeta.readyAt || new Date();
+          c.archiveDownloadedAt = null;
+          c.files = [];
+        }
+      }
+      await c.save();
+
+      if (gross === 0 && archiveMeta?.key) {
+        try {
+          await Message.updateMany(
+            { caseId: c._id, deleted: { $ne: true } },
+            { $set: { deleted: true, deletedBy: req.user.id } }
+          );
+          await CaseFile.deleteMany({ caseId: c._id });
+        } catch (err) {
+          console.warn("[payments] unable to reset workspace history", err?.message || err);
+        }
+      }
+
+      try {
+        const { attorneyPayload, paralegalPayload } = buildWithdrawalReceiptPayloads(c, gross);
+        const attorneyKey = getWithdrawalReceiptKey(c._id, "attorney");
+        const paralegalKey = getWithdrawalReceiptKey(
+          c._id,
+          "paralegal",
+          payoutParalegal?._id || c.withdrawnParalegalId
+        );
+        const [attorneyPdf, paralegalPdf] = await Promise.all([
+          buildReceiptPdfBuffer(attorneyPayload),
+          buildReceiptPdfBuffer(paralegalPayload),
+        ]);
+        await Promise.all([
+          uploadPdfToS3({ key: attorneyKey, buffer: attorneyPdf }),
+          uploadPdfToS3({ key: paralegalKey, buffer: paralegalPdf }),
+        ]);
+      } catch (err) {
+        console.warn("[payments] withdrawal receipt generation failed", err?.message || err);
+      }
+
+      await AuditLog.logFromReq(req, "dispute.withdrawal.settle", {
+        targetType: "payment",
+        targetId: c._id,
+        caseId: c._id,
+        meta: {
+          grossAmount: gross,
+          netAmount: net,
+          feePct,
+          feeAmount,
+          transferId,
+          pending,
+        },
+      });
+
+      return res.json({ ok: true, payout: net, transferId, pending });
     }
 
     if (!hasActiveDispute(c) && !hasResolvedDispute(c)) {
@@ -2496,7 +2755,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const doc = await Case.findById(req.params.caseId)
       .select(
-        "title lockedTotalAmount totalAmount feeAttorneyAmount feeAttorneyPct paymentIntentId escrowIntentId payoutTransferId paidOutAt completedAt updatedAt attorney attorneyId attorneyNameSnapshot"
+        "title lockedTotalAmount totalAmount feeAttorneyAmount feeAttorneyPct paymentIntentId escrowIntentId payoutTransferId paidOutAt completedAt updatedAt attorney attorneyId attorneyNameSnapshot paralegalNameSnapshot withdrawnParalegalId pausedReason payoutFinalizedAt payoutFinalizedType partialPayoutAmount paymentReleased"
       )
       .populate("attorney", "firstName lastName email role")
       .lean();
@@ -2505,15 +2764,36 @@ router.get(
     if (String(attorneyId) !== String(req.user.id)) {
       return res.status(403).json({ error: "Only the case attorney can access this receipt." });
     }
-    const forceRegen = ["1", "true", "yes"].includes(String(req.query?.regen || "").toLowerCase());
+    const isWithdrawalReceipt =
+      doc?.withdrawnParalegalId &&
+      doc?.payoutFinalizedAt &&
+      !doc?.paymentReleased &&
+      ["zero_auto", "partial_attorney", "admin", "expired_zero"].includes(String(doc?.payoutFinalizedType || ""));
+    if (isWithdrawalReceipt) {
+      const gross = Number(doc.partialPayoutAmount ?? 0);
+      const { attorneyPayload } = buildWithdrawalReceiptPayloads(doc, gross);
+      const key = getWithdrawalReceiptKey(doc._id, "attorney");
+      const filename = safeReceiptFilename(doc.title, "payout-receipt");
+      const streamed = await tryStreamReceipt(res, key, filename);
+      if (streamed) return;
+      const pdfBuffer = await buildReceiptPdfBuffer(attorneyPayload);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(pdfBuffer);
+      if (S3_BUCKET) {
+        uploadPdfToS3({ key, buffer: pdfBuffer }).catch((err) => {
+          console.warn("[payments] withdrawal receipt upload failed", err?.message || err);
+        });
+      }
+      return;
+    }
+
     const paymentMethodLabel = await resolvePaymentMethodLabel(doc);
     const payload = buildAttorneyReceiptPayload(doc, paymentMethodLabel);
     const key = getReceiptKey(doc._id, "attorney");
     const filename = safeReceiptFilename(doc.title, "receipt");
-    if (!forceRegen) {
-      const streamed = await tryStreamReceipt(res, key, filename);
-      if (streamed) return;
-    }
+    const streamed = await tryStreamReceipt(res, key, filename);
+    if (streamed) return;
     const pdfBuffer = await buildReceiptPdfBuffer(payload);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -2532,28 +2812,49 @@ router.get(
   asyncHandler(async (req, res) => {
     const doc = await Case.findById(req.params.caseId)
       .select(
-        "title lockedTotalAmount totalAmount feeAttorneyAmount feeAttorneyPct payoutTransferId paidOutAt completedAt updatedAt paralegal paralegalId paralegalNameSnapshot attorney attorneyId attorneyNameSnapshot"
+        "title lockedTotalAmount totalAmount feeAttorneyAmount feeAttorneyPct payoutTransferId paidOutAt completedAt updatedAt paralegal paralegalId paralegalNameSnapshot attorney attorneyId attorneyNameSnapshot withdrawnParalegalId pausedReason payoutFinalizedAt payoutFinalizedType partialPayoutAmount paymentReleased"
       )
       .populate("paralegal", "firstName lastName email role")
       .populate("attorney", "firstName lastName email role")
       .lean();
     if (!doc) return res.status(404).json({ error: "Case not found" });
-    const paralegalId = doc.paralegal?._id || doc.paralegalId || doc.paralegal;
-    if (String(paralegalId) !== String(req.user.id)) {
+    const assignedId = doc.paralegal?._id || doc.paralegalId || doc.paralegal;
+    const withdrawnId = doc.withdrawnParalegalId || null;
+    const isWithdrawn = withdrawnId && String(withdrawnId) === String(req.user.id);
+    if (!isWithdrawn && String(assignedId) !== String(req.user.id)) {
       return res.status(403).json({ error: "Only the assigned paralegal can access this receipt." });
     }
-    const forceRegen = ["1", "true", "yes"].includes(String(req.query?.regen || "").toLowerCase());
+    if (isWithdrawn) {
+      if (!doc.payoutFinalizedAt) {
+        return res.status(400).json({ error: "No withdrawal receipt is available yet." });
+      }
+      const gross = Number(doc.partialPayoutAmount ?? 0);
+      const { paralegalPayload } = buildWithdrawalReceiptPayloads(doc, gross);
+      const key = getWithdrawalReceiptKey(doc._id, "paralegal", withdrawnId);
+      const filename = safeReceiptFilename(doc.title, "payout-receipt");
+      const streamed = await tryStreamReceipt(res, key, filename);
+      if (streamed) return;
+      const pdfBuffer = await buildReceiptPdfBuffer(paralegalPayload);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(pdfBuffer);
+      if (S3_BUCKET) {
+        uploadPdfToS3({ key, buffer: pdfBuffer }).catch((err) => {
+          console.warn("[payments] withdrawal payout receipt upload failed", err?.message || err);
+        });
+      }
+      return;
+    }
+
     const payoutDoc = await Payout.findOne({ caseId: doc._id }).select("amountPaid transferId").lean();
     const payload = buildParalegalReceiptPayload(doc, payoutDoc);
     const key = getReceiptKey(doc._id, "paralegal");
     const filename = safeReceiptFilename(doc.title, "payout-receipt");
-    if (!forceRegen) {
-      const streamed = await tryStreamReceipt(res, key, filename);
-      if (streamed) return;
-    }
+    const streamed = await tryStreamReceipt(res, key, filename);
+    if (streamed) return;
     const pdfBuffer = await buildReceiptPdfBuffer(payload);
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Disposition", `attachment; filename=\"${filename}\"`);
     res.send(pdfBuffer);
     if (S3_BUCKET) {
       uploadPdfToS3({ key, buffer: pdfBuffer }).catch((err) => {

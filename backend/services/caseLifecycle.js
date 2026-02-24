@@ -33,6 +33,43 @@ const PURGE_INTERVAL_MS = Math.max(30_000, Number(process.env.CASE_PURGE_INTERVA
 const PURGE_BATCH_LIMIT = Math.max(1, Math.min(10, Number(process.env.CASE_PURGE_BATCH_LIMIT || 3)));
 let purgeWorkerStarted = false;
 
+function resolvePuppeteerExecutablePath() {
+  const envPath = process.env.PUPPETEER_EXECUTABLE_PATH || process.env.CHROME_PATH || "";
+  if (envPath && fs.existsSync(envPath)) return envPath;
+
+  try {
+    const bundled = typeof puppeteer.executablePath === "function" ? puppeteer.executablePath() : "";
+    if (bundled && fs.existsSync(bundled)) return bundled;
+  } catch {}
+
+  const platform = process.platform;
+  const candidates = [];
+  if (platform === "darwin") {
+    candidates.push(
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "/Applications/Chromium.app/Contents/MacOS/Chromium"
+    );
+  } else if (platform === "win32") {
+    const programFiles = process.env.PROGRAMFILES || "C:\\\\Program Files";
+    const programFilesX86 = process.env["PROGRAMFILES(X86)"] || "C:\\\\Program Files (x86)";
+    candidates.push(
+      path.join(programFiles, "Google", "Chrome", "Application", "chrome.exe"),
+      path.join(programFilesX86, "Google", "Chrome", "Application", "chrome.exe"),
+      path.join(programFiles, "Chromium", "Application", "chrome.exe"),
+      path.join(programFilesX86, "Chromium", "Application", "chrome.exe")
+    );
+  } else {
+    candidates.push(
+      "/usr/bin/google-chrome",
+      "/usr/bin/google-chrome-stable",
+      "/usr/bin/chromium",
+      "/usr/bin/chromium-browser"
+    );
+  }
+
+  return candidates.find((candidate) => fs.existsSync(candidate)) || "";
+}
+
 function normalizeKey(key) {
   return String(key || "").replace(/^\/+/, "");
 }
@@ -731,10 +768,11 @@ function buildReceiptHtml(payload = {}) {
 }
 
 async function renderHtmlToPdf(html, options = {}) {
+  const executablePath = resolvePuppeteerExecutablePath() || undefined;
   const browser = await puppeteer.launch({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    executablePath,
   });
   try {
     const page = await browser.newPage();

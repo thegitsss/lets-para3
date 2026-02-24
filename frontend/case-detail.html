@@ -938,7 +938,7 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: border-color 0.2s ease, color 0.2s ease;
+      transition: border-color 1.2s ease, color 1.2s ease;
     }
 
     .case-participants-toggle:hover {
@@ -1486,10 +1486,19 @@
 
     .composer-send {
       margin-left: auto;
-      border-radius: 10px;
-      padding: 6px 14px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      padding: 0;
+      display: grid;
+      place-items: center;
       font-weight: 600;
       font-size: 0.85rem;
+    }
+
+    .composer-send svg {
+      width: 16px;
+      height: 16px;
     }
 
     .visually-hidden {
@@ -1574,8 +1583,19 @@
     }
 
     .message-composer .composer-send {
-      border-radius: 10px;
-      padding: 8px 18px;
+      background: var(--app-surface);
+      color: var(--app-text);
+      border: 1px solid var(--app-border-soft);
+      border-radius: 50%;
+      padding: 0;
+      width: 36px;
+      height: 36px;
+      transition: border-color 0.2s ease, color 0.2s ease;
+    }
+
+    .message-composer .composer-send:hover {
+      border-color: var(--app-accent);
+      color: var(--app-accent);
     }
 
     .case-overview-panel {
@@ -1855,6 +1875,30 @@
       align-self: center;
     }
 
+    .case-action-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .case-action-row .case-action-btn {
+      align-self: stretch;
+    }
+
+    .case-paused-banner {
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(197, 168, 117, 0.12);
+      border: 1px solid rgba(197, 168, 117, 0.4);
+      color: var(--app-text);
+      font-size: 0.88rem;
+      line-height: 1.4;
+    }
+
+    .case-paused-banner strong {
+      font-weight: 600;
+    }
+
     .case-overview-note {
       font-size: 0.88rem;
       color: var(--app-muted);
@@ -1941,6 +1985,23 @@
     .case-status-link:hover,
     .case-status-link:focus-visible {
       color: var(--app-accent);
+      text-decoration: none;
+    }
+
+    .case-inline-action {
+      border: none;
+      background: transparent;
+      padding: 0;
+      margin: 0;
+      font: inherit;
+      color: var(--app-accent);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .case-inline-action:disabled {
+      color: var(--app-muted);
+      cursor: not-allowed;
       text-decoration: none;
     }
 
@@ -2045,6 +2106,14 @@
         padding: 28px 20px 60px;
         max-width: 100%;
         overflow-x: hidden;
+      }
+
+      .case-topbar-left {
+        padding-left: 64px;
+      }
+
+      .back-button {
+        align-self: flex-start;
       }
 
       img,
@@ -2199,7 +2268,8 @@
       }
 
       .case-thread {
-        min-height: 70vh;
+        height: 70vh;
+        min-height: 0;
       }
 
       .case-thread-header {
@@ -2399,7 +2469,13 @@
                   </label>
                   <input id="message-attachment" name="message-attachment" type="file" multiple class="attachment-input" />
                   <textarea id="caseMessageInput" name="message-body" rows="1" placeholder="Write your message"></textarea>
-                  <button type="submit" class="composer-send">Send</button>
+                  <button type="submit" class="composer-send" aria-label="Send message">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 19V5" />
+                      <path d="M6 11l6-6 6 6" />
+                    </svg>
+                    <span class="visually-hidden">Send</span>
+                  </button>
                 </div>
                 <div id="caseAttachmentStaging" class="composer-attachments" aria-live="polite" hidden></div>
                 <p id="caseMessageStatus" class="case-thread-subtitle" role="status" aria-live="polite"></p>

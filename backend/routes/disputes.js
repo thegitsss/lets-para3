@@ -49,7 +49,9 @@ router.get(
       {
         $addFields: {
           attorneyRef: { $ifNull: ["$attorney", "$attorneyId"] },
-          paralegalRef: { $ifNull: ["$paralegal", "$paralegalId"] },
+          paralegalRef: {
+            $ifNull: ["$paralegal", { $ifNull: ["$paralegalId", "$withdrawnParalegalId"] }],
+          },
         },
       },
       { $lookup: { from: "users", localField: "attorneyRef", foreignField: "_id", as: "attorneyDoc" } },
@@ -99,6 +101,7 @@ router.get(
           },
           lockedTotalAmount: "$lockedTotalAmount",
           totalAmount: "$totalAmount",
+          remainingAmount: "$remainingAmount",
           currency: "$currency",
           feeParalegalPct: "$feeParalegalPct",
           feeParalegalAmount: "$feeParalegalAmount",
@@ -107,6 +110,14 @@ router.get(
           escrowStatus: "$escrowStatus",
           paymentReleased: "$paymentReleased",
           payoutTransferId: "$payoutTransferId",
+          pausedReason: "$pausedReason",
+          disputeDeadlineAt: "$disputeDeadlineAt",
+          partialPayoutAmount: "$partialPayoutAmount",
+          payoutFinalizedAt: "$payoutFinalizedAt",
+          payoutFinalizedType: "$payoutFinalizedType",
+          withdrawnParalegalId: "$withdrawnParalegalId",
+          relistPending: "$relistPending",
+          relistRequestedAt: "$relistRequestedAt",
           disputeSettlement: "$disputeSettlement",
           dispute: "$disputes",
         },
@@ -224,11 +235,29 @@ router.post(
     const c = await Case.findById(caseId);
     if (!c) return res.status(404).json({ error: "Case not found" });
 
-    // Only attorney, paralegal (if assigned), or admin can open a dispute
-    const isParty =
+    const now = new Date();
+    const isWithdrawnParalegal =
+      c.withdrawnParalegalId && String(c.withdrawnParalegalId) === String(req.user.id);
+    const hasWithdrawalWindow =
+      c.pausedReason === "paralegal_withdrew" &&
+      c.disputeDeadlineAt &&
+      !c.payoutFinalizedAt &&
+      now.getTime() <= new Date(c.disputeDeadlineAt).getTime();
+    if (hasWithdrawalWindow && !isWithdrawnParalegal && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Only the withdrawn paralegal can dispute within this window." });
+    }
+
+    // Only attorney, assigned paralegal, withdrawn paralegal (within window), or admin can open a dispute
+    let isParty =
       String(c.attorney) === String(req.user.id) ||
       (c.paralegal && String(c.paralegal) === String(req.user.id)) ||
       req.user.role === "admin";
+    if (isWithdrawnParalegal && hasWithdrawalWindow) {
+      isParty = true;
+    }
+    if (c.pausedReason === "paralegal_withdrew" && c.disputeDeadlineAt && !hasWithdrawalWindow) {
+      return res.status(400).json({ error: "The request window has expired." });
+    }
     if (!isParty) return res.status(403).json({ error: "Not authorized to dispute this case" });
 
     // Use model helper if available
@@ -241,6 +270,10 @@ router.post(
         status: "open",
       });
       if (c.status !== "closed") c.status = "disputed";
+    }
+    if (hasWithdrawalWindow || isWithdrawnParalegal) {
+      c.status = "disputed";
+      c.pausedReason = "dispute";
     }
 
     await c.save();
@@ -269,6 +302,7 @@ router.post(
       const paralegalId = c.paralegal || c.paralegalId;
       if (attorneyId) recipients.add(String(attorneyId));
       if (paralegalId) recipients.add(String(paralegalId));
+      if (c.withdrawnParalegalId) recipients.add(String(c.withdrawnParalegalId));
 
       const admins = await User.find({ role: "admin", status: "approved" }).select("_id").lean();
       admins.forEach((admin) => {

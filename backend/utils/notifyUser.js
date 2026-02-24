@@ -64,6 +64,10 @@ function buildDisplayMessage(type, payload = {}) {
     }
     case "case_budget_locked":
       return `Case amount locked${caseFragment || ""}.`.trim();
+    case "case_deleted":
+      return payload.message || "A case posting was removed by admin.";
+    case "account_suspended":
+      return payload.message || "Your account has been suspended.";
     default:
       return "You have a new notification.";
   }
@@ -233,6 +237,19 @@ function emailTemplate(type, payload) {
         html: `<p>${payload.message || `The dispute for <strong>${title}</strong> was resolved.`}</p><p>Resolution: ${resolution}.</p><p>${receiptNote}</p>`,
       };
     }
+    case "account_suspended":
+      return emailTemplates.accountSuspended({
+        recipientName: payload.recipientName || payload.userName || "",
+        reason: payload.reason || "",
+        message: payload.customNote || "",
+      });
+    case "case_deleted":
+      return emailTemplates.caseDeleted({
+        recipientName: payload.recipientName || payload.userName || "",
+        caseTitle: payload.caseTitle || "your case",
+        reason: payload.reason || "",
+        message: payload.customNote || "",
+      });
     default:
       return {
         subject: "LPC Notification",
@@ -334,6 +351,8 @@ function shouldSuppressMessageEmail(user, payload = {}) {
 
 function shouldSendEmailForType(user, type, payload = {}) {
   const prefs = normalizePrefs(user);
+  if (type === "case_deleted") return true;
+  if (type === "account_suspended") return true;
   if (type === "case_budget_locked") return false;
   if (type === "profile_photo_rejected") return false;
   if (type === "application_denied") return false;

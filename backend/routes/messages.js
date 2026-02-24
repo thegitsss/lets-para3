@@ -136,37 +136,35 @@ async function shouldNotifyAttorneyForParalegalMessage({ caseId, messageDoc }) {
     return true;
   }
 
-  const latestAttorneyMessage = await Message.findOne({
+  const PARLEGAL_NOTIFY_COOLDOWN_MS = 2 * 60 * 60 * 1000;
+  const currentBoundary = buildMessagesBeforeBoundary(currentCreatedAt, currentMessageId);
+
+  const latestParalegalMessage = await Message.findOne({
     caseId: caseObjectId,
     deleted: { $ne: true },
-    senderRole: "attorney",
+    senderRole: "paralegal",
+    _id: { $ne: currentMessageId },
+    $and: [currentBoundary],
   })
     .sort({ createdAt: -1, _id: -1 })
     .select("_id createdAt")
     .lean();
 
-  const bounds = [buildMessagesBeforeBoundary(currentCreatedAt, currentMessageId)];
-  const latestAttorneyMessageId = toObjectId(latestAttorneyMessage?._id);
-  const latestAttorneyCreatedAt = latestAttorneyMessage?.createdAt ? new Date(latestAttorneyMessage.createdAt) : null;
-  if (
-    latestAttorneyMessageId &&
-    latestAttorneyCreatedAt &&
-    !Number.isNaN(latestAttorneyCreatedAt.getTime())
-  ) {
-    bounds.push(buildMessagesAfterBoundary(latestAttorneyCreatedAt, latestAttorneyMessageId));
+  if (!latestParalegalMessage) {
+    return true;
   }
 
-  const priorParalegalMessageInStreak = await Message.findOne({
-    caseId: caseObjectId,
-    deleted: { $ne: true },
-    senderRole: "paralegal",
-    _id: { $ne: currentMessageId },
-    $and: bounds,
-  })
-    .select("_id")
-    .lean();
+  const latestParalegalCreatedAt = latestParalegalMessage?.createdAt
+    ? new Date(latestParalegalMessage.createdAt)
+    : null;
+  if (!latestParalegalCreatedAt || Number.isNaN(latestParalegalCreatedAt.getTime())) {
+    return true;
+  }
 
-  return !priorParalegalMessageInStreak;
+  const latestParalegalId = toObjectId(latestParalegalMessage?._id);
+
+  const gapMs = currentCreatedAt.getTime() - latestParalegalCreatedAt.getTime();
+  return gapMs >= PARLEGAL_NOTIFY_COOLDOWN_MS;
 }
 
 async function createMessageNotification({ caseDoc, senderDoc, previewText, messageDoc }) {
@@ -245,6 +243,20 @@ function resolveSenderRole(req) {
   if (req?.acl?.isParalegal) return "paralegal";
   if (req?.acl?.isAttorney) return "attorney";
   return String(req?.user?.role || "");
+}
+
+function normalizeSenderRole(role) {
+  const normalized = String(role || "").toLowerCase();
+  if (["attorney", "paralegal", "admin"].includes(normalized)) return normalized;
+  return "";
+}
+
+async function loadSenderDoc(req) {
+  const senderDoc = await User.findById(req.user.id).select("firstName lastName role").lean();
+  if (!senderDoc) return null;
+  const normalized = normalizeSenderRole(senderDoc.role);
+  if (!normalized) return null;
+  return { ...senderDoc, role: normalized };
 }
 
 // All message routes require auth
@@ -460,12 +472,13 @@ router.post(
     const text = sanitizeText(req.body?.text);
     if (!text) return res.status(400).json({ error: "text required" });
 
-    const senderDocPromise = User.findById(req.user.id).select("firstName lastName role").lean();
+    const senderDoc = await loadSenderDoc(req);
+    if (!senderDoc) return res.status(403).json({ error: "Invalid sender role" });
 
     const msg = await Message.create({
       caseId,
       senderId: req.user.id,
-      senderRole: resolveSenderRole(req),
+      senderRole: senderDoc.role,
       type: "text",
       text,
       content: text,
@@ -478,7 +491,6 @@ router.post(
     });
 
     try {
-      const senderDoc = await senderDocPromise;
       await createMessageNotification({
         caseDoc,
         senderDoc,
@@ -512,11 +524,14 @@ router.post(
     const { fileKey, fileName, mimeType, fileSize } = req.body || {};
     if (!fileKey || !fileName) return res.status(400).json({ error: "fileKey and fileName required" });
 
+    const senderDoc = await loadSenderDoc(req);
+    if (!senderDoc) return res.status(403).json({ error: "Invalid sender role" });
+
     const size = Number.isFinite(+fileSize) ? +fileSize : undefined;
     const msg = await Message.create({
       caseId: req.params.caseId,
       senderId: req.user.id,
-      senderRole: resolveSenderRole(req),
+      senderRole: senderDoc.role,
       type: "file",
       text: fileName,
       fileKey,
@@ -559,11 +574,14 @@ router.post(
       return res.status(400).json({ error: "mimeType must be audio/*" });
     }
 
+    const senderDoc = await loadSenderDoc(req);
+    if (!senderDoc) return res.status(403).json({ error: "Invalid sender role" });
+
     const safeTranscript = sanitizeText(transcript);
     const msg = await Message.create({
       caseId: req.params.caseId,
       senderId: req.user.id,
-      senderRole: resolveSenderRole(req),
+      senderRole: senderDoc.role,
       type: "audio",
       text: safeTranscript,
       fileKey,

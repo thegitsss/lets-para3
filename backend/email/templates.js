@@ -126,6 +126,49 @@ const templates = {
     );
     return { subject: "Resume updated", html };
   },
+  accountSuspended: (payload = {}) => {
+    const name = payload.recipientName || "";
+    const reason = payload.reason || "Policy review";
+    const custom = payload.message || "";
+    const greeting = name ? `<p>Hi ${name},</p>` : "";
+    const noteBlock = custom
+      ? `<p style="margin-top:12px;padding:12px 14px;border-left:3px solid ${GOLD};background:#fbfaf7;">${custom}</p>`
+      : "";
+    const html = frameEmail(
+      "Account suspended",
+      `${greeting}
+       <p>Your Let&rsquo;s-ParaConnect account has been suspended.</p>
+       <div style="margin:16px 0 14px;padding:14px;border:1px solid rgba(0,0,0,0.06);border-radius:14px;background:#ffffff;">
+         <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8a8373;">Reason</div>
+         <div style="font-size:15px;color:${INK};margin-top:6px;">${reason}</div>
+       </div>
+       ${noteBlock}
+       <p>If you believe this was in error, please reply to this email so our team can review.</p>`
+    );
+    return { subject: "Your LPC account has been suspended", html };
+  },
+  caseDeleted: (payload = {}) => {
+    const name = payload.recipientName || "";
+    const caseTitle = payload.caseTitle || "your case";
+    const reason = payload.reason || "Policy review";
+    const custom = payload.message || "";
+    const greeting = name ? `<p>Hi ${name},</p>` : "";
+    const noteBlock = custom
+      ? `<p style="margin-top:12px;padding:12px 14px;border-left:3px solid ${GOLD};background:#fbfaf7;">${custom}</p>`
+      : "";
+    const html = frameEmail(
+      "Case posting removed",
+      `${greeting}
+       <p>Your case posting <strong>${caseTitle}</strong> has been removed by the LPC admin team.</p>
+       <div style="margin:16px 0 14px;padding:14px;border:1px solid rgba(0,0,0,0.06);border-radius:14px;background:#ffffff;">
+         <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8a8373;">Reason</div>
+         <div style="font-size:15px;color:${INK};margin-top:6px;">${reason}</div>
+       </div>
+       ${noteBlock}
+       <p>If you have questions, please reply to this email.</p>`
+    );
+    return { subject: "Your case posting was removed", html };
+  },
   systemAnnouncement: (payload = {}) => {
     const title = payload.title || "System announcement";
     const body = payload.message || "There is a new update available.";
