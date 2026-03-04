@@ -40,7 +40,7 @@
 
     main {
       max-width: 880px;
-      margin: 80px auto;
+      margin: 10px auto 80px;
       padding: 0 24px;
       flex: 1;
     }
@@ -62,6 +62,83 @@
     form {
       display: grid;
       gap: 24px;
+    }
+
+    .contact-shell {
+      position: relative;
+      display: inline-block;
+    }
+
+    .contact-details {
+      position: absolute;
+      top: 0;
+      left: calc(100% + 32px);
+      width: 240px;
+      color: var(--ink);
+      border-left: 1px solid var(--line);
+      padding-left: 24px;
+      font-size: 14px;
+    }
+
+    .contact-heading {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-size: 16px;
+      letter-spacing: 0.3px;
+      margin: 0 0 10px;
+      color: var(--ink);
+    }
+
+    .contact-block {
+      margin-bottom: 32px;
+    }
+
+    .contact-block p {
+      margin: 0 0 8px;
+    }
+
+    .contact-links a {
+      color: var(--ink);
+      text-decoration: none;
+      margin-right: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      font-size: 14px;
+      line-height: 1;
+      vertical-align: middle;
+    }
+
+    .contact-links a:last-child {
+      margin-right: 0;
+    }
+
+    .contact-links .icon {
+      width: 16px;
+      height: 16px;
+      display: block;
+    }
+
+    .contact-links .icon rect,
+    .contact-links .icon circle,
+    .contact-links .icon path {
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.5;
+    }
+
+    .contact-links svg {
+      width: 16px;
+      height: 16px;
+      display: block;
+      fill: currentColor;
+      stroke: none;
+    }
+
+    .contact-details .support-email-link {
+      color: var(--gold);
     }
 
     .field-group {
@@ -158,6 +235,13 @@
       color: #8b1f1f;
     }
     @media (max-width: 768px) {
+      .contact-details {
+        position: static;
+        width: auto;
+        border-left: none;
+        padding-left: 0;
+        margin-top: 24px;
+      }
 
       .actions {
         flex-direction: column;
@@ -172,14 +256,12 @@
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
-
-    <!-- Header -->
+<!-- Header -->
 <header>
   <div class="header-inner">
     <nav class="nav-left" aria-label="Primary">
       <a href="index.html#who-we-are">About</a>
       <a href="index.html#how">How It Works</a>
-      <a href="paralegal-faq.html">Paralegal FAQ</a>
     </nav>
 
     <a href="index.html" class="header-logo">
@@ -187,7 +269,7 @@
     </a>
 
     <div class="header-actions">
-      <a class="pill" href="login.html" id="authAction">Sign In</a>
+<a class="pill" href="login.html" id="authAction">Sign In</a>
       <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
     </div>
     </div>
@@ -199,50 +281,86 @@
     <h1 id="contact-title">Contact Us</h1>
     <p class="muted">Questions, or support—send us a note and we’ll get back to you shortly.</p>
 
-    <form id="contactForm" novalidate>
-      <input type="text" id="hp" name="hp" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;" />
-      <div class="field-group">
-        <div class="field">
-          <label for="name">Full name</label>
-          <input type="text" id="name" name="name" required />
+    <div class="contact-shell">
+      <form id="contactForm" novalidate>
+        <input type="text" id="hp" name="hp" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;" />
+        <div class="field-group">
+          <div class="field">
+            <label for="name">Full name</label>
+            <input type="text" id="name" name="name" required />
+          </div>
+          <div class="field">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required />
+          </div>
         </div>
-        <div class="field">
-          <label for="email">Email</label>
-          <input type="email" id="email" name="email" required />
-        </div>
-      </div>
 
-      <div class="field-group">
-        <div class="field">
-          <label for="role">I am a(n)</label>
-          <select id="role" name="role">
-            <option value="">— Select —</option>
-            <option value="attorney">Attorney</option>
-            <option value="paralegal">Paralegal</option>
-            <option value="other">Other</option>
-          </select>
+        <div class="field-group">
+          <div class="field">
+            <label for="role">Role</label>
+            <select id="role" name="role">
+              <option value="">— Select —</option>
+              <option value="attorney">Attorney</option>
+              <option value="paralegal">Paralegal</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="subject">Subject</label>
+            <input type="text" id="subject" name="subject" required />
+          </div>
         </div>
+
         <div class="field">
-          <label for="subject">Subject</label>
-          <input type="text" id="subject" name="subject" required />
+          <label for="message">Message</label>
+          <textarea id="message" name="message" required></textarea>
         </div>
-      </div>
 
-      <div class="field">
-        <label for="message">Message</label>
-        <textarea id="message" name="message" required></textarea>
-      </div>
+        <div class="actions">
+          <button type="reset" class="btn">Clear Form</button>
+          <button type="submit" class="btn primary">Submit Message</button>
+        </div>
+        <div id="formStatus" class="form-status" role="status" aria-live="polite"></div>
+      </form>
 
-      <div class="actions">
-        <button type="reset" class="btn">Clear Form</button>
-        <button type="submit" class="btn primary">Submit Message</button>
-      </div>
-      <div id="formStatus" class="form-status" role="status" aria-live="polite"></div>
-    </form>
+      <aside class="contact-details" aria-label="Contact details">
+        <div class="contact-block">
+          <p class="contact-heading">Address</p>
+          <p>16192 Coastal Hwy, Lewes,<br>DE 19958, United States</p>
+        </div>
+
+        <div class="contact-block">
+          <p class="contact-heading">Talk to us</p>
+          <p>+1 (302)-281-4353</p>
+          <p><a class="support-email-link" href="mailto:help@lets-paraconnect.com" style="text-decoration:none;">help@lets-paraconnect.com</a></p>
+          <p>Monday–Friday, 9:00 AM – 5:00 PM EST</p>
+        </div>
+
+        <div class="contact-block">
+          <p class="contact-heading">Connect with us</p>
+          <p class="contact-links">
+            <a href="https://www.linkedin.com/company/lets-paraconnect/" target="_blank" rel="noopener" aria-label="LinkedIn">
+              in
+            </a>
+            <a href="https://www.facebook.com/LetsParaConnect/" target="_blank" rel="noopener" aria-label="Facebook">
+              f
+            </a>
+            <a href="https://www.instagram.com/letsparaconnect/" target="_blank" rel="noopener" aria-label="Instagram">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="5"></rect>
+                <circle cx="12" cy="12" r="4.5"></circle>
+                <circle cx="17" cy="7" r="1"></circle>
+              </svg>
+            </a>
+          </p>
+        </div>
+      </aside>
+    </div>
   </main>
 
 <footer class="footer">
   <div class="footer-inner">
+    <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
     <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
     <nav>
       <a href="privacy.html">Privacy Policy</a>
@@ -259,6 +377,30 @@
   </div>
 </footer>
 <script type="module" src="assets/scripts/hero-parallax.js"></script>
+<script>
+  function alignContactDetails() {
+    const shell = document.querySelector('.contact-shell');
+    const details = document.querySelector('.contact-details');
+    const textarea = document.getElementById('message');
+    if (!shell || !details || !textarea) return;
+    if (window.matchMedia('(max-width: 768px)').matches) {
+      details.style.top = '';
+      return;
+    }
+    const shellRect = shell.getBoundingClientRect();
+    const textareaRect = textarea.getBoundingClientRect();
+    const detailsHeight = details.offsetHeight || 0;
+    const targetTop = Math.max(0, textareaRect.bottom - shellRect.top - detailsHeight);
+    details.style.top = `${targetTop}px`;
+  }
+
+  window.addEventListener('load', () => {
+    requestAnimationFrame(alignContactDetails);
+  });
+  window.addEventListener('resize', () => {
+    requestAnimationFrame(alignContactDetails);
+  });
+</script>
 <script>
   const form = document.getElementById('contactForm');
   const statusEl = document.getElementById('formStatus');
@@ -331,5 +473,6 @@
     });
   }
 </script>
+  <script src="assets/scripts/accessibility-toggle.js"></script>
 </body>
 </html>

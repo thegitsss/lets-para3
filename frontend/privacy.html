@@ -18,7 +18,6 @@
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
-
   <!-- Fonts -->
 
   <style>
@@ -154,13 +153,13 @@ html {
 
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
-    <!-- Header -->
+<!-- Header -->
 <header>
   <div class="header-inner">
     <nav class="nav-left" aria-label="Primary">
+      <a href="contact.html">Contact Us</a>
       <a href="index.html#who-we-are">About</a>
       <a href="index.html#how">How It Works</a>
-      <a href="paralegal-faq.html">Paralegal FAQ</a>
     </nav>
 
     <a href="index.html" class="header-logo">
@@ -168,7 +167,7 @@ html {
     </a>
 
     <div class="header-actions">
-      <a class="pill" href="login.html" id="authAction">Sign In</a>
+<a class="pill" href="login.html" id="authAction">Sign In</a>
       <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
     </div>
   </div>
@@ -240,7 +239,7 @@ html {
       <ul>
         <li><strong>MongoDB Atlas</strong> – application database and backups.</li>
         <li><strong>AWS S3</strong> – private file storage for uploads.</li>
-        <li><strong>Stripe</strong> – Checkout/PaymentIntents for funding; Connect for payouts.</li>
+        <li><strong>Stripe</strong> – Checkout/PaymentIntents for payment processing; Connect for payouts.</li>
         <li><strong>Email (SMTP via Nodemailer)</strong> – transactional emails.</li>
         <li><strong>Cloudflare</strong> – bot mitigation and security protections on auth flows.</li>
       </ul>
@@ -309,6 +308,7 @@ html {
 
  <footer class="footer">
   <div class="footer-inner">
+    <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
     <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
     <nav>
       <a href="privacy.html">Privacy Policy</a>
@@ -325,8 +325,7 @@ html {
   </div>
 </footer>
 
-
-
   <script type="module" src="assets/scripts/hero-parallax.js"></script>
+  <script src="assets/scripts/accessibility-toggle.js"></script>
 </body>
 </html>

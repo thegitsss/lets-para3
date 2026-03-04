@@ -18,7 +18,6 @@
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
-
   <style>
     .gold{color:#b4975a;}
     body {
@@ -101,6 +100,7 @@
 <header>
   <div class="header-inner">
     <nav class="nav-left" aria-label="Primary">
+      <a href="contact.html">Contact Us</a>
       <a href="index.html#who-we-are">About</a>
       <a href="index.html#how">How It Works</a>
     </nav>
@@ -110,7 +110,7 @@
     </a>
 
     <div class="header-actions">
-      <a class="pill" href="login.html" id="authAction">Sign In</a>
+<a class="pill" href="login.html" id="authAction">Sign In</a>
       <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
     </div>
   </div>
@@ -150,7 +150,7 @@
 
   <section id="q3" class="card">
     <h2>3) How do payments work?</h2>
-    <p>All cases are funded by the attorney before work begins. Payments are processed through Stripe as part of the platform workflow. Stripe processes all payments to you once the attorney you are working with confirms completion.</p>
+    <p>Attorneys pay through Stripe at the start of a project. Let’s-ParaConnect uses Stripe to facilitate payment processing and route payouts to the paralegal connected to that project. Payouts are issued through Stripe based on the project’s completion confirmation in the platform.</p>
   </section>
 
   <section id="q4" class="card">
@@ -185,7 +185,7 @@
 
   <section id="q10" class="card">
     <h2>10) What if there’s a dispute?</h2>
-    <p>Let’s‑ParaConnect provides a structured, neutral review process designed to support both parties. If a concern is raised, the matter is reviewed based on the agreed scope of work and completion status before payment is finalized.</p>
+    <p>If there’s a concern about scope or completion, both parties can submit details for review so the project can be resolved in a structured way. We may request supporting information (for example, the agreed task list and completion notes) and work with both parties toward a fair resolution under the platform’s policies.</p>
   </section>
 </main>
 
@@ -210,6 +210,7 @@
 
 <footer class="footer">
   <div class="footer-inner">
+    <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
     <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
     <nav>
       <a href="privacy.html">Privacy Policy</a>
@@ -227,5 +228,6 @@
 </footer>
 
 <script type="module" src="assets/scripts/hero-parallax.js"></script>
+  <script src="assets/scripts/accessibility-toggle.js"></script>
 </body>
 </html>

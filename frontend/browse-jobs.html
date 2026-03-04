@@ -218,6 +218,14 @@
       color: #475569;
     }
 
+    .filter-group select:focus,
+    .filter-group select:focus-visible,
+    .results-controls select:focus,
+    .results-controls select:focus-visible {
+      outline: none;
+      box-shadow: none;
+    }
+
     .slider-field {
       display: flex;
       align-items: center;
@@ -358,10 +366,23 @@
       margin-bottom: 0.8rem;
     }
 
+    .partial-completion-note {
+      margin-top: 0.35rem;
+      margin-bottom: 0.8rem;
+      color: #6b7280;
+      font-size: 0.85rem;
+    }
+
     .job-card .job-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 0.6rem;
+    }
+
+    .job-card-footer {
+      margin-top: 0.6rem;
+      font-size: 0.82rem;
+      color: #6b7280;
     }
 
     .flag-button {
@@ -560,6 +581,53 @@
     .expanded-header h3 { margin-bottom: 0.35rem; }
     .expanded-header .meta { margin-bottom: 0; }
     .expanded-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .apply-info-disclosure {
+      position: relative;
+    }
+    .apply-info-disclosure summary {
+      list-style: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      border: 1px solid rgba(26, 34, 48, 0.18);
+      color: #6b7280;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 0.95rem;
+      background: #fff;
+    }
+    .apply-info-disclosure summary::-webkit-details-marker {
+      display: none;
+    }
+    .apply-info-disclosure .apply-info {
+      position: absolute;
+      right: 0;
+      top: 38px;
+      min-width: 260px;
+      max-width: 320px;
+      border: 1px solid rgba(26, 34, 48, 0.08);
+      border-radius: 14px;
+      padding: 0.8rem 1rem;
+      background: #fbfcff;
+      box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+      z-index: 5;
+    }
+    .apply-info-disclosure .apply-info-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 500;
+      font-size: 1rem;
+      margin-bottom: 0.35rem;
+      color: #0f172a;
+    }
+    .apply-info-disclosure .apply-info-list {
+      margin: 0;
+      padding-left: 1.1rem;
+      color: #0f172a;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
     .expanded-grid {
       display: grid;
       grid-template-columns: minmax(0, 1.8fr) minmax(200px, 0.85fr);
@@ -590,6 +658,13 @@
     .job-task-list li {
       font-size: 0.98rem;
     }
+    .job-task-list li.task-completed {
+      color: #94a3b8;
+      text-decoration: line-through;
+    }
+    .job-task-list li.task-completed::marker {
+      color: #94a3b8;
+    }
     .job-task-empty {
       color: #94a3b8;
       font-size: 0.98rem;
@@ -599,23 +674,6 @@
       border: 1px solid rgba(26, 34, 48, 0.15);
       background: #fff;
       color: #0f172a;
-    }
-    .apply-info {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      font-size: 0.95rem;
-      color: #0f172a;
-      text-align: center;
-    }
-    .apply-info-block {
-      border: 1px solid rgba(26, 34, 48, 0.08);
-      border-radius: 16px;
-      padding: 0.8rem 1rem;
-      background: #fbfcff;
-      box-sizing: border-box;
-      max-width: 520px;
-      width: 100%;
-      margin: 0 auto 0.2rem;
     }
     .apply-info-title {
       font-family: 'Cormorant Garamond', serif;
@@ -721,6 +779,46 @@
       text-align: center;
       color: #6b7280;
       font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .pagination-btn {
+      border: 1px solid rgba(26, 34, 48, 0.2);
+      background: #ffffff;
+      color: #1a2230;
+      padding: 0.35rem 1.1rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+    }
+
+    .pagination-btn:hover:not(:disabled) {
+      background: rgba(136, 114, 68, 0.08);
+      border-color: rgba(136, 114, 68, 0.35);
+      color: #7b5f2a;
+    }
+
+    .pagination-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .pagination-btn:focus {
+      outline: none;
+      box-shadow: none;
+    }
+
+    .pagination-info {
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #7a8699;
     }
 
     footer {
@@ -729,7 +827,7 @@
       background: #ffffff;
       text-align: center;
       color: #6b7280;
-      font-size: 0.95rem;
+      font-size: 0.85rem;
       margin-top: auto;
     }
 
@@ -777,14 +875,14 @@
     }
   </style>
 </head>
-<body class="browse-jobs-page auth-guarded">
+<body>
   <a class="skip-link" href="#main">Skip to main content</a>
-  <header class="site-header">
+<header class="site-header">
     <div class="header-inner">
       <nav aria-label="Primary"></nav>
       <a class="brand" href="index.html">Let<span class="accent-apostrophe">’</span>s-ParaConnect</a>
       <div class="header-actions">
-        <a class="pill signup-pill" href="dashboard-paralegal.html" id="returnDashboard">Return to Dashboard</a>
+<a class="pill signup-pill" href="dashboard-paralegal.html" id="returnDashboard">Return to Dashboard</a>
       </div>
     </div>
   </header>
@@ -855,6 +953,7 @@
 
   <footer class="footer">
     <div class="footer-inner">
+      <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
       <p>© <script>document.write(new Date().getFullYear());</script> Let’s-ParaConnect. All rights reserved.</p>
       <nav>
         <a href="privacy.html">Privacy Policy</a>
@@ -929,5 +1028,6 @@
     });
   </script>
   <script type="module" src="assets/scripts/hero-parallax.js"></script>
+  <script src="assets/scripts/accessibility-toggle.js"></script>
 </body>
 </html>

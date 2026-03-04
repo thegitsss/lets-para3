@@ -350,6 +350,7 @@
   <aside class="sidebar" id="sidebarNav">
     <div class="logo">Dashboard</div>
     <nav id="helpNav" aria-label="Primary">
+      <a href="contact.html">Contact Us</a>
       <a href="dashboard-attorney.html">Home</a>
       <a href="dashboard-attorney.html#cases">Cases &amp; Files</a>
       <a href="dashboard-attorney.html#billing">Funds</a>
@@ -388,10 +389,10 @@
 
       <h3>Funding the job</h3>
       <p>When an attorney posts a flat-fee job, Stripe charges their card or bank method at checkout. We store only the necessary Stripe IDs, never full card numbers.</p>
-      <p>Payments are processed through Stripe. Funds remain within Stripe’s infrastructure until the attorney marks the work complete or a platform compliance review resolves a dispute.</p>
+      <p>Payments are processed through Stripe Connect. Attorneys confirm completion in the platform, and Stripe processes payout to the paralegal’s connected account in accordance with Stripe’s systems and terms.</p>
 
       <h3>Release &amp; payout</h3>
-      <p>Once approved, a Stripe Transfer is sent to your Stripe Connect account.</p>
+      <p>Once completion is confirmed, Stripe processes payout to your connected Stripe account.</p>
       <p>Payouts usually settle within 2–3 business days, depending on the receiving bank.</p>
       <div class="callout"><strong>Note:</strong> If you haven’t finished Stripe Connect onboarding, payouts remain pending in Stripe until your account is complete.</div>
 
@@ -399,7 +400,7 @@
       <ul>
         <li>Platform fees are displayed in the case flow and are deducted automatically.</li>
         <li>All Stripe fees are paid for and covered by Let's-ParaConnect except in cases involving a dispute resulting in refund or partial refund.</li>
-        <li>Let's-ParaConnect charges a 22% platform fee to attorneys during the funding of Stripe and is reflected on the receipt after job completion.</li>
+        <li>Let’s-ParaConnect charges a 22% platform fee to attorneys when payment is authorized through Stripe. This fee appears on the payment receipt.</li>
         <li>Let's-ParaConnect charges an 18% platform fee to paralegals that is automatically deducted out of the funds released by Stripe after job completion.</li>
         <li>Let's-ParaConnect does not have subscription fees.</li>
         <li>Users are responsible for their own taxes. Stripe may collect additional forms when required.</li>
@@ -409,9 +410,9 @@
 
       <h3>Cancellations &amp; withdrawals</h3>
       <ul>
-        <li>Cases can be deleted only before a paralegal is hired and before Stripe funding occurs. Once funded or hired, cases cannot be deleted and can be archived for recordkeeping.</li>
+        <li>Cases can be deleted only before a paralegal is hired and before Stripe payment is authorized. Once payment is authorized or a paralegal is hired, cases cannot be deleted and can be archived for recordkeeping.</li>
         <li>If a paralegal withdraws before completion and no tasks were completed, a $0 payout is issued and the case relists.</li>
-        <li>If some work was completed, the attorney may set a partial payout (capped at 70% of the case amount unless an admin approves otherwise) or close without release, which starts a 24-hour dispute window for the withdrawn paralegal. Disputes are reviewed for Platform compliance and may result in a refund, partial release, or full release.</li>
+        <li>If some work was completed, the attorney may propose a partial payout consistent with the work completed. Any payout adjustments are processed through Stripe in accordance with Stripe’s rules. If the attorney closes without release, this starts a 24-hour dispute window for the withdrawn paralegal. Disputes are reviewed for compliance with Platform policies. Any resulting refund or payout adjustments are processed through Stripe in accordance with Stripe’s rules and payment network requirements.</li>
       </ul>
 
       <h3>Approval, revisions &amp; disputes</h3>
@@ -463,18 +464,21 @@
     if (nav && window.checkSession) {
       const navItems = {
         attorney: [
+          { href: 'contact.html', label: 'Contact Us' },
           { href: 'dashboard-attorney.html', label: 'Home' },
           { href: 'dashboard-attorney.html#cases', label: 'Cases & Files' },
           { href: 'dashboard-attorney.html#billing', label: 'Funds' },
           { href: 'help.html', label: 'Help', active: true },
         ],
         paralegal: [
+          { href: 'contact.html', label: 'Contact Us' },
           { href: 'dashboard-paralegal.html', label: 'Home' },
           { href: 'dashboard-paralegal.html#cases', label: 'Cases and Applications' },
           { href: 'profile-settings.html', label: 'Profile Settings' },
           { href: 'help.html', label: 'Help', active: true },
         ],
         admin: [
+          { href: 'contact.html', label: 'Contact Us' },
           { href: 'admin-dashboard.html', label: 'Admin Dashboard' },
           { href: 'help.html', label: 'Help', active: true },
         ],

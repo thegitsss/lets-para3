@@ -18,7 +18,6 @@
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
-
   <style>
     .gold{color:#b4975a;}
     .gold-link {
@@ -189,6 +188,7 @@
 <header>
   <div class="header-inner">
     <nav class="nav-left" aria-label="Primary">
+      <a href="contact.html">Contact Us</a>
       <a href="index.html#who-we-are">About</a>
       <a href="index.html#how">How It Works</a>
     </nav>
@@ -198,7 +198,7 @@
     </a>
 
     <div class="header-actions">
-      <a class="pill" href="login.html" id="authAction">Sign In</a>
+<a class="pill" href="login.html" id="authAction">Sign In</a>
       <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
     </div>
   </div>
@@ -245,7 +245,7 @@
 
   <section id="q4" class="card">
     <h2>4) Secure, approval-based payments</h2>
-    <p>All matters are funded through <a class="gold-link" href="https://stripe.com/security" target="_blank" rel="noopener">Stripe</a>. Attorneys review completed work and confirm before payment is finalized, creating a transparent and structured workflow for both parties.</p>
+    <p>Attorneys pay through Stripe for project work. Let’s-ParaConnect uses Stripe to process payments and route payouts to the paralegal connected to that project once project completion is confirmed in the platform.</p>
   </section>
 
   <section id="q5" class="card">
@@ -270,6 +270,7 @@
       <li>A high-volume marketplace</li>
       <li>An open or public sign-up platform</li>
     </ul>
+    <p>Let’s-ParaConnect is a software platform that enables attorneys to engage independent paralegals and process payments through Stripe. Let’s-ParaConnect is not a law firm, does not provide legal advice, and is not an escrow service, money transmitter, or payment processor.</p>
     <p>Let’s-ParaConnect is a private, curated platform. Admission is limited and granted by approval only.</p>
   </section>
 
@@ -280,7 +281,7 @@
 
   <section id="q8" class="card">
     <h2>8) Are there platform fees?</h2>
-    <p>Yes. Let’s-ParaConnect applies a 22% platform fee to completed cases. This fee supports platform development, case management tools, vetting processes, and ongoing operations. Stripe processing fees are handled as part of our platform's payment integration. No additional transaction charges are added beyond the stated platform fee.</p>
+    <p>Yes. Let’s-ParaConnect charges a 22% platform fee on completed, paid projects. Stripe processing fees apply as part of the Stripe payment transaction. No additional transaction fees are added beyond the platform fee and Stripe’s processing fees.</p>
   </section>
 
   <section id="q9" class="card">
@@ -310,6 +311,7 @@
 
 <footer class="footer">
   <div class="footer-inner">
+    <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
     <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
     <nav>
       <a href="privacy.html">Privacy Policy</a>
@@ -349,5 +351,6 @@
     }
   }
 </script>
+  <script src="assets/scripts/accessibility-toggle.js"></script>
 </body>
 </html>
