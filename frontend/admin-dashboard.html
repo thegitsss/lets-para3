@@ -897,34 +897,6 @@ font-size:.95rem;
 </div>
 </div>
 
-<div class="panel" id="massEmailPanel">
-<div class="panel-header">
-<h2>Send Mass Email</h2>
-<p class="pending-count" id="massEmailCountLabel">0 users selected</p>
-</div>
-<p class="settings-help">Approved paralegals missing a profile photo.</p>
-<div class="mass-email-actions">
-<button class="btn secondary" type="button" id="massEmailAcceptanceBtn">Send Acceptance</button>
-<button class="btn secondary" type="button" id="massEmailDenialBtn">Send Denial</button>
-<button class="btn primary" type="button" id="massEmailCompleteBtn">Send Complete Profile</button>
-</div>
-<div class="table-wrap">
-<table class="pending-users-table">
-<thead>
-<tr>
-<th><input type="checkbox" id="massEmailSelectAll" aria-label="Select all users"></th>
-<th>Name</th>
-<th>Email</th>
-<th>Status</th>
-</tr>
-</thead>
-<tbody id="massEmailUsersBody">
-<tr><td colspan="4" class="pending-empty">Loading users…</td></tr>
-</tbody>
-</table>
-</div>
-</div>
-
 <div class="panel collapsed" id="deletedUsersPanel">
 <div class="panel-header">
 <h2 role="button" tabindex="0" aria-expanded="false" data-panel-toggle="deletedUsersPanel">Deleted Users <span>▾</span></h2>
@@ -959,6 +931,37 @@ font-size:.95rem;
 </tbody>
 </table>
 </div>
+</div>
+</div>
+
+<div class="panel" id="massEmailPanel">
+<div class="panel-header">
+<h2>Send Mass Email</h2>
+<p class="pending-count" id="massEmailCountLabel">0 users selected</p>
+</div>
+<p class="settings-help">Approved paralegals missing a profile photo.</p>
+<div class="mass-email-actions">
+<button class="btn secondary" type="button" id="massEmailAcceptanceBtn">Send Acceptance</button>
+<button class="btn secondary" type="button" id="massEmailDenialBtn">Send Denial</button>
+<button class="btn primary" type="button" id="massEmailCompleteBtn">Send Complete Profile</button>
+</div>
+<div class="pending-controls mass-email-controls">
+<select id="massEmailPageSelect" aria-label="Mass email users page"></select>
+</div>
+<div class="table-wrap">
+<table class="pending-users-table">
+<thead>
+<tr>
+<th><input type="checkbox" id="massEmailSelectAll" aria-label="Select all users"></th>
+<th>Name</th>
+<th>Email</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody id="massEmailUsersBody">
+<tr><td colspan="4" class="pending-empty">Loading users…</td></tr>
+</tbody>
+</table>
 </div>
 </div>
 </div>
@@ -3048,6 +3051,7 @@ const massEmailCountLabel = document.getElementById('massEmailCountLabel');
 const massEmailAcceptanceBtn = document.getElementById('massEmailAcceptanceBtn');
 const massEmailDenialBtn = document.getElementById('massEmailDenialBtn');
 const massEmailCompleteBtn = document.getElementById('massEmailCompleteBtn');
+const massEmailPageSelect = document.getElementById('massEmailPageSelect');
 
 let pendingUsers = [];
 let pendingRequestId = 0;
@@ -3064,10 +3068,12 @@ let auditRequestId = 0;
 let massEmailUsers = [];
 const massEmailSelected = new Set();
 const USERS_PAGE_SIZE = 5;
+const MASS_EMAIL_PAGE_SIZE = 10;
 let pendingPage = 1;
 let photoReviewPage = 1;
 let approvedPage = 1;
 let deletedPage = 1;
+let massEmailPage = 1;
 
 const showToast = (message, type = 'info') => {
 if (toastHelper?.show) {
@@ -3247,17 +3253,17 @@ user.name ||
 );
 };
 
-const getTotalPages = (total) => Math.max(1, Math.ceil(total / USERS_PAGE_SIZE));
+const getTotalPages = (total, pageSize = USERS_PAGE_SIZE) => Math.max(1, Math.ceil(total / pageSize));
 
-const clampPage = (page, total) => {
+const clampPage = (page, total, pageSize = USERS_PAGE_SIZE) => {
 const safePage = Number(page) || 1;
-const totalPages = getTotalPages(total);
+const totalPages = getTotalPages(total, pageSize);
 return Math.min(totalPages, Math.max(1, safePage));
 };
 
-const updatePageSelect = (select, total, page) => {
+const updatePageSelect = (select, total, page, pageSize = USERS_PAGE_SIZE) => {
 if (!select) return;
-const totalPages = getTotalPages(total);
+const totalPages = getTotalPages(total, pageSize);
 select.innerHTML = '';
 for (let i = 1; i <= totalPages; i += 1) {
 const option = document.createElement('option');
@@ -3269,9 +3275,9 @@ select.value = String(page);
 select.disabled = totalPages <= 1;
 };
 
-const getPageSlice = (items = [], page = 1) => {
-const start = (page - 1) * USERS_PAGE_SIZE;
-return items.slice(start, start + USERS_PAGE_SIZE);
+const getPageSlice = (items = [], page = 1, pageSize = USERS_PAGE_SIZE) => {
+const start = (page - 1) * pageSize;
+return items.slice(start, start + pageSize);
 };
 
 const getPhotoStatusClass = (status = '') => {
@@ -3698,8 +3704,12 @@ massEmailUsersBody.innerHTML =
 updateMassEmailCount();
 return;
 }
+const total = massEmailUsers.length;
+massEmailPage = clampPage(massEmailPage, total, MASS_EMAIL_PAGE_SIZE);
+updatePageSelect(massEmailPageSelect, total, massEmailPage, MASS_EMAIL_PAGE_SIZE);
+const pageItems = getPageSlice(massEmailUsers, massEmailPage, MASS_EMAIL_PAGE_SIZE);
 massEmailUsersBody.innerHTML = '';
-massEmailUsers.forEach((user) => {
+pageItems.forEach((user) => {
 const tr = document.createElement('tr');
 const userId = String(user.id || user._id || '');
 
@@ -3744,10 +3754,12 @@ headers: { Accept: 'application/json' },
 });
 const data = res.ok ? await res.json() : { users: [] };
 massEmailUsers = Array.isArray(data.users) ? data.users.filter(isMissingProfilePhoto) : [];
+massEmailPage = 1;
 massEmailSelected.clear();
 renderMassEmailUsers();
 } catch (err) {
 massEmailUsers = [];
+massEmailPage = 1;
 massEmailSelected.clear();
 massEmailUsersBody.innerHTML =
 `<tr><td colspan="4" class="pending-empty">${err?.message || 'Unable to load users.'}</td></tr>`;
@@ -4398,6 +4410,10 @@ const id = String(user.id || user._id || '');
 if (id) massEmailSelected.add(id);
 });
 }
+renderMassEmailUsers();
+});
+massEmailPageSelect?.addEventListener('change', () => {
+massEmailPage = Number(massEmailPageSelect.value) || 1;
 renderMassEmailUsers();
 });
 massEmailAcceptanceBtn?.addEventListener('click', () => sendMassEmail('acceptance'));

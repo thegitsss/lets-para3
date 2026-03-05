@@ -62,10 +62,10 @@
       --bg: #0f172a;
       --sidebar-bg: #1c2333;
       --panel: #151b29;
-      --ink: #f5f6fb;
+      --ink: #e6edf7;
       --muted: #9aa7c4;
       --line: rgba(255, 255, 255, 0.12);
-      --sidebar-text: #f8fbff;
+      --sidebar-text: #e6edf7;
       --app-surface-contrast: #1c2333;
       --app-surface-muted: #111827;
       --app-card-muted: #1c2333;
@@ -80,7 +80,7 @@
     html.theme-mountain-dark,
     body.theme-mountain-dark {
       background: #0f172a;
-      color: #f5f6fb;
+      color: #e6edf7;
     }
 
     html.theme-mountain,
@@ -578,7 +578,7 @@
     html.theme-mountain-dark .user-chip {
       background: #1c2333;
       border-color: rgba(255, 255, 255, 0.12);
-      color: #f5f6fb;
+      color: var(--app-text);
     }
 
     .user-chip img {
@@ -731,7 +731,7 @@
     html.theme-mountain-dark .case-rail-header select {
       background: #1c2333;
       border-color: rgba(255, 255, 255, 0.12);
-      color: #f5f6fb;
+      color: var(--app-text);
     }
 
     .case-rail-list ul {
@@ -1903,6 +1903,18 @@
       border: 1px solid var(--app-border-soft);
       border-radius: 10px;
       background: var(--app-surface-contrast);
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .case-documents-item:hover {
+      background: var(--app-surface);
+      border-color: var(--app-border);
+    }
+
+    .case-documents-item:focus-within {
+      border-color: var(--app-accent);
+      box-shadow: 0 0 0 2px var(--app-accent-soft);
     }
 
     .case-documents-list.case-documents-attorney .case-documents-item {

@@ -638,7 +638,7 @@ async function processAdminOverdueDisputes() {
       const basePayload = {
         caseId: doc._id,
         caseTitle,
-        message: "Admin is still reviewing this dispute and will resolve it in a timely manner.",
+        message: "Admin is still reviewing this request and will resolve it in a timely manner.",
       };
       const attorneyId = doc.attorney?._id || doc.attorneyId || doc.attorney || null;
       const withdrawnId =
@@ -4264,7 +4264,7 @@ router.post(
           "case_update",
           doc,
           {
-            summary: "The case was closed without release. You may dispute within 24 hours.",
+            summary: "The case was closed without release. You may request a review within 24 hours.",
           },
           { actorUserId: req.user.id }
         );

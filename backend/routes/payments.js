@@ -69,13 +69,13 @@ function buildDisputeResolutionMessage(caseTitle, action) {
   const title = caseTitle || "the case";
   switch (String(action || "")) {
     case "refund":
-      return `The dispute for ${title} was resolved. Funds were refunded to the attorney.`;
+      return `The review for ${title} was resolved. Funds were refunded to the attorney.`;
     case "release_partial":
-      return `The dispute for ${title} was resolved. A partial payment was released.`;
+      return `The review for ${title} was resolved. A partial payment was released.`;
     case "release_full":
-      return `The dispute for ${title} was resolved. Funds were released to the paralegal.`;
+      return `The review for ${title} was resolved. Funds were released to the paralegal.`;
     default:
-      return `The dispute for ${title} was resolved.`;
+      return `The review for ${title} was resolved.`;
   }
 }
 
@@ -100,7 +100,7 @@ function buildDisputeReceiptPayloads({
   const resolutionLabel =
     action === "refund" ? "Refund" : action === "release_partial" ? "Partial release" : "Full release";
   const basePayload = {
-    title: "Dispute resolved",
+    title: "Review resolved",
     caseId: String(caseDoc?._id || ""),
     disputeId: String(disputeId || ""),
     resolution: action,
@@ -112,17 +112,17 @@ function buildDisputeReceiptPayloads({
 
   const attorneyMessage =
     action === "refund"
-      ? `The dispute for ${caseTitle} was resolved with a refund issued to you.`
+      ? `The review for ${caseTitle} was resolved with a refund issued to you.`
       : action === "release_partial"
-      ? `The dispute for ${caseTitle} was resolved with a partial release.`
-      : `The dispute for ${caseTitle} was resolved with funds released to the paralegal.`;
+      ? `The review for ${caseTitle} was resolved with a partial release.`
+      : `The review for ${caseTitle} was resolved with funds released to the paralegal.`;
 
   const paralegalMessage =
     action === "refund"
-      ? `The dispute for ${caseTitle} was resolved. No payout was released.`
+      ? `The review for ${caseTitle} was resolved. No payout was released.`
       : action === "release_partial"
-      ? `The dispute for ${caseTitle} was resolved with a partial payout.`
-      : `The dispute for ${caseTitle} was resolved and your payout was released.`;
+      ? `The review for ${caseTitle} was resolved with a partial payout.`
+      : `The review for ${caseTitle} was resolved and your payout was released.`;
 
   const attorneyReceiptNote =
     "A receipt is available in your dashboard with refund and platform fee details.";

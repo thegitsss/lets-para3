@@ -343,8 +343,8 @@ router.post(
       const disputeId = last?.disputeId || (last?._id ? String(last._id) : "");
       const caseTitle = c.title || "Case";
       const payload = {
-        title: "Dispute opened",
-        message: `A dispute has been opened for the case: ${caseTitle}.`,
+        title: "Review opened",
+        message: `A review has been opened for the case: ${caseTitle}.`,
         caseId: String(c._id),
         disputeId,
         caseTitle,

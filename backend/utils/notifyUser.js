@@ -69,9 +69,9 @@ function buildDisplayMessage(type, payload = {}) {
     case "account_suspended":
       return payload.message || "Your account has been suspended.";
     case "dispute_opened":
-      return `A dispute was opened for ${caseTitle || "a case"}.`;
+      return `A review was opened for ${caseTitle || "a case"}.`;
     case "admin_review_overdue":
-      return payload.message || "Admin is still reviewing this dispute and will resolve it soon.";
+      return payload.message || "Admin is still reviewing this request and will resolve it soon.";
     default:
       return "You have a new notification.";
   }
@@ -237,21 +237,21 @@ function emailTemplate(type, payload) {
       const receiptNote =
         payload.receiptNote || "A receipt is available in your dashboard with full payment details.";
       return {
-        subject: `Dispute resolved${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
-        html: `<p>${payload.message || `The dispute for <strong>${title}</strong> was resolved.`}</p><p>Resolution: ${resolution}.</p><p>${receiptNote}</p>`,
+        subject: `Review resolved${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
+        html: `<p>${payload.message || `The review for <strong>${title}</strong> was resolved.`}</p><p>Resolution: ${resolution}.</p><p>${receiptNote}</p>`,
       };
     }
     case "dispute_opened": {
       const title = payload.caseTitle || "your case";
       return {
-        subject: `Dispute opened${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
-        html: `<p>A dispute was opened for <strong>${title}</strong>.</p><p>Log in to review the case details.</p>`,
+        subject: `Review opened${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
+        html: `<p>A review was opened for <strong>${title}</strong>.</p><p>Log in to review the case details.</p>`,
       };
     }
     case "admin_review_overdue": {
       const title = payload.caseTitle || "your case";
       return {
-        subject: `Dispute review update${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
+        subject: `Review update${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
         html: `<p>Our admin team is still reviewing <strong>${title}</strong>.</p><p>We will resolve this in a timely manner. Thank you for your patience.</p>`,
       };
     }

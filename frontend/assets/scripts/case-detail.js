@@ -515,13 +515,13 @@ function maybeShowAttorneyWithdrawalNotice(previousCase, nextCase) {
   const noticeKey = `lpc-attorney-withdrawal:${caseId}:${stamp}`;
   if (state.withdrawalNoticeKey === noticeKey) return;
   state.withdrawalNoticeKey = noticeKey;
-  const title = "Case Paused";
-  const caseTitle = nextCase?.title || "this case";
-  showWithdrawalNoticeModal({
-    title,
-    message: `Paralegal withdrew from ${caseTitle}. The case is now paused.`,
-    caseData: nextCase,
-  });
+  const actionState = getAttorneyWithdrawalActionState(nextCase);
+  if (!actionState?.eligible) return;
+  setTimeout(async () => {
+    if (state.activeCaseId && String(state.activeCaseId) !== String(caseId)) return;
+    const action = await openAttorneyFlagMenu(nextCase, actionState);
+    await handleWithdrawalActionSelection(action, nextCase, actionState);
+  }, 0);
 }
 
 function isDisputeWindowActive(caseData) {
@@ -674,7 +674,7 @@ function ensureCompleteModalStyles() {
     }
     body.theme-dark .case-complete-actions .case-action-btn.secondary{
       background:transparent;
-      color:#f8fbff;
+      color:var(--app-text);
       border-color:rgba(255,255,255,.25);
     }
     body.theme-dark .case-complete-actions .case-action-btn.secondary:hover{
@@ -1086,11 +1086,18 @@ function ensureWithdrawalNoticeModalStyles() {
     .withdrawal-decision{display:grid;gap:14px;text-align:left;margin-bottom:16px}
     .decision-card{border:1px solid var(--app-border);border-radius:16px;padding:14px 16px;display:grid;gap:6px;cursor:pointer;transition:border-color .2s ease, box-shadow .2s ease;background:var(--app-surface)}
     .decision-card.selected{border-color:var(--accent);box-shadow:0 0 0 1px rgba(182,164,122,.25)}
-    .decision-title{font-weight:600;color:var(--app-text)}
+    .decision-title{font-weight:500;color:var(--app-text)}
     .decision-text{font-size:.9rem;color:var(--app-muted)}
     .decision-card.decision-deny{
       background:linear-gradient(135deg, var(--app-accent-soft), rgba(255,255,255,0));
       border-color:rgba(182,164,122,.35);
+    }
+    html.theme-dark .decision-card.decision-deny,
+    body.theme-dark .decision-card.decision-deny,
+    html.theme-mountain-dark .decision-card.decision-deny,
+    body.theme-mountain-dark .decision-card.decision-deny{
+      background:var(--app-surface);
+      border-color:var(--app-border);
     }
     .decision-card.decision-deny .decision-title{
       letter-spacing:.01em;
@@ -2008,7 +2015,7 @@ function ensureFlagMenuStyles() {
     body.theme-mountain-dark .case-flag-modal,
     html.theme-mountain-dark .case-flag-modal{
       background:#151b29;
-      color:#f5f6fb;
+      color:var(--app-text);
       border-color:rgba(255,255,255,.12);
     }
     body.theme-dark .case-flag-modal::before,
@@ -2023,7 +2030,7 @@ function ensureFlagMenuStyles() {
     html.theme-mountain-dark .case-flag-actions .case-action-btn{
       background:rgba(255,255,255,.06);
       border-color:rgba(255,255,255,.12);
-      color:#f5f6fb;
+      color:var(--app-text);
     }
     body.theme-dark .case-flag-actions .case-action-btn.secondary,
     html.theme-dark .case-flag-actions .case-action-btn.secondary,
@@ -2267,6 +2274,26 @@ function openAttorneyFlagMenu(caseData, actionState) {
   });
 }
 
+async function handleWithdrawalActionSelection(action, caseData, actionState) {
+  if (action === "partial") {
+    await handlePartialPayout({ returnToMenu: true, menuCaseData: caseData, menuActionState: actionState });
+    return true;
+  }
+  if (action === "reject") {
+    await handleRejectPayout();
+    return true;
+  }
+  if (action === "relist") {
+    await handleRelistCase();
+    return true;
+  }
+  if (action === "dispute") {
+    await handleDisputeCase();
+    return true;
+  }
+  return false;
+}
+
 function maybePromptAttorneyWithdrawalDecision(caseData) {
   if (getCurrentUserRole() !== "attorney") return;
   if (!caseData) return;
@@ -2285,26 +2312,15 @@ function maybePromptAttorneyWithdrawalDecision(caseData) {
   if (!caseId) return;
   const actionState = getAttorneyWithdrawalActionState(caseData);
   if (!actionState?.eligible) return;
+  const stamp = caseData?.pausedAt || "withdrawal";
+  const noticeKey = `lpc-attorney-withdrawal:${caseId}:${stamp}`;
+  if (state.withdrawalNoticeKey === noticeKey) return;
+  state.withdrawalNoticeKey = noticeKey;
 
   setTimeout(async () => {
     if (state.activeCaseId && String(state.activeCaseId) !== String(caseId)) return;
     const action = await openAttorneyFlagMenu(caseData, actionState);
-    if (action === "partial") {
-      await handlePartialPayout({ returnToMenu: true, menuCaseData: caseData, menuActionState: actionState });
-      return;
-    }
-    if (action === "reject") {
-      await handleRejectPayout();
-      return;
-    }
-    if (action === "relist") {
-      await handleRelistCase();
-      return;
-    }
-    if (action === "dispute") {
-      await handleDisputeCase();
-      return;
-    }
+    await handleWithdrawalActionSelection(action, caseData, actionState);
   }, 0);
 }
 
@@ -4712,27 +4728,41 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
     subNode.className = "case-documents-sub";
     subNode.textContent = createdAt ? `Shared ${formatDate(createdAt)}` : "Shared document";
     meta.append(nameNode, subNode);
-    meta.setAttribute("role", "button");
-    meta.setAttribute("tabindex", "0");
-    meta.setAttribute("aria-label", `Open ${fileName}`);
+    li.setAttribute("role", "button");
+    li.setAttribute("tabindex", "0");
+    li.setAttribute("aria-label", `Open ${fileName}`);
 
     li.append(meta);
-    const openPreview = () => {
-      openDocumentPreview({
-        fileName,
-        viewUrl,
-        mimeType,
-        caseId,
-        storageKey,
-        uploadedAt: createdAt,
-        uploaderName: formatUploaderName(documentData, state.activeCase),
-      });
+    const openDocument = () => {
+      if (canPreview) {
+        openDocumentPreview({
+          fileName,
+          viewUrl,
+          mimeType,
+          caseId,
+          storageKey,
+          uploadedAt: createdAt,
+          uploaderName: formatUploaderName(documentData, state.activeCase),
+        });
+        return;
+      }
+      if (downloadUrl) {
+        window.open(downloadUrl, "_blank", "noopener");
+      }
     };
-    meta.addEventListener("click", openPreview);
-    meta.addEventListener("keydown", (event) => {
+    li.addEventListener("click", (event) => {
+      if (event.target?.closest(".case-documents-actions")) return;
+      if (event.target?.closest("input")) return;
+      if (event.target?.closest("label")) return;
+      openDocument();
+    });
+    li.addEventListener("keydown", (event) => {
+      if (event.target?.closest(".case-documents-actions")) return;
+      if (event.target?.closest("input")) return;
+      if (event.target?.closest("label")) return;
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        openPreview();
+        openDocument();
       }
     });
     const uploadRole = getDocumentUploadRole(documentData);
