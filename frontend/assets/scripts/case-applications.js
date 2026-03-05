@@ -138,7 +138,12 @@ function renderCase(data) {
     setNotice("A paralegal is already in progress for this case.", "error");
   }
 
-  const applicants = Array.isArray(data?.applicants) ? data.applicants : [];
+  const applicants = Array.isArray(data?.applicants)
+    ? data.applicants.filter((applicant) => {
+        const status = String(applicant?.status || "pending").toLowerCase();
+        return !["accepted", "rejected"].includes(status);
+      })
+    : [];
   if (hasParalegal) {
     if (applicantList) {
       applicantList.innerHTML = `<li class="empty">${escapeHTML(resolveParalegalName(data))} has been hired.</li>`;
@@ -209,6 +214,7 @@ function buildApplicantMarkup(applicant) {
   const profileHref = paralegalId
     ? `profile-paralegal.html?paralegalId=${encodeURIComponent(paralegalId)}`
     : "";
+  const showRemove = Boolean(paralegalId);
 
   return `
     <li class="applicant-card">
@@ -252,6 +258,13 @@ function buildApplicantMarkup(applicant) {
             ? `<button class="btn primary" data-hire-paralegal data-paralegal-id="${escapeHTML(
                 paralegalId
               )}" data-paralegal-name="${escapeAttribute(displayName)}"${hireDisabledAttr}>Hire</button>`
+            : ""
+        }
+        ${
+          showRemove
+            ? `<button class="btn danger" data-remove-applicant data-paralegal-id="${escapeHTML(
+                paralegalId
+              )}">Remove</button>`
             : ""
         }
         ${
@@ -308,6 +321,24 @@ function bindApplicantActions() {
       });
       return;
     }
+    const removeBtn = event.target.closest("[data-remove-applicant]");
+    if (removeBtn) {
+      event.preventDefault();
+      const paralegalId = removeBtn.dataset.paralegalId || "";
+      if (!paralegalId || !state.caseId) return;
+      const confirmed = window.confirm(
+        "Remove this applicant? They will be notified and unable to reapply unless relisted."
+      );
+      if (!confirmed) return;
+      try {
+        await removeApplicant(state.caseId, paralegalId);
+        setNotice("Applicant removed.", "success");
+        await loadCase(state.caseId);
+      } catch (err) {
+        setNotice(err?.message || "Unable to remove applicant.", "error");
+      }
+      return;
+    }
     const docLink = event.target.closest("a[data-doc-key]");
     if (docLink) {
       event.preventDefault();
@@ -316,6 +347,27 @@ function bindApplicantActions() {
       openDocument(key);
     }
   });
+}
+
+async function removeApplicant(caseId, paralegalId) {
+  const csrfToken = await fetchCSRF().catch(() => "");
+  const res = await fetch(
+    `/api/cases/${encodeURIComponent(caseId)}/applicants/${encodeURIComponent(paralegalId)}/reject`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-csrf-token": csrfToken,
+      },
+      credentials: "include",
+      body: JSON.stringify({}),
+    }
+  );
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload?.error || "Unable to remove applicant.");
+  }
+  return payload;
 }
 
 async function openDocument(key) {

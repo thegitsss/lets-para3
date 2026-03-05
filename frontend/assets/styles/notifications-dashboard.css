@@ -1,5 +1,12 @@
 /* Dashboard-attorney notification styles (source of truth), applied globally */
 
+body.dashboard-no-shadows *,
+body.dashboard-no-shadows *::before,
+body.dashboard-no-shadows *::after {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
 .notification-icon {
   position: relative;
   cursor: pointer;

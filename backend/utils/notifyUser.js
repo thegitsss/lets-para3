@@ -68,6 +68,10 @@ function buildDisplayMessage(type, payload = {}) {
       return payload.message || "A case posting was removed by admin.";
     case "account_suspended":
       return payload.message || "Your account has been suspended.";
+    case "dispute_opened":
+      return `A dispute was opened for ${caseTitle || "a case"}.`;
+    case "admin_review_overdue":
+      return payload.message || "Admin is still reviewing this dispute and will resolve it soon.";
     default:
       return "You have a new notification.";
   }
@@ -237,6 +241,20 @@ function emailTemplate(type, payload) {
         html: `<p>${payload.message || `The dispute for <strong>${title}</strong> was resolved.`}</p><p>Resolution: ${resolution}.</p><p>${receiptNote}</p>`,
       };
     }
+    case "dispute_opened": {
+      const title = payload.caseTitle || "your case";
+      return {
+        subject: `Dispute opened${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
+        html: `<p>A dispute was opened for <strong>${title}</strong>.</p><p>Log in to review the case details.</p>`,
+      };
+    }
+    case "admin_review_overdue": {
+      const title = payload.caseTitle || "your case";
+      return {
+        subject: `Dispute review update${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
+        html: `<p>Our admin team is still reviewing <strong>${title}</strong>.</p><p>We will resolve this in a timely manner. Thank you for your patience.</p>`,
+      };
+    }
     case "account_suspended":
       return emailTemplates.accountSuspended({
         recipientName: payload.recipientName || payload.userName || "",
@@ -351,6 +369,8 @@ function shouldSuppressMessageEmail(user, payload = {}) {
 
 function shouldSendEmailForType(user, type, payload = {}) {
   const prefs = normalizePrefs(user);
+  if (type === "admin_review_overdue") return true;
+  if (type === "dispute_opened" && String(user.role || "").toLowerCase() === "admin") return true;
   if (type === "case_deleted") return true;
   if (type === "account_suspended") return true;
   if (type === "case_budget_locked") return false;
@@ -372,23 +392,25 @@ function shouldSendEmailForType(user, type, payload = {}) {
 
 function shouldCreateInAppNotification(user, type) {
   const prefs = normalizePrefs(user);
+  if (type === "admin_review_overdue") return true;
+  if (type === "dispute_opened" && String(user.role || "").toLowerCase() === "admin") return true;
   if (prefs.inApp === false) return false;
   if (type === "message") {
     if (Object.prototype.hasOwnProperty.call(prefs, "inAppMessages")) {
       return prefs.inAppMessages !== false;
     }
-    return prefs.emailMessages !== false;
+    return true;
   }
   if (CASE_EMAIL_TYPES.has(type)) {
     if (Object.prototype.hasOwnProperty.call(prefs, "inAppCase")) {
       return prefs.inAppCase !== false;
     }
-    return prefs.emailCase !== false;
+    return true;
   }
   if (Object.prototype.hasOwnProperty.call(prefs, "inApp")) {
     return prefs.inApp !== false;
   }
-  return prefs.email !== false;
+  return true;
 }
 
 async function notifyUser(userId, type, payload = {}, options = {}) {

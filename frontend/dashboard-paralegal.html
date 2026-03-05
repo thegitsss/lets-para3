@@ -672,6 +672,39 @@
       line-height: 1.3;
     }
 
+    .earnings-card {
+      position: relative;
+    }
+
+    .earnings-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      border: none;
+      background: transparent;
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 0.7rem;
+      line-height: 1;
+      transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    }
+
+    .info-box-link:hover .earnings-toggle,
+    .info-box-link:focus-visible .earnings-toggle,
+    .earnings-toggle:focus-visible {
+      background: rgba(26, 34, 48, 0.06);
+      color: var(--ink);
+    }
+
+    .earnings-toggle[data-mode="total"] {
+      transform: rotate(180deg);
+    }
+
     .message-box .info-label {
       color: var(--accent);
     }
@@ -1140,8 +1173,9 @@
       .body-text,
       .recommendations-list li {
         min-width: 0;
-        overflow-wrap: anywhere;
-        word-break: break-word;
+        overflow-wrap: break-word;
+        word-break: normal;
+        hyphens: auto;
       }
     }
 
@@ -1180,6 +1214,21 @@
       margin-top: 0.25rem;
       padding-top: 1.25rem;
       border-top: 1px solid var(--line);
+    }
+
+    .file-card.is-highlighted {
+      border-color: #b6a47a;
+      box-shadow: 0 18px 38px rgba(182, 164, 122, 0.22);
+      background: #fffdf7;
+      position: relative;
+    }
+    .file-card.is-highlighted::after {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border: 1px solid rgba(182, 164, 122, 0.5);
+      border-radius: 14px;
+      pointer-events: none;
     }
 
     .completed-cases-section .section-title {
@@ -2178,6 +2227,47 @@
       text-decoration: underline;
     }
 
+    .btn-link.dispute-note {
+      background: transparent;
+      border: none;
+      padding: 0;
+      color: var(--accent);
+      font-weight: 600;
+      text-decoration: none;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .btn-link.dispute-note:hover {
+      text-decoration: underline;
+    }
+
+    .tour-form {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .tour-form label {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .tour-form textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 0.85rem 1rem;
+      border-radius: 14px;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      background: #fff;
+      font-family: inherit;
+      font-size: 0.95rem;
+      resize: vertical;
+    }
+
+    #disputeFormModal .tour-actions {
+      margin-top: 1rem;
+    }
+
     .note-modal {
       position: fixed;
       inset: 0;
@@ -2371,7 +2461,7 @@
 
   </style>
 </head>
-<body>
+<body class="dashboard-no-shadows">
   <a class="skip-link" href="#main">Skip to main content</a>
   <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
     <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
@@ -2437,9 +2527,12 @@
           </div>
           <div class="info-label">next deadline</div>
         </div>
-        <a class="info-box info-box-link" id="earnedThisMonthCard" href="dashboard-paralegal.html#cases-completed" aria-label="View completed cases">
-          <div class="info-value">$<span data-field="monthEarnings"><span class="skeleton-line short"></span></span></div>
-          <div class="info-label">earned this month</div>
+        <a class="info-box info-box-link earnings-card" id="earnedThisMonthCard" href="dashboard-paralegal.html#cases-completed" aria-label="View completed cases">
+          <div class="info-value">$<span data-field="earningsValue"><span class="skeleton-line short"></span></span></div>
+          <div class="info-label">
+            <span id="earningsLabelText">earned this month</span>
+            <span class="earnings-toggle" id="earningsToggle" role="button" tabindex="0" aria-label="Toggle earnings view" aria-pressed="false">▾</span>
+          </div>
         </a>
       </section>
 
@@ -2570,10 +2663,38 @@
       <button type="button" class="tour-close" id="withdrawalSuccessCloseBtn" aria-label="Close withdrawal notice">×</button>
       <div class="tour-hero" role="presentation"></div>
       <div class="tour-content">
-        <div class="tour-title" id="withdrawalSuccessTitle">Withdrawal Successful</div>
+        <div class="tour-title" id="withdrawalSuccessTitle">Withdraw Successful</div>
         <p class="tour-text" id="withdrawalSuccessText">Your withdrawal has been recorded.</p>
         <div class="tour-actions">
           <button type="button" class="tour-btn primary" id="withdrawalSuccessOkBtn">Close</button>
+        </div>
+      </div>
+    </div>
+    <div class="tour-overlay" id="caseCompletedOverlay" aria-hidden="true"></div>
+    <div class="tour-modal" id="caseCompletedModal" role="dialog" aria-modal="true" aria-labelledby="caseCompletedTitle" aria-describedby="caseCompletedText">
+      <button type="button" class="tour-close" id="caseCompletedCloseBtn" aria-label="Close case completed notice">×</button>
+      <div class="tour-hero" role="presentation"></div>
+      <div class="tour-content">
+        <div class="tour-title" id="caseCompletedTitle">Case Completed</div>
+        <p class="tour-text" id="caseCompletedText">Your case has been marked complete.</p>
+        <div class="tour-actions">
+          <button type="button" class="tour-btn primary" id="caseCompletedOkBtn">Close</button>
+        </div>
+      </div>
+    </div>
+    <div class="tour-overlay" id="disputeFormOverlay" aria-hidden="true"></div>
+    <div class="tour-modal" id="disputeFormModal" role="dialog" aria-modal="true" aria-labelledby="disputeFormTitle" aria-describedby="disputeFormText">
+      <button type="button" class="tour-close" id="disputeFormCloseBtn" aria-label="Close dispute form">×</button>
+      <div class="tour-hero" role="presentation"></div>
+      <div class="tour-content">
+        <div class="tour-title" id="disputeFormTitle">Open Dispute</div>
+        <p class="tour-text" id="disputeFormText">Please share the details of your dispute.</p>
+        <div class="tour-form">
+          <textarea id="disputeFormMessage" name="disputeFormMessage" placeholder="Add a note (required)" aria-label="Dispute note"></textarea>
+        </div>
+        <div class="tour-actions">
+          <button type="button" class="tour-btn ghost" id="disputeFormCancelBtn">Cancel</button>
+          <button type="button" class="tour-btn primary" id="disputeFormSubmitBtn">Submit dispute</button>
         </div>
       </div>
     </div>
@@ -2728,7 +2849,10 @@
       let activeCasesCache = [];
       let completedCasesCache = [];
       let completedPageIndex = 0;
+      let completedMinHeight = 0;
       const COMPLETED_PAGE_SIZE = 3;
+      const highlightCaseId = new URLSearchParams(window.location.search).get("highlightCase") || "";
+      let highlightPending = highlightCaseId;
 
       function escapeHTML(value) {
         return String(value ?? "")
@@ -2804,8 +2928,11 @@
             const viewLink = caseId
               ? `case-detail.html?caseId=${encodeURIComponent(caseId)}`
               : "#";
+            const highlightClass = highlightPending && caseId && String(caseId) === String(highlightPending)
+              ? " is-highlighted"
+              : "";
             return `
-              <article class="file-card" data-case-id="${escapeHTML(caseId)}">
+              <article class="file-card${highlightClass}" data-case-id="${escapeHTML(caseId)}">
                 <div class="file-line">
                   <span class="file-name">${escapeHTML(title)}</span>
                 </div>
@@ -2817,6 +2944,15 @@
             `;
           })
           .join("");
+        if (highlightPending && filesContainer) {
+          requestAnimationFrame(() => {
+            const target = filesContainer.querySelector(`[data-case-id="${CSS.escape(highlightPending)}"]`);
+            if (target) {
+              target.scrollIntoView({ behavior: "smooth", block: "center" });
+              finalizeHighlight();
+            }
+          });
+        }
       }
 
       function updateCompletedPagination(totalCount) {
@@ -2841,6 +2977,9 @@
         if (!items.length) {
           completedCasesContainer.innerHTML = `<p class="case-files-empty">No completed cases yet.</p>`;
           updateCompletedPagination(0);
+          if (completedMinHeight) {
+            completedCasesContainer.style.minHeight = `${completedMinHeight}px`;
+          }
           return;
         }
         const totalCount = items.length;
@@ -2879,12 +3018,15 @@
               ? `<a href="${receiptLink}" class="btn-link" target="_blank" rel="noopener">Download Payout Details</a>`
               : "";
             const disputeAction = isWithdrawn && item.canDispute
-              ? `<button type="button" class="btn-link" data-dispute-withdrawn data-case-id="${escapeHTML(
+              ? `<button type="button" class="btn-link dispute-note" data-dispute-withdrawn data-case-id="${escapeHTML(
                   caseId
                 )}">${escapeHTML(disputeSentence)}</button>`
               : "";
+            const highlightClass = highlightPending && caseId && String(caseId) === String(highlightPending)
+              ? " is-highlighted"
+              : "";
             return `
-              <article class="file-card" data-case-id="${escapeHTML(caseId)}">
+              <article class="file-card${highlightClass}" data-case-id="${escapeHTML(caseId)}">
                 <div class="file-line">
                   <span class="file-name">${escapeHTML(title)}</span>
                 </div>
@@ -2894,10 +3036,36 @@
                   ${receiptAction}
                 </div>
               </article>
-            `;
+          `;
           })
           .join("");
         updateCompletedPagination(totalCount);
+        requestAnimationFrame(() => {
+          const nextHeight = completedCasesContainer.offsetHeight;
+          if (nextHeight > completedMinHeight) {
+            completedMinHeight = nextHeight;
+          }
+          if (completedMinHeight) {
+            completedCasesContainer.style.minHeight = `${completedMinHeight}px`;
+          }
+        });
+        if (highlightPending && completedCasesContainer) {
+          requestAnimationFrame(() => {
+            const target = completedCasesContainer.querySelector(`[data-case-id="${CSS.escape(highlightPending)}"]`);
+            if (target) {
+              target.scrollIntoView({ behavior: "smooth", block: "center" });
+              finalizeHighlight();
+            }
+          });
+        }
+      }
+
+      function finalizeHighlight() {
+        if (!highlightPending) return;
+        const url = new URL(window.location.href);
+        url.searchParams.delete("highlightCase");
+        history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+        highlightPending = "";
       }
 
       async function loadActiveCases() {
@@ -2932,7 +3100,21 @@
             throw new Error(payload?.error || "Unable to load completed cases.");
           }
           completedCasesCache = Array.isArray(payload?.items) ? payload.items : [];
-          completedPageIndex = 0;
+          completedCasesCache.sort((a, b) => {
+            const aDate = new Date(a?.completedAt || a?.updatedAt || 0).getTime();
+            const bDate = new Date(b?.completedAt || b?.updatedAt || 0).getTime();
+            return bDate - aDate;
+          });
+          if (highlightPending) {
+            const matchIndex = completedCasesCache.findIndex((item) => {
+              const caseId = item.caseId || item.id || item._id || "";
+              return caseId && String(caseId) === String(highlightPending);
+            });
+            completedPageIndex =
+              matchIndex >= 0 ? Math.floor(matchIndex / COMPLETED_PAGE_SIZE) : 0;
+          } else {
+            completedPageIndex = 0;
+          }
           renderCompletedCases(completedCasesCache);
         } catch (err) {
           completedCasesContainer.innerHTML = `<p class="case-files-empty">${escapeHTML(
@@ -3001,6 +3183,7 @@
 
       setActiveView(resolveViewFromHash());
 
+      let withdrawalToastShown = false;
       (function showWithdrawalToast() {
         try {
           const stored = sessionStorage.getItem("lpc-withdrawal-toast");
@@ -3008,8 +3191,6 @@
           sessionStorage.removeItem("lpc-withdrawal-toast");
           const payload = JSON.parse(stored || "{}");
           const message = payload?.message || "Withdrawal recorded.";
-          const type = payload?.type || "success";
-          notifyCase(message, type);
           const overlay = document.getElementById("withdrawalSuccessOverlay");
           const modal = document.getElementById("withdrawalSuccessModal");
           const textNode = document.getElementById("withdrawalSuccessText");
@@ -3018,6 +3199,7 @@
             overlay.classList.add("is-active");
             overlay.setAttribute("aria-hidden", "false");
             modal.classList.add("is-active");
+            withdrawalToastShown = true;
             const close = () => {
               overlay.classList.remove("is-active");
               overlay.setAttribute("aria-hidden", "true");
@@ -3030,6 +3212,40 @@
           }
         } catch (err) {
           sessionStorage.removeItem("lpc-withdrawal-toast");
+        }
+      })();
+
+      (function showCaseCompletedToast() {
+        try {
+          if (withdrawalToastShown) return;
+          const stored = sessionStorage.getItem("lpc-case-completed-toast");
+          if (!stored) return;
+          sessionStorage.removeItem("lpc-case-completed-toast");
+          const payload = JSON.parse(stored || "{}");
+          const title = payload?.title || "Case Completed";
+          const message = payload?.message || "Your case has been marked complete.";
+          const overlay = document.getElementById("caseCompletedOverlay");
+          const modal = document.getElementById("caseCompletedModal");
+          const titleNode = document.getElementById("caseCompletedTitle");
+          const textNode = document.getElementById("caseCompletedText");
+          if (titleNode) titleNode.textContent = title;
+          if (textNode) textNode.textContent = message;
+          if (overlay && modal) {
+            overlay.classList.add("is-active");
+            overlay.setAttribute("aria-hidden", "false");
+            modal.classList.add("is-active");
+            const close = () => {
+              overlay.classList.remove("is-active");
+              overlay.setAttribute("aria-hidden", "true");
+              modal.classList.remove("is-active");
+            };
+            const closeBtn = document.getElementById("caseCompletedCloseBtn");
+            const okBtn = document.getElementById("caseCompletedOkBtn");
+            closeBtn?.addEventListener("click", close, { once: true });
+            okBtn?.addEventListener("click", close, { once: true });
+          }
+        } catch (err) {
+          sessionStorage.removeItem("lpc-case-completed-toast");
         }
       })();
 
@@ -3055,32 +3271,80 @@
           if (!btn) return;
           const caseId = btn.dataset.caseId || "";
           if (!caseId) return;
-          const noteRaw = window.prompt("Please provide details (required).");
-          if (noteRaw === null) return;
-          const note = String(noteRaw || "").trim();
-          if (!note) {
-            notifyCase("Details are required.", "error");
-            return;
-          }
-          btn.disabled = true;
-          try {
-            await fetchCSRF().catch(() => "");
-            const res = await secureFetch(`/api/disputes/${encodeURIComponent(caseId)}`, {
-              method: "POST",
-              body: { message: note },
-            });
-            if (!res.ok) {
-              throw new Error("Unable to submit request.");
-            }
-            notifyCase("Request submitted.", "success");
-            await loadCompletedCases();
-          } catch (err) {
-            notifyCase("Unable to submit request.", "error");
-          } finally {
-            btn.disabled = false;
-          }
+          openDisputeModal(caseId);
         });
       }
+
+      let pendingDisputeCaseId = "";
+      const disputeOverlay = document.getElementById("disputeFormOverlay");
+      const disputeModal = document.getElementById("disputeFormModal");
+      const disputeMessageInput = document.getElementById("disputeFormMessage");
+      const disputeSubmitBtn = document.getElementById("disputeFormSubmitBtn");
+      const disputeCancelBtn = document.getElementById("disputeFormCancelBtn");
+      const disputeCloseBtn = document.getElementById("disputeFormCloseBtn");
+
+      function openDisputeModal(caseId) {
+        if (!disputeOverlay || !disputeModal) return;
+        pendingDisputeCaseId = caseId;
+        if (disputeMessageInput) disputeMessageInput.value = "";
+        disputeOverlay.classList.add("is-active");
+        disputeOverlay.setAttribute("aria-hidden", "false");
+        disputeModal.classList.add("is-active");
+        disputeMessageInput?.focus();
+      }
+
+      function closeDisputeModal() {
+        if (!disputeOverlay || !disputeModal) return;
+        disputeOverlay.classList.remove("is-active");
+        disputeOverlay.setAttribute("aria-hidden", "true");
+        disputeModal.classList.remove("is-active");
+        pendingDisputeCaseId = "";
+      }
+
+      async function submitDispute() {
+        const caseId = pendingDisputeCaseId;
+        if (!caseId) return;
+        const note = String(disputeMessageInput?.value || "").trim();
+        if (!note) {
+          notifyCase("Details are required.", "error");
+          disputeMessageInput?.focus();
+          return;
+        }
+        disputeSubmitBtn?.setAttribute("disabled", "true");
+        disputeCancelBtn?.setAttribute("disabled", "true");
+        disputeCloseBtn?.setAttribute("disabled", "true");
+        try {
+          await fetchCSRF().catch(() => "");
+          const res = await secureFetch(`/api/disputes/${encodeURIComponent(caseId)}`, {
+            method: "POST",
+            body: { message: note },
+          });
+          if (!res.ok) {
+            throw new Error("Unable to submit request.");
+          }
+          notifyCase("Request submitted.", "success");
+          closeDisputeModal();
+          await loadCompletedCases();
+        } catch (err) {
+          notifyCase("Unable to submit request.", "error");
+        } finally {
+          disputeSubmitBtn?.removeAttribute("disabled");
+          disputeCancelBtn?.removeAttribute("disabled");
+          disputeCloseBtn?.removeAttribute("disabled");
+        }
+      }
+
+      disputeOverlay?.addEventListener("click", (event) => {
+        if (event.target === disputeOverlay) closeDisputeModal();
+      });
+      disputeCancelBtn?.addEventListener("click", closeDisputeModal);
+      disputeCloseBtn?.addEventListener("click", closeDisputeModal);
+      disputeSubmitBtn?.addEventListener("click", submitDispute);
+      disputeMessageInput?.addEventListener("keydown", (event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+          submitDispute();
+        }
+      });
       const browseJobsBtn = document.getElementById("browseJobsBtn");
       if (browseJobsBtn) {
         browseJobsBtn.addEventListener("click", () => {

@@ -777,7 +777,7 @@ function bindHeaderEvents() {
       }
     });
     elements.profileDropdown.querySelector("[data-settings]")?.addEventListener("click", () => {
-      window.location.href = state.viewerRole === "paralegal" ? "profile-settings.html" : "account-settings.html";
+      window.location.href = "profile-settings.html";
     });
     elements.profileDropdown.querySelector("[data-logout]")?.addEventListener("click", () => logout("login.html"));
   }
@@ -1878,8 +1878,16 @@ function ensureHireModalStyles() {
     .hire-confirm-overlay.is-visible .hire-confirm-modal{opacity:1;transform:translateY(0) scale(1)}
     .hire-confirm-modal button,
     .hire-confirm-modal a{font-family:'Cormorant Garamond',serif}
+    .hire-confirm-modal .btn{font-family:'Sarabun',sans-serif;font-size:0.85rem;font-weight:300;padding:8px 16px;border:1px solid rgba(26,34,48,0.5);background:transparent;color:#1a1a1a;border-radius:999px;text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background .2s ease,color .2s ease,border-color .2s ease}
+    .hire-confirm-modal .btn.secondary{background:#fff}
+    .hire-confirm-modal .btn.primary{background:#1a2230;color:#fff;border-color:#1a2230}
+    .hire-confirm-modal .btn:hover{background:rgba(26,34,48,0.06)}
+    .hire-confirm-modal .btn.primary:hover{background:#0f172a;border-color:#0f172a}
+    .hire-confirm-modal .btn:focus-visible{outline:2px solid #b6a47a;outline-offset:2px}
+    .hire-confirm-modal .btn:disabled,
+    .hire-confirm-modal .btn[aria-disabled="true"]{opacity:0.6;cursor:not-allowed}
     .hire-confirm-modal p{font-weight:300;color:#6b7280}
-    .hire-confirm-title{font-weight:300;font-size:1.6rem;letter-spacing:0.01em}
+    .hire-confirm-title{font-weight:300;font-size:1.6rem;letter-spacing:0.01em;text-align:center}
     .hire-confirm-summary{border:1px solid rgba(0,0,0,0.08);border-radius:14px;padding:14px 18px;display:grid;gap:12px;background:#fff}
     .hire-confirm-row{display:flex;justify-content:space-between;gap:16px;align-items:baseline}
     .hire-confirm-row span{text-transform:uppercase;font-size:0.75rem;letter-spacing:0.08em;color:#6b7280;font-weight:300}
@@ -1889,11 +1897,13 @@ function ensureHireModalStyles() {
     .hire-confirm-info{width:26px;height:26px;border-radius:50%;border:1px solid rgba(0,0,0,0.08);background:#fff;color:#94a3b8;font-size:0.8rem;font-weight:250;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0;transition:border-color .2s ease,color .2s ease,transform .15s ease}
     .hire-confirm-info:hover,
     .hire-confirm-info:focus-visible{border-color:#b6a47a;color:#1a1a1a;transform:translateY(-1px)}
-    .hire-confirm-tooltip{position:absolute;right:0;bottom:calc(100% + 10px);width:min(320px,80vw);padding:12px 14px;border-radius:12px;background:#fff;border:1px solid rgba(0,0,0,0.08);box-shadow:0 18px 40px rgba(0,0,0,.18);font-size:0.78rem;line-height:1.45;color:#1a1a1a;opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .15s ease,transform .15s ease;z-index:2}
+    .hire-confirm-tooltip{position:absolute;right:0;bottom:calc(100% + 10px);width:min(320px,80vw);padding:12px 14px;border-radius:12px;background:#fff;border:1px solid rgba(0,0,0,0.08);box-shadow:0 18px 40px rgba(0,0,0,.18);font-size:0.9rem;line-height:1.5;color:#1a1a1a;opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .15s ease,transform .15s ease;z-index:2}
     .hire-confirm-info:hover .hire-confirm-tooltip,
     .hire-confirm-info:focus-visible .hire-confirm-tooltip{opacity:1;pointer-events:auto;transform:translateY(0)}
     .hire-confirm-error{border:1px solid rgba(185,28,28,.4);background:rgba(254,242,242,.9);color:#991b1b;border-radius:10px;padding:8px 10px;font-size:0.9rem}
     .hire-confirm-success{border:1px solid rgba(22,163,74,.35);background:rgba(240,253,244,.9);color:#166534;border-radius:10px;padding:8px 10px;font-size:0.9rem}
+    .hire-confirm-terms-link{color:var(--accent,#b6a47a);font-weight:600;text-decoration:none;transition:color .2s ease}
+    .hire-confirm-terms-link:hover{color:#1a1a1a}
     .hire-confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:4px;flex-wrap:wrap}
     .hire-confirm-actions[hidden]{display:none}
     @media (prefers-reduced-motion: reduce){
@@ -1907,7 +1917,7 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   ensureHireModalStyles();
   const safeName = escapeHtml(paralegalName || "Paralegal");
   const feeNote =
-    "Platform fee includes Stripe security, dispute support, payment processing, and vetted paralegal access.";
+    "The platform fee supports secure Stripe payment processing and access to the Let’s-ParaConnect vetted paralegal network.";
   const feeRate = Number(feePct || 0);
   const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
   const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
@@ -1915,8 +1925,8 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   overlay.className = "hire-confirm-overlay";
   overlay.innerHTML = `
     <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
-      <div class="hire-confirm-title" id="hireConfirmTitle">Confirm Hire</div>
-      <p>You're about to hire ${safeName}. This will fund the case immediately.</p>
+      <div class="hire-confirm-title" id="hireConfirmTitle">Confirm &amp; Hire</div>
+      <p>You’re about to hire <strong>${safeName}</strong>. Your payment will be processed through Stripe upon confirmation. You can review the <a class="hire-confirm-terms-link" href="terms.html#payments" target="_blank" rel="noopener">payment terms here</a>.</p>
       <div class="hire-confirm-summary">
         <div class="hire-confirm-row">
           <span>Case amount</span>
@@ -1944,7 +1954,7 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
       </div>
       <div class="hire-confirm-actions" data-hire-actions>
         <button class="btn secondary" type="button" data-hire-cancel>Cancel</button>
-        <button class="btn primary" type="button" data-hire-confirm>Confirm &amp; Hire</button>
+        <button class="btn primary" type="button" data-hire-confirm>Confirm Hire</button>
       </div>
     </div>
   `;

@@ -80,6 +80,8 @@ async function getCaseApplicationsForAttorney(attorneyId, blockedSet = null) {
     const practiceArea = caseDoc.practiceArea || "";
     const fallbackDate = caseDoc.createdAt || null;
     (caseDoc.applicants || []).forEach((applicant) => {
+      const status = String(applicant?.status || "pending").toLowerCase();
+      if (status !== "pending") return;
       const paralegal = applicant?.paralegalId || null;
       const paralegalId = paralegal?._id || applicant?.paralegalId || "";
       if (blockedSet && paralegalId && blockedSet.has(String(paralegalId))) {
@@ -384,7 +386,7 @@ router.get("/my-postings", auth, requireApproved, requireRole("attorney"), async
     if (!jobs.length && !caseApps.length) return res.json([]);
     const jobIds = jobs.map((j) => j._id);
     const jobById = new Map(jobs.map((j) => [String(j._id), j]));
-    const appFilter = { jobId: { $in: jobIds } };
+    const appFilter = { jobId: { $in: jobIds }, status: { $nin: ["accepted", "rejected"] } };
     if (blockedIds.length) {
       appFilter.paralegalId = { $nin: blockedIds };
     }

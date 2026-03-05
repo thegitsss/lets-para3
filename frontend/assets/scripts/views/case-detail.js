@@ -162,7 +162,9 @@ function draw(root, data, escapeHTML, caseId, session, hasPaymentMethod) {
   const statusRaw = String(data?.status || "open");
   const statusKey = statusRaw.toLowerCase();
   const isFinal = statusKey === "completed" || data?.paymentReleased;
-  const budgetCents = Number.isFinite(data?.lockedTotalAmount)
+  const budgetCents = Number.isFinite(data?.remainingAmount) && data.remainingAmount > 0
+    ? data.remainingAmount
+    : Number.isFinite(data?.lockedTotalAmount)
     ? data.lockedTotalAmount
     : Number(data?.totalAmount) || 0;
   const budgetDisplay = formatCurrency(budgetCents / 100);
@@ -824,16 +826,23 @@ function setCompleteButtonLocked(btn, locked, reason) {
   }
 }
 
+function applyChecklistLockFromCounts(btn, total, open) {
+  if (!btn) return;
+  if (Number.isFinite(total)) btn.dataset.checklistTotal = String(total);
+  if (Number.isFinite(open)) btn.dataset.checklistOpen = String(open);
+  const locked = total === 0 || open > 0;
+  const reason =
+    total === 0 ? "Add at least one task before releasing funds." : open > 0 ? "Complete all tasks first." : "";
+  setCompleteButtonLocked(btn, locked, reason);
+}
+
 async function refreshCompleteButtonLock(caseId, btn) {
   if (!btn || !caseId) return;
   if (checklistLockInFlight) return checklistLockInFlight;
   checklistLockInFlight = (async () => {
     try {
       const { total, open } = await fetchChecklistCompletionState(caseId);
-      const locked = total === 0 || open > 0;
-      const reason =
-        total === 0 ? "Add at least one task before releasing funds." : open > 0 ? "Complete all tasks first." : "";
-      setCompleteButtonLocked(btn, locked, reason);
+      applyChecklistLockFromCounts(btn, total, open);
     } catch (err) {
       setCompleteButtonLocked(btn, true, "Unable to verify tasks.");
     } finally {
@@ -856,6 +865,13 @@ function bindChecklistLock(checklistHost, caseId, btn) {
   checklistHost.dataset.lockBound = "true";
   checklistHost.addEventListener("change", (event) => {
     if (!event.target || event.target.type !== "checkbox") return;
+    const total = Number(btn?.dataset.checklistTotal);
+    const open = Number(btn?.dataset.checklistOpen);
+    if (Number.isFinite(total) && Number.isFinite(open)) {
+      const delta = event.target.checked ? -1 : 1;
+      const nextOpen = Math.max(0, Math.min(total, open + delta));
+      applyChecklistLockFromCounts(btn, total, nextOpen);
+    }
     scheduleCompleteButtonLock(caseId, btn);
   });
 }
@@ -1661,7 +1677,11 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       const caseDetails = await fetchCaseForHire(caseId);
-      const amountCents = Number(caseDetails?.lockedTotalAmount ?? caseDetails?.totalAmount ?? 0);
+      const amountCents = Number(
+        Number.isFinite(caseDetails?.remainingAmount) && caseDetails.remainingAmount > 0
+          ? caseDetails.remainingAmount
+          : caseDetails?.lockedTotalAmount ?? caseDetails?.totalAmount ?? 0
+      );
       if (!Number.isFinite(amountCents) || amountCents <= 0) {
         notify("Payment amount is unavailable for this case.", "error");
         return;

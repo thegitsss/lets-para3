@@ -47,6 +47,9 @@ let allowApply = false;
 let viewerState = "";
 let viewerStateExperience = [];
 let autoStateFilterApplied = false;
+const PAGE_SIZE = 15;
+let currentPage = 1;
+let userPageOverride = false;
 const initialJobParam = (idParam || explicitCaseId || "").trim();
 const STRIPE_BYPASS_EMAILS = new Set([
   "samanthasider+11@gmail.com",
@@ -437,6 +440,8 @@ function applyFilters(options = {}) {
     return true;
   });
 
+  currentPage = 1;
+  userPageOverride = false;
   applySort();
   if (render) {
     renderJobs();
@@ -480,6 +485,8 @@ function clearFilters() {
   if (sortSelect) sortSelect.value = "";
 
   filteredJobs = allJobs.filter((job) => !shouldHideAppliedJob(job));
+  currentPage = 1;
+  userPageOverride = false;
   applySort();
   renderJobs();
   filterMenu?.classList.remove("active");
@@ -501,6 +508,20 @@ function getJobPayUSD(job) {
   const parsedBudget = Number(job.budget);
   if (Number.isFinite(parsedBudget) && parsedBudget > 0) return Math.max(0, parsedBudget);
   return 0;
+}
+
+function getJobCompensation(job) {
+  const payUSD = getJobPayUSD(job);
+  const budgetValue = Number(job?.budget);
+  const budget = Number.isFinite(budgetValue) && budgetValue > 0 ? budgetValue : null;
+  const relistedWithRemaining =
+    isRelistedJob(job) && typeof job?.remainingAmount === "number" && job.remainingAmount > 0;
+
+  if (relistedWithRemaining && payUSD) return `$${formatPay(payUSD)} total`;
+  if (job?.compensationDisplay) return job.compensationDisplay;
+  if (budget) return `$${formatPay(budget)} compensation`;
+  if (payUSD) return `$${formatPay(payUSD)} total`;
+  return "Rate negotiable";
 }
 
 function getJobExperience(job) {
@@ -539,11 +560,27 @@ function formatAppliedLabel(value) {
 function isHiddenJob(job) {
   const title = String(job?.title || job?.caseTitle || "").trim().toLowerCase();
   const jobId = getJobIdForApply(job);
-  return title.includes("job not found") || !jobId;
+  const caseId = getCaseIdForApply(job);
+  return title.includes("job not found") || (!jobId && !caseId);
 }
 
 function isRelistedJob(job) {
   return Boolean(job?.relistRequestedAt);
+}
+
+function getJobTaskCounts(job) {
+  const tasks = Array.isArray(job?.tasks) ? job.tasks : [];
+  const total = tasks.length;
+  const completed = tasks.reduce((count, task) => {
+    if (typeof task === "string") return count;
+    return count + (task?.completed ? 1 : 0);
+  }, 0);
+  return { total, completed };
+}
+
+function isPartiallyCompletedRelist(job) {
+  const { total, completed } = getJobTaskCounts(job);
+  return isRelistedJob(job) && total > 0 && completed > 0 && completed < total;
 }
 
 function shouldHideAppliedJob(job) {
@@ -650,7 +687,18 @@ function renderJobs() {
     return;
   }
 
-  filteredJobs.forEach((job, idx) => {
+  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / PAGE_SIZE));
+  if (expandedJobId && !userPageOverride) {
+    const targetIndex = filteredJobs.findIndex((job) => getJobUniqueId(job) === expandedJobId);
+    if (targetIndex >= 0) {
+      currentPage = Math.min(totalPages, Math.max(1, Math.floor(targetIndex / PAGE_SIZE) + 1));
+    }
+  }
+  if (currentPage > totalPages) currentPage = totalPages;
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = filteredJobs.slice(startIndex, startIndex + PAGE_SIZE);
+
+  pageItems.forEach((job, idx) => {
     const card = document.createElement("div");
     card.classList.add("job-card");
 
@@ -677,6 +725,14 @@ function renderJobs() {
         <span>${escapeHtml(when)}</span>
       </div>
     `;
+
+    const meta = card.querySelector(".meta");
+    if (meta && isPartiallyCompletedRelist(job)) {
+      const note = document.createElement("div");
+      note.className = "partial-completion-note";
+      note.textContent = "This case has been partially completed";
+      meta.insertAdjacentElement("afterend", note);
+    }
 
     const header = card.querySelector(".job-card-header");
     if (header) {
@@ -706,6 +762,14 @@ function renderJobs() {
 
     card.appendChild(actions);
 
+    if (isPartiallyCompletedRelist(job)) {
+      const { total, completed } = getJobTaskCounts(job);
+      const footer = document.createElement("div");
+      footer.className = "job-card-footer";
+      footer.textContent = `This case has ${completed}/${total} tasks completed`;
+      card.appendChild(footer);
+    }
+
     card.addEventListener("click", () => {
       openJobModal(job);
     });
@@ -717,7 +781,45 @@ function renderJobs() {
     });
   });
 
-  if (pagination) pagination.textContent = "";
+  renderPagination(totalPages);
+}
+
+function renderPagination(totalPages) {
+  if (!pagination) return;
+  pagination.innerHTML = "";
+  if (totalPages <= 1) return;
+
+  const prevBtn = document.createElement("button");
+  prevBtn.type = "button";
+  prevBtn.textContent = "Back";
+  prevBtn.className = "pagination-btn";
+  prevBtn.disabled = currentPage <= 1;
+  prevBtn.addEventListener("click", () => {
+    if (currentPage <= 1) return;
+    userPageOverride = true;
+    currentPage -= 1;
+    renderJobs();
+  });
+
+  const info = document.createElement("span");
+  info.className = "pagination-info";
+  info.textContent = `${currentPage} / ${totalPages}`;
+
+  const nextBtn = document.createElement("button");
+  nextBtn.type = "button";
+  nextBtn.textContent = "Next";
+  nextBtn.className = "pagination-btn";
+  nextBtn.disabled = currentPage >= totalPages;
+  nextBtn.addEventListener("click", () => {
+    if (currentPage >= totalPages) return;
+    userPageOverride = true;
+    currentPage += 1;
+    renderJobs();
+  });
+
+  pagination.appendChild(prevBtn);
+  pagination.appendChild(info);
+  pagination.appendChild(nextBtn);
 }
 
 // Fetch jobs
@@ -742,6 +844,8 @@ async function fetchJobs() {
     allJobs = allJobs.filter((job) => !isHiddenJob(job));
     allJobs = allJobs.filter((job) => !shouldHideAppliedJob(job));
     filteredJobs = [...allJobs];
+    currentPage = 1;
+    userPageOverride = false;
 
     populateFilters();
     const autoFiltered = applyDefaultStateFilter();
@@ -1196,12 +1300,7 @@ async function openJobModal(job) {
   const title = job.title || "Untitled job";
   const summary = job.shortDescription || job.practiceArea || job.briefSummary || "";
   const description = job.description || job.details || "No additional description provided.";
-  const payUSD = getJobPayUSD(job);
-  const budgetValue = Number(job.budget);
-  const budget = Number.isFinite(budgetValue) && budgetValue > 0 ? budgetValue : null;
-  const compensation =
-    job.compensationDisplay ||
-    (budget ? `$${formatPay(budget)} compensation` : payUSD ? `$${formatPay(payUSD)} total` : "Rate negotiable");
+  const compensation = getJobCompensation(job);
 
   if (jobTitleEl) jobTitleEl.textContent = title;
   if (jobSummaryEl) jobSummaryEl.textContent = summary;
@@ -1637,16 +1736,13 @@ function renderExpandedJob(job) {
   const jobId = getJobIdForApply(job) || caseId;
   const applyKey = getApplyKey(job);
   const appliedAt = getAppliedAt(job);
-  const payUSD = getJobPayUSD(job);
-  const budgetValue = Number(job.budget);
-  const budget = Number.isFinite(budgetValue) && budgetValue > 0 ? budgetValue : null;
-  const compensation =
-    job.compensationDisplay ||
-    (budget ? `$${formatPay(budget)} compensation` : payUSD ? `$${formatPay(payUSD)} total` : "Rate negotiable");
+  const compensation = getJobCompensation(job);
   const jobState = getJobState(job) || "—";
   const when = job.createdAt
     ? new Date(job.createdAt).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })
     : "Recently posted";
+  const showPartial = isPartiallyCompletedRelist(job);
+  const { total: totalTasks, completed: completedTasks } = getJobTaskCounts(job);
   const rawSummary = job.briefSummary || job.shortDescription || job.practiceArea || "";
   const summary = scrubStateLines(rawSummary, jobState);
   const rawDescription = job.description || job.details || job.briefSummary || "";
@@ -1660,7 +1756,10 @@ function renderExpandedJob(job) {
             ${tasks
               .map((task) => {
                 const title = typeof task === "string" ? task : task?.title;
-                return title ? `<li>${escapeHtml(title)}</li>` : "";
+                if (!title) return "";
+                const isComplete = typeof task === "object" && task?.completed;
+                const className = isComplete ? ' class="task-completed"' : "";
+                return `<li${className}>${escapeHtml(title)}</li>`;
               })
               .filter(Boolean)
               .join("")}
@@ -1670,18 +1769,20 @@ function renderExpandedJob(job) {
   `;
   const applyInfoHtml = allowApply
     ? `
-        <div class="apply-info">
-          <div class="apply-info-title">What Happens After You Apply</div>
-          <ul class="apply-info-list">
-            <li>The attorney reviews applications</li>
-            <li>Selected applicants are invited to the workspace</li>
-            <li>Scope is confirmed and work begins</li>
-            <li>Compensation is released after attorney approval and case completion</li>
-          </ul>
-        </div>
+        <details class="apply-info-disclosure">
+          <summary aria-label="What happens after you apply">?</summary>
+          <div class="apply-info">
+            <div class="apply-info-title">What Happens After You Apply</div>
+            <ul class="apply-info-list">
+              <li>The attorney reviews applications</li>
+              <li>Selected applicants are invited to the workspace</li>
+              <li>Scope is confirmed and work begins</li>
+              <li>Compensation is released after attorney approval and case completion</li>
+            </ul>
+          </div>
+        </details>
       `
     : "";
-  const applyInfoBlock = applyInfoHtml ? `<div class="apply-info-block">${applyInfoHtml}</div>` : "";
 
   card.className = "job-card expanded";
 
@@ -1697,8 +1798,12 @@ function renderExpandedJob(job) {
             <span>${escapeHtml(compensation)}</span>
             <span>Posted ${escapeHtml(when)}</span>
           </div>
+          ${showPartial ? `<div class="partial-completion-note">This case has been partially completed</div>` : ""}
+
         </div>
-        <div class="expanded-actions"></div>
+        <div class="expanded-actions">
+          ${applyInfoHtml}
+        </div>
       </div>
       <div class="expanded-body">
         ${summary ? `<p class="lede">${escapeHtml(summary)}</p>` : ""}
@@ -1721,7 +1826,6 @@ function renderExpandedJob(job) {
         </div>
         <div class="expanded-footer-actions" data-footer-actions></div>
       </div>
-      ${applyInfoBlock}
     </div>
   `;
 

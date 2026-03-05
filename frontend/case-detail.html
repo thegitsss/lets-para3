@@ -111,11 +111,17 @@
     }
 
     a:focus,
+    a:focus-visible,
     button:focus,
+    button:focus-visible,
     input:focus,
-    textarea:focus {
-      outline: 2px solid var(--app-focus);
-      outline-offset: 2px;
+    input:focus-visible,
+    textarea:focus,
+    textarea:focus-visible,
+    select:focus,
+    select:focus-visible {
+      outline: none;
+      box-shadow: none;
     }
 
     .skip-link {
@@ -738,6 +744,33 @@
       font-size: 0.9rem;
       color: var(--app-muted);
     }
+    #caseMessageStatus {
+      margin: 0;
+      padding: 0;
+      line-height: 1;
+      height: 1em;
+      min-height: 1em;
+      overflow: hidden;
+    }
+    .case-thread-subtitle.status-flash {
+      animation: messageStatusFlash 1.8s ease;
+    }
+    @keyframes messageStatusFlash {
+      0% {
+        opacity: 0;
+        transform: translateY(2px);
+      }
+      20% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      80% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+      }
+    }
 
 
     .case-participants,
@@ -1057,6 +1090,17 @@
       box-shadow: none;
       display: flex;
       gap: 12px;
+    }
+
+    .thread-break {
+      width: 100%;
+      padding: 8px 0;
+    }
+
+    .thread-break-line {
+      width: 100%;
+      height: 1px;
+      background: var(--app-border-soft);
     }
 
     .message-card {
@@ -1399,6 +1443,7 @@
       background: var(--app-surface);
       color: var(--app-text);
       font-family: var(--font-sans);
+      font-weight: 200;
       min-height: 52px;
       max-height: 140px;
       font-size: 0.9rem;
@@ -1421,6 +1466,7 @@
       padding: 6px 0;
       font-size: 0.95rem;
       line-height: 1.5;
+      font-weight: 200;
       border: none;
       box-shadow: none;
       background: transparent;
@@ -1913,6 +1959,66 @@
       margin-right: 28px;
     }
 
+    #caseTaskList label {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #caseTaskList input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 6px;
+      border: 1px solid rgba(172, 154, 120, 0.6);
+      background: linear-gradient(180deg, #fff, #f6f2ea);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.7),
+        0 1px 2px rgba(15, 10, 2, 0.08);
+      transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    #caseTaskList input[type="checkbox"]::after {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 3px;
+      background: var(--app-accent);
+      opacity: 0;
+      transform: scale(0.7);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    #caseTaskList input[type="checkbox"]:checked {
+      border-color: rgba(172, 154, 120, 0.85);
+      background: linear-gradient(180deg, #f9f5ee, #efe5d5);
+    }
+
+    #caseTaskList input[type="checkbox"]:checked::after {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    #caseTaskList input[type="checkbox"]:focus,
+    #caseTaskList input[type="checkbox"]:focus-visible {
+      outline: none;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.8),
+        0 1px 2px rgba(15, 10, 2, 0.08);
+    }
+
+    #caseTaskList input[type="checkbox"]:disabled {
+      cursor: default;
+      opacity: 0.55;
+    }
+
     .case-overview-actions {
       position: relative;
     }
@@ -2330,7 +2436,7 @@
     }
   </style>
 </head>
-<body>
+<body class="dashboard-no-shadows">
   <a href="#case-messages" class="skip-link">Skip to case messages</a>
   <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
     <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />

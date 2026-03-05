@@ -171,6 +171,11 @@ function normalizeId(source) {
 }
 
 function shapeListing({ job = null, caseDoc = null }) {
+  const autoRelistTypes = new Set(["zero_auto", "partial_attorney", "expired_zero", "admin"]);
+  const autoRelistFallback =
+    !caseDoc?.relistRequestedAt &&
+    caseDoc?.payoutFinalizedAt &&
+    autoRelistTypes.has(String(caseDoc?.payoutFinalizedType || ""));
   const totalAmount = typeof caseDoc?.totalAmount === "number" ? caseDoc.totalAmount : null;
   const lockedTotalAmount = typeof caseDoc?.lockedTotalAmount === "number" ? caseDoc.lockedTotalAmount : null;
   const remainingAmount = typeof caseDoc?.remainingAmount === "number" ? caseDoc.remainingAmount : null;
@@ -208,7 +213,7 @@ function shapeListing({ job = null, caseDoc = null }) {
     status: caseDoc?.status || job?.status || "open",
     contextCaseId: caseDoc?._id || job?.caseId || null,
     tasks: Array.isArray(caseDoc?.tasks) ? caseDoc.tasks : [],
-    relistRequestedAt: caseDoc?.relistRequestedAt || null,
+    relistRequestedAt: caseDoc?.relistRequestedAt || (autoRelistFallback ? caseDoc.payoutFinalizedAt : null),
   };
 }
 
@@ -217,12 +222,20 @@ router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req,
   try {
     const limit = clamp(parseInt(req.query.limit, 10) || 200, 1, 500);
     const blockedIds = await getBlockedUserIds(req.user.id);
+    const autoRelistTypes = ["zero_auto", "partial_attorney", "expired_zero", "admin"];
     const jobFilter = { status: "open" };
     const caseFilter = {
       archived: { $ne: true },
       $or: [
         { status: "open" },
-        { status: "paused", relistRequestedAt: { $ne: null }, payoutFinalizedAt: { $ne: null } },
+        {
+          status: "paused",
+          payoutFinalizedAt: { $ne: null },
+          $or: [
+            { relistRequestedAt: { $ne: null } },
+            { payoutFinalizedType: { $in: autoRelistTypes } },
+          ],
+        },
       ],
       paralegal: null,
       paralegalId: null,
@@ -245,7 +258,7 @@ router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req,
       Case.find(caseFilter)
         .sort({ createdAt: -1 })
         .limit(limit)
-        .select("title practiceArea details briefSummary totalAmount lockedTotalAmount remainingAmount currency state locationState status applicants attorney attorneyId jobId createdAt tasks relistRequestedAt")
+        .select("title practiceArea details briefSummary totalAmount lockedTotalAmount remainingAmount currency state locationState status applicants attorney attorneyId jobId createdAt tasks relistRequestedAt payoutFinalizedAt payoutFinalizedType")
         .populate({
           path: "attorney",
           select: "firstName lastName lawFirm firmName profileImage avatarURL",
@@ -264,10 +277,15 @@ router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req,
       const jobId = String(doc.jobId || "");
       if (!jobId) return;
       const status = String(doc.status || "").toLowerCase();
+      const autoRelistEligible =
+        status === "paused" &&
+        doc.payoutFinalizedAt &&
+        autoRelistTypes.includes(String(doc.payoutFinalizedType || ""));
       const eligible =
         doc.archived !== true &&
         (status === "open" ||
-          (status === "paused" && doc.relistRequestedAt && doc.payoutFinalizedAt));
+          (status === "paused" && doc.relistRequestedAt && doc.payoutFinalizedAt) ||
+          autoRelistEligible);
       linkedJobEligibility.set(jobId, eligible);
     });
 
@@ -296,7 +314,11 @@ router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req,
       const key = String(caseDoc._id);
       const job = jobByCaseId.get(key) || null;
       if (job) jobByCaseId.delete(key);
-      if (!job) return;
+      if (!job) {
+        const fallbackCase = { ...caseDoc, jobId: null };
+        shapedCases.push(shapeListing({ job: null, caseDoc: fallbackCase }));
+        return;
+      }
       shapedCases.push(shapeListing({ job, caseDoc }));
     });
 

@@ -73,7 +73,9 @@ if (el) el.textContent = value;
 }
 
 function formatCurrency(value) {
-return "—";
+  const cents = Number(value);
+  if (!Number.isFinite(cents)) return "—";
+  return CURRENCY.format(cents / 100);
 }
 
 function formatNumber(value) {
@@ -111,10 +113,10 @@ function buildPersonLabel(person = {}) {
 
 function isWithdrawalDispute(item = {}) {
   const status = String(item?.caseStatus || "").toLowerCase();
-  return (
-    item?.pausedReason === "dispute" ||
-    (item?.withdrawnParalegalId && status === "disputed")
-  );
+  const pausedReason = String(item?.pausedReason || "").toLowerCase();
+  const hasActiveParalegal = !!item?.activeParalegalId;
+  if (!item?.withdrawnParalegalId || hasActiveParalegal) return false;
+  return pausedReason === "dispute" || pausedReason === "paralegal_withdrew" || status === "disputed";
 }
 
 function resolveDisputeAmounts(item = {}) {
@@ -158,9 +160,13 @@ function resolveDisputeResolution(item = {}) {
   if (!action && withdrawal) {
     const payoutType = String(item.payoutFinalizedType || "");
     if (!payoutType) return null;
+    const payoutAmount = Number(item.partialPayoutAmount ?? 0);
     return {
       action: payoutType,
-      label: payoutType === "expired_zero" || payoutType === "zero_auto" ? "Zero" : "Payout",
+      label:
+        payoutType === "expired_zero" || payoutType === "zero_auto" || payoutAmount <= 0
+          ? "Zero"
+          : "Payout",
       resolvedAt: item.payoutFinalizedAt || null,
     };
   }
@@ -593,6 +599,62 @@ tbody.appendChild(row);
 });
 }
 
+const receiptsBody = document.getElementById("receiptsBody");
+const receiptSearchInput = document.getElementById("receiptSearch");
+const receiptRefreshBtn = document.getElementById("receiptRefreshBtn");
+let receiptSearchTimer = null;
+
+function renderReceipts(items = []) {
+  if (!receiptsBody) return;
+  if (!items.length) {
+    receiptsBody.innerHTML =
+      '<tr><td colspan="6" style="text-align:center;color:var(--muted)">No receipts found.</td></tr>';
+    return;
+  }
+  receiptsBody.innerHTML = items
+    .map((item) => {
+      const issuedAt = item?.issuedAt ? formatDate(item.issuedAt) : "—";
+      const receiptId = escapeHTML(item.receiptId || "—");
+      const caseTitle = escapeHTML(item.caseTitle || "Case");
+      const party = escapeHTML(item.party || "—");
+      const type = escapeHTML(item.type || "Receipt");
+      const amount = formatCurrencyValue(item.amountCents);
+      return `
+        <tr>
+          <td>${escapeHTML(issuedAt)}</td>
+          <td><span class="receipt-id">${receiptId}</span></td>
+          <td>${caseTitle}</td>
+          <td>${party}</td>
+          <td>${type}</td>
+          <td>${escapeHTML(amount)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+async function loadReceipts() {
+  if (!receiptsBody) return;
+  receiptsBody.innerHTML =
+    '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Loading receipts…</td></tr>';
+  try {
+    const q = String(receiptSearchInput?.value || "").trim();
+    const params = new URLSearchParams({ limit: "200" });
+    if (q) params.set("q", q);
+    const res = await secureFetch(`/api/payments/receipts?${params.toString()}`, {
+      headers: { Accept: "application/json" },
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload?.error || "Unable to load receipts.");
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+    renderReceipts(items);
+  } catch (err) {
+    receiptsBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted)">${escapeHTML(
+      err?.message || "Unable to load receipts."
+    )}</td></tr>`;
+  }
+}
+
 function populateTaxSummary(data) {
 const list = document.querySelector(".tax-summary");
 if (!list) return;
@@ -893,17 +955,29 @@ function renderOpenDisputes(items = []) {
       const status = String(dispute.status || "open").toLowerCase();
       const isResolved =
         status !== "open" || item.paymentReleased || item.payoutTransferId || item.payoutFinalizedAt;
-      const reason = escapeHTML(dispute.message || dispute.reason || "—");
+      const messageRaw = String(dispute.message || dispute.reason || "").trim();
+      const reason = messageRaw ? escapeHTML(messageRaw) : "—";
+      const requestedCents = Number(dispute.amountRequestedCents);
+      const requestedLabel =
+        Number.isFinite(requestedCents) && requestedCents > 0 ? formatCurrencyValue(requestedCents) : "";
+      const requestedLine = requestedLabel
+        ? `<div class="dispute-meta">Requested: ${escapeHTML(requestedLabel)}</div>`
+        : "";
       const createdAt = dispute.createdAt ? formatDate(dispute.createdAt) : "—";
       const attorneyLabel = buildPersonLabel(item.attorney);
       const paralegalLabel = buildPersonLabel(item.paralegal);
+      const tasksTotal = Number.isFinite(Number(item.tasksTotal)) ? Number(item.tasksTotal) : 0;
+      const tasksCompleted = Number.isFinite(Number(item.tasksCompleted))
+        ? Number(item.tasksCompleted)
+        : 0;
+      const tasksLabel = `Tasks: ${tasksCompleted} / ${tasksTotal}`;
       const amounts = resolveDisputeAmounts(item);
       const baseAmount = Number.isFinite(amounts.baseAmount) ? amounts.baseAmount : 0;
       const grossLabel = formatCurrencyValue(baseAmount);
+      const recommendedCents = baseAmount > 0 ? Math.round(baseAmount * 0.7) : 0;
+      const recommendedLabel = recommendedCents ? formatCurrencyValue(recommendedCents) : "";
       const feeLabel = formatCurrencyValue(amounts.feeAmount);
       const payoutLabel = formatCurrencyValue(amounts.payoutAmount);
-      const actionDisabled = isResolved ? ' disabled aria-disabled="true"' : "";
-      const actionNote = isResolved ? '<div class="dispute-meta">Resolved</div>' : "";
       const actionDisabled = isResolved ? ' disabled aria-disabled="true"' : "";
       const actionNote = isResolved ? '<div class="dispute-meta">Resolved</div>' : "";
       const withdrawalActions = `
@@ -916,6 +990,7 @@ function renderOpenDisputes(items = []) {
                 caseId
               )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Finalize payout</button>
             </div>
+            ${recommendedLabel ? `<div class="dispute-meta">Recommended: no more than ${recommendedLabel} (70% of original case amount).</div>` : ""}
             ${actionNote}
       `;
       const standardActions = `
@@ -948,8 +1023,10 @@ function renderOpenDisputes(items = []) {
             <div class="dispute-meta">${escapeHTML(paralegalLabel)}</div>
           </td>
           <td>
-            <div>${reason}</div>
+            <div class="dispute-message">${reason}</div>
             <div class="dispute-meta">${escapeHTML(createdAt)}</div>
+            <div class="dispute-meta">${escapeHTML(tasksLabel)}</div>
+            ${requestedLine}
           </td>
           <td><span class="dispute-status">${escapeHTML(status)}</span></td>
           <td>
@@ -980,6 +1057,11 @@ function renderResolvedDisputes(items = []) {
       if (!resolution) return "";
       const attorneyLabel = buildPersonLabel(item.attorney);
       const paralegalLabel = buildPersonLabel(item.paralegal);
+      const tasksTotal = Number.isFinite(Number(item.tasksTotal)) ? Number(item.tasksTotal) : 0;
+      const tasksCompleted = Number.isFinite(Number(item.tasksCompleted))
+        ? Number(item.tasksCompleted)
+        : 0;
+      const tasksLabel = `Tasks: ${tasksCompleted} / ${tasksTotal}`;
       const resolvedAt = resolution.resolvedAt ? formatDate(resolution.resolvedAt) : "—";
       const notesValue = escapeHTML(dispute.adminNotes || "");
       const detailId = `dispute-detail-${escapeAttribute(caseId)}-${escapeAttribute(disputeId)}`;
@@ -994,6 +1076,7 @@ function renderResolvedDisputes(items = []) {
               </a>
             </div>
             <div class="dispute-meta">${escapeHTML(caseId)}</div>
+            <div class="dispute-meta">${escapeHTML(tasksLabel)}</div>
           </td>
           <td>
             <div>${escapeHTML(attorneyLabel)}</div>
@@ -1301,6 +1384,21 @@ bindSettingsActions();
 await loadAdminSettings();
 await hydrateAnalytics();
 await loadDisputeSummary();
+await loadReceipts();
+
+if (receiptRefreshBtn) {
+receiptRefreshBtn.addEventListener("click", () => {
+loadReceipts();
+});
+}
+if (receiptSearchInput) {
+receiptSearchInput.addEventListener("input", () => {
+if (receiptSearchTimer) window.clearTimeout(receiptSearchTimer);
+receiptSearchTimer = window.setTimeout(() => {
+loadReceipts();
+}, 250);
+});
+}
 
 const taxReportBtn = document.getElementById("taxReportBtn");
 if (taxReportBtn) {

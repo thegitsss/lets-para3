@@ -141,6 +141,9 @@ const selectors = {
   inviteDeclineBtn: document.getElementById('inviteDeclineBtn'),
   welcomeNotice: document.getElementById('paralegalWelcomeNotice'),
   welcomeNoticeDismiss: document.getElementById('dismissWelcomeNotice'),
+  earningsCard: document.getElementById('earnedThisMonthCard'),
+  earningsToggle: document.getElementById('earningsToggle'),
+  earningsLabel: document.getElementById('earningsLabelText'),
 };
 
 const recentActivityState = {
@@ -202,6 +205,8 @@ let appliedQueryHandled = false;
 let dashboardRefreshInFlight = false;
 let lastDashboardRefreshAt = 0;
 const DASHBOARD_REFRESH_COOLDOWN_MS = 4000;
+let earningsMode = 'month';
+let earningsSnapshot = { month: 0, total: 0 };
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -355,11 +360,48 @@ function setField(field, value) {
   });
 }
 
+function readEarningsMode() {
+  try {
+    const saved = localStorage.getItem('lpc-earnings-mode');
+    if (saved === 'total' || saved === 'month') return saved;
+  } catch {}
+  return 'month';
+}
+
+function writeEarningsMode(mode) {
+  try {
+    localStorage.setItem('lpc-earnings-mode', mode);
+  } catch {}
+}
+
+function renderEarningsDisplay() {
+  const amount = earningsMode === 'total' ? earningsSnapshot.total : earningsSnapshot.month;
+  const label = earningsMode === 'total' ? 'total earned' : 'earned this month';
+  if (selectors.earningsLabel) selectors.earningsLabel.textContent = label;
+  if (selectors.earningsToggle) {
+    selectors.earningsToggle.dataset.mode = earningsMode;
+    selectors.earningsToggle.setAttribute('aria-pressed', earningsMode === 'total' ? 'true' : 'false');
+  }
+  const earningsDisplay = formatCurrency(amount).replace(/^\$/, '');
+  setField('earningsValue', earningsDisplay);
+}
+
+function toggleEarningsMode(event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  earningsMode = earningsMode === 'total' ? 'month' : 'total';
+  writeEarningsMode(earningsMode);
+  renderEarningsDisplay();
+}
+
 function updateStats(stats = {}) {
   const activeCases = Number(stats.activeCases ?? 0);
   const unread = Number(stats.unreadMessages ?? 0);
   const nextDeadline = stats.nextDeadline ?? '--';
   const monthEarnings = Number(stats.monthEarnings ?? 0);
+  const totalEarnings = Number(stats.totalEarnings ?? monthEarnings ?? 0);
   const payout30Days = Number(stats.payout30Days ?? 0);
   const nextPayout = stats.nextPayout ?? '—';
 
@@ -371,9 +413,9 @@ function updateStats(stats = {}) {
     selectors.pluralText.textContent = unread === 1 ? ' waiting' : 's waiting';
   }
   setField('nextDeadline', nextDeadline);
-  const earningsDisplay = formatCurrency(monthEarnings).replace(/^\$/, '');
   const payoutDisplay = formatCurrency(payout30Days).replace(/^\$/, '');
-  setField('monthEarnings', earningsDisplay);
+  earningsSnapshot = { month: monthEarnings, total: totalEarnings };
+  renderEarningsDisplay();
   setField('payout30Days', payoutDisplay);
   setField('nextPayout', nextPayout);
 }
@@ -392,6 +434,7 @@ async function refreshDashboardFromServer(reason = '') {
       unreadMessages: unreadMessageCount,
       nextDeadline: deriveNextDeadline(caseDeadlines),
       monthEarnings: dashboard?.metrics?.earnings,
+      totalEarnings: dashboard?.metrics?.earningsTotal,
       payout30Days: dashboard?.metrics?.earningsLast30Days,
       nextPayout: dashboard?.metrics?.nextPayoutDate,
     });
@@ -814,6 +857,8 @@ function attachUIHandlers() {
   if (stagedToast?.message && selectors.toastBanner) {
     toastHelper.show(stagedToast.message, { targetId: selectors.toastBanner.id, type: stagedToast.type });
   }
+  earningsMode = readEarningsMode();
+  renderEarningsDisplay();
 
   if (selectors.inviteCloseBtn) {
     selectors.inviteCloseBtn.addEventListener('click', closeInviteOverlay);
@@ -841,6 +886,14 @@ function attachUIHandlers() {
       const caseId = latestMessageThread?.id || latestMessageThread?._id || '';
       if (!caseId) return;
       window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}#case-messages`;
+    });
+  }
+  if (selectors.earningsToggle) {
+    selectors.earningsToggle.addEventListener('click', toggleEarningsMode);
+    selectors.earningsToggle.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        toggleEarningsMode(event);
+      }
     });
   }
   document.addEventListener('keydown', (event) => {
@@ -2087,6 +2140,7 @@ async function initDashboard() {
       unreadMessages: unreadCount,
       nextDeadline: deriveNextDeadline(deadlineEvents),
       monthEarnings: dashboard?.metrics?.earnings,
+      totalEarnings: dashboard?.metrics?.earningsTotal,
       payout30Days: dashboard?.metrics?.earningsLast30Days,
       nextPayout: dashboard?.metrics?.nextPayoutDate,
     });

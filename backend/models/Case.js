@@ -65,6 +65,7 @@ const disputeSchema = new Schema(
     // Give each embedded dispute its own stable ID for admin tooling
     disputeId: { type: String, default: () => new Types.ObjectId().toString(), index: true },
     message: { type: String, required: true, trim: true, maxlength: 20_000 },
+    amountRequestedCents: { type: Number, min: 0, default: null },
     raisedBy: { type: Types.ObjectId, ref: "User", required: true, index: true },
     status: { type: String, enum: DISPUTE_STATUS, default: "open", index: true },
     adminNotes: { type: String, trim: true, maxlength: 4000, default: "" },
@@ -192,6 +193,8 @@ const caseSchema = new Schema(
     },
     pausedAt: { type: Date, default: null },
     disputeDeadlineAt: { type: Date, default: null },
+    adminDisputeDeadlineAt: { type: Date, default: null },
+    adminDisputeOverdueNotifiedAt: { type: Date, default: null },
     partialPayoutAmount: { type: Number, default: null, min: 0 }, // cents (gross before paralegal fee)
     payoutFinalizedAt: { type: Date, default: null },
     payoutFinalizedType: {
@@ -448,9 +451,13 @@ caseSchema.methods.acceptApplicant = function (paralegalId) {
 };
 
 // Create a dispute embedded record
-caseSchema.methods.createDispute = function ({ message, raisedBy }) {
+caseSchema.methods.createDispute = function ({ message, raisedBy, amountRequestedCents }) {
   if (!message || !raisedBy) throw new Error("message and raisedBy are required to create a dispute.");
-  this.disputes.push({ message: String(message).trim(), raisedBy });
+  const payload = { message: String(message).trim(), raisedBy };
+  if (Number.isFinite(amountRequestedCents) && amountRequestedCents > 0) {
+    payload.amountRequestedCents = amountRequestedCents;
+  }
+  this.disputes.push(payload);
   // Surface status to disputed if not closed
   if (this.status !== "closed") this.status = "disputed";
   return this;

@@ -25,6 +25,10 @@ const CASE_VIEW_FILTERS = ["active", "draft", "archived", "inquiries"];
 const CASE_FILE_MAX_BYTES = 20 * 1024 * 1024;
 const PLATFORM_FEE_PCT = 22;
 const HOME_PAGE_SIZE = 5;
+const CASE_PAGE_SIZE = 15;
+const ESCROW_PAGE_SIZE = 15;
+const CASE_POSTED_STORAGE_KEY = "lpc_case_posted_notice";
+const AUTO_RELIST_TYPES = new Set(["zero_auto", "partial_attorney", "expired_zero", "admin"]);
 const FUNDED_WORKSPACE_STATUSES = new Set([
   "in progress",
   "in_progress",
@@ -81,6 +85,7 @@ const state = {
     posted: [],
     postedMap: new Map(),
     escrows: [],
+    escrowPage: 0,
     history: [],
     spendingChart: null,
     jobChart: null,
@@ -110,6 +115,13 @@ const state = {
     error: "",
   },
   archivedSelection: new Set(),
+  archivedStatusFilter: "all",
+  casesPage: {
+    active: 0,
+    draft: 0,
+    archived: 0,
+    inquiries: 0,
+  },
   archiveHighlightCaseId: null,
   archiveHighlightApplied: false,
   simpleMessages: {
@@ -118,6 +130,11 @@ const state = {
     activeCaseId: null,
     messagesByCase: new Map(),
     lastIds: new Map(),
+    pollTimer: null,
+  },
+  overview: {
+    cases: [],
+    eligibleCaseIds: new Set(),
     pollTimer: null,
   },
   localDrafts: [],
@@ -183,6 +200,10 @@ let applicantsCaseHandled = false;
 const caseApplicationCounts = new Map();
 let applicationsCache = [];
 let applicationsPromise = null;
+let notificationAutoRefreshBound = false;
+let applicantAutoRefreshTimer = null;
+let overviewPollingBound = false;
+const applicantDrawerRequests = new Map();
 
 function repositionOpenCaseMenu() {
   if (!openCaseMenu) return;
@@ -274,6 +295,7 @@ async function bootstrap() {
   const headerOnly = HEADER_ONLY_ROUTES[role]?.has(pageKey);
   const skipNotifications = role !== "paralegal" && headerOnly && pageKey !== "profile-settings";
   await initHeader({ skipNotifications });
+  bindNotificationAutoRefresh();
   if (headerOnly) {
     return;
   }
@@ -304,6 +326,26 @@ async function bootstrap() {
   }
 }
 
+function bindNotificationAutoRefresh() {
+  if (notificationAutoRefreshBound) return;
+  notificationAutoRefreshBound = true;
+  window.addEventListener("lpc:notifications-refreshed", (event) => {
+    const types = event?.detail?.types;
+    if (!Array.isArray(types) || !types.length) return;
+    const lowerTypes = new Set(types.map((type) => String(type || "").toLowerCase()));
+    if (!lowerTypes.has("application_submitted")) return;
+    if (applicantAutoRefreshTimer) return;
+    applicantAutoRefreshTimer = window.setTimeout(async () => {
+      applicantAutoRefreshTimer = null;
+      try {
+        await refreshApplicationsOverview({ force: true });
+      } catch (err) {
+        console.warn("Auto-refresh applications failed", err);
+      }
+    }, 400);
+  });
+}
+
 // -------------------------
 // Header + Notifications
 // -------------------------
@@ -319,13 +361,13 @@ function ensureHeaderStyles() {
   .lpc-shared-header .btn.btn-outline{background:transparent;border-color:rgba(0,0,0,0.08);color:#1a1a1a}
   .lpc-shared-header .btn.btn-outline:hover{border-color:#b6a47a;color:#b6a47a;background:rgba(182,164,122,0.06)}
   .lpc-shared-header .user-chip{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.4);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color .2s ease, box-shadow .2s ease}
-  .lpc-shared-header .user-chip img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,0.08);object-fit:cover}
+  .lpc-shared-header .user-chip img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:none;object-fit:cover}
   .lpc-shared-header .user-chip strong{display:block;font-family:var(--font-serif);font-weight:500;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lpc-shared-header .user-chip span{font-size:.85rem;color:#6b6b6b;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  body.theme-dark .lpc-shared-header .user-chip{background:rgba(15,23,42,0.4);border-color:rgba(255,255,255,0.15);box-shadow:0 10px 25px rgba(0,0,0,0.35)}
+  body.theme-dark .lpc-shared-header .user-chip{background:rgba(15,23,42,0.4);border-color:rgba(255,255,255,0.15);box-shadow:none}
   body.theme-dark .lpc-shared-header .user-chip strong{color:#fff}
   body.theme-dark .lpc-shared-header .user-chip span{color:rgba(255,255,255,0.8)}
-  body.theme-mountain .lpc-shared-header .user-chip{background:rgba(255,255,255,0.65);border-color:rgba(255,255,255,0.42);box-shadow:0 18px 34px rgba(17,22,26,0.2)}
+  body.theme-mountain .lpc-shared-header .user-chip{background:rgba(255,255,255,0.65);border-color:rgba(255,255,255,0.42);box-shadow:none}
   body.theme-mountain .lpc-shared-header .user-chip strong{color:#1b1b1b}
   body.theme-mountain .lpc-shared-header .user-chip span{color:#6b6b6b}
   .lpc-shared-header .profile-dropdown{position:absolute;right:0;top:calc(100% + 10px);background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:16px;box-shadow:0 18px 30px rgba(0,0,0,0.12);display:none;flex-direction:column;min-width:200px;z-index:9999;pointer-events:auto;overflow:visible;color:var(--ink,#1a1a1a)}
@@ -923,6 +965,7 @@ async function initOverviewPage() {
   const deadlineList = document.getElementById("deadlineList");
   const escrowDetails = document.getElementById("escrowDetails");
   const caseCards = document.getElementById("caseCards");
+  const homeView = document.querySelector(".view-home");
   const quickButtons = document.querySelectorAll("[data-quick-link]");
   const weeklyNotesGrid = document.getElementById("weeklyNotesGrid");
   const weeklyNotesRange = document.getElementById("weeklyNotesRange");
@@ -963,6 +1006,7 @@ async function initOverviewPage() {
   hydrateOverview().catch(() => {});
   setupWeeklyNoteModal();
   void initWeeklyNotes(weeklyNotesGrid, weeklyNotesRange);
+  startOverviewPolling();
 
   quickButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -986,6 +1030,45 @@ async function initOverviewPage() {
     } catch (err) {
       console.warn("Message count fallback", err?.message);
     }
+  }
+
+  function shouldPollOverview() {
+    return document.visibilityState === "visible" && (!homeView || !homeView.hasAttribute("hidden"));
+  }
+
+  async function refreshOverviewMessages({ force = false } = {}) {
+    if (!force && !shouldPollOverview()) return;
+    await fetchUnreadMessages();
+    const threads = await fetchThreadsOverview(200);
+    const threadByCase = new Map();
+    (threads || []).forEach((thread) => {
+      const id = thread?.caseId || thread?.case?.id || thread?.id || "";
+      if (id) threadByCase.set(String(id), thread);
+    });
+    state.threadOverview = threadByCase;
+    if (caseCards && Array.isArray(state.overview.cases) && state.overview.cases.length) {
+      renderCaseCards(caseCards, state.overview.cases, threadByCase);
+    }
+    updateMessagePreviewUI({
+      threads,
+      messageSnippet,
+      messagePreviewSender,
+      messagePreviewText,
+      eligibleCaseIds: state.overview.eligibleCaseIds,
+    });
+  }
+
+  function startOverviewPolling() {
+    if (state.overview.pollTimer) return;
+    if (!overviewPollingBound) {
+      document.addEventListener("visibilitychange", () => {
+        if (shouldPollOverview()) void refreshOverviewMessages({ force: true });
+      });
+      overviewPollingBound = true;
+    }
+    state.overview.pollTimer = window.setInterval(() => {
+      void refreshOverviewMessages();
+    }, 120_000);
   }
 
   async function hydrateOverview() {
@@ -1016,6 +1099,8 @@ async function initOverviewPage() {
         const id = item?.caseId || item?.id || item?._id;
         return id && eligibleCaseIds.has(String(id));
       });
+      state.overview.cases = filteredCaseCards;
+      state.overview.eligibleCaseIds = eligibleCaseIds;
       updateMetrics(dashboard?.metrics, overdueCount);
       renderCaseCards(caseCards, filteredCaseCards, threadByCase);
       renderEscrowPanel(escrowDetails, dashboard?.metrics);
@@ -1320,6 +1405,9 @@ let weeklyNoteCancelBtn = null;
 let weeklyNoteModalBound = false;
 let weeklyNoteModalOnSave = null;
 
+let statusHistoryModalRef = null;
+let statusHistoryBodyRef = null;
+
 function ensureWeeklyNoteModal() {
   if (document.getElementById("weeklyNoteModal")) {
     return;
@@ -1405,6 +1493,91 @@ function closeWeeklyNoteModal() {
   weeklyNoteModalRef.classList.add("hidden");
   weeklyNoteModalRef.removeAttribute("aria-busy");
   weeklyNoteModalOnSave = null;
+}
+
+function initStatusHistoryModal() {
+  if (statusHistoryModalRef) return;
+  statusHistoryModalRef = document.getElementById("statusHistoryModal");
+  if (!statusHistoryModalRef) return;
+  statusHistoryBodyRef = document.getElementById("statusHistoryBody");
+  statusHistoryModalRef.querySelectorAll("[data-status-history-close]").forEach((btn) => {
+    btn.addEventListener("click", () => closeStatusHistoryModal());
+  });
+  statusHistoryModalRef.addEventListener("click", (event) => {
+    if (event.target === statusHistoryModalRef) closeStatusHistoryModal();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && statusHistoryModalRef && !statusHistoryModalRef.classList.contains("hidden")) {
+      closeStatusHistoryModal();
+    }
+  });
+}
+
+function closeStatusHistoryModal() {
+  if (!statusHistoryModalRef) return;
+  statusHistoryModalRef.classList.add("hidden");
+  statusHistoryModalRef.removeAttribute("aria-busy");
+}
+
+function formatHistoryTimestamp(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString();
+}
+
+function getStatusHistoryClass(statusKey) {
+  const normalized = normalizeCaseStatus(statusKey);
+  if (!normalized) return "public";
+  if (normalized === "withdrawn") return "withdrawn";
+  if (normalized === "relisted") return "relisted";
+  if (normalized === "hold") return "pending";
+  if (normalized === "payout_finalized") return "accepted";
+  if (normalized === "paused") return "pending";
+  return CASE_STATUS_CLASSES[normalized] || "public";
+}
+
+async function openStatusHistoryModal(caseId) {
+  if (!caseId) return;
+  initStatusHistoryModal();
+  if (!statusHistoryModalRef || !statusHistoryBodyRef) return;
+  statusHistoryBodyRef.innerHTML = `<div class="info-line">Loading status history…</div>`;
+  statusHistoryModalRef.classList.remove("hidden");
+  statusHistoryModalRef.setAttribute("aria-busy", "true");
+  try {
+    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/status-history`, {
+      headers: { Accept: "application/json" },
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload?.error || "Unable to load status history.");
+    const items = Array.isArray(payload?.items) ? payload.items : [];
+    if (!items.length) {
+      statusHistoryBodyRef.innerHTML = `<div class="info-line">No status history recorded yet.</div>`;
+    } else {
+      statusHistoryBodyRef.innerHTML = `
+        <ul class="status-history-list">
+          ${items
+            .map(
+              (entry) => {
+                const statusClass = getStatusHistoryClass(entry?.statusKey || entry?.label);
+                return `
+                <li class="status-history-item">
+                  <span class="status status-history-status ${statusClass}">${sanitize(entry.label || "Status")}</span>
+                  <span class="status-history-time">${sanitize(formatHistoryTimestamp(entry.at))}</span>
+                </li>`;
+              }
+            )
+            .join("")}
+        </ul>
+      `;
+    }
+  } catch (err) {
+    statusHistoryBodyRef.innerHTML = `<div class="info-line">${sanitize(
+      err?.message || "Unable to load status history."
+    )}</div>`;
+  } finally {
+    statusHistoryModalRef.removeAttribute("aria-busy");
+  }
 }
 
 function getWeekStart(date) {
@@ -1638,6 +1811,9 @@ function setCaseFilter(filterKey, { render = true } = {}) {
   const tables = document.querySelectorAll("[data-case-table]");
   if (!tabs.length || !tables.length) return;
   state.casesViewFilter = key;
+  if (state.casesPage) {
+    state.casesPage[key] = 0;
+  }
   tabs.forEach((btn) => {
     const active = btn.dataset.caseFilter === key;
     btn.classList.toggle("active", active);
@@ -1738,6 +1914,7 @@ async function initBillingPage() {
 
   postedBody?.addEventListener("click", onPostedJobsAction);
   activeBody?.addEventListener("click", onActiveEscrowAction);
+  document.querySelector("[data-escrow-pagination]")?.addEventListener("click", onEscrowPaginationClick);
   editModal?.querySelector("[data-close-modal]")?.addEventListener("click", () => toggleModal(editModal, false));
   editForm?.addEventListener("submit", submitJobEdit);
   document.querySelectorAll("[data-refresh]").forEach((btn) => {
@@ -1948,9 +2125,17 @@ async function loadActiveEscrows(force = false) {
 function renderActiveEscrows(body, escrows = []) {
   if (!escrows.length) {
     body.innerHTML = `<tr><td colspan="5" class="empty-state">No active payments.</td></tr>`;
+    updateEscrowPagination(0);
     return;
   }
-  body.innerHTML = escrows
+  const totalCount = escrows.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / ESCROW_PAGE_SIZE));
+  const pageIndex = Math.max(0, state.billing?.escrowPage ?? 0);
+  const safeIndex = Math.min(pageIndex, totalPages - 1);
+  if (safeIndex !== pageIndex) state.billing.escrowPage = safeIndex;
+  const start = safeIndex * ESCROW_PAGE_SIZE;
+  const pageItems = escrows.slice(start, start + ESCROW_PAGE_SIZE);
+  body.innerHTML = pageItems
     .map((record) => {
       const caseId = parseCaseId(record);
       const title = sanitize(record.caseTitle || record.title || "Case");
@@ -1981,6 +2166,47 @@ function renderActiveEscrows(body, escrows = []) {
       `;
     })
     .join("");
+  updateEscrowPagination(totalCount);
+}
+
+function updateEscrowPagination(totalCount) {
+  const pagination = document.querySelector("[data-escrow-pagination]");
+  if (!pagination) return;
+  const info = pagination.querySelector("[data-escrow-page-info]");
+  const prev = pagination.querySelector('[data-escrow-page-action="prev"]');
+  const next = pagination.querySelector('[data-escrow-page-action="next"]');
+  const totalPages = Math.max(1, Math.ceil(totalCount / ESCROW_PAGE_SIZE));
+  const pageIndex = Math.max(0, state.billing?.escrowPage ?? 0);
+  const safeIndex = Math.min(pageIndex, totalPages - 1);
+  if (totalCount === 0) {
+    if (info) info.textContent = "0 of 0";
+    pagination.style.display = "none";
+    if (prev) prev.disabled = true;
+    if (next) next.disabled = true;
+    return;
+  }
+  const start = safeIndex * ESCROW_PAGE_SIZE + 1;
+  const end = Math.min(totalCount, (safeIndex + 1) * ESCROW_PAGE_SIZE);
+  if (info) info.textContent = `${start}–${end} of ${totalCount}`;
+  if (prev) prev.disabled = safeIndex <= 0;
+  if (next) next.disabled = safeIndex >= totalPages - 1;
+  pagination.style.display = totalCount > ESCROW_PAGE_SIZE ? "flex" : "none";
+}
+
+function onEscrowPaginationClick(event) {
+  const button = event.target.closest("[data-escrow-page-action]");
+  if (!button) return;
+  const action = button.dataset.escrowPageAction;
+  const total = state.billing?.escrows?.length || 0;
+  const totalPages = Math.max(1, Math.ceil(total / ESCROW_PAGE_SIZE));
+  const current = Math.max(0, state.billing?.escrowPage ?? 0);
+  let nextIndex = current;
+  if (action === "prev") nextIndex = Math.max(0, current - 1);
+  if (action === "next") nextIndex = Math.min(totalPages - 1, current + 1);
+  if (nextIndex === current) return;
+  state.billing.escrowPage = nextIndex;
+  const body = document.getElementById("activeEscrowsBody");
+  if (body) renderActiveEscrows(body, state.billing.escrows || []);
 }
 
 function onActiveEscrowAction(event) {
@@ -3162,6 +3388,7 @@ const CASE_STATUS_LABELS = {
   in_progress: "In Progress",
   completed: "Completed",
   disputed: "Disputed",
+  archived: "Archived",
   closed: "Closed",
 };
 const CASE_STATUS_CLASSES = {
@@ -3170,6 +3397,8 @@ const CASE_STATUS_CLASSES = {
   in_progress: "private",
   completed: "accepted",
   disputed: "declined",
+  paused: "pending",
+  archived: "archived",
   closed: "declined",
 };
 
@@ -3189,6 +3418,7 @@ async function initCasesPage() {
 
   searchInput?.addEventListener("input", (event) => {
     state.casesSearchTerm = event.target.value.trim().toLowerCase();
+    state.casesPage[state.casesViewFilter] = 0;
     renderCasesView();
   });
 
@@ -3201,6 +3431,7 @@ async function initCasesPage() {
   });
 
   wrapper.addEventListener("click", onCasesTableClick);
+  wrapper.addEventListener("click", onCasesPaginationClick);
   wrapper.addEventListener("change", onArchivedSelectionChange);
   document.addEventListener("click", (evt) => {
     if (openCaseMenu && !openCaseMenu.contains(evt.target)) {
@@ -3231,6 +3462,18 @@ async function initCasesPage() {
   document.querySelectorAll("[data-archived-bulk]").forEach((btn) => {
     btn.addEventListener("click", onArchivedBulkAction);
   });
+
+  const archivedStatusFilter = document.querySelector("[data-archived-status-filter]");
+  if (archivedStatusFilter) {
+    archivedStatusFilter.value = state.archivedStatusFilter || "all";
+    archivedStatusFilter.addEventListener("change", (event) => {
+      state.archivedStatusFilter = event.target.value || "all";
+      if (state.casesPage) {
+        state.casesPage.archived = 0;
+      }
+      renderCasesView();
+    });
+  }
   setupCaseNoteModal();
   window.addEventListener("lpc-case-notes-updated", async (event) => {
     const targetId = event?.detail?.caseId;
@@ -3243,6 +3486,55 @@ async function initCasesPage() {
       console.warn("External note refresh failed", err);
     }
   });
+
+  showCasePostedPopup();
+}
+
+function showCasePostedPopup() {
+  const overlay = document.getElementById("casePostedOverlay");
+  const modal = document.getElementById("casePostedModal");
+  if (!overlay || !modal) return;
+  const raw = sessionStorage.getItem(CASE_POSTED_STORAGE_KEY);
+  if (!raw) return;
+  sessionStorage.removeItem(CASE_POSTED_STORAGE_KEY);
+  let payload = {};
+  try {
+    payload = JSON.parse(raw) || {};
+  } catch {
+    payload = {};
+  }
+  const title = String(payload?.title || "").trim();
+  const titleEl = document.getElementById("casePostedTitle");
+  const textEl = document.getElementById("casePostedText");
+  if (titleEl) titleEl.textContent = "Case Posted";
+  if (textEl) {
+    textEl.textContent = title
+      ? `“${title}” is now live and open to applications.`
+      : "Your case is now live and open to applications.";
+  }
+
+  const close = () => {
+    overlay.classList.remove("is-active");
+    modal.classList.remove("is-active");
+    overlay.setAttribute("aria-hidden", "true");
+  };
+  if (!modal.dataset.bound) {
+    modal.dataset.bound = "true";
+    modal.querySelector("#casePostedCloseBtn")?.addEventListener("click", close);
+    modal.querySelector("#casePostedConfirmBtn")?.addEventListener("click", close);
+    overlay.addEventListener("click", close);
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key === "Escape") close();
+      },
+      { once: true }
+    );
+  }
+
+  overlay.classList.add("is-active");
+  modal.classList.add("is-active");
+  overlay.setAttribute("aria-hidden", "false");
 }
 
 async function loadArchivedCases(force = false) {
@@ -3285,14 +3577,25 @@ function renderCasesView() {
     const body = document.querySelector(`[data-table-body="${key}"]`);
     if (!body) return;
     const records = getCasesByFilter(key, { applySearch: key === state.casesViewFilter });
-    if (!records.length) {
+    const totalCount = records.length;
+    const pageIndex = Math.max(0, state.casesPage?.[key] ?? 0);
+    const totalPages = Math.max(1, Math.ceil(totalCount / CASE_PAGE_SIZE));
+    const safeIndex = Math.min(pageIndex, totalPages - 1);
+    if (safeIndex !== pageIndex) {
+      state.casesPage[key] = safeIndex;
+    }
+    const start = safeIndex * CASE_PAGE_SIZE;
+    const pageItems = records.slice(start, start + CASE_PAGE_SIZE);
+    if (!pageItems.length) {
       const searchActive = state.casesSearchTerm && key === state.casesViewFilter;
       const message = searchActive ? "No cases match your search." : "No cases in this category.";
-      const span = key === "archived" ? 9 : 8;
+      const span = key === "archived" ? 8 : key === "draft" ? 6 : 7;
       body.innerHTML = `<tr><td colspan="${span}" class="empty-row">${message}</td></tr>`;
+      updateCasesPagination(key, 0);
       return;
     }
-    body.innerHTML = records.map((item) => renderCaseRow(item, key)).join("");
+    body.innerHTML = pageItems.map((item) => renderCaseRow(item, key)).join("");
+    updateCasesPagination(key, totalCount);
   });
   syncArchivedBulkUI();
   maybeHighlightArchivedCase();
@@ -3314,8 +3617,11 @@ function computeCaseCounts() {
 }
 
 function getCasesByFilter(filterKey, { applySearch = false } = {}) {
-  let source = filterKey === "archived" ? state.casesArchived : state.cases;
-  if (filterKey !== "archived") {
+  let source = state.cases;
+  if (filterKey === "archived") {
+    const archivedFromActive = state.cases.filter((item) => !isTerminalCase(item) && categorizeCase(item) === "archived");
+    source = [...state.casesArchived, ...archivedFromActive];
+  } else {
     source = source.filter((item) => !isTerminalCase(item) && categorizeCase(item) === filterKey);
   }
   if (filterKey === "draft" && Array.isArray(state.localDrafts) && state.localDrafts.length) {
@@ -3330,7 +3636,66 @@ function getCasesByFilter(filterKey, { applySearch = false } = {}) {
   if (applySearch && state.casesSearchTerm) {
     records = records.filter((item) => matchesCaseSearch(item, state.casesSearchTerm));
   }
+  if (filterKey === "archived") {
+    records = applyArchivedStatusFilter(records);
+  }
   return records;
+}
+
+function updateCasesPagination(filterKey, totalCount) {
+  const pagination = document.querySelector(`[data-case-pagination="${filterKey}"]`);
+  if (!pagination) return;
+  const info = pagination.querySelector(`[data-page-info="${filterKey}"]`);
+  const prev = pagination.querySelector('[data-page-action="prev"]');
+  const next = pagination.querySelector('[data-page-action="next"]');
+  const totalPages = Math.max(1, Math.ceil(totalCount / CASE_PAGE_SIZE));
+  const pageIndex = Math.max(0, state.casesPage?.[filterKey] ?? 0);
+  const safeIndex = Math.min(pageIndex, totalPages - 1);
+  if (totalCount === 0) {
+    if (info) info.textContent = "0 of 0";
+    pagination.style.display = "none";
+    if (prev) prev.disabled = true;
+    if (next) next.disabled = true;
+    return;
+  }
+  const start = safeIndex * CASE_PAGE_SIZE + 1;
+  const end = Math.min(totalCount, (safeIndex + 1) * CASE_PAGE_SIZE);
+  if (info) info.textContent = `${start}–${end} of ${totalCount}`;
+  if (prev) prev.disabled = safeIndex <= 0;
+  if (next) next.disabled = safeIndex >= totalPages - 1;
+  pagination.style.display = totalCount > CASE_PAGE_SIZE ? "flex" : "none";
+}
+
+function applyArchivedStatusFilter(records = []) {
+  const filter = state.archivedStatusFilter || "all";
+  if (filter === "all") return records;
+  return records.filter((item) => {
+    const status = normalizeCaseStatus(item?.status);
+    const isCompleted = isFinalCase(item) || status === "completed";
+    const isPaused = status === "paused";
+    const isArchived = !!item?.archived && !isCompleted && !isPaused;
+    if (filter === "completed") return isCompleted;
+    if (filter === "paused") return isPaused;
+    if (filter === "archived") return isArchived;
+    return true;
+  });
+}
+
+function onCasesPaginationClick(event) {
+  const button = event.target.closest("[data-page-action]");
+  if (!button) return;
+  const action = button.dataset.pageAction;
+  const target = button.dataset.pageTarget;
+  if (!target || !state.casesPage) return;
+  const total = getCasesByFilter(target, { applySearch: target === state.casesViewFilter }).length;
+  const totalPages = Math.max(1, Math.ceil(total / CASE_PAGE_SIZE));
+  const current = Math.max(0, state.casesPage[target] ?? 0);
+  let nextIndex = current;
+  if (action === "prev") nextIndex = Math.max(0, current - 1);
+  if (action === "next") nextIndex = Math.min(totalPages - 1, current + 1);
+  if (nextIndex === current) return;
+  state.casesPage[target] = nextIndex;
+  renderCasesView();
 }
 
 function categorizeCase(item) {
@@ -3341,6 +3706,7 @@ function categorizeCase(item) {
     item.applicantsCount ?? (Array.isArray(item.applicants) ? item.applicants.length : item.applicants) ?? 0
   );
   if (!item.paralegal && applicantCount > 0) return "inquiries";
+  if (status === "paused") return "archived";
   if (status === "draft") return "draft";
   return "active";
 }
@@ -3442,6 +3808,7 @@ function normalizeApplicantData(applicant = {}) {
   const coverLetter = applicant?.coverLetter || applicant?.note || "";
   const resumeURL = applicant?.resumeURL || "";
   const linkedInURL = applicant?.linkedInURL || "";
+  const status = String(applicant?.status || "pending").toLowerCase();
   return {
     paralegalId,
     name,
@@ -3457,6 +3824,7 @@ function normalizeApplicantData(applicant = {}) {
     coverLetter,
     resumeURL,
     linkedInURL,
+    status,
   };
 }
 
@@ -3537,7 +3905,7 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
     : `<span class="applicant-side-btn muted" aria-disabled="true">No résumé</span>`;
   const linkedInMarkup = safeLinkedInUrl
     ? `<a href="${sanitize(safeLinkedInUrl)}" target="_blank" rel="noopener" class="applicant-side-btn">LinkedIn</a>`
-    : `<span class="applicant-side-btn muted" aria-disabled="true">LinkedIn unavailable</span>`;
+    : "";
   const firstName = String(applicant.name || "Paralegal").split(" ")[0] || "Paralegal";
   const hireMarkup = canHire
     ? `<button type="button" class="applicant-side-hire" data-hire-paralegal data-case-id="${sanitize(
@@ -3546,6 +3914,12 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
         applicant.name || "Paralegal"
       )}">Hire ${sanitize(firstName)}</button>`
     : "";
+  const removeMarkup =
+    caseId && applicant.paralegalId
+      ? `<button type="button" class="applicant-side-btn danger" data-remove-applicant data-case-id="${sanitize(
+          caseId
+        )}" data-paralegal-id="${sanitize(applicant.paralegalId)}">Remove applicant</button>`
+      : "";
   return `
     <div class="applicant-detail-grid">
       <div class="applicant-detail-main">
@@ -3574,6 +3948,7 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
             ${resumeMarkup}
             ${linkedInMarkup}
             ${hireMarkup}
+            ${removeMarkup}
           </div>
           ${
             hireMarkup
@@ -3608,10 +3983,34 @@ function renderCaseRow(item, filterKey = "active") {
   const updated = formatCaseDate(item.updatedAt || item.completedAt || item.createdAt);
   const displayedDate =
     filterKey === "draft" ? updated : filterKey === "archived" ? updated : created;
-  const statusText = item.localDraft ? "Draft" : formatCaseStatus(item.status);
-  const statusClass = item.localDraft ? "pending" : getStatusClass(item.status);
+  const normalizedStatus = normalizeCaseStatus(item.status);
+  const isCompletedStatus = normalizedStatus === "completed" || normalizedStatus === "closed";
+  const isManualArchived =
+    item.archived &&
+    !isCompletedStatus &&
+    normalizedStatus !== "paused" &&
+    normalizedStatus !== "disputed";
+  const statusKey = item.localDraft ? "draft" : isManualArchived ? "archived" : normalizedStatus;
+  let statusText = statusKey === "draft" ? "Draft" : formatCaseStatus(statusKey);
+  let statusClass = statusKey === "draft" ? "pending" : getStatusClass(statusKey);
+  if (
+    normalizedStatus === "paused" &&
+    String(item?.pausedReason || "") === "paralegal_withdrew" &&
+    !item?.payoutFinalizedAt &&
+    isDisputeWindowActiveCase(item)
+  ) {
+    statusText = "24 Hour Hold";
+    statusClass = "pending";
+  }
+  const payoutFinalized = !!item?.payoutFinalizedAt;
+  const relisted =
+    !!item?.relistRequestedAt ||
+    (payoutFinalized && AUTO_RELIST_TYPES.has(String(item?.payoutFinalizedType || "")));
+  const hasWithdrawal =
+    String(item?.pausedReason || "") === "paralegal_withdrew" || Boolean(item?.withdrawnParalegalId);
   const amountDisplay = formatCaseAmount(item);
   const canViewWorkspace = isWorkspaceEligibleCase(item);
+  const canOpenDetail = canOpenCaseDetail(item);
   const caseId = item.id || item.caseId || item._id || "";
   const returnContext = getApplicantReturnContext();
   const shouldOpenDrawer =
@@ -3619,6 +4018,19 @@ function renderCaseRow(item, filterKey = "active") {
   const applicantCount = Number(
     item.applicantsCount ?? (Array.isArray(item.applicants) ? item.applicants.length : item.applicants) ?? 0
   );
+  const hasInvites =
+    pendingInvites.length > 0 || !!item.pendingParalegal || !!item.pendingParalegalId;
+  const showStatusBadge =
+    !hasInvites &&
+    applicantCount === 0 &&
+    (statusKey === "archived" || normalizedStatus === "paused") &&
+    hasWithdrawal;
+  let withdrawalBadge = "";
+  if (showStatusBadge && !payoutFinalized) {
+    withdrawalBadge = `<span class="status withdrawn">Withdrawn</span>`;
+  } else if (showStatusBadge && relisted) {
+    withdrawalBadge = `<span class="status relisted">Relisted</span>`;
+  }
   const selectionCell =
     filterKey === "archived"
       ? `<td class="case-select"><input type="checkbox" data-archived-select value="${item.id}" ${
@@ -3672,13 +4084,13 @@ function renderCaseRow(item, filterKey = "active") {
       <td>${
         item.localDraft
           ? `<a href="create-case.html#description">${sanitize(item.title || "Untitled Case")}</a>`
-          : canViewWorkspace
+          : canOpenDetail
           ? `<a href="case-detail.html?caseId=${encodeURIComponent(caseId)}">${sanitize(item.title || "Untitled Case")}</a>`
           : `<span>${sanitize(item.title || "Untitled Case")}</span>`
       }</td>
-      <td>${sanitize(client)}</td>
+      ${filterKey === "draft" ? "" : `<td class="case-paralegal-cell">${sanitize(client)}</td>`}
       <td>${sanitize(practice)}</td>
-      <td><span class="status ${statusClass}">${statusText}</span></td>
+      <td><span class="status ${statusClass}">${statusText}</span>${withdrawalBadge}</td>
       <td>${sanitize(amountDisplay)}</td>
       <td>${displayedDate}</td>
       ${actionsCell}
@@ -3693,6 +4105,7 @@ function renderCaseMenu(item) {
   const menuId = `case-menu-${safeId || "case"}`;
   const isFinal = isFinalCase(item);
   const canViewWorkspace = isWorkspaceEligibleCase(item);
+  const canOpenDetail = canOpenCaseDetail(item);
   const hasAssigned = hasAssignedParalegal(item);
   const statusKey = normalizeCaseStatus(item.status);
   if (statusKey === "in progress") {
@@ -3730,6 +4143,14 @@ function renderCaseMenu(item) {
   if (!item.archived) {
     parts.push(
       `<button type="button" class="menu-item" data-case-action="details" data-case-id="${baseCaseId}">View Details</button>`
+    );
+  }
+  parts.push(
+    `<button type="button" class="menu-item" data-case-action="status-history" data-case-id="${baseCaseId}">View Status History</button>`
+  );
+  if (canOpenDetail && !canViewWorkspace) {
+    parts.push(
+      `<button type="button" class="menu-item" data-case-action="open-case-detail" data-case-id="${baseCaseId}">Open Case</button>`
     );
   }
   if (canViewWorkspace) {
@@ -3824,7 +4245,8 @@ function closeOtherApplicantsDrawers(activeCaseId, contextEl) {
 function renderApplicantsInDrawer(caseId, applicants = [], drawerEl) {
   const body = drawerEl?.querySelector("[data-applicants-body]");
   if (!body) return;
-  if (!applicants.length) {
+  const visible = applicants.filter((applicant) => !["accepted", "rejected"].includes(applicant.status));
+  if (!visible.length) {
     body.innerHTML = `<div class="applicant-card empty-card">No applications yet.</div>`;
     const detail = drawerEl.querySelector("[data-applicant-detail]");
     if (detail) {
@@ -3833,9 +4255,23 @@ function renderApplicantsInDrawer(caseId, applicants = [], drawerEl) {
     }
     return;
   }
-  body.innerHTML = applicants.map((applicant, index) => buildApplicantDrawerRow(applicant, index, caseId)).join("");
+  body.innerHTML = visible.map((applicant, index) => buildApplicantDrawerRow(applicant, index, caseId)).join("");
   drawerEl.querySelectorAll("[data-applicant-row]").forEach((row) => row.classList.remove("is-active"));
   showApplicantDetail(caseId, 0, drawerEl);
+}
+
+function updateCaseApplicantCount(caseId, count) {
+  if (!caseId) return;
+  const normalized = Number.isFinite(count) ? Math.max(0, count) : 0;
+  caseApplicationCounts.set(String(caseId), normalized);
+  const updateItem = (item) => {
+    const itemId = String(item?.id || item?._id || item?.caseId || "");
+    if (!itemId || itemId !== String(caseId)) return;
+    item.applicantsCount = normalized;
+    item.applicants = normalized;
+  };
+  state.cases.forEach(updateItem);
+  state.casesArchived.forEach(updateItem);
 }
 
 async function loadApplicantsForDrawer(caseId, drawerEl) {
@@ -3844,19 +4280,32 @@ async function loadApplicantsForDrawer(caseId, drawerEl) {
   if (body) {
     body.innerHTML = `<div class="applicant-card empty-card">Loading applicants…</div>`;
   }
+  const existingRequest = applicantDrawerRequests.get(caseId);
+  if (existingRequest) {
+    existingRequest.abort();
+  }
+  const controller = new AbortController();
+  applicantDrawerRequests.set(caseId, controller);
   try {
-    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, {
+    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/applicants`, {
       headers: { Accept: "application/json" },
+      signal: controller.signal,
     });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error(payload?.error || "Unable to load applicants.");
     }
+    const caseKey = parseCaseId(payload) || payload?._id || payload?.id || caseId;
+    if (caseKey) {
+      state.caseLookup.set(String(caseKey), payload);
+    }
     const applicantsRaw = Array.isArray(payload?.applicants) ? payload.applicants : [];
     const applicants = applicantsRaw.map((applicant) => normalizeApplicantData(applicant));
     applicantDrawerCache.set(caseId, applicants);
     renderApplicantsInDrawer(caseId, applicants, drawerEl);
+    drawerEl.dataset.loaded = "true";
   } catch (err) {
+    if (err?.name === "AbortError") return;
     console.warn("Applicants drawer load failed", err);
     if (body) {
       body.innerHTML = `<div class="applicant-card empty-card">Unable to load applicants.</div>`;
@@ -3867,13 +4316,17 @@ async function loadApplicantsForDrawer(caseId, drawerEl) {
       detail.classList.add("hidden");
     }
   } finally {
-    drawerEl.dataset.loaded = "true";
+    if (applicantDrawerRequests.get(caseId) === controller) {
+      applicantDrawerRequests.delete(caseId);
+    }
   }
 }
 
 function showApplicantDetail(caseId, index, drawerEl) {
   if (!drawerEl || !caseId) return;
-  const applicants = applicantDrawerCache.get(caseId) || [];
+  const applicants = (applicantDrawerCache.get(caseId) || []).filter(
+    (entry) => !["accepted", "rejected"].includes(entry.status)
+  );
   const applicant = applicants[index];
   if (!applicant) return;
   drawerEl.querySelectorAll("[data-applicant-row]").forEach((row) => row.classList.remove("is-active"));
@@ -3887,7 +4340,9 @@ function showApplicantDetail(caseId, index, drawerEl) {
 
 function showApplicantDetailById(caseId, applicantId, drawerEl) {
   if (!drawerEl || !caseId || !applicantId) return;
-  const applicants = applicantDrawerCache.get(caseId) || [];
+  const applicants = (applicantDrawerCache.get(caseId) || []).filter(
+    (entry) => !["accepted", "rejected"].includes(entry.status)
+  );
   const index = applicants.findIndex((applicant) => String(applicant.paralegalId) === String(applicantId));
   if (index < 0) return;
   showApplicantDetail(caseId, index, drawerEl);
@@ -4840,6 +5295,16 @@ function onCasesTableClick(event) {
     handleHireFromApplications({ caseId, paralegalId, paralegalName, button: hireBtn });
     return;
   }
+  const removeBtn = event.target.closest("[data-remove-applicant]");
+  if (removeBtn) {
+    event.preventDefault();
+    const caseId = removeBtn.dataset.caseId || "";
+    const paralegalId = removeBtn.dataset.paralegalId || "";
+    if (!caseId || !paralegalId) return;
+    const drawerEl = removeBtn.closest("[data-applicants-drawer]");
+    void removeApplicantFromCase(caseId, paralegalId, drawerEl);
+    return;
+  }
   const applicantRow = event.target.closest("[data-applicant-row]");
   if (applicantRow && !event.target.closest("a")) {
     const caseId = applicantRow.dataset.caseId || "";
@@ -5002,6 +5467,8 @@ async function handleCaseAction(action, caseId) {
       return;
     } else if (action === "details") {
       await openCasePreview(caseId);
+    } else if (action === "open-case-detail") {
+      window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
     } else if (action === "workspace") {
       const entry = state.caseLookup.get(String(caseId));
       if (!isWorkspaceEligibleCase(entry)) {
@@ -5020,6 +5487,9 @@ async function handleCaseAction(action, caseId) {
       goToMessages(caseId);
     } else if (action === "edit-case") {
       window.location.href = `create-case.html?caseId=${encodeURIComponent(caseId)}#details`;
+      return;
+    } else if (action === "status-history") {
+      await openStatusHistoryModal(caseId);
       return;
     } else if (action === "edit-note") {
       openCaseNoteModal(caseId);
@@ -5226,6 +5696,10 @@ function resolveCaseBudgetCents(item) {
       item?.budget ??
       0
   );
+}
+
+function isEscrowFundedCase(item) {
+  return !!item?.escrowIntentId && String(item?.escrowStatus || "").toLowerCase() === "funded";
 }
 
 function isDisputeWindowActiveCase(item) {
@@ -6536,6 +7010,15 @@ function isWorkspaceEligibleCase(caseItem) {
   return hasAssignedParalegal(caseItem);
 }
 
+function canOpenCaseDetail(caseItem) {
+  if (!caseItem) return false;
+  const status = normalizeCaseStatus(caseItem?.status);
+  if (status === "paused" || status === "disputed") {
+    return String(caseItem?.pausedReason || "") === "paralegal_withdrew";
+  }
+  return isWorkspaceEligibleCase(caseItem);
+}
+
 function filterWorkspaceEligibleCases(list = []) {
   if (!Array.isArray(list) || !list.length) return [];
   return list.filter((item) => isWorkspaceEligibleCase(item));
@@ -6629,6 +7112,31 @@ async function openReviewFile(caseId, fileKey, downloadUrl, mode, fileName) {
     return true;
   }
   throw new Error("Download link unavailable for this file.");
+}
+
+async function removeApplicantFromCase(caseId, paralegalId, drawerEl) {
+  const confirmed = window.confirm("Remove this applicant? They will be notified and unable to reapply unless relisted.");
+  if (!confirmed) return;
+  try {
+    await secureFetch(
+      `/api/cases/${encodeURIComponent(caseId)}/applicants/${encodeURIComponent(paralegalId)}/reject`,
+      { method: "POST", body: {} }
+    );
+    notifyCases("Applicant removed.", "success");
+    if (drawerEl) {
+      await loadApplicantsForDrawer(caseId, drawerEl);
+    }
+    await loadCasesWithFiles(true);
+    await loadArchivedCases(true);
+    const cachedApplicants = applicantDrawerCache.get(caseId) || [];
+    const visibleCount = cachedApplicants.filter(
+      (entry) => !["accepted", "rejected"].includes(entry.status)
+    ).length;
+    updateCaseApplicantCount(caseId, visibleCount);
+    renderCasesView();
+  } catch (err) {
+    notifyCases(err?.message || "Unable to remove applicant.", "error");
+  }
 }
 
 async function getSignedUrl(caseId, key) {
@@ -6855,10 +7363,7 @@ function applyApplicationCountsToCases({ render = false } = {}) {
   state.cases.forEach((caseItem) => {
     const caseId = String(caseItem?.id || caseItem?._id || caseItem?.caseId || "");
     if (!caseId || !caseApplicationCounts.has(caseId)) return;
-    const existing = Number(
-      caseItem.applicantsCount ?? (Array.isArray(caseItem.applicants) ? caseItem.applicants.length : caseItem.applicants) ?? 0
-    );
-    caseItem.applicantsCount = Math.max(existing, caseApplicationCounts.get(caseId));
+    caseItem.applicantsCount = caseApplicationCounts.get(caseId);
   });
   if (render && dashboardViewState.casesInitialized) {
     renderCasesView();
@@ -7178,7 +7683,7 @@ function renderApplications(apps = [], hasPaymentMethod = true) {
       } else if (!canHire) {
         let reason = "Select an applicant to hire.";
         if (caseEntry && isRelistHireLocked(caseEntry)) {
-          reason = "Hiring locked until the case becomes eligible to be relisted.";
+          reason = "Hiring locked until the payout is finalized.";
         } else if (caseEntry && !canHireForCase(caseEntry)) {
           reason = "Case is not ready for hiring.";
         }
@@ -7249,12 +7754,6 @@ async function handleHireFromApplications({ caseId, paralegalId, paralegalName, 
     button.classList.add("is-pressed");
     window.setTimeout(() => button.classList.remove("is-pressed"), 180);
   }
-  const paymentReady = await hasDefaultPaymentMethod();
-  if (!paymentReady) {
-    state.billing.hasPaymentMethod = false;
-    notifyCases("Add a payment method to hire before hiring.", "error");
-    return;
-  }
   let caseDetails;
   try {
     caseDetails = await getCaseForHire(caseId);
@@ -7296,10 +7795,21 @@ async function handleHireFromApplications({ caseId, paralegalId, paralegalName, 
     return;
   }
 
+  const reuseEscrow = isRelistedCase(caseDetails) && isEscrowFundedCase(caseDetails);
+  if (!reuseEscrow) {
+    const paymentReady = await hasDefaultPaymentMethod();
+    if (!paymentReady) {
+      state.billing.hasPaymentMethod = false;
+      notifyCases("Add a payment method to hire before hiring.", "error");
+      return;
+    }
+  }
+
   openHireConfirmModal({
     paralegalName,
     amountCents,
     feePct: PLATFORM_FEE_PCT,
+    reuseEscrow,
     continueHref: `case-detail.html?caseId=${encodeURIComponent(caseId)}`,
     onConfirm: async () => {
       const originalText = button?.textContent || "Hire";
@@ -7385,7 +7895,7 @@ function ensureHireModalStyles() {
     .hire-confirm-modal button,
     .hire-confirm-modal a{font-family:'Cormorant Garamond',serif}
     .hire-confirm-modal p{font-weight:300;color:var(--muted,#666)}
-    .hire-confirm-title{font-weight:300;font-size:1.6rem;letter-spacing:0.01em}
+    .hire-confirm-title{font-weight:300;font-size:1.6rem;letter-spacing:0.01em;text-align:center}
     .hire-confirm-summary{border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:var(--radius,14px);padding:14px 18px;display:grid;gap:12px;background:var(--panel,#fff)}
     .hire-confirm-row{display:flex;justify-content:space-between;gap:16px;align-items:baseline}
     .hire-confirm-row span{text-transform:uppercase;font-size:0.75rem;letter-spacing:0.08em;color:var(--muted,#666);font-weight:300}
@@ -7395,13 +7905,15 @@ function ensureHireModalStyles() {
     .hire-confirm-info{width:26px;height:26px;border-radius:50%;border:1px solid var(--line,rgba(0,0,0,0.08));background:var(--panel,#fff);color:var(--muted,#666);font-size:0.8rem;font-weight:250;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0;transition:border-color .2s ease,color .2s ease,transform .15s ease}
     .hire-confirm-info:hover,
     .hire-confirm-info:focus-visible{border-color:var(--accent,#b6a47a);color:var(--ink,#1a1a1a);transform:translateY(-1px)}
-    .hire-confirm-tooltip{position:absolute;right:0;bottom:calc(100% + 10px);width:min(320px,80vw);padding:12px 14px;border-radius:12px;background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));box-shadow:0 18px 40px rgba(0,0,0,.18);font-size:0.78rem;line-height:1.45;color:var(--ink,#1a1a1a);opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .15s ease,transform .15s ease;z-index:2}
+    .hire-confirm-tooltip{position:absolute;right:0;bottom:calc(100% + 10px);width:min(320px,80vw);padding:12px 14px;border-radius:12px;background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));box-shadow:0 18px 40px rgba(0,0,0,.18);font-size:0.9rem;line-height:1.45;color:var(--ink,#1a1a1a);opacity:0;pointer-events:none;transform:translateY(6px);transition:opacity .15s ease,transform .15s ease;z-index:2}
     .hire-confirm-info:hover .hire-confirm-tooltip,
     .hire-confirm-info:focus-visible .hire-confirm-tooltip{opacity:1;pointer-events:auto;transform:translateY(0)}
     .hire-confirm-error{border:1px solid rgba(185,28,28,.4);background:rgba(254,242,242,.9);color:#991b1b;border-radius:10px;padding:8px 10px;font-size:0.9rem}
     .hire-confirm-error a{color:inherit;text-decoration:underline;font-weight:400}
     .hire-confirm-error a:hover{color:var(--ink,#1a1a1a)}
     .hire-confirm-success{border:1px solid rgba(22,163,74,.35);background:rgba(240,253,244,.9);color:#166534;border-radius:10px;padding:8px 10px;font-size:0.9rem}
+    .hire-confirm-terms-link{color:var(--accent,#b6a47a);font-weight:600;text-decoration:none}
+    .hire-confirm-terms-link:hover{color:var(--ink,#1a1a1a)}
     .hire-confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:4px;flex-wrap:wrap}
     .hire-confirm-actions[hidden]{display:none}
     @media (prefers-reduced-motion: reduce){
@@ -7411,21 +7923,33 @@ function ensureHireModalStyles() {
   document.head.appendChild(style);
 }
 
-function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref, onConfirm }) {
+function openHireConfirmModal({
+  paralegalName,
+  amountCents,
+  feePct,
+  continueHref,
+  onConfirm,
+  reuseEscrow = false,
+}) {
   ensureHireModalStyles();
   const safeName = sanitize(paralegalName || "Paralegal");
   const feeNote =
-    "Platform fee includes Stripe security, dispute support, payment processing, and vetted paralegal access.";
+    "The platform fee supports secure Stripe payment processing and access to the Let’s-ParaConnect vetted paralegal network.";
   const feeRate = Number(feePct || 0);
   const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
   const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
-  const overlay = document.createElement("div");
-  overlay.className = "hire-confirm-overlay";
-  overlay.innerHTML = `
-    <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
-      <div class="hire-confirm-title" id="hireConfirmTitle">Confirm Hire</div>
-      <p>You’re about to hire ${safeName}. This will fund Stripe immediately. Once you mark the matter Complete, only then will funds be released to the paralegal.</p>
-      <div class="hire-confirm-summary">
+  const summaryMarkup = reuseEscrow
+    ? `
+        <div class="hire-confirm-row">
+          <span>Remaining balance</span>
+          <strong>${sanitize(formatCurrency(amountCents))}</strong>
+        </div>
+        <div class="hire-confirm-row hire-confirm-total">
+          <span>New charge</span>
+          <strong>${sanitize(formatCurrency(0))}</strong>
+        </div>
+      `
+    : `
         <div class="hire-confirm-row">
           <span>Case amount</span>
           <strong>${sanitize(formatCurrency(amountCents))}</strong>
@@ -7438,18 +7962,34 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
           <span>Total charge</span>
           <strong>${sanitize(formatCurrency(totalCents))}</strong>
         </div>
+      `;
+  const infoMarkup = reuseEscrow
+    ? ""
+    : `
+        <div class="hire-confirm-help">
+          <button class="hire-confirm-info" type="button" aria-label="${sanitize(feeNote)}">
+            ?
+            <span class="hire-confirm-tooltip" aria-hidden="true">${sanitize(feeNote)}</span>
+          </button>
+        </div>
+      `;
+  const copy = `You’re about to hire ${safeName}. Your payment will be processed through Stripe upon confirmation. You can review the <a class="hire-confirm-terms-link" href="terms.html#payments">payment terms here</a>.`;
+  const successCopy = reuseEscrow ? "Case ready. Work can begin." : "Case funded. Work can begin.";
+  const overlay = document.createElement("div");
+  overlay.className = "hire-confirm-overlay";
+  overlay.innerHTML = `
+    <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
+      <div class="hire-confirm-title" id="hireConfirmTitle">Confirm &amp; Hire</div>
+      <p>${copy}</p>
+      <div class="hire-confirm-summary">
+        ${summaryMarkup}
       </div>
-      <div class="hire-confirm-help">
-        <button class="hire-confirm-info" type="button" aria-label="${sanitize(feeNote)}">
-          ?
-          <span class="hire-confirm-tooltip" aria-hidden="true">${sanitize(feeNote)}</span>
-        </button>
-      </div>
+      ${infoMarkup}
       <div class="hire-confirm-error" data-hire-error hidden></div>
-      <div class="hire-confirm-success" data-hire-success hidden>Case funded. Work can begin.</div>
+      <div class="hire-confirm-success" data-hire-success hidden>${successCopy}</div>
       <div class="hire-confirm-actions" data-hire-actions>
         <button class="btn secondary" type="button" data-hire-cancel>Cancel</button>
-        <button class="btn primary" type="button" data-hire-confirm>Confirm &amp; Hire</button>
+        <button class="btn primary" type="button" data-hire-confirm>Confirm Hire</button>
         <a class="btn primary" href="${sanitize(continueHref || "#")}" data-hire-continue hidden>Continue to case</a>
       </div>
     </div>
@@ -7481,7 +8021,8 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   const setLoading = (isLoading) => {
     if (confirmBtn) {
       confirmBtn.disabled = isLoading;
-      confirmBtn.textContent = isLoading ? "Charging..." : "Confirm & Hire";
+      const loadingLabel = reuseEscrow ? "Assigning..." : "Charging...";
+      confirmBtn.textContent = isLoading ? loadingLabel : "Confirm Hire";
     }
     if (cancelBtn) cancelBtn.disabled = isLoading;
   };
@@ -7592,12 +8133,13 @@ function buildMatterRowMarkup(caseItem, threadsByCase) {
   const metaParts = [practice, paralegal, status, created ? `Created ${created}` : ""].filter(Boolean);
   const thread = threadsByCase.get(caseId);
   const unread = Number(thread?.unread || 0);
-  const messageLabel =
+  const rawMessageLabel =
     unread > 0
-      ? `\u{1F4AC} ${unread} new message${unread === 1 ? "" : "s"}${
+      ? `${unread} new message${unread === 1 ? "" : "s"}${
           paralegal && paralegal !== "Unassigned" ? ` from ${paralegal}` : ""
         }`
       : "";
+  const messageLabel = rawMessageLabel.replace(/^\s*\u{1F4AC}\s*/u, "");
   return `
     <div class="matter-row" data-case-id="${caseId}">
       <div class="matter-main">

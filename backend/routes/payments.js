@@ -741,7 +741,13 @@ async function resolvePaymentMethodLabel(caseDoc) {
 
 function buildAttorneyReceiptPayload(caseDoc, paymentMethodLabel) {
   const settlement = resolveDisputeSettlement(caseDoc);
-  const baseAmount = settlement?.grossAmount ?? Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
+  const hasWithdrawalPayout =
+    !!caseDoc?.payoutFinalizedAt &&
+    !!caseDoc?.payoutFinalizedType &&
+    Number.isFinite(Number(caseDoc?.remainingAmount));
+  const baseAmount =
+    settlement?.grossAmount ??
+    Number(hasWithdrawalPayout ? caseDoc.remainingAmount : caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
   const platformFee = settlement?.feeAttorneyAmount ?? computePlatformFee(caseDoc);
   const attorneyPct = settlement?.feeAttorneyPct ?? resolveAttorneyFeePct(caseDoc);
   const attorneyName = fullName(caseDoc.attorney || {}) || caseDoc.attorneyNameSnapshot || "Attorney";
@@ -766,7 +772,13 @@ function buildAttorneyReceiptPayload(caseDoc, paymentMethodLabel) {
 
 function buildParalegalReceiptPayload(caseDoc, payoutDoc) {
   const settlement = resolveDisputeSettlement(caseDoc);
-  const baseAmount = settlement?.grossAmount ?? Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
+  const hasWithdrawalPayout =
+    !!caseDoc?.payoutFinalizedAt &&
+    !!caseDoc?.payoutFinalizedType &&
+    Number.isFinite(Number(caseDoc?.remainingAmount));
+  const baseAmount =
+    settlement?.grossAmount ??
+    Number(hasWithdrawalPayout ? caseDoc.remainingAmount : caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
   const platformFee = settlement?.feeParalegalAmount ?? computeParalegalFee(caseDoc);
   const paralegalPct = settlement?.feeParalegalPct ?? resolveParalegalFeePct(caseDoc);
   const computedNet = settlement?.payoutAmount ?? Math.max(0, baseAmount - platformFee);
@@ -802,6 +814,26 @@ function computeParalegalFeeFromGross(grossCents, caseDoc) {
   const fee = Math.max(0, Math.round((gross * (Number(pct) || 0)) / 100));
   const net = Math.max(0, gross - fee);
   return { gross, feePct: pct, feeAmount: fee, net };
+}
+
+function buildReceiptRow({
+  receiptId,
+  caseId,
+  caseTitle,
+  partyLabel,
+  receiptType,
+  amountCents,
+  issuedAt,
+}) {
+  return {
+    receiptId: String(receiptId || ""),
+    caseId: String(caseId || ""),
+    caseTitle: caseTitle || "Case",
+    party: partyLabel || "—",
+    type: receiptType || "Receipt",
+    amountCents: Number(amountCents) || 0,
+    issuedAt: issuedAt ? new Date(issuedAt).toISOString() : null,
+  };
 }
 
 function getWithdrawalReceiptKey(caseId, kind, paralegalId) {
@@ -2113,11 +2145,23 @@ router.post(
       return res.status(400).json({ error: "No dispute found for this case." });
     }
 
+    const statusKey = String(c.status || "").toLowerCase();
+    const pausedReason = String(c.pausedReason || "");
+    const hasActiveParalegal = !!(c.paralegal || c.paralegalId);
     const isWithdrawalDispute =
       c.withdrawnParalegalId &&
-      (String(c.pausedReason || "") === "dispute" || String(c.status || "").toLowerCase() === "disputed");
+      !hasActiveParalegal &&
+      (pausedReason === "dispute" || pausedReason === "paralegal_withdrew" || statusKey === "disputed");
 
     if (isWithdrawalDispute) {
+      if (
+        pausedReason === "paralegal_withdrew" &&
+        c.disputeDeadlineAt &&
+        statusKey !== "disputed" &&
+        new Date().getTime() < new Date(c.disputeDeadlineAt).getTime()
+      ) {
+        return res.status(400).json({ error: "Awaiting the 24-hour dispute window before admin review." });
+      }
       const resolvedAt = new Date();
       const baseAmount = Number(c.remainingAmount ?? c.lockedTotalAmount ?? c.totalAmount ?? 0);
       if (!Number.isFinite(baseAmount) || baseAmount < 0) {
@@ -2211,47 +2255,15 @@ router.post(
       c.payoutFinalizedType = "admin";
       c.payoutFinalizedAt = resolvedAt;
       c.disputeDeadlineAt = null;
-      c.relistRequestedAt = null;
+      c.adminDisputeDeadlineAt = null;
+      c.adminDisputeOverdueNotifiedAt = null;
+      c.relistRequestedAt = c.relistRequestedAt || resolvedAt || new Date();
       c.relistPending = false;
       c.remainingAmount = Math.max(0, Math.round(baseAmount - gross));
       c.pausedReason = "paralegal_withdrew";
       c.status = "paused";
       targetDispute.status = "resolved";
-      let archiveMeta = null;
-      if (gross === 0) {
-        try {
-          archiveMeta = await generateArchiveZip(c);
-        } catch (err) {
-          console.warn("[payments] archive generation failed during withdrawal reset", err?.message || err);
-        }
-        c.tasks = Array.isArray(c.tasks)
-          ? c.tasks.map((task) => ({
-              ...task,
-              completed: false,
-            }))
-          : [];
-        c.tasksLocked = false;
-        c.hiredAt = null;
-        if (archiveMeta?.key) {
-          c.archiveZipKey = archiveMeta.key;
-          c.archiveReadyAt = archiveMeta.readyAt || new Date();
-          c.archiveDownloadedAt = null;
-          c.files = [];
-        }
-      }
       await c.save();
-
-      if (gross === 0 && archiveMeta?.key) {
-        try {
-          await Message.updateMany(
-            { caseId: c._id, deleted: { $ne: true } },
-            { $set: { deleted: true, deletedBy: req.user.id } }
-          );
-          await CaseFile.deleteMany({ caseId: c._id });
-        } catch (err) {
-          console.warn("[payments] unable to reset workspace history", err?.message || err);
-        }
-      }
 
       try {
         const { attorneyPayload, paralegalPayload } = buildWithdrawalReceiptPayloads(c, gross);
@@ -2286,6 +2298,57 @@ router.post(
           pending,
         },
       });
+
+      try {
+        const caseTitle = c.title || "Case";
+        const disputeKey = String(targetDispute.disputeId || targetDispute._id || "");
+        const payoutLabel = formatCurrency(net);
+        const baseMessage =
+          gross > 0
+            ? `Admin finalized the withdrawal payout for ${caseTitle}. Payout: ${payoutLabel}.`
+            : `Admin finalized the withdrawal payout for ${caseTitle}. No payout was released.`;
+        const receiptNote = "A receipt is available in your dashboard with payout details.";
+        const attorneyId = c.attorney?._id || c.attorneyId || c.attorney;
+        const paralegalId = payoutParalegal?._id || c.withdrawnParalegalId;
+        await Promise.all([
+          attorneyId
+            ? notifyUser(
+                attorneyId,
+                "dispute_resolved",
+                {
+                  caseId: String(c._id),
+                  caseTitle,
+                  disputeId: disputeKey,
+                  resolution: "withdrawal_admin",
+                  resolutionLabel: gross > 0 ? "Payout finalized" : "No payout",
+                  message: baseMessage,
+                  receiptNote,
+                  link: "dashboard-attorney.html#billing",
+                },
+                { actorUserId: req.user.id }
+              )
+            : Promise.resolve(null),
+          paralegalId
+            ? notifyUser(
+                paralegalId,
+                "dispute_resolved",
+                {
+                  caseId: String(c._id),
+                  caseTitle,
+                  disputeId: disputeKey,
+                  resolution: "withdrawal_admin",
+                  resolutionLabel: gross > 0 ? "Payout finalized" : "No payout",
+                  message: baseMessage,
+                  receiptNote,
+                  link: "dashboard-paralegal.html#cases-completed",
+                },
+                { actorUserId: req.user.id }
+              )
+            : Promise.resolve(null),
+        ]);
+      } catch (err) {
+        console.warn("[payments] withdrawal dispute notification failed", err?.message || err);
+      }
 
       return res.json({ ok: true, payout: net, transferId, pending });
     }
@@ -2818,8 +2881,16 @@ router.get(
       .populate("attorney", "firstName lastName email role")
       .lean();
     if (!doc) return res.status(404).json({ error: "Case not found" });
-    const assignedId = doc.paralegal?._id || doc.paralegalId || doc.paralegal;
-    const withdrawnId = doc.withdrawnParalegalId || null;
+    const assignedId =
+      doc.paralegal?._id ||
+      (doc.paralegal && doc.paralegal.id) ||
+      doc.paralegalId ||
+      doc.paralegal;
+    const withdrawnId =
+      (doc.withdrawnParalegalId && doc.withdrawnParalegalId._id) ||
+      (doc.withdrawnParalegalId && doc.withdrawnParalegalId.id) ||
+      doc.withdrawnParalegalId ||
+      null;
     const isWithdrawn = withdrawnId && String(withdrawnId) === String(req.user.id);
     if (!isWithdrawn && String(assignedId) !== String(req.user.id)) {
       return res.status(403).json({ error: "Only the assigned paralegal can access this receipt." });
@@ -2918,6 +2989,150 @@ router.get(
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", "attachment; filename=\"billing-history.csv\"");
     res.send(rows.join("\n"));
+  })
+);
+
+// ----------------------------------------
+// Admin Receipts Index
+// ----------------------------------------
+router.get(
+  "/receipts",
+  requireRole("admin"),
+  asyncHandler(async (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50));
+    const skip = (page - 1) * limit;
+    const query = String(req.query.q || req.query.query || "").trim().toLowerCase();
+
+    const cases = await Case.find({
+      $or: [
+        { escrowIntentId: { $exists: true, $ne: null } },
+        { paymentIntentId: { $exists: true, $ne: null } },
+        { payoutTransferId: { $exists: true, $ne: null } },
+        { payoutFinalizedAt: { $ne: null }, payoutFinalizedType: { $ne: null } },
+      ],
+    })
+      .select(
+        "title escrowIntentId paymentIntentId payoutTransferId payoutFinalizedAt payoutFinalizedType partialPayoutAmount lockedTotalAmount totalAmount remainingAmount feeAttorneyPct feeAttorneyAmount feeParalegalPct feeParalegalAmount currency attorney attorneyId paralegal paralegalId withdrawnParalegalId paidOutAt completedAt updatedAt createdAt"
+      )
+      .populate("attorney", "firstName lastName email")
+      .populate("paralegal", "firstName lastName email")
+      .populate("withdrawnParalegalId", "firstName lastName email")
+      .lean();
+
+    const caseIds = cases.map((c) => c._id);
+    const payouts = caseIds.length
+      ? await Payout.find({ caseId: { $in: caseIds } })
+          .select("caseId transferId amountPaid createdAt paralegalId")
+          .lean()
+      : [];
+    const payoutMap = new Map();
+    payouts.forEach((p) => {
+      const key = String(p.caseId || "");
+      if (!key || payoutMap.has(key)) return;
+      payoutMap.set(key, p);
+    });
+
+    const rows = [];
+    cases.forEach((doc) => {
+      const caseId = String(doc._id || "");
+      const caseTitle = doc.title || "Case";
+      const attorneyName = fullName(doc.attorney || {}) || doc.attorneyNameSnapshot || "Attorney";
+      const paralegalName = fullName(doc.paralegal || {}) || doc.paralegalNameSnapshot || "Paralegal";
+      const withdrawnName =
+        fullName(doc.withdrawnParalegalId || {}) || doc.paralegalNameSnapshot || "Paralegal";
+
+      const baseAmount = Number(doc.lockedTotalAmount ?? doc.totalAmount ?? 0);
+      const attorneyFee = Number.isFinite(Number(doc.feeAttorneyAmount))
+        ? Number(doc.feeAttorneyAmount)
+        : computePlatformFee(doc);
+      const fundingReceiptId = doc.paymentIntentId || doc.escrowIntentId || "";
+      if (fundingReceiptId) {
+        rows.push(
+          buildReceiptRow({
+            receiptId: fundingReceiptId,
+            caseId,
+            caseTitle,
+            partyLabel: attorneyName,
+            receiptType: "Funding",
+            amountCents: Math.max(0, baseAmount + attorneyFee),
+            issuedAt: doc.createdAt || doc.updatedAt,
+          })
+        );
+      }
+
+      const payoutDoc = payoutMap.get(caseId);
+      const payoutReceiptId = payoutDoc?.transferId || doc.payoutTransferId || "";
+      if (payoutReceiptId) {
+        const payoutAmount = Number.isFinite(Number(payoutDoc?.amountPaid))
+          ? Number(payoutDoc.amountPaid)
+          : Math.max(0, baseAmount - computeParalegalFee(doc));
+        rows.push(
+          buildReceiptRow({
+            receiptId: payoutReceiptId,
+            caseId,
+            caseTitle,
+            partyLabel: paralegalName,
+            receiptType: "Payout",
+            amountCents: payoutAmount,
+            issuedAt: payoutDoc?.createdAt || doc.paidOutAt || doc.completedAt || doc.updatedAt,
+          })
+        );
+      }
+
+      if (doc.payoutFinalizedAt && doc.payoutFinalizedType) {
+        const issuedAt = doc.payoutFinalizedAt;
+        const receiptId = `${caseId}-withdrawal-${new Date(issuedAt).getTime()}`;
+        const gross = Number(doc.partialPayoutAmount ?? 0);
+        const { net } = computeParalegalFeeFromGross(gross, doc);
+        rows.push(
+          buildReceiptRow({
+            receiptId,
+            caseId,
+            caseTitle,
+            partyLabel: attorneyName,
+            receiptType: "Withdrawal",
+            amountCents: gross,
+            issuedAt,
+          })
+        );
+        rows.push(
+          buildReceiptRow({
+            receiptId,
+            caseId,
+            caseTitle,
+            partyLabel: withdrawnName,
+            receiptType: "Withdrawal",
+            amountCents: net,
+            issuedAt,
+          })
+        );
+      }
+    });
+
+    let filtered = rows;
+    if (query) {
+      filtered = rows.filter((row) => {
+        return (
+          String(row.receiptId || "").toLowerCase().includes(query) ||
+          String(row.caseTitle || "").toLowerCase().includes(query) ||
+          String(row.party || "").toLowerCase().includes(query) ||
+          String(row.type || "").toLowerCase().includes(query)
+        );
+      });
+    }
+    filtered.sort((a, b) => new Date(b.issuedAt || 0) - new Date(a.issuedAt || 0));
+
+    const total = filtered.length;
+    const items = filtered.slice(skip, skip + limit);
+
+    res.json({
+      page,
+      limit,
+      total,
+      pages: Math.max(1, Math.ceil(total / limit)),
+      items,
+    });
   })
 );
 

@@ -82,7 +82,7 @@ router.get("/", auth, requireApproved, requireRole(["attorney"]), async (req, re
       Case.countDocuments({
         attorneyId,
         archived: { $ne: true },
-        status: { $in: ["active", "awaiting_documents", "reviewing", "in progress", "in_progress"] },
+        status: { $in: ["active", "awaiting_documents", "reviewing", "in progress", "in_progress", "paused"] },
       }),
       Job.countDocuments({ attorneyId, status: "open" }),
       Application.countDocuments({

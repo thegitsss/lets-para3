@@ -52,8 +52,11 @@ async function evaluateCaseParticipant(req, caseId) {
 
   if (!isAttorney && !isParalegal) {
     const baseUrl = String(req.baseUrl || "");
+    const path = String(req.path || "");
     const allowWithdrawn =
-      isWithdrawnParalegal && baseUrl.includes("/disputes");
+      isWithdrawnParalegal &&
+      (baseUrl.includes("/disputes") ||
+        (baseUrl.includes("/payments") && path.includes("/receipt/paralegal")));
     if (allowWithdrawn) {
       return {
         caseDoc,

@@ -20,6 +20,7 @@ const { notifyUser } = require("../utils/notifyUser");
 const stripe = require("../utils/stripe");
 const { cleanText, cleanTitle, cleanMessage } = require("../utils/sanitize");
 const { logAction } = require("../utils/audit");
+const AuditLog = require("../models/AuditLog");
 const { generateArchiveZip, buildReceiptPdfBuffer, uploadPdfToS3, getReceiptKey } = require("../services/caseLifecycle");
 const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
@@ -42,6 +43,9 @@ const STRIPE_BYPASS_ATTORNEY_EMAILS = new Set([
   "game4funwithme1@gmail.com",
 ]);
 const REAPPLY_BYPASS_EMAILS = new Set(["samanthasider+0@gmail.com"]);
+const WITHDRAWAL_WORKER_INTERVAL_MS = Number(
+  process.env.WITHDRAWAL_WORKER_INTERVAL_MS || 5 * 60 * 1000
+);
 
 // ----------------------------------------
 // CSRF (enabled in production or when ENABLE_CSRF=true)
@@ -250,6 +254,21 @@ function isCompletionOnlyTaskUpdate(existingTasks, incomingTasks) {
   return true;
 }
 
+function hasCompletedTaskReversal(existingTasks, incomingTasks) {
+  if (!Array.isArray(existingTasks) || !Array.isArray(incomingTasks)) return false;
+  const count = Math.min(existingTasks.length, incomingTasks.length);
+  for (let index = 0; index < count; index += 1) {
+    const wasCompleted = normalizeTaskCompletion(
+      existingTasks[index]?.completed ?? existingTasks[index]?.done ?? existingTasks[index]?.isCompleted
+    );
+    const nextCompleted = normalizeTaskCompletion(
+      incomingTasks[index]?.completed ?? incomingTasks[index]?.done ?? incomingTasks[index]?.isCompleted
+    );
+    if (wasCompleted && !nextCompleted) return true;
+  }
+  return false;
+}
+
 function mergeTaskCompletion(existingTasks, incomingTasks) {
   if (!Array.isArray(existingTasks)) return [];
   return existingTasks.map((task, index) => {
@@ -395,7 +414,13 @@ function resolveDisputeSettlement(doc = {}) {
 async function generateReceiptDocuments(caseDoc, { payoutAmount, paymentMethodLabel } = {}) {
   if (!caseDoc?._id) return;
   const settlement = resolveDisputeSettlement(caseDoc);
-  const baseAmount = settlement?.grossAmount ?? Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0);
+  const remainingAmount =
+    caseDoc?.payoutFinalizedType === "partial_attorney" && Number.isFinite(caseDoc?.remainingAmount)
+      ? Number(caseDoc.remainingAmount)
+      : null;
+  const baseAmount =
+    settlement?.grossAmount ??
+    (remainingAmount != null ? remainingAmount : Number(caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0));
   const attorneyFee = settlement?.feeAttorneyAmount ?? computeAttorneyFeeAmount(baseAmount, caseDoc);
   const paralegalFee = settlement?.feeParalegalAmount ?? computeParalegalFeeAmount(baseAmount, caseDoc);
   const computedNet = settlement?.payoutAmount ?? Math.max(0, baseAmount - paralegalFee);
@@ -543,63 +568,115 @@ async function finalizeExpiredDisputeWindow(caseDoc) {
   const now = new Date();
   if (now.getTime() < new Date(caseDoc.disputeDeadlineAt).getTime()) return false;
   if (String(caseDoc.status || "").toLowerCase() === "disputed") return false;
+  const disputes = Array.isArray(caseDoc.disputes) ? caseDoc.disputes : [];
+  const hasOpen = disputes.some((d) => String(d?.status || "").toLowerCase() === "open");
+  if (hasOpen) return false;
+
+  const remainingAmount =
+    resolveRemainingAmount(caseDoc) ?? caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0;
   caseDoc.partialPayoutAmount = 0;
   caseDoc.payoutFinalizedType = "expired_zero";
   caseDoc.payoutFinalizedAt = now;
   caseDoc.disputeDeadlineAt = null;
-  caseDoc.relistPending = false;
+  caseDoc.adminDisputeDeadlineAt = null;
+  caseDoc.adminDisputeOverdueNotifiedAt = null;
   caseDoc.relistRequestedAt = caseDoc.relistRequestedAt || now;
+  caseDoc.relistPending = false;
+  caseDoc.remainingAmount = Math.max(0, Math.round(Number(remainingAmount) || 0));
   caseDoc.status = "paused";
   caseDoc.pausedReason = "paralegal_withdrew";
-  caseDoc.remainingAmount = resolveRemainingAmount(caseDoc);
   try {
     await ensureCaseJobOpen(caseDoc);
   } catch (err) {
-    console.warn("[cases] auto relist after dispute window failed", err?.message || err);
+    console.warn("[cases] ensure case job open failed", err?.message || err);
   }
   try {
     await generateWithdrawalReceipts(caseDoc, { grossAmount: 0 });
   } catch (err) {
     console.warn("[cases] withdrawal receipt generation failed", err?.message || err);
   }
-  try {
-    const attorneyId = caseDoc.attorney?._id || caseDoc.attorneyId || caseDoc.attorney || null;
-    const withdrawnId =
-      caseDoc.withdrawnParalegalId && typeof caseDoc.withdrawnParalegalId === "object"
-        ? caseDoc.withdrawnParalegalId._id
-        : caseDoc.withdrawnParalegalId || null;
-    if (attorneyId) {
-      await sendCaseNotification(
-        attorneyId,
-        "case_update",
-        caseDoc,
-        {
-          summary: "24-hour hold complete. $0 payout finalized.",
-        }
-      );
-      await sendCaseNotification(
-        attorneyId,
-        "case_update",
-        caseDoc,
-        {
-          summary: "Case relisted and ready for new applicants.",
-        }
-      );
-    }
-    if (withdrawnId) {
-      await sendCaseNotification(
-        withdrawnId,
-        "case_update",
-        caseDoc,
-        {
-          summary: "24-hour hold complete. $0 payout finalized.",
-        }
-      );
-    }
-  } catch (err) {
-    console.warn("[cases] dispute window notifications failed", err?.message || err);
-  }
   return true;
+}
+
+let withdrawalWorkerStarted = false;
+
+async function processExpiredWithdrawalWindows() {
+  const now = new Date();
+  const docs = await Case.find({
+    pausedReason: "paralegal_withdrew",
+    disputeDeadlineAt: { $lte: now },
+    payoutFinalizedAt: null,
+    status: { $ne: "disputed" },
+  }).select(
+    "title attorney attorneyId withdrawnParalegalId pausedReason status disputeDeadlineAt payoutFinalizedAt payoutFinalizedType partialPayoutAmount remainingAmount lockedTotalAmount totalAmount currency jobId job escrowStatus feeParalegalPct feeAttorneyPct paralegalNameSnapshot attorneyNameSnapshot paralegal paralegalId disputes"
+  );
+
+  for (const doc of docs) {
+    try {
+      const expired = await finalizeExpiredDisputeWindow(doc);
+      if (expired) {
+        await doc.save();
+      }
+    } catch (err) {
+      console.warn("[cases] withdrawal expiry finalize failed", err?.message || err);
+    }
+  }
+}
+
+async function processAdminOverdueDisputes() {
+  const now = new Date();
+  const docs = await Case.find({
+    adminDisputeDeadlineAt: { $lte: now },
+    adminDisputeOverdueNotifiedAt: null,
+    status: "disputed",
+    pausedReason: "dispute",
+  }).select("title attorney attorneyId withdrawnParalegalId adminDisputeDeadlineAt adminDisputeOverdueNotifiedAt");
+
+  for (const doc of docs) {
+    try {
+      const caseTitle = doc.title || "Case";
+      const basePayload = {
+        caseId: doc._id,
+        caseTitle,
+        message: "Admin is still reviewing this dispute and will resolve it in a timely manner.",
+      };
+      const attorneyId = doc.attorney?._id || doc.attorneyId || doc.attorney || null;
+      const withdrawnId =
+        doc.withdrawnParalegalId && typeof doc.withdrawnParalegalId === "object"
+          ? doc.withdrawnParalegalId._id
+          : doc.withdrawnParalegalId || null;
+      if (attorneyId) {
+        await notifyUser(attorneyId, "admin_review_overdue", {
+          ...basePayload,
+          link: "dashboard-attorney.html#cases",
+        });
+      }
+      if (withdrawnId) {
+        await notifyUser(withdrawnId, "admin_review_overdue", {
+          ...basePayload,
+          link: "dashboard-paralegal.html#cases",
+        });
+      }
+      doc.adminDisputeOverdueNotifiedAt = now;
+      await doc.save();
+    } catch (err) {
+      console.warn("[cases] admin overdue notification failed", err?.message || err);
+    }
+  }
+}
+
+function startWithdrawalWorker() {
+  if (withdrawalWorkerStarted) return;
+  if (process.env.DISABLE_WITHDRAWAL_WORKER === "true") return;
+  withdrawalWorkerStarted = true;
+  setInterval(() => {
+    processExpiredWithdrawalWindows().catch((err) => {
+      console.error("[cases] withdrawal expiry worker error", err);
+    });
+    processAdminOverdueDisputes().catch((err) => {
+      console.error("[cases] admin overdue worker error", err);
+    });
+  }, WITHDRAWAL_WORKER_INTERVAL_MS);
 }
 
 function normalizePracticeArea(value) {
@@ -659,6 +736,14 @@ function resolveRemainingAmount(caseDoc) {
   const paid = Number(caseDoc.partialPayoutAmount ?? 0);
   if (!Number.isFinite(paid) || paid <= 0) return base;
   return Math.max(0, Math.round(base - paid));
+}
+
+function countPendingApplicants(caseDoc) {
+  if (!caseDoc || !Array.isArray(caseDoc.applicants)) return 0;
+  return caseDoc.applicants.filter((applicant) => {
+    const status = String(applicant?.status || "pending").toLowerCase();
+    return status === "pending";
+  }).length;
 }
 
 function computeParalegalFeeFromGross(grossCents, caseDoc) {
@@ -1005,7 +1090,7 @@ function caseSummary(doc, { includeFiles = false, viewerRole = "" } = {}) {
     currency: doc.currency || "usd",
     assignedTo: paralegal,
     acceptedParalegal: !!paralegal,
-    applicants: Array.isArray(doc.applicants) ? doc.applicants.length : 0,
+    applicants: countPendingApplicants(doc),
     filesCount: !isAdmin && Array.isArray(doc.files) ? doc.files.length : 0,
     jobId: doc.jobId || null,
     attorney,
@@ -1537,6 +1622,267 @@ router.use(requireRole("admin", "attorney", "paralegal"));
 // Server-Sent Events for case updates
 // ----------------------------------------
 router.get(
+  "/:caseId/status-history",
+  verifyToken,
+  requireCaseAccess("caseId", {
+    project:
+      "title status archived createdAt updatedAt hiredAt completedAt paymentReleased pausedReason pausedAt disputeDeadlineAt payoutFinalizedAt payoutFinalizedType relistRequestedAt disputes",
+  }),
+  asyncHandler(async (req, res) => {
+    if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
+      return res.status(403).json({ error: "Only attorneys can view case history." });
+    }
+    const caseDoc = req.case;
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+
+    const STATUS_LABELS = {
+      open: "Posted",
+      "in progress": "In Progress",
+      completed: "Completed",
+      disputed: "Disputed",
+      archived: "Archived",
+      closed: "Closed",
+      paused: "Paused",
+      withdrawn: "Withdrawn",
+      hold: "24 Hour Hold",
+      payout_finalized: "Payout Finalized",
+      relisted: "Relisted",
+    };
+    const formatStatusLabel = (status) => {
+      if (!status) return "";
+      const key = normalizeCaseStatusValue(status);
+      if (!key) return "";
+      return (
+        STATUS_LABELS[key] || key.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
+      );
+    };
+
+    const actionMap = {
+      "case.create": { label: "Posted", statusKey: "open" },
+      "case.release": { label: "Payment Released", statusKey: "completed" },
+      "case.complete.archive": { label: "Completed", statusKey: "completed" },
+      "case.withdrawal.requested": { label: "Withdrawn", statusKey: "withdrawn" },
+      "case.withdrawal.reject": { label: "24 Hour Hold", statusKey: "hold" },
+      "case.withdrawal.payout": { label: "Payout Finalized", statusKey: "payout_finalized" },
+      "case.archive": { label: "Archived", statusKey: "archived" },
+      "case.restore": { label: "Restored", statusKey: "open" },
+      "case.terminate": { label: "Closed", statusKey: "closed" },
+      "case.delete": { label: "Deleted", statusKey: "closed" },
+    };
+    const auditActions = Object.keys(actionMap);
+    let logs = [];
+    try {
+      logs = await AuditLog.find({ case: caseDoc._id, action: { $in: auditActions } })
+        .sort({ createdAt: 1 })
+        .lean();
+    } catch (err) {
+      logs = [];
+    }
+
+    const items = [];
+    const addedEntries = new Set();
+    const pushItem = (label, at, statusKey) => {
+      if (!label || !at) return;
+      const date = new Date(at);
+      if (Number.isNaN(date.getTime())) return;
+      const iso = date.toISOString();
+      const sig = `${label}|${iso}`;
+      if (addedEntries.has(sig)) return;
+      items.push({ label, at: iso, statusKey: statusKey || null });
+      addedEntries.add(sig);
+    };
+
+    logs.forEach((entry) => {
+      const mapping = actionMap[entry.action];
+      if (!mapping) return;
+      pushItem(mapping.label, entry.createdAt, mapping.statusKey);
+    });
+
+    pushItem("Posted", caseDoc.createdAt, "open");
+    if (caseDoc.hiredAt) {
+      pushItem("In Progress", caseDoc.hiredAt, "in progress");
+    }
+
+    if (caseDoc.pausedReason === "paralegal_withdrew") {
+      pushItem("Withdrawn", caseDoc.pausedAt, "withdrawn");
+      if (caseDoc.disputeDeadlineAt && !caseDoc.payoutFinalizedAt) {
+        const holdStart = new Date(caseDoc.disputeDeadlineAt).getTime() - DISPUTE_WINDOW_MS;
+        if (holdStart > 0) {
+          pushItem("24 Hour Hold", new Date(holdStart), "hold");
+        }
+      }
+    } else if (String(caseDoc.status || "").toLowerCase() === "paused" && caseDoc.pausedAt) {
+      pushItem("Paused", caseDoc.pausedAt, "paused");
+    }
+
+    const disputes = Array.isArray(caseDoc.disputes) ? caseDoc.disputes : [];
+    if (disputes.length) {
+      const latest = disputes
+        .map((d) => d?.createdAt)
+        .filter(Boolean)
+        .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+        .pop();
+      if (latest) {
+        pushItem("Disputed", latest, "disputed");
+      }
+    }
+
+    pushItem("Payout Finalized", caseDoc.payoutFinalizedAt, "payout_finalized");
+    pushItem("Relisted", caseDoc.relistRequestedAt, "relisted");
+    if (caseDoc.completedAt || caseDoc.paymentReleased) {
+      pushItem("Completed", caseDoc.completedAt || caseDoc.updatedAt, "completed");
+    }
+    if (caseDoc.archived) {
+      pushItem("Archived", caseDoc.updatedAt, "archived");
+    }
+
+    const currentStatus = normalizeCaseStatusValue(caseDoc.status);
+    if (currentStatus) {
+      const label = formatStatusLabel(currentStatus);
+      pushItem(label || currentStatus, caseDoc.updatedAt, currentStatus);
+    }
+
+    items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+
+    res.json({
+      caseId: String(caseDoc._id),
+      caseTitle: caseDoc.title || "Case",
+      items,
+    });
+  })
+);
+
+router.get(
+  "/:caseId/applicants",
+  requireCaseAccess("caseId", {
+    allowApplicants: true,
+    alsoAllow: (req, caseDoc) => {
+      if (String(req.user.role).toLowerCase() !== "paralegal") return false;
+      const isOpen = caseDoc.status === "open" && !caseDoc.archived;
+      const hasHire = !!caseDoc.paralegal;
+      if (isOpen && !hasHire) return true;
+      if (caseDoc.status === "paused" && caseDoc.relistRequestedAt) return true;
+      return false;
+    },
+    project:
+      "status paralegal paralegalId attorney applicants archived withdrawnParalegalId paralegalNameSnapshot pausedReason disputeDeadlineAt payoutFinalizedAt relistRequestedAt relistPending readOnly totalAmount lockedTotalAmount remainingAmount paymentReleased practiceArea jobId job",
+  }),
+  asyncHandler(async (req, res) => {
+    const doc = await Case.findById(req.params.caseId)
+      .select(
+        "title status practiceArea paymentReleased totalAmount lockedTotalAmount remainingAmount readOnly paralegal paralegalId applicants jobId job relistRequestedAt relistPending payoutFinalizedAt disputeDeadlineAt"
+      )
+      .populate("paralegal", "firstName lastName email role")
+      .populate("applicants.paralegalId", "firstName lastName email role");
+    if (!doc) return res.status(404).json({ error: "Case not found" });
+
+    const role = String(req.user?.role || "").toLowerCase();
+    const isAdmin = role === "admin";
+    const canSeeStars = role === "attorney" || isAdmin;
+
+    let applicants = Array.isArray(doc.applicants)
+      ? doc.applicants.map((entry) => {
+          const paralegalDoc =
+            entry.paralegalId && typeof entry.paralegalId === "object" ? entry.paralegalId : null;
+          const coverLetter = entry.note || "";
+          const baseSnapshot = shapeParalegalSnapshot(paralegalDoc || {});
+          const storedSnapshot =
+            entry.profileSnapshot && typeof entry.profileSnapshot === "object"
+              ? entry.profileSnapshot
+              : {};
+          const profileSnapshot = { ...baseSnapshot, ...storedSnapshot };
+          const resumeURL = entry.resumeURL || paralegalDoc?.resumeURL || "";
+          const linkedInURL = entry.linkedInURL || paralegalDoc?.linkedInURL || "";
+          const starred =
+            canSeeStars &&
+            Array.isArray(entry.starredBy) &&
+            entry.starredBy.some((id) => String(id) === String(req.user.id));
+          return {
+            status: entry.status,
+            appliedAt: entry.appliedAt,
+            note: coverLetter,
+            coverLetter,
+            resumeURL,
+            linkedInURL,
+            profileSnapshot,
+            applicationId: null,
+            starred,
+            paralegalId: entry.paralegalId ? String(entry.paralegalId._id || entry.paralegalId) : null,
+            paralegal: summarizeUser(entry.paralegalId),
+          };
+        })
+      : [];
+
+    const jobId = doc.jobId || doc.job || null;
+    if (jobId) {
+      const jobApps = await Application.find({ jobId })
+        .populate("paralegalId", "firstName lastName email role profileImage avatarURL")
+        .lean();
+      if (jobApps.length) {
+        const existing = new Set(applicants.map((entry) => String(entry.paralegalId || "")));
+        const mapped = jobApps
+          .map((app) => {
+            const paralegalDoc = app.paralegalId && typeof app.paralegalId === "object" ? app.paralegalId : null;
+            const paralegalId = paralegalDoc?._id || app.paralegalId || null;
+            const starred =
+              canSeeStars &&
+              Array.isArray(app.starredBy) &&
+              app.starredBy.some((id) => String(id) === String(req.user.id));
+            return {
+              status: app.status || "submitted",
+              appliedAt: app.createdAt,
+              note: app.coverLetter || "",
+              coverLetter: app.coverLetter || "",
+              resumeURL: app.resumeURL || "",
+              linkedInURL: app.linkedInURL || "",
+              profileSnapshot: app.profileSnapshot || {},
+              applicationId: app._id ? String(app._id) : null,
+              starred,
+              paralegalId: paralegalId ? String(paralegalId) : null,
+              paralegal: summarizeUser(paralegalDoc),
+            };
+          })
+          .filter((entry) => {
+            if (!entry.paralegalId) return true;
+            if (existing.has(String(entry.paralegalId))) return false;
+            existing.add(String(entry.paralegalId));
+            return true;
+          });
+        applicants = [...applicants, ...mapped];
+      }
+    }
+
+    if (String(req.user?.role || "").toLowerCase() === "attorney") {
+      const blockedIds = await getBlockedUserIds(req.user.id);
+      if (blockedIds.length) {
+        const blockedSet = new Set(blockedIds.map((id) => String(id)));
+        applicants = applicants.filter((entry) => !blockedSet.has(String(entry.paralegalId || "")));
+      }
+    }
+
+    res.json({
+      id: String(doc._id),
+      _id: doc._id,
+      title: doc.title,
+      status: normalizeCaseStatusValue(doc.status),
+      practiceArea: doc.practiceArea || "",
+      paymentReleased: doc.paymentReleased || false,
+      totalAmount: doc.totalAmount || 0,
+      lockedTotalAmount: typeof doc.lockedTotalAmount === "number" ? doc.lockedTotalAmount : null,
+      remainingAmount: resolveRemainingAmount(doc),
+      readOnly: !!doc.readOnly,
+      relistRequestedAt: doc.relistRequestedAt || null,
+      relistPending: !!doc.relistPending,
+      payoutFinalizedAt: doc.payoutFinalizedAt || null,
+      disputeDeadlineAt: doc.disputeDeadlineAt || null,
+      paralegal: doc.paralegal || null,
+      paralegalId: doc.paralegalId || null,
+      applicants,
+    });
+  })
+);
+
+router.get(
   "/:caseId/stream",
   ensureCaseParticipant(),
   asyncHandler(async (req, res) => {
@@ -1656,6 +2002,7 @@ router.post(
       caseDoc.amountLockedAt = new Date();
     }
     await caseDoc.save();
+    publishCaseEvent(caseDoc._id, "case", { at: new Date().toISOString() });
 
     if (lockedNow) {
       try {
@@ -2038,7 +2385,7 @@ router.get(
       remainingAmount: resolveRemainingAmount(doc),
       currency: doc.currency || "usd",
       applicants: doc.applicants || [],
-      applicantsCount: Array.isArray(doc.applicants) ? doc.applicants.length : 0,
+      applicantsCount: countPendingApplicants(doc),
       paralegal: doc.paralegal || null,
       hiredAt: doc.hiredAt || null,
       escrowStatus: doc.escrowStatus || null,
@@ -2418,7 +2765,7 @@ router.get(
       .sort({ completedAt: -1, paidOutAt: -1, updatedAt: -1 })
       .limit(limit)
       .select(
-        "title status paymentReleased completedAt paidOutAt updatedAt attorney attorneyId withdrawnParalegalId pausedReason disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType currency"
+        "title status paymentReleased completedAt paidOutAt updatedAt attorney attorneyId withdrawnParalegalId pausedReason disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType currency disputes"
       )
       .populate("attorney", "firstName lastName email role")
       .populate("attorneyId", "firstName lastName email role");
@@ -2543,6 +2890,17 @@ router.patch(
     if (tasksInputProvided && (doc.tasksLocked || doc.hiredAt || doc.paralegal || doc.paralegalId) && !completionOnlyUpdate) {
       return res.status(403).json({
         error: "Tasks are locked once a paralegal is hired. Create a new case for additional work.",
+      });
+    }
+    if (
+      tasksInputProvided &&
+      completionOnlyUpdate &&
+      doc.withdrawnParalegalId &&
+      (doc.paralegalId || doc.paralegal) &&
+      hasCompletedTaskReversal(doc.tasks, normalizedTasks)
+    ) {
+      return res.status(403).json({
+        error: "Completed tasks cannot be unchecked after a withdrawal and rehire.",
       });
     }
     let touched = false;
@@ -3114,7 +3472,7 @@ router.post(
     if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid case id" });
 
     const doc = await Case.findById(caseId).select(
-      "status paralegal applicants archived attorney attorneyId title paymentReleased totalAmount lockedTotalAmount amountLockedAt relistRequestedAt payoutFinalizedAt"
+      "status paralegal applicants archived attorney attorneyId title paymentReleased totalAmount lockedTotalAmount amountLockedAt relistRequestedAt payoutFinalizedAt payoutFinalizedType relistPending"
     );
     if (!doc) return res.status(404).json({ error: "Case not found" });
     if (isFinalCaseDoc(doc)) {
@@ -3123,9 +3481,19 @@ router.post(
     if (doc.archived) return res.status(400).json({ error: "This case is not accepting applications" });
     if (doc.paralegal) return res.status(400).json({ error: "A paralegal has already been hired" });
     const statusKey = String(doc.status || "").toLowerCase();
+    const autoRelistTypes = new Set(["zero_auto", "partial_attorney", "expired_zero", "admin"]);
+    const autoRelistEligible =
+      statusKey === "paused" &&
+      !!doc.payoutFinalizedAt &&
+      autoRelistTypes.has(String(doc.payoutFinalizedType || ""));
     const relisted = statusKey === "paused" && doc.relistRequestedAt && doc.payoutFinalizedAt;
-    if (statusKey !== "open" && !relisted) {
+    if (statusKey !== "open" && !relisted && !autoRelistEligible) {
       return res.status(400).json({ error: "Applications are closed for this case" });
+    }
+    if (autoRelistEligible && !doc.relistRequestedAt) {
+      doc.relistRequestedAt = doc.payoutFinalizedAt || new Date();
+      doc.relistPending = false;
+      await doc.save();
     }
     const caseAttorneyId = doc.attorneyId || doc.attorney || null;
     if (caseAttorneyId && (await isBlockedBetween(req.user.id, caseAttorneyId))) {
@@ -3286,6 +3654,97 @@ router.post(
     }
 
     res.json({ ok: true, starred: shouldStar });
+  })
+);
+
+router.post(
+  "/:caseId/applicants/:paralegalId/reject",
+  verifyToken,
+  csrfProtection,
+  requireCaseAccess("caseId", { project: "title applicants attorney attorneyId jobId job" }),
+  asyncHandler(async (req, res) => {
+    if (!req.acl?.isAttorney && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Only attorneys can remove applicants." });
+    }
+    const caseDoc = req.case;
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+    const ownerId = String(caseDoc.attorneyId || caseDoc.attorney || "");
+    if (ownerId && String(req.user.id) !== ownerId && req.user.role !== "admin") {
+      return res.status(403).json({ error: "You are not the attorney for this case." });
+    }
+
+    const paralegalId = req.params.paralegalId;
+    if (!isObjId(paralegalId)) {
+      return res.status(400).json({ error: "Invalid paralegal id" });
+    }
+
+    let updated = false;
+    const caseEntry = Array.isArray(caseDoc.applicants)
+      ? caseDoc.applicants.find((app) => String(app.paralegalId) === String(paralegalId))
+      : null;
+    if (caseEntry) {
+      const status = String(caseEntry.status || "pending").toLowerCase();
+      if (status !== "rejected") {
+        caseEntry.status = "rejected";
+        updated = true;
+      }
+    }
+
+    const jobId = caseDoc.jobId || caseDoc.job || null;
+    let appUpdated = false;
+    let applicationDoc = null;
+    if (jobId) {
+      applicationDoc = await Application.findOne({ jobId, paralegalId });
+      if (applicationDoc) {
+        const status = String(applicationDoc.status || "submitted").toLowerCase();
+        if (status !== "rejected") {
+          applicationDoc.status = "rejected";
+          await applicationDoc.save();
+          appUpdated = true;
+          try {
+            const updatedJob = await Job.findByIdAndUpdate(
+              jobId,
+              { $inc: { applicantsCount: -1 } },
+              { new: true, select: "applicantsCount" }
+            );
+            if (updatedJob && typeof updatedJob.applicantsCount === "number" && updatedJob.applicantsCount < 0) {
+              await Job.findByIdAndUpdate(jobId, { applicantsCount: 0 });
+            }
+          } catch (err) {
+            console.warn("[cases] Unable to decrement job applicants count", err?.message || err);
+          }
+        }
+      }
+    }
+
+    if (!caseEntry && !applicationDoc) {
+      return res.status(404).json({ error: "Application not found." });
+    }
+
+    if (updated) {
+      await caseDoc.save();
+    }
+
+    try {
+      await logAction(req, "case.applicant.rejected", {
+        targetType: "case",
+        targetId: caseDoc._id,
+        caseId: caseDoc._id,
+        meta: { paralegalId },
+      });
+    } catch {}
+
+    try {
+      await sendCaseNotification(
+        paralegalId,
+        "application_denied",
+        caseDoc,
+        { link: "dashboard-paralegal.html" },
+        { actorUserId: req.user.id }
+      );
+    } catch {}
+
+    res.json({ ok: true, updated: updated || appUpdated });
   })
 );
 
@@ -3642,6 +4101,8 @@ router.post(
     caseDoc.pausedReason = "paralegal_withdrew";
     caseDoc.pausedAt = now;
     caseDoc.status = "paused";
+    caseDoc.adminDisputeDeadlineAt = null;
+    caseDoc.adminDisputeOverdueNotifiedAt = null;
 
     if (completedCount === 0) {
       caseDoc.partialPayoutAmount = 0;
@@ -3668,6 +4129,7 @@ router.post(
     }
 
     await caseDoc.save();
+    publishCaseEvent(caseDoc._id, "case", { at: new Date().toISOString() });
 
     try {
       await logAction(req, "case.withdrawal.requested", {
@@ -3762,6 +4224,8 @@ router.post(
     doc.partialPayoutAmount = null;
     doc.payoutFinalizedType = null;
     doc.payoutFinalizedAt = null;
+    doc.adminDisputeDeadlineAt = null;
+    doc.adminDisputeOverdueNotifiedAt = null;
     doc.relistRequestedAt = null;
     doc.relistPending = false;
     doc.remainingAmount = resolveRemainingAmount(doc);
@@ -3787,7 +4251,8 @@ router.post(
           "case_update",
           doc,
           {
-            summary: "Close without release recorded. The case will be eligible to be relisted after 24 hours.",
+            summary:
+              "Release was declined. A 24-hour review window is now active. The paralegal may request payment for submitted deliverables during this time. If no request is made, the case will automatically relist after 24 hours.",
           },
           { actorUserId: req.user.id }
         );
@@ -3799,7 +4264,7 @@ router.post(
           "case_update",
           doc,
           {
-            summary: "The case was closed without release.",
+            summary: "The case was closed without release. You may dispute within 24 hours.",
           },
           { actorUserId: req.user.id }
         );
@@ -3961,7 +4426,7 @@ router.post(
         return res.status(400).json({ error: "Payout must be finalized before hiring a new paralegal." });
       }
       if (isDisputeWindowActive(selectedCase)) {
-        return res.status(400).json({ error: "Hiring is locked until the case becomes eligible to be relisted." });
+        return res.status(400).json({ error: "Hiring is locked until the payout is finalized." });
       }
       const relistBudgetCents = Number(resolveRemainingAmount(selectedCase) ?? 0);
       if (!Number.isFinite(relistBudgetCents) || relistBudgetCents <= 0) {
@@ -4744,18 +5209,27 @@ router.post(
     if (isDisputeWindowActive(doc)) {
       return res.status(400).json({ error: "Payout cannot be set during the 24-hour hold." });
     }
+    if (doc.disputeDeadlineAt && req.user?.role !== "admin") {
+      return res.status(400).json({
+        error: "Payout decisions are locked after close without release. Admin will finalize.",
+      });
+    }
     if (doc.pausedReason !== "paralegal_withdrew") {
       return res.status(400).json({ error: "Partial payouts are only available after a withdrawal." });
     }
 
-    const baseAmount = resolveRemainingAmount(doc) ?? doc.lockedTotalAmount ?? doc.totalAmount ?? 0;
-    if (!Number.isFinite(baseAmount) || baseAmount < 0) {
+    const remainingAmount = resolveRemainingAmount(doc) ?? doc.lockedTotalAmount ?? doc.totalAmount ?? 0;
+    if (!Number.isFinite(remainingAmount) || remainingAmount < 0) {
       return res.status(400).json({ error: "Case amount is invalid." });
     }
-    if (amountCents > baseAmount) {
+    if (amountCents > remainingAmount) {
       return res.status(400).json({ error: "Payout exceeds the remaining case amount." });
     }
-
+    const totalAmount = doc.lockedTotalAmount ?? doc.totalAmount ?? remainingAmount;
+    const capCents = Math.max(0, Math.round(Number(totalAmount || 0) * 0.7));
+    if (req.user?.role !== "admin" && amountCents > capCents) {
+      return res.status(400).json({ error: "Payout exceeds the 70% cap for attorney partial payouts." });
+    }
     const withdrawnParalegal =
       doc.withdrawnParalegalId && typeof doc.withdrawnParalegalId === "object"
         ? doc.withdrawnParalegalId
@@ -4782,12 +5256,15 @@ router.post(
 
     const now = new Date();
     doc.partialPayoutAmount = amountCents;
-    doc.payoutFinalizedType = "partial_attorney";
+    const isAdmin = req.user?.role === "admin";
+    doc.payoutFinalizedType = isAdmin ? "admin" : "partial_attorney";
     doc.payoutFinalizedAt = now;
     doc.disputeDeadlineAt = null;
+    doc.adminDisputeDeadlineAt = null;
+    doc.adminDisputeOverdueNotifiedAt = null;
     doc.relistRequestedAt = doc.relistRequestedAt || now;
     doc.relistPending = false;
-    doc.remainingAmount = Math.max(0, Math.round(baseAmount - amountCents));
+    doc.remainingAmount = Math.max(0, Math.round(remainingAmount - amountCents));
     doc.status = "paused";
     doc.pausedReason = "paralegal_withdrew";
     await ensureCaseJobOpen(doc);
@@ -4906,15 +5383,17 @@ router.get(
       if (caseDoc.status === "paused" && caseDoc.relistRequestedAt) return true;
       return false;
     },
-    project: "status paralegal attorney applicants archived withdrawnParalegalId pausedReason disputeDeadlineAt payoutFinalizedAt relistRequestedAt",
+    project:
+      "status paralegal attorney applicants archived withdrawnParalegalId paralegalNameSnapshot pausedReason disputeDeadlineAt payoutFinalizedAt relistRequestedAt",
   }),
   asyncHandler(async (req, res) => {
     const doc = await Case.findById(req.params.caseId)
       .select(
-        "title status practiceArea details state locationState deadline zoomLink paymentReleased escrowIntentId escrowStatus totalAmount lockedTotalAmount remainingAmount currency files attorney paralegal applicants hiredAt completedAt briefSummary archived downloadUrl terminationReason terminationStatus terminationRequestedAt terminationRequestedBy terminationDisputeId terminatedAt paralegalAccessRevokedAt archiveReadyAt archiveDownloadedAt purgeScheduledFor readOnly jobId job tasks tasksLocked pausedReason pausedAt disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType withdrawnParalegalId relistRequestedAt relistPending"
+        "title status practiceArea details state locationState deadline zoomLink paymentReleased escrowIntentId escrowStatus totalAmount lockedTotalAmount remainingAmount currency files attorney paralegal applicants hiredAt completedAt briefSummary archived downloadUrl terminationReason terminationStatus terminationRequestedAt terminationRequestedBy terminationDisputeId terminatedAt paralegalAccessRevokedAt archiveReadyAt archiveDownloadedAt purgeScheduledFor readOnly jobId job tasks tasksLocked pausedReason pausedAt disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType withdrawnParalegalId paralegalNameSnapshot relistRequestedAt relistPending disputes"
       )
       .populate("paralegal", "firstName lastName email role")
       .populate("attorney", "firstName lastName email role")
+      .populate("withdrawnParalegalId", "firstName lastName email role")
       .populate("applicants.paralegalId", "firstName lastName email role")
       .populate("terminationRequestedBy", "firstName lastName email role");
     if (!doc) return res.status(404).json({ error: "Case not found" });
@@ -5144,5 +5623,7 @@ router.use((err, _req, res, _next) => {
   console.error("[cases] route error:", err);
   res.status(500).json({ error: "Server error", detail: err?.message || "Unknown error" });
 });
+
+startWithdrawalWorker();
 
 module.exports = router;

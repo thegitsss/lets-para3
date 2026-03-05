@@ -9,6 +9,8 @@ const User = require("../models/User");
 const AuditLog = require("../models/AuditLog");
 const { notifyUser } = require("../utils/notifyUser");
 
+const ADMIN_REVIEW_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 // ----------------------------------------
 // Helpers
 // ----------------------------------------
@@ -20,6 +22,17 @@ function parsePagination(req, { maxLimit = 100, defaultLimit = 25 } = {}) {
   const limit = Math.min(maxLimit, Math.max(1, parseInt(req.query.limit, 10) || defaultLimit));
   const skip = (page - 1) * limit;
   return { page, limit, skip };
+}
+
+const DOLLARS_RX = /[^0-9.\-]/g;
+function dollarsToCents(input) {
+  if (input === null || typeof input === "undefined" || input === "") return null;
+  const value =
+    typeof input === "number"
+      ? input
+      : parseFloat(String(input).replace(DOLLARS_RX, ""));
+  if (!Number.isFinite(value) || value < 0) return null;
+  return Math.max(0, Math.round(value * 100));
 }
 
 // ----------------------------------------
@@ -71,8 +84,22 @@ router.get(
       ];
     }
     if (finalized) {
-      match["disputeSettlement.action"] = { $in: ["refund", "release_full", "release_partial"] };
-      match.$expr = { $eq: ["$disputeSettlement.disputeId", "$disputes.disputeId"] };
+      const settlementMatch = {
+        "disputeSettlement.action": { $in: ["refund", "release_full", "release_partial"] },
+        $expr: { $eq: ["$disputeSettlement.disputeId", "$disputes.disputeId"] },
+      };
+      const withdrawalMatch = {
+        payoutFinalizedAt: { $ne: null },
+        payoutFinalizedType: { $ne: null },
+        "disputes.status": "resolved",
+      };
+      const finalizedMatch = { $or: [settlementMatch, withdrawalMatch] };
+      if (match.$or) {
+        match.$and = [{ $or: match.$or }, finalizedMatch];
+        delete match.$or;
+      } else {
+        Object.assign(match, finalizedMatch);
+      }
     }
 
     if (Object.keys(match).length) basePipeline.push({ $match: match });
@@ -99,6 +126,7 @@ router.get(
             lastName: "$paralegalDoc.lastName",
             email: "$paralegalDoc.email",
           },
+          activeParalegalId: "$paralegal",
           lockedTotalAmount: "$lockedTotalAmount",
           totalAmount: "$totalAmount",
           remainingAmount: "$remainingAmount",
@@ -120,6 +148,16 @@ router.get(
           relistRequestedAt: "$relistRequestedAt",
           disputeSettlement: "$disputeSettlement",
           dispute: "$disputes",
+          tasksTotal: { $size: { $ifNull: ["$tasks", []] } },
+          tasksCompleted: {
+            $size: {
+              $filter: {
+                input: { $ifNull: ["$tasks", []] },
+                as: "task",
+                cond: { $eq: ["$$task.completed", true] },
+              },
+            },
+          },
         },
       }
     ]);
@@ -228,7 +266,7 @@ router.post(
   "/:caseId",
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
-    const { message } = req.body || {};
+    const { message, amount, amountCents } = req.body || {};
     if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid caseId" });
     if (!message || !String(message).trim()) return res.status(400).json({ error: "message required" });
 
@@ -260,20 +298,34 @@ router.post(
     }
     if (!isParty) return res.status(403).json({ error: "Not authorized to dispute this case" });
 
+    const requestedCents =
+      typeof amountCents !== "undefined" ? dollarsToCents(amountCents) : dollarsToCents(amount);
+
     // Use model helper if available
     if (typeof c.createDispute === "function") {
-      c.createDispute({ message: String(message).trim(), raisedBy: req.user.id });
+      c.createDispute({
+        message: String(message).trim(),
+        raisedBy: req.user.id,
+        amountRequestedCents: requestedCents,
+      });
     } else {
-      c.disputes.push({
+      const payload = {
         message: String(message).trim(),
         raisedBy: req.user.id,
         status: "open",
-      });
+      };
+      if (Number.isFinite(requestedCents) && requestedCents > 0) {
+        payload.amountRequestedCents = requestedCents;
+      }
+      c.disputes.push(payload);
       if (c.status !== "closed") c.status = "disputed";
     }
     if (hasWithdrawalWindow || isWithdrawnParalegal) {
       c.status = "disputed";
       c.pausedReason = "dispute";
+      c.disputeDeadlineAt = null;
+      c.adminDisputeDeadlineAt = new Date(now.getTime() + ADMIN_REVIEW_WINDOW_MS);
+      c.adminDisputeOverdueNotifiedAt = null;
     }
 
     await c.save();

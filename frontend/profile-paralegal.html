@@ -311,6 +311,41 @@
       color: var(--muted);
       display: block;
     }
+
+    body.viewer-attorney .profile-header-controls .user-chip {
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      box-shadow: none;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    body.viewer-attorney .profile-header-controls .user-chip img {
+      border: 2px solid #fff;
+      box-shadow: none;
+    }
+
+    body.viewer-attorney .profile-header-controls .user-chip strong {
+      font-family: var(--font-serif);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: #1a1a1a;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    body.viewer-attorney .profile-header-controls .user-chip span {
+      color: #6b6b6b;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     .profile-menu {
       position: relative;
     }
@@ -345,6 +380,49 @@
     }
     .profile-dropdown button:hover {
       background: rgba(182, 164, 122, 0.14);
+    }
+
+    body.viewer-attorney .profile-dropdown {
+      background: var(--panel, #fff);
+      border: 1px solid var(--line, rgba(0, 0, 0, 0.08));
+      border-radius: 16px;
+      box-shadow: 0 18px 30px rgba(0, 0, 0, 0.12);
+      min-width: 200px;
+      z-index: 9999;
+      pointer-events: auto;
+      overflow: visible;
+      color: var(--ink, #1a1a1a);
+    }
+
+    body.viewer-attorney .profile-dropdown button {
+      background: none;
+      border: none;
+      padding: 0.85rem 1.1rem;
+      text-align: left;
+      font-size: 0.92rem;
+      cursor: pointer;
+      color: inherit;
+      text-decoration: none;
+      display: block;
+      font-weight: 200;
+      border-radius: 12px;
+      margin: 4px 6px;
+      width: calc(100% - 12px);
+    }
+
+    body.viewer-attorney .profile-dropdown button:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    body.viewer-attorney .profile-dropdown .logout-btn {
+      color: #b91c1c;
+      background: rgba(185, 28, 28, 0.08);
+      border: 1px solid rgba(185, 28, 28, 0.2);
+    }
+
+    body.viewer-attorney .profile-dropdown .logout-btn:hover {
+      background: rgba(185, 28, 28, 0.15);
+      color: #991b1b;
     }
 
     .notif-panel {
@@ -636,6 +714,20 @@
 
     .hero-meta-pill a:hover {
       text-decoration: underline;
+    }
+
+    #locationMeta,
+    #locationMeta .hero-meta-link,
+    #locationMeta .meta-line,
+    #locationMeta .meta-text {
+      color: var(--accent);
+      font-size: 0.9rem;
+      font-weight: 400;
+      text-decoration: none;
+    }
+
+    #locationMeta a:hover {
+      text-decoration: none;
     }
 
     #joinedMeta,
@@ -1567,8 +1659,8 @@
             </div>
           </a>
           <div class="profile-dropdown" id="profileDropdown">
-            <button type="button" data-settings>Account settings</button>
-            <button type="button" data-logout>Log out</button>
+            <button type="button" data-settings>Account Settings</button>
+            <button type="button" class="logout-btn" data-logout>Log out</button>
           </div>
         </div>
       </div>

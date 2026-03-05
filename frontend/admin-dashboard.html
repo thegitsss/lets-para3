@@ -378,6 +378,10 @@ font-weight:300;
 .grid-four{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1.5rem;}
 .ledger-table{width:100%;border-collapse:collapse;}
 .ledger-table th,.ledger-table td{padding:.75rem;border-bottom:1px solid var(--line);text-align:left;}
+.receipts-header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.receipts-actions{display:flex;align-items:center;gap:10px;}
+.receipts-actions input{min-width:240px;padding:.5rem .85rem;border:1px solid var(--line);border-radius:999px;font-size:.9rem;}
+.receipt-id{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;font-size:.85rem;color:var(--muted);}
 .tax-summary,.payout-schedule{list-style:none;padding:0;margin:0;}
 .tax-summary li,.payout-schedule li{padding:.4rem 0;border-bottom:1px solid var(--line);font-size:.95rem;}
 .tax-summary strong{color:var(--ink);}
@@ -385,6 +389,7 @@ font-weight:300;
 .dispute-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
 .dispute-actions input{width:120px;}
 .dispute-meta{font-size:.85rem;color:var(--muted);}
+.dispute-message{white-space:pre-wrap;}
 .dispute-status{font-size:.85rem;text-transform:capitalize;}
 .dispute-actions .btn{white-space:nowrap;}
 .dispute-tabs{display:flex;flex-wrap:wrap;gap:8px;}
@@ -1195,6 +1200,27 @@ font-size:.95rem;
 </table>
 </div>
 
+<!-- Receipts Table -->
+<div class="panel" style="margin-top:2rem;">
+<div class="panel-header receipts-header">
+<h2>Receipts</h2>
+<div class="receipts-actions">
+<input type="search" id="receiptSearch" placeholder="Search receipt ID, case, or party">
+<button class="btn secondary" type="button" id="receiptRefreshBtn">Refresh</button>
+</div>
+</div>
+<div class="table-wrap">
+<table class="ledger-table receipts-table">
+<thead>
+<tr><th>Date</th><th>Receipt ID</th><th>Case</th><th>Party</th><th>Type</th><th>Amount</th></tr>
+</thead>
+<tbody id="receiptsBody">
+<tr><td colspan="6" style="text-align:center;color:var(--muted)">Loading receipts…</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+
 <!-- Tax Summary -->
 <div class="grid-two" style="margin-top:2rem;">
 <div class="panel">
@@ -1803,7 +1829,13 @@ return fallback;
 }
 
 function formatCurrencyFromCents(value) {
-return "—";
+const cents = Number(value);
+if (!Number.isFinite(cents)) return "—";
+return new Intl.NumberFormat("en-US", {
+style: "currency",
+currency: "USD",
+minimumFractionDigits: 2,
+}).format(cents / 100);
 }
 
 async function loadFinanceCards() {

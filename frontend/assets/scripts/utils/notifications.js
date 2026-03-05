@@ -1,5 +1,5 @@
 // Shared notification center for headers
-import { secureFetch } from "../auth.js";
+import { secureFetch, getStoredSession } from "../auth.js";
 
 const NOTIFICATION_STYLE_ID = "lpc-notification-styles";
 const MAX_VISIBLE_NOTIFICATION_CARDS = 3;
@@ -148,6 +148,111 @@ function getAvatarFallback(name = "") {
   const letter = (name || "?").trim().charAt(0).toUpperCase() || "?";
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="32" fill="#eef1f7"/><text x="50%" y="56%" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" fill="#5c6477">${letter}</text></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function normalizeUserId(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  return String(value._id || value.id || "");
+}
+
+function extractCaseIdFromLink(link = "") {
+  if (!link || typeof link !== "string") return "";
+  try {
+    const url = link.startsWith("http") ? new URL(link) : new URL(link, window.location.origin);
+    if (!url.pathname.endsWith("case-detail.html")) return "";
+    return url.searchParams.get("caseId") || "";
+  } catch {
+    const match = link.match(/case-detail\.html\?caseId=([^&#]+)/i);
+    return match ? decodeURIComponent(match[1]) : "";
+  }
+}
+
+async function resolveCaseDetailLink(link, item = {}) {
+  const caseId = extractCaseIdFromLink(link);
+  if (!caseId) return link;
+  const session = getStoredSession();
+  const role = String(item.userRole || session?.role || "").toLowerCase();
+  const userId = normalizeUserId(session?.user?._id || session?.user?.id);
+  let res;
+  try {
+    res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, { noRedirect: true });
+  } catch {
+    return role === "admin"
+      ? "admin-dashboard.html"
+      : role === "attorney"
+        ? "dashboard-attorney.html#cases"
+        : "dashboard-paralegal.html#cases";
+  }
+  if (!res || !res.ok) {
+    return role === "admin"
+      ? "admin-dashboard.html"
+      : role === "attorney"
+        ? "dashboard-attorney.html#cases"
+        : "dashboard-paralegal.html#cases";
+  }
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {}
+  const caseData = data?.case || data;
+  if (!caseData) return link;
+  const status = String(caseData.status || "").toLowerCase();
+  const paymentReleased = caseData.paymentReleased === true;
+  const paralegalId = normalizeUserId(caseData.paralegalId || caseData.paralegal);
+  const withdrawnId = normalizeUserId(caseData.withdrawnParalegalId);
+  const isAssigned = userId && paralegalId && userId === paralegalId;
+  const isWithdrawn = userId && withdrawnId && userId === withdrawnId;
+  const activeStatuses = new Set(["in progress", "active"]);
+  const hasActiveParalegal = !!paralegalId;
+
+  if (role === "paralegal") {
+    if (["completed", "closed"].includes(status) || paymentReleased) {
+      return caseId
+        ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases-completed`
+        : "dashboard-paralegal.html#cases-completed";
+    }
+    if (status === "paused" && caseData.pausedReason === "paralegal_withdrew" && isWithdrawn) {
+      return caseId
+        ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases-completed`
+        : "dashboard-paralegal.html#cases-completed";
+    }
+    if (!isAssigned && !isWithdrawn) {
+      return caseId
+        ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases`
+        : "dashboard-paralegal.html#cases";
+    }
+    if (["open", "draft", "applied"].includes(status)) {
+      return caseId
+        ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases`
+        : "dashboard-paralegal.html#cases";
+    }
+    if (!hasActiveParalegal || !isAssigned || !activeStatuses.has(status)) {
+      return caseId
+        ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases`
+        : "dashboard-paralegal.html#cases";
+    }
+  }
+
+  if (role === "attorney") {
+    if (["completed", "closed"].includes(status) || paymentReleased) {
+      return caseId
+        ? `dashboard-attorney.html?highlightCase=${encodeURIComponent(caseId)}#cases:archived`
+        : "dashboard-attorney.html#cases:archived";
+    }
+    if (["open", "draft", "applied"].includes(status)) {
+      return caseId
+        ? `dashboard-attorney.html?highlightCase=${encodeURIComponent(caseId)}#cases`
+        : "dashboard-attorney.html#cases";
+    }
+    if (!hasActiveParalegal || !activeStatuses.has(status)) {
+      return caseId
+        ? `dashboard-attorney.html?highlightCase=${encodeURIComponent(caseId)}#cases`
+        : "dashboard-attorney.html#cases";
+    }
+  }
+
+  return link;
 }
 
 const ADMIN_NOTIFICATION_IMAGE = "/hero-mountain.jpg";
@@ -352,6 +457,7 @@ function closeAllNotificationPanels() {
   document.querySelectorAll("[data-notification-panel].show").forEach((panel) => {
     panel.classList.remove("show");
     panel.classList.add("hidden");
+    panel.style.removeProperty("display");
   });
   document.querySelectorAll(".notification-dropdown").forEach((dropdown) => {
     dropdown.style.display = "none";
@@ -526,10 +632,15 @@ function createCenter(root) {
 
   if (!root.dataset.boundNotificationCenter) {
     root.dataset.boundNotificationCenter = "true";
-    toggle.addEventListener("click", () => togglePanel(state));
+    toggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      togglePanel(state);
+    });
     toggle.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
+        event.stopImmediatePropagation();
         togglePanel(state);
       }
     });
@@ -540,6 +651,13 @@ function createCenter(root) {
 }
 
 function togglePanel(center) {
+  if (!center?.panel) return;
+  if (center.panel.dataset.toggleLock === "true") return;
+  center.panel.dataset.toggleLock = "true";
+  window.setTimeout(() => {
+    if (center.panel) center.panel.dataset.toggleLock = "";
+  }, 120);
+  center.panel.style.removeProperty("display");
   const willShow = !center.panel.classList.contains("show");
   document.querySelectorAll("[data-notification-panel].show").forEach((panel) => {
     if (panel !== center.panel) panel.classList.remove("show");
@@ -627,9 +745,11 @@ function showPanel(center) {
       panel.classList.remove("show");
       panel.classList.add("hidden");
       panel.dataset.pendingShow = "";
+      panel.style.removeProperty("display");
     }
   });
   scheduleNotificationListViewportSync(center.list);
+  center.panel.style.removeProperty("display");
   center.panel.classList.add("show");
   center.panel.classList.remove("hidden");
 }
@@ -908,9 +1028,10 @@ async function getCompletedCaseIds(role = "") {
 
 async function filterCompletedCaseNotifications(items = []) {
   if (!Array.isArray(items) || !items.length) return items;
-  const allowCompletedTypes = new Set(["payout_released"]);
   const role = String(items.find((item) => item?.userRole)?.userRole || "").toLowerCase();
-  if (role !== "attorney" && role !== "paralegal") return items;
+  if (role === "paralegal") return items;
+  const allowCompletedTypes = new Set(["payout_released"]);
+  if (role !== "attorney") return items;
   const completedIds = await getCompletedCaseIds(role);
   if (!completedIds.size) return items;
   return items.filter((item) => {
@@ -965,6 +1086,19 @@ function resolveNotificationLink(item = {}) {
       payload.caseRef ||
       payload.caseDoc
   );
+  if (type === "case_update" && role === "paralegal") {
+    const summaryText = String(payload.summary || payload.message || item.message || "").toLowerCase();
+    if (summaryText.includes("close without release")) {
+      return caseId
+        ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases-completed`
+        : "dashboard-paralegal.html#cases-completed";
+    }
+    if (summaryText.includes("you withdrew") || summaryText.includes("withdrawn")) {
+      return caseId
+        ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases-completed`
+        : "dashboard-paralegal.html#cases-completed";
+    }
+  }
   if (type === "application_submitted" && role === "attorney") {
     const applicantId = extractApplicantId(item);
     if (caseId && applicantId) {
@@ -980,7 +1114,9 @@ function resolveNotificationLink(item = {}) {
   const explicitLink = primaryLink || payloadLink || payloadUrl;
   if (explicitLink) return explicitLink;
   if (type === "payout_released" && role === "paralegal") {
-    return "dashboard-paralegal.html#cases-completed";
+    return caseId
+      ? `dashboard-paralegal.html?highlightCase=${encodeURIComponent(caseId)}#cases-completed`
+      : "dashboard-paralegal.html#cases-completed";
   }
   if (caseId) {
     const base = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
@@ -1214,7 +1350,22 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
       }
     }
     if (link) {
-      window.location.href = link;
+      const resolvedLink = await resolveCaseDetailLink(link, normalized);
+      closeAllNotificationPanels();
+      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      let target = resolvedLink;
+      try {
+        if (/^https?:\/\//i.test(resolvedLink)) {
+          const url = new URL(resolvedLink);
+          target = `${url.pathname}${url.search}${url.hash}`;
+        } else if (resolvedLink.startsWith("/")) {
+          target = resolvedLink;
+        }
+      } catch {}
+      if (target === current) {
+        return;
+      }
+      window.location.href = resolvedLink;
     }
   });
 

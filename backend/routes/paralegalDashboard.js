@@ -50,14 +50,58 @@ async function getParalegalEarnings(paralegalId) {
             { $match: { createdAt: { $gte: last30, $lte: now } } },
             { $group: { _id: null, total: { $sum: "$amountPaid" } } },
           ],
+          total: [
+            { $group: { _id: null, total: { $sum: "$amountPaid" } } },
+          ],
         },
       },
     ]);
     const monthTotal = totals[0]?.month?.[0]?.total || 0;
     const last30Total = totals[0]?.last30?.[0]?.total || 0;
+    const allTimeTotal = totals[0]?.total?.[0]?.total || 0;
+    let withdrawalMonthTotal = 0;
+    let withdrawalLast30Total = 0;
+    let withdrawalAllTimeTotal = 0;
+    const withdrawalCases = await Case.find({
+      withdrawnParalegalId: paralegalMatch,
+      payoutFinalizedAt: { $ne: null },
+      partialPayoutAmount: { $gt: 0 },
+    }).select("partialPayoutAmount payoutFinalizedAt feeParalegalPct");
+
+    if (withdrawalCases.length) {
+      const withdrawalCaseIds = withdrawalCases.map((doc) => doc._id);
+      const payoutCaseIds = await Payout.find({ caseId: { $in: withdrawalCaseIds } })
+        .select("caseId")
+        .lean();
+      const payoutCaseIdSet = new Set(payoutCaseIds.map((p) => String(p.caseId)));
+      const defaultParalegalFeePct = Number(process.env.PLATFORM_FEE_PARALEGAL_PERCENT || 18);
+
+      withdrawalCases.forEach((doc) => {
+        if (payoutCaseIdSet.has(String(doc._id))) return;
+        const gross = Number(doc.partialPayoutAmount || 0);
+        if (!Number.isFinite(gross) || gross <= 0) return;
+        const feePct =
+          typeof doc.feeParalegalPct === "number" && Number.isFinite(doc.feeParalegalPct)
+            ? doc.feeParalegalPct
+            : defaultParalegalFeePct;
+        const fee = Math.max(0, Math.round((gross * feePct) / 100));
+        const net = Math.max(0, gross - fee);
+        const paidAt = doc.payoutFinalizedAt ? new Date(doc.payoutFinalizedAt) : null;
+        if (!paidAt || Number.isNaN(paidAt.getTime())) return;
+        withdrawalAllTimeTotal += net;
+        if (paidAt >= startOfMonth && paidAt <= now) {
+          withdrawalMonthTotal += net;
+        }
+        if (paidAt >= last30 && paidAt <= now) {
+          withdrawalLast30Total += net;
+        }
+      });
+    }
+
     return {
-      month: monthTotal / 100,
-      last30: last30Total / 100,
+      month: (monthTotal + withdrawalMonthTotal) / 100,
+      last30: (last30Total + withdrawalLast30Total) / 100,
+      total: (allTimeTotal + withdrawalAllTimeTotal) / 100,
     };
   } catch (err) {
     console.error("Error computing paralegal earnings:", err);
@@ -121,6 +165,7 @@ router.get("/", auth, requireApproved, requireRole(["paralegal"]), async (req, r
       pendingApplications: pendingApplicationsCount,
       earnings: earningsTotals.month,
       earningsLast30Days: earningsTotals.last30,
+      earningsTotal: earningsTotals.total,
     };
 
     // 5. Shape response for frontend
