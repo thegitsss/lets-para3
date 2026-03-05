@@ -353,6 +353,12 @@
       color: var(--ink);
     }
 
+    body.theme-dark .escrow-pagination .page-btn {
+      background: rgba(18, 23, 36, 0.92);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: var(--ink);
+    }
+
     body.theme-dark .case-subinfo,
     body.theme-dark .info-line,
     body.theme-dark .muted {
@@ -3832,6 +3838,13 @@
       flex-direction:column;
       gap:0.65rem;
       min-height:100%;
+      cursor:pointer;
+      transition:transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .view-billing .history-card:hover {
+      transform:translateY(-2px);
+      box-shadow:0 12px 24px rgba(0,0,0,0.12);
     }
 
     .view-billing .history-primary .case-name {

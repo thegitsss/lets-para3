@@ -64,8 +64,23 @@
       --panel: #151b29;
       --ink: #f5f6fb;
       --muted: #9aa7c4;
-      --line: rgba(255, 255, 255, 0.08);
+      --line: rgba(255, 255, 255, 0.12);
       --sidebar-text: #f8fbff;
+      --app-surface-contrast: #1c2333;
+      --app-surface-muted: #111827;
+      --app-card-muted: #1c2333;
+      --app-surface: #151b29;
+      --app-card: #151b29;
+      --app-border: rgba(255, 255, 255, 0.12);
+      --app-border-soft: rgba(255, 255, 255, 0.08);
+    }
+
+    html.theme-dark,
+    body.theme-dark,
+    html.theme-mountain-dark,
+    body.theme-mountain-dark {
+      background: #0f172a;
+      color: #f5f6fb;
     }
 
     html.theme-mountain,
@@ -472,6 +487,7 @@
       min-width: 0;
       height: 100vh;
       overflow: hidden;
+      background: var(--app-background);
     }
 
     .case-topbar {
@@ -556,6 +572,14 @@
       color: var(--app-text);
       text-align: left;
     }
+    body.theme-dark .user-chip,
+    html.theme-dark .user-chip,
+    body.theme-mountain-dark .user-chip,
+    html.theme-mountain-dark .user-chip {
+      background: #1c2333;
+      border-color: rgba(255, 255, 255, 0.12);
+      color: #f5f6fb;
+    }
 
     .user-chip img {
       width: 38px;
@@ -573,6 +597,12 @@
       font-size: 0.82rem;
       color: var(--app-muted);
     }
+    body.theme-dark .user-chip span,
+    html.theme-dark .user-chip span,
+    body.theme-mountain-dark .user-chip span,
+    html.theme-mountain-dark .user-chip span {
+      color: #9aa7c4;
+    }
 
     .profile-dropdown {
       position: absolute;
@@ -586,6 +616,13 @@
       flex-direction: column;
       min-width: 200px;
       z-index: 40;
+    }
+    body.theme-dark .profile-dropdown,
+    html.theme-dark .profile-dropdown,
+    body.theme-mountain-dark .profile-dropdown,
+    html.theme-mountain-dark .profile-dropdown {
+      background: #151b29;
+      border-color: rgba(255, 255, 255, 0.12);
     }
 
     .profile-dropdown.show {
@@ -605,6 +642,12 @@
     .profile-dropdown button:hover {
       background: var(--app-surface-contrast);
     }
+    body.theme-dark .profile-dropdown button:hover,
+    html.theme-dark .profile-dropdown button:hover,
+    body.theme-mountain-dark .profile-dropdown button:hover,
+    html.theme-mountain-dark .profile-dropdown button:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
 
     .case-workspace {
       display: grid;
@@ -619,6 +662,13 @@
       flex: 1;
       min-height: 0;
     }
+    body.theme-dark .case-workspace,
+    html.theme-dark .case-workspace,
+    body.theme-mountain-dark .case-workspace,
+    html.theme-mountain-dark .case-workspace {
+      background: #151b29;
+      border-color: rgba(255, 255, 255, 0.12);
+    }
 
     .case-rail-stack {
       display: flex;
@@ -626,6 +676,13 @@
       gap: 18px;
       padding: 20px 18px;
       border-right: 1px solid var(--app-border-soft);
+    }
+    body.theme-dark .case-rail-stack,
+    html.theme-dark .case-rail-stack,
+    body.theme-mountain-dark .case-rail-stack,
+    html.theme-mountain-dark .case-rail-stack {
+      background: #151b29;
+      border-right-color: rgba(255, 255, 255, 0.08);
     }
 
     .case-rail {
@@ -663,6 +720,18 @@
       border: 1px solid var(--app-border-soft);
       background: var(--app-surface-contrast);
       color: var(--app-text);
+    }
+    body.theme-dark .case-rail-header input,
+    body.theme-dark .case-rail-header select,
+    html.theme-dark .case-rail-header input,
+    html.theme-dark .case-rail-header select,
+    body.theme-mountain-dark .case-rail-header input,
+    body.theme-mountain-dark .case-rail-header select,
+    html.theme-mountain-dark .case-rail-header input,
+    html.theme-mountain-dark .case-rail-header select {
+      background: #1c2333;
+      border-color: rgba(255, 255, 255, 0.12);
+      color: #f5f6fb;
     }
 
     .case-rail-list ul {
@@ -733,6 +802,13 @@
       padding: 12px 22px 20px;
       border-right: 1px solid var(--app-border-soft);
       min-height: 0;
+    }
+    body.theme-dark .case-thread,
+    html.theme-dark .case-thread,
+    body.theme-mountain-dark .case-thread,
+    html.theme-mountain-dark .case-thread {
+      background: #151b29;
+      border-right-color: rgba(255, 255, 255, 0.08);
     }
 
     .case-thread-header {
@@ -1056,7 +1132,7 @@
       padding: 4px 6px;
       border: none;
       border-radius: 10px;
-      background: var(--app-surface-contrast);
+      background: transparent;
       color: var(--app-text);
       font-size: 0.82rem;
       line-height: 1.2;
@@ -1657,6 +1733,12 @@
       min-height: 0;
       overflow-y: auto;
     }
+    body.theme-dark .case-overview-panel,
+    html.theme-dark .case-overview-panel,
+    body.theme-mountain-dark .case-overview-panel,
+    html.theme-mountain-dark .case-overview-panel {
+      background: #151b29;
+    }
 
     .case-overview-panel > header {
       display: flex;
@@ -2017,6 +2099,38 @@
     #caseTaskList input[type="checkbox"]:disabled {
       cursor: default;
       opacity: 0.55;
+    }
+
+    body.theme-dark #caseTaskList input[type="checkbox"],
+    html.theme-dark #caseTaskList input[type="checkbox"],
+    body.theme-mountain-dark #caseTaskList input[type="checkbox"],
+    html.theme-mountain-dark #caseTaskList input[type="checkbox"] {
+      border-color: rgba(255, 255, 255, 0.22);
+      background: linear-gradient(180deg, #1f2533, #151b29);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 1px 2px rgba(0, 0, 0, 0.45);
+    }
+
+    body.theme-dark #caseTaskList input[type="checkbox"]:checked,
+    html.theme-dark #caseTaskList input[type="checkbox"]:checked,
+    body.theme-mountain-dark #caseTaskList input[type="checkbox"]:checked,
+    html.theme-mountain-dark #caseTaskList input[type="checkbox"]:checked {
+      border-color: rgba(182, 164, 122, 0.65);
+      background: linear-gradient(180deg, #2a3344, #1f2533);
+    }
+
+    body.theme-dark #caseTaskList input[type="checkbox"]:focus,
+    body.theme-dark #caseTaskList input[type="checkbox"]:focus-visible,
+    html.theme-dark #caseTaskList input[type="checkbox"]:focus,
+    html.theme-dark #caseTaskList input[type="checkbox"]:focus-visible,
+    body.theme-mountain-dark #caseTaskList input[type="checkbox"]:focus,
+    body.theme-mountain-dark #caseTaskList input[type="checkbox"]:focus-visible,
+    html.theme-mountain-dark #caseTaskList input[type="checkbox"]:focus,
+    html.theme-mountain-dark #caseTaskList input[type="checkbox"]:focus-visible {
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+        0 1px 2px rgba(0, 0, 0, 0.45);
     }
 
     .case-overview-actions {

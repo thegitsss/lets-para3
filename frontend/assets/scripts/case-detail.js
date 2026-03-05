@@ -1072,24 +1072,24 @@ function ensureWithdrawalNoticeModalStyles() {
     .tour-overlay{position:fixed;inset:0;display:none;z-index:12000;pointer-events:none}
     .tour-overlay.is-active{display:block}
     .tour-overlay::before{content:"";position:absolute;inset:0;background:rgba(10,15,25,.6)}
-    .tour-modal{width:min(420px,92vw);background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(15,23,42,.35);text-align:center;display:none;z-index:12001;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%)}
+    .tour-modal{width:min(420px,92vw);background:var(--app-surface);color:var(--app-text);border:1px solid var(--app-border);border-radius:18px;overflow:hidden;box-shadow:0 24px 60px rgba(15,23,42,.35);text-align:center;display:none;z-index:12001;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%)}
     .tour-modal.is-active{display:block}
     .tour-hero{height:150px;background-image:url("hero-mountain.jpg");background-size:cover;background-position:center}
     .tour-content{padding:22px 26px 28px}
-    .tour-title{font-family:var(--font-serif);font-size:1.6rem;color:var(--navy);margin-bottom:8px;font-weight:500}
-    .tour-text{color:var(--muted);font-size:.98rem;line-height:1.5;margin-bottom:20px}
+    .tour-title{font-family:var(--font-serif);font-size:1.6rem;color:var(--app-text);margin-bottom:8px;font-weight:500}
+    .tour-text{color:var(--app-muted);font-size:.98rem;line-height:1.5;margin-bottom:20px}
     .tour-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
-    .tour-btn{border:1px solid var(--line);background:#fff;color:var(--navy);padding:10px 20px;border-radius:999px;font-weight:300;cursor:pointer;transition:transform .2s ease, box-shadow .2s ease}
+    .tour-btn{border:1px solid var(--app-border);background:var(--app-surface);color:var(--app-text);padding:10px 20px;border-radius:999px;font-weight:300;cursor:pointer;transition:transform .2s ease, box-shadow .2s ease}
     .tour-btn.primary{background:var(--accent);color:#fff;border-color:transparent;box-shadow:0 12px 24px rgba(182,164,122,.35)}
     .tour-btn:hover{transform:translateY(-1px)}
-    .tour-close{position:absolute;top:10px;right:12px;width:32px;height:32px;border-radius:50%;border:1px solid rgba(15,23,42,.15);background:#fff;color:var(--navy);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+    .tour-close{position:absolute;top:10px;right:12px;width:32px;height:32px;border-radius:50%;border:1px solid var(--app-border);background:var(--app-surface);color:var(--app-text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
     .withdrawal-decision{display:grid;gap:14px;text-align:left;margin-bottom:16px}
-    .decision-card{border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:grid;gap:6px;cursor:pointer;transition:border-color .2s ease, box-shadow .2s ease;background:#fff}
+    .decision-card{border:1px solid var(--app-border);border-radius:16px;padding:14px 16px;display:grid;gap:6px;cursor:pointer;transition:border-color .2s ease, box-shadow .2s ease;background:var(--app-surface)}
     .decision-card.selected{border-color:var(--accent);box-shadow:0 0 0 1px rgba(182,164,122,.25)}
-    .decision-title{font-weight:600;color:var(--navy)}
-    .decision-text{font-size:.9rem;color:var(--muted)}
+    .decision-title{font-weight:600;color:var(--app-text)}
+    .decision-text{font-size:.9rem;color:var(--app-muted)}
     .decision-card.decision-deny{
-      background:linear-gradient(135deg, rgba(182,164,122,.12), rgba(255,255,255,0));
+      background:linear-gradient(135deg, var(--app-accent-soft), rgba(255,255,255,0));
       border-color:rgba(182,164,122,.35);
     }
     .decision-card.decision-deny .decision-title{
@@ -1098,7 +1098,7 @@ function ensureWithdrawalNoticeModalStyles() {
     .decision-card.decision-deny .decision-text{
       font-family:'Cormorant Garamond', serif;
       font-size:.95rem;
-      color:rgba(15,23,42,.7);
+      color:var(--app-muted);
       line-height:1.6;
     }
     .decision-input{display:none;gap:6px;margin-top:8px}
@@ -1107,7 +1107,7 @@ function ensureWithdrawalNoticeModalStyles() {
     .decision-prefix{
       position:absolute;
       left:12px;
-      color:rgba(15,23,42,.6);
+      color:var(--app-muted);
       font-weight:500;
       font-size:.95rem;
       pointer-events:none;
@@ -1116,24 +1116,26 @@ function ensureWithdrawalNoticeModalStyles() {
       width:100%;
       max-width:220px;
       border-radius:12px;
-      border:1px solid rgba(15,23,42,.15);
+      border:1px solid var(--app-border-soft);
+      background:var(--app-surface);
+      color:var(--app-text);
       padding:10px 12px 10px 26px;
       font-family:var(--font-sans);
     }
-    .decision-caption{font-size:.85rem;color:var(--muted);line-height:1.4}
+    .decision-caption{font-size:.85rem;color:var(--app-muted);line-height:1.4}
     .decision-error{font-size:.85rem;color:#b91c1c;min-height:1.1em}
-    .decision-note{display:flex;align-items:center;gap:6px;font-size:.8rem;color:rgba(15,23,42,.6)}
+    .decision-note{display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--app-muted)}
     .decision-note-icon{
       width:18px;
       height:18px;
       border-radius:999px;
-      border:1px solid rgba(15,23,42,.2);
+      border:1px solid var(--app-border);
       display:inline-flex;
       align-items:center;
       justify-content:center;
       font-size:.75rem;
       font-weight:600;
-      color:rgba(15,23,42,.7);
+      color:var(--app-muted);
       flex:0 0 auto;
     }
   `;
@@ -1423,11 +1425,19 @@ function ensurePartialPayoutModalStyles() {
     .case-payout-modal{background:var(--app-surface);color:var(--app-text);border:1px solid rgba(15,23,42,.12);border-radius:22px;padding:20px 22px;max-width:440px;width:92%;box-shadow:none;display:grid;gap:0;opacity:0;transform:translateY(4px);transition:opacity .18s ease, transform .18s ease;position:relative}
     .case-payout-overlay.is-visible{opacity:1}
     .case-payout-overlay.is-visible .case-payout-modal{opacity:1;transform:translateY(0) scale(1)}
+    body.theme-dark .case-payout-modal,
+    html.theme-dark .case-payout-modal,
+    body.theme-mountain-dark .case-payout-modal,
+    html.theme-mountain-dark .case-payout-modal{
+      background:#1c2333;
+      border-color:rgba(255,255,255,.12);
+      box-shadow:0 20px 40px rgba(0,0,0,.35);
+    }
     .case-payout-title{font-weight:400;font-size:1.35rem;text-align:center;font-family:var(--font-serif);margin:0 0 6px}
     .case-payout-divider{height:1px;background:var(--app-border);margin:0 0 12px}
-    .case-payout-body{display:grid;gap:0}
+    .case-payout-body{display:grid;gap:0;transition:opacity .2s ease}
     .case-payout-copy{font-family:'Cormorant Garamond', serif;font-size:1rem;line-height:1.5;text-align:left;margin:0 0 12px}
-    .case-payout-subcopy{display:block;margin-top:6px;color:rgba(15,23,42,.65);font-size:.95rem}
+    .case-payout-subcopy{display:block;margin-top:6px;color:var(--app-muted);font-size:.95rem}
     .line-item-card{
       border:0;
       border-radius:0;
@@ -1439,12 +1449,18 @@ function ensurePartialPayoutModalStyles() {
       background:transparent;
       box-shadow:none;
     }
-    .line-item-details{display:flex;align-items:center;gap:12px;min-width:0;margin-top:10px}
+    .line-item-details{display:flex;align-items:center;gap:12px;min-width:0;flex:1;padding-top:10px}
     .line-item-icon{display:none}
-    .line-item-text{display:grid;gap:2px;min-width:0}
-    .line-item-title{font-weight:500;color:var(--app-text);font-size:.98rem}
+    .line-item-text{display:flex;align-items:center;gap:10px;min-width:0}
+    .line-item-title{
+      font-family:var(--font-serif);
+      font-weight:500;
+      color:var(--app-text);
+      font-size:1.05rem;
+      line-height:1.2;
+    }
     .line-item-subtitle{font-size:.82rem;color:rgba(15,23,42,.6)}
-    .line-item-amount{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+    .line-item-amount{display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-left:auto}
     .money-input{
       display:flex;
       align-items:center;
@@ -1502,11 +1518,50 @@ function ensurePartialPayoutModalStyles() {
     .case-payout-summary .summary-label{color:rgba(15,23,42,.7)}
     .case-payout-summary .summary-value{font-weight:500;color:var(--app-text)}
     .case-payout-error{font-size:.82rem;color:#b91c1c;min-height:1.1em}
-    .case-payout-footer{display:flex;flex-direction:column;gap:8px;margin-top:0;padding-top:0}
+    .case-payout-footer{display:flex;flex-direction:column;gap:8px;margin-top:0;padding-top:0;transition:opacity .2s ease}
+    .case-payout-body.is-fading,
+    .case-payout-footer.is-fading{opacity:0}
     .case-payout-actions{display:flex;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;gap:10px}
     .case-payout-actions .case-action-btn{font-family:var(--font-serif);font-weight:500;letter-spacing:.02em}
     .case-payout-actions .case-action-btn.primary{width:auto}
     .case-payout-help-text{font-size:.8rem;color:rgba(15,23,42,.6);margin-top:2px}
+    .case-payout-modal.is-processing .case-payout-actions .case-action-btn{cursor:progress}
+    .case-payout-success{
+      display:grid;
+      gap:12px;
+      text-align:left;
+    }
+    .case-payout-success-title{
+      font-family:var(--font-serif);
+      font-size:1.2rem;
+      font-weight:500;
+      color:var(--app-text);
+    }
+    .case-payout-success-copy{
+      font-size:.95rem;
+      color:var(--app-muted);
+      line-height:1.5;
+    }
+    body.theme-dark .case-payout-subcopy,
+    html.theme-dark .case-payout-subcopy,
+    body.theme-mountain-dark .case-payout-subcopy,
+    html.theme-mountain-dark .case-payout-subcopy,
+    body.theme-dark .case-payout-help-text,
+    html.theme-dark .case-payout-help-text,
+    body.theme-mountain-dark .case-payout-help-text,
+    html.theme-mountain-dark .case-payout-help-text,
+    body.theme-dark .case-payout-hint,
+    html.theme-dark .case-payout-hint,
+    body.theme-mountain-dark .case-payout-hint,
+    html.theme-mountain-dark .case-payout-hint{
+      color:rgba(226,232,240,.85);
+    }
+    body.theme-dark .case-payout-summary .summary-label,
+    html.theme-dark .case-payout-summary .summary-label,
+    body.theme-mountain-dark .case-payout-summary .summary-label,
+    html.theme-mountain-dark .case-payout-summary .summary-label{
+      color:rgba(226,232,240,.85);
+    }
   `;
   document.head.appendChild(style);
 }
@@ -1544,12 +1599,11 @@ function openPartialPayoutModal({ maxCents = 0, currency = "USD", paralegalName 
       : "Maximum available: 70% cap";
     overlay.innerHTML = `
       <div class="case-payout-modal" role="dialog" aria-modal="true" aria-labelledby="casePayoutTitle">
-        <div class="case-payout-title" id="casePayoutTitle">Enter Partial Release</div>
+        <div class="case-payout-title" id="casePayoutTitle" data-payout-title>Enter Partial Release</div>
         <div class="case-payout-divider" role="presentation"></div>
-        <div class="case-payout-body">
+        <div class="case-payout-body" data-payout-body>
           <p class="case-payout-copy">
-            Enter the amount to release to the withdrawn paralegal.
-            <span class="case-payout-subcopy">This will finalize the case closure on your side.</span>
+            Enter the amount to release to the withdrawn paralegal. This will finalize the case closure on your side.
           </p>
           <div class="line-item-card">
             <div class="line-item-details">
@@ -1573,8 +1627,8 @@ function openPartialPayoutModal({ maxCents = 0, currency = "USD", paralegalName 
           </div>
         </div>
         <div class="case-payout-error" data-payout-error></div>
-        <div class="case-payout-footer">
-          <div class="case-payout-actions">
+        <div class="case-payout-footer" data-payout-footer>
+          <div class="case-payout-actions" data-payout-actions>
             <button class="case-action-btn secondary" type="button" data-payout-cancel>Cancel</button>
             <button class="case-action-btn primary" type="button" data-payout-confirm>Confirm Release</button>
           </div>
@@ -1584,9 +1638,35 @@ function openPartialPayoutModal({ maxCents = 0, currency = "USD", paralegalName 
     const input = overlay.querySelector("[data-payout-input]");
     const error = overlay.querySelector("[data-payout-error]");
     const confirmBtn = overlay.querySelector("[data-payout-confirm]");
+    const cancelBtn = overlay.querySelector("[data-payout-cancel]");
     const summaryValue = overlay.querySelector("[data-payout-summary]");
+    const modal = overlay.querySelector(".case-payout-modal");
+    const titleEl = overlay.querySelector("[data-payout-title]");
+    const bodyEl = overlay.querySelector("[data-payout-body]");
+    const footerEl = overlay.querySelector("[data-payout-footer]");
+    const actionsEl = overlay.querySelector("[data-payout-actions]");
+    const defaultTitle = titleEl?.textContent || "Enter Partial Release";
+    const swapContent = (nextBodyHtml, nextFooterHtml, onDone) => {
+      const duration = 180;
+      if (bodyEl) bodyEl.classList.add("is-fading");
+      if (footerEl) footerEl.classList.add("is-fading");
+      window.setTimeout(() => {
+        if (bodyEl && typeof nextBodyHtml === "string") {
+          bodyEl.innerHTML = nextBodyHtml;
+        }
+        if (footerEl && typeof nextFooterHtml === "string") {
+          footerEl.innerHTML = nextFooterHtml;
+        }
+        requestAnimationFrame(() => {
+          if (bodyEl) bodyEl.classList.remove("is-fading");
+          if (footerEl) footerEl.classList.remove("is-fading");
+          if (typeof onDone === "function") onDone();
+        });
+      }, duration);
+    };
 
     const updateState = () => {
+      if (confirmBtn?.disabled && confirmBtn.dataset.forceDisabled === "true") return;
       const amountCents = parseCurrencyInput(input?.value || "");
       if (summaryValue) {
         summaryValue.textContent =
@@ -1610,9 +1690,99 @@ function openPartialPayoutModal({ maxCents = 0, currency = "USD", paralegalName 
       dismissPopupOverlay(overlay);
       resolve(payload);
     };
+    const resolveWithControls = (payload) => {
+      resolve(payload);
+    };
+
+    let isProcessing = false;
+    const setProcessing = () => {
+      isProcessing = true;
+      if (modal) modal.classList.add("is-processing");
+      if (titleEl) titleEl.textContent = "Processing partial release";
+      if (confirmBtn) {
+        confirmBtn.dataset.forceDisabled = "true";
+        confirmBtn.disabled = true;
+      }
+      if (cancelBtn) cancelBtn.disabled = true;
+      if (input) input.disabled = true;
+      if (error) error.textContent = "";
+      swapContent(
+        `
+          <div class="case-payout-success">
+            <div class="case-payout-success-title">Processing partial release</div>
+            <div class="case-payout-success-copy">Please keep this window open while we finalize the release.</div>
+          </div>
+        `,
+        `
+          <div class="case-payout-actions">
+            <button class="case-action-btn primary" type="button" disabled>Processing…</button>
+          </div>
+        `
+      );
+    };
+
+    const setError = (message) => {
+      isProcessing = false;
+      if (modal) modal.classList.remove("is-processing");
+      if (titleEl) titleEl.textContent = "Unable to finalize";
+      const safeMessage = escapeHTML(message || "Unable to finalize partial payout.");
+      swapContent(
+        `
+          <div class="case-payout-success">
+            <div class="case-payout-success-title">Partial release not completed</div>
+            <div class="case-payout-success-copy">${safeMessage}</div>
+            <div class="case-payout-success-copy">Please try again in a moment.</div>
+          </div>
+        `,
+        `
+          <div class="case-payout-actions">
+            <button class="case-action-btn primary" type="button" data-payout-close>Close</button>
+          </div>
+        `,
+        () => {
+          footerEl?.querySelector("[data-payout-close]")?.addEventListener("click", () =>
+            close({ completed: false })
+          );
+        }
+      );
+    };
+
+    const setSuccess = ({ payoutLabel, paralegalName, receiptUrl, relistCopy, pending } = {}) => {
+      isProcessing = false;
+      if (modal) modal.classList.remove("is-processing");
+      const safeName = escapeHTML(paralegalName || "the paralegal");
+      const safeRelist = escapeHTML(relistCopy || "The case has been automatically relisted.");
+      const receiptLink = receiptUrl
+        ? `<a class="case-action-btn secondary" href="${receiptUrl}" target="_blank" rel="noopener">View / Download Receipt</a>`
+        : "";
+      if (titleEl) {
+        titleEl.textContent = pending ? "Processing partial release" : "Partial payment released";
+      }
+      const nextBody = `
+        <div class="case-payout-success">
+          <div class="case-payout-success-title">
+            ${pending ? "Processing partial release" : `Partial payment released to ${safeName}`}
+          </div>
+          <div class="case-payout-success-copy">
+            ${pending ? "We’re processing the release now. You can close this window or keep it open." : `Partial payment released to ${safeName}.`}
+          </div>
+          ${payoutLabel ? `<div class="case-payout-success-copy">Amount released: ${escapeHTML(payoutLabel)}.</div>` : ""}
+          <div class="case-payout-success-copy">${safeRelist}</div>
+        </div>
+      `;
+      const nextFooter = `
+        <div class="case-payout-actions">
+          ${receiptLink}
+          <button class="case-action-btn primary" type="button" data-payout-close>Close</button>
+        </div>
+      `;
+      swapContent(nextBody, nextFooter, () => {
+        footerEl?.querySelector("[data-payout-close]")?.addEventListener("click", () => close({ completed: true }));
+      });
+    };
 
     overlay.addEventListener("click", (event) => {
-      if (event.target === overlay) close({ cancelled: true, reason: "overlay" });
+      if (event.target === overlay && !isProcessing) close({ cancelled: true, reason: "overlay" });
     });
     overlay
       .querySelector("[data-payout-cancel]")
@@ -1627,12 +1797,19 @@ function openPartialPayoutModal({ maxCents = 0, currency = "USD", paralegalName 
         updateState();
         return;
       }
-      close({ amountCents, cancelled: false });
+      resolveWithControls({
+        amountCents,
+        cancelled: false,
+        setProcessing,
+        setError,
+        setSuccess,
+        closeModal: () => close({ completed: true }),
+      });
     });
     document.addEventListener(
       "keydown",
       (event) => {
-        if (event.key === "Escape") close({ cancelled: true, reason: "escape" });
+        if (event.key === "Escape" && !isProcessing) close({ cancelled: true, reason: "escape" });
       },
       { once: true }
     );
@@ -1825,6 +2002,48 @@ function ensureFlagMenuStyles() {
     .case-flag-overlay.is-visible .case-flag-modal{
       opacity:1;
       transform:translateY(0) scale(1);
+    }
+    body.theme-dark .case-flag-modal,
+    html.theme-dark .case-flag-modal,
+    body.theme-mountain-dark .case-flag-modal,
+    html.theme-mountain-dark .case-flag-modal{
+      background:#151b29;
+      color:#f5f6fb;
+      border-color:rgba(255,255,255,.12);
+    }
+    body.theme-dark .case-flag-modal::before,
+    html.theme-dark .case-flag-modal::before,
+    body.theme-mountain-dark .case-flag-modal::before,
+    html.theme-mountain-dark .case-flag-modal::before{
+      background:linear-gradient(135deg, rgba(182,164,122,.12), transparent 55%);
+    }
+    body.theme-dark .case-flag-actions .case-action-btn,
+    html.theme-dark .case-flag-actions .case-action-btn,
+    body.theme-mountain-dark .case-flag-actions .case-action-btn,
+    html.theme-mountain-dark .case-flag-actions .case-action-btn{
+      background:rgba(255,255,255,.06);
+      border-color:rgba(255,255,255,.12);
+      color:#f5f6fb;
+    }
+    body.theme-dark .case-flag-actions .case-action-btn.secondary,
+    html.theme-dark .case-flag-actions .case-action-btn.secondary,
+    body.theme-mountain-dark .case-flag-actions .case-action-btn.secondary,
+    html.theme-mountain-dark .case-flag-actions .case-action-btn.secondary{
+      background:transparent;
+    }
+    body.theme-dark .case-flag-info,
+    html.theme-dark .case-flag-info,
+    body.theme-mountain-dark .case-flag-info,
+    html.theme-mountain-dark .case-flag-info,
+    body.theme-dark .case-flag-muted,
+    html.theme-dark .case-flag-muted,
+    body.theme-mountain-dark .case-flag-muted,
+    html.theme-mountain-dark .case-flag-muted,
+    body.theme-dark .case-flag-note,
+    html.theme-dark .case-flag-note,
+    body.theme-mountain-dark .case-flag-note,
+    html.theme-mountain-dark .case-flag-note{
+      color:#9aa7c4;
     }
     @media (prefers-reduced-motion: reduce){
       .case-flag-actions .case-action-btn{
@@ -4170,24 +4389,42 @@ async function handlePartialPayout({ returnToMenu = false, menuCaseData = null, 
   }
   const amountCents = result.amountCents;
   if (!Number.isFinite(amountCents)) return;
+  if (typeof result.setProcessing === "function") {
+    result.setProcessing();
+  }
   state.partialPayoutSubmitting = true;
   if (casePartialPayoutButton) casePartialPayoutButton.disabled = true;
   if (statusNode) showMsg(statusNode, "Finalizing partial payout...");
   try {
     await fetchCSRF().catch(() => "");
-    await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/partial-payout`, {
+    const payload = await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/partial-payout`, {
       method: "POST",
       body: { amountCents },
     });
     if (statusNode) showMsg(statusNode, "Partial payout finalized. Case relisted.");
     await loadCase(caseId);
     const payoutLabel = formatCurrency(amountCents / 100, currency);
-    showCaseActionAcknowledgement({
-      title: "Partial Payout Submitted",
-      message: `A partial payout of ${payoutLabel} was submitted. The case will be relisted automatically.`,
-    });
+    if (typeof result.setSuccess === "function") {
+      const receiptUrl = `/api/payments/receipt/attorney/${encodeURIComponent(caseId)}`;
+      const pending = !payload?.transferId && Number(payload?.payout || 0) > 0;
+      result.setSuccess({
+        payoutLabel,
+        paralegalName: getWithdrawnParalegalName(caseData),
+        receiptUrl,
+        relistCopy: "The case has been automatically relisted.",
+        pending,
+      });
+    } else {
+      showCaseActionAcknowledgement({
+        title: "Partial Payout Submitted",
+        message: `A partial payout of ${payoutLabel} was submitted. The case will be relisted automatically.`,
+      });
+    }
   } catch (err) {
     if (statusNode) showMsg(statusNode, err.message || "Unable to finalize partial payout.");
+    if (typeof result.setError === "function") {
+      result.setError(err.message || "Unable to finalize partial payout.");
+    }
   } finally {
     state.partialPayoutSubmitting = false;
     if (casePartialPayoutButton) casePartialPayoutButton.disabled = false;

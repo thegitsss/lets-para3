@@ -79,11 +79,11 @@ function initBillingLite() {
 function bindEvents() {
   portalBtn?.addEventListener("click", openBillingPortal);
   historyList?.addEventListener("click", (event) => {
-    const btn = event.target.closest("[data-case-id]");
-    if (!btn) return;
-    const caseId = btn.getAttribute("data-case-id");
+    const card = event.target.closest("[data-case-id]");
+    if (!card) return;
+    const caseId = card.getAttribute("data-case-id");
     if (!caseId) return;
-    const receiptUrl = btn.getAttribute("data-receipt-url") || "";
+    const receiptUrl = card.getAttribute("data-receipt-url") || "";
     if (receiptUrl) {
       try {
         sessionStorage.setItem(
@@ -101,6 +101,13 @@ function bindEvents() {
       return;
     }
     showToast("Unable to load details right now.", "info");
+  });
+  historyList?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const card = event.target.closest(".history-card[data-case-id]");
+    if (!card) return;
+    event.preventDefault();
+    card.click();
   });
   refreshEscrowsBtn?.addEventListener("click", () => {
     loadActiveEscrows(true, { syncAlerts: true });
@@ -585,7 +592,7 @@ function renderHistoryCard(entry = {}) {
   const caseId = String(entry.caseId || entry.id || "");
   const receiptAttr = receipt ? ` data-receipt-url="${receipt}"` : "";
   return `
-    <article class="history-card">
+    <article class="history-card" role="button" tabindex="0" data-case-id="${caseId}"${receiptAttr}>
       <div class="history-primary">
         <div class="case-name">${caseName}</div>
         <div class="paralegal-name">Paralegal: ${paralegal}</div>
@@ -599,9 +606,6 @@ function renderHistoryCard(entry = {}) {
           <span>Date Paid</span>
           <strong>${datePaid}</strong>
         </div>
-      </div>
-      <div class="history-actions">
-        <button type="button" data-case-id="${caseId}"${receiptAttr}>Details</button>
       </div>
     </article>
   `;
