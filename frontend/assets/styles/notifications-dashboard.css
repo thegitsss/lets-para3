@@ -1,8 +1,8 @@
 /* Dashboard-attorney notification styles (source of truth), applied globally */
 
-body.dashboard-no-shadows *,
-body.dashboard-no-shadows *::before,
-body.dashboard-no-shadows *::after {
+body.dashboard-no-shadows *:not(.tour-overlay):not(.profile-tour-overlay):not(.tour-modal):not(.tour-tooltip):not(.profile-tour-tooltip):not(.tour-btn),
+body.dashboard-no-shadows *:not(.tour-overlay):not(.profile-tour-overlay):not(.tour-modal):not(.tour-tooltip):not(.profile-tour-tooltip):not(.tour-btn)::before,
+body.dashboard-no-shadows *:not(.tour-overlay):not(.profile-tour-overlay):not(.tour-modal):not(.tour-tooltip):not(.profile-tour-tooltip):not(.tour-btn)::after {
   box-shadow: none !important;
   text-shadow: none !important;
 }

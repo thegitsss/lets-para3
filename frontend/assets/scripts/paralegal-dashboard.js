@@ -202,6 +202,7 @@ const applicationDetail = applicationModal?.querySelector('[data-application-det
 let applicationModalBound = false;
 let appliedPreviewBound = false;
 let appliedQueryHandled = false;
+let appliedHighlightHandled = false;
 let dashboardRefreshInFlight = false;
 let lastDashboardRefreshAt = 0;
 const DASHBOARD_REFRESH_COOLDOWN_MS = 4000;
@@ -1679,6 +1680,18 @@ function clearApplicationQuery() {
   } catch {}
 }
 
+function getAppliedHighlightTarget() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      applicationId: (params.get('highlightApplicationId') || params.get('applicationId') || params.get('appId') || '').trim(),
+      jobId: (params.get('highlightJobId') || params.get('jobId') || '').trim(),
+    };
+  } catch {
+    return { applicationId: '', jobId: '' };
+  }
+}
+
 function openApplicationModal(app) {
   if (!applicationModal || !applicationDetail) return;
   if (window.location.hash !== '#cases') return;
@@ -1976,6 +1989,25 @@ function applyAppliedFilters({ resetPage = false } = {}) {
 
   filtered.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
+  const highlightTarget = getAppliedHighlightTarget();
+  if (!appliedHighlightHandled && (highlightTarget.applicationId || highlightTarget.jobId)) {
+    const matchIndex = filtered.findIndex((app) => {
+      const appId = String(app?._id || app?.id || '');
+      const jobId = String(app?.jobId?._id || app?.jobId || '');
+      if (highlightTarget.applicationId && appId) {
+        return appId === highlightTarget.applicationId;
+      }
+      if (highlightTarget.jobId && jobId) {
+        return jobId === highlightTarget.jobId;
+      }
+      return false;
+    });
+    if (matchIndex >= 0) {
+      appliedPage = Math.floor(matchIndex / APPLIED_PAGE_SIZE) + 1;
+      appliedHighlightHandled = true;
+    }
+  }
+
   const total = filtered.length;
   appliedTotalPages = total ? Math.ceil(total / APPLIED_PAGE_SIZE) : 1;
   if (appliedPage > appliedTotalPages) appliedPage = appliedTotalPages;
@@ -2015,6 +2047,11 @@ function renderAppliedJobs(container, apps, total, { startIndex = 0, endIndex = 
     return;
   }
 
+  const highlightTarget = getAppliedHighlightTarget();
+  const highlightAppId = highlightTarget.applicationId;
+  const highlightJobId = highlightTarget.jobId;
+  let shouldScroll = false;
+
   container.innerHTML = apps
     .map((app) => {
       const job = app.jobId || {};
@@ -2025,13 +2062,19 @@ function renderAppliedJobs(container, apps, total, { startIndex = 0, endIndex = 
         : 'Recently';
       const applicationId = app._id || app.id || '';
       const jobId = job._id || job.id || app.jobId || '';
+      const appIdValue = String(applicationId || '');
+      const jobIdValue = String(jobId || '');
+      const isHighlighted =
+        (highlightAppId && appIdValue && highlightAppId === appIdValue) ||
+        (!highlightAppId && highlightJobId && jobIdValue && highlightJobId === jobIdValue);
+      if (isHighlighted) shouldScroll = true;
       const href = applicationId
         ? `dashboard-paralegal.html?applicationId=${encodeURIComponent(applicationId)}#cases`
         : jobId
           ? `dashboard-paralegal.html?jobId=${encodeURIComponent(jobId)}#cases`
           : 'dashboard-paralegal.html#cases';
       return `
-        <div class="case-card applied-card">
+        <div class="case-card applied-card${isHighlighted ? ' is-highlighted' : ''}">
           <div class="case-header">
             <div>
               <h2>${title}</h2>
@@ -2046,6 +2089,15 @@ function renderAppliedJobs(container, apps, total, { startIndex = 0, endIndex = 
       `;
     })
     .join('');
+
+  if (shouldScroll) {
+    requestAnimationFrame(() => {
+      const highlighted = container.querySelector('.applied-card.is-highlighted');
+      if (highlighted) {
+        highlighted.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  }
 
   updateAppliedPagination({ total, startIndex, endIndex });
 }

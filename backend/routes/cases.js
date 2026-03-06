@@ -2864,7 +2864,6 @@ router.patch(
     const normalizedStatus = normalizeCaseStatusValue(doc.status);
     const statusKey = normalizedStatus;
     const caseClosed = CLOSED_CASE_STATUSES.has(normalizedStatus);
-    const hasApplicants = Array.isArray(doc.applicants) && doc.applicants.length > 0;
     if (normalizedStatus === IN_PROGRESS_STATUS && !completionOnlyUpdate) {
       return res.status(403).json({ error: "Case edits are locked once work is in progress." });
     }
@@ -2873,10 +2872,8 @@ router.patch(
         return res.status(403).json({ error: "Closed cases cannot be modified." });
       }
       if (!completionOnlyUpdate) {
-        if (doc.paralegalId || hasPendingInvites(doc) || hasApplicants) {
-          return res.status(403).json({
-            error: "Compensation is locked once a paralegal is invited, applies, or is hired.",
-          });
+        if (doc.paralegalId || doc.hiredAt) {
+          return res.status(403).json({ error: "Case edits are locked once a paralegal is hired." });
         }
         if (!["open"].includes(statusKey)) {
           return res.status(403).json({ error: "Case edits are limited to posted cases." });
@@ -2994,6 +2991,35 @@ router.patch(
 
     if (tasksInputProvided) {
       publishCaseEvent(doc._id, "tasks", { at: new Date().toISOString() });
+    }
+
+    if (!isAdmin && !doc.paralegalId && !doc.hiredAt) {
+      const applicantIds = Array.isArray(doc.applicants)
+        ? doc.applicants
+            .filter((app) => String(app?.status || "pending").toLowerCase() === "pending")
+            .map((app) => app?.paralegalId?._id || app?.paralegalId)
+            .filter(Boolean)
+        : [];
+      if (applicantIds.length) {
+        const uniqueApplicants = [...new Set(applicantIds.map((id) => String(id)))];
+        const rawJobId = doc.jobId || doc.job || "";
+        const jobId =
+          typeof rawJobId === "object"
+            ? rawJobId._id || rawJobId.id || ""
+            : rawJobId;
+        const link = jobId
+          ? `dashboard-paralegal.html?highlightJobId=${encodeURIComponent(String(jobId))}#cases`
+          : "dashboard-paralegal.html#cases";
+        const payload = {
+          link,
+          summary: "A case you applied to was updated.",
+        };
+        await Promise.allSettled(
+          uniqueApplicants.map((userId) =>
+            sendCaseNotification(userId, "case_update", doc, payload, { actorUserId: req.user?.id })
+          )
+        );
+      }
     }
 
     res.json(caseSummary(doc, { viewerRole: req.user?.role }));

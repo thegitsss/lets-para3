@@ -1388,6 +1388,19 @@
       background: var(--panel);
     }
 
+    .case-card.applied-card.is-highlighted {
+      border-color: rgba(182, 164, 122, 0.7);
+      background: rgba(182, 164, 122, 0.08);
+      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.18), var(--shadow-md);
+    }
+
+    body.theme-dark .case-card.applied-card.is-highlighted,
+    html.theme-dark .case-card.applied-card.is-highlighted {
+      border-color: rgba(182, 164, 122, 0.6);
+      background: rgba(182, 164, 122, 0.12);
+      box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.22), var(--shadow-md);
+    }
+
     .activity-card .case-header {
       cursor: default;
     }
