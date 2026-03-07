@@ -3913,7 +3913,7 @@ async function loadSettings() {
 
     if (currentUser?.role === "attorney") {
       if (titleEl) titleEl.textContent = "Account Settings";
-      if (subtitleEl) subtitleEl.textContent = "Keep your LPC profile accurate, stay secure, and control how we notify you.";
+      if (subtitleEl) subtitleEl.textContent = "";
     }
     enforceUnifiedRoleStyling(user);
     applyAvatar(user);
