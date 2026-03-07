@@ -2399,6 +2399,59 @@ function refreshParalegalSectionDisplays() {
   }
 
   updateRequiredFieldMarkers();
+  requestAnimationFrame(() => {
+    lockParalegalSectionHeights();
+  });
+}
+
+function autoSizeParalegalTextarea(textarea) {
+  if (!textarea) return;
+  const section = textarea.closest("[data-edit-section]");
+  const baseRaw = section ? parseFloat(getComputedStyle(section).getPropertyValue("--section-base-height")) : 0;
+  const baseHeight = baseRaw > 0 ? baseRaw : 260;
+  const expandedHeight = baseHeight * 2;
+  const shouldExpand = textarea.scrollHeight > baseHeight;
+  if (section) {
+    section.style.setProperty(
+      "--section-edit-max-height",
+      `${Math.round(shouldExpand ? expandedHeight : baseHeight)}px`
+    );
+  }
+  textarea.style.height = "auto";
+  const nextHeight = Math.min(textarea.scrollHeight, expandedHeight);
+  textarea.style.height = `${nextHeight}px`;
+  textarea.style.overflowY = textarea.scrollHeight > expandedHeight ? "auto" : "hidden";
+}
+
+function bindParalegalTextareaAutoSize() {
+  const root = document.getElementById("paralegalSettings");
+  if (!root) return;
+  root.querySelectorAll("[data-edit-section] textarea").forEach((textarea) => {
+    if (!textarea.dataset.autoSizeBound) {
+      textarea.dataset.autoSizeBound = "true";
+      textarea.addEventListener("input", () => autoSizeParalegalTextarea(textarea));
+    }
+    if (!textarea.closest("[data-edit-section]")?.classList.contains("is-editing")) {
+      textarea.style.height = "";
+      textarea.style.overflowY = "hidden";
+    }
+  });
+}
+
+function lockParalegalSectionHeights() {
+  const root = document.getElementById("paralegalSettings");
+  if (!root) return;
+  const sections = root.querySelectorAll("[data-edit-section]");
+  sections.forEach((section) => {
+    if (section.classList.contains("is-editing")) return;
+    const measured = Math.ceil(section.getBoundingClientRect().height);
+    if (measured > 0) {
+      const base = Math.max(120, measured);
+      section.style.setProperty("--section-base-height", `${base}px`);
+      section.style.setProperty("--section-edit-max-height", `${base}px`);
+    }
+  });
+  bindParalegalTextareaAutoSize();
 }
 
 function setActiveParalegalSection(sectionKey) {
@@ -2408,12 +2461,25 @@ function setActiveParalegalSection(sectionKey) {
   sections.forEach((section) => {
     const isActive = section.dataset.editSection === sectionKey;
     section.classList.toggle("is-editing", isActive);
+    if (isActive) {
+      const baseRaw = parseFloat(getComputedStyle(section).getPropertyValue("--section-base-height"));
+      const base = Number.isFinite(baseRaw) && baseRaw > 0 ? baseRaw : Math.max(120, Math.ceil(section.getBoundingClientRect().height));
+      section.style.setProperty("--section-edit-max-height", `${Math.round(base)}px`);
+    }
     const toggle = section.querySelector(".section-edit-toggle");
-    if (toggle) toggle.setAttribute("aria-pressed", isActive ? "true" : "false");
+    if (toggle) {
+      toggle.setAttribute("aria-pressed", isActive ? "true" : "false");
+      if (section.dataset.editSection === "documents") {
+        toggle.setAttribute("aria-expanded", isActive ? "true" : "false");
+      }
+    }
   });
   updateBestForEditingState();
   activeParalegalSection = sectionKey || null;
   refreshParalegalSectionDisplays();
+  requestAnimationFrame(() => {
+    lockParalegalSectionHeights();
+  });
 }
 
 function initParalegalSectionEditing() {
@@ -2422,20 +2488,40 @@ function initParalegalSectionEditing() {
   const toggles = root.querySelectorAll(".section-edit-toggle");
   if (!toggles.length) return;
 
+  const openSection = (targetKey, { allowToggleClose = true } = {}) => {
+    if (!targetKey) return;
+    if (targetKey === "education") {
+      setActiveParalegalSection(null);
+      openEducationModal();
+      return;
+    }
+    if (allowToggleClose) {
+      const nextKey = activeParalegalSection === targetKey ? null : targetKey;
+      setActiveParalegalSection(nextKey);
+      return;
+    }
+    setActiveParalegalSection(targetKey);
+  };
+
   if (!paralegalEditBound) {
     toggles.forEach((toggle) => {
       toggle.addEventListener("click", () => {
         const targetKey = toggle.dataset.editToggle;
-        if (!targetKey) return;
-        if (targetKey === "education") {
-          setActiveParalegalSection(null);
-          openEducationModal();
-          return;
-        }
-        const nextKey = activeParalegalSection === targetKey ? null : targetKey;
-        setActiveParalegalSection(nextKey);
+        openSection(targetKey, { allowToggleClose: true });
       });
     });
+
+    root.addEventListener("click", (event) => {
+      const section = event.target.closest("[data-edit-section]");
+      if (!section || !root.contains(section)) return;
+      const targetKey = section.dataset.editSection;
+      if (!targetKey || targetKey === "documents") return;
+      if (event.target.closest(".section-edit-toggle")) return;
+      if (event.target.closest(".section-edit")) return;
+      if (event.target.closest("button, a, input, select, textarea, label, [contenteditable='true']")) return;
+      openSection(targetKey, { allowToggleClose: false });
+    });
+
     paralegalEditBound = true;
   }
 
@@ -2444,6 +2530,22 @@ function initParalegalSectionEditing() {
   } else {
     setActiveParalegalSection(activeParalegalSection);
   }
+
+  if (!root.dataset.sectionResizeBound) {
+    window.addEventListener("resize", () => {
+      requestAnimationFrame(() => {
+        lockParalegalSectionHeights();
+      });
+    });
+    root.dataset.sectionResizeBound = "true";
+  }
+}
+
+function isPdfFile(file) {
+  if (!file) return false;
+  const mime = String(file.type || "").toLowerCase();
+  const name = String(file.name || "").toLowerCase();
+  return mime === "application/pdf" || name.endsWith(".pdf");
 }
 
 function hydrateAttorneyProfileForm(user = {}) {
@@ -3970,7 +4072,7 @@ function loadCertificate(user) {
       alert("Please choose a PDF certificate first.");
       return;
     }
-    if (file.type !== "application/pdf") {
+    if (!isPdfFile(file)) {
       alert("Certificate must be a PDF.");
       return;
     }
@@ -4072,14 +4174,22 @@ function loadResume(user) {
       alert("Please choose a PDF résumé first.");
       return;
     }
+    if (!isPdfFile(file)) {
+      alert("Résumé must be a PDF.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Résumé must be 10 MB or smaller.");
+      return;
+    }
 
-  const fd = new FormData();
-  fd.append("file", file);
+    const fd = new FormData();
+    fd.append("file", file);
 
-  const res = await secureFetch("/api/uploads/paralegal-resume", {
-    method: "POST",
-    body: fd
-  });
+    const res = await secureFetch("/api/uploads/paralegal-resume", {
+      method: "POST",
+      body: fd
+    });
 
     const payload = await res.json().catch(() => ({}));
 
@@ -4173,7 +4283,7 @@ function loadWritingSample(user) {
       alert("Please choose a PDF writing sample first.");
       return;
     }
-    if (file.type !== "application/pdf") {
+    if (!isPdfFile(file)) {
       alert("Writing sample must be a PDF.");
       return;
     }

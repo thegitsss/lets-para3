@@ -1923,10 +1923,32 @@ input[type="number"],
     body.paralegal-flat {
       --paralegal-max-width: 1350px;
       --paralegal-radius: 8px;
+      height: 100vh;
+      overflow: hidden;
     }
 
     body.paralegal-flat .content {
       padding-top: 24px;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    body.paralegal-flat #settingsContent {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    body.paralegal-flat .settings-section.active {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      height: 100%;
     }
 
     body.paralegal-flat .topbar .header-skeleton {
@@ -1935,6 +1957,7 @@ input[type="number"],
 
     body.paralegal-flat .page-header {
       margin-bottom: 8px;
+      flex: 0 0 auto;
     }
 
     body.paralegal-flat #accountSettingsTitle {
@@ -1945,6 +1968,11 @@ input[type="number"],
       max-width: var(--paralegal-max-width);
       margin: 0 auto;
       width: 100%;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      height: 100%;
+      align-items: stretch;
     }
 
     body.paralegal-flat #profileSection {
@@ -1954,6 +1982,12 @@ input[type="number"],
       margin-bottom: 0;
       box-shadow: none;
       animation: none;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      height: 100%;
     }
 
     #paralegalSettings label {
@@ -1961,11 +1995,22 @@ input[type="number"],
       font-size: 0.95rem;
     }
 
+    #paralegalSettings .paralegal-profile-form {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      height: 100%;
+    }
+
     #paralegalSettings .profile-layout {
       display: grid;
       grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.6fr);
       gap: 24px;
       align-items: start;
+      flex: 1;
+      min-height: 0;
+      height: 100%;
     }
 
     #paralegalSettings .profile-sidebar,
@@ -1978,10 +2023,20 @@ input[type="number"],
     #paralegalSettings .profile-sidebar {
       padding-right: 24px;
       border-right: 1px solid var(--line);
+      position: sticky;
+      top: 24px;
+      align-self: start;
     }
 
     #paralegalSettings .profile-main {
       padding-left: 24px;
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 8px;
+      height: 100%;
+      max-height: 100%;
+      overscroll-behavior: contain;
+      align-self: stretch;
     }
 
     #paralegalSettings .profile-photo-block {
@@ -2266,12 +2321,88 @@ input[type="number"],
       height: 14px;
     }
 
+    #paralegalSettings #documentsSection .section-header {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    #paralegalSettings #documentsSection .documents-toggle {
+      position: static;
+      right: auto;
+      top: auto;
+      transform: none;
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      background: transparent;
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-size: 0.8rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    }
+
+    #paralegalSettings #documentsSection .documents-toggle:hover {
+      background: rgba(0, 0, 0, 0.04);
+      color: var(--ink);
+    }
+
+    #paralegalSettings #documentsSection .documents-toggle svg {
+      width: 12px;
+      height: 12px;
+      transition: transform 0.2s ease;
+    }
+
+    #paralegalSettings #documentsSection.is-editing .documents-toggle {
+      background: rgba(182, 164, 122, 0.12);
+      border-color: rgba(182, 164, 122, 0.45);
+      color: var(--ink);
+    }
+
+    #paralegalSettings #documentsSection.is-editing .documents-toggle svg {
+      transform: rotate(180deg);
+    }
+
+    #paralegalSettings [data-edit-section] {
+      --section-base-height: 180px;
+      min-height: var(--section-base-height);
+    }
+
+    #paralegalSettings [data-edit-section]:not(.is-editing) {
+      overflow: hidden;
+    }
+
+    #paralegalSettings [data-edit-section].is-editing {
+      overflow: hidden;
+    }
+
+    #paralegalSettings [data-edit-section] .section-display {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
     #paralegalSettings [data-edit-section] .section-edit {
       display: none;
+      pointer-events: none;
+    }
+
+    #paralegalSettings .section-editable:not(.is-editing):not(#documentsSection) .section-display,
+    #paralegalSettings .section-editable:not(.is-editing):not(#documentsSection) .best-for-body {
+      cursor: pointer;
     }
 
     #paralegalSettings [data-edit-section].is-editing .section-edit {
       display: block;
+      pointer-events: auto;
+      max-height: var(--section-edit-max-height, var(--section-base-height));
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
 
     #paralegalSettings [data-edit-section].is-editing .section-display {
@@ -2335,7 +2466,7 @@ input[type="number"],
     }
 
     #paralegalSettings #bestForSection.is-editing .best-for-body {
-      max-height: 140px;
+      max-height: calc(var(--section-base-height) * 2);
       overflow-y: auto;
       padding-right: 8px;
     }
@@ -2358,6 +2489,23 @@ input[type="number"],
 
     #paralegalSettings #documentsSection:not(.is-editing) .paralegal-doc-actions {
       display: none;
+    }
+
+    #paralegalSettings #documentsSection .profile-docs-stack {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    #paralegalSettings #documentsSection.is-editing .profile-docs-stack {
+      display: flex;
+    }
+
+    #paralegalSettings [data-edit-section] textarea {
+      resize: none;
+      width: 100%;
+      overflow-y: hidden;
     }
 
     #paralegalSettings .chip-section {
@@ -2492,7 +2640,7 @@ input[type="number"],
       gap: 18px;
     }
 
-    #paralegalSettings .paralegal-actions .profile-fyi-card {
+    #paralegalSettings .profile-fyi-card {
       background: #ffffff;
       border: 1px solid var(--line);
       border-radius: var(--paralegal-radius);
@@ -2501,7 +2649,7 @@ input[type="number"],
       box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
     }
 
-    #paralegalSettings .paralegal-actions .profile-fyi-title {
+    #paralegalSettings .profile-fyi-title {
       font-size: 0.7rem;
       letter-spacing: 3px;
       text-transform: uppercase;
@@ -2509,7 +2657,7 @@ input[type="number"],
       margin-bottom: 6px;
     }
 
-    #paralegalSettings .paralegal-actions .profile-fyi-card p {
+    #paralegalSettings .profile-fyi-card p {
       margin: 0;
       font-size: 0.95rem;
       color: var(--ink);
@@ -2520,24 +2668,31 @@ input[type="number"],
       font-family: "Cormorant Garamond", "Times New Roman", serif;
     }
 
-    #paralegalSettings .paralegal-actions .profile-fyi-card .fyi-amount {
+    #paralegalSettings .profile-fyi-card .fyi-amount {
       color: var(--accent);
       font-weight: 600;
     }
 
-    html.theme-dark #paralegalSettings .paralegal-actions .profile-fyi-card,
-    body.theme-dark #paralegalSettings .paralegal-actions .profile-fyi-card,
-    html.theme-mountain-dark #paralegalSettings .paralegal-actions .profile-fyi-card,
-    body.theme-mountain-dark #paralegalSettings .paralegal-actions .profile-fyi-card {
+    #paralegalSettings .profile-main .profile-fyi-card {
+      margin-top: auto;
+      margin-left: auto;
+      margin-right: auto;
+      width: min(100%, 360px);
+    }
+
+    html.theme-dark #paralegalSettings .profile-fyi-card,
+    body.theme-dark #paralegalSettings .profile-fyi-card,
+    html.theme-mountain-dark #paralegalSettings .profile-fyi-card,
+    body.theme-mountain-dark #paralegalSettings .profile-fyi-card {
       background: var(--panel);
       border-color: var(--line);
       box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
     }
 
-    html.theme-dark #paralegalSettings .paralegal-actions .profile-fyi-card p,
-    body.theme-dark #paralegalSettings .paralegal-actions .profile-fyi-card p,
-    html.theme-mountain-dark #paralegalSettings .paralegal-actions .profile-fyi-card p,
-    body.theme-mountain-dark #paralegalSettings .paralegal-actions .profile-fyi-card p {
+    html.theme-dark #paralegalSettings .profile-fyi-card p,
+    body.theme-dark #paralegalSettings .profile-fyi-card p,
+    html.theme-mountain-dark #paralegalSettings .profile-fyi-card p,
+    body.theme-mountain-dark #paralegalSettings .profile-fyi-card p {
       color: #d1d9e6;
       font-weight: 300;
     }
@@ -2548,7 +2703,7 @@ input[type="number"],
         align-items: stretch;
       }
 
-      #paralegalSettings .paralegal-actions .profile-fyi-card {
+      #paralegalSettings .profile-fyi-card {
         max-width: 100%;
       }
     }
@@ -2689,9 +2844,11 @@ input[type="number"],
     .profile-tour-overlay {
       position: fixed;
       inset: 0;
-      display: none;
       z-index: 12000;
       pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 240ms ease, visibility 0s linear 240ms;
       --spot-x: 0px;
       --spot-y: 0px;
       --spot-w: 0px;
@@ -2699,7 +2856,9 @@ input[type="number"],
     }
 
     .profile-tour-overlay.is-active {
-      display: block;
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 240ms ease;
     }
 
     .profile-tour-overlay::before {
@@ -2707,6 +2866,7 @@ input[type="number"],
       position: absolute;
       inset: 0;
       background: rgba(10, 15, 25, 0.6);
+      transition: background 240ms ease;
     }
 
     .profile-tour-overlay.spotlight::before {
@@ -2722,6 +2882,7 @@ input[type="number"],
       height: var(--spot-h);
       border-radius: 12px;
       box-shadow: 0 0 0 9999px rgba(10, 15, 25, 0.6);
+      transition: left 280ms ease, top 280ms ease, width 280ms ease, height 280ms ease, box-shadow 280ms ease;
     }
 
     .profile-tour-tooltip {
@@ -2731,13 +2892,20 @@ input[type="number"],
       border-radius: 14px;
       padding: 16px 18px 14px;
       box-shadow: 0 18px 38px rgba(15, 23, 42, 0.25);
-      display: none;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(6px) scale(0.98);
+      transition: opacity 200ms ease, transform 200ms ease, visibility 0s linear 200ms;
       z-index: 12001;
-      pointer-events: auto;
     }
 
     .profile-tour-tooltip.is-active {
-      display: block;
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translateY(0) scale(1);
+      transition: opacity 200ms ease, transform 200ms ease;
     }
 
     .profile-tour-tooltip::after {
@@ -2824,8 +2992,41 @@ input[type="number"],
     }
 
     @media (max-width: 960px) {
+      body.paralegal-flat {
+        height: auto;
+        overflow: visible;
+      }
+
+      body.paralegal-flat .content {
+        height: auto;
+        overflow-y: auto;
+      }
+
+      body.paralegal-flat #settingsContent {
+        height: auto;
+      }
+
+      body.paralegal-flat .settings-section.active {
+        overflow: visible;
+        height: auto;
+      }
+
+      body.paralegal-flat #profileSection {
+        overflow: visible;
+        height: auto;
+      }
+
+      #paralegalSettings {
+        height: auto;
+      }
+
+      #paralegalSettings .paralegal-profile-form {
+        height: auto;
+      }
+
       #paralegalSettings .profile-layout {
         grid-template-columns: 1fr;
+        height: auto;
       }
 
       #paralegalSettings .profile-photo-block,
@@ -2850,10 +3051,16 @@ input[type="number"],
       #paralegalSettings .profile-sidebar {
         padding-right: 0;
         border-right: none;
+        position: static;
+        top: auto;
       }
 
       #paralegalSettings .profile-main {
         padding-left: 0;
+        padding-right: 0;
+        overflow: visible;
+        height: auto;
+        max-height: none;
       }
 
       #paralegalSettings .profile-role-row {
@@ -3936,25 +4143,6 @@ input[type="number"],
                 </div>
               </div>
 
-              <article class="profile-section section-editable" id="educationCard" data-edit-section="education">
-                <div class="section-header">
-                  <span class="card-header-label">Education</span>
-                  <button class="section-edit-toggle" type="button" data-edit-toggle="education" aria-label="Edit education" aria-pressed="false">
-                    <svg viewBox="0 0 20 20" aria-hidden="true">
-                      <path d="M3 14.5V17h2.5l7.4-7.4-2.5-2.5L3 14.5z" fill="currentColor"/>
-                      <path d="M14.7 2.8l2.5 2.5 1-1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1 1z" fill="currentColor"/>
-                    </svg>
-                  </button>
-                </div>
-                <div class="section-display" data-section-display="education">
-                  <p id="educationDisplay" class="section-display-text"></p>
-                </div>
-                <div class="section-edit" data-section-edit="education">
-                  <div id="educationEditor" class="education-editor"></div>
-                  <button type="button" class="btn btn-outline" id="addEducationBtn">Add education</button>
-                </div>
-              </article>
-
               <article class="profile-section section-editable" id="skillsCard" data-edit-section="skills">
                 <div class="section-header">
                   <span class="card-header-label">Skills &amp; Focus Areas</span>
@@ -3976,53 +4164,6 @@ input[type="number"],
                   <div class="chip-section" id="practiceSection">
                     <span class="card-header-label" style="text-align:center; width:100%;">Focus Areas</span>
                     <input type="text" id="practiceAreasInput" placeholder="Litigation, Family Law, Immigration" />
-                  </div>
-                </div>
-              </article>
-
-              <article class="profile-section section-editable" id="languagesRow" data-edit-section="languages">
-                <div class="section-header">
-                  <span class="card-header-label">Languages</span>
-                  <button class="section-edit-toggle" type="button" data-edit-toggle="languages" aria-label="Edit languages" aria-pressed="false">
-                    <svg viewBox="0 0 20 20" aria-hidden="true">
-                      <path d="M3 14.5V17h2.5l7.4-7.4-2.5-2.5L3 14.5z" fill="currentColor"/>
-                      <path d="M14.7 2.8l2.5 2.5 1-1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1 1z" fill="currentColor"/>
-                    </svg>
-                  </button>
-                </div>
-                <div class="section-display" data-section-display="languages">
-                  <p id="languagesDisplay" class="section-display-text"></p>
-                </div>
-                <div class="section-edit" data-section-edit="languages">
-                  <div id="languagesEditor" class="language-editor"></div>
-                  <button type="button" class="btn btn-outline" id="addLanguageBtn">Add language</button>
-                </div>
-              </article>
-
-              <article class="profile-section section-editable" id="stateExperienceCard" data-edit-section="stateExperience">
-                <div class="section-header">
-                  <span class="card-header-label">State Experience</span>
-                  <button class="section-edit-toggle" type="button" data-edit-toggle="stateExperience" aria-label="Edit state experience" aria-pressed="false">
-                    <svg viewBox="0 0 20 20" aria-hidden="true">
-                      <path d="M3 14.5V17h2.5l7.4-7.4-2.5-2.5L3 14.5z" fill="currentColor"/>
-                      <path d="M14.7 2.8l2.5 2.5 1-1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1 1z" fill="currentColor"/>
-                    </svg>
-                  </button>
-                </div>
-                <div class="section-display" data-section-display="stateExperience">
-                  <p id="stateExperienceDisplay" class="section-display-text"></p>
-                </div>
-                <div class="section-edit" data-section-edit="stateExperience">
-                  <div class="state-experience-editor">
-                    <div id="stateExperienceChips" class="chip-cloud" aria-live="polite"></div>
-                    <input
-                      type="text"
-                      id="stateExperienceInput"
-                      placeholder="Type a state abbreviation (e.g., VA) and press Enter"
-                      autocomplete="off"
-                      aria-describedby="stateExperienceHelp"
-                    />
-                    <p class="muted" id="stateExperienceHelp">Add states using the two-letter abbreviation, then press Enter.</p>
                   </div>
                 </div>
               </article>
@@ -4097,13 +4238,78 @@ input[type="number"],
                 </div>
               </article>
 
-              <article class="profile-section section-editable" id="documentsSection" data-edit-section="documents">
+              <article class="profile-section section-editable" id="educationCard" data-edit-section="education">
                 <div class="section-header">
-                  <span class="card-header-label">Documents</span>
-                  <button class="section-edit-toggle" type="button" data-edit-toggle="documents" aria-label="Edit documents" aria-pressed="false">
+                  <span class="card-header-label">Education</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="education" aria-label="Edit education" aria-pressed="false">
                     <svg viewBox="0 0 20 20" aria-hidden="true">
                       <path d="M3 14.5V17h2.5l7.4-7.4-2.5-2.5L3 14.5z" fill="currentColor"/>
                       <path d="M14.7 2.8l2.5 2.5 1-1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1 1z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="section-display" data-section-display="education">
+                  <p id="educationDisplay" class="section-display-text"></p>
+                </div>
+                <div class="section-edit" data-section-edit="education">
+                  <div id="educationEditor" class="education-editor"></div>
+                  <button type="button" class="btn btn-outline" id="addEducationBtn">Add education</button>
+                </div>
+              </article>
+
+              <article class="profile-section section-editable" id="languagesRow" data-edit-section="languages">
+                <div class="section-header">
+                  <span class="card-header-label">Languages</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="languages" aria-label="Edit languages" aria-pressed="false">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M3 14.5V17h2.5l7.4-7.4-2.5-2.5L3 14.5z" fill="currentColor"/>
+                      <path d="M14.7 2.8l2.5 2.5 1-1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1 1z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="section-display" data-section-display="languages">
+                  <p id="languagesDisplay" class="section-display-text"></p>
+                </div>
+                <div class="section-edit" data-section-edit="languages">
+                  <div id="languagesEditor" class="language-editor"></div>
+                  <button type="button" class="btn btn-outline" id="addLanguageBtn">Add language</button>
+                </div>
+              </article>
+
+              <article class="profile-section section-editable" id="stateExperienceCard" data-edit-section="stateExperience">
+                <div class="section-header">
+                  <span class="card-header-label">State Experience</span>
+                  <button class="section-edit-toggle" type="button" data-edit-toggle="stateExperience" aria-label="Edit state experience" aria-pressed="false">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M3 14.5V17h2.5l7.4-7.4-2.5-2.5L3 14.5z" fill="currentColor"/>
+                      <path d="M14.7 2.8l2.5 2.5 1-1a1 1 0 0 0 0-1.4l-1.1-1.1a1 1 0 0 0-1.4 0l-1 1z" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="section-display" data-section-display="stateExperience">
+                  <p id="stateExperienceDisplay" class="section-display-text"></p>
+                </div>
+                <div class="section-edit" data-section-edit="stateExperience">
+                  <div class="state-experience-editor">
+                    <div id="stateExperienceChips" class="chip-cloud" aria-live="polite"></div>
+                    <input
+                      type="text"
+                      id="stateExperienceInput"
+                      placeholder="Type a state abbreviation (e.g., VA) and press Enter"
+                      autocomplete="off"
+                      aria-describedby="stateExperienceHelp"
+                    />
+                    <p class="muted" id="stateExperienceHelp">Add states using the two-letter abbreviation, then press Enter.</p>
+                  </div>
+                </div>
+              </article>
+
+              <article class="profile-section section-editable" id="documentsSection" data-edit-section="documents">
+                <div class="section-header">
+                  <button class="section-edit-toggle documents-toggle" type="button" data-edit-toggle="documents" aria-label="Toggle documents uploads" aria-expanded="false" aria-pressed="false">
+                    <span>Documents</span>
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M5 7l5 6 5-6H5z" fill="currentColor"></path>
                     </svg>
                   </button>
                 </div>
@@ -4113,14 +4319,15 @@ input[type="number"],
                   <div class="field-block" data-paralegal-only id="settingsWritingSample"></div>
                 </div>
               </article>
+
+              <aside class="profile-fyi-card" aria-label="Marketplace minimum notice">
+                <div class="profile-fyi-title">Professional Standards</div>
+                <p>Matters posted on Let’s-ParaConnect have a minimum posted amount of <span class="fyi-amount">$400</span> to ensure serious, professional legal work. Attorneys are solely responsible for selecting which paralegal they choose to work with, based on experience, fit, and profile quality. Selection is competitive.</p>
+              </aside>
             </section>
           </section>
 
           <div class="btn-row paralegal-actions">
-            <aside class="profile-fyi-card" aria-label="Marketplace minimum notice">
-              <div class="profile-fyi-title">Professional Standards</div>
-              <p>Matters posted on Let’s-ParaConnect have a minimum posted amount of <span class="fyi-amount">$400</span> to ensure serious, professional legal work. Attorneys are solely responsible for selecting which paralegal they choose to work with, based on experience, fit, and profile quality. Selection is competitive.</p>
-            </aside>
             <button class="btn btn-primary" type="button" id="profileSaveBtn">Save changes</button>
             <button class="btn btn-outline" type="button" id="previewProfileBtn">
     View Profile
