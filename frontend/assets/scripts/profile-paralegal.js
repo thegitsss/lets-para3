@@ -117,6 +117,7 @@ const elements = {
   locationMeta: document.getElementById("locationMeta"),
   credentialMeta: document.getElementById("credentialMeta"),
   joinedMeta: document.getElementById("joinedMeta"),
+  joinedMetaCorner: document.getElementById("joinedMetaCorner"),
   nameField: document.getElementById("profileName"),
   roleLine: document.getElementById("roleLine"),
   bioCopy: document.getElementById("bioCopy"),
@@ -130,6 +131,7 @@ const elements = {
   skillsSection: document.getElementById("skillsSection"),
   practiceSection: document.getElementById("practiceSection"),
   bestForCard: document.getElementById("bestForCard"),
+  bestForFocusRow: document.getElementById("bestForFocusRow"),
   bestForList: document.getElementById("bestForList"),
   experienceSection: document.getElementById("experienceSection"),
   educationSection: document.getElementById("educationSection"),
@@ -198,6 +200,8 @@ const state = {
   inviteTarget: null,
   applicantContext: null,
 };
+let inviteCutoutLayer = null;
+let inviteCutoutAlignRaf = null;
 
 const PREFILL_CACHE_KEY = "lpc_edit_profile_prefill";
 
@@ -337,6 +341,8 @@ async function init() {
   bindCtaEvents();
   bindProfileForm();
   bindBackButton();
+  window.addEventListener("resize", scheduleInviteCutoutAlign);
+  window.addEventListener("scroll", scheduleInviteCutoutAlign, { passive: true });
   elements.messageBtn?.classList.add("hidden");
   elements.messageBtn?.setAttribute("aria-hidden", "true");
 
@@ -386,6 +392,7 @@ async function init() {
     await loadAttorneyCases();
     updateInviteButtonState();
   }
+  scheduleInviteCutoutAlign();
 }
 
 function bindCtaEvents() {
@@ -888,7 +895,7 @@ function renderProfile(profile) {
 
   const experienceLabel = describeExperience(profile.yearsExperience);
   const roleCopy = profile.role || profile.title || "Paralegal";
-  const roleLine = [experienceLabel, roleCopy].filter(Boolean).join(" • ") || "Paralegal";
+  const roleLine = [roleCopy, experienceLabel].filter(Boolean).join(" • ") || "Paralegal";
   setFieldText(elements.roleLine, roleLine);
 
   const summary = profile.bio || profile.about || "";
@@ -912,6 +919,7 @@ function renderProfile(profile) {
     (Array.isArray(profile.specialties) && profile.specialties.length ? profile.specialties : null);
   const { hasSkills, hasPractice } = renderSkillsAndPractice(skillValues, practiceValues);
   renderBestFor(profile.bestFor);
+  syncBestForFocusRowLayout();
   const hasExperience = renderExperience(profile.experience);
   const hasEducation = renderEducation(profile.education);
   renderFunFacts(profile.about, profile.writingSamples);
@@ -928,6 +936,117 @@ function renderProfile(profile) {
     hasLanguages,
     hasDocuments,
   });
+  scheduleInviteCutoutAlign();
+}
+
+function ensureInviteCutoutLayer() {
+  if (inviteCutoutLayer) return inviteCutoutLayer;
+  const shell = document.querySelector(".page-shell");
+  if (!shell) return null;
+
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("class", "invite-cutout-overlay");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+
+  const defs = document.createElementNS(ns, "defs");
+  const mask = document.createElementNS(ns, "mask");
+  const maskId = `invite-cutout-mask-${Math.random().toString(36).slice(2, 10)}`;
+  mask.setAttribute("id", maskId);
+  mask.setAttribute("maskUnits", "userSpaceOnUse");
+
+  const full = document.createElementNS(ns, "rect");
+  full.setAttribute("x", "0");
+  full.setAttribute("y", "0");
+  full.setAttribute("fill", "white");
+
+  const hole = document.createElementNS(ns, "rect");
+  hole.setAttribute("x", "-9999");
+  hole.setAttribute("y", "-9999");
+  hole.setAttribute("width", "0");
+  hole.setAttribute("height", "0");
+  hole.setAttribute("rx", "0");
+  hole.setAttribute("ry", "0");
+  hole.setAttribute("fill", "black");
+
+  mask.appendChild(full);
+  mask.appendChild(hole);
+  defs.appendChild(mask);
+  svg.appendChild(defs);
+
+  const layer = document.createElementNS(ns, "rect");
+  layer.setAttribute("x", "0");
+  layer.setAttribute("y", "0");
+  layer.setAttribute("fill", "#ffffff");
+  layer.setAttribute("mask", `url(#${maskId})`);
+  svg.appendChild(layer);
+
+  shell.prepend(svg);
+  shell.classList.add("cutout-active");
+  inviteCutoutLayer = { shell, svg, full, hole, layer };
+  return inviteCutoutLayer;
+}
+
+function alignInviteCutout() {
+  const cutout = ensureInviteCutoutLayer();
+  if (!cutout) return;
+  const { shell, svg, full, hole, layer } = cutout;
+  const shellRect = shell.getBoundingClientRect();
+  const width = Math.max(1, Math.round(shellRect.width));
+  const height = Math.max(1, Math.round(shellRect.height));
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("width", String(width));
+  svg.setAttribute("height", String(height));
+  full.setAttribute("width", String(width));
+  full.setAttribute("height", String(height));
+  layer.setAttribute("width", String(width));
+  layer.setAttribute("height", String(height));
+
+  const visible =
+    Boolean(elements.inviteBtn) &&
+    !elements.inviteBtn.classList.contains("hidden") &&
+    elements.inviteBtn.offsetWidth > 0 &&
+    elements.inviteBtn.offsetHeight > 0;
+  if (!visible) {
+    hole.setAttribute("x", "-9999");
+    hole.setAttribute("y", "-9999");
+    hole.setAttribute("width", "0");
+    hole.setAttribute("height", "0");
+    return;
+  }
+
+  const rect = elements.inviteBtn.getBoundingClientRect();
+  const seamBleed = 2.5;
+  const borderRadius = parseFloat(window.getComputedStyle(elements.inviteBtn).borderTopLeftRadius) || rect.height / 2;
+  const x = rect.left - shellRect.left - seamBleed;
+  const y = rect.top - shellRect.top - seamBleed;
+  const w = rect.width + seamBleed * 2;
+  const h = rect.height + seamBleed * 2;
+  const r = Math.max(2, borderRadius + seamBleed);
+
+  hole.setAttribute("x", x.toFixed(3));
+  hole.setAttribute("y", y.toFixed(3));
+  hole.setAttribute("width", w.toFixed(3));
+  hole.setAttribute("height", h.toFixed(3));
+  hole.setAttribute("rx", r.toFixed(3));
+  hole.setAttribute("ry", r.toFixed(3));
+}
+
+function scheduleInviteCutoutAlign() {
+  if (inviteCutoutAlignRaf !== null) return;
+  inviteCutoutAlignRaf = window.requestAnimationFrame(() => {
+    inviteCutoutAlignRaf = null;
+    alignInviteCutout();
+  });
+}
+
+function syncBestForFocusRowLayout() {
+  if (!elements.bestForFocusRow) return;
+  const cards = Array.from(elements.bestForFocusRow.querySelectorAll(".profile-section"));
+  const visibleCount = cards.filter((card) => !card.classList.contains("hidden")).length;
+  elements.bestForFocusRow.classList.toggle("hidden", visibleCount === 0);
+  elements.bestForFocusRow.classList.toggle("is-single", visibleCount === 1);
 }
 
 function populateProfileForm(profile) {
@@ -1027,6 +1146,7 @@ function renderMetadata(profile) {
       : null;
   const joinedLabel = joined ? `Joined ${joined}` : "Joined date unavailable";
   renderMetaLine(elements.joinedMeta, "J", joinedLabel);
+  renderMetaLine(elements.joinedMetaCorner, "J", joinedLabel);
 }
 
 function renderDocumentLinks(profile) {
@@ -1468,12 +1588,17 @@ function renderEducation(entries) {
 
     const title = document.createElement("div");
     title.className = "edu-title";
-    const titleParts = [item.degree, item.fieldOfStudy].filter(Boolean);
-    title.textContent = titleParts.length ? titleParts.join(", ") : item.school || "Education";
+    const degree = String(item.degree || "").trim();
+    const fieldOfStudy = String(item.fieldOfStudy || "").trim();
+    const school = String(item.school || "").trim();
+    const titleParts = [degree, fieldOfStudy].filter(Boolean);
+    const titleText = titleParts.length ? titleParts.join(", ") : school || "Education";
+    title.textContent = titleText;
     entry.appendChild(title);
 
     const range = formatEducationRange(item);
-    const subParts = [item.school, range].filter(Boolean);
+    const includeSchoolInSub = Boolean(school) && school.toLowerCase() !== titleText.toLowerCase();
+    const subParts = [includeSchoolInSub ? school : "", range].filter(Boolean);
     if (subParts.length) {
       const sub = document.createElement("div");
       sub.className = "edu-sub";
@@ -1484,7 +1609,7 @@ function renderEducation(entries) {
     if (item.grade) {
       const grade = document.createElement("div");
       grade.className = "edu-meta";
-      grade.textContent = `Grade: ${item.grade}`;
+      grade.textContent = String(item.grade);
       entry.appendChild(grade);
     }
 
@@ -1634,6 +1759,7 @@ function updateInviteButtonState() {
     if (!state.caseContextTitle && !state.caseContextLoading) {
       void loadCaseContextTitle(applicantCaseId);
     }
+    scheduleInviteCutoutAlign();
     return;
   }
   const hasOpenCases = isAttorney && state.openCases.length > 0;
@@ -1642,6 +1768,7 @@ function updateInviteButtonState() {
   toggleElement(elements.inviteBtn, hasOpenCases);
   elements.inviteBtn.disabled = !hasOpenCases;
   if (elements.sendInviteBtn) elements.sendInviteBtn.disabled = !hasOpenCases;
+  scheduleInviteCutoutAlign();
 }
 
 function toggleSkeleton(enable) {
@@ -1653,6 +1780,7 @@ function toggleSkeleton(enable) {
     elements.locationMeta,
     elements.credentialMeta,
     elements.joinedMeta,
+    elements.joinedMetaCorner,
   ].filter(Boolean);
   targets.forEach((node) => node.classList.toggle("skeleton-block", enable));
 }

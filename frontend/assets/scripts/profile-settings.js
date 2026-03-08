@@ -53,6 +53,7 @@ function setAttorneyOnboardingModalSeen(step = "profile") {
 document.addEventListener("DOMContentLoaded", () => {
   let suppressProfileToast = false;
   let showOnboardingModal = false;
+  let requestedOnboardingStep = "";
   try {
     const params = new URLSearchParams(window.location.search);
     const onboardingStep = params.get("onboardingStep");
@@ -60,9 +61,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const onboardingStatus = params.get("onboarding");
     if (onboardingStep) {
       setAttorneyOnboardingStep(onboardingStep);
+      requestedOnboardingStep = onboardingStep;
       params.delete("onboardingStep");
     } else if (shouldPrompt) {
       setAttorneyOnboardingStep("profile");
+      requestedOnboardingStep = "profile";
       suppressProfileToast = true;
       showOnboardingModal = true;
     }
@@ -132,8 +135,10 @@ document.addEventListener("DOMContentLoaded", () => {
     ? navItems[initialNav.id]
     : navItems.navProfile;
   setActiveSection(initialSectionId);
-  const stepToRun = getAttorneyOnboardingStep();
-  runAttorneyOnboardingStep(stepToRun, { silent: suppressProfileToast && stepToRun === "profile" });
+  const stepToRun = String(requestedOnboardingStep || "").toLowerCase();
+  if (stepToRun) {
+    runAttorneyOnboardingStep(stepToRun, { silent: suppressProfileToast && stepToRun === "profile" });
+  }
   if (showOnboardingModal || (stepToRun === "profile" && !getAttorneyOnboardingModalSeen("profile"))) {
     bindAttorneyOnboardingModal();
     showAttorneyOnboardingModal(
@@ -3102,8 +3107,7 @@ async function handleAttorneyProfileSave() {
       }
     }
     if (getAttorneyOnboardingStep() === "profile" && isAttorneyRole()) {
-      setAttorneyOnboardingStep("payment");
-      runAttorneyOnboardingStep("payment");
+      clearAttorneyOnboardingStep();
     }
   } catch (err) {
     console.error("Failed to save attorney profile", err);
@@ -3473,7 +3477,7 @@ function buildEducationModalEntry(entry = {}) {
   );
   grid.appendChild(
     buildEducationModalField({
-      label: "Grade",
+      label: "GPA",
       field: "grade",
       placeholder: "Ex: 3.8 GPA",
       value: normalized.grade
@@ -3656,6 +3660,7 @@ function bindAttorneyOnboardingModal() {
   const overlay = document.getElementById("attorneyOnboardingOverlay");
   const closeBtn = modal.querySelector("[data-onboarding-close]");
   const continueBtn = modal.querySelector("[data-onboarding-continue]");
+  const skipBtn = modal.querySelector("[data-onboarding-skip]");
 
   const handleClose = () => {
     hideAttorneyOnboardingModal();
@@ -3672,6 +3677,11 @@ function bindAttorneyOnboardingModal() {
     } else if (step === "payment") {
       window.location.href = "dashboard-attorney.html#billing";
     }
+  });
+  skipBtn?.addEventListener("click", () => {
+    hideAttorneyOnboardingModal();
+    clearOnboardingHighlights();
+    clearAttorneyOnboardingStep();
   });
   overlay?.addEventListener("click", (event) => {
     event.preventDefault();
@@ -3761,8 +3771,8 @@ function runAttorneyOnboardingStep(step, options = {}) {
     return;
   }
 
-  if (step === "payment") {
-    window.location.href = "dashboard-attorney.html#billing";
+  if (step === "case") {
+    window.location.href = "dashboard-attorney.html#cases";
   }
 }
 

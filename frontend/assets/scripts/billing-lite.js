@@ -34,6 +34,7 @@ function initBillingLite() {
   const paymentSummaryEl = document.getElementById("paymentMethodSummary");
   const paymentFormEl = document.getElementById("paymentMethodForm");
   const paymentElementHost = document.getElementById("paymentMethodElement");
+  const paymentPanelActionsEl = document.querySelector(".payment-method-panel .panel-actions");
   const paymentErrorsEl = document.getElementById("paymentMethodErrors");
   const paymentModalEl = document.getElementById("paymentMethodModal");
   const addCardBtn = document.getElementById("addPaymentMethodBtn");
@@ -50,6 +51,7 @@ function initBillingLite() {
   let setupPaymentElement = null;
   let pendingHire = null;
   let pendingHireLoaded = false;
+  let paymentFlowOpening = false;
 
   const STRIPE_JS_SRC = "https://js.stripe.com/v3/";
   let stripeJsPromise = null;
@@ -68,6 +70,9 @@ function initBillingLite() {
         targetBtn.classList.add("onboarding-pulse");
         targetBtn.addEventListener("click", () => targetBtn.classList.remove("onboarding-pulse"), { once: true });
       }
+      ensurePaymentOnboardingSkipButton();
+    } else {
+      removePaymentOnboardingSkipButton();
     }
     if (pendingHire && paymentStatus?.paymentMethod) {
       resumePendingHire(pendingHire);
@@ -77,7 +82,19 @@ function initBillingLite() {
   })();
 
 function bindEvents() {
-  portalBtn?.addEventListener("click", openBillingPortal);
+  const pauseTour = () => {
+    try {
+      window.dispatchEvent(new CustomEvent("lpc:attorney-tour-pause"));
+    } catch {}
+    if (typeof window.stopAttorneyTour === "function") {
+      window.stopAttorneyTour();
+    }
+  };
+
+  portalBtn?.addEventListener("click", () => {
+    pauseTour();
+    openBillingPortal();
+  });
   historyList?.addEventListener("click", (event) => {
     const card = event.target.closest("[data-case-id]");
     if (!card) return;
@@ -121,10 +138,50 @@ function bindEvents() {
       trigger?.focus();
     }
   });
-  addCardBtn?.addEventListener("click", () => startPaymentMethodFlow());
-  replaceCardBtn?.addEventListener("click", () => startPaymentMethodFlow());
+  addCardBtn?.addEventListener("click", () => {
+    pauseTour();
+    startPaymentMethodFlow();
+  });
+  replaceCardBtn?.addEventListener("click", () => {
+    pauseTour();
+    startPaymentMethodFlow();
+  });
   saveCardBtn?.addEventListener("click", () => savePaymentMethod());
   cancelCardBtn?.addEventListener("click", () => cancelPaymentFlow());
+  paymentModalEl?.addEventListener("click", (event) => {
+    if (event.target === paymentModalEl) {
+      cancelPaymentFlow();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (paymentModalEl?.classList.contains("hidden")) return;
+    cancelPaymentFlow();
+  });
+}
+
+function ensurePaymentOnboardingSkipButton() {
+  if (!paymentPanelActionsEl) return;
+  let skipBtn = document.getElementById("skipPaymentOnboardingBtn");
+  if (!skipBtn) {
+    skipBtn = document.createElement("button");
+    skipBtn.type = "button";
+    skipBtn.id = "skipPaymentOnboardingBtn";
+    skipBtn.className = "ghost-btn";
+    skipBtn.textContent = "Skip onboarding";
+    paymentPanelActionsEl.appendChild(skipBtn);
+  }
+  skipBtn.onclick = () => {
+    setAttorneyOnboardingStep("");
+    window.location.href = "dashboard-attorney.html#home";
+  };
+}
+
+function removePaymentOnboardingSkipButton() {
+  const skipBtn = document.getElementById("skipPaymentOnboardingBtn");
+  if (skipBtn?.parentNode) {
+    skipBtn.parentNode.removeChild(skipBtn);
+  }
 }
 
 async function loadActiveEscrows(showLoading = false, { syncAlerts = false } = {}) {
@@ -346,7 +403,7 @@ async function openBillingPortal() {
   portalBtn.disabled = true;
   portalBtn.textContent = "Opening…";
   try {
-    const res = await secureFetch("/api/payments/portal", { method: "POST" });
+    const res = await secureFetch("/api/payments/portal", { method: "POST", noRedirect: true });
     let data = {};
     try {
       data = await res.json();
@@ -393,7 +450,10 @@ async function loadPaymentMethodStatus() {
   if (!paymentSummaryEl) return null;
   paymentSummaryEl.innerHTML = `<p class="muted">Checking saved payment method…</p>`;
   try {
-    const res = await secureFetch("/api/payments/payment-method/default", { headers: { Accept: "application/json" } });
+    const res = await secureFetch("/api/payments/payment-method/default", {
+      headers: { Accept: "application/json" },
+      noRedirect: true,
+    });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(payload?.error || `HTTP ${res.status}`);
     renderPaymentMethodSummary(payload);
@@ -444,6 +504,8 @@ function resetPaymentElement() {
 
 async function startPaymentMethodFlow() {
   if (!paymentFormEl || !paymentElementHost) return;
+  if (paymentFlowOpening) return;
+  paymentFlowOpening = true;
   if (paymentErrorsEl) paymentErrorsEl.textContent = "";
   if (paymentModalEl) {
     paymentModalEl.classList.remove("hidden");
@@ -457,9 +519,8 @@ async function startPaymentMethodFlow() {
     await ensureStripeJs();
     const session = await createSetupIntentSession();
     resetPaymentElement();
-    setupElements = await createElements(session.clientSecret, { appearance: { theme: "flat" } });
+    setupElements = await createElements(session.clientSecret, { theme: "flat" });
     setupPaymentElement = mountPaymentElement(setupElements, paymentElementHost);
-    paymentElementHost.scrollIntoView({ behavior: "smooth", block: "center" });
   } catch (err) {
     console.warn("Unable to start payment method flow", err);
     if (paymentErrorsEl) paymentErrorsEl.textContent = err?.message || "Unable to start card setup.";
@@ -470,6 +531,7 @@ async function startPaymentMethodFlow() {
   } finally {
     addCardBtn?.removeAttribute("aria-busy");
     replaceCardBtn?.removeAttribute("aria-busy");
+    paymentFlowOpening = false;
   }
 }
 
@@ -477,6 +539,7 @@ async function createSetupIntentSession() {
   const res = await secureFetch("/api/payments/payment-method/setup-intent", {
     method: "POST",
     headers: { Accept: "application/json" },
+    noRedirect: true,
   });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok || !payload?.clientSecret) {
@@ -504,9 +567,7 @@ async function savePaymentMethod() {
     await loadPaymentMethodStatus();
     cancelPaymentFlow();
     if (getAttorneyOnboardingStep() === "payment") {
-      setAttorneyOnboardingStep("case");
-      window.location.href = "dashboard-attorney.html#cases";
-      return;
+      setAttorneyOnboardingStep("");
     }
     if (!pendingHire) pendingHire = await loadPendingHire(true);
     if (pendingHire?.caseId) {
@@ -525,6 +586,7 @@ async function setDefaultPaymentMethod(paymentMethodId) {
     method: "POST",
     headers: { Accept: "application/json" },
     body: { paymentMethodId },
+    noRedirect: true,
   });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {

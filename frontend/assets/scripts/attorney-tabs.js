@@ -142,11 +142,17 @@ const state = {
 
 const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
 const ATTORNEY_ONBOARDING_MODAL_SEEN_KEY = "lpc_attorney_onboarding_modal_seen_case";
+const ATTORNEY_ONBOARDING_MODAL_SEEN_PREFIX = "lpc_attorney_onboarding_modal_seen";
+const ATTORNEY_ONBOARDING_COMPLETE_NOTICE_KEY = "lpc_attorney_onboarding_complete_notice_seen";
 let onboardingChecklistApi = null;
 let caseOnboardingPrompted = false;
 let caseOnboardingModalBound = false;
 let caseOnboardingScrollY = 0;
 let caseOnboardingBodyOverflow = "";
+let onboardingAttentionCompleteTimer = null;
+let onboardingAttentionHydrated = false;
+let onboardingAttentionInitialized = false;
+let onboardingAttentionWasComplete = false;
 
 function getAttorneyOnboardingStep() {
   try {
@@ -776,6 +782,222 @@ function isAttorneyProfileComplete(user = {}) {
   return hasPractice && hasSummary;
 }
 
+function getAttorneyOnboardingProgress() {
+  const profileDone = isAttorneyProfileComplete(state.user || {});
+  const paymentDone = state.billing.hasPaymentMethod === true;
+  const caseDone = (state.cases?.length || 0) > 0 || (state.casesArchived?.length || 0) > 0;
+  return { profileDone, paymentDone, caseDone };
+}
+
+function getNextOnboardingStep(progress = getAttorneyOnboardingProgress()) {
+  if (!progress.profileDone) return "profile";
+  if (!progress.paymentDone) return "payment";
+  if (!progress.caseDone) return "case";
+  return "";
+}
+
+function getOnboardingAttentionCopy(step) {
+  if (step === "profile") {
+    return {
+      title: "Complete Step 1: Finish your profile",
+      text: "Step 1 of 3 is still pending. Add your profile details to continue onboarding.",
+      cta: "Open Step 1",
+    };
+  }
+  if (step === "payment") {
+    return {
+      title: "Complete Step 2: Add payment method",
+      text: "Step 2 of 3 is still pending. Complete payment method setup in Stripe.",
+      cta: "Open Step 2",
+    };
+  }
+  if (step === "case") {
+    return {
+      title: "Complete Step 3: Post your first case",
+      text: "Step 3 of 3 is still pending. Create your first case to finish onboarding.",
+      cta: "Open Step 3",
+    };
+  }
+  return { title: "", text: "", cta: "Open step" };
+}
+
+function clearOnboardingModalSeen(step) {
+  try {
+    if (step === "case") {
+      sessionStorage.removeItem(ATTORNEY_ONBOARDING_MODAL_SEEN_KEY);
+      return;
+    }
+    if (step === "profile" || step === "payment") {
+      sessionStorage.removeItem(`${ATTORNEY_ONBOARDING_MODAL_SEEN_PREFIX}_${step}`);
+    }
+  } catch {}
+}
+
+function getOnboardingCompleteNoticeSeen() {
+  try {
+    return sessionStorage.getItem(ATTORNEY_ONBOARDING_COMPLETE_NOTICE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setOnboardingCompleteNoticeSeen() {
+  try {
+    sessionStorage.setItem(ATTORNEY_ONBOARDING_COMPLETE_NOTICE_KEY, "1");
+  } catch {}
+}
+
+function clearOnboardingCompleteNoticeSeen() {
+  try {
+    sessionStorage.removeItem(ATTORNEY_ONBOARDING_COMPLETE_NOTICE_KEY);
+  } catch {}
+}
+
+function clearOnboardingAttentionCompleteTimer() {
+  if (!onboardingAttentionCompleteTimer) return;
+  clearTimeout(onboardingAttentionCompleteTimer);
+  onboardingAttentionCompleteTimer = null;
+}
+
+function updateCaseOnboardingSkipButton() {
+  const btn = document.getElementById("caseOnboardingSkipBtn");
+  if (!btn) return;
+  const shouldShow = getAttorneyOnboardingStep() === "case";
+  btn.hidden = !shouldShow;
+  btn.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+}
+
+function skipAttorneyOnboardingFlow() {
+  clearAttorneyOnboardingStep();
+  clearOnboardingModalSeen("profile");
+  clearOnboardingModalSeen("payment");
+  clearOnboardingModalSeen("case");
+  caseOnboardingPrompted = true;
+  document.querySelectorAll(".onboarding-pulse").forEach((el) => el.classList.remove("onboarding-pulse"));
+  try {
+    hideCaseOnboardingModal();
+  } catch {}
+  updateCaseOnboardingSkipButton();
+  updateOnboardingChecklist();
+}
+
+function openOnboardingStepWithPopup(step) {
+  if (!step) return;
+  if (step === "profile") {
+    setAttorneyOnboardingStep("profile");
+    clearOnboardingModalSeen("profile");
+    window.location.href = "profile-settings.html?onboardingStep=profile&profilePrompt=1";
+    return;
+  }
+  if (step === "payment") {
+    setAttorneyOnboardingStep("payment");
+    clearOnboardingModalSeen("payment");
+    window.location.href = "profile-settings.html?onboardingStep=payment";
+    return;
+  }
+  if (step === "case") {
+    setAttorneyOnboardingStep("case");
+    clearOnboardingModalSeen("case");
+    caseOnboardingPrompted = false;
+    if (typeof showDashboardView === "function") {
+      showDashboardView("cases");
+    } else {
+      window.location.hash = "cases";
+    }
+    setTimeout(() => {
+      maybePromptCaseOnboarding();
+    }, 280);
+  }
+}
+
+function updateOnboardingAttentionCard(progress = getAttorneyOnboardingProgress()) {
+  const card = document.getElementById("attorneyOnboardingAttentionCard");
+  if (!card) return;
+  const titleEl = card.querySelector("[data-onboarding-attention-title]");
+  const textEl = card.querySelector("[data-onboarding-attention-text]");
+  const ctaEl = card.querySelector("[data-onboarding-attention-action]");
+  const skipBtn = card.querySelector("[data-onboarding-attention-skip]");
+  const checkItems = Array.from(card.querySelectorAll("[data-onboarding-check-step]"));
+  const doneByStep = {
+    profile: Boolean(progress.profileDone),
+    payment: Boolean(progress.paymentDone),
+    case: Boolean(progress.caseDone),
+  };
+  checkItems.forEach((item) => {
+    const key = String(item.dataset.onboardingCheckStep || "").toLowerCase();
+    const done = Boolean(doneByStep[key]);
+    item.classList.toggle("is-complete", done);
+    const input = item.querySelector('input[type="checkbox"]');
+    if (input) input.checked = done;
+  });
+
+  if (!onboardingAttentionHydrated) {
+    clearOnboardingAttentionCompleteTimer();
+    card.hidden = true;
+    card.setAttribute("aria-hidden", "true");
+    return;
+  }
+
+  const step = getNextOnboardingStep(progress);
+  const isComplete = !step;
+  const hadSnapshot = onboardingAttentionInitialized;
+  const transitionedToComplete = hadSnapshot && !onboardingAttentionWasComplete && isComplete;
+  onboardingAttentionInitialized = true;
+  onboardingAttentionWasComplete = isComplete;
+
+  if (!isComplete) {
+    clearOnboardingAttentionCompleteTimer();
+    clearOnboardingCompleteNoticeSeen();
+    card.classList.remove("is-static", "is-complete");
+    if (ctaEl) ctaEl.hidden = true;
+    if (skipBtn) skipBtn.hidden = false;
+    checkItems.forEach((item) => {
+      item.setAttribute("tabindex", "0");
+      item.setAttribute("aria-disabled", "false");
+    });
+    const copy = getOnboardingAttentionCopy(step);
+    if (titleEl) titleEl.textContent = copy.title;
+    if (textEl) {
+      textEl.textContent = "";
+      textEl.hidden = true;
+    }
+    card.dataset.step = step;
+    card.hidden = false;
+    card.setAttribute("aria-hidden", "false");
+    return;
+  }
+
+  card.dataset.step = "";
+  card.classList.add("is-static", "is-complete");
+  if (titleEl) titleEl.textContent = "Onboarding Complete";
+  if (textEl) {
+    textEl.hidden = false;
+    textEl.textContent = "Everything is set. You're ready to work with confidence.";
+  }
+  if (ctaEl) ctaEl.hidden = true;
+  if (skipBtn) skipBtn.hidden = true;
+  checkItems.forEach((item) => {
+    item.setAttribute("tabindex", "-1");
+    item.setAttribute("aria-disabled", "true");
+  });
+
+  if (!transitionedToComplete || getOnboardingCompleteNoticeSeen()) {
+    card.hidden = true;
+    card.setAttribute("aria-hidden", "true");
+    return;
+  }
+
+  card.hidden = false;
+  card.setAttribute("aria-hidden", "false");
+  setOnboardingCompleteNoticeSeen();
+  clearOnboardingAttentionCompleteTimer();
+  onboardingAttentionCompleteTimer = window.setTimeout(() => {
+    card.hidden = true;
+    card.setAttribute("aria-hidden", "true");
+    onboardingAttentionCompleteTimer = null;
+  }, 4200);
+}
+
 function setupOnboardingChecklist() {
   if (onboardingChecklistApi) return onboardingChecklistApi;
   const root = document.getElementById("attorneyOnboardingChecklist");
@@ -844,9 +1066,8 @@ function setupOnboardingChecklist() {
   };
 
   const update = () => {
-    const profileDone = isAttorneyProfileComplete(state.user || {});
-    const paymentDone = state.billing.hasPaymentMethod === true;
-    const caseDone = (state.cases?.length || 0) > 0 || (state.casesArchived?.length || 0) > 0;
+    const progress = getAttorneyOnboardingProgress();
+    const { profileDone, paymentDone, caseDone } = progress;
 
     setStep("profile", profileDone, {
       statusText: profileDone ? "Complete" : "Next",
@@ -863,6 +1084,7 @@ function setupOnboardingChecklist() {
       actionText: caseDone ? "View" : "New case",
       onClick: caseDone ? goToCaseList : goToCases,
     });
+    updateOnboardingAttentionCard(progress);
   };
 
   onboardingChecklistApi = { update };
@@ -872,6 +1094,8 @@ function setupOnboardingChecklist() {
 
 function updateOnboardingChecklist() {
   onboardingChecklistApi?.update?.();
+  updateOnboardingAttentionCard();
+  updateCaseOnboardingSkipButton();
 }
 
 function bindCaseOnboardingModal() {
@@ -882,14 +1106,24 @@ function bindCaseOnboardingModal() {
   caseOnboardingModalBound = true;
   const closeBtn = modal.querySelector("[data-case-onboarding-close]");
   const continueBtn = modal.querySelector("[data-case-onboarding-continue]");
+  const skipBtn = modal.querySelector("[data-case-onboarding-skip]");
 
   const handleClose = () => {
     hideCaseOnboardingModal();
     highlightNewCaseButton();
   };
 
+  const handleSkip = () => {
+    hideCaseOnboardingModal();
+    clearAttorneyOnboardingStep();
+    caseOnboardingPrompted = true;
+    document.querySelectorAll(".onboarding-pulse").forEach((el) => el.classList.remove("onboarding-pulse"));
+    updateOnboardingChecklist();
+  };
+
   closeBtn?.addEventListener("click", handleClose);
   continueBtn?.addEventListener("click", handleClose);
+  skipBtn?.addEventListener("click", handleSkip);
   overlay.addEventListener("click", handleClose);
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && modal.classList.contains("is-active")) {
@@ -969,7 +1203,38 @@ async function initOverviewPage() {
   const quickButtons = document.querySelectorAll("[data-quick-link]");
   const weeklyNotesGrid = document.getElementById("weeklyNotesGrid");
   const weeklyNotesRange = document.getElementById("weeklyNotesRange");
+  const onboardingAttentionCard = document.getElementById("attorneyOnboardingAttentionCard");
+  const onboardingAttentionSkip = onboardingAttentionCard?.querySelector("[data-onboarding-attention-skip]");
+  const onboardingAttentionSteps = Array.from(
+    onboardingAttentionCard?.querySelectorAll("[data-onboarding-check-step]") || []
+  );
+  const caseOnboardingSkipBtn = document.getElementById("caseOnboardingSkipBtn");
   setupOnboardingChecklist();
+  updateOnboardingAttentionCard();
+  updateCaseOnboardingSkipButton();
+
+  const handleOnboardingStepOpen = (stepValue) => {
+    const step = String(stepValue || "").toLowerCase();
+    if (!step) return;
+    openOnboardingStepWithPopup(step);
+  };
+  const handleSkipOnboarding = (event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    skipAttorneyOnboardingFlow();
+  };
+  onboardingAttentionSteps.forEach((node) => {
+    node.addEventListener("click", () => {
+      handleOnboardingStepOpen(node.dataset.onboardingCheckStep);
+    });
+    node.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      handleOnboardingStepOpen(node.dataset.onboardingCheckStep);
+    });
+  });
+  onboardingAttentionSkip?.addEventListener("click", handleSkipOnboarding);
+  caseOnboardingSkipBtn?.addEventListener("click", handleSkipOnboarding);
 
   const toastHelper = window.toastUtils;
   const stagedToast = toastHelper?.consume();
@@ -1084,6 +1349,7 @@ async function initOverviewPage() {
         loadArchivedCases(),
       ]);
       state.billing.hasPaymentMethod = hasPaymentMethod;
+      onboardingAttentionHydrated = true;
       updateOnboardingChecklist();
       applyApplicationsToCases(apps || []);
       const eligibleCaseIds = new Set(
@@ -1119,6 +1385,8 @@ async function initOverviewPage() {
     } catch (err) {
       console.warn("Overview hydration failed", err);
       if (deadlineList) deadlineList.innerHTML = `<div class="info-line" style="color:var(--muted);">Unable to load deadlines.</div>`;
+      onboardingAttentionHydrated = true;
+      updateOnboardingChecklist();
     }
   }
 

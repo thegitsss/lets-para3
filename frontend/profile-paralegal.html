@@ -87,6 +87,29 @@
       box-shadow: 0 40px 90px rgba(15, 23, 42, 0.25);
     }
 
+    .page-shell.cutout-active {
+      background: transparent;
+    }
+
+    .page-shell.cutout-active > :not(.invite-cutout-overlay) {
+      position: relative;
+      z-index: 1;
+    }
+
+    .page-shell .invite-cutout-overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      display: none;
+    }
+
+    .page-shell.cutout-active .invite-cutout-overlay {
+      display: block;
+    }
+
     .topbar {
       display: flex;
       justify-content: space-between;
@@ -663,7 +686,8 @@
       max-width: 520px;
       margin-left: auto;
       margin-right: auto;
-      text-align: center;
+      text-align: justify;
+      text-justify: inter-word;
       margin-top: 10px;
     }
 
@@ -721,8 +745,9 @@
     #locationMeta .meta-line,
     #locationMeta .meta-text {
       color: var(--accent);
-      font-size: 0.9rem;
-      font-weight: 400;
+      font-size: 0.82rem;
+      font-family: var(--font-sans);
+      font-weight: 300;
       text-decoration: none;
     }
 
@@ -730,41 +755,39 @@
       text-decoration: none;
     }
 
-    #joinedMeta,
     #credentialMeta {
       justify-content: center;
       text-align: center;
       width: 100%;
     }
 
+    #joinedMeta {
+      display: none;
+    }
+
     .joined-meta-corner {
-      display: none;
-      width: 100%;
-      justify-content: flex-start;
-      margin-top: auto;
-      padding-left: 6px;
-    }
-
-    body.viewer-attorney .profile-layout {
-      align-items: stretch;
-    }
-
-    body.viewer-attorney .profile-sidebar {
-      align-items: stretch;
-    }
-
-    body.viewer-attorney #joinedMeta {
-      display: none;
-    }
-
-    body.viewer-attorney .joined-meta-corner {
       display: flex;
+      width: 100%;
+      justify-content: center;
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
     }
 
-    body.viewer-attorney .joined-meta-corner .hero-meta-pill {
+    .joined-meta-corner .hero-meta-pill {
+      background: transparent;
+      border: none;
+      box-shadow: none;
       width: auto;
-      justify-content: flex-start;
-      text-align: left;
+      min-height: 0;
+      padding: 0;
+      justify-content: center;
+      text-align: center;
+      color: #8e94a0;
+      font-family: var(--font-serif);
+      font-size: 9pt;
+      font-weight: 400;
+      letter-spacing: 0.01em;
     }
 
     .profile-layout {
@@ -1019,6 +1042,35 @@
       transform: none;
     }
 
+    .hero-cta-row .cta-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 22px;
+      border: 2px solid rgba(255, 255, 255, 0.45);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.12);
+      color: rgba(17, 19, 23, 0.94);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 300;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      -webkit-backdrop-filter: saturate(160%) blur(2px);
+      backdrop-filter: saturate(160%) blur(2px);
+    }
+
+    .hero-cta-row .cta-primary:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.6);
+      transform: none;
+    }
+
+    .hero-cta-row .cta-primary:focus-visible {
+      outline: 2px solid rgba(182, 164, 122, 0.44);
+      outline-offset: 2px;
+    }
+
     .hero-doc-buttons {
       display: flex;
       gap: 8px;
@@ -1176,19 +1228,26 @@
     }
 
     .best-for-list {
-      margin: 0;
+      margin: 10px 0 0;
       padding-left: 18px;
+      list-style: disc;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
+      text-align: left;
     }
 
     .best-for-list li {
       margin: 0;
+      text-align: justify;
+      text-justify: inter-word;
+      font-size: 0.92rem;
+      line-height: 1.55;
     }
 
     .best-for-list li::marker {
-      font-size: 0.75em;
+      color: var(--accent);
+      font-size: 0.45em;
     }
 
     .profile-duo {
@@ -1198,6 +1257,10 @@
       width: 100%;
       max-width: 720px;
       margin: 6px auto 0;
+    }
+
+    .profile-duo.is-single {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .edu-inline {
@@ -1701,16 +1764,14 @@
           </div>
         </article>
 
+        <article class="profile-section" id="practiceSection">
+          <div class="card-header-label" style="text-align:center;">Practice Areas</div>
+          <div id="practiceList" class="chip-cloud"></div>
+        </article>
+
         <article class="profile-section hidden" id="stateExperienceRow">
           <div class="card-header-label" style="text-align:center;">State Experience</div>
           <div class="chip-row" id="stateExperienceList"></div>
-        </article>
-
-        <article class="profile-section" id="skillsCard">
-          <div class="chip-section" id="skillsSection">
-            <span class="card-header-label" style="text-align:center; width:100%;">Skills</span>
-            <div id="skillsList" class="chip-cloud"></div>
-          </div>
         </article>
 
         <article class="profile-section" id="languagesRow">
@@ -1763,9 +1824,11 @@
             <div class="card-header-label" style="text-align:center;">Best For</div>
             <ul id="bestForList" class="best-for-list"></ul>
           </article>
-          <article class="profile-section" id="practiceSection">
-            <div class="card-header-label" style="text-align:center;">Focus Areas</div>
-            <div id="practiceList" class="chip-cloud"></div>
+          <article class="profile-section" id="skillsCard">
+            <div class="chip-section" id="skillsSection">
+              <span class="card-header-label" style="text-align:center; width:100%;">Skills</span>
+              <div id="skillsList" class="chip-cloud"></div>
+            </div>
           </article>
         </div>
 

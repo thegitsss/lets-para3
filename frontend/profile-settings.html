@@ -3299,12 +3299,12 @@ input[type="number"],
     .attorney-onboarding-title {
       font-family: var(--font-serif);
       font-size: 1.6rem;
-      color: var(--ink);
+      color: #1a2230;
       margin-bottom: 8px;
       font-weight: 500;
     }
     .attorney-onboarding-text {
-      color: var(--muted);
+      color: #4b5563;
       font-size: 0.98rem;
       line-height: 1.5;
       margin-bottom: 20px;
@@ -3316,9 +3316,9 @@ input[type="number"],
       justify-content: center;
     }
     .attorney-onboarding-btn {
-      border: 1px solid var(--line);
-      background: #ffffff;
-      color: var(--ink);
+      border: 1px solid rgba(26, 34, 48, 0.18);
+      background: #f8fafc;
+      color: #1a2230;
       padding: 10px 20px;
       border-radius: 999px;
       font-weight: 300;
@@ -3340,7 +3340,7 @@ input[type="number"],
       right: 12px;
       border: none;
       background: transparent;
-      color: var(--muted);
+      color: #8a94a6;
       font-size: 1.4rem;
       cursor: pointer;
     }
@@ -4042,7 +4042,7 @@ input[type="number"],
                 </div>
 
                 <div class="form-field">
-                  <label for="attorneyPracticeDescription">Practice Description (optional)</label>
+                  <label for="attorneyPracticeDescription">Practice Description</label>
                   <textarea id="attorneyPracticeDescription" rows="5" placeholder="Briefly describe your practice, areas of focus, or how you collaborate with paralegals."></textarea>
                   <div id="attorneyPracticeCount" class="muted">0 / 4000 characters</div>
                 </div>
@@ -4654,6 +4654,7 @@ input[type="number"],
       <div class="attorney-onboarding-title" id="attorneyOnboardingTitle">Let’s Get Started</div>
       <p class="attorney-onboarding-text" id="attorneyOnboardingText">Step 1 of 3: Complete your profile, then click Save changes.</p>
       <div class="attorney-onboarding-actions">
+        <button type="button" class="attorney-onboarding-btn" data-onboarding-skip>Skip onboarding</button>
         <button type="button" class="attorney-onboarding-btn primary" data-onboarding-continue>Continue</button>
       </div>
     </div>

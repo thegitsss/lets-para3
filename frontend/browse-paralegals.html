@@ -133,9 +133,10 @@
     .site-header.over-image .signup-pill { border-color: rgba(26, 34, 48, 0.35) !important; }
 
     .jobs-shell {
-      width: min(1100px, 94vw);
+      width: min(1200px, 92vw);
       margin: 60px auto 90px;
-      padding: 0 24px;
+      padding: 0;
+      box-sizing: border-box;
     }
 
     .layout {
@@ -173,7 +174,7 @@
     }
 
     .filter-group select,
-    .filter-group input {
+    .filter-group input[type="text"] {
       width: 100%;
       padding: 0.55rem 0.75rem;
       border: 1px solid rgba(26, 34, 48, 0.12);
@@ -356,7 +357,7 @@
 
     .job-card {
       border: 1px solid rgba(26, 34, 48, 0.08);
-      border-left: 4px solid var(--gold);
+      border-left: 4px solid #111;
       background: #fff;
       padding: 1.4rem 1.6rem;
       border-radius: 18px;
@@ -418,9 +419,12 @@
     }
 
     #pagination {
-      text-align: center;
+      display: flex;
+      justify-content: center;
+      width: 100%;
       color: #6b7280;
       font-size: 0.95rem;
+      margin-top: 0.5rem;
     }
 
     footer {
@@ -441,13 +445,17 @@
     footer a { color: #6b7280; text-decoration: none; }
 
     @media (max-width: 960px) {
+      .browse-paralegals-page {
+        --mobile-header-offset: calc(env(safe-area-inset-top, 0px) + 88px);
+      }
       .layout { flex-direction: column; }
       aside.filter {
         position: fixed;
-        inset: 0 auto 0 0;
+        inset: var(--mobile-header-offset) auto 0 0;
         width: min(320px, 85vw);
         max-width: 90vw;
-        height: 100vh;
+        height: calc(100vh - var(--mobile-header-offset));
+        height: calc(100dvh - var(--mobile-header-offset));
         overflow-y: auto;
         transform: translateX(-110%);
         transition: transform 0.3s ease;
@@ -517,8 +525,18 @@
       color: var(--navy);
       display: flex;
       align-items: center;
+      justify-content: flex-start;
       gap: 8px;
       transition: background 0.15s;
+    }
+
+    aside.filter #specialtyList li label {
+      display: inline;
+      margin: 0;
+      color: var(--navy);
+      font-size: 0.95rem;
+      line-height: 1.35;
+      cursor: pointer;
     }
 
     aside.filter #stateList li:hover,
@@ -530,6 +548,12 @@
       accent-color: var(--gold);
       cursor: pointer;
       transform: scale(1.1);
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      padding: 0;
+      flex: 0 0 auto;
+      display: inline-block;
     }
 
     aside.filter select,
@@ -578,7 +602,7 @@
       align-items: center;
       padding: 1.75rem 2rem;
       border: 1px solid var(--line);
-      border-left: 4px solid var(--gold);
+      border-left: 4px solid #111;
       background: #fdfdfb;
     }
 
@@ -908,7 +932,7 @@
     }
   </style>
 </head>
-<body>
+<body class="browse-jobs-page browse-paralegals-page">
   <a class="skip-link" href="#main">Skip to main content</a>
 <header class="site-header">
     <div class="header-inner">
@@ -987,16 +1011,16 @@
         <div id="paralegalResults" class="jobs-grid">
           <div class="results-status" id="resultsStatus">Loading paralegals…</div>
         </div>
-        <div id="pagination">
-          <div class="pagination-controls">
-            <div class="page-nav">
-              <button type="button" id="prevPage" class="invite-btn">Previous</button>
-              <span id="paginationLabel">Page 1</span>
-              <button type="button" id="nextPage" class="invite-btn">Next</button>
-            </div>
-          </div>
-        </div>
       </section>
+    </div>
+    <div id="pagination">
+      <div class="pagination-controls">
+        <div class="page-nav">
+          <button type="button" id="prevPage" class="invite-btn">Previous</button>
+          <span id="paginationLabel">Page 1</span>
+          <button type="button" id="nextPage" class="invite-btn">Next</button>
+        </div>
+      </div>
     </div>
   </main>
 

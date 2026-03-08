@@ -552,6 +552,36 @@
       margin-bottom: 20px;
     }
 
+    body.theme-dark #attorneyTourModal .tour-title,
+    body.theme-dark #attorneyCaseOnboardingModal .tour-title,
+    body.theme-dark #casePostedModal .tour-title,
+    body.theme-mountain-dark #attorneyTourModal .tour-title,
+    body.theme-mountain-dark #attorneyCaseOnboardingModal .tour-title,
+    body.theme-mountain-dark #casePostedModal .tour-title,
+    html.theme-dark #attorneyTourModal .tour-title,
+    html.theme-dark #attorneyCaseOnboardingModal .tour-title,
+    html.theme-dark #casePostedModal .tour-title,
+    html.theme-mountain-dark #attorneyTourModal .tour-title,
+    html.theme-mountain-dark #attorneyCaseOnboardingModal .tour-title,
+    html.theme-mountain-dark #casePostedModal .tour-title {
+      color: #1a2230;
+    }
+
+    body.theme-dark #attorneyTourModal .tour-text,
+    body.theme-dark #attorneyCaseOnboardingModal .tour-text,
+    body.theme-dark #casePostedModal .tour-text,
+    body.theme-mountain-dark #attorneyTourModal .tour-text,
+    body.theme-mountain-dark #attorneyCaseOnboardingModal .tour-text,
+    body.theme-mountain-dark #casePostedModal .tour-text,
+    html.theme-dark #attorneyTourModal .tour-text,
+    html.theme-dark #attorneyCaseOnboardingModal .tour-text,
+    html.theme-dark #casePostedModal .tour-text,
+    html.theme-mountain-dark #attorneyTourModal .tour-text,
+    html.theme-mountain-dark #attorneyCaseOnboardingModal .tour-text,
+    html.theme-mountain-dark #casePostedModal .tour-text {
+      color: #4b5563;
+    }
+
     .tour-actions {
       display: flex;
       flex-wrap: wrap;
@@ -654,6 +684,39 @@
       margin: 0 0 10px;
       color: var(--muted);
       font-weight: 400;
+    }
+
+    body.theme-dark #attorneyTourTooltip .tour-tooltip-title,
+    body.theme-mountain-dark #attorneyTourTooltip .tour-tooltip-title,
+    html.theme-dark #attorneyTourTooltip .tour-tooltip-title,
+    html.theme-mountain-dark #attorneyTourTooltip .tour-tooltip-title {
+      color: #1a2230;
+    }
+
+    body.theme-dark #attorneyTourTooltip p,
+    body.theme-mountain-dark #attorneyTourTooltip p,
+    html.theme-dark #attorneyTourTooltip p,
+    html.theme-mountain-dark #attorneyTourTooltip p {
+      color: #4b5563;
+    }
+
+    @media (max-width: 1024px) {
+      body.theme-dark #attorneyTourTooltip .tour-tooltip-title,
+      body.theme-mountain-dark #attorneyTourTooltip .tour-tooltip-title,
+      html.theme-dark #attorneyTourTooltip .tour-tooltip-title,
+      html.theme-mountain-dark #attorneyTourTooltip .tour-tooltip-title {
+        font-size: 1.2rem;
+        line-height: 1.25;
+        text-align: center;
+        margin-bottom: 8px;
+      }
+
+      body.theme-dark #attorneyTourTooltip p,
+      body.theme-mountain-dark #attorneyTourTooltip p,
+      html.theme-dark #attorneyTourTooltip p,
+      html.theme-mountain-dark #attorneyTourTooltip p {
+        text-align: center;
+      }
     }
 
     .tour-step-actions {
@@ -1081,6 +1144,115 @@
       color: var(--muted);
       margin-bottom: 0.6rem;
       font-weight: 400;
+    }
+    .onboarding-attention-card {
+      margin-top: 1.1rem;
+      border: 1px solid rgba(182, 164, 122, 0.42);
+      border-radius: 14px;
+      padding: 0.9rem 1rem;
+      background: linear-gradient(135deg, rgba(182, 164, 122, 0.16), rgba(255, 255, 255, 0.96));
+      box-shadow: var(--card-shadow-soft);
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .onboarding-attention-card:not(.is-static):hover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+      box-shadow: var(--card-shadow);
+    }
+    .onboarding-attention-card.is-static {
+      cursor: default;
+    }
+    .onboarding-attention-card:focus-visible {
+      outline: 2px solid rgba(182, 164, 122, 0.45);
+      outline-offset: 2px;
+    }
+    .onboarding-attention-label {
+      font-size: 0.68rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.3rem;
+    }
+    .onboarding-attention-title {
+      font-family: var(--font-serif);
+      font-size: 1.08rem;
+      font-weight: 300;
+      color: var(--ink);
+    }
+    .onboarding-attention-text {
+      margin-top: 0.3rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .onboarding-attention-checklist {
+      margin: 0.55rem 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 0.3rem;
+    }
+    .onboarding-attention-check {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      cursor: pointer;
+      border-radius: 8px;
+      padding: 0.16rem 0.2rem;
+      transition: background 0.16s ease, color 0.16s ease;
+    }
+    .onboarding-attention-check:hover,
+    .onboarding-attention-check:focus-visible {
+      color: var(--ink);
+      background: rgba(182, 164, 122, 0.1);
+      outline: none;
+    }
+    .onboarding-attention-check.is-complete {
+      color: var(--ink);
+    }
+    .onboarding-attention-check input[type="checkbox"] {
+      width: 0.92rem;
+      height: 0.92rem;
+      margin: 0;
+      accent-color: var(--accent);
+      pointer-events: none;
+    }
+    .onboarding-attention-check input[type="checkbox"][disabled] {
+      opacity: 1;
+    }
+    .onboarding-attention-cta {
+      margin-top: 0.45rem;
+      font-size: 0.7rem;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .onboarding-attention-skip {
+      margin-top: 0.55rem;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.66rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease;
+    }
+    .onboarding-attention-skip:hover,
+    .onboarding-attention-skip:focus-visible {
+      border-color: var(--accent);
+      color: var(--ink);
+      outline: none;
+    }
+    body.theme-dark .onboarding-attention-card,
+    body.theme-mountain-dark .onboarding-attention-card {
+      background: linear-gradient(135deg, rgba(148, 163, 184, 0.22), rgba(15, 23, 42, 0.86));
+      border-color: rgba(148, 163, 184, 0.38);
     }
     .weekly-notes {
       margin-top: 1.4rem;
@@ -1887,6 +2059,35 @@
       background: var(--panel);
       padding: 2rem;
       box-shadow: var(--card-shadow);
+    }
+
+    .view-cases .cases-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.9rem;
+      flex-wrap: wrap;
+    }
+
+    .view-cases .cases-onboarding-skip {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 0.45rem 0.9rem;
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+    }
+
+    .view-cases .cases-onboarding-skip:hover,
+    .view-cases .cases-onboarding-skip:focus-visible {
+      border-color: var(--accent);
+      color: var(--ink);
+      outline: none;
+      background: rgba(182, 164, 122, 0.08);
     }
 
     .view-cases .case-switcher {
@@ -3637,7 +3838,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 2000;
+      z-index: 13010;
     }
     .payment-modal.hidden { display: none; }
     .payment-modal .modal-card {
@@ -4495,6 +4696,33 @@
             </div>
 
 
+            <section
+              class="onboarding-attention-card"
+              id="attorneyOnboardingAttentionCard"
+              hidden
+              aria-hidden="true"
+            >
+              <div class="onboarding-attention-label">Onboarding</div>
+              <div class="onboarding-attention-title" data-onboarding-attention-title></div>
+              <p class="onboarding-attention-text" data-onboarding-attention-text></p>
+              <ul class="onboarding-attention-checklist" data-onboarding-attention-checklist>
+                <li class="onboarding-attention-check" data-onboarding-check-step="profile" role="button" tabindex="0" aria-label="Open step 1 onboarding">
+                  <input type="checkbox" aria-label="Step 1 complete" data-onboarding-check-input="profile" disabled />
+                  <span>Step 1: Profile setup</span>
+                </li>
+                <li class="onboarding-attention-check" data-onboarding-check-step="payment" role="button" tabindex="0" aria-label="Open step 2 onboarding">
+                  <input type="checkbox" aria-label="Step 2 complete" data-onboarding-check-input="payment" disabled />
+                  <span>Step 2: Payment method</span>
+                </li>
+                <li class="onboarding-attention-check" data-onboarding-check-step="case" role="button" tabindex="0" aria-label="Open step 3 onboarding">
+                  <input type="checkbox" aria-label="Step 3 complete" data-onboarding-check-input="case" disabled />
+                  <span>Step 3: First case</span>
+                </li>
+              </ul>
+              <div class="onboarding-attention-cta" data-onboarding-attention-action>Open this step</div>
+              <button type="button" class="onboarding-attention-skip" data-onboarding-attention-skip>Skip onboarding</button>
+            </section>
+
             <section class="ledger-shell weekly-notes" aria-labelledby="weeklyNotesTitle">
               <div class="ledger-header weekly-notes-header">
                 <div class="weekly-notes-title">
@@ -4586,9 +4814,12 @@
 
     <section class="view-panel view-cases" data-view="cases" hidden>
       <div class="cases-shell">
-        <header>
-          <h1>Active Cases</h1>
-          <p>Manage and monitor your open matters below.</p>
+        <header class="cases-header">
+          <div>
+            <h1>Active Cases</h1>
+            <p>Manage and monitor your open matters below.</p>
+          </div>
+          <button type="button" class="cases-onboarding-skip" id="caseOnboardingSkipBtn" hidden>Skip onboarding</button>
         </header>
         <section id="casesViewSection">
           <div class="page-header">
@@ -4917,6 +5148,7 @@
         <div class="tour-title" id="attorneyCaseOnboardingTitle">Let’s Post Your First Case</div>
         <p class="tour-text" id="attorneyCaseOnboardingText">Step 3 of 3: Click “+ New Case” to create a matter for paralegals to apply to.</p>
         <div class="tour-actions">
+          <button type="button" class="tour-btn ghost" data-case-onboarding-skip>Skip onboarding</button>
           <button type="button" class="tour-btn primary" data-case-onboarding-continue>Continue</button>
         </div>
       </div>

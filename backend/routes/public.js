@@ -110,7 +110,7 @@ const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const escapeRegex = (str = "") => String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const PUBLIC_PAR_FIELDS =
-  "_id firstName lastName avatarURL profileImage location state specialties practiceAreas bestFor yearsExperience linkedInURL education bio about availability approvedAt";
+  "_id firstName lastName avatarURL profileImage location state specialties practiceAreas bestFor yearsExperience linkedInURL education bio about availability approvedAt createdAt";
 
 function serializeParalegal(userDoc) {
   if (!userDoc) return null;
@@ -134,6 +134,7 @@ function serializeParalegal(userDoc) {
     about: src.about || "",
     availability: src.availability || "",
     approvedAt: src.approvedAt || null,
+    createdAt: src.createdAt || null,
   };
 }
 // ----------------------------------------

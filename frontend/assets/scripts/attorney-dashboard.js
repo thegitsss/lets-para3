@@ -85,6 +85,9 @@ async function updateOnboardingState(updates = {}, { markFirstLoginComplete = fa
 }
 
 function markTourCompleted() {
+  try {
+    sessionStorage.setItem("lpc_attorney_tour_completed", "1");
+  } catch (_) {}
   void updateOnboardingState({ attorneyTourCompleted: true }, { markFirstLoginComplete: true });
 }
 
@@ -100,6 +103,15 @@ function isVisibleForTour(target) {
 let tourApi = null;
 const ATTORNEY_TOUR_STEP_KEY = "lpc_attorney_tour_step";
 const ATTORNEY_TOUR_ACTIVE_KEY = "lpc_attorney_tour_active";
+const ATTORNEY_TOUR_COMPLETED_KEY = "lpc_attorney_tour_completed";
+
+function getLocalTourCompleted() {
+  try {
+    return sessionStorage.getItem(ATTORNEY_TOUR_COMPLETED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 function getStoredTourProgress() {
   try {
@@ -203,10 +215,20 @@ async function initAttorneyTour(user = {}, options = {}) {
 
   if (role !== "attorney") return;
   if (status && status !== "approved") return;
+  if (!force && getLocalTourCompleted()) {
+    clearTourProgress();
+    return;
+  }
   if (!force && !isFirstLogin) return;
 
   const onboarding = await loadOnboardingState(effectiveUser);
-  if (!force && onboarding?.attorneyTourCompleted) return;
+  if (!force && onboarding?.attorneyTourCompleted) {
+    try {
+      sessionStorage.setItem(ATTORNEY_TOUR_COMPLETED_KEY, "1");
+    } catch (_) {}
+    clearTourProgress();
+    return;
+  }
   if (!force) markTourCompleted();
 
   const steps = [
@@ -247,6 +269,7 @@ async function initAttorneyTour(user = {}, options = {}) {
 
   let stepIndex = -1;
   let activeTarget = null;
+  let spotlightSyncQueued = false;
 
   const setSidebarOpen = (open) => {
     document.body.classList.toggle("nav-open", Boolean(open));
@@ -376,6 +399,27 @@ async function initAttorneyTour(user = {}, options = {}) {
     tooltip.style.left = `${left}px`;
   };
 
+  const queueSpotlightSync = () => {
+    if (spotlightSyncQueued) return;
+    spotlightSyncQueued = true;
+    requestAnimationFrame(() => {
+      spotlightSyncQueued = false;
+      if (!overlay.classList.contains("is-active") || !overlay.classList.contains("spotlight")) return;
+      const step = tourSteps[stepIndex];
+      if (!step) return;
+      const resolvedTarget = resolveStepTarget(step, { visibleOnly: true });
+      const nextTarget = resolvedTarget || activeTarget;
+      if (!nextTarget) return;
+      if (activeTarget && activeTarget !== nextTarget) {
+        activeTarget.classList.remove("tour-highlight");
+      }
+      activeTarget = nextTarget;
+      activeTarget.classList.add("tour-highlight");
+      positionSpotlight(activeTarget);
+      positionTooltip(activeTarget, step);
+    });
+  };
+
   const showIntro = () => {
     setTourProgress(-1);
     showOverlay();
@@ -436,15 +480,19 @@ async function initAttorneyTour(user = {}, options = {}) {
       }
 
       const start = performance.now();
+      const syncDuration = isMobileSidebarMode() ? 900 : 420;
       const sync = () => {
         if (!overlay.classList.contains("is-active") || !overlay.classList.contains("spotlight")) return;
         positionSpotlight(target);
         positionTooltip(target, step);
-        if (performance.now() - start < 380) {
+        if (performance.now() - start < syncDuration) {
           requestAnimationFrame(sync);
         }
       };
       requestAnimationFrame(sync);
+      if (isMobileSidebarMode()) {
+        setTimeout(queueSpotlightSync, 320);
+      }
     };
 
     if (step.view) {
@@ -469,41 +517,12 @@ async function initAttorneyTour(user = {}, options = {}) {
     clearTourProgress();
   };
 
-  const startAttorneyOnboarding = () => {
-    try {
-      sessionStorage.setItem("lpc_attorney_onboarding_step", "profile");
-      sessionStorage.removeItem("lpc_attorney_onboarding_modal_seen_profile");
-      sessionStorage.removeItem("lpc_attorney_onboarding_modal_seen_payment");
-      sessionStorage.removeItem("lpc_attorney_onboarding_modal_seen_case");
-    } catch (_) {}
-  };
-
-  const buildProfileTourUrl = (href = "profile-settings.html", options = {}) => {
-    const { prompt = false, step = "profile" } = options;
-    try {
-      const url = new URL(href, window.location.href);
-      url.searchParams.set("tour", "1");
-      url.searchParams.set("onboardingStep", step);
-      if (prompt) {
-        url.searchParams.set("profilePrompt", "1");
-      }
-      return `${url.pathname}${url.search}${url.hash}`;
-    } catch {
-      const suffix = `?tour=1&onboardingStep=${encodeURIComponent(step)}`;
-      return prompt ? `profile-settings.html${suffix}&profilePrompt=1` : `profile-settings.html${suffix}`;
-    }
-  };
-
   startBtn.addEventListener("click", () => showStep(0));
   closeBtn?.addEventListener("click", () => {
     completeTour();
-    startAttorneyOnboarding();
-    window.location.href = buildProfileTourUrl("profile-settings.html", { prompt: true, step: "profile" });
   });
   tooltipCloseBtn?.addEventListener("click", () => {
     completeTour();
-    startAttorneyOnboarding();
-    window.location.href = buildProfileTourUrl("profile-settings.html", { prompt: true, step: "profile" });
   });
   backBtn.addEventListener("click", () => {
     if (stepIndex <= 0) return showIntro();
@@ -512,15 +531,23 @@ async function initAttorneyTour(user = {}, options = {}) {
   nextBtn.addEventListener("click", () => {
     if (stepIndex < tourSteps.length - 1) return showStep(stepIndex + 1);
     completeTour();
-    startAttorneyOnboarding();
-    window.location.href = buildProfileTourUrl("profile-settings.html", { prompt: true, step: "profile" });
   });
 
   window.addEventListener("resize", () => {
-    if (overlay.classList.contains("is-active") && tooltip.classList.contains("is-active") && activeTarget) {
-      showStep(stepIndex);
+    if (overlay.classList.contains("is-active") && tooltip.classList.contains("is-active")) {
+      queueSpotlightSync();
     }
   });
+
+  window.addEventListener(
+    "scroll",
+    () => {
+      if (overlay.classList.contains("is-active") && tooltip.classList.contains("is-active")) {
+        queueSpotlightSync();
+      }
+    },
+    true
+  );
 
   tourApi = {
     start: showIntro,
@@ -549,8 +576,9 @@ async function bootAttorneyTour() {
     user = stored || {};
   }
   const forceReplay = consumeReplayFlag();
-  const resume = forceReplay ? null : getStoredTourProgress();
-  if (forceReplay) clearTourProgress();
+  const canResume = !forceReplay && !getLocalTourCompleted();
+  const resume = canResume ? getStoredTourProgress() : null;
+  if (forceReplay || !canResume) clearTourProgress();
   setTimeout(
     () =>
       initAttorneyTour(user || {}, {
@@ -591,6 +619,18 @@ if (document.readyState === "loading") {
 window.startAttorneyTour = () => {
   void replayAttorneyTour();
 };
+
+window.stopAttorneyTour = () => {
+  try {
+    tourApi?.complete?.();
+  } catch (_) {}
+};
+
+window.addEventListener("lpc:attorney-tour-pause", () => {
+  try {
+    tourApi?.complete?.();
+  } catch (_) {}
+});
 
 window.addEventListener("lpc:attorney-tour", () => {
   void replayAttorneyTour();

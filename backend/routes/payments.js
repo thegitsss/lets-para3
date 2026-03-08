@@ -380,9 +380,40 @@ function pickLimit(rawValue, fallback = 200, max = 1000) {
 }
 
 function resolveClientBase(req) {
-  if (CLIENT_BASE_URL) return CLIENT_BASE_URL;
   const origin = req?.headers?.origin || req?.get?.("origin");
-  if (origin) return trimSlash(origin);
+  if (origin) {
+    try {
+      const parsed = new URL(String(origin));
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        return trimSlash(parsed.origin);
+      }
+    } catch (_) {}
+  }
+
+  const referer = req?.headers?.referer || req?.get?.("referer");
+  if (referer) {
+    try {
+      const parsed = new URL(String(referer));
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        return trimSlash(parsed.origin);
+      }
+    } catch (_) {}
+  }
+
+  if (CLIENT_BASE_URL) return CLIENT_BASE_URL;
+
+  const forwardedProto = String(req?.headers?.["x-forwarded-proto"] || "")
+    .split(",")[0]
+    .trim();
+  const forwardedHost = String(req?.headers?.["x-forwarded-host"] || "")
+    .split(",")[0]
+    .trim();
+  const host = forwardedHost || req?.headers?.host || req?.get?.("host");
+  if (host) {
+    const scheme = forwardedProto || (req?.secure ? "https" : "http");
+    return trimSlash(`${scheme}://${host}`);
+  }
+
   const fallback = process.env.PUBLIC_ORIGIN || "http://localhost:5001";
   return trimSlash(fallback);
 }

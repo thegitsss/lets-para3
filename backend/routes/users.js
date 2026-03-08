@@ -155,7 +155,7 @@ const parseParalegalFilters = (query = {}) => {
 };
 
 const SAFE_PUBLIC_SELECT =
-  "_id firstName lastName avatarURL profileImage profileImageOriginal pendingProfileImage pendingProfileImageOriginal profilePhotoStatus location specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt languages writingSamples status stateExperience";
+  "_id firstName lastName avatarURL profileImage profileImageOriginal pendingProfileImage pendingProfileImageOriginal profilePhotoStatus location specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt createdAt languages writingSamples status stateExperience";
 const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email phoneNumber onboarding pendingHire`;
 const FILE_PUBLIC_BASE =
   (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
@@ -220,6 +220,7 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
     availability: src.availability || "",
     availabilityDetails: src.availabilityDetails || null,
     approvedAt: src.approvedAt || null,
+    createdAt: src.createdAt || null,
     bio: src.bio || "",
     about: src.about || "",
     writingSamples: Array.isArray(src.writingSamples) ? src.writingSamples : [],
