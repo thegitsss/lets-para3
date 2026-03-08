@@ -7,10 +7,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0B2A4A">
-  <link href="assets/styles/styles.css" rel="stylesheet" />
-  <link href="assets/styles/hero-pages.css" rel="stylesheet" />
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="utf-8" />
   <title>Privacy Policy – Let’s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
@@ -18,84 +15,85 @@
   <link rel="manifest" href="site.webmanifest" />
   <link rel="mask-icon" href="maskable-icon.png" color="#0B2A4A" />
 
-  <!-- Fonts -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link href="assets/styles/styles.css" rel="stylesheet" />
+  <link href="assets/styles/hero-pages.css" rel="stylesheet" />
 
   <style>
+    .gold{color:var(--gold);}
     :root {
-      --gold: #b4975a;
-      --ink: #1a1a1a;
-    }
-    .gold{color:#b4975a;}
-    a {
-      color: var(--gold);
+      --ink: #1a2230;
+      --muted: #5c6b7a;
+      --line: #e8edf3;
+      --gold: #887244;
     }
 
-    a:visited {
-      color: var(--gold);
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    a:hover {
-      color: #a5854b;
-    }
     body {
+      background: #ffffff;
+      color: var(--ink);
       font-family: 'Sarabun', sans-serif;
       font-weight: 200;
-      margin: 0;
-      padding: 0;
-      background-color: white;
-      color: #1a1a1a;
-      line-height: 1.6;
-    }
-
-    .header-logo {
-      font-family: 'Cormorant Garamond', serif;
-      font-weight: 300;
-      font-size: 1.5rem;
-      letter-spacing: 0.08em;
-      color: var(--ink);
-      text-decoration: none;
-    }
-
-    .header-logo:visited,
-    .header-logo:hover {
-      color: var(--ink);
-    }
-
-    .header-logo .accent-apostrophe {
-      color: var(--gold);
+      font-size: 16px;
+      line-height: 1.7;
     }
 
     main {
-      padding: 60px 40px;
-      max-width: 800px;
-      margin: 0 auto;
+      max-width: 900px;
+      margin: 60px auto 80px;
+      padding: 0 24px;
+    }
+
+    h1, h2, h3 {
+      margin-bottom: 12px;
     }
 
     h1 {
       font-family: 'Cormorant Garamond', serif;
       font-weight: 300;
-      font-size: 2.5rem;
-      margin-bottom: 30px;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.4px;
+      font-size: 2.3rem;
+      margin-bottom: 24px;
     }
 
     h2 {
-      font-family: 'Cormorant Garamond', serif;
+      font-family: 'Sarabun', sans-serif;
       font-weight: 300;
-      margin-top: 40px;
-      font-size: 1.75rem;
+      letter-spacing: 0;
+      font-size: 1.5rem;
+      margin-top: 48px;
     }
 
-    p {
-      margin-bottom: 20px;
+    section.card > h2 {
+      margin-top: 28px;
     }
 
-    main strong {
-      font-weight: 250;
+    section.card:first-of-type > h2 {
+      margin-top: 20px;
+    }
+
+    h3 {
+      font-family: 'Sarabun', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 400;
+      letter-spacing: 0;
+      margin-top: 30px;
+      margin-bottom: 10px;
+    }
+
+    p, ul, ol {
+      margin-bottom: 18px;
+    }
+
+    main p,
+    main ul:not(.toc-list) li {
+      text-align: justify;
+      text-justify: inter-word;
     }
 
     ul, ol {
-      margin-bottom: 20px;
       padding-left: 20px;
     }
 
@@ -120,212 +118,391 @@
       font-size: 0.45em;
     }
 
-    ol li::marker {
-      color: var(--gold);
-      font-weight: 250;
+    .muted {
+      color: var(--muted);
+      font-size: 15px;
+      margin-bottom: 30px;
     }
+
     .toc-list {
-  list-style: none;
-  padding-left: 0;
-  margin: 2rem 0;
-  font-family: 'Sarabun', sans-serif;
-  font-weight: 200;
-}
+      list-style: none;
+      padding-left: 0;
+      margin: 2rem 0;
+    }
 
-.toc-list li {
-  margin: 0.5rem 0;
-}
+    .toc-list li {
+      margin: 0.5rem 0;
+    }
 
-.toc-list a {
-  text-decoration: none;
-  color: var(--gold);
-  transition: color 0.2s ease-in-out;
-}
+    .toc-list a {
+      color: var(--ink);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
 
-.toc-list a:hover {
-  color: var(--gold);
-}
-html {
-  scroll-behavior: smooth;
-}
+    .toc-list a:hover {
+      color: var(--gold);
+    }
+
+    .header-logo .accent-apostrophe {
+      color: var(--gold);
+    }
+
+    main strong {
+      font-weight: 400;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-size: 0.92em;
+    }
+
+    ul:not(.toc-list) li strong {
+      text-transform: uppercase;
+    }
+
+    #section-9 p {
+      line-height: 1.2;
+      margin-bottom: 18px;
+    }
+
+    #section-10 p,
+    #section-11 p,
+    #section-12 p,
+    #section-13 p,
+    #section-14 p,
+    #section-15 p {
+      line-height: 1.2;
+    }
+
+    #section-6 h3 {
+      font-size: 1rem;
+      margin-top: 14px;
+      margin-bottom: 4px;
+    }
+
+    #section-6 p {
+      margin-bottom: 12px;
+    }
+
+    #section-6 ul {
+      margin-bottom: 12px;
+    }
+
+    #section-6 ul:not(.toc-list) li {
+      margin: 0.35rem 0;
+    }
+
+    #section-2 ul:not(.toc-list) li {
+      line-height: 1.2;
+      margin: 0.2rem 0;
+    }
   </style>
 </head>
 
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
-<!-- Header -->
 <header>
-  <div class="header-inner">
-    <nav class="nav-left" aria-label="Primary">
-      <a href="contact.html">Contact Us</a>
-      <a href="index.html#who-we-are">About</a>
-      <a href="index.html#how">How It Works</a>
-    </nav>
+    <div class="header-inner">
+      <nav class="nav-left" aria-label="Primary">
+        <a href="contact.html">Contact Us</a>
+        <a href="index.html#who-we-are">About</a>
+        <a href="index.html#how">How It Works</a>
+      </nav>
 
-    <a href="index.html" class="header-logo">
-      Let<span class="accent-apostrophe">’</span>s-ParaConnect
-    </a>
+      <a href="index.html" class="header-logo">
+        Let<span class="accent-apostrophe">’</span>s-ParaConnect
+      </a>
 
-    <div class="header-actions">
+      <div class="header-actions">
 <a class="pill" href="login.html" id="authAction">Sign In</a>
-      <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
+        <button type="button" class="pill" id="logoutAction" style="display:none;">Log Out</button>
+      </div>
     </div>
-  </div>
-</header>
+  </header>
 
   <div class="hero-banner" role="presentation" aria-hidden="true"></div>
 
- <main tabindex="-1" id="main" aria-labelledby="privacy-title">
+  <main tabindex="-1" aria-labelledby="privacy-title" id="main">
     <h1 id="privacy-title">Privacy Policy</h1>
-    <p class="muted">Effective date: <strong><!-- update when publishing --> August 22, 2025</strong></p>
+    <p class="muted">Effective date: <strong>March 8, 2026</strong></p>
 
-    <div class="card" role="region" aria-labelledby="intro">
-      <h2 id="intro" class="sr-only">Introduction</h2>
-      <p>Welcome to <strong>Lets-ParaConnect</strong> (“we,” “us,” “our”). We operate a platform where attorneys can hire and collaborate with certified paralegals. This Privacy Policy explains what information we collect, how we use it, how we share it, and the rights available to you.</p>
-      <p><strong>Quick facts about our stack:</strong></p>
-      <p>
-        <span class="pill">MongoDB Atlas (app data)</span>
-        <span class="pill">AWS S3 (private uploads)</span>
-        <span class="pill">Stripe (Checkout, PaymentIntents &amp; Connect)</span>
-        <span class="pill">Nodemailer (SMTP email)</span>
-        <span class="pill">JWT auth + CSRF</span>
-      </p>
-    </div>
+    <p>Let’s-ParaConnect respects the privacy of its users and is committed to protecting personal information collected through the Platform. This Privacy Policy explains how Let’s-ParaConnect collects, uses, stores, and protects information submitted through the Platform.</p>
 
-<section>
-  <h2>Table of Contents</h2>
-  <ul class="toc-list">
-  <li><a href="#info-we-collect">1. Information We Collect</a></li>
-  <li><a href="#how-we-use">2. How We Use Your Information</a></li>
-  <li><a href="#sharing">3. Sharing &amp; Service Providers</a></li>
-  <li><a href="#payments">4. Payments &amp; Stripe</a></li>
-  <li><a href="#cookies">5. Cookies &amp; Local Storage</a></li>
-  <li><a href="#retention">6. Data Retention</a></li>
-  <li><a href="#security">7. Data Security</a></li>
-  <li><a href="#transfers">8. International Transfers</a></li>
-  <li><a href="#your-rights">9. Your Privacy Rights</a></li>
-  <li><a href="#changes">10. Updates to This Policy</a></li>
-  <li><a href="#contact">11. Contact Us</a></li>
-</ul>
-</section>
+    <h2>Table of Contents</h2>
+    <ul class="toc-list">
+      <li><a href="#section-1">1. Security of Protected Content</a></li>
+      <li><a href="#section-2">1.1 Information You Submit</a></li>
+      <li><a href="#section-3">1.2 Public Content</a></li>
+      <li><a href="#section-4">1.3 Messaging and Communications</a></li>
+      <li><a href="#section-5">1.4 Payment Processing</a></li>
+      <li><a href="#section-6">1.5 Information We Collect</a></li>
+      <li><a href="#section-7">2. Electronic Communications</a></li>
+      <li><a href="#section-8">3. Indemnification</a></li>
+      <li><a href="#section-9">4. Disclaimers and Limitations of Liability</a></li>
+      <li><a href="#section-10">5. Choice of Law and Venue</a></li>
+      <li><a href="#section-11">6. Waiver of Jury Trial and Class Action</a></li>
+      <li><a href="#section-12">7. Termination</a></li>
+      <li><a href="#section-13">8. General Terms</a></li>
+      <li><a href="#section-14">9. Changes to This Agreement</a></li>
+      <li><a href="#section-15">10. Definitions</a></li>
+    </ul>
 
-    <section id="info-we-collect" class="card">
-      <h2>1) Information We Collect</h2>
+    <section id="section-1" class="card">
+      <h2>1. Security of Protected Content</h2>
+      <p>Let’s-ParaConnect (the “Platform”) uses commercially reasonable security measures to protect user information and platform data. The Platform utilizes industry-standard infrastructure and security practices designed to protect data transmitted through the Platform. Data may be stored using secure cloud infrastructure providers and encrypted using widely accepted encryption standards. While Let’s-ParaConnect implements reasonable safeguards to protect user data, no method of electronic transmission or storage is completely secure. Therefore, Let’s-ParaConnect cannot guarantee absolute security of any information transmitted through the Platform.</p>
+    </section>
+
+    <section id="section-2" class="card">
+      <h2>1.1 Information You Submit</h2>
+      <p>Let’s-ParaConnect may collect and store information that users submit through the Platform. This information may include:</p>
       <ul>
-        <li><strong>Account &amp; Profile Data:</strong> name, email, role (attorney/paralegal/admin), bar number (attorneys), resume/certification URLs (paralegals), optional bio, availability, headline, website/LinkedIn.</li>
-        <li><strong>Case &amp; Collaboration Data:</strong> case titles/descriptions, assignments, messages, disputes, checklists, deadlines, Zoom links you choose to store, and related timestamps/audit entries.</li>
-        <li><strong>Uploads:</strong> files you upload via <em>presigned S3 URLs</em> (e.g., resumes, certificates, case documents). Files are stored privately in AWS S3; we keep object keys and metadata in the app database.</li>
-        <li><strong>Payments:</strong> Stripe identifiers like <code class="small">checkout.session</code> IDs, <code class="small">payment_intent</code> IDs, transfer IDs/metadata (e.g., <code class="small">transfer_group</code>). <em>We never store full card numbers.</em></li>
-        <li><strong>System &amp; Security:</strong> hashed passwords, session/JWT identifiers, CSRF tokens, IP addresses, user-agent, timestamps, rate-limit counters, audit logs (e.g., approvals, status changes).</li>
+        <li>account registration information</li>
+        <li>profile information</li>
+        <li>case postings and applications</li>
+        <li>communications between users</li>
+        <li>documents uploaded to the Platform</li>
+        <li>payment-related information handled by the Platform’s payment processor</li>
+        <li>technical and usage data related to platform activity</li>
+      </ul>
+      <p>Let’s-ParaConnect may use this information to:</p>
+      <ul>
+        <li>provide and operate the Platform</li>
+        <li>facilitate collaboration between Attorneys and Paralegals</li>
+        <li>process transactions through third-party payment providers</li>
+        <li>provide customer support</li>
+        <li>maintain system security</li>
+        <li>improve platform functionality</li>
+        <li>comply with legal obligations</li>
       </ul>
     </section>
 
-    <section id="how-we-use" class="card">
-      <h2>2) How We Use Information</h2>
+    <section id="section-3" class="card">
+      <h2>1.2 Public Content</h2>
+      <p>Certain information submitted to the Platform may be visible to other users of the Platform. For example, user profiles, professional qualifications, and other information may be displayed to Attorneys or Paralegals for the purpose of facilitating professional collaboration. Users are responsible for the information they choose to include in their public profiles.</p>
+    </section>
+
+    <section id="section-4" class="card">
+      <h2>1.3 Messaging and Communications</h2>
+      <p>If users exchange messages through the Platform, Let’s-ParaConnect may store those communications in order to deliver messages, maintain message history, and facilitate collaboration between users. Let’s-ParaConnect may also send notifications to users regarding Platform activity, account updates, or case-related events. Users may be able to adjust certain notification preferences within their account settings. Standard messaging, email, or SMS carrier charges may apply depending on the user’s communication provider.</p>
+    </section>
+
+    <section id="section-5" class="card">
+      <h2>1.4 Payment Processing</h2>
+      <p>Certain services on the Let’s-ParaConnect platform require payment processing between Attorneys and Paralegals. Let’s-ParaConnect uses a third-party payment processor (such as Stripe) to process payments and facilitate payouts through the Platform. In order to make or receive payments through the Platform, users may be required to create or maintain an account with the payment processor and agree to that processor’s terms of service and privacy policies. The payment processor may collect and store certain financial information necessary to complete transactions, including billing information, bank account details, or payment card information.</p>
+      <p>Let’s-ParaConnect does not store full credit card numbers or sensitive banking credentials. Such information is transmitted directly to the payment processor using industry-standard security technologies. Financial information collected by the payment processor is used solely for the purpose of processing transactions and facilitating payments through the Platform. Users acknowledge that payment processing services are provided by the third-party processor and are subject to the terms and policies of that processor.</p>
+    </section>
+
+    <section id="section-6" class="card">
+      <h2>1.5 Information We Collect</h2>
+      <p>In addition to information you voluntarily submit through the Let’s-ParaConnect Platform, we may automatically collect certain information related to your use of the Platform. This information helps us operate, maintain, and improve the Platform and may include information about how users interact with the Platform. Examples of information we may collect include:</p>
+
+      <h3>a. Location Information</h3>
+      <p>The Platform may collect general location information associated with your device or internet connection, such as country, region, or approximate geographic location. You may be able to limit the sharing of certain location information through your device or browser settings.</p>
+
+      <h3>b. Platform Activity</h3>
+      <p>We may collect information related to your use of the Platform, including but not limited to:</p>
       <ul>
-        <li>Provide and improve the platform (case creation, messaging, file transfers, deadlines, summaries).</li>
-        <li>Authenticate users; enforce roles and access controls.</li>
-        <li>Process payments through Stripe and facilitate payouts to paralegals upon job completion.</li>
-        <li>Detect/prevent fraud, abuse, and policy violations (rate limits, CSRF, content checks).</li>
-        <li>Send transactional emails (approvals, resets, receipts, dispute updates).</li>
-        <li>Comply with legal obligations and enforce our <a href="terms.html">Terms</a>.</li>
+        <li>browser type and device type</li>
+        <li>IP address</li>
+        <li>unique device identifiers</li>
+        <li>pages visited and features used</li>
+        <li>referring and exit pages</li>
+        <li>date and time of access</li>
+        <li>general usage patterns and platform activity</li>
       </ul>
-      <p>We do not sell your personal information.</p>
-    </section>
+      <p>This information may be used to improve platform performance, analyze usage trends, enhance security, and personalize the user experience.</p>
 
-    <section id="sharing" class="card">
-      <h2>3) Sharing &amp; Service Providers</h2>
-      <p>We share information with service providers who help us operate the platform:</p>
+      <h3>c. Cookies and Similar Technologies</h3>
+      <p>Let’s-ParaConnect may use cookies and similar technologies to improve functionality and user experience. Cookies are small data files stored on your device that allow the Platform to recognize returning users, remember preferences, and analyze usage of the Platform. Users may adjust browser settings to refuse or disable certain cookies. However, doing so may affect the functionality of some features of the Platform.</p>
+
+      <h3>d. Third-Party Service Providers</h3>
+      <p>Let’s-ParaConnect does not sell or rent personally identifiable information to third parties for marketing purposes. However, we may share limited information with trusted third-party service providers that help operate the Platform. These providers may include:</p>
       <ul>
-        <li><strong>MongoDB Atlas</strong> – application database and backups.</li>
-        <li><strong>AWS S3</strong> – private file storage for uploads.</li>
-        <li><strong>Stripe</strong> – Checkout/PaymentIntents for payment processing; Connect for payouts.</li>
-        <li><strong>Email (SMTP via Nodemailer)</strong> – transactional emails.</li>
-        <li><strong>Cloudflare</strong> – bot mitigation and security protections on auth flows.</li>
+        <li>payment processors (such as Stripe)</li>
+        <li>hosting and cloud infrastructure providers</li>
+        <li>analytics providers</li>
+        <li>communication and notification services</li>
       </ul>
-      <p>We may disclose data to comply with law, protect rights/safety, or in connection with a business transaction (e.g., merger). We do not allow third parties to use your data for their own marketing.</p>
-    </section>
+      <p>These providers are only given access to information necessary to perform services on behalf of the Platform.</p>
 
-    <section id="payments" class="card">
-      <h2>4) Payments &amp; Stripe</h2>
-      <p>Payments are processed by Stripe. Card information is handled by Stripe directly; we do not store full card numbers. We store Stripe identifiers and related metadata to coordinate payment records and support Stripe Connect payouts.</p>
-      <p>We use Stripe for payment processing. Stripe may collect/process personal data in accordance with its Privacy Policy: <a href="https://stripe.com/privacy" target="_blank" rel="noopener">stripe.com/privacy</a>.</p>
-    </section>
+      <h3>e. Third-Party Technologies</h3>
+      <p>Let’s-ParaConnect may allow certain third-party services used in connection with the Platform to utilize cookies or similar technologies. These services may collect information similar to the data described above in order to provide functionality such as analytics, security monitoring, performance optimization, or platform features. Such third parties may combine the information collected through the Platform with other information they maintain about you, subject to their own privacy policies. Users may be able to manage certain tracking preferences through browser settings or other opt-out tools provided by third-party services. Disabling certain cookies or tracking technologies may affect the functionality of some features of the Platform.</p>
 
-    <section id="cookies" class="card">
-      <h2>5) Cookies &amp; Local Storage</h2>
+      <h3>f. Service Providers</h3>
+      <p>Let’s-ParaConnect may engage trusted third-party service providers to assist in operating the Platform and providing services to users. These service providers may perform functions such as:</p>
       <ul>
-        <li><strong>CSRF cookie:</strong> a short-lived, httpOnly cookie used only for cross-site request forgery protection.</li>
-        <li><strong>Auth token (frontend):</strong> in some flows, a JWT may be stored in <em>localStorage</em> to authorize API requests from the browser. You can clear it by logging out or clearing site data.</li>
-        <li><strong>Analytics/ads:</strong> we do not run third-party ads or tracking beacons on the core app.</li>
+        <li>platform hosting and infrastructure</li>
+        <li>software development and technical support</li>
+        <li>analytics and system monitoring</li>
+        <li>customer support services</li>
+        <li>payment processing (such as Stripe)</li>
+        <li>communication and notification services</li>
       </ul>
-    </section>
+      <p>These providers may have access to limited information about users solely for the purpose of performing services on behalf of Let’s-ParaConnect and are required to handle such information in accordance with applicable privacy and security standards.</p>
 
-    <section id="retention" class="card">
-      <h2>6) Data Retention</h2>
-      <p>We keep data only as long as needed for the purposes above or as required by law. As a guide (subject to change):</p>
+      <h3>g. Aggregated Information</h3>
+      <p>Let’s-ParaConnect may use and share aggregated or anonymized information about Platform usage. For example, we may share statistics regarding:</p>
       <ul>
-        <li><strong>Accounts &amp; profiles:</strong> retained while the account is active; deleted or archived upon verified request, subject to legal holds.</li>
-        <li><strong>Cases, messages, disputes:</strong> retained for the life of the case and at least 24 months after closure, unless longer retention is required for legal, accounting, or audit purposes.</li>
-        <li><strong>Uploads (S3):</strong> retained while associated to open matters; may be archived or purged after case closure per our internal schedules.</li>
-        <li><strong>Audit logs &amp; security records:</strong> typically 12–24 months.</li>
+        <li>the number of Attorneys or Paralegals registered on the Platform</li>
+        <li>the number or types of Cases posted</li>
+        <li>general platform usage trends</li>
       </ul>
-    </section>
+      <p>Such information does not identify individual users.</p>
 
-    <section id="security" class="card">
-      <h2>7) Security</h2>
+      <h3>h. Business Transfers</h3>
+      <p>If Let’s-ParaConnect is involved in a merger, acquisition, reorganization, sale of assets, or similar business transaction, user information may be transferred as part of that transaction. In such circumstances, the acquiring entity or successor organization will assume the rights and obligations related to that information as described in this Privacy Policy. Let’s-ParaConnect may also share information with affiliated companies under common ownership or control, provided that such entities agree to honor the protections described in this Privacy Policy.</p>
+
+      <h3>i. Legal Compliance and Investigations</h3>
+      <p>Let’s-ParaConnect may access, preserve, and disclose information from or about users if we believe in good faith that such disclosure is reasonably necessary to:</p>
       <ul>
-        <li>Industry-standard password hashing (bcrypt) and role-based authorization.</li>
-        <li>HTTPS required; Content-Security-Policy; rate limiting; CSRF protection.</li>
-        <li>Private S3 ACL for uploads; access via presigned URLs.</li>
-        <li>Webhook signature verification for Stripe events.</li>
+        <li>comply with applicable laws, regulations, legal processes, or government requests;</li>
+        <li>enforce or apply our Terms of Service or other agreements;</li>
+        <li>investigate potential violations of our policies;</li>
+        <li>detect, prevent, or address fraud, security, or technical issues; or</li>
+        <li>protect the rights, property, or safety of Let’s-ParaConnect, its users, or the public.</li>
       </ul>
-      <p>No system is 100% secure. If you suspect unauthorized access, contact us immediately at <a href="mailto:help@lets-paraconnect.com">help@lets-paraconnect.com</a>.</p>
+      <p>If you access or use the Platform from outside the United States, you acknowledge that your information may be transferred to and processed in the United States and other jurisdictions where our service providers operate.</p>
+
+      <h3>j. Links to Third-Party Websites</h3>
+      <p>The Platform may contain links to websites or services operated by third parties that are not affiliated with Let’s-ParaConnect. Let’s-ParaConnect does not control and is not responsible for the content, security, or privacy practices of any third-party websites. Except as otherwise stated in this Privacy Policy, Let’s-ParaConnect does not share your personal information with such third parties. If you choose to access any third-party websites through links on the Platform, you do so at your own risk. Users are encouraged to review the privacy policies and terms of use of any third-party websites they visit.</p>
+
+      <h3>k. Data Retention and Account Termination</h3>
+      <p>Let’s-ParaConnect may retain information collected from or about users for as long as necessary to fulfill the purposes described in this Privacy Policy, comply with legal obligations, resolve disputes, enforce agreements, or maintain the security and integrity of the Platform. If a user account is deactivated or terminated, Let’s-ParaConnect may remove or disable certain user content from the Platform. However, Let’s-ParaConnect may retain certain information in its systems for legitimate business purposes, including:</p>
+      <ul>
+        <li>maintaining system backups</li>
+        <li>complying with legal or regulatory requirements</li>
+        <li>preventing fraud or misuse of the Platform</li>
+        <li>resolving disputes or enforcing agreements</li>
+      </ul>
+      <p>Please note that certain information may remain in backup archives or system logs even after it has been removed from active databases.</p>
+
+      <h3>l. Security</h3>
+      <p>Let’s-ParaConnect uses commercially reasonable security measures designed to protect personal information submitted through the Platform, both during transmission and once it is received. However, no method of transmission over the internet or electronic storage system is completely secure. While Let’s-ParaConnect takes reasonable steps to safeguard user information, we cannot guarantee the absolute security of any information transmitted to or stored on the Platform. Users are responsible for maintaining the confidentiality of their account credentials and for taking appropriate precautions to protect access to their accounts.</p>
+
+      <h3>m. Notification of Security Issues</h3>
+      <p>Users must promptly notify Let’s-ParaConnect if they become aware of any suspected unauthorized access to their account or any security issue related to their use of the Platform. Security concerns may be reported by contacting Let’s-ParaConnect through the contact information provided on the Platform. Timely reporting of potential security issues helps Let’s-ParaConnect investigate and respond appropriately to protect the integrity of the Platform and its users.</p>
     </section>
 
-    <section id="transfers" class="card">
-      <h2>8) International Transfers</h2>
-      <p>We primarily process data in the United States. If personal data is transferred internationally, we rely on appropriate safeguards as required by applicable law.</p>
+    <section id="section-7" class="card">
+      <h2>2. Electronic Communications</h2>
+
+      <h3>2.1 Consent to Electronic Communications</h3>
+      <p>By creating an account or using the Platform, you consent to receive communications from Let’s-ParaConnect in electronic form, including through email or notifications within the Platform. You agree that all agreements, notices, disclosures, and other communications provided electronically by Let’s-ParaConnect satisfy any legal requirement that such communications be provided in writing.</p>
+
+      <h3>2.2 Maintaining Accurate Contact Information</h3>
+      <p>Users are responsible for maintaining accurate and current contact information associated with their account, including email and mailing addresses. Users agree to promptly update their account information if their contact information changes. Let’s-ParaConnect may rely on the email address and other contact information provided by the user to deliver important communications related to the Platform, including notices regarding disputes, account activity, or policy updates. Failure to maintain accurate contact information or to respond to reasonable communications from Let’s-ParaConnect may result in temporary restrictions, suspension, or termination of the user’s account where necessary to maintain the proper operation of the Platform.</p>
     </section>
 
-    <section id="your-rights" class="card">
-      <h2>9) Your Privacy Rights</h2>
-      <p>Depending on your location, you may have rights to access, correct, delete, or download your personal data, and to object or restrict certain processing. In the U.S., some state privacy laws (e.g., CA/VA/CO/CT/UT) may provide similar rights. We do not sell personal information.</p>
-      <p>To exercise rights, email <a href="mailto:help@lets-paraconnect.com">help@lets-paraconnect.com</a>. We may need to verify your identity.</p>
+    <section id="section-8" class="card">
+      <h2>3. Indemnification</h2>
+      <p>You agree to indemnify, defend, and hold harmless Let’s-ParaConnect, its affiliates, and any related entities, as well as their respective officers, directors, employees, agents, and representatives, from and against any claims, demands, liabilities, damages, losses, costs, and expenses (including reasonable attorneys’ fees) arising out of or relating to:</p>
+      <ul>
+        <li>(i) your access to or use of the Platform;</li>
+        <li>(ii) your violation of these Terms;</li>
+        <li>(iii) any services, work, or transactions performed or arranged through the Platform; or</li>
+        <li>(iv) your infringement or alleged infringement of any intellectual property or other rights of any person or entity.</li>
+      </ul>
+      <p>Let’s-ParaConnect reserves the right, at its own discretion and at your expense where permitted by law, to assume the exclusive defense and control of any matter subject to indemnification under this section. You agree to cooperate fully with Let’s-ParaConnect in the defense of such claims. You may not settle any claim that involves Let’s-ParaConnect without the prior written consent of Let’s-ParaConnect. Let’s-ParaConnect will make reasonable efforts to notify you of any claim, action, or proceeding for which indemnification may be sought.</p>
     </section>
 
-    <section id="changes" class="card">
-      <h2>10) Changes to this Policy</h2>
-      <p>We may update this Policy from time to time. Material changes will be posted here with a new effective date.</p>
+    <section id="section-9" class="card">
+      <h2>4. DISCLAIMERS AND LIMITATIONS OF LIABILITY</h2>
+      <p>PLEASE READ THIS SECTION CAREFULLY SINCE IT LIMITS THE LIABILITY OF LET’S-PARACONNECT AND ITS AFFILIATES AND THEIR RESPECTIVE OFFICERS, DIRECTORS, EMPLOYEES, AGENTS, AND REPRESENTATIVES (COLLECTIVELY, THE “LPC ENTITIES”). EACH OF THE SUBSECTIONS BELOW ONLY APPLIES TO THE MAXIMUM EXTENT PERMITTED UNDER APPLICABLE LAW. NOTHING HEREIN IS INTENDED TO LIMIT ANY RIGHTS YOU MAY HAVE WHICH MAY NOT BE LAWFULLY LIMITED.</p>
+
+      <p><strong>4.1</strong> THE PLATFORM IS MADE AVAILABLE TO YOU ON AN “AS IS,” “WITH ALL FAULTS,” AND “AS AVAILABLE” BASIS. YOUR USE OF THE PLATFORM IS AT YOUR OWN DISCRETION AND RISK. LPC ENTITIES MAKE NO CLAIMS OR PROMISES ABOUT THE QUALITY, ACCURACY, RELIABILITY, COMPLETENESS, OR AVAILABILITY OF THE PLATFORM OR ANY CONTENT, COMMUNICATIONS, DOCUMENTS, PROFILES, CASES, REVIEWS, RATINGS, OR OTHER MATERIALS AVAILABLE ON OR THROUGH THE PLATFORM. ACCORDINGLY, LPC ENTITIES ARE NOT LIABLE TO YOU FOR ANY LOSS OR DAMAGE THAT MIGHT ARISE, FOR EXAMPLE, FROM YOUR RELIANCE ON THE QUALITY, ACCURACY, RELIABILITY, OR COMPLETENESS OF THE PLATFORM OR ANY CONTENT AVAILABLE THROUGH THE PLATFORM.</p>
+
+      <p><strong>4.2</strong> LPC ENTITIES EXPRESSLY DISCLAIM ALL WARRANTIES, WHETHER EXPRESS OR IMPLIED, INCLUDING WARRANTIES AS TO ANY SERVICES OFFERED OR PERFORMED BY USERS OF THE PLATFORM, AND ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. NO ORAL OR WRITTEN INFORMATION OR ADVICE PROVIDED TO YOU BY LET’S-PARACONNECT OR ANY REPRESENTATIVE OF THE LPC ENTITIES SHALL CREATE ANY REPRESENTATION OR WARRANTY.</p>
+
+      <p><strong>4.3</strong> OTHER THAN THE REVIEW OR DISPUTE RESOLUTION PROCEDURES DESCRIBED ELSEWHERE IN THESE TERMS, YOUR SOLE AND EXCLUSIVE RIGHT AND REMEDY IN THE EVENT OF DISSATISFACTION WITH THE PLATFORM, THE SERVICES, OR ANY OTHER GRIEVANCE SHALL BE YOUR TERMINATION AND DISCONTINUATION OF ACCESS TO, OR USE OF, THE PLATFORM.</p>
+
+      <p><strong>4.4</strong> LPC ENTITIES MAKE NO REPRESENTATION OR WARRANTY THAT THE INFORMATION WE PROVIDE OR THAT IS PROVIDED THROUGH THE SITE IS ACCURATE, RELIABLE, OR CORRECT; THAT THE SERVICES WILL MEET YOUR REQUIREMENTS; THAT THE SERVICES WILL BE AVAILABLE AT ANY PARTICULAR TIME OR LOCATION, THAT THE SERVICES WILL FUNCTION IN AN UNINTERRUPTED MANNER OR BE SECURE EXCEPT AS EXPRESSLY SET FORTH HEREIN; THAT ANY DEFECTS OR ERRORS WILL BE CORRECTED; OR THAT THE SITE IS FREE OF VIRUSES OR OTHER HARMFUL COMPONENTS. YOU ASSUME FULL RESPONSIBILITY AND RISK OF LOSS RESULTING FROM YOUR USE OF INFORMATION, CONTENT, OR OTHER MATERIAL OBTAINED FROM THE SITE OR SERVICES.</p>
+
+      <p><strong>4.5</strong> LPC ENTITIES’ MAXIMUM AGGREGATE LIABILITY TO YOU FOR LOSSES OR DAMAGES THAT YOU SUFFER IN CONNECTION WITH THE PLATFORM OR THESE TERMS IS LIMITED TO THE GREATER OF: (i) THE PLATFORM FEES, IF ANY, PAID BY YOU TO LET’S-PARACONNECT IN CONNECTION WITH THE PLATFORM IN THE TWELVE (12) MONTHS PRIOR TO THE ACTION GIVING RISE TO LIABILITY; OR (ii) $100.</p>
+
+      <p><strong>4.6</strong> LPC ENTITIES DISCLAIM LIABILITY FOR ANY: (i) INDIRECT, SPECIAL, INCIDENTAL, PUNITIVE, EXEMPLARY, RELIANCE, OR CONSEQUENTIAL DAMAGES; (ii) LOSS OF PROFITS; (iii) BUSINESS INTERRUPTION; (iv) REPUTATIONAL HARM; OR (v) LOSS OF INFORMATION OR DATA.</p>
+
+      <p><strong>4.7</strong> LEGAL NOTICE TO LET’S-PARACONNECT MUST BE IN WRITING AND NOT BY EMAIL OR PLATFORM MESSAGING. COMMUNICATIONS MADE THROUGH EMAIL OR THROUGH THE PLATFORM’S MESSAGING SYSTEM WILL NOT CONSTITUTE LEGAL NOTICE TO LET’S-PARACONNECT OR ANY OF ITS OFFICERS, EMPLOYEES, AGENTS, OR REPRESENTATIVES IN ANY SITUATION WHERE NOTICE TO LET’S-PARACONNECT IS REQUIRED BY THIS AGREEMENT OR BY LAW. ALL NOTICES TO LET’S-PARACONNECT INTENDED TO HAVE A LEGAL EFFECT CONCERNING THIS AGREEMENT OR USE OF THE PLATFORM OR SERVICES MUST BE IN WRITING AND DELIVERED IN PERSON OR BY MAIL EVIDENCED BY A DELIVERY RECEIPT TO THE FOLLOWING ADDRESS:</p>
+      <p>LET’S-PARACONNECT, INC.<br>16192 COASTAL HIGHWAY<br>LEWES, DELAWARE 19958<br>UNITED STATES</p>
     </section>
 
-    <section id="contact" class="card">
-      <h2>11) Contact Us</h2>
-      <p><strong>Lets-ParaConnect</strong><br>
-         We are happy to help with privacy questions or requests. Email us at <a href="mailto:help@lets-paraconnect.com">help@lets-paraconnect.com</a> and we will respond as soon as possible.</p>
+    <section id="section-10" class="card">
+      <h2>5. CHOICE OF LAW AND VENUE</h2>
+      <p>DELAWARE LAW GOVERNS THESE TERMS, AS WELL AS ANY CLAIM, CAUSE OF ACTION, OR DISPUTE THAT MAY ARISE BETWEEN YOU AND LET’S-PARACONNECT (A “CLAIM”), WITHOUT REGARD TO CONFLICT OF LAW PROVISIONS. FOR ANY CLAIM BROUGHT BY OR AGAINST YOU, YOU AGREE TO SUBMIT TO THE PERSONAL AND EXCLUSIVE JURISDICTION OF THE STATE AND FEDERAL COURTS LOCATED IN THE STATE OF DELAWARE.</p>
+    </section>
+
+    <section id="section-11" class="card">
+      <h2>6. WAIVER OF JURY TRIAL AND CLASS ACTION</h2>
+      <p>YOU AGREE THAT BY ENTERING INTO THIS AGREEMENT YOU ARE WAIVING THE RIGHT TO TRIAL BY JURY. YOU ALSO AGREE THAT YOU ARE WAIVING THE RIGHT TO PARTICIPATE IN A CLASS ACTION. YOU AGREE THAT YOU MAY BRING CLAIMS ONLY IN YOUR INDIVIDUAL CAPACITY AND NOT AS A PLAINTIFF OR CLASS MEMBER IN ANY PURPORTED CLASS OR REPRESENTATIVE PROCEEDING.</p>
+    </section>
+
+    <section id="section-12" class="card">
+      <h2>7. TERMINATION</h2>
+      <p>LET’S-PARACONNECT RESERVES THE RIGHT (THOUGH NOT THE OBLIGATION), IN ITS SOLE DISCRETION, TO DETERMINE WHETHER ANY USER CONDUCT IS APPROPRIATE AND COMPLIES WITH THIS AGREEMENT, AND TO TERMINATE OR DENY ACCESS TO OR USE OF THE PLATFORM OR SERVICES TO ANY USER FOR ANY REASON OR NO REASON, WITH OR WITHOUT PRIOR NOTICE.</p>
+      <p>YOU MAY TERMINATE THIS AGREEMENT AT ANY TIME BY PROVIDING WRITTEN NOTICE TO LET’S-PARACONNECT OF YOUR INTENT TO TERMINATE YOUR ACCOUNT. PLEASE REVIEW THE PRIVACY POLICY SET FORTH ABOVE FOR INFORMATION REGARDING THE HANDLING OF YOUR ACCOUNT INFORMATION FOLLOWING TERMINATION.</p>
+      <p>LET’S-PARACONNECT MAY CLOSE YOUR ACCOUNT, SUSPEND YOUR ABILITY TO USE CERTAIN FEATURES OF THE PLATFORM, OR TERMINATE YOUR ACCESS TO THE PLATFORM AT ANY TIME, WITH OR WITHOUT NOTICE, FOR ANY REASON PERMITTED BY LAW. SUCH ACTION MAY PREVENT YOU FROM ACCESSING YOUR ACCOUNT, THE PLATFORM, YOUR USER CONTENT, OR OTHER RELATED INFORMATION.</p>
+      <p>IN THE EVENT OF ANY TERMINATION, WHETHER BY YOU OR BY LET’S-PARACONNECT, THIS AGREEMENT SHALL REMAIN BINDING FROM THE DATE YOU FIRST ACCEPTED THESE TERMS UNTIL THE DATE YOUR ACCOUNT TERMINATION IS PROCESSED. FOLLOWING TERMINATION, ALL PROVISIONS OF THIS AGREEMENT THAT BY THEIR NATURE SHOULD SURVIVE TERMINATION SHALL REMAIN IN FULL FORCE AND EFFECT, INCLUDING BUT NOT LIMITED TO SECTIONS RELATING TO DISCLAIMERS, LIMITATIONS OF LIABILITY, INDEMNIFICATION, AND GOVERNING LAW.</p>
+    </section>
+
+    <section id="section-13" class="card">
+      <h2>8. GENERAL TERMS</h2>
+      <p>LET’S-PARACONNECT RESERVES THE RIGHT TO MODIFY, UPDATE, INTERRUPT, SUSPEND, OR DISCONTINUE THE PLATFORM OR SERVICES AT ANY TIME WITHOUT NOTICE OR LIABILITY.</p>
+      <p>LET’S-PARACONNECT MAY PROVIDE USERS WITH NOTICES, INCLUDING NOTICES REGARDING CHANGES TO THIS AGREEMENT, BY EMAIL, REGULAR MAIL, OR THROUGH COMMUNICATIONS MADE AVAILABLE ON OR THROUGH THE PLATFORM.</p>
+      <p>EXCEPT AS OTHERWISE EXPRESSLY PROVIDED IN THIS AGREEMENT, NOTHING HEREIN IS INTENDED, NOR SHALL BE DEEMED, TO CONFER ANY RIGHTS OR REMEDIES UPON ANY THIRD PARTY.</p>
+      <p>THIS AGREEMENT CONSTITUTES THE ENTIRE AGREEMENT BETWEEN YOU AND LET’S-PARACONNECT REGARDING THE USE OF THE PLATFORM AND SERVICES AND SUPERSEDES ANY PRIOR OR CONTEMPORANEOUS AGREEMENTS, COMMUNICATIONS, OR UNDERSTANDINGS BETWEEN YOU AND LET’S-PARACONNECT RELATING TO THE SUBJECT MATTER HEREOF. YOU ACKNOWLEDGE THAT YOU HAVE NOT RELIED ON ANY REPRESENTATION OR STATEMENT NOT EXPRESSLY SET FORTH IN THIS AGREEMENT.</p>
+      <p>ANY FAILURE BY LET’S-PARACONNECT TO EXERCISE OR ENFORCE ANY RIGHT OR PROVISION OF THIS AGREEMENT SHALL NOT CONSTITUTE A WAIVER OF SUCH RIGHT OR PROVISION. THE FAILURE OF EITHER PARTY AT ANY TIME TO REQUIRE PERFORMANCE BY THE OTHER PARTY OF ANY PROVISION OF THIS AGREEMENT SHALL NOT AFFECT THE RIGHT TO REQUIRE SUCH PERFORMANCE AT ANY LATER TIME.</p>
+      <p>IF ANY PROVISION OF THIS AGREEMENT IS FOUND TO BE INVALID, ILLEGAL, OR UNENFORCEABLE BY A COURT OF COMPETENT JURISDICTION, THAT PROVISION SHALL BE LIMITED OR ELIMINATED TO THE MINIMUM EXTENT NECESSARY SO THAT THE REMAINDER OF THIS AGREEMENT SHALL REMAIN IN FULL FORCE AND EFFECT.</p>
+      <p>THIS AGREEMENT MAY NOT BE ASSIGNED, TRANSFERRED, OR SUBLICENSED BY YOU WITHOUT THE PRIOR WRITTEN CONSENT OF LET’S-PARACONNECT. LET’S-PARACONNECT MAY ASSIGN OR TRANSFER THIS AGREEMENT WITHOUT RESTRICTION. ANY ATTEMPTED ASSIGNMENT IN VIOLATION OF THIS PROVISION SHALL BE VOID.</p>
+      <p>THE SECTION HEADINGS USED IN THIS AGREEMENT ARE FOR CONVENIENCE ONLY AND SHALL NOT AFFECT THE INTERPRETATION OF ANY PROVISION OF THIS AGREEMENT.</p>
+    </section>
+
+    <section id="section-14" class="card">
+      <h2>9. CHANGES TO THIS AGREEMENT</h2>
+      <p>LET’S-PARACONNECT MAY, IN ITS SOLE DISCRETION, AMEND OR UPDATE THIS AGREEMENT AT ANY TIME BY POSTING A REVISED VERSION ON THE PLATFORM. WHEN CHANGES ARE MADE, WE WILL INDICATE AT THE TOP OF THE REVISED AGREEMENT THE DATE THAT REVISIONS WERE LAST MADE. YOU SHOULD REVIEW THIS AGREEMENT PERIODICALLY, AS REVISED VERSIONS WILL BECOME BINDING UPON YOU WHEN POSTED ON THE PLATFORM. YOUR CONTINUED USE OF THE PLATFORM OR SERVICES AFTER ANY MODIFIED AGREEMENT HAS BEEN POSTED CONSTITUTES YOUR ACCEPTANCE OF THE UPDATED TERMS.</p>
+    </section>
+
+    <section id="section-15" class="card">
+      <h2>10. DEFINITIONS</h2>
+      <p>THE FOLLOWING TERMS USED THROUGHOUT THIS AGREEMENT SHALL HAVE THE MEANINGS SET FORTH BELOW, REGARDLESS OF WHETHER THEY ARE CAPITALIZED, USED IN THE PAST, PRESENT, OR FUTURE TENSE, OR USED IN THEIR SINGULAR OR PLURAL FORM:</p>
+
+      <p><strong>“CONTENT”</strong> MEANS ALL DOCUMENTS, COMMUNICATIONS, ALERTS, EMAILS, TEXT, IMAGES, PHOTOS, AUDIO, VIDEO, FILES, LOCATION DATA, AND ANY OTHER FORM OF DATA OR COMMUNICATION TRANSMITTED, STORED, OR PROCESSED THROUGH THE PLATFORM.</p>
+      <p><strong>“ATTORNEY”</strong> MEANS A USER OF THE PLATFORM WHO POSTS OR MANAGES CASES AND ENGAGES PARALEGALS FOR PROJECT-BASED LEGAL SUPPORT THROUGH THE PLATFORM.</p>
+      <p><strong>“PARALEGAL”</strong> MEANS A USER WHO APPLIES FOR OR PERFORMS WORK ON CASES THROUGH THE PLATFORM AS AN INDEPENDENT PROFESSIONAL.</p>
+      <p><strong>“LET’S-PARACONNECT,” “LPC,” “WE,” “US,” AND “OUR”</strong> MEANS LET’S-PARACONNECT, INC., A DELAWARE CORPORATION, TOGETHER WITH ITS AFFILIATES, MEMBERS, MANAGERS, DIRECTORS, OFFICERS, AND EMPLOYEES.</p>
+      <p><strong>“PLATFORM” OR “SITE”</strong> MEANS THE LET’S-PARACONNECT WEBSITE, ALL RELATED SUBPAGES, SUBDOMAINS, APPLICATIONS, AND ANY SERVICES OR FEATURES MADE AVAILABLE THROUGH WWW.LETS-PARACONNECT.COM.</p>
+      <p><strong>“CASE”</strong> MEANS A DISCRETE PROJECT OR ASSIGNMENT POSTED BY AN ATTORNEY THROUGH THE PLATFORM FOR WHICH A PARALEGAL MAY APPLY OR BE INVITED TO PERFORM WORK.</p>
+
+      <p><strong>9.</strong> <strong>“LET’S-PARACONNECT CONTENT” OR “LPC CONTENT”</strong> MEANS CONTENT THAT LET’S-PARACONNECT CREATES AND MAKES AVAILABLE IN CONNECTION WITH THE PLATFORM.</p>
+
+      <p><strong>10.</strong> <strong>“PROTECTED CONTENT”</strong> MEANS: (i) CONTENT RELATED TO WORK PERFORMED THROUGH A CASE THAT IS POSTED TO THE PLATFORM BY EITHER THE ATTORNEY OR THE PARALEGAL AND STORED IN THE PLATFORM’S DOCUMENT SHARING OR COMMUNICATION FEATURES; AND (ii) PAYMENT OR PAYOUT INFORMATION ASSOCIATED WITH USERS OF THE PLATFORM.</p>
+
+      <p><strong>11.</strong> <strong>“PARALEGAL”</strong> REFERS TO A USER WHO SEEKS TO FIND OR PERFORM WORK THROUGH THE PLATFORM AS AN INDEPENDENT PROFESSIONAL.</p>
+
+      <p><strong>12.</strong> <strong>“THIRD-PARTY CONTENT”</strong> MEANS CONTENT THAT ORIGINATES FROM PARTIES OTHER THAN LET’S-PARACONNECT OR ITS USERS AND IS MADE AVAILABLE THROUGH OR IN CONNECTION WITH THE PLATFORM. <strong>“PLATFORM CONTENT”</strong> MEANS ALL CONTENT MADE AVAILABLE THROUGH THE PLATFORM, INCLUDING USER CONTENT, THIRD-PARTY CONTENT, AND LET’S-PARACONNECT CONTENT.</p>
+
+      <p><strong>13.</strong> <strong>“USER,” “YOU,” AND “YOUR”</strong> REFER TO ANY PERSON, COMPANY, OR ORGANIZATION THAT VISITS OR USES THE PLATFORM OR SERVICES, INCLUDING ANY PERSON OR ENTITY THAT BROWSES, ACCESSES, OR OTHERWISE USES THE PLATFORM. A USER MAY BE AN ATTORNEY, A PARALEGAL, BOTH, OR NEITHER.</p>
+
+      <p><strong>14.</strong> <strong>“USER CONTENT”</strong> MEANS CONTENT THAT USERS SUBMIT OR TRANSMIT TO OR THROUGH THE PLATFORM. USER CONTENT DOES NOT INCLUDE PROTECTED CONTENT.</p>
     </section>
   </main>
 
- <footer class="footer">
-  <div class="footer-inner">
-    <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
-    <p>© 2026 Let’s-ParaConnect. All rights reserved.</p>
-    <nav>
-      <a href="privacy.html">Privacy Policy</a>
-      <span>|</span>
-      <a href="terms.html">Terms</a>
-      <span>|</span>
-      <a href="/paralegal-admission.html">Admissions</a>
-      <span>|</span>
-      <a href="contact.html">Contact</a>
-      <span>|</span>
-      <a href="accessibility.html">Accessibility</a>
-    </nav>
-    <div class="region">United States</div>
-  </div>
-</footer>
-
-  <script type="module" src="assets/scripts/hero-parallax.js"></script>
+  <footer class="footer">
+    <div class="footer-inner">
+      <button type="button" class="accessibility-toggle accessibility-footer" aria-pressed="false" aria-label="Accessibility mode"><svg class="accessibility-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm5 7h-3v13h-2v-6h-2v6H8V9H5V7h12v2z" /></svg><span class="sr-only">Accessibility</span></button>
+      <p>© <script>document.write(new Date().getFullYear());</script> Let’s-ParaConnect. All rights reserved.</p>
+      <nav>
+        <a href="privacy.html">Privacy Policy</a>
+        <span>|</span>
+        <a href="terms.html">Terms</a>
+        <span>|</span>
+        <a href="/paralegal-admission.html">Admissions</a>
+        <span>|</span>
+        <a href="contact.html">Contact</a>
+        <span>|</span>
+        <a href="accessibility.html">Accessibility</a>
+      </nav>
+      <div class="region">United States</div>
+    </div>
+  </footer>
+<script type="module" src="assets/scripts/hero-parallax.js"></script>
   <script src="assets/scripts/accessibility-toggle.js"></script>
 </body>
 </html>

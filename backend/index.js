@@ -56,6 +56,7 @@ app.use(
       imgSrc: [
         "'self'",
         "data:",
+        "blob:",
         "https://images.unsplash.com",
         "https://challenges.cloudflare.com",
         `https://${process.env.S3_BUCKET}.s3.${process.env.S3_REGION}.amazonaws.com`,

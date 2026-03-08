@@ -165,13 +165,36 @@ async function ensureObjectExists(key) {
 function extractKeyFromUrl(value) {
   const raw = String(value || "").trim();
   if (!raw || raw.startsWith("data:") || raw.startsWith("blob:")) return "";
-  if (!/^https?:\/\//i.test(raw)) return normalizeKeyPath(raw);
   try {
-    const parsed = new URL(raw);
-    return normalizeKeyPath(parsed.pathname);
+    const parsed = /^https?:\/\//i.test(raw)
+      ? new URL(raw)
+      : new URL(raw, "https://lets-paraconnect.local");
+    const pathname = String(parsed.pathname || "").replace(/\/+$/, "");
+    if (
+      pathname === "/api/uploads/view" ||
+      pathname === "/api/uploads/download" ||
+      pathname === "/api/uploads/signed-get"
+    ) {
+      const fromQuery = normalizeKeyPath(parsed.searchParams.get("key") || "");
+      if (fromQuery) return fromQuery;
+    }
+    let key = normalizeKeyPath(pathname);
+    // Handle path-style URLs such as /<bucket>/<key>.
+    const bucket = String(BUCKET || "").trim().replace(/^\/+|\/+$/g, "");
+    if (bucket && key.toLowerCase().startsWith(`${bucket.toLowerCase()}/`)) {
+      key = key.slice(bucket.length + 1);
+    }
+    return key;
   } catch {
-    return "";
+    return normalizeKeyPath(raw.split("?")[0] || "");
   }
+}
+
+function isOwnerProfilePhotoKey(key, ownerId) {
+  const normalized = normalizeKeyPath(key);
+  const ownerSegment = safeSegment(ownerId);
+  if (!normalized || !ownerSegment) return false;
+  return normalized.startsWith(`profile-photos/${ownerSegment}/`);
 }
 
 function normalizeFileName(value = "", fallback = "") {
@@ -708,7 +731,12 @@ router.post(
     const user = await User.findById(ownerId);
     if (!user) return res.status(404).json({ msg: "User not found" });
     const role = String(user.role || "").toLowerCase();
-    const requiresReview = role === "paralegal";
+    const editExistingRaw = String(req.body?.editExisting || "").trim().toLowerCase();
+    const editExisting = editExistingRaw === "1" || editExistingRaw === "true" || editExistingRaw === "yes";
+    const hasExistingPhoto = Boolean(user.profileImage || user.avatarURL);
+    // Paralegal edits to an existing approved photo are auto-approved.
+    // Only truly new uploads require admin review.
+    const requiresReview = role === "paralegal" && !(editExisting && hasExistingPhoto);
     const queueAdminReview = role === "attorney";
     if (requiresReview) {
       user.pendingProfileImage = publicUrl;
@@ -787,11 +815,21 @@ router.get(
     ]
       .map((item) => (typeof item === "string" ? item.trim() : ""))
       .filter(Boolean);
+    const sourceCandidate = String(req.query?.source || "").trim();
+    if (sourceCandidate) {
+      const sourceKey = extractKeyFromUrl(sourceCandidate);
+      // Accept caller-provided source only when it points to this user's profile-photo prefix.
+      if (sourceKey && isOwnerProfilePhotoKey(sourceKey, ownerId)) {
+        candidates.unshift(sourceKey);
+      }
+    }
+
     if (!candidates.length) return res.status(404).json({ msg: "Profile photo not found" });
 
+    const urlCandidates = candidates.filter((value) => /^https?:\/\//i.test(String(value || "").trim()));
     let lastErr = null;
     for (const candidate of candidates) {
-      const key = extractKeyFromUrl(candidate);
+      const key = normalizeKeyPath(extractKeyFromUrl(candidate) || candidate);
       if (!key) continue;
       try {
         const getCmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
@@ -806,6 +844,26 @@ router.get(
         lastErr = err;
       }
     }
+
+    // Fallback for legacy absolute URLs that may not map to the current bucket/key format.
+    for (const candidateUrl of urlCandidates) {
+      try {
+        const upstream = await fetch(candidateUrl);
+        if (!upstream.ok) continue;
+        const contentType = String(upstream.headers.get("content-type") || "").toLowerCase();
+        if (contentType && !contentType.startsWith("image/")) continue;
+        const buffer = Buffer.from(await upstream.arrayBuffer());
+        if (!buffer.length) continue;
+        res.set("Content-Type", contentType || "image/jpeg");
+        res.set("Content-Length", String(buffer.length));
+        res.set("Cache-Control", "no-store");
+        res.send(buffer);
+        return;
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+
     if (lastErr) {
       console.warn("[uploads] profile-photo/original fetch failed", lastErr?.message || lastErr);
     }

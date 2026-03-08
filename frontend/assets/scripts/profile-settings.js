@@ -851,6 +851,7 @@ let settingsState = {
   pendingProfileImageOriginal: "",
   profilePhotoStatus: "",
   stagedProfilePhotoFile: null,
+  stagedProfilePhotoIsEdit: false,
   stagedProfilePhotoUrl: "",
   stagedProfilePhotoOriginalFile: null,
   stagedProfilePhotoOriginalUrl: "",
@@ -3037,7 +3038,8 @@ async function handleAttorneyProfileSave() {
       try {
         const uploadPayload = await uploadProfilePhotoFile(
           settingsState.stagedProfilePhotoFile,
-          settingsState.stagedProfilePhotoOriginalFile
+          settingsState.stagedProfilePhotoOriginalFile,
+          settingsState.stagedProfilePhotoIsEdit
         );
         applyProfilePhotoUploadResult(uploadPayload, { suppressToast: true });
       } catch (err) {
@@ -4605,6 +4607,7 @@ async function saveSettings() {
     }
   }
   const stagedPhoto = !!settingsState.stagedProfilePhotoFile;
+  let uploadedPhotoPendingReview = false;
   const firstNameInput = document.getElementById("firstNameInput");
   const lastNameInput = document.getElementById("lastNameInput");
   const emailInput = document.getElementById("emailInput");
@@ -4622,8 +4625,10 @@ async function saveSettings() {
     try {
       const payload = await uploadProfilePhotoFile(
         settingsState.stagedProfilePhotoFile,
-        settingsState.stagedProfilePhotoOriginalFile
+        settingsState.stagedProfilePhotoOriginalFile,
+        settingsState.stagedProfilePhotoIsEdit
       );
+      uploadedPhotoPendingReview = String(payload?.status || "").toLowerCase() === "pending_review";
       applyProfilePhotoUploadResult(payload, { suppressToast: true });
     } catch (err) {
       console.error("Unable to upload profile photo", err);
@@ -4765,7 +4770,11 @@ async function saveSettings() {
     localStorage.removeItem(PREFILL_CACHE_KEY);
   } catch {}
   showToast(
-    stagedPhoto ? "Settings saved and profile photo submitted for review." : "Settings saved!",
+    stagedPhoto
+      ? uploadedPhotoPendingReview
+        ? "Settings saved and profile photo submitted for review."
+        : "Settings saved and profile photo updated."
+      : "Settings saved!",
     "ok"
   );
 }
@@ -4903,6 +4912,7 @@ function clearStagedProfilePhoto() {
   }
   settingsState.stagedProfilePhotoUrl = "";
   settingsState.stagedProfilePhotoFile = null;
+  settingsState.stagedProfilePhotoIsEdit = false;
   if (settingsState.stagedProfilePhotoOriginalUrl?.startsWith("blob:")) {
     URL.revokeObjectURL(settingsState.stagedProfilePhotoOriginalUrl);
   }
@@ -5226,7 +5236,8 @@ function openExistingPhotoEditor(config) {
 
   const originalUrl = source?.value || fallbackUrl || "";
   const allowFallback = Boolean(source?.value && fallbackUrl && fallbackUrl !== primaryUrl);
-  secureFetch("/api/uploads/profile-photo/original")
+  const sourceParam = encodeURIComponent(primaryUrl);
+  secureFetch(`/api/uploads/profile-photo/original?source=${sourceParam}`)
     .then((res) => {
       if (!res.ok) throw new Error("Unable to load profile photo.");
       const contentType = res.headers.get("content-type") || "";
@@ -5384,9 +5395,11 @@ async function applyCroppedPhoto() {
   const name = cropperFile?.name ? cropperFile.name.replace(/\.[^.]+$/, ".jpg") : "profile-photo.jpg";
   const file = new File([blob], name, { type: "image/jpeg" });
   const previewUrl = canvas.toDataURL("image/jpeg", 0.92);
+  const editedExistingPhoto = !cropperFile && Boolean(cropperOriginalUrl);
 
   updateAvatarPreview(preview, frame, initials, previewUrl);
   settingsState.stagedProfilePhotoFile = file;
+  settingsState.stagedProfilePhotoIsEdit = editedExistingPhoto;
   settingsState.stagedProfilePhotoUrl = previewUrl;
   if (settingsState.stagedProfilePhotoOriginalUrl?.startsWith("blob:") && settingsState.stagedProfilePhotoOriginalUrl !== cropperOriginalUrl) {
     URL.revokeObjectURL(settingsState.stagedProfilePhotoOriginalUrl);
@@ -5424,6 +5437,7 @@ function stagePhotoDirect(file, config) {
     const previewUrl = dataUrl || URL.createObjectURL(file);
     updateAvatarPreview(preview, frame, initials, previewUrl);
     settingsState.stagedProfilePhotoFile = file;
+    settingsState.stagedProfilePhotoIsEdit = false;
     settingsState.stagedProfilePhotoUrl = previewUrl;
     if (settingsState.stagedProfilePhotoOriginalUrl?.startsWith("blob:")) {
       URL.revokeObjectURL(settingsState.stagedProfilePhotoOriginalUrl);
@@ -5439,6 +5453,7 @@ function stagePhotoDirect(file, config) {
     const fallbackUrl = URL.createObjectURL(file);
     updateAvatarPreview(preview, frame, initials, fallbackUrl);
     settingsState.stagedProfilePhotoFile = file;
+    settingsState.stagedProfilePhotoIsEdit = false;
     settingsState.stagedProfilePhotoUrl = fallbackUrl;
     if (settingsState.stagedProfilePhotoOriginalUrl?.startsWith("blob:")) {
       URL.revokeObjectURL(settingsState.stagedProfilePhotoOriginalUrl);
@@ -5453,11 +5468,14 @@ function stagePhotoDirect(file, config) {
   reader.readAsDataURL(file);
 }
 
-async function uploadProfilePhotoFile(file, originalFile) {
+async function uploadProfilePhotoFile(file, originalFile, editedExisting = false) {
   const formData = new FormData();
   formData.append("file", file, file.name || "avatar.png");
   if (originalFile) {
     formData.append("original", originalFile, originalFile.name || "profile-original.png");
+  }
+  if (editedExisting) {
+    formData.append("editExisting", "1");
   }
 
   const res = await fetch("/api/uploads/profile-photo", {
