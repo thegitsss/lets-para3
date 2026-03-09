@@ -1179,6 +1179,30 @@
       background: var(--app-border-soft);
     }
 
+    .thread-date-divider {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--app-muted);
+      font-size: 0.85rem;
+      text-transform: capitalize;
+      padding: 8px 0 6px;
+    }
+
+    .thread-date-divider::before,
+    .thread-date-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--app-border-soft);
+    }
+
+    .thread-date-label {
+      white-space: nowrap;
+    }
+
     .message-card {
       max-width: 72%;
       align-items: flex-start;
@@ -2595,7 +2619,7 @@
           <ul class="case-nav-list" data-case-nav-list></ul>
         </div>
         <a href="profile-settings.html">Profile Settings</a>
-        <a href="help.html">Help</a>
+        <a href="paralegalhelp.html">Help</a>
       </nav>
       <div class="sidebar-bottom">
         <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>

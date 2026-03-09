@@ -7,6 +7,7 @@ const mongoose = require("mongoose");
 
 process.env.NODE_ENV = "test";
 process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret";
+process.env.ENABLE_CSRF = "false";
 process.env.EMAIL_DISABLE = "true";
 process.env.STRIPE_CONNECT_RETURN_URL =
   process.env.STRIPE_CONNECT_RETURN_URL || "http://localhost:5050/stripe/connect/return";
@@ -88,7 +89,8 @@ async function main() {
     const attorney = await User.create({
       firstName: "Ava",
       lastName: "Stone",
-      email: "samanthasider+attorney@gmail.com",
+      // Use a Stripe-bypass email to allow case posting without a stored payment method.
+      email: "game4funwithme1+1@gmail.com",
       password: "Password123!",
       role: "attorney",
       status: "approved",

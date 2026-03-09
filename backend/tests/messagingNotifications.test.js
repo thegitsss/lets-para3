@@ -167,6 +167,9 @@ describe("Messaging + notifications", () => {
     expect(updated.readBy.map(String)).toContain(String(attorney._id));
     expect(updated.readReceipts.map((r) => String(r.user))).toContain(String(attorney._id));
 
+    const refreshedAttorney = await User.findById(attorney._id).select("messageLastViewedAt");
+    expect(refreshedAttorney?.messageLastViewedAt?.get(String(caseDoc._id))).toBeTruthy();
+
     // Simulate new login (fresh JWT)
     const listRes2 = await request(app)
       .get(`/api/messages/${caseDoc._id}`)

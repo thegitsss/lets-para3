@@ -116,9 +116,7 @@ const initLogin = () => {
   const checkHealth = async () => {
     try {
       const res = await fetch(`${API_BASE}/health`, { credentials: "include" });
-      if (!res.ok) {
-        notify("Service is temporarily unavailable. Please try again shortly.");
-      }
+      if (!res.ok) return;
     } catch {
       notify("Unable to reach the server. Please check your connection.");
     }

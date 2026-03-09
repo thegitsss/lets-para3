@@ -971,7 +971,7 @@ function openDisputeConfirmModal({ showAmount = false } = {}) {
           <button class="case-action-btn secondary" type="button" data-dispute-cancel>Cancel</button>
           <button class="case-action-btn" type="button" data-dispute-confirm>Flag dispute</button>
         </div>
-        <p class="case-dispute-footer">Confirming will pause this workspace for both parties until an admin resolves the dispute.</p>
+        <p class="case-dispute-footer">Confirming will pause this workspace for both parties until the dispute is reviewed and resolved.</p>
       </div>
     `;
     const close = (confirmed) => {
@@ -2871,6 +2871,16 @@ function getItemTimestamp(value) {
   return Number.isNaN(time) ? 0 : time;
 }
 
+function getLocalDayKey(value) {
+  const time = typeof value === "number" ? value : getItemTimestamp(value);
+  if (!time) return "";
+  const date = new Date(time);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function computeThreadResetAt(caseData) {
   if (!caseData?.withdrawnParalegalId) return null;
   const hiredAt = getItemTimestamp(caseData?.hiredAt);
@@ -4618,14 +4628,27 @@ function renderThreadItems(messages, documents, caseId) {
       empty.textContent = "No messages yet. Use the thread below to coordinate work.";
       li.appendChild(empty);
       fragment.appendChild(li);
-    } else {
-      let previousMeta = null;
-      let dividerInserted = false;
-      for (const item of items) {
-        const itemTime = getItemTimestamp(item.createdAt);
-        if (shouldInsertBreak && !dividerInserted && itemTime && itemTime >= resetAt) {
-          const divider = document.createElement("li");
-          divider.className = "thread-break";
+	    } else {
+	      let previousMeta = null;
+	      let previousDayKey = "";
+	      let dividerInserted = false;
+	      for (const item of items) {
+	        const itemTime = getItemTimestamp(item.createdAt);
+	        const itemDayKey = getLocalDayKey(itemTime);
+	        if (itemDayKey && previousDayKey && itemDayKey !== previousDayKey) {
+	          const dayDivider = document.createElement("li");
+	          dayDivider.className = "thread-date-divider";
+	          const dayLabel = document.createElement("span");
+	          dayLabel.className = "thread-date-label";
+	          dayLabel.textContent = formatDate(new Date(itemTime)) || "";
+	          if (dayLabel.textContent) {
+	            dayDivider.appendChild(dayLabel);
+	            fragment.appendChild(dayDivider);
+	          }
+	        }
+	        if (shouldInsertBreak && !dividerInserted && itemTime && itemTime >= resetAt) {
+	          const divider = document.createElement("li");
+	          divider.className = "thread-break";
           const line = document.createElement("div");
           line.className = "thread-break-line";
           divider.appendChild(line);
@@ -4657,11 +4680,12 @@ function renderThreadItems(messages, documents, caseId) {
         } catch (err) {
           console.warn("Unable to render thread item", err);
           continue;
-        }
-        fragment.appendChild(li);
-        previousMeta = { senderKey, timeValue };
-      }
-    }
+	        }
+	        fragment.appendChild(li);
+	        previousMeta = { senderKey, timeValue };
+	        if (itemDayKey) previousDayKey = itemDayKey;
+	      }
+	    }
     messageList.appendChild(fragment);
   } catch (err) {
     console.warn("Thread render failed", err);

@@ -9,7 +9,7 @@
   <meta name="theme-color" content="#0B2A4A">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Help for Attorneys – Let’s-ParaConnect</title>
+  <title>Help for Paralegals – Let’s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -205,10 +205,6 @@
       padding-bottom: 0;
       margin-bottom: 0;
     }
-    #attorney-help {
-      border-bottom: none;
-      padding-bottom: 0;
-    }
 
     .lead {
       color: var(--muted);
@@ -369,43 +365,36 @@
     <div class="logo">Dashboard</div>
     <nav id="helpNav" aria-label="Primary">
       <a href="contact.html">Contact Us</a>
-      <a href="dashboard-attorney.html">Home</a>
-      <a href="dashboard-attorney.html#cases">Cases &amp; Files</a>
-      <a href="dashboard-attorney.html#billing">Funds</a>
-      <a href="help.html" class="active">Help</a>
+      <a href="dashboard-paralegal.html">Home</a>
+      <a href="dashboard-paralegal.html#cases">Cases and Applications</a>
+      <a href="profile-settings.html">Profile Settings</a>
+      <a href="paralegalhelp.html" class="active">Help</a>
     </nav>
     <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
     <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s‑ParaConnect 2026</a></div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <main id="main" tabindex="-1" aria-labelledby="help-title">
-    <h1 id="help-title">Help for Attorneys</h1>
-    <p class="muted">Guidance for posting matters, hiring paralegals, and managing payments.</p>
+    <h1 id="help-title">Help for Paralegals</h1>
+    <p class="muted">Guidance for invitations, applications, case work, and payouts.</p>
     <p class="muted">Need a person? <a href="contact.html">Contact Support</a>.</p>
 
-    <section id="attorney-help">
-      <h2>Help for Attorneys</h2>
-      <p class="lead">Post matters, hire paralegals, and manage delivery, messaging, and payments.</p>
-
+    <section id="paralegal-help">
       <h3>Account &amp; access</h3>
-      <p>Forgot your password? <a href="forgot-password.html">Reset it here</a> and check spam or junk if the email doesn’t arrive. If two-factor auth is enabled, watch for autofilled or expired codes. Update your email, profile, or security settings anytime in <a href="profile-settings.html">Settings</a>. If you can’t access your account, contact support.</p>
+      <p>Forgot your password? <a href="forgot-password.html">Reset it here</a> and check spam or junk if the email doesn’t arrive. If two-factor auth is enabled, check for autofilled or expired codes. Paralegal profiles must include a clear headshot, current resume, and accurate practice-area and jurisdiction details; photos are reviewed for clarity and professionalism and can take 1–2 business days. Update your email, profile, or security settings anytime in <a href="profile-settings.html">Settings</a>. If you can’t access your account, contact support.</p>
 
-      <h3>Posting a matter</h3>
-      <p>To begin, create a new case by providing a clear description of the work required, including the scope of the assignment, expected timeline, required tasks and deliverables. You may review applications from paralegals who express interest in the matter.</p>
-      <p>All active and completed matters can be accessed at any time through <a href="dashboard-attorney.html#cases">Cases &amp; Files</a>, where each assignment is organized within its own workspace.</p>
+      <h3>Invitations &amp; Applying</h3>
+      <p>To apply to open matters, use the Browse cases button to go to the Browse Cases page, then filter by practice area, state, minimum compensation, and experience; open a posting and click Apply for this case. A cover letter is required, and your résumé and LinkedIn profile are included automatically. After you submit, you’ll see a confirmation and the application appears under <a href="dashboard-paralegal.html#cases">Cases and Applications</a> → My Applications, where you can search by title or practice area and filter by date; you’ll be notified if the attorney accepts or declines, and accepted applications move to Active Cases. Invitations appear in your dashboard activity and notifications—open the invite, review the summary, and accept or decline. Accepting an invitation or applying to a case requires Stripe Connect to be set up first in Profile Settings, <a href="profile-settings.html#securitySection">here</a>.</p>
 
-      <h3>Hiring &amp; managing work</h3>
-      <p>After hiring a paralegal, the case workspace becomes the central location for communication, file sharing, and progress updates. Attorneys may upload documents, review drafts, and provide guidance as the assignment progresses.</p>
-      <p>When reviewing deliverables, attorneys should evaluate the work against the agreed scope and request any necessary revisions before confirming completion.</p>
+      <h3>Working a case</h3>
+      <p>Post updates in the thread, upload drafts and final files to the case, and ask clarifying questions before you start if anything is unclear. When you deliver work, summarize what’s included and what still needs review so the attorney can respond quickly.</p>
+      <p>Tasks are created by the attorney and appear in the case overview as a checklist. Use them to track what’s due; only the attorney can check tasks off. Once all tasks are checked, the attorney can mark the case complete and release payment.</p>
 
-      <h3>Workflow</h3>
-      <p>Post a case or single-scope assignment with a clear description of the work needed, the timeline, and required tasks the paralegal must complete. Once applications begin coming in, review the paralegals who apply and select the one you want to hire. After hiring, use the case workspace to communicate, share files, and review drafts or completed documents. When the final work meets your expectations, confirm completion to release payment and close the matter.</p>
+      <h3>Payouts &amp; Stripe Connect</h3>
+      <p>Payouts are processed through Stripe. Connect your <a href="profile-settings.html#securitySection">Stripe account</a> to receive funds. Payouts are released after the attorney confirms completion or the applicable review period ends after final delivery of work. Funds are released immediately, governed by Stripe and your financial institution.</p>
 
-      <h3>Funding, release, and disputes</h3>
-      <p>During case creation, attorneys set the case amount required to hire a paralegal. When selecting a paralegal to hire, the total cost of the matter, including any applicable platform fees, will be displayed for confirmation before funding.</p>
-      <p>Once the matter is funded through Stripe, the case workspace opens for both the attorney and the assigned paralegal to begin work. Within the workspace, attorneys may communicate with the paralegal, upload reference documents, and review progress as the assignment is completed. Only the attorney may mark tasks as completed and confirm when the matter is finished.</p>
-      <p>When the final deliverable meets the agreed scope of work, the attorney can confirm completion to release the escrowed payment to the paralegal.</p>
-      <p>If the work does not meet the agreed scope, the attorney may open a dispute before releasing funds by selecting the flag icon within the case workspace. Opening a dispute temporarily pauses the workspace and payment release while the matter is reviewed. The attorney may then provide additional context explaining the concern so that the issue can be evaluated and resolved appropriately.</p>
+      <h3>Withdrawals &amp; disputes</h3>
+      <p>Withdrawals and disputes are actionable from the case workspace by clicking the flag icon. Withdrawal is only available before all tasks are complete; if you withdraw before any tasks are completed, a $0 payout is issued, and if some tasks are complete, you are removed from the case and cannot submit further work (payout decisions are made by the attorney, if applicable). To dispute, choose Open Dispute, add optional details, and confirm—this pauses the workspace for both parties while it’s reviewed, and you’ll see a status update in the case.</p>
     </section>
 
     <section id="help-links">

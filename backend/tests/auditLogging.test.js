@@ -49,7 +49,7 @@ beforeEach(async () => {
 describe("Audit logging", () => {
   test("Admin case status update writes audit log", async () => {
     // Description: Admin changes a case status and the action is logged.
-    // Input values: status="assigned" on open case.
+    // Input values: status="in progress" on open case.
     // Expected result: AuditLog entry with action="admin.case.status.update".
 
     const admin = await User.create({
@@ -84,7 +84,7 @@ describe("Audit logging", () => {
     const res = await request(app)
       .patch(`/api/admin/cases/${caseDoc._id}/status`)
       .set("Cookie", authCookieFor(admin))
-      .send({ status: "assigned" });
+      .send({ status: "in progress" });
     expect(res.status).toBe(200);
 
     const log = await AuditLog.findOne({
@@ -97,7 +97,7 @@ describe("Audit logging", () => {
     expect(log.actorRole).toBe("admin");
     expect(log.targetType).toBe("case");
     expect(String(log.case)).toBe(String(caseDoc._id));
-    expect(log.meta?.status).toBe("assigned");
+    expect(log.meta?.status).toBe("in progress");
     expect(log.path).toMatch(/\/api\/admin\/cases\/.+\/status/);
   });
 });

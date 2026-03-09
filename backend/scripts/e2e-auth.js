@@ -31,6 +31,7 @@ function startStubServer() {
   app.use(express.static(publicDir));
   app.use(express.static(frontendDir));
 
+  app.get("/api/health", (_req, res) => res.json({ ok: true }));
   app.get("/api/csrf", (_req, res) => res.json({ csrfToken: "test-csrf" }));
   function hasSession(req) {
     const raw = req.headers.cookie || "";

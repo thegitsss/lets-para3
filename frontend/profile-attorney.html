@@ -306,6 +306,7 @@
       font-size: 1.2rem;
       color: var(--ink);
       line-height: 1.7;
+      margin-top: 16px;
     }
 
     .copy {
@@ -413,8 +414,9 @@
 
     @media (max-width: 640px) {
       .page-header {
-        flex-direction: column;
-        align-items: flex-start;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
       }
 
       #profileName {
@@ -438,7 +440,6 @@
         <div class="hero-text">
           <p class="eyebrow">Attorney Profile</p>
           <h1 id="profileName">Loading…</h1>
-          <p id="profileSubtitle" class="subhead hidden"></p>
           <div class="link-strip">
             <a id="heroLinkedIn" class="inline-link hidden" target="_blank" rel="noopener">LinkedIn</a>
             <a id="heroWebsite" class="inline-link hidden" target="_blank" rel="noopener">Firm Website</a>
@@ -447,17 +448,20 @@
           <div class="contact-grid">
             <div class="contact-card">
               <h4>Firm</h4>
-              <p id="profileFirm" class="contact-line muted">Independent attorney</p>
+              <p id="profileFirm" class="contact-line muted"></p>
             </div>
             <div class="contact-card">
               <h4>Office</h4>
-              <p id="profileLocation" class="contact-line muted">Location not provided</p>
+              <p id="profileLocation" class="contact-line muted"></p>
             </div>
             <div class="contact-card">
               <h4>Connect</h4>
-              <div id="contactLinkedIn" class="contact-link muted">—</div>
-              <div id="contactWebsite" class="contact-link muted">—</div>
+              <div id="contactLinkedIn" class="contact-link muted"></div>
+              <div id="contactWebsite" class="contact-link muted"></div>
             </div>
+          </div>
+          <div class="bio">
+            <p id="practiceBio" class="copy">Loading profile…</p>
           </div>
         </div>
         <div class="hero-photo">
@@ -468,7 +472,6 @@
           <div class="practice-card">
             <div class="practice-header">
               <h3>PRACTICES</h3>
-              <span class="practice-close" aria-hidden="true">×</span>
             </div>
             <div id="practiceAreasList" class="practice-list pill-list"></div>
           </div>
@@ -476,12 +479,9 @@
       </section>
 
       <section class="profile-body">
-        <div class="tabs" role="tablist" aria-label="Profile sections">
+        <div class="tabs" id="profileTabs" role="tablist" aria-label="Profile sections">
           <button class="tab active" type="button" aria-selected="true">Profile</button>
           <button class="tab" type="button" aria-disabled="true" aria-selected="false">Publications &amp; Presentations</button>
-        </div>
-        <div class="bio">
-          <p id="practiceBio" class="copy">Loading profile…</p>
         </div>
       </section>
 

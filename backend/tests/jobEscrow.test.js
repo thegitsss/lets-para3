@@ -90,6 +90,10 @@ beforeEach(async () => {
   stripe.paymentIntents.create.mockReset();
   stripe.paymentIntents.retrieve.mockReset();
   stripe.isTransferablePaymentIntent.mockClear();
+  stripe.customers.retrieve.mockReset();
+  stripe.customers.retrieve.mockResolvedValue({
+    invoice_settings: { default_payment_method: "pm_test_default" },
+  });
 });
 
 describe("Job posting + escrow", () => {
@@ -106,6 +110,7 @@ describe("Job posting + escrow", () => {
       role: "attorney",
       status: "approved",
       state: "CA",
+      stripeCustomerId: "cus_attorney_test_1",
     });
 
     const cookie = authCookieFor(attorney);
@@ -141,6 +146,7 @@ describe("Job posting + escrow", () => {
       role: "attorney",
       status: "approved",
       state: "CA",
+      stripeCustomerId: "cus_attorney_test_2",
     });
 
     const cookie = authCookieFor(attorney);
@@ -173,6 +179,7 @@ describe("Job posting + escrow", () => {
       role: "attorney",
       status: "approved",
       state: "CA",
+      stripeCustomerId: "cus_attorney_test_3",
     });
 
     const cookie = authCookieFor(attorney);

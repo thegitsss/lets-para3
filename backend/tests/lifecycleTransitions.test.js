@@ -48,7 +48,7 @@ beforeEach(async () => {
 });
 
 describe("Case lifecycle transitions", () => {
-  test("Open → assigned → in progress → completed → archived", async () => {
+  test("Open (with assignee) → in progress → completed → archived", async () => {
     // Description: Admin and attorney move a case through lifecycle.
     // Input values: status transitions + archive=true.
     // Expected result: status updates in order and archived=true.
@@ -96,7 +96,13 @@ describe("Case lifecycle transitions", () => {
       .set("Cookie", authCookieFor(admin))
       .send({ paralegalId: paralegal._id });
     expect(assignRes.status).toBe(200);
-    expect(assignRes.body.case.status).toBe("assigned");
+    expect(assignRes.body.case.status).toBe("open");
+    const assignedParalegal =
+      assignRes.body.case.paralegal?._id ||
+      assignRes.body.case.paralegalId?._id ||
+      assignRes.body.case.paralegal ||
+      assignRes.body.case.paralegalId;
+    expect(String(assignedParalegal)).toBe(String(paralegal._id));
 
     const inProgressRes = await request(app)
       .patch(`/api/admin/cases/${caseDoc._id}/status`)

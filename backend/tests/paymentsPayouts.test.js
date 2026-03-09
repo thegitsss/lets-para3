@@ -6,6 +6,7 @@ const request = require("supertest");
 const User = require("../models/User");
 const Case = require("../models/Case");
 const Payout = require("../models/Payout");
+const Notification = require("../models/Notification");
 
 jest.mock("../utils/email", () => jest.fn(async () => ({ ok: true })));
 
@@ -117,6 +118,7 @@ describe("Payments + payouts", () => {
       lockedTotalAmount: 100000,
       totalAmount: 100000,
       currency: "usd",
+      tasks: [{ title: "Finalize and deliver", completed: true }],
     });
 
     mockStripe.paymentIntents.retrieve.mockResolvedValue({
@@ -153,6 +155,12 @@ describe("Payments + payouts", () => {
     const payoutDoc = await Payout.findOne({ caseId: caseDoc._id }).lean();
     expect(payoutDoc).toBeTruthy();
     expect(payoutDoc.amountPaid).toBe(expectedPayout);
+
+    const payoutNotif = await Notification.findOne({
+      userId: paralegal._id,
+      type: "payout_released",
+    }).lean();
+    expect(payoutNotif).toBeTruthy();
 
     const refreshed = await Case.findById(caseDoc._id).lean();
     expect(refreshed.paymentReleased).toBe(true);
@@ -201,6 +209,7 @@ describe("Payments + payouts", () => {
       lockedTotalAmount: 100000,
       totalAmount: 100000,
       currency: "usd",
+      tasks: [{ title: "Finalize and deliver", completed: true }],
     });
 
     mockStripe.paymentIntents.retrieve.mockResolvedValue({

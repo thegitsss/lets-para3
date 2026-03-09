@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
@@ -100,6 +101,43 @@ describe("Notification preferences", () => {
 
     const notif = await Notification.findOne({ userId: user._id, type: "message" }).lean();
     expect(notif).toBeFalsy();
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  test("Recent last-viewed timestamp suppresses message email", async () => {
+    // Description: User recently viewed case thread, then receives a message notification.
+    // Input values: messageLastViewedAt[caseId]=now, type="message".
+    // Expected result: in-app notification is created but email is suppressed.
+
+    const caseId = new mongoose.Types.ObjectId().toString();
+    const user = await User.create({
+      firstName: "Taylor",
+      lastName: "Reed",
+      email: "taylor.reed@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+      notificationPrefs: {
+        email: true,
+        emailMessages: true,
+        inApp: true,
+        inAppMessages: true,
+      },
+      messageLastViewedAt: {
+        [caseId]: new Date(),
+      },
+    });
+
+    await notifyUser(user._id, "message", {
+      caseId,
+      caseTitle: "Suppression case",
+      fromName: "Priya",
+      messageSnippet: "Hello",
+    });
+
+    const notif = await Notification.findOne({ userId: user._id, type: "message" }).lean();
+    expect(notif).toBeTruthy();
     expect(sendEmail).not.toHaveBeenCalled();
   });
 });

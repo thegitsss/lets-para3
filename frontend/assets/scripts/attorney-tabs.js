@@ -4351,7 +4351,7 @@ function renderCaseRow(item, filterKey = "active") {
       ${selectionCell}
       <td>${
         item.localDraft
-          ? `<a href="create-case.html#description">${sanitize(item.title || "Untitled Case")}</a>`
+          ? `<a href="create-case.html?draftId=${encodeURIComponent(caseId)}#description">${sanitize(item.title || "Untitled Case")}</a>`
           : canOpenDetail
           ? `<a href="case-detail.html?caseId=${encodeURIComponent(caseId)}">${sanitize(item.title || "Untitled Case")}</a>`
           : `<span>${sanitize(item.title || "Untitled Case")}</span>`

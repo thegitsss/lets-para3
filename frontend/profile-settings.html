@@ -3376,6 +3376,42 @@ input[type="number"],
       max-width: 100%;
     }
 
+    .photo-crop-loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.88);
+      color: var(--ink);
+      font-size: 0.95rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 2;
+    }
+
+    .photo-crop-spinner {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid var(--line);
+      border-top-color: var(--accent);
+      animation: cropper-spin 0.9s linear infinite;
+    }
+
+    .photo-crop-card.is-loading .photo-crop-loading {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    @keyframes cropper-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
     .photo-crop-stage .cropper-container {
       width: 100% !important;
       height: 100% !important;
@@ -4623,6 +4659,10 @@ input[type="number"],
       <p class="photo-crop-subtitle">Drag to reposition and use zoom to refine the crop.</p>
       <div class="photo-crop-stage">
         <img id="photoCropImage" alt="Crop profile photo" />
+        <div class="photo-crop-loading" id="photoCropLoading" aria-live="polite">
+          <span class="photo-crop-spinner" aria-hidden="true"></span>
+          <span id="photoCropLoadingText">Loading photo…</span>
+        </div>
       </div>
       <div class="photo-crop-controls">
         <label for="photoCropZoom">Zoom</label>

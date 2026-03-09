@@ -23,10 +23,14 @@
     "test:e2e:job-escrow": "node scripts/e2e-job-escrow.js",
     "test:e2e:matching": "node scripts/e2e-matching.js",
     "test:e2e:messaging": "node scripts/e2e-messaging.js",
+    "test:e2e:onboarding": "node scripts/e2e-attorney-onboarding.js",
+    "test:e2e:paralegal-tour": "node scripts/e2e-paralegal-tour.js",
+    "test:e2e:realtime": "node scripts/e2e-case-realtime.js",
     "test:e2e:admin": "node scripts/e2e-admin.js",
     "test:e2e:error-handling": "node scripts/e2e-error-handling.js",
     "test:e2e:payouts": "node scripts/e2e-payouts.js",
     "test:e2e:withdrawal": "node scripts/e2e-withdrawal-flow.js",
+    "test:load:cases": "node scripts/load-case-activity.js",
     "postinstall": "npm prune --production=false || true && npx puppeteer browsers install chrome || true"
   },
   "dependencies": {

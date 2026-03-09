@@ -302,26 +302,63 @@ function renderProfile(profile) {
     elements.subtitle.classList.toggle("hidden", !subtitle);
   }
 
-  setText(elements.firm, profile.lawFirm || profile.firmName || "Independent attorney", "Independent attorney");
-  setText(elements.location, profile.location, "Location not provided");
+  const firmCard = elements.firm?.closest(".contact-card");
+  const firmValue = profile.lawFirm || profile.firmName || "";
+  if (firmValue) {
+    elements.firm.textContent = firmValue;
+    elements.firm.classList.remove("muted");
+    firmCard?.classList.remove("hidden");
+  } else {
+    if (elements.firm) elements.firm.textContent = "";
+    firmCard?.classList.add("hidden");
+  }
+
+  const locationCard = elements.location?.closest(".contact-card");
+  const locationValue = profile.location || "";
+  if (locationValue) {
+    elements.location.textContent = locationValue;
+    elements.location.classList.remove("muted");
+    locationCard?.classList.remove("hidden");
+  } else {
+    if (elements.location) elements.location.textContent = "";
+    locationCard?.classList.add("hidden");
+  }
 
   const linkedIn = cleanUrl(profile.linkedInURL);
   const website = cleanUrl(profile.firmWebsite || profile.website);
   setHeroLink(elements.heroLinkedIn, linkedIn, "LinkedIn");
   setHeroLink(elements.heroWebsite, website, "Firm Website");
 
-  const summary = profile.practiceDescription || profile.bio ||
-    "Keep this space updated so paralegals know what types of matters you collaborate on.";
-  setText(elements.practiceBio, summary);
+  const summary = profile.practiceDescription || profile.bio || "";
+  if (summary && elements.practiceBio) {
+    elements.practiceBio.textContent = summary;
+    elements.practiceBio.classList.remove("hidden");
+    elements.practiceBio.closest(".bio")?.classList.remove("hidden");
+  } else {
+    if (elements.practiceBio) elements.practiceBio.textContent = "";
+    elements.practiceBio?.closest(".bio")?.classList.add("hidden");
+  }
 
-  setLinkField(elements.contactLinkedIn, linkedIn, "View LinkedIn");
-  setLinkField(elements.contactWebsite, website, "Visit site");
+  const hasLinkedIn = setLinkField(elements.contactLinkedIn, linkedIn, "View LinkedIn");
+  const hasWebsite = setLinkField(elements.contactWebsite, website, "Visit site");
+  const connectCard = elements.contactLinkedIn?.closest(".contact-card") || elements.contactWebsite?.closest(".contact-card");
+  if (connectCard) {
+    connectCard.classList.toggle("hidden", !hasLinkedIn && !hasWebsite);
+  }
+  const contactGrid = elements.firm?.closest(".contact-grid");
+  if (contactGrid) {
+    const cards = Array.from(contactGrid.querySelectorAll(".contact-card"));
+    const hasVisible = cards.some((card) => !card.classList.contains("hidden"));
+    contactGrid.classList.toggle("hidden", !hasVisible);
+  }
 
   renderAvatar(fullName, profile.profileImage || profile.avatarURL);
   renderPracticeAreas(profile);
   renderExperience(profile.experience);
   renderLanguages(profile.languages);
   renderPublications(profile.publications);
+  updateMetaGridVisibility();
+  updateTabsVisibility();
 }
 
 function bindEditButton() {
@@ -374,6 +411,7 @@ function renderPracticeAreas(profile) {
   const container = elements.practiceAreas;
   if (!container) return;
   container.textContent = "";
+  const practiceCard = container.closest(".practice-card");
   const values = [
     ...(Array.isArray(profile.practiceAreas) ? profile.practiceAreas : []),
     ...(Array.isArray(profile.specialties) ? profile.specialties : [])
@@ -382,9 +420,10 @@ function renderPracticeAreas(profile) {
     .filter(Boolean);
   const unique = [...new Set(values)];
   if (!unique.length) {
-    container.appendChild(buildPlaceholder("Add your focus areas to stand out."));
+    practiceCard?.classList.add("hidden");
     return;
   }
+  practiceCard?.classList.remove("hidden");
   unique.forEach((value) => {
     const pill = document.createElement("span");
     pill.className = "pill";
@@ -398,12 +437,10 @@ function renderExperience(entries = []) {
   if (!list) return;
   list.textContent = "";
   if (!Array.isArray(entries) || !entries.length) {
-    const item = document.createElement("li");
-    item.className = "muted";
-    item.textContent = "Share notable roles or cases to build confidence.";
-    list.appendChild(item);
+    list.closest(".meta-card")?.classList.add("hidden");
     return;
   }
+  list.closest(".meta-card")?.classList.remove("hidden");
   entries.slice(0, 5).forEach((entry) => {
     if (!entry) return;
     const item = document.createElement("li");
@@ -430,9 +467,10 @@ function renderLanguages(entries = []) {
   if (!container) return;
   container.textContent = "";
   if (!Array.isArray(entries) || !entries.length) {
-    container.appendChild(buildPlaceholder("Add languages you speak to streamline matches."));
+    container.closest(".meta-card")?.classList.add("hidden");
     return;
   }
+  container.closest(".meta-card")?.classList.remove("hidden");
   entries.forEach((entry) => {
     if (!entry?.name) return;
     const pill = document.createElement("span");
@@ -448,12 +486,10 @@ function renderPublications(items = []) {
   if (!list) return;
   list.textContent = "";
   if (!Array.isArray(items) || !items.length) {
-    const item = document.createElement("li");
-    item.className = "muted";
-    item.textContent = "Add publications or presentations to showcase your work.";
-    list.appendChild(item);
+    list.closest(".meta-card")?.classList.add("hidden");
     return;
   }
+  list.closest(".meta-card")?.classList.remove("hidden");
   items.forEach((entry) => {
     if (!entry) return;
     const item = document.createElement("li");
@@ -493,10 +529,13 @@ function setLinkField(el, url, label) {
     link.textContent = label || url;
     link.className = "inline-link";
     el.classList.remove("muted");
+    el.classList.remove("hidden");
     el.appendChild(link);
+    return true;
   } else {
-    el.textContent = "Not provided";
-    el.classList.add("muted");
+    el.classList.add("hidden");
+    el.classList.remove("muted");
+    return false;
   }
 }
 
@@ -524,6 +563,21 @@ function buildPlaceholder(copy) {
   span.className = "placeholder";
   span.textContent = copy;
   return span;
+}
+
+function updateMetaGridVisibility() {
+  document.querySelectorAll(".meta-grid").forEach((grid) => {
+    const cards = Array.from(grid.querySelectorAll(".meta-card"));
+    const hasVisible = cards.some((card) => !card.classList.contains("hidden"));
+    grid.classList.toggle("hidden", !hasVisible);
+  });
+}
+
+function updateTabsVisibility() {
+  const tabs = document.getElementById("profileTabs");
+  if (!tabs) return;
+  const hasPublications = Array.isArray(state.profile?.publications) && state.profile.publications.length > 0;
+  tabs.classList.toggle("hidden", !hasPublications);
 }
 
 function formatName(user = {}) {

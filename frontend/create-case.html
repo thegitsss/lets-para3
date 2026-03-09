@@ -416,6 +416,9 @@
       margin:10px 0 0;
       display:grid;
       gap:8px;
+      max-height:250px;
+      overflow-y:auto;
+      padding-right:6px;
     }
     .task-list li{
       display:flex;
@@ -489,13 +492,16 @@
 .dollar-sign {
   position: absolute;
   left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--muted);
   font-size: 0.9rem;
+  pointer-events: none;
 }
 
 #comp {
   padding-left: 24px;
-  width: 120px;
+  width: 135px;
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 0.5rem 0.6rem 0.5rem 1.4rem;
@@ -656,6 +662,7 @@ body.theme-dark .select-field select{
       display:flex;
       flex-direction:column;
       gap:1.5rem;
+      position: relative;
     }
 
     #create-step-description .form-wrapper form{
@@ -666,6 +673,10 @@ body.theme-dark .select-field select{
       width:100%;
     }
 
+    #caseDescription {
+      min-height: 220px;
+    }
+
     .tips{
       border:1px solid var(--line);
       border-radius:var(--radius);
@@ -673,6 +684,48 @@ body.theme-dark .select-field select{
       background:var(--panel);
       font-size:0.9rem;
       color:var(--muted);
+    }
+    .tips-help{
+      position: absolute;
+      top: 4px;
+      right: 0;
+      z-index: 5;
+    }
+    .tips-help summary{
+      list-style:none;
+      width:28px;
+      height:28px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border:1px solid var(--line);
+      border-radius:50%;
+      font-family:var(--font-serif);
+      font-size:0.9rem;
+      color:var(--muted);
+      cursor:pointer;
+      background:#fff;
+      transition:border-color .2s ease,color .2s ease,transform .2s ease;
+    }
+    .tips-help summary::-webkit-details-marker{
+      display:none;
+    }
+    .tips-help summary:hover{
+      border-color:var(--accent);
+      color:var(--accent);
+      transform:translateY(-1px);
+    }
+    .tips-help[open] summary{
+      border-color:var(--accent);
+      color:var(--accent);
+    }
+    .tips-help .tips{
+      position: absolute;
+      right: 0;
+      top: 36px;
+      margin-top:0;
+      width: min(360px, 90vw);
+      box-shadow:0 12px 30px rgba(0,0,0,0.08);
     }
     .tips h3{
       font-family:var(--font-serif);
@@ -689,31 +742,38 @@ body.theme-dark .select-field select{
       gap:0.35rem;
     }
 
-    .compliance-note{
-      border:1px solid rgba(180,151,90,0.25);
-      border-radius:var(--radius);
-      padding:1.35rem;
-      background:#f7f4ec;
+    .summary-layout{
       display:grid;
-      gap:0.85rem;
+      grid-template-columns: 1fr 30%;
+      gap:18px;
+      align-items:start;
+    }
+    .summary-content{
+      min-width:0;
+    }
+    .summary-wide{
+      grid-column:1 / -1;
+    }
+    .compliance-note{
+      max-width:100%;
+      margin:0;
+      padding:0 0 0 1rem;
+      background:transparent;
+      border-left:1px solid var(--line);
     }
 
     .compliance-note h3{
-      margin:0;
+      margin:0 0 0.35rem;
       font-family:var(--font-serif);
-      font-size:1.1rem;
+      font-size:0.95rem;
       font-weight:300;
       color:var(--ink);
     }
 
-    .compliance-note ul{
-      margin:0 0 0 1.1rem;
-      padding:0;
-      display:flex;
-      flex-direction:column;
-      gap:0.4rem;
-      font-size:0.92rem;
-      line-height:1.5;
+    .compliance-note p{
+      margin:0;
+      font-size:0.8rem;
+      line-height:1.35;
       color:#5f5542;
     }
     .fee-info{
@@ -746,6 +806,7 @@ body.theme-dark .select-field select{
       color:#1a2230;
       font-size:0.78rem;
       line-height:1.4;
+      font-family:var(--font-sans);
       box-shadow:0 16px 32px rgba(15,23,42,0.18);
       opacity:0;
       pointer-events:none;
@@ -830,6 +891,22 @@ body.theme-dark .select-field select{
     .summary p{margin:0;color:var(--ink);}
     .summary small{color:var(--muted);}
     .summary hr{margin:0.75rem 0;}
+    .review-task-list{
+      max-height:220px;
+      overflow-y:auto;
+      padding-right:6px;
+    }
+    .preview-tasks{
+      max-height:220px;
+      overflow-y:auto;
+      padding-right:6px;
+    }
+    .review-task-list .task-list,
+    .preview-tasks .task-list{
+      max-height:none;
+      overflow:visible;
+      padding-right:0;
+    }
 
     .auto-note{margin-top:0.6rem;font-size:0.9rem;color:var(--muted);}
 
@@ -1133,6 +1210,25 @@ body.theme-dark .select-field select{
         left: 16px;
         max-width: none;
       }
+      .summary-layout {
+        grid-template-columns: 1fr;
+      }
+      .summary-content {
+        order: 1;
+      }
+      .summary-wide {
+        order: 2;
+      }
+      .compliance-note {
+        max-width: none;
+        width: 100%;
+        order: 3;
+        border-left: none;
+        padding-left: 0;
+        border-top: 1px solid var(--line);
+        padding-top: 0.8rem;
+        margin-top: 0.6rem;
+      }
     }
 
     @media (max-width: 640px) {
@@ -1231,7 +1327,6 @@ body.theme-dark .select-field select{
     <section class="step-panel" data-step="details" id="create-step-details">
       <header>
         <h1>Create a New Case</h1>
-        <p>Provide details to post your case and invite paralegals to apply.</p>
       </header>
 
       <div class="steps">
@@ -1372,9 +1467,9 @@ body.theme-dark .select-field select{
   <label for="comp">Compensation</label>
   <div class="comp-wrapper">
     <span class="dollar-sign">$</span>
-    <input id="comp" type="number" min="0" placeholder="Amount" />
+    <input id="comp" type="number" min="0" placeholder="400 minimum" />
   </div>
-  <p class="muted lock-note" id="compLockNotice">You may edit the case amount until the first invitation is sent or a paralegal applies. After that point, the amount is automatically locked.</p>
+  <p class="muted lock-note" id="compLockNotice">You may edit the amount until a paralegal applies or you send the first invitation. After that, the amount is locked.</p>
 </div>
 
       <div class="field select-field">
@@ -1402,7 +1497,6 @@ body.theme-dark .select-field select{
     <section class="step-panel" data-step="description" id="create-step-description" hidden>
       <header>
         <h1>Create a New Case</h1>
-        <p>Step 2: Add a detailed description for your case posting.</p>
       </header>
 
       <div class="steps">
@@ -1418,6 +1512,17 @@ body.theme-dark .select-field select{
       </div>
 
       <div class="form-wrapper">
+        <details class="tips-help">
+          <summary aria-label="Tips for a Great Description">?</summary>
+          <div class="tips">
+            <h3>Tips for a Great Description</h3>
+            <ul>
+              <li>Be clear, well-written, and detailed about your case needs.</li>
+              <li>Include the scope of work, deliverables, and deadlines.</li>
+              <li>Avoid sensitive or identifying details in the posting.</li>
+            </ul>
+          </div>
+        </details>
         <form>
           <div class="case-title-preview" id="caseTitlePreview">
             <span class="label">Matter Title</span>
@@ -1443,15 +1548,6 @@ body.theme-dark .select-field select{
           </div>
         </form>
 
-        <div class="tips">
-          <h3>Tips for a Great Description</h3>
-          <ul>
-            <li>Be clear, well-written, and detailed about your case needs.</li>
-            <li>Include the scope of work, deliverables, and deadlines.</li>
-            <li>Avoid sensitive or identifying details in the posting.</li>
-          </ul>
-        </div>
-
         <div class="actions">
           <button type="button" class="btn secondary" data-step-switch="details">Back</button>
           <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html#cases:draft" data-save-draft="true">Save and Exit</button>
@@ -1462,7 +1558,6 @@ body.theme-dark .select-field select{
     <section class="step-panel" data-step="review" id="create-step-review" hidden>
       <header>
         <h1>Review &amp; Post Your Case</h1>
-        <p>Step 3: Confirm details before posting your case publicly.</p>
       </header>
 
       <div class="steps">
@@ -1478,17 +1573,16 @@ body.theme-dark .select-field select{
       </div>
 
       <section class="summary" id="reviewSummary">
-        <p>Gathering your case details…</p>
-      </section>
-
-      <section class="compliance-note" aria-label="Platform disclosures">
-        <h3>Platform Disclosures</h3>
-        <ul>
-          <li>Only attorneys and paralegals may use the platform. Communication here is attorney-to-paralegal only.</li>
-          <li>Paralegal work must be supervised by the attorney. The attorney remains responsible for all work product.</li>
-          <li>Let&rsquo;s-ParaConnect does not provide legal services or legal advice.</li>
-          <li>Payments are processed through Stripe. Funds remain within Stripe&rsquo;s infrastructure and are released upon attorney approval.</li>
-        </ul>
+        <div class="summary-layout">
+          <div class="summary-content">
+            <p>Gathering your case details…</p>
+          </div>
+          <aside class="compliance-note" aria-label="Professional guidelines">
+            <h3>Professional Guidelines</h3>
+            <p>Attorney-to-paralegal use only; attorney supervision required. Let&rsquo;s-ParaConnect does not provide legal advice. Payments are processed through Stripe.</p>
+          </aside>
+          <div class="summary-wide"></div>
+        </div>
       </section>
 
       <div class="actions">
@@ -2081,7 +2175,7 @@ body.theme-dark .select-field select{
       tasks: document.getElementById("previewTasks"),
     };
     const previewAutoNote = document.getElementById("previewAutoNote");
-    const autoNoteCopy = "Applicants automatically include their résumé, cover letter, and LinkedIn profile (if available).";
+    const autoNoteCopy = "";
     const PLATFORM_FEE_PCT = 22;
     const PLATFORM_FEE_NOTE =
       "Platform fee includes Stripe security, dispute support, payment processing, and vetted paralegal access.";
@@ -2115,7 +2209,7 @@ body.theme-dark .select-field select{
       {
         field: fields.comp,
         check: (value) => Number(value) >= 400,
-        message: "Enter a compensation amount of at least $400.",
+        message: "Enter a valid compensation amount with a minimum of $400.",
       },
     ];
 
@@ -2313,6 +2407,13 @@ body.theme-dark .select-field select{
     function applyInitialStep() {
       if (initialStepApplied) return;
       initialStepApplied = true;
+      if (currentDraftId) {
+        showStep(pendingInitialStep, { updateHash: false });
+        if (pendingInitialStep === "review") {
+          hydrateReviewSummary();
+        }
+        return;
+      }
       if (pendingInitialStep === "description") {
         showStep("details", { updateHash: false });
         attemptStepChange("description");
@@ -2416,8 +2517,8 @@ body.theme-dark .select-field select{
           draftCache.description = draft.description || "";
           draftCache.tasks = Array.isArray(draft.tasks) ? draft.tasks : [];
           if (fields.title) fields.title.value = draftCache.title;
-          if (fields.specialty) fields.specialty.value = draftCache.practiceArea;
-          if (fields.state) fields.state.value = draftCache.state;
+          if (fields.specialty) setSelectValue(fields.specialty, draftCache.practiceArea);
+          if (fields.state) setSelectValue(fields.state, draftCache.state);
           if (fields.comp) fields.comp.value = draftCache.compAmount;
           if (fields.experience) fields.experience.value = draftCache.experience;
           if (fields.deadline) fields.deadline.value = draftCache.deadline;
@@ -2640,22 +2741,35 @@ body.theme-dark .select-field select{
           ? `${safeDescription.slice(0, MAX_REVIEW_DESCRIPTION)}…`
           : safeDescription;
       const displayDescription = truncated.replace(/\n/g, "<br>");
+      const guidelinesHtml = `
+        <aside class="compliance-note" aria-label="Professional guidelines">
+          <h3>Professional Guidelines</h3>
+          <p>Attorney-to-paralegal use only; attorney supervision required. Let&rsquo;s-ParaConnect does not provide legal advice. Payments are processed through Stripe.</p>
+        </aside>
+      `;
       reviewSummary.innerHTML = `
-        <h2>${safeTitle}</h2>
-        <p><small>${safeField} • ${safeState}</small></p>
-        <p><strong>Compensation:</strong> ${safeComp}</p>
-        ${feeLine}
-        ${totalLine}
-        <p><strong>Experience:</strong> ${safeExperience}</p>
-        <p><strong>Deadline:</strong> ${safeDeadline}</p>
-        <hr>
-        <p>${displayDescription}</p>
-        <div style="margin-top:8px;">
-          <div class="description-label" style="margin-bottom:6px;">TASKS</div>
-          ${tasksMarkup}
+        <div class="summary-layout">
+          <div class="summary-content">
+            <h2>${safeTitle}</h2>
+            <p><small>${safeField} • ${safeState}</small></p>
+            <p><strong>Compensation:</strong> ${safeComp}</p>
+            ${feeLine}
+            ${totalLine}
+            <p><strong>Experience:</strong> ${safeExperience}</p>
+            <p><strong>Deadline:</strong> ${safeDeadline}</p>
+          </div>
+          ${guidelinesHtml}
+          <div class="summary-wide">
+            <hr>
+            <p>${displayDescription}</p>
+            <div style="margin-top:16px;">
+              <div class="description-label" style="margin-bottom:6px;">TASKS</div>
+              <div class="review-task-list">${tasksMarkup}</div>
+            </div>
+            ${extraTasks > 0 ? `<p class="auto-note">+${extraTasks} more tasks will be included when you post.</p>` : ""}
+            <p class="auto-note">${autoNoteCopy}</p>
+          </div>
         </div>
-        ${extraTasks > 0 ? `<p class="auto-note">+${extraTasks} more tasks will be included when you post.</p>` : ""}
-        <p class="auto-note">${autoNoteCopy}</p>
       `;
     }
 
@@ -2764,10 +2878,6 @@ body.theme-dark .select-field select{
 
     async function authorizedFetch(url, options = {}) {
       const token = (window.getSessionToken && window.getSessionToken()) || "";
-      if (!token) {
-        window.checkSession?.("attorney");
-        throw new Error("Please log in again.");
-      }
       const headers = { ...(options.headers || {}), ...resolveAuthHeader(token) };
       let body = options.body;
       if (typeof body !== "undefined" && body !== null && !(body instanceof FormData)) {

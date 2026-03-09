@@ -4811,6 +4811,9 @@ let cropperModal = null;
 let cropperImage = null;
 let cropperZoom = null;
 let cropperSaveBtn = null;
+let cropperLoading = null;
+let cropperLoadingText = null;
+let cropperModalCard = null;
 let cropperConfig = null;
 let cropperFile = null;
 let cropperOriginalFile = null;
@@ -5113,12 +5116,14 @@ function initPhotoCropperModal() {
   const cancelBtn = document.getElementById("photoCropCancel");
   const saveBtn = document.getElementById("photoCropSave");
   cropperSaveBtn = saveBtn;
-  const modalCard = cropperModal?.querySelector(".photo-crop-card");
+  cropperModalCard = cropperModal?.querySelector(".photo-crop-card");
+  cropperLoading = document.getElementById("photoCropLoading");
+  cropperLoadingText = document.getElementById("photoCropLoadingText");
   if (!cropperModal || !cropperImage || !saveBtn) return;
   saveBtn.disabled = true;
 
   cancelBtn?.addEventListener("click", closePhotoCropper);
-  modalCard?.addEventListener("mousedown", (event) => event.stopPropagation());
+  cropperModalCard?.addEventListener("mousedown", (event) => event.stopPropagation());
   cropperModal.addEventListener("mousedown", (event) => {
     if (event.target === cropperModal) closePhotoCropper();
   });
@@ -5147,6 +5152,18 @@ function initPhotoCropperModal() {
     }
     void applyCroppedPhoto();
   });
+}
+
+function setCropperLoading(isLoading, text = "") {
+  if (cropperModalCard) {
+    cropperModalCard.classList.toggle("is-loading", Boolean(isLoading));
+  }
+  if (cropperLoadingText && text) {
+    cropperLoadingText.textContent = text;
+  }
+  if (cropperLoading) {
+    cropperLoading.setAttribute("aria-hidden", isLoading ? "false" : "true");
+  }
 }
 
 function openPhotoCropper(file, config) {
@@ -5197,6 +5214,12 @@ function openExistingPhotoEditor(config) {
     return;
   }
 
+  if (cropperModal) {
+    cropperModal.classList.add("show");
+    cropperModal.setAttribute("aria-hidden", "false");
+    setCropperLoading(true, "Loading photo…");
+  }
+
   const openFromBlob = (blob, originalUrl) => {
     const objectUrl = URL.createObjectURL(blob);
     openPhotoCropperFromUrl(objectUrl, config, true, { originalUrl });
@@ -5236,6 +5259,7 @@ function openExistingPhotoEditor(config) {
           return;
         }
         showToast("Unable to load the original photo. Please re-upload the image.", "err");
+        closePhotoCropper();
       });
   };
 
@@ -5276,6 +5300,7 @@ function loadCropperImage(url, isObjectUrl) {
   if (isObjectUrl) cropperObjectUrl = url;
   cropperModal.classList.add("show");
   cropperModal.setAttribute("aria-hidden", "false");
+  setCropperLoading(true, "Loading photo…");
   if (activeCropper) {
     activeCropper.destroy();
     activeCropper = null;
@@ -5290,6 +5315,7 @@ function loadCropperImage(url, isObjectUrl) {
     }
     if (cropperZoom) cropperZoom.disabled = true;
     if (cropperSaveBtn) cropperSaveBtn.disabled = true;
+    setCropperLoading(false);
     showToast("Unable to open the crop editor for this image. We'll add it without cropping.", "err");
     closePhotoCropper();
     if (fallbackFile && fallbackConfig) {
@@ -5316,6 +5342,7 @@ function loadCropperImage(url, isObjectUrl) {
           if (cropperZoom) cropperZoom.disabled = false;
           cropperReady = true;
           if (cropperSaveBtn) cropperSaveBtn.disabled = false;
+          setCropperLoading(false);
         },
         zoom() {
           if (!cropperZoom) return;
@@ -5352,6 +5379,7 @@ function closePhotoCropper() {
   if (!cropperModal) return;
   cropperModal.classList.remove("show");
   cropperModal.setAttribute("aria-hidden", "true");
+  setCropperLoading(false);
   destroyPhotoCropper();
 }
 
