@@ -1,5 +1,6 @@
 // backend/routes/cases.js
 const router = require("express").Router();
+const crypto = require("crypto");
 const mongoose = require("mongoose");
 const { S3Client, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
@@ -18,7 +19,6 @@ const sendEmail = require("../utils/email");
 const emailTemplates = require("../email/templates");
 const { notifyUser } = require("../utils/notifyUser");
 const stripe = require("../utils/stripe");
-const { buildFundingFingerprint, ensureFundingRequestKey } = require("../utils/funding");
 const { cleanText, cleanTitle, cleanMessage } = require("../utils/sanitize");
 const { logAction } = require("../utils/audit");
 const AuditLog = require("../models/AuditLog");
@@ -90,6 +90,57 @@ const PRACTICE_AREAS = [
   "tax law",
   "technology",
 ];
+
+function buildFundingFingerprint({ caseId, amount, currency = "usd", mode = "escrow" }) {
+  return [mode, String(caseId || ""), String(amount || 0), String(currency || "usd").toLowerCase()].join(":");
+}
+
+async function ensureFundingRequestKey(caseId, fingerprint, { forceNew = false } = {}) {
+  if (!caseId) return crypto.randomUUID();
+
+  if (forceNew) {
+    const key = crypto.randomUUID();
+    await Case.updateOne(
+      { _id: caseId },
+      { $set: { fundingRequestKey: key, fundingRequestFingerprint: fingerprint } }
+    );
+    return key;
+  }
+
+  const current = await Case.findById(caseId)
+    .select("fundingRequestKey fundingRequestFingerprint")
+    .lean();
+  if (current?.fundingRequestKey && current.fundingRequestFingerprint === fingerprint) {
+    return current.fundingRequestKey;
+  }
+
+  const nextKey = crypto.randomUUID();
+  const claimed = await Case.findOneAndUpdate(
+    {
+      _id: caseId,
+      $or: [
+        { fundingRequestKey: { $exists: false } },
+        { fundingRequestKey: "" },
+        { fundingRequestFingerprint: { $ne: fingerprint } },
+      ],
+    },
+    {
+      $set: {
+        fundingRequestKey: nextKey,
+        fundingRequestFingerprint: fingerprint,
+      },
+    },
+    {
+      new: true,
+      projection: { fundingRequestKey: 1 },
+    }
+  ).lean();
+
+  if (claimed?.fundingRequestKey) return claimed.fundingRequestKey;
+
+  const refreshed = await Case.findById(caseId).select("fundingRequestKey").lean();
+  return refreshed?.fundingRequestKey || nextKey;
+}
 const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
   acc[name.toLowerCase()] = name;
   return acc;

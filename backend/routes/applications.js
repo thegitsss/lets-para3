@@ -7,7 +7,6 @@ const Case = require("../models/Case");
 const User = require("../models/User");
 const auth = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
-const { protectMutations } = require("../utils/csrf");
 const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
 const stripe = require("../utils/stripe");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
@@ -20,6 +19,25 @@ const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
 const REAPPLY_BYPASS_EMAILS = new Set(["samanthasider+0@gmail.com"]);
 const ACTIVE_APPLICATION_FILTER = { status: { $nin: ["accepted", "rejected"] } };
 const authenticatedGuards = [auth, requireApproved];
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const noop = (_req, _res, next) => next();
+const csrf = require("csurf");
+const csrfMiddleware = csrf({
+  cookie: {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+  },
+});
+const protectMutations = (req, res, next) => {
+  const requireCsrf = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+  if (!requireCsrf) return noop(req, res, next);
+  const method = String(req.method || "").toUpperCase();
+  if (SAFE_METHODS.has(method)) return next();
+  return csrfMiddleware(req, res, next);
+};
+
 const mutatingGuards = [...authenticatedGuards, protectMutations];
 
 function sanitizeMessage(value, { min = 0, max = 2000 } = {}) {

@@ -7,7 +7,6 @@ const Case = require("../models/Case");
 const User = require("../models/User");
 const auth = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
-const { protectMutations } = require("../utils/csrf");
 const applicationsRouter = require("./applications");
 const { cleanTitle, cleanText, cleanBudget } = require("../utils/sanitize");
 const { getBlockedUserIds } = require("../utils/blocks");
@@ -47,6 +46,25 @@ const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
   return acc;
 }, {});
 const authenticatedGuards = [auth, requireApproved];
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const noop = (_req, _res, next) => next();
+const csrf = require("csurf");
+const csrfMiddleware = csrf({
+  cookie: {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+  },
+});
+const protectMutations = (req, res, next) => {
+  const requireCsrf = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+  if (!requireCsrf) return noop(req, res, next);
+  const method = String(req.method || "").toUpperCase();
+  if (SAFE_METHODS.has(method)) return next();
+  return csrfMiddleware(req, res, next);
+};
+
 const mutatingGuards = [...authenticatedGuards, protectMutations];
 
 async function attorneyHasPaymentMethod(attorneyId) {

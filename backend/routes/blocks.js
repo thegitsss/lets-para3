@@ -2,10 +2,27 @@ const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved } = require("../utils/authz");
-const { protectMutations } = require("../utils/csrf");
 const Block = require("../models/Block");
 const User = require("../models/User");
 const { BLOCKED_MESSAGE, isBlockPairAllowed, isBlockableRole } = require("../utils/blocks");
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const noop = (_req, _res, next) => next();
+const csrf = require("csurf");
+const csrfMiddleware = csrf({
+  cookie: {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+  },
+});
+const protectMutations = (req, res, next) => {
+  const requireCsrf = process.env.NODE_ENV === "production" || process.env.ENABLE_CSRF === "true";
+  if (!requireCsrf) return noop(req, res, next);
+  const method = String(req.method || "").toUpperCase();
+  if (SAFE_METHODS.has(method)) return next();
+  return csrfMiddleware(req, res, next);
+};
 
 const isObjId = (val) => mongoose.Types.ObjectId.isValid(val);
 const normalizeReason = (value = "") =>
