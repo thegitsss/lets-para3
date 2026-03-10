@@ -41,4 +41,6 @@ const ApplicationSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
+ApplicationSchema.index({ jobId: 1, paralegalId: 1 }, { unique: true });
+
 module.exports = mongoose.model("Application", ApplicationSchema);

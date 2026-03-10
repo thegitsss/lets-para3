@@ -1214,10 +1214,9 @@ async function fetchVapidKey() {
 
 async function sendSubscriptionToServer(subscription) {
   try {
-    await fetch("/api/notifications/subscribe", {
+    await secureFetch("/api/notifications/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(subscription),
     });
   } catch (err) {

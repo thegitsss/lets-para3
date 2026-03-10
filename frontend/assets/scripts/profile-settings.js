@@ -668,10 +668,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       container.querySelectorAll(".unblock-btn").forEach((btn) => {
         btn.addEventListener("click", async () => {
-          await fetch("/api/users/unblock", {
+          await secureFetch("/api/users/unblock", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({ userId: btn.dataset.id })
           });
           loadBlockedUsers();

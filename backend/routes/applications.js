@@ -7,6 +7,7 @@ const Case = require("../models/Case");
 const User = require("../models/User");
 const auth = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
+const { protectMutations } = require("../utils/csrf");
 const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
 const stripe = require("../utils/stripe");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
@@ -17,6 +18,9 @@ const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
   "game4funwithme1@gmail.com",
 ]);
 const REAPPLY_BYPASS_EMAILS = new Set(["samanthasider+0@gmail.com"]);
+const ACTIVE_APPLICATION_FILTER = { status: { $nin: ["accepted", "rejected"] } };
+const authenticatedGuards = [auth, requireApproved];
+const mutatingGuards = [...authenticatedGuards, protectMutations];
 
 function sanitizeMessage(value, { min = 0, max = 2000 } = {}) {
   if (typeof value !== "string") return "";
@@ -57,6 +61,16 @@ async function attorneyHasPaymentMethod(attorneyId) {
     console.warn("[applications] Unable to verify attorney payment method", err?.message || err);
     return false;
   }
+}
+
+async function syncApplicantsCount(jobId) {
+  if (!mongoose.isValidObjectId(jobId)) return 0;
+  const count = await Application.countDocuments({
+    jobId,
+    ...ACTIVE_APPLICATION_FILTER,
+  });
+  await Job.findByIdAndUpdate(jobId, { $set: { applicantsCount: count } });
+  return count;
 }
 
 async function getCaseApplicationsForAttorney(attorneyId, blockedSet = null) {
@@ -222,29 +236,29 @@ async function createApplicationForJob(jobId, user, coverLetter) {
   }
 
   if (allowReapply && existingCount) {
-    const deleteResult = await Application.deleteMany({ jobId, paralegalId: user._id });
-    const decBy = deleteResult?.deletedCount ?? existingCount;
-    if (decBy) {
-      const updatedJob = await Job.findByIdAndUpdate(
-        jobId,
-        { $inc: { applicantsCount: -decBy } },
-        { new: true, select: "applicantsCount" }
-      );
-      if (updatedJob && typeof updatedJob.applicantsCount === "number" && updatedJob.applicantsCount < 0) {
-        await Job.findByIdAndUpdate(jobId, { applicantsCount: 0 });
-      }
-    }
+    await Application.deleteMany({ jobId, paralegalId: user._id });
+    await syncApplicantsCount(jobId);
   }
 
-  const application = await Application.create({
-    jobId,
-    paralegalId: user._id,
-    coverLetter: note,
-    resumeURL: applicant.resumeURL || "",
-    linkedInURL: applicant.linkedInURL || "",
-    profileSnapshot: shapeParalegalSnapshot(applicant),
-  });
-  await Job.findByIdAndUpdate(jobId, { $inc: { applicantsCount: 1 } });
+  let application = null;
+  try {
+    application = await Application.create({
+      jobId,
+      paralegalId: user._id,
+      coverLetter: note,
+      resumeURL: applicant.resumeURL || "",
+      linkedInURL: applicant.linkedInURL || "",
+      profileSnapshot: shapeParalegalSnapshot(applicant),
+    });
+  } catch (err) {
+    if (err?.code === 11000) {
+      const duplicate = new Error("You have already applied to this job");
+      duplicate.status = 400;
+      throw duplicate;
+    }
+    throw err;
+  }
+  await syncApplicantsCount(jobId);
   const lockedNow = !!caseDoc && caseDoc.lockedTotalAmount == null;
   if (caseDoc && lockedNow) {
     caseDoc.lockedTotalAmount = caseDoc.totalAmount;
@@ -292,7 +306,7 @@ async function createApplicationForJob(jobId, user, coverLetter) {
 }
 
 // GET /applications/my — paralegal views jobs they've applied to
-router.get("/my", auth, requireApproved, requireRole("paralegal"), async (req, res) => {
+router.get("/my", ...authenticatedGuards, requireRole("paralegal"), async (req, res) => {
   try {
     const apps = await Application.find({ paralegalId: req.user._id })
       .populate("jobId")
@@ -307,8 +321,7 @@ router.get("/my", auth, requireApproved, requireRole("paralegal"), async (req, r
 // POST /applications/:applicationId/revoke — paralegal revokes their application
 router.post(
   "/:applicationId/revoke",
-  auth,
-  requireApproved,
+  ...mutatingGuards,
   requireRole("paralegal"),
   async (req, res) => {
     try {
@@ -330,14 +343,7 @@ router.post(
       const jobId = application.jobId;
       await application.deleteOne();
       if (jobId) {
-        const updatedJob = await Job.findByIdAndUpdate(
-          jobId,
-          { $inc: { applicantsCount: -1 } },
-          { new: true, select: "applicantsCount" }
-        );
-        if (updatedJob && typeof updatedJob.applicantsCount === "number" && updatedJob.applicantsCount < 0) {
-          await Job.findByIdAndUpdate(jobId, { applicantsCount: 0 });
-        }
+        await syncApplicantsCount(jobId);
       }
 
       return res.json({ success: true });
@@ -349,7 +355,7 @@ router.post(
 );
 
 // GET /applications/for-job/:jobId — attorney views applicants
-router.get("/for-job/:jobId", auth, requireApproved, requireRole("admin", "attorney"), async (req, res) => {
+router.get("/for-job/:jobId", ...authenticatedGuards, requireRole("admin", "attorney"), async (req, res) => {
   try {
     const job = await Job.findById(req.params.jobId);
     if (!job) return res.status(404).json({ error: "Job not found" });
@@ -377,7 +383,7 @@ router.get("/for-job/:jobId", auth, requireApproved, requireRole("admin", "attor
 });
 
 // GET /applications/my-postings — attorney sees applications to their jobs
-router.get("/my-postings", auth, requireApproved, requireRole("attorney"), async (req, res) => {
+router.get("/my-postings", ...authenticatedGuards, requireRole("attorney"), async (req, res) => {
   try {
     const jobs = await Job.find({ attorneyId: req.user._id }).select("_id title practiceArea budget caseId");
     const blockedIds = await getBlockedUserIds(req.user._id || req.user.id);

@@ -7,6 +7,7 @@ const Case = require("../models/Case");
 const User = require("../models/User");
 const auth = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
+const { protectMutations } = require("../utils/csrf");
 const applicationsRouter = require("./applications");
 const { cleanTitle, cleanText, cleanBudget } = require("../utils/sanitize");
 const { getBlockedUserIds } = require("../utils/blocks");
@@ -45,6 +46,8 @@ const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
   acc[name.toLowerCase()] = name;
   return acc;
 }, {});
+const authenticatedGuards = [auth, requireApproved];
+const mutatingGuards = [...authenticatedGuards, protectMutations];
 
 async function attorneyHasPaymentMethod(attorneyId) {
   if (!attorneyId) return false;
@@ -61,8 +64,19 @@ async function attorneyHasPaymentMethod(attorneyId) {
   }
 }
 
+async function linkJobToCase(caseDoc, jobId) {
+  if (!caseDoc?._id || !jobId) return;
+  await Case.updateOne(
+    {
+      _id: caseDoc._id,
+      $or: [{ jobId: null }, { jobId: { $exists: false } }, { jobId }],
+    },
+    { $set: { jobId } }
+  );
+}
+
 // POST /jobs — Attorney posts a job
-router.post("/", auth, requireApproved, requireRole("attorney"), async (req, res) => {
+router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) => {
   try {
     const hasPaymentMethod = await attorneyHasPaymentMethod(req.user._id || req.user.id);
     if (!hasPaymentMethod) {
@@ -125,7 +139,7 @@ router.post("/", auth, requireApproved, requireRole("attorney"), async (req, res
       return res.status(400).json({ error: err.message });
     }
 
-    const job = await Job.create({
+    const jobPayload = {
       caseId: caseDoc?._id || null,
       attorneyId: req.user._id,
       title,
@@ -134,11 +148,25 @@ router.post("/", auth, requireApproved, requireRole("attorney"), async (req, res
       budget: Math.round(budget),
       state: attorneyState,
       locationState: attorneyState,
-    });
+    };
 
-    if (caseDoc && !caseDoc.jobId) {
-      caseDoc.jobId = job._id;
-      await caseDoc.save();
+    let job = null;
+    try {
+      job = await Job.create(jobPayload);
+    } catch (err) {
+      if (err?.code === 11000 && caseDoc?._id) {
+        job = await Job.findOne({ caseId: caseDoc._id });
+      } else {
+        throw err;
+      }
+    }
+
+    if (!job) {
+      return res.status(409).json({ error: "A job already exists for this case." });
+    }
+
+    if (caseDoc) {
+      await linkJobToCase(caseDoc, job._id);
     }
 
     res.json(job);
@@ -218,7 +246,7 @@ function shapeListing({ job = null, caseDoc = null }) {
 }
 
 // GET /jobs/open — paralegals view available jobs
-router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req, res) => {
+router.get("/open", ...authenticatedGuards, requireRole("paralegal"), async (req, res) => {
   try {
     const limit = clamp(parseInt(req.query.limit, 10) || 200, 1, 500);
     const blockedIds = await getBlockedUserIds(req.user.id);
@@ -350,7 +378,7 @@ router.get("/open", auth, requireApproved, requireRole("paralegal"), async (req,
 });
 
 // GET /jobs/my — attorney views their posted jobs
-router.get("/my", auth, requireApproved, requireRole("attorney"), async (req, res) => {
+router.get("/my", ...authenticatedGuards, requireRole("attorney"), async (req, res) => {
   try {
     const jobs = await Job.find({ attorneyId: req.user._id });
     res.json(jobs);
@@ -360,7 +388,7 @@ router.get("/my", auth, requireApproved, requireRole("attorney"), async (req, re
 });
 
 // POST /jobs/:jobId/apply — paralegal applies
-router.post("/:jobId/apply", auth, requireApproved, requireRole("paralegal"), async (req, res) => {
+router.post("/:jobId/apply", ...mutatingGuards, requireRole("paralegal"), async (req, res) => {
   try {
     if (!createApplicationForJob) {
       return res.status(500).json({ error: "Applications service unavailable" });
@@ -376,7 +404,7 @@ router.post("/:jobId/apply", auth, requireApproved, requireRole("paralegal"), as
 });
 
 // POST /jobs/:jobId/hire/:paralegalId — disabled to avoid hiring without funded escrow
-router.post("/:jobId/hire/:paralegalId", auth, requireRole(["attorney"]), async (_req, res) => {
+router.post("/:jobId/hire/:paralegalId", auth, protectMutations, requireRole(["attorney"]), async (_req, res) => {
   return res.status(410).json({
     error: "Direct job-to-paralegal hire is disabled. Use the case hire + funding flow to ensure the case is funded.",
   });

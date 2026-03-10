@@ -16,6 +16,7 @@ const sendEmail = require("../utils/email");
 const emailTemplates = require("../email/templates");
 const { buildReceiptPdfBuffer, uploadPdfToS3, getReceiptKey, generateArchiveZip } = require("../services/caseLifecycle");
 const { notifyUser } = require("../utils/notifyUser");
+const { buildFundingFingerprint, ensureFundingRequestKey } = require("../utils/funding");
 const Message = require("../models/Message");
 const CaseFile = require("../models/CaseFile");
 
@@ -87,6 +88,16 @@ function resolveAttorneyId(caseDoc) {
   if (caseDoc?.attorneyId) return String(caseDoc.attorneyId);
   if (attorney) return String(attorney);
   return "";
+}
+
+async function resolveFundingIdempotencyKey(caseDoc, amount, { mode, forceNew = false } = {}) {
+  const fingerprint = buildFundingFingerprint({
+    caseId: caseDoc?._id,
+    amount,
+    currency: caseDoc?.currency || "usd",
+    mode,
+  });
+  return ensureFundingRequestKey(caseDoc?._id, fingerprint, { forceNew });
 }
 
 function buildDisputeReceiptPayloads({
@@ -1200,8 +1211,17 @@ router.post(
       attorneyId: attorneyMeta ? String(attorneyMeta) : "",
     };
 
+    let forceNewFundingKey = false;
     if (selectedCase.escrowIntentId) {
       const existing = await stripe.paymentIntents.retrieve(selectedCase.escrowIntentId);
+      if (existing?.status === "succeeded") {
+        await applyPaymentIntentSnapshot(selectedCase, existing, { notifyOnSuccess: true });
+        return res.json({
+          clientSecret: existing.client_secret,
+          intentId: existing.id,
+          alreadyFunded: true,
+        });
+      }
       if (existing && !["succeeded", "canceled"].includes(existing.status)) {
         const amountMatches = existing.amount === totalCharge;
         const tgMatches = existing.transfer_group && existing.transfer_group === `case_${selectedCase._id.toString()}`;
@@ -1212,17 +1232,25 @@ router.post(
         }
         return res.json({ clientSecret: existing.client_secret, intentId: existing.id });
       }
+      forceNewFundingKey = true;
     }
 
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: totalCharge,
-      currency: selectedCase.currency || "usd",
-      automatic_payment_methods: { enabled: true },
-      receipt_email: selectedCase.attorney.email,
-      transfer_group: `case_${selectedCase._id.toString()}`,
-      metadata,
-      description: context.description,
+    const idempotencyKey = await resolveFundingIdempotencyKey(selectedCase, totalCharge, {
+      mode: "client-escrow",
+      forceNew: forceNewFundingKey,
     });
+    const paymentIntent = await stripe.paymentIntents.create(
+      {
+        amount: totalCharge,
+        currency: selectedCase.currency || "usd",
+        automatic_payment_methods: { enabled: true },
+        receipt_email: selectedCase.attorney.email,
+        transfer_group: `case_${selectedCase._id.toString()}`,
+        metadata,
+        description: context.description,
+      },
+      { idempotencyKey }
+    );
 
     selectedCase.paymentIntentId = paymentIntent.id;
     selectedCase.escrowIntentId = paymentIntent.id;
@@ -1710,9 +1738,9 @@ router.patch(
 router.post(
   "/intent/:caseId",
   requireRole("attorney", "admin"),
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
-    const idem = req.headers["x-idempotency-key"];
     const c = await Case.findById(caseId)
       .populate("paralegal", "firstName lastName email role")
       .populate("jobId", "title practiceArea");
@@ -1745,8 +1773,17 @@ router.post(
     const description = context.description;
 
     // Reuse existing PI if still active; ensure correct transfer_group/amount if editable
+    let forceNewFundingKey = false;
     if (c.escrowIntentId) {
       const existing = await stripe.paymentIntents.retrieve(c.escrowIntentId);
+      if (existing?.status === "succeeded") {
+        await applyPaymentIntentSnapshot(c, existing, { notifyOnSuccess: true });
+        return res.json({
+          clientSecret: existing.client_secret,
+          intentId: existing.id,
+          alreadyFunded: true,
+        });
+      }
       if (existing && !["succeeded", "canceled"].includes(existing.status)) {
         const amountMatches = existing.amount === amountToCharge;
         const tgMatches = existing.transfer_group && existing.transfer_group === transferGroup;
@@ -1765,9 +1802,14 @@ router.post(
 
         return res.json({ clientSecret: existing.client_secret, intentId: existing.id });
       }
+      forceNewFundingKey = true;
     }
 
     // Create a fresh PI
+    const idempotencyKey = await resolveFundingIdempotencyKey(c, amountToCharge, {
+      mode: "client-escrow",
+      forceNew: forceNewFundingKey,
+    });
     const intent = await stripe.paymentIntents.create(
       {
         amount: amountToCharge, // cents
@@ -1777,7 +1819,7 @@ router.post(
         metadata: paymentMetadata,
         description,
       },
-      idem ? { idempotencyKey: idem } : undefined
+      { idempotencyKey }
     );
 
     c.escrowIntentId = intent.id;

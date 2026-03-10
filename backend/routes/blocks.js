@@ -2,6 +2,7 @@ const router = require("express").Router();
 const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved } = require("../utils/authz");
+const { protectMutations } = require("../utils/csrf");
 const Block = require("../models/Block");
 const User = require("../models/User");
 const { BLOCKED_MESSAGE, isBlockPairAllowed, isBlockableRole } = require("../utils/blocks");
@@ -11,6 +12,7 @@ const normalizeReason = (value = "") =>
   typeof value === "string" ? value.trim().slice(0, 2000) : "";
 
 router.use(verifyToken, requireApproved);
+router.use(protectMutations);
 
 // GET /api/blocks - list who the requester has blocked
 router.get("/", async (req, res) => {

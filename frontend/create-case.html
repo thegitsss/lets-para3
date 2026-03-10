@@ -1820,9 +1820,8 @@ body.theme-dark .select-field select{
       async function dismissNotification(id) {
         if (!id) return false;
         try {
-          await fetch(`/api/notifications/${encodeURIComponent(id)}`, {
+          await authorizedFetch(`/api/notifications/${encodeURIComponent(id)}`, {
             method: "DELETE",
-            credentials: "include",
           });
         } catch (_) {}
         const targetId = String(id);
@@ -1912,9 +1911,8 @@ body.theme-dark .select-field select{
           row.addEventListener("click", async () => {
             try {
               if (item?.read === false && (item?.id || item?._id)) {
-                await fetch(`/api/notifications/${encodeURIComponent(item.id || item._id)}/read`, {
+                await authorizedFetch(`/api/notifications/${encodeURIComponent(item.id || item._id)}/read`, {
                   method: "POST",
-                  credentials: "include",
                 });
               }
             } catch (_) {}
@@ -1968,9 +1966,8 @@ body.theme-dark .select-field select{
           event.preventDefault();
           event.stopPropagation();
           try {
-            await fetch("/api/notifications/read-all", {
+            await authorizedFetch("/api/notifications/read-all", {
               method: "POST",
-              credentials: "include",
             });
           } catch (_) {}
           await fetchNotifications();

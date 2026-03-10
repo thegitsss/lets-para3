@@ -3,11 +3,13 @@ const Notification = require("../models/Notification");
 const User = require("../models/User");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved } = require("../utils/authz");
+const { protectMutations } = require("../utils/csrf");
 const { addSubscriber, publishNotificationEvent } = require("../utils/notificationEvents");
 
 const router = express.Router();
 
 router.use(verifyToken, requireApproved);
+router.use(protectMutations);
 
 // SSE stream for live notifications
 router.get("/stream", (req, res) => {

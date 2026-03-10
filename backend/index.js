@@ -197,9 +197,13 @@ app.use((req, res, next) => {
 });
 
 // 6) Static + SPA fallback
+app.use("/api", (_req, res) => {
+  res.status(404).json({ error: "Not found" });
+});
+
 app.use(express.static(PUBLIC_DIR));
 app.use(express.static(FRONTEND_DIR));
-app.get(/.*/, (req, res) => {
+app.get(/^(?!\/api(?:\/|$)).*/, (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/index.html"));
 });
 

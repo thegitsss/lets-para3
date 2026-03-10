@@ -18,6 +18,7 @@ const sendEmail = require("../utils/email");
 const emailTemplates = require("../email/templates");
 const { notifyUser } = require("../utils/notifyUser");
 const stripe = require("../utils/stripe");
+const { buildFundingFingerprint, ensureFundingRequestKey } = require("../utils/funding");
 const { cleanText, cleanTitle, cleanMessage } = require("../utils/sanitize");
 const { logAction } = require("../utils/audit");
 const AuditLog = require("../models/AuditLog");
@@ -96,6 +97,16 @@ const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
 
 function normalizeEmail(value) {
   return String(value || "").toLowerCase().trim();
+}
+
+async function resolveFundingIdempotencyKey(caseDoc, amount, { mode, forceNew = false } = {}) {
+  const fingerprint = buildFundingFingerprint({
+    caseId: caseDoc?._id,
+    amount,
+    currency: caseDoc?.currency || "usd",
+    mode,
+  });
+  return ensureFundingRequestKey(caseDoc?._id, fingerprint, { forceNew });
 }
 
 function isStripeBypassPair(req, caseDoc, paralegal) {
@@ -801,17 +812,27 @@ async function ensureCaseJobOpen(caseDoc) {
     const attorneyState = String(attorneyProfile?.state || "").trim().toUpperCase();
     const budgetCents = resolveRemainingAmount(caseDoc) ?? caseDoc.lockedTotalAmount ?? caseDoc.totalAmount ?? 0;
     const budgetDollars = Math.max(0, Math.round(Number(budgetCents || 0) / 100));
-    const job = await Job.create({
-      caseId: caseDoc._id,
-      attorneyId,
-      title: caseDoc.title || "Case",
-      practiceArea: caseDoc.practiceArea || "",
-      description: caseDoc.details || caseDoc.briefSummary || "",
-      budget: budgetDollars,
-      status: "open",
-      state: attorneyState,
-      locationState: attorneyState,
-    });
+    let job = null;
+    try {
+      job = await Job.create({
+        caseId: caseDoc._id,
+        attorneyId,
+        title: caseDoc.title || "Case",
+        practiceArea: caseDoc.practiceArea || "",
+        description: caseDoc.details || caseDoc.briefSummary || "",
+        budget: budgetDollars,
+        status: "open",
+        state: attorneyState,
+        locationState: attorneyState,
+      });
+    } catch (err) {
+      if (err?.code === 11000) {
+        job = await Job.findOne({ caseId: caseDoc._id });
+      } else {
+        throw err;
+      }
+    }
+    if (!job) return null;
     caseDoc.jobId = job._id;
     return job._id;
   } catch (err) {
@@ -4616,43 +4637,58 @@ router.post(
       return res.status(400).json({ error: "Add a payment method before hiring." });
     }
 
+    let paymentIntent = null;
+    let forceNewFundingKey = false;
     if (selectedCase.escrowIntentId) {
       try {
         const existing = await stripe.paymentIntents.retrieve(selectedCase.escrowIntentId);
-        if (existing && !["succeeded", "canceled"].includes(existing.status)) {
+        if (existing?.status === "succeeded") {
+          paymentIntent = existing;
+        } else if (existing && !["succeeded", "canceled"].includes(existing.status)) {
           await stripe.paymentIntents.cancel(existing.id);
+          forceNewFundingKey = true;
+        } else if (existing?.status === "canceled") {
+          forceNewFundingKey = true;
         }
       } catch (err) {
         console.warn("[case-hire] Unable to cancel existing payment intent", err?.message || err);
       }
     }
 
-    let paymentIntent;
-    try {
-      paymentIntent = await stripe.paymentIntents.create({
-        amount: totalCharge,
-        currency: selectedCase.currency || "usd",
-        customer: customerId,
-        payment_method: defaultPaymentMethodId,
-        off_session: true,
-        confirm: true,
-        receipt_email: attorney.email,
-        transfer_group: stripe.caseTransferGroup
-          ? stripe.caseTransferGroup(selectedCase._id)
-          : `case_${selectedCase._id.toString()}`,
-        metadata: {
-          caseId: String(selectedCase._id),
-          attorneyId: String(attorney._id),
-          paralegalId: String(paralegal._id),
-        },
-        description: buildCaseChargeDescription(selectedCase, paralegal),
-      });
-    } catch (err) {
-      const message = stripe.sanitizeStripeError(
-        err,
-        "Unable to charge the card on file. Please try again or update your payment method."
-      );
-      return res.status(402).json({ error: message });
+    if (!paymentIntent) {
+      try {
+        const idempotencyKey = await resolveFundingIdempotencyKey(selectedCase, totalCharge, {
+          mode: "hire-charge",
+          forceNew: forceNewFundingKey,
+        });
+        paymentIntent = await stripe.paymentIntents.create(
+          {
+            amount: totalCharge,
+            currency: selectedCase.currency || "usd",
+            customer: customerId,
+            payment_method: defaultPaymentMethodId,
+            off_session: true,
+            confirm: true,
+            receipt_email: attorney.email,
+            transfer_group: stripe.caseTransferGroup
+              ? stripe.caseTransferGroup(selectedCase._id)
+              : `case_${selectedCase._id.toString()}`,
+            metadata: {
+              caseId: String(selectedCase._id),
+              attorneyId: String(attorney._id),
+              paralegalId: String(paralegal._id),
+            },
+            description: buildCaseChargeDescription(selectedCase, paralegal),
+          },
+          { idempotencyKey }
+        );
+      } catch (err) {
+        const message = stripe.sanitizeStripeError(
+          err,
+          "Unable to charge the card on file. Please try again or update your payment method."
+        );
+        return res.status(402).json({ error: message });
+      }
     }
 
     if (!paymentIntent || paymentIntent.status !== "succeeded") {
@@ -5374,6 +5410,7 @@ router.get(
 router.put(
   "/:caseId/notes",
   verifyToken,
+  csrfProtection,
   requireCaseAccess("caseId", { project: "internalNotes" }),
   asyncHandler(async (req, res) => {
     if (!req.acl?.isAttorney && req.user.role !== "admin") {

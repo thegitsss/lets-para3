@@ -216,6 +216,8 @@ const caseSchema = new Schema(
     archiveDownloadedAt: { type: Date, default: null },
     purgeScheduledFor: { type: Date, default: null, index: true },
     purgedAt: { type: Date, default: null },
+    fundingRequestKey: { type: String, default: "" },
+    fundingRequestFingerprint: { type: String, default: "" },
     paralegalNameSnapshot: { type: String, trim: true, default: "" },
     attorneyNameSnapshot: { type: String, trim: true, default: "" },
     terminationReason: { type: String, trim: true, maxlength: 2000, default: "" },

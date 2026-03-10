@@ -5,7 +5,6 @@ const JobSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Case",
     default: null,
-    index: true,
   },
   attorneyId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -35,5 +34,13 @@ const JobSchema = new mongoose.Schema({
 
   createdAt: { type: Date, default: Date.now },
 });
+
+JobSchema.index(
+  { caseId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { caseId: { $type: "objectId" } },
+  }
+);
 
 module.exports = mongoose.model("Job", JobSchema);
