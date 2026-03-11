@@ -2890,6 +2890,8 @@ router.get(
       caseName: doc.title || doc.caseTitle || "Case",
       paralegalName: doc.paralegal ? fullName(doc.paralegal) : "",
       paralegal: doc.paralegal || null,
+      archived: !!doc.archived,
+      caseStatus: doc.archived ? "archived" : doc.status || "active",
       amountHeld: cents(doc.lockedTotalAmount ?? doc.totalAmount),
       fundedAt: doc.updatedAt || doc.createdAt || doc.hiredAt || null,
       status: doc.paymentStatus || doc.status || "pending",

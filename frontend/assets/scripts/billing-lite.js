@@ -2,6 +2,31 @@ import { secureFetch } from "./auth.js";
 import { createElements, mountPaymentElement, confirmSetup } from "./payments.js";
 
 const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
+const STRIPE_JS_SRC = "https://js.stripe.com/v3/";
+const CASE_PREVIEW_STORAGE_KEY = "lpc_case_preview_id";
+const CASE_PREVIEW_RECEIPT_KEY = "lpc_case_preview_receipt";
+
+let historyList = null;
+let portalBtn = null;
+let currencyFormatter = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" });
+let paymentSummaryEl = null;
+let paymentFormEl = null;
+let paymentElementHost = null;
+let paymentPanelActionsEl = null;
+let paymentErrorsEl = null;
+let paymentModalEl = null;
+let addCardBtn = null;
+let replaceCardBtn = null;
+let saveCardBtn = null;
+let cancelCardBtn = null;
+
+let setupElements = null;
+let setupPaymentElement = null;
+let pendingHire = null;
+let pendingHireLoaded = false;
+let paymentFlowOpening = false;
+let stripeJsPromise = null;
+let billingLiteInitialized = false;
 
 function getAttorneyOnboardingStep() {
   try {
@@ -23,63 +48,48 @@ function setAttorneyOnboardingStep(step) {
 
 function initBillingLite() {
   const surface = document.querySelector("[data-billing-surface]");
-  if (!surface) return;
+  if (!surface || billingLiteInitialized) return;
 
-  const historyList = document.getElementById("historyList");
-  const portalBtn = document.getElementById("openPortalBtn");
-  const financeAlertsEl = document.getElementById("financeAlerts");
-  const escrowTableBody = document.getElementById("escrowTableBody");
-  const refreshEscrowsBtn = document.getElementById("refreshEscrowsBtn");
-  const currencyFormatter = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" });
-  const paymentSummaryEl = document.getElementById("paymentMethodSummary");
-  const paymentFormEl = document.getElementById("paymentMethodForm");
-  const paymentElementHost = document.getElementById("paymentMethodElement");
-  const paymentPanelActionsEl = document.querySelector(".payment-method-panel .panel-actions");
-  const paymentErrorsEl = document.getElementById("paymentMethodErrors");
-  const paymentModalEl = document.getElementById("paymentMethodModal");
-  const addCardBtn = document.getElementById("addPaymentMethodBtn");
-  const replaceCardBtn = document.getElementById("replacePaymentMethodBtn");
-  const saveCardBtn = document.getElementById("savePaymentMethodBtn");
-  const cancelCardBtn = document.getElementById("cancelPaymentMethodBtn");
-  const CASE_PREVIEW_STORAGE_KEY = "lpc_case_preview_id";
-  const CASE_PREVIEW_RECEIPT_KEY = "lpc_case_preview_receipt";
+  billingLiteInitialized = true;
+  historyList = document.getElementById("historyList");
+  portalBtn = document.getElementById("openPortalBtn");
+  currencyFormatter = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" });
+  paymentSummaryEl = document.getElementById("paymentMethodSummary");
+  paymentFormEl = document.getElementById("paymentMethodForm");
+  paymentElementHost = document.getElementById("paymentMethodElement");
+  paymentPanelActionsEl = document.querySelector(".payment-method-panel .panel-actions");
+  paymentErrorsEl = document.getElementById("paymentMethodErrors");
+  paymentModalEl = document.getElementById("paymentMethodModal");
+  addCardBtn = document.getElementById("addPaymentMethodBtn");
+  replaceCardBtn = document.getElementById("replacePaymentMethodBtn");
+  saveCardBtn = document.getElementById("savePaymentMethodBtn");
+  cancelCardBtn = document.getElementById("cancelPaymentMethodBtn");
 
-  let cachedEscrows = [];
-  let openDrawerEl = null;
-  let openDrawerTrigger = null;
-  let setupElements = null;
-  let setupPaymentElement = null;
-  let pendingHire = null;
-  let pendingHireLoaded = false;
-  let paymentFlowOpening = false;
+  bindEvents();
+  void initBillingSurface();
+}
 
-  const STRIPE_JS_SRC = "https://js.stripe.com/v3/";
-  let stripeJsPromise = null;
-
-  (async function initBillingSurface() {
-    console.log("billing-lite loaded");
-    bindEvents();
-    pendingHire = await loadPendingHire();
-    if (pendingHire?.message) {
-      showToast(pendingHire.message, "info");
+async function initBillingSurface() {
+  pendingHire = await loadPendingHire();
+  if (pendingHire?.message) {
+    showToast(pendingHire.message, "info");
+  }
+  const paymentStatus = await loadPaymentMethodStatus();
+  if (getAttorneyOnboardingStep() === "payment") {
+    const targetBtn = addCardBtn && !addCardBtn.hidden ? addCardBtn : replaceCardBtn;
+    if (targetBtn) {
+      targetBtn.classList.add("onboarding-pulse");
+      targetBtn.addEventListener("click", () => targetBtn.classList.remove("onboarding-pulse"), { once: true });
     }
-    const paymentStatus = await loadPaymentMethodStatus();
-    if (getAttorneyOnboardingStep() === "payment") {
-      const targetBtn = addCardBtn && !addCardBtn.hidden ? addCardBtn : replaceCardBtn;
-      if (targetBtn) {
-        targetBtn.classList.add("onboarding-pulse");
-        targetBtn.addEventListener("click", () => targetBtn.classList.remove("onboarding-pulse"), { once: true });
-      }
-      ensurePaymentOnboardingSkipButton();
-    } else {
-      removePaymentOnboardingSkipButton();
-    }
-    if (pendingHire && paymentStatus?.paymentMethod) {
-      resumePendingHire(pendingHire);
-    }
-    const activeItems = await loadActiveEscrows(true);
-    await Promise.all([loadFinanceAlerts(activeItems), loadHistory()]);
-  })();
+    ensurePaymentOnboardingSkipButton();
+  } else {
+    removePaymentOnboardingSkipButton();
+  }
+  if (pendingHire && paymentStatus?.paymentMethod) {
+    resumePendingHire(pendingHire);
+  }
+  await loadHistory();
+}
 
 function bindEvents() {
   const pauseTour = () => {
@@ -126,18 +136,6 @@ function bindEvents() {
     event.preventDefault();
     card.click();
   });
-  refreshEscrowsBtn?.addEventListener("click", () => {
-    loadActiveEscrows(true, { syncAlerts: true });
-  });
-  financeAlertsEl?.addEventListener("click", handleAlertAction);
-  document.addEventListener("click", handleGlobalClick);
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && openDrawerEl) {
-      const trigger = openDrawerTrigger || openDrawerEl.querySelector(".action-toggle");
-      closeActionDrawers();
-      trigger?.focus();
-    }
-  });
   addCardBtn?.addEventListener("click", () => {
     pauseTour();
     startPaymentMethodFlow();
@@ -182,194 +180,6 @@ function removePaymentOnboardingSkipButton() {
   if (skipBtn?.parentNode) {
     skipBtn.parentNode.removeChild(skipBtn);
   }
-}
-
-async function loadActiveEscrows(showLoading = false, { syncAlerts = false } = {}) {
-  if (!escrowTableBody) return [];
-  if (showLoading) {
-    escrowTableBody.innerHTML = renderEscrowSkeletonRows();
-  }
-  try {
-    const res = await secureFetch("/api/payments/escrow/active", { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const payload = await res.json().catch(() => ({}));
-    const items = Array.isArray(payload?.items) ? payload.items : [];
-    cachedEscrows = items;
-    if (!items.length) {
-      escrowTableBody.innerHTML = `<tr><td colspan="5" class="history-empty">No funds currently pending in Stripe.</td></tr>`;
-    } else {
-      escrowTableBody.innerHTML = items.map(renderEscrowRow).join("");
-    }
-    if (syncAlerts) {
-      await loadFinanceAlerts(items);
-    }
-    return items;
-  } catch (err) {
-    console.warn("Unable to load active funds", err);
-    escrowTableBody.innerHTML = `<tr><td colspan="5" class="history-empty error">Unable to load active Stripe records.</td></tr>`;
-    return [];
-  }
-}
-
-function renderEscrowRow(entry = {}) {
-  const caseName = escapeHtml(entry.caseName || entry.caseTitle || entry.title || "Case");
-  const paralegal = escapeHtml(entry.paralegalName || "Paralegal pending");
-  const amount = formatCurrency(entry.amountHeld ?? entry.amount ?? entry.lockedTotalAmount ?? entry.totalAmount);
-  const funded = formatDate(entry.fundedAt || entry.updatedAt);
-  const statusLabel = formatStatusLabel(entry.status || "");
-  return `
-    <tr>
-      <td>${caseName}</td>
-      <td>${paralegal}</td>
-      <td>${amount}</td>
-      <td>${funded}</td>
-      <td><span class="pill">${statusLabel}</span></td>
-    </tr>
-  `;
-}
-
-async function loadFinanceAlerts(activeItems) {
-  if (!financeAlertsEl) return;
-  financeAlertsEl.innerHTML = `<div class="finance-alert"><div><div class="alert-title">Checking finance alerts…</div><p>Give us a moment.</p></div></div>`;
-  try {
-    const [summaryRes, pendingRes] = await Promise.all([
-      secureFetch("/api/payments/summary", { headers: { Accept: "application/json" } }),
-      secureFetch("/api/payments/escrow/pending", { headers: { Accept: "application/json" } }),
-    ]);
-    if (!summaryRes.ok) throw new Error(`HTTP ${summaryRes.status}`);
-    if (!pendingRes.ok) throw new Error(`HTTP ${pendingRes.status}`);
-    const summary = await summaryRes.json().catch(() => ({}));
-    const pendingPayload = await pendingRes.json().catch(() => ({}));
-    const pendingItems = Array.isArray(pendingPayload?.items) ? pendingPayload.items : [];
-    const activeList = Array.isArray(activeItems) ? activeItems : cachedEscrows;
-    const alerts = buildFinanceAlerts({ summary, active: activeList, pending: pendingItems });
-    renderFinanceAlerts(alerts);
-  } catch (err) {
-    console.warn("Unable to load finance alerts", err);
-    financeAlertsEl.innerHTML = `<div class="finance-alert"><div><div class="alert-title">Finance alerts unavailable</div><p class="muted">Please refresh the page or try again shortly.</p></div></div>`;
-  }
-}
-
-function buildFinanceAlerts({ active = [], pending = [] } = {}) {
-  const alerts = [];
-  if (pending.length) {
-    const first = pending[0];
-    const count = pending.length;
-    const label = count === 1 ? first.caseName || "This case" : `${count} cases`;
-    const summary = count === 1 ? `${first.paralegalName || "Your paralegal"} is ready to start.` : "Fund Stripe to unblock your assignments.";
-    alerts.push({
-      id: `fund-${first.caseId}`,
-      type: "fund",
-      title: `${label} ${count === 1 ? "needs" : "need"} funding`,
-      body: summary,
-      actions: [
-        first.checkoutUrl
-          ? { type: "link", label: "Fund Now", href: first.checkoutUrl, external: true, primary: true }
-          : { type: "view", label: "View Case", caseId: first.caseId, primary: true },
-        { type: "view", label: "View Case", caseId: first.caseId },
-      ],
-    });
-  }
-  return alerts;
-}
-
-function renderFinanceAlerts(alerts = []) {
-  if (!financeAlertsEl) return;
-  if (!alerts.length) {
-    financeAlertsEl.innerHTML = "";
-    return;
-  }
-  financeAlertsEl.innerHTML = alerts.map(renderFinanceAlert).join("");
-}
-
-function renderFinanceAlert(alert) {
-  const actionsHtml = (alert.actions || [])
-    .map((action) => {
-      if (action.type === "link" && action.href) {
-        const target = action.external ? ' target="_blank" rel="noopener"' : "";
-        return `<a class="pill-btn ${action.primary ? "primary" : ""}" href="${action.href}"${target}>${escapeHtml(action.label)}</a>`;
-      }
-      const attrs = [
-        `class="pill-btn ${action.primary ? "primary" : ""}"`,
-        `data-alert-action="${action.type}"`,
-        action.caseId ? `data-case-id="${action.caseId}"` : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
-      return `<button type="button" ${attrs}>${escapeHtml(action.label)}</button>`;
-    })
-    .join("");
-  return `
-    <article class="finance-alert ${alert.type || ""}">
-      <div>
-        <div class="alert-title">${escapeHtml(alert.title)}</div>
-        <p>${escapeHtml(alert.body)}</p>
-      </div>
-      ${actionsHtml ? `<div class="alert-actions">${actionsHtml}</div>` : ""}
-    </article>
-  `;
-}
-
-function handleEscrowClick(event) {
-  const toggle = event.target.closest(".action-toggle");
-  if (toggle) {
-    const drawer = toggle.closest(".action-drawer");
-    toggleActionDrawer(drawer);
-    return;
-  }
-  const actionBtn = event.target.closest("[data-escrow-action]");
-  if (actionBtn) {
-    const action = actionBtn.dataset.escrowAction;
-    const caseId = actionBtn.dataset.caseId;
-    closeActionDrawers();
-    if (action === "view") {
-      viewCase(caseId);
-    } else if (action === "messages") {
-      jumpToMessages(caseId);
-    } else if (action === "release") {
-      releaseEscrowCase(caseId, actionBtn);
-    }
-  }
-}
-
-function handleAlertAction(event) {
-  const btn = event.target.closest("[data-alert-action]");
-  if (!btn) return;
-  const action = btn.dataset.alertAction;
-  const caseId = btn.dataset.caseId;
-  if (action === "view") {
-    viewCase(caseId);
-  } else if (action === "messages") {
-    jumpToMessages(caseId);
-  } else if (action === "release") {
-    releaseEscrowCase(caseId, btn);
-  }
-}
-
-function toggleActionDrawer(drawer) {
-  if (!drawer) return;
-  const willOpen = openDrawerEl !== drawer;
-  closeActionDrawers();
-  if (willOpen) {
-    drawer.classList.add("open");
-    drawer.querySelector(".action-toggle")?.setAttribute("aria-expanded", "true");
-    openDrawerEl = drawer;
-    openDrawerTrigger = drawer.querySelector(".action-toggle");
-  }
-}
-
-function closeActionDrawers() {
-  document.querySelectorAll(".action-drawer.open").forEach((drawer) => {
-    drawer.classList.remove("open");
-    drawer.querySelector(".action-toggle")?.setAttribute("aria-expanded", "false");
-  });
-  openDrawerEl = null;
-  openDrawerTrigger = null;
-}
-
-function handleGlobalClick(event) {
-  if (event.target.closest(".action-drawer")) return;
-  closeActionDrawers();
 }
 
 async function loadHistory() {
@@ -673,53 +483,6 @@ function renderHistoryCard(entry = {}) {
   `;
 }
 
-function releaseEscrowCase(caseId, trigger) {
-  if (!caseId) return;
-  showToast("Funds are released only via the case completion flow.", "info");
-  return;
-  const confirmRelease = window.confirm("Release funds for this case?");
-  if (!confirmRelease) return;
-  const btn = trigger;
-  if (btn) {
-    btn.disabled = true;
-    btn.setAttribute("aria-busy", "true");
-  }
-  secureFetch("/api/payments/release", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ caseId }),
-  })
-    .then(async (res) => {
-      let payload = {};
-      try {
-        payload = await res.json();
-      } catch {
-        payload = {};
-      }
-      if (!res.ok) throw new Error(payload?.error || payload?.msg || "Unable to release funds.");
-      showToast("Funds released successfully.", "success");
-      void loadActiveEscrows(true, { syncAlerts: true });
-    })
-    .catch((err) => {
-      console.error("Release escrow error", err);
-      showToast(err.message || "Unable to release funds.", "error");
-    })
-    .finally(() => {
-      if (btn) {
-        btn.disabled = false;
-        btn.removeAttribute("aria-busy");
-      }
-    });
-}
-
-function jumpToMessages(caseId) {
-  if (!caseId) {
-    showToast("Open a case to view messages.", "info");
-    return;
-  }
-  window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}#case-messages`;
-}
-
 function formatCurrency(value) {
   const cents = normalizeToCents(value);
   return currencyFormatter.format(cents / 100);
@@ -737,35 +500,6 @@ function normalizeToCents(value) {
     return cleaned.includes(".") ? Math.round(parsed * 100) : Math.round(parsed);
   }
   return 0;
-}
-
-function isReleaseCandidate(status = "") {
-  const normalized = String(status).toLowerCase();
-  return ["awaiting_release", "release", "ready", "complete"].some((term) => normalized.includes(term));
-}
-
-function formatStatusLabel(status = "") {
-  const safe = String(status || "In progress")
-    .replace(/[_-]/g, " ")
-    .trim();
-  return safe ? safe.replace(/\b\w/g, (c) => c.toUpperCase()) : "In Progress";
-}
-
-function renderEscrowSkeletonRows(count = 3) {
-  const cell = (size) => `<div class="skeleton-line ${size}"></div>`;
-  return Array.from({ length: count })
-    .map(
-      () => `
-        <tr class="skeleton-row">
-          <td>${cell("long")}</td>
-          <td>${cell("medium")}</td>
-          <td>${cell("short")}</td>
-          <td>${cell("short")}</td>
-          <td>${cell("short")}</td>
-        </tr>
-      `
-    )
-    .join("");
 }
 
 function renderHistorySkeleton(count = 2) {
@@ -801,24 +535,6 @@ function viewCase(caseId) {
   window.location.href = `dashboard-attorney.html?previewCaseId=${encodeURIComponent(caseId)}#cases`;
 }
 
-function viewArchivedCase(caseId) {
-  if (!caseId) return;
-  try {
-    sessionStorage.setItem(CASE_PREVIEW_STORAGE_KEY, String(caseId));
-  } catch {
-    /* ignore */
-  }
-  if (window.location.pathname.endsWith("dashboard-attorney.html")) {
-    if (window.location.hash !== "#cases:archived") {
-      window.location.hash = "cases:archived";
-    } else {
-      window.dispatchEvent(new HashChangeEvent("hashchange"));
-    }
-    return;
-  }
-  window.location.href = `dashboard-attorney.html?previewCaseId=${encodeURIComponent(caseId)}#cases:archived`;
-}
-
 function formatDate(raw) {
   if (!raw) return "—";
   const date = new Date(raw);
@@ -851,6 +567,8 @@ function showToast(message, type = "info") {
   }
 }
 
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initBillingLite, { once: true });
+} else {
+  initBillingLite();
 }
-
-document.addEventListener("DOMContentLoaded", initBillingLite);

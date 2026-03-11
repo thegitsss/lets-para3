@@ -26,7 +26,7 @@ const CASE_FILE_MAX_BYTES = 20 * 1024 * 1024;
 const PLATFORM_FEE_PCT = 22;
 const HOME_PAGE_SIZE = 5;
 const CASE_PAGE_SIZE = 15;
-const ESCROW_PAGE_SIZE = 15;
+const ESCROW_PAGE_SIZE = 5;
 const CASE_POSTED_STORAGE_KEY = "lpc_case_posted_notice";
 const AUTO_RELIST_TYPES = new Set(["zero_auto", "partial_attorney", "expired_zero", "admin"]);
 const FUNDED_WORKSPACE_STATUSES = new Set([
@@ -81,17 +81,10 @@ const state = {
   latestThreadCaseId: null,
   threadOverview: new Map(),
   billing: {
-    summary: null,
-    posted: [],
-    postedMap: new Map(),
     escrows: [],
+    escrowsLoaded: false,
     escrowPage: 0,
-    history: [],
-    spendingChart: null,
-    jobChart: null,
-    completedCount: 0,
-    editJobId: null,
-    demoLoaded: false,
+    escrowSort: "funded_desc",
     hasPaymentMethod: null,
   },
   messages: {
@@ -124,14 +117,6 @@ const state = {
   },
   archiveHighlightCaseId: null,
   archiveHighlightApplied: false,
-  simpleMessages: {
-    cases: [],
-    unread: new Map(),
-    activeCaseId: null,
-    messagesByCase: new Map(),
-    lastIds: new Map(),
-    pollTimer: null,
-  },
   overview: {
     cases: [],
     eligibleCaseIds: new Set(),
@@ -223,6 +208,8 @@ const dashboardViewState = {
   currentView: "",
   casesInitialized: false,
   casesInitPromise: null,
+  billingInitialized: false,
+  billingInitPromise: null,
   caseTabsBound: false,
   caseFilesPromise: null,
   caseFilesReady: false,
@@ -433,74 +420,6 @@ function enhanceSharedHeaderNotificationScroll() {
   document
     .querySelectorAll(".lpc-shared-header [data-notification-list]")
     .forEach((list) => initList(list));
-}
-
-function ensureSimpleMessageStyles() {
-  if (document.getElementById("simple-message-styles")) return;
-  const style = document.createElement("style");
-  style.id = "simple-message-styles";
-  style.textContent = `
-  #msgInterface{
-    margin-top:2rem;
-    border:1px solid var(--line, rgba(0,0,0,0.08));
-    border-radius:12px;
-    background:var(--panel, #fcfcfc);
-    padding:1.25rem;
-    display:flex;
-    flex-direction:column;
-    gap:1rem;
-    font-family:'Sarabun',sans-serif;
-    box-shadow:0 10px 30px rgba(0,0,0,0.06);
-  }
-  #msgInterface select{
-    width:100%;
-    border:1px solid var(--line, rgba(0,0,0,0.1));
-    border-radius:8px;
-    padding:0.55rem 0.75rem;
-    font-size:0.95rem;
-    background:#fff;
-  }
-  #msgInterface #msgThread{
-    min-height:140px;
-    border:1px dashed var(--line, rgba(0,0,0,0.15));
-    border-radius:8px;
-    padding:0.75rem;
-    font-size:0.9rem;
-    color:var(--muted,#6b6b6b);
-    background:#fff;
-  }
-  #msgInterface form{
-    display:flex;
-    flex-direction:column;
-    gap:0.75rem;
-  }
-  #msgInterface textarea{
-    width:100%;
-    border:1px solid var(--line, rgba(0,0,0,0.12));
-    border-radius:10px;
-    padding:0.65rem 0.85rem;
-    resize:vertical;
-    min-height:80px;
-    font-size:0.95rem;
-    background:#fff;
-  }
-  #msgInterface button{
-    align-self:flex-end;
-    border:none;
-    border-radius:999px;
-    padding:0.55rem 1.4rem;
-    font-size:0.95rem;
-    background:var(--accent,#b6a47a);
-    color:#fff;
-    cursor:pointer;
-    transition:background .2s ease, transform .2s ease;
-  }
-  #msgInterface button:hover{
-    background:var(--accent-dark,#9c8a63);
-    transform:translateY(-1px);
-  }
-  `;
-  document.head.appendChild(style);
 }
 
 async function initHeader(options = {}) {
@@ -1987,6 +1906,9 @@ function showDashboardView(target, { skipHash = false, caseFilter = null } = {})
         }
       });
     }
+    if (target === "billing") {
+      void ensureBillingViewReady();
+    }
     return;
   }
 
@@ -2023,6 +1945,8 @@ function showDashboardView(target, { skipHash = false, caseFilter = null } = {})
       maybeOpenApplicantsCaseFromQuery();
       maybePromptCaseOnboarding();
     });
+  } else if (target === "billing") {
+    void ensureBillingViewReady();
   }
 }
 
@@ -2041,6 +1965,22 @@ function ensureCasesViewReady() {
       dashboardViewState.casesInitPromise = null;
     });
   return dashboardViewState.casesInitPromise;
+}
+
+function ensureBillingViewReady() {
+  if (dashboardViewState.billingInitialized) return Promise.resolve();
+  if (dashboardViewState.billingInitPromise) return dashboardViewState.billingInitPromise;
+  dashboardViewState.billingInitPromise = (async () => {
+    await initBillingPage();
+    dashboardViewState.billingInitialized = true;
+  })()
+    .catch((err) => {
+      console.warn("Billing view init failed", err);
+    })
+    .finally(() => {
+      dashboardViewState.billingInitPromise = null;
+    });
+  return dashboardViewState.billingInitPromise;
 }
 
 function bindCaseViewTabs() {
@@ -2126,11 +2066,8 @@ function ensureCaseFilesEmbedReady() {
 async function loadCompletedJobs(container) {
   if (!container) return;
   try {
-    await loadArchivedCases();
-    const completed = (state.casesArchived || []).filter((item) => {
-      const statusKey = normalizeCaseStatus(item?.status);
-      return statusKey === "completed" && item?.archived === true;
-    });
+    await Promise.all([loadCasesWithFiles(), loadArchivedCases()]);
+    const completed = getCompletedDashboardCases();
     if (!completed.length) {
       container.innerHTML = '<p class="info-line" style="color:var(--muted);">No completed jobs yet.</p>';
       return;
@@ -2170,258 +2107,86 @@ function goToMessages(caseId) {
 // Billing Page
 // -------------------------
 async function initBillingPage() {
-  const postedBody = document.getElementById("postedJobsBody");
   const activeBody = document.getElementById("activeEscrowsBody");
-  const editModal = document.getElementById("editJobModal");
-  const editForm = document.getElementById("editJobForm");
   const toastHelper = window.toastUtils;
   const stagedToast = toastHelper?.consume?.();
   if (stagedToast?.message) {
     toastHelper.show(stagedToast.message, { targetId: "toastBanner", type: stagedToast.type });
   }
 
-  postedBody?.addEventListener("click", onPostedJobsAction);
   activeBody?.addEventListener("click", onActiveEscrowAction);
+  document.querySelector(".escrow-table thead")?.addEventListener("click", onEscrowSortHeaderClick);
   document.querySelector("[data-escrow-pagination]")?.addEventListener("click", onEscrowPaginationClick);
-  editModal?.querySelector("[data-close-modal]")?.addEventListener("click", () => toggleModal(editModal, false));
-  editForm?.addEventListener("submit", submitJobEdit);
-  document.querySelectorAll("[data-refresh]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const type = btn.dataset.refresh;
-      if (type === "posted") loadPostedJobs(true);
-      else if (type === "escrows") loadActiveEscrows(true);
-      else if (type === "history") loadCompletedPayments(true);
-    });
-  });
 
-  document.querySelectorAll("[data-export]").forEach((btn) => {
-    btn.addEventListener("click", () => triggerExport(btn.dataset.export));
-  });
-  document.querySelector("[data-customer-portal]")?.addEventListener("click", () => openCustomerPortal());
-
-  await hydrateBillingOverview();
-  await Promise.all([loadPostedJobs(), loadActiveEscrows()]);
-}
-
-async function hydrateBillingOverview(force = false) {
-  try {
-    const [summary, history] = await Promise.all([fetchBillingSummary(force), fetchPaymentHistory(force)]);
-    renderBillingSummary(summary);
-    renderSpendingChart(history);
-    renderCompletedPayments(history);
-    updateJobDistributionChart();
-  } catch (err) {
-    console.warn("Unable to hydrate billing overview", err);
-    loadBillingDemoData();
-  }
-}
-
-async function loadPostedJobs(force = false) {
-  const body = document.getElementById("postedJobsBody");
-  if (!body) return;
-  if (force) body.innerHTML = `<tr><td colspan="4" class="empty-state">Refreshing posted jobs…</td></tr>`;
-  try {
-    const res = await secureFetch("/api/cases/posted", { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const payload = await res.json().catch(() => []);
-    const items = Array.isArray(payload?.items) ? payload.items : Array.isArray(payload) ? payload : [];
-    state.billing.posted = items;
-    state.billing.postedMap.clear();
-    items.forEach((job) => {
-      const id = parseCaseId(job);
-      if (id) state.billing.postedMap.set(String(id), job);
-    });
-    renderPostedJobs(body, items);
-    updateJobDistributionChart();
-    updatePostedSummaryCount();
-  } catch (err) {
-    console.warn("Unable to load posted jobs", err);
-    loadBillingDemoData();
-  }
-}
-
-function renderPostedJobs(body, jobs = []) {
-  if (!jobs.length) {
-    body.innerHTML = `<tr><td colspan="4" class="empty-state">No open jobs awaiting hire.</td></tr>`;
-    return;
-  }
-  body.innerHTML = jobs
-    .map((job) => {
-      const caseId = parseCaseId(job);
-      const title = sanitize(job.title || job.caseTitle || "Untitled Matter");
-      const applicants = Number(job.applicantsCount ?? (Array.isArray(job.applicants) ? job.applicants.length : 0)) || 0;
-      const budget = formatCurrency(
-        normalizeAmountToCents(job.lockedTotalAmount ?? job.totalAmount ?? job.paymentAmount ?? job.budget)
-      );
-      const escrowFunded = String(job.escrowStatus || "").toLowerCase() === "funded";
-      const canOpenWorkspace = !!job.paralegal && escrowFunded && job.escrowIntentId;
-      const openAction = canOpenWorkspace ? "open-case" : "view-details";
-      const openLabel = canOpenWorkspace ? "Open Case" : "View Details";
-      const openDisabled = caseId
-        ? ""
-        : ' disabled aria-disabled="true" title="Case unavailable."';
-      const viewApplicantsDisabled = caseId
-        ? ""
-        : ' disabled aria-disabled="true" title="Case unavailable."';
-      return `
-        <tr data-case-id="${caseId || ""}">
-          <td>${title}</td>
-          <td>${budget}</td>
-          <td>${applicants}</td>
-          <td>
-            <div class="btn-group">
-              <button type="button" class="secondary" data-job-action="view-applicants" data-case-id="${caseId}"${viewApplicantsDisabled}>View Applicants</button>
-              <button type="button" data-job-action="edit" data-case-id="${caseId}">Edit Job</button>
-              <button type="button" class="danger" data-job-action="delete" data-case-id="${caseId}">Delete</button>
-              <button type="button" class="secondary" data-job-action="${openAction}" data-case-id="${caseId}"${openDisabled}>${openLabel}</button>
-            </div>
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
-}
-
-function onPostedJobsAction(event) {
-  const btn = event.target.closest("[data-job-action]");
-  if (!btn) return;
-  const action = btn.dataset.jobAction;
-  const caseId = btn.getAttribute("data-case-id");
-  if (!caseId) return;
-  if (action === "view-applicants") {
-    void openCaseApplications(caseId);
-  } else if (action === "open-case") {
-    window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
-  } else if (action === "view-details") {
-    void openCasePreview(caseId);
-  } else if (action === "edit") {
-    openEditJobModal(caseId);
-  } else if (action === "delete") {
-    deletePostedJob(caseId);
-  }
-}
-
-function openEditJobModal(caseId) {
-  const modal = document.getElementById("editJobModal");
-  const form = document.getElementById("editJobForm");
-  const job = state.billing.postedMap.get(String(caseId));
-  if (!modal || !form || !job) return;
-  state.billing.editJobId = caseId;
-  form.caseId.value = caseId;
-  form.title.value = job.title || job.caseTitle || "";
-  form.description.value = getJobDescription(job);
-  const amountCents = normalizeAmountToCents(job.lockedTotalAmount ?? job.totalAmount ?? job.paymentAmount ?? job.budget);
-  form.budget.value = amountCents ? (amountCents / 100).toFixed(2) : "";
-  toggleModal(modal, true);
-}
-
-async function submitJobEdit(event) {
-  event.preventDefault();
-  const form = event.target;
-  const modal = document.getElementById("editJobModal");
-  const submitBtn = form.querySelector('button[type="submit"]');
-  const caseId = form.caseId?.value || state.billing.editJobId;
-  if (!caseId) return;
-  const payload = {
-    title: form.title.value.trim(),
-    details: form.description.value.trim(),
-    totalAmount: dollarsToCents(form.budget.value),
-    budget: dollarsToCents(form.budget.value),
-  };
-  const defaultText = submitBtn?.textContent || "Save";
-  let restoreButton = true;
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.textContent = "Posting…";
-  }
-  try {
-    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, {
-      method: "PATCH",
-      body: payload,
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    notifyBilling("Job updated successfully.", "success");
-    toggleModal(modal, false);
-    await loadPostedJobs(true);
-    enableButtonOnFormInput(form, submitBtn, defaultText);
-    restoreButton = false;
-  } catch (err) {
-    console.error("Job update failed", err);
-    notifyBilling("Unable to save those changes right now.", "error");
-  } finally {
-    if (restoreButton && submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = defaultText;
-    }
-  }
-}
-
-async function deletePostedJob(caseId) {
-  if (!caseId) return;
-  const confirmed = window.confirm("Delete this job posting? Applicants will no longer see it.");
-  if (!confirmed) return;
-  try {
-    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, { method: "DELETE" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    notifyBilling("Job removed.", "success");
-    await loadPostedJobs(true);
-  } catch (err) {
-    console.error("Job delete failed", err);
-    notifyBilling("Unable to delete this job right now.", "error");
-  }
+  await loadActiveEscrows();
 }
 
 async function loadActiveEscrows(force = false) {
   const body = document.getElementById("activeEscrowsBody");
   if (!body) return;
-  if (force) body.innerHTML = `<tr><td colspan="5" class="empty-state">Refreshing activity…</td></tr>`;
+  if (force) body.innerHTML = `<tr><td colspan="6" class="empty-state">Refreshing activity…</td></tr>`;
   try {
     const res = await secureFetch("/api/payments/escrow/active", { headers: { Accept: "application/json" } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const payload = await res.json().catch(() => []);
     const items = Array.isArray(payload?.items) ? payload.items : Array.isArray(payload) ? payload : [];
     state.billing.escrows = items;
+    state.billing.escrowsLoaded = true;
+    state.billing.escrowPage = 0;
     renderActiveEscrows(body, items);
-    updateJobDistributionChart();
   } catch (err) {
     console.warn("Unable to load escrow activity", err);
-    loadBillingDemoData();
+    if (state.billing.escrowsLoaded) {
+      renderActiveEscrows(body, state.billing.escrows);
+    } else {
+      state.billing.escrows = [];
+      renderActiveEscrows(body, [], { errorMessage: "Unable to load payment activity right now." });
+    }
   }
 }
 
-function renderActiveEscrows(body, escrows = []) {
-  if (!escrows.length) {
-    body.innerHTML = `<tr><td colspan="5" class="empty-state">No active payments.</td></tr>`;
+function renderActiveEscrows(body, escrows = [], options = {}) {
+  const errorMessage = options.errorMessage || "";
+  if (errorMessage) {
+    body.innerHTML = `<tr><td colspan="6" class="history-empty error">${sanitize(errorMessage)}</td></tr>`;
+    updateEscrowSortHeaders();
     updateEscrowPagination(0);
     return;
   }
-  const totalCount = escrows.length;
+  if (!escrows.length) {
+    body.innerHTML = `<tr><td colspan="6" class="empty-state">No active payments.</td></tr>`;
+    updateEscrowSortHeaders();
+    updateEscrowPagination(0);
+    return;
+  }
+  const sortedEscrows = sortActiveEscrows(escrows);
+  const totalCount = sortedEscrows.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / ESCROW_PAGE_SIZE));
   const pageIndex = Math.max(0, state.billing?.escrowPage ?? 0);
   const safeIndex = Math.min(pageIndex, totalPages - 1);
   if (safeIndex !== pageIndex) state.billing.escrowPage = safeIndex;
   const start = safeIndex * ESCROW_PAGE_SIZE;
-  const pageItems = escrows.slice(start, start + ESCROW_PAGE_SIZE);
+  const pageItems = sortedEscrows.slice(start, start + ESCROW_PAGE_SIZE);
   body.innerHTML = pageItems
     .map((record) => {
       const caseId = parseCaseId(record);
-      const title = sanitize(record.caseTitle || record.title || "Case");
+      const title = sanitize(record.caseTitle || record.caseName || record.title || "Case");
       const paralegal = sanitize(
         record.paralegalName ||
           (record.paralegal && [record.paralegal.firstName, record.paralegal.lastName].filter(Boolean).join(" ")) ||
           "Assigned Paralegal"
       );
       const fundedDate = formatDisplayDate(record.fundedAt || record.createdAt || record.updatedAt);
-      const statusRaw = (record.status || record.escrowStatus || "").toLowerCase();
-      const status =
-        statusRaw.includes("pending") || statusRaw === "awaiting_release"
-          ? "Pending Approval"
-          : statusRaw
-          ? statusRaw.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-          : "In Progress";
+      const caseStatus = sanitize(formatActiveEscrowCaseStatus(record));
+      const status = sanitize(formatActiveEscrowPaymentStatus(record));
       const amount = formatCurrency(
-        normalizeAmountToCents(record.amount ?? record.lockedTotalAmount ?? record.totalAmount ?? record.budget)
+        normalizeAmountToCents(
+          record.amountHeld ??
+            record.amount ??
+            record.lockedTotalAmount ??
+            record.totalAmount ??
+            record.budget
+        )
       );
       return `
         <tr data-case-id="${caseId || ""}">
@@ -2429,11 +2194,13 @@ function renderActiveEscrows(body, escrows = []) {
           <td>${paralegal}</td>
           <td>${amount}</td>
           <td>${fundedDate}</td>
-          <td><span class="pill">${sanitize(status)}</span></td>
+          <td><span class="pill">${caseStatus}</span></td>
+          <td><span class="pill">${status}</span></td>
         </tr>
       `;
     })
     .join("");
+  updateEscrowSortHeaders();
   updateEscrowPagination(totalCount);
 }
 
@@ -2448,7 +2215,8 @@ function updateEscrowPagination(totalCount) {
   const safeIndex = Math.min(pageIndex, totalPages - 1);
   if (totalCount === 0) {
     if (info) info.textContent = "0 of 0";
-    pagination.style.display = "none";
+    pagination.style.display = "flex";
+    pagination.style.visibility = "hidden";
     if (prev) prev.disabled = true;
     if (next) next.disabled = true;
     return;
@@ -2458,7 +2226,22 @@ function updateEscrowPagination(totalCount) {
   if (info) info.textContent = `${start}–${end} of ${totalCount}`;
   if (prev) prev.disabled = safeIndex <= 0;
   if (next) next.disabled = safeIndex >= totalPages - 1;
-  pagination.style.display = totalCount > ESCROW_PAGE_SIZE ? "flex" : "none";
+  pagination.style.display = "flex";
+  pagination.style.visibility = totalCount > ESCROW_PAGE_SIZE ? "visible" : "hidden";
+}
+
+function onEscrowSortHeaderClick(event) {
+  const button = event.target.closest("[data-escrow-sort-key]");
+  if (!button) return;
+  const sortKey = button.getAttribute("data-escrow-sort-key");
+  if (!sortKey) return;
+  const current = getEscrowSortConfig();
+  const nextDirection =
+    current.key === sortKey ? (current.direction === "asc" ? "desc" : "asc") : getDefaultEscrowSortDirection(sortKey);
+  state.billing.escrowSort = `${sortKey}_${nextDirection}`;
+  state.billing.escrowPage = 0;
+  const body = document.getElementById("activeEscrowsBody");
+  if (body) renderActiveEscrows(body, state.billing.escrows || []);
 }
 
 function onEscrowPaginationClick(event) {
@@ -2477,6 +2260,135 @@ function onEscrowPaginationClick(event) {
   if (body) renderActiveEscrows(body, state.billing.escrows || []);
 }
 
+function sortActiveEscrows(escrows = []) {
+  const sortKey = state.billing?.escrowSort || "funded_desc";
+  const items = Array.isArray(escrows) ? [...escrows] : [];
+  items.sort((left, right) => compareActiveEscrowRecords(left, right, sortKey));
+  return items;
+}
+
+function compareActiveEscrowRecords(left = {}, right = {}, sortKey = "funded_desc") {
+  const { key, direction } = parseEscrowSort(sortKey);
+  const leftCase = getActiveEscrowSortCaseName(left);
+  const rightCase = getActiveEscrowSortCaseName(right);
+  const leftParalegal = getActiveEscrowSortParalegal(left);
+  const rightParalegal = getActiveEscrowSortParalegal(right);
+  const leftAmount = getActiveEscrowSortAmount(left);
+  const rightAmount = getActiveEscrowSortAmount(right);
+  const leftDate = getActiveEscrowSortDate(left);
+  const rightDate = getActiveEscrowSortDate(right);
+
+  let result = 0;
+  if (key === "case") {
+    result = compareStrings(leftCase, rightCase) || compareStrings(leftParalegal, rightParalegal);
+  } else if (key === "paralegal") {
+    result = compareStrings(leftParalegal, rightParalegal) || compareStrings(leftCase, rightCase);
+  } else if (key === "amount") {
+    result = compareNumbers(leftAmount, rightAmount) || compareStrings(leftCase, rightCase);
+  } else if (key === "funded") {
+    result = compareNumbers(leftDate, rightDate) || compareStrings(leftCase, rightCase);
+  } else if (key === "case_status") {
+    result =
+      compareStrings(formatActiveEscrowCaseStatus(left), formatActiveEscrowCaseStatus(right)) ||
+      compareStrings(leftCase, rightCase);
+  } else if (key === "payment_status") {
+    result = compareStrings(formatActiveEscrowPaymentStatus(left), formatActiveEscrowPaymentStatus(right)) || compareStrings(leftCase, rightCase);
+  } else {
+    result = compareNumbers(leftDate, rightDate) || compareStrings(leftCase, rightCase);
+  }
+
+  if (direction === "desc") result *= -1;
+  return result;
+}
+
+function getActiveEscrowSortCaseName(record = {}) {
+  return String(record.caseTitle || record.caseName || record.title || record.paralegalName || "").trim().toLowerCase();
+}
+
+function getActiveEscrowSortParalegal(record = {}) {
+  return String(
+    record.paralegalName ||
+      (record.paralegal && [record.paralegal.firstName, record.paralegal.lastName].filter(Boolean).join(" ")) ||
+      ""
+  )
+    .trim()
+    .toLowerCase();
+}
+
+function getActiveEscrowSortAmount(record = {}) {
+  return normalizeAmountToCents(
+    record.amountHeld ??
+      record.amount ??
+      record.lockedTotalAmount ??
+      record.totalAmount ??
+      record.budget
+  );
+}
+
+function getActiveEscrowSortDate(record = {}) {
+  const raw = record.fundedAt || record.createdAt || record.updatedAt;
+  const timestamp = raw ? new Date(raw).getTime() : 0;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function compareNumbers(left, right) {
+  return left - right;
+}
+
+function compareStrings(left, right) {
+  return String(left || "").localeCompare(String(right || ""), undefined, { sensitivity: "base" });
+}
+
+function formatActiveEscrowCaseStatus(record = {}) {
+  if (record.archived === true) return "Archived";
+  const normalized = normalizeCaseStatus(record.caseStatus || "");
+  if (normalized === "paused") return "Paused";
+  if (normalized === "archived") return "Archived";
+  return "Active";
+}
+
+function formatActiveEscrowPaymentStatus(record = {}) {
+  const statusRaw = String(record.status || record.escrowStatus || "").toLowerCase();
+  if (statusRaw.includes("pending") || statusRaw === "awaiting_release") {
+    return "Pending Approval";
+  }
+  if (statusRaw) {
+    return statusRaw.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+  return "In Progress";
+}
+
+function parseEscrowSort(sortValue = "") {
+  const normalized = String(sortValue || "").trim().toLowerCase();
+  const match = normalized.match(/^(case|paralegal|amount|funded|case_status|payment_status)_(asc|desc)$/);
+  if (match) {
+    return { key: match[1], direction: match[2] };
+  }
+  return { key: "funded", direction: "desc" };
+}
+
+function getEscrowSortConfig() {
+  return parseEscrowSort(state.billing?.escrowSort || "funded_desc");
+}
+
+function getDefaultEscrowSortDirection(sortKey = "") {
+  return sortKey === "amount" || sortKey === "funded" ? "desc" : "asc";
+}
+
+function updateEscrowSortHeaders() {
+  const { key, direction } = getEscrowSortConfig();
+  document.querySelectorAll("[data-escrow-sort-th]").forEach((header) => {
+    const headerKey = header.getAttribute("data-escrow-sort-th");
+    const indicator = header.querySelector(".sort-indicator");
+    const active = headerKey === key;
+    header.classList.toggle("is-sorted", active);
+    header.setAttribute("aria-sort", active ? (direction === "asc" ? "ascending" : "descending") : "none");
+    if (indicator) {
+      indicator.textContent = active ? (direction === "asc" ? "↑" : "↓") : "↕";
+    }
+  });
+}
+
 function onActiveEscrowAction(event) {
   const btn = event.target.closest("[data-escrow-action]");
   if (!btn) return;
@@ -2490,273 +2402,19 @@ function onActiveEscrowAction(event) {
   }
 }
 
-async function loadCompletedPayments(force = false) {
-  const body = document.getElementById("completedPaymentsBody");
-  if (!body) return;
-  if (force) body.innerHTML = `<tr><td colspan="5" class="empty-state">Refreshing payment history…</td></tr>`;
-  try {
-    const records = await fetchPaymentHistory(force);
-    renderCompletedPayments(records);
-    renderSpendingChart(records);
-    updateJobDistributionChart();
-  } catch (err) {
-    console.warn("Unable to load payment history", err);
-    loadBillingDemoData();
-  }
-}
-
-function renderCompletedPayments(records = []) {
-  const body = document.getElementById("completedPaymentsBody");
-  if (!body) return;
-  if (!records.length) {
-    body.innerHTML = `<tr><td colspan="5" class="empty-state">No completed payments yet.</td></tr>`;
-    return;
-  }
-  body.innerHTML = records
-    .map((entry) => {
-      const title = sanitize(entry.caseTitle || entry.title || "Case");
-      const paralegal = sanitize(
-        entry.paralegalName ||
-          (entry.paralegal && [entry.paralegal.firstName, entry.paralegal.lastName].filter(Boolean).join(" ")) ||
-          "Paralegal"
-      );
-      const amount = formatCurrency(
-        normalizeAmountToCents(entry.finalAmount ?? entry.amount ?? entry.lockedTotalAmount ?? entry.totalAmount)
-      );
-      const releaseDate = formatDisplayDate(entry.releaseDate || entry.releasedAt || entry.completedAt || entry.paidOutAt);
-      const downloadUrl = Array.isArray(entry.downloadUrl) ? entry.downloadUrl[0] : entry.downloadUrl;
-      const receiptPath = sanitizeDownloadPath(entry.receiptUrl || entry.receipt || downloadUrl || "");
-      const receiptCell = receiptPath && receiptPath !== "#"
-        ? `<a class="btn-link secondary" href="${receiptPath}" target="_blank" rel="noopener">Download</a>`
-        : `<span class="muted">Not available</span>`;
-      return `
-        <tr>
-          <td>${title}</td>
-          <td>${paralegal}</td>
-          <td>${amount}</td>
-          <td>${releaseDate}</td>
-          <td>${receiptCell}</td>
-        </tr>
-      `;
-    })
-    .join("");
-}
-
-async function fetchBillingSummary(force = false) {
-  if (state.billing.summary && !force) return state.billing.summary;
-  try {
-    const res = await secureFetch("/api/payments/summary", { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const payload = await res.json().catch(() => ({}));
-    state.billing.summary = payload || {};
-    return state.billing.summary;
-  } catch (err) {
-    console.warn("Unable to fetch billing summary", err);
-    state.billing.summary = state.billing.summary || {};
-    return state.billing.summary;
-  }
-}
-
-async function fetchPaymentHistory(force = false) {
-  if (state.billing.history.length && !force) return state.billing.history;
-  try {
-    const res = await secureFetch("/api/payments/history", { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const payload = await res.json().catch(() => []);
-    const items = Array.isArray(payload?.items)
-      ? payload.items
-      : Array.isArray(payload?.history)
-      ? payload.history
-      : Array.isArray(payload)
-      ? payload
-      : [];
-    state.billing.history = items;
-    state.billing.completedCount = items.length;
-    return items;
-  } catch (err) {
-    console.warn("Unable to fetch payment history", err);
-    state.billing.history = [];
-    state.billing.completedCount = 0;
-    throw err;
-  }
-}
-
-function renderBillingSummary(summary = {}) {
-  const totalSpent =
-    summary.totalSpentCents ??
-    summary.totalSpent ??
-    summary.total ??
-    summary.allTime ??
-    0;
-  const activeEscrow = summary.activeEscrowTotal ?? summary.escrowActive ?? summary.escrowTotal ?? 0;
-  const postedJobs =
-    typeof summary.postedJobsCount === "number" ? summary.postedJobsCount : state.billing.posted.length;
-  const completedJobs =
-    typeof summary.completedJobsCount === "number" ? summary.completedJobsCount : state.billing.completedCount;
-  const summaryMap = {
-    totalSpent: formatCurrency(normalizeAmountToCents(totalSpent)),
-    activeEscrow: formatCurrency(normalizeAmountToCents(activeEscrow)),
-    postedJobs: String(postedJobs),
-    completedJobs: String(completedJobs),
-  };
-  Object.entries(summaryMap).forEach(([key, value]) => {
-    const el = document.querySelector(`[data-summary="${key}"]`);
-    if (el) el.textContent = value;
-  });
-}
-
-function updatePostedSummaryCount() {
-  const summary = state.billing.summary || {};
-  if (typeof summary.postedJobsCount === "number") return;
-  const el = document.querySelector('[data-summary="postedJobs"]');
-  if (el) el.textContent = String(state.billing.posted.length);
-}
-
-function renderSpendingChart(records = []) {
-  const ctx = document.getElementById("billingSpendingChart");
-  if (!ctx || !window.Chart) return;
-  const { labels, data } = buildMonthlySeries(records);
-  if (!state.billing.spendingChart) {
-    state.billing.spendingChart = new window.Chart(ctx, {
-      type: "line",
-      data: {
-        labels,
-        datasets: [
-          {
-            label: "Monthly spend",
-            data,
-            borderColor: "#b6a47a",
-            backgroundColor: "rgba(182,164,122,0.2)",
-            tension: 0.35,
-            fill: true,
-          },
-        ],
-      },
-      options: {
-        plugins: { legend: { display: false } },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              callback(value) {
-                return `$${Number(value).toLocaleString()}`;
-              },
-            },
-          },
-        },
-      },
-    });
-  } else {
-    state.billing.spendingChart.data.labels = labels;
-    state.billing.spendingChart.data.datasets[0].data = data;
-    state.billing.spendingChart.update();
-  }
-}
-
-function updateJobDistributionChart() {
-  const canvas = document.getElementById("billingJobChart");
-  if (!canvas || !window.Chart) return;
-  const posted = state.billing.posted.length;
-  const active = state.billing.escrows.length;
-  const completed =
-    typeof state.billing.summary?.completedJobsCount === "number"
-      ? state.billing.summary.completedJobsCount
-      : state.billing.completedCount;
-  const data = [posted, active, completed];
-  const labels = ["Posted Jobs", "Active Funds in Stripe", "Completed Jobs"];
-  if (!state.billing.jobChart) {
-    state.billing.jobChart = new window.Chart(canvas, {
-      type: "doughnut",
-      data: {
-        labels,
-        datasets: [
-          {
-            data,
-            backgroundColor: ["#d9c9a3", "#b6a47a", "#a08c60"],
-            borderWidth: 0,
-          },
-        ],
-      },
-      options: {
-        plugins: { legend: { position: "bottom" } },
-        cutout: "60%",
-      },
-    });
-  } else {
-    state.billing.jobChart.data.datasets[0].data = data;
-    state.billing.jobChart.update();
-  }
-}
-
-function buildMonthlySeries(records = []) {
-  const buckets = new Map();
-  records.forEach((entry) => {
-    const rawDate = entry.releaseDate || entry.releasedAt || entry.completedAt || entry.paidOutAt || entry.fundedAt;
-    if (!rawDate) return;
-    const dt = new Date(rawDate);
-    if (Number.isNaN(dt.getTime())) return;
-    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
-    const prev = buckets.get(key) || 0;
-    buckets.set(key, prev + normalizeAmountToCents(entry.finalAmount ?? entry.amount ?? entry.lockedTotalAmount ?? entry.totalAmount));
-  });
-  const sorted = Array.from(buckets.entries()).sort(([a], [b]) => (a > b ? 1 : -1));
-  if (!sorted.length) return { labels: ["No data"], data: [0] };
-  const labels = sorted.map(([key]) => {
-    const [year, month] = key.split("-");
-    const date = new Date(Number(year), Number(month) - 1, 1);
-    return date.toLocaleString(undefined, { month: "short", year: "numeric" });
-  });
-  const data = sorted.map(([, cents]) => (cents || 0) / 100);
-  return { labels, data };
-}
-
-async function openCustomerPortal() {
-  try {
-    const res = await secureFetch("/api/payments/portal", { method: "POST", headers: { Accept: "application/json" } });
-    const payload = await res.json().catch(() => ({}));
-    if (res.ok && payload.url) {
-      window.location.href = payload.url;
-      return;
-    }
-    throw new Error(payload.error || "No portal URL");
-  } catch (err) {
-    console.warn("Unable to open customer portal", err);
-    notifyBilling("Customer portal link is unavailable right now.", "error");
-  }
-}
-
-async function triggerExport(type) {
-  const endpoint = type === "pdf" ? "/api/payments/export/pdf" : "/api/payments/export/csv";
-  try {
-    const res = await secureFetch(endpoint);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = type === "pdf" ? "lpc-billing-summary.pdf" : "lpc-billing-history.csv";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => window.URL.revokeObjectURL(url), 1500);
-    notifyBilling("Export ready.", "success");
-  } catch (err) {
-    console.warn("Unable to export billing data", err);
-    notifyBilling("Unable to export data right now.", "error");
-  }
-}
-
-function notifyBilling(message, type = "info") {
-  const helper = window.toastUtils;
-  if (helper?.show) {
-    helper.show(message, { targetId: "toastBanner", type });
-  } else {
-    alert(message);
-  }
-}
 
 function parseCaseId(entry = {}) {
   return entry.caseId || entry.id || entry._id || entry.case || entry.caseID;
+}
+
+function getUniqueCaseRecords(records = []) {
+  const unique = new Map();
+  records.forEach((item) => {
+    const key = parseCaseId(item);
+    if (!key || unique.has(String(key))) return;
+    unique.set(String(key), item);
+  });
+  return Array.from(unique.values());
 }
 
 function normalizeAmountToCents(value) {
@@ -2780,143 +2438,6 @@ function formatDisplayDate(raw) {
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
-function dollarsToCents(input) {
-  const value = typeof input === "number" ? input : parseFloat(String(input).replace(/[^0-9.-]/g, ""));
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.round(value * 100));
-}
-
-function getJobDescription(job = {}) {
-  return job.details || job.description || job.briefSummary || "";
-}
-
-function loadBillingDemoData() {
-  if (state.billing.demoLoaded) return;
-  state.billing.demoLoaded = true;
-  const today = new Date();
-  const day = 24 * 60 * 60 * 1000;
-  const history = [
-    {
-      caseId: "demo-complete-1",
-      caseTitle: "Contract Review for Acme Holdings",
-      paralegalName: "Morgan Ellis",
-      finalAmount: 420000,
-      releaseDate: today,
-      downloadUrl: [],
-    },
-    {
-      caseId: "demo-complete-2",
-      caseTitle: "Trademark Diligence – West Coast Launch",
-      paralegalName: "Priya Patel",
-      finalAmount: 560000,
-      releaseDate: new Date(today.getTime() - 4 * day),
-      downloadUrl: [],
-    },
-    {
-      caseId: "demo-complete-3",
-      caseTitle: "M&A Filings – Series B Close",
-      paralegalName: "Henry Nolan",
-      finalAmount: 310000,
-      releaseDate: new Date(today.getTime() - 9 * day),
-      downloadUrl: [],
-    },
-    {
-      caseId: "demo-complete-4",
-      caseTitle: "Delaware Franchise Filings",
-      paralegalName: "Claudia Stone",
-      finalAmount: 360000,
-      releaseDate: new Date(today.getTime() - 13 * day),
-      downloadUrl: [],
-    },
-    {
-      caseId: "demo-complete-5",
-      caseTitle: "SaaS MSAs – Redline Support",
-      paralegalName: "Noah Rivers",
-      finalAmount: 290000,
-      releaseDate: new Date(today.getTime() - 18 * day),
-      downloadUrl: [],
-    },
-    {
-      caseId: "demo-complete-6",
-      caseTitle: "Immigration Packet Assembly",
-      paralegalName: "Priya Patel",
-      finalAmount: 250000,
-      releaseDate: new Date(today.getTime() - 22 * day),
-      downloadUrl: [],
-    },
-    {
-      caseId: "demo-complete-7",
-      caseTitle: "Urgent Discovery Support",
-      paralegalName: "Morgan Ellis",
-      finalAmount: 315000,
-      releaseDate: new Date(today.getTime() - 26 * day),
-      downloadUrl: [],
-    },
-    {
-      caseId: "demo-complete-8",
-      caseTitle: "Compliance Audit Prep",
-      paralegalName: "Henry Nolan",
-      finalAmount: 275000,
-      releaseDate: new Date(today.getTime() - 30 * day),
-      downloadUrl: [],
-    },
-  ];
-  const posted = [
-    {
-      caseId: "demo-posted-1",
-      title: "Urgent Discovery Support",
-      totalAmount: 250000,
-      applicantsCount: 7,
-      details: "Need organization and Bates stamping for productions.",
-    },
-    {
-      caseId: "demo-posted-2",
-      title: "Immigration Packet Assembly",
-      totalAmount: 180000,
-      applicantsCount: 4,
-      details: "Prepare I-140 supporting document set.",
-    },
-  ];
-  const active = [
-    {
-      caseId: "demo-active-1",
-      title: "Delaware Franchise Filings",
-      paralegalName: "Claudia Stone",
-      amount: 360000,
-      fundedAt: new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000),
-      status: "In Progress",
-    },
-    {
-      caseId: "demo-active-2",
-      title: "SaaS MSAs – Redline Support",
-      paralegalName: "Noah Rivers",
-      amount: 290000,
-      fundedAt: new Date(today.getTime() - 9 * 24 * 60 * 60 * 1000),
-      status: "Pending Approval",
-    },
-  ];
-
-  state.billing.history = history;
-  state.billing.completedCount = history.length;
-  state.billing.posted = posted;
-  state.billing.postedMap.clear();
-  posted.forEach((item) => state.billing.postedMap.set(String(item.caseId), item));
-  state.billing.escrows = active;
-  state.billing.summary = {
-    totalSpentCents: history.reduce((sum, entry) => sum + Number(entry.finalAmount || 0), 0),
-    activeEscrowTotal: active.reduce((sum, entry) => sum + Number(entry.amount || 0), 0),
-    postedJobsCount: posted.length,
-    completedJobsCount: history.length,
-  };
-
-  renderBillingSummary(state.billing.summary);
-  renderSpendingChart(history);
-  renderCompletedPayments(history);
-  renderPostedJobs(document.getElementById("postedJobsBody"), posted);
-  renderActiveEscrows(document.getElementById("activeEscrowsBody"), active);
-  updateJobDistributionChart();
 }
 
 // -------------------------
@@ -3873,12 +3394,12 @@ function computeCaseCounts() {
   const counts = {
     active: 0,
     draft: Array.isArray(state.localDrafts) ? state.localDrafts.length : 0,
-    archived: state.casesArchived.length,
+    archived: getArchivedBucketCases().length,
     inquiries: 0,
   };
   state.cases.forEach((item) => {
-    if (isTerminalCase(item)) return;
     const bucket = categorizeCase(item);
+    if (bucket === "archived") return;
     if (counts[bucket] !== undefined) counts[bucket] += 1;
   });
   return counts;
@@ -3887,10 +3408,9 @@ function computeCaseCounts() {
 function getCasesByFilter(filterKey, { applySearch = false } = {}) {
   let source = state.cases;
   if (filterKey === "archived") {
-    const archivedFromActive = state.cases.filter((item) => !isTerminalCase(item) && categorizeCase(item) === "archived");
-    source = [...state.casesArchived, ...archivedFromActive];
+    source = getArchivedBucketCases();
   } else {
-    source = source.filter((item) => !isTerminalCase(item) && categorizeCase(item) === filterKey);
+    source = source.filter((item) => categorizeCase(item) === filterKey);
   }
   if (filterKey === "draft" && Array.isArray(state.localDrafts) && state.localDrafts.length) {
     source = [...state.localDrafts, ...source];
@@ -3939,9 +3459,9 @@ function applyArchivedStatusFilter(records = []) {
   if (filter === "all") return records;
   return records.filter((item) => {
     const status = normalizeCaseStatus(item?.status);
-    const isCompleted = isFinalCase(item) || status === "completed";
+    const isCompleted = isCompletedDashboardCase(item);
     const isPaused = status === "paused";
-    const isArchived = !!item?.archived && !isCompleted && !isPaused;
+    const isArchived = isArchivedBucketCase(item) && !isCompleted && !isPaused;
     if (filter === "completed") return isCompleted;
     if (filter === "paused") return isPaused;
     if (filter === "archived") return isArchived;
@@ -3967,14 +3487,13 @@ function onCasesPaginationClick(event) {
 }
 
 function categorizeCase(item) {
-  if (item.archived) return "archived";
   if (item.localDraft) return "draft";
+  if (isArchivedBucketCase(item)) return "archived";
   const status = String(item.status || "").toLowerCase();
   const applicantCount = Number(
     item.applicantsCount ?? (Array.isArray(item.applicants) ? item.applicants.length : item.applicants) ?? 0
   );
   if (!item.paralegal && applicantCount > 0) return "inquiries";
-  if (status === "paused") return "archived";
   if (status === "draft") return "draft";
   return "active";
 }
@@ -4301,9 +3820,11 @@ function renderCaseRow(item, filterKey = "active") {
   }
   const selectionCell =
     filterKey === "archived"
-      ? `<td class="case-select"><input type="checkbox" data-archived-select value="${item.id}" ${
-          state.archivedSelection.has(String(item.id)) ? "checked" : ""
-        } aria-label="Select case ${sanitize(item.title || "Untitled Case")}" /></td>`
+      ? item.archived
+        ? `<td class="case-select"><input type="checkbox" data-archived-select value="${sanitize(caseId)}" ${
+            state.archivedSelection.has(String(caseId)) ? "checked" : ""
+          } aria-label="Select case ${sanitize(item.title || "Untitled Case")}" /></td>`
+        : `<td class="case-select"></td>`
       : "";
   const applicantsToggle =
     filterKey === "inquiries"
@@ -4642,7 +4163,7 @@ async function openApplicantDocument(key) {
 function pruneArchivedSelection() {
   if (!state.archivedSelection) state.archivedSelection = new Set();
   if (!state.archivedSelection.size) return;
-  const valid = new Set((state.casesArchived || []).map((c) => String(c.id)));
+  const valid = new Set(getArchivedBucketCases().map((c) => String(c.id)));
   state.archivedSelection.forEach((id) => {
     if (!valid.has(id)) state.archivedSelection.delete(id);
   });
@@ -4680,18 +4201,16 @@ function readLocalDrafts() {
 
 async function removeLocalDraft(draftId) {
   if (!draftId) return;
-  try {
-    const res = await secureFetch(`/api/case-drafts/${encodeURIComponent(draftId)}`, {
-      method: "DELETE",
-      headers: { Accept: "application/json" },
-      noRedirect: true,
-    });
-    if (!res.ok) throw new Error("Unable to delete draft");
-  } catch (err) {
-    console.warn(err);
-  } finally {
-    state.localDrafts = readLocalDrafts().filter((item) => String(item.id) !== String(draftId));
+  const res = await secureFetch(`/api/case-drafts/${encodeURIComponent(draftId)}`, {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+    noRedirect: true,
+  });
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload?.error || "Unable to delete draft.");
   }
+  state.localDrafts = readLocalDrafts().filter((item) => String(item.id) !== String(draftId));
 }
 
 function syncArchivedBulkUI() {
@@ -4863,6 +4382,32 @@ function cacheCaseEditPrefill(caseId, payload = {}) {
   try {
     sessionStorage.setItem(CASE_EDIT_PREFILL_KEY, JSON.stringify({ caseId: String(caseId), payload }));
   } catch {}
+}
+
+function buildCaseEditPrefill(entry = {}) {
+  const summary = String(entry.briefSummary || "");
+  const experience = extractSummaryValue(summary, "Experience") || entry.experience || "Not specified";
+  const location =
+    entry.locationState || entry.state || extractSummaryValue(summary, "State") || "";
+  const rawDetails = String(entry.details || entry.description || "").trim();
+  const practiceArea = titleCaseWords(entry.practiceArea || entry.field || "");
+  const tasks = Array.isArray(entry.tasks) ? entry.tasks : [];
+  const taskTitles = tasks
+    .map((task) => (typeof task === "string" ? task : task?.title))
+    .map((title) => String(title || "").trim())
+    .filter(Boolean);
+
+  return {
+    title: entry.title || "",
+    practiceArea,
+    state: location || entry.state || entry.locationState || "",
+    locationState: location || entry.locationState || entry.state || "",
+    totalAmount: entry.lockedTotalAmount ?? entry.totalAmount ?? 0,
+    deadline: entry.deadline || null,
+    experience,
+    details: rawDetails,
+    tasks: taskTitles.map((title) => ({ title })),
+  };
 }
 
 function canEditCaseEntry(entry) {
@@ -5466,17 +5011,7 @@ async function openCasePreview(caseId, options = {}) {
     clearCasePreviewReceipt();
   }
 
-  const editPayload = {
-    title: entry.title || "",
-    practiceArea,
-    state: location || entry.state || entry.locationState || "",
-    locationState: location || entry.locationState || entry.state || "",
-    totalAmount: entry.lockedTotalAmount ?? entry.totalAmount ?? 0,
-    deadline: entry.deadline || null,
-    experience,
-    details: rawDetails,
-    tasks: taskTitles.map((title) => ({ title })),
-  };
+  const editPayload = buildCaseEditPrefill(entry);
   if (casePreviewModalRef) {
     casePreviewModalRef.dataset.editPayload = JSON.stringify(editPayload);
   }
@@ -5754,6 +5289,10 @@ async function handleCaseAction(action, caseId) {
       }
       goToMessages(caseId);
     } else if (action === "edit-case") {
+      const entry = state.caseLookup.get(String(caseId));
+      if (entry) {
+        cacheCaseEditPrefill(caseId, buildCaseEditPrefill(entry));
+      }
       window.location.href = `create-case.html?caseId=${encodeURIComponent(caseId)}#details`;
       return;
     } else if (action === "status-history") {
@@ -5931,7 +5470,7 @@ function syncCaseCollections(updatedCase) {
   };
   removeFromList(state.cases);
   removeFromList(state.casesArchived);
-  if (normalized.archived) state.casesArchived.push(normalized);
+  if (isArchivedBucketCase(normalized)) state.casesArchived.push(normalized);
   else state.cases.push(normalized);
   buildCaseLookup();
 }
@@ -6054,12 +5593,6 @@ async function initMessagesPage() {
   } else {
     renderMessageThreads(null);
     renderChatMessages();
-  }
-
-  try {
-    await setupCaseScopedMessagingUI();
-  } catch (err) {
-    console.warn("Case-scoped messaging unavailable", err);
   }
 }
 
@@ -6354,207 +5887,6 @@ function setComposerLock(readOnly) {
   }
 }
 
-async function setupCaseScopedMessagingUI() {
-  injectCaseScopedMessagingUI();
-  updateSimpleMessageCases();
-  await loadMessageSummaryCounts();
-  populateCaseSelectOptions();
-  const initialCaseId =
-    state.simpleMessages.activeCaseId ||
-    (state.simpleMessages.cases[0] ? String(state.simpleMessages.cases[0].id) : null);
-  if (initialCaseId) {
-    await loadSimpleMessageThread(initialCaseId, { replace: true });
-  } else {
-    renderSimpleMessageThread(null, [], "Select a case to view messages.");
-  }
-}
-
-function injectCaseScopedMessagingUI() {
-  if (document.getElementById("msgInterface")) return;
-  const host = document.querySelector(".main");
-  if (!host) return;
-  ensureSimpleMessageStyles();
-  const wrapper = document.createElement("section");
-  wrapper.id = "msgInterface";
-  wrapper.innerHTML = `
-    <div>
-      <select id="msgCaseSelect"></select>
-    </div>
-    <div id="msgThread"></div>
-    <form id="msgForm">
-      <textarea id="msgInput" rows="3" placeholder="Type a case message..."></textarea>
-      <button type="submit" id="msgSend">Send</button>
-    </form>
-  `;
-  host.appendChild(wrapper);
-  const select = wrapper.querySelector("#msgCaseSelect");
-  const form = wrapper.querySelector("#msgForm");
-  select?.addEventListener("change", (event) => {
-    loadSimpleMessageThread(event.target.value, { replace: true });
-  });
-  form?.addEventListener("submit", handleSimpleMessageSend);
-}
-
-function updateSimpleMessageCases() {
-  state.simpleMessages.cases = (state.messages.cases || []).map((caseItem) => ({
-    id: String(caseItem.id),
-    title: caseItem.title || "Untitled Case",
-  }));
-}
-
-async function loadMessageSummaryCounts() {
-  try {
-    const res = await secureFetch("/api/messages/summary", {
-      headers: { Accept: "application/json" },
-      noRedirect: true,
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (res.ok && Array.isArray(payload.items)) {
-      state.simpleMessages.unread = new Map(
-        payload.items.map((entry) => [String(entry.caseId), Number(entry.unread) || 0])
-      );
-    } else {
-      state.simpleMessages.unread = new Map();
-    }
-  } catch {
-    state.simpleMessages.unread = new Map();
-  }
-}
-
-function populateCaseSelectOptions() {
-  const select = document.getElementById("msgCaseSelect");
-  if (!select) return;
-  select.innerHTML = "";
-  const cases = state.simpleMessages.cases;
-  if (!cases.length) {
-    select.disabled = true;
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "No cases available";
-    select.appendChild(option);
-    return;
-  }
-  select.disabled = false;
-  cases.forEach((caseItem) => {
-    const option = document.createElement("option");
-    const unread = state.simpleMessages.unread.get(String(caseItem.id)) || 0;
-    option.value = String(caseItem.id);
-    option.textContent =
-      unread > 0 ? `${caseItem.title || "Case"} (${unread})` : caseItem.title || "Case";
-    select.appendChild(option);
-  });
-  const active =
-    state.simpleMessages.activeCaseId &&
-    cases.some((entry) => String(entry.id) === String(state.simpleMessages.activeCaseId))
-      ? String(state.simpleMessages.activeCaseId)
-      : String(cases[0].id);
-  state.simpleMessages.activeCaseId = active;
-  select.value = active;
-}
-
-async function loadSimpleMessageThread(caseId, { replace = true } = {}) {
-  if (!caseId) {
-    state.simpleMessages.activeCaseId = null;
-    renderSimpleMessageThread(null, [], "Select a case to view messages.");
-    stopSimpleMessagePolling();
-    return;
-  }
-  state.simpleMessages.activeCaseId = String(caseId);
-  const select = document.getElementById("msgCaseSelect");
-  if (select && select.value !== String(caseId)) {
-    select.value = String(caseId);
-  }
-  const result = await fetchSimpleMessages(caseId, { replace });
-  renderSimpleMessageThread(caseId, result.messages, result.error);
-  await markMessagesRead(caseId, result.messages);
-  state.simpleMessages.unread.set(String(caseId), 0);
-  populateCaseSelectOptions();
-  startSimpleMessagePolling();
-}
-
-async function fetchSimpleMessages(caseId, { replace = true } = {}) {
-  const existing = state.simpleMessages.messagesByCase.get(caseId) || [];
-  try {
-    const res = await secureFetch(`/api/messages/${encodeURIComponent(caseId)}`, {
-      headers: { Accept: "application/json" },
-      noRedirect: true,
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(payload?.error || (res.status === 403 ? "Access denied." : "Unable to load messages."));
-    }
-    const currentUserId = getCurrentUserId();
-    const incoming = Array.isArray(payload.messages)
-      ? payload.messages.map((msg) => {
-          const senderId = normalizeUserId(msg.senderId);
-          return {
-            id: msg._id || msg.id || `${Date.now()}-${Math.random()}`,
-            text: msg.text || msg.content || "",
-            createdAt: msg.createdAt || msg.updatedAt || new Date().toISOString(),
-            isMine: senderId && currentUserId && String(senderId) === String(currentUserId),
-          };
-        })
-      : [];
-    const merged = mergeSimpleMessages(caseId, incoming, replace);
-    return { messages: merged, error: null };
-  } catch (err) {
-    return { messages: existing, error: err?.message || "Unable to load messages." };
-  }
-}
-
-function mergeSimpleMessages(caseId, incoming, replace) {
-  const current = replace ? [] : state.simpleMessages.messagesByCase.get(caseId) || [];
-  const known = new Set(current.map((msg) => msg.id));
-  let changed = false;
-  incoming.forEach((msg) => {
-    if (!known.has(msg.id)) {
-      current.push(msg);
-      known.add(msg.id);
-      changed = true;
-    }
-  });
-  if (changed || replace) {
-    current.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-  }
-  state.simpleMessages.messagesByCase.set(caseId, current);
-  state.simpleMessages.lastIds.set(caseId, current.length ? current[current.length - 1].id : null);
-  return current;
-}
-
-function renderSimpleMessageThread(caseId, messages = [], error) {
-  const thread = document.getElementById("msgThread");
-  if (!thread) return;
-  if (!caseId) {
-    thread.innerHTML = `<p style="color:var(--muted);font-size:.9rem;">Select a case to view messages.</p>`;
-    return;
-  }
-  if (error) {
-    thread.innerHTML = `<p style="color:#b91c1c;font-size:.9rem;">${sanitize(error)}</p>`;
-    return;
-  }
-  if (!messages.length) {
-    thread.innerHTML = `<p style="color:var(--muted);font-size:.9rem;">No messages yet.</p>`;
-    return;
-  }
-  thread.innerHTML = messages
-    .map(
-      (msg) => `
-        <div class="msg-row${msg.isMine ? " mine" : ""}">
-          <div class="msg-text">${sanitize(msg.text || "")}</div>
-          <div class="msg-time">${sanitize(formatMessageTimestamp(msg.createdAt))}</div>
-        </div>
-      `
-    )
-    .join("");
-}
-
-function formatMessageTimestamp(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString();
-}
-
 function getLatestMessageTimestamp(messages = []) {
   let latest = 0;
   messages.forEach((msg) => {
@@ -6580,81 +5912,6 @@ async function markMessagesRead(caseId, messages = []) {
     });
   } catch (err) {
     console.warn("Unable to mark messages read", err);
-  }
-}
-
-async function handleSimpleMessageSend(event) {
-  event.preventDefault();
-  const caseId = state.simpleMessages.activeCaseId;
-  if (!caseId) {
-    notifyMessages("Select a case before sending.", "error");
-    return;
-  }
-  const input = document.getElementById("msgInput");
-  const btn = document.getElementById("msgSend");
-  const text = (input?.value || "").trim();
-  if (!text) {
-    notifyMessages("Enter a message before sending.", "error");
-    return;
-  }
-  if (btn) {
-    btn.disabled = true;
-    btn.dataset.originalText = btn.textContent || "Send";
-    btn.textContent = "Sending…";
-  }
-  try {
-    const res = await secureFetch(`/api/messages/${encodeURIComponent(caseId)}`, {
-      method: "POST",
-      body: { text },
-      headers: { Accept: "application/json" },
-      noRedirect: true,
-    });
-    if (!res.ok) {
-      const payload = await res.json().catch(() => ({}));
-      throw new Error(payload?.error || "Unable to send message.");
-    }
-    if (input) input.value = "";
-    const result = await fetchSimpleMessages(caseId, { replace: true });
-    renderSimpleMessageThread(caseId, result.messages, result.error);
-    await markMessagesRead(caseId, result.messages);
-    startSimpleMessagePolling();
-  } catch (err) {
-    notifyMessages(err?.message || "Unable to send message.", "error");
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = btn.dataset.originalText || "Send";
-    }
-  }
-}
-
-function startSimpleMessagePolling() {
-  if (state.simpleMessages.pollTimer) {
-    clearInterval(state.simpleMessages.pollTimer);
-  }
-  if (!state.simpleMessages.activeCaseId) return;
-  state.simpleMessages.pollTimer = setInterval(pollSimpleMessages, 10_000);
-}
-
-function stopSimpleMessagePolling() {
-  if (state.simpleMessages.pollTimer) {
-    clearInterval(state.simpleMessages.pollTimer);
-    state.simpleMessages.pollTimer = null;
-  }
-}
-
-async function pollSimpleMessages() {
-  const caseId = state.simpleMessages.activeCaseId;
-  if (!caseId) return;
-  const previousLast = state.simpleMessages.lastIds.get(caseId);
-  const result = await fetchSimpleMessages(caseId, { replace: false });
-  const currentLast = state.simpleMessages.lastIds.get(caseId);
-  if (result.error) {
-    renderSimpleMessageThread(caseId, result.messages, result.error);
-    return;
-  }
-  if (currentLast && currentLast !== previousLast) {
-    renderSimpleMessageThread(caseId, result.messages);
   }
 }
 
@@ -7253,6 +6510,10 @@ function isFinalCase(caseItem) {
   return status === "completed";
 }
 
+function isCompletedDashboardCase(caseItem) {
+  return isFinalCase(caseItem);
+}
+
 function hasAssignedParalegal(caseItem) {
   if (!caseItem) return false;
   return !!(caseItem?.paralegal || caseItem?.paralegalId);
@@ -7263,6 +6524,25 @@ function isTerminalCase(caseItem) {
   if (caseItem.paymentReleased === true) return true;
   const status = normalizeCaseStatus(caseItem?.status);
   return TERMINAL_CASE_STATUSES.has(status);
+}
+
+function isArchivedBucketCase(caseItem) {
+  if (!caseItem || caseItem.localDraft) return false;
+  if (caseItem.archived === true) return true;
+  const status = normalizeCaseStatus(caseItem?.status);
+  if (status === "paused") return true;
+  return isTerminalCase(caseItem);
+}
+
+function getArchivedBucketCases({ cases = state.cases, archivedCases = state.casesArchived } = {}) {
+  return getUniqueCaseRecords([
+    ...(Array.isArray(archivedCases) ? archivedCases : []),
+    ...(Array.isArray(cases) ? cases.filter((item) => isArchivedBucketCase(item)) : []),
+  ]);
+}
+
+function getCompletedDashboardCases({ cases = state.cases, archivedCases = state.casesArchived } = {}) {
+  return getArchivedBucketCases({ cases, archivedCases }).filter((item) => isCompletedDashboardCase(item));
 }
 
 function isWorkspaceEligibleCase(caseItem) {
@@ -7304,7 +6584,7 @@ async function loadCasesWithFiles(force = false) {
       const res = await secureFetch(url, { headers: { Accept: "application/json" } });
       if (!res.ok) throw new Error("Case fetch failed");
       const data = await res.json();
-      state.cases = Array.isArray(data) ? data.filter((item) => !isTerminalCase(item)) : [];
+      state.cases = Array.isArray(data) ? data : [];
       buildCaseLookup();
       applyApplicationCountsToCases({ render: dashboardViewState.casesInitialized });
     } catch (err) {
@@ -7642,7 +6922,6 @@ function applyApplicationCountsToCases({ render = false } = {}) {
 function buildOverviewSignals({ cases = [], apps = [], archivedCases = [], overdueCount = 0 } = {}) {
   const reviewCaseIds = new Set();
   let unfundedCount = 0;
-  let completedCasesCount = 0;
 
   (cases || []).forEach((caseItem) => {
     const statusKey = normalizeCaseStatus(caseItem?.status);
@@ -7660,12 +6939,7 @@ function buildOverviewSignals({ cases = [], apps = [], archivedCases = [], overd
     });
   });
 
-  (archivedCases || []).forEach((caseItem) => {
-    const statusKey = normalizeCaseStatus(caseItem?.status);
-    if (statusKey === "completed") {
-      completedCasesCount += 1;
-    }
-  });
+  const completedCasesCount = getCompletedDashboardCases({ cases, archivedCases }).length;
 
   const pendingApplications = filterApplicationsForDisplay(Array.isArray(apps) ? apps : []).filter((app) => {
     const status = String(app?.status || "").toLowerCase();

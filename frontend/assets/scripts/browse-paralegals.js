@@ -44,6 +44,8 @@ const elements = {
   filterToggle: document.getElementById("filterToggle"),
   applyFilters: document.getElementById("applyFilters"),
   clearFilters: document.getElementById("clearFilters"),
+  authBlocker: document.getElementById("authBlocker"),
+  returnDashboard: document.getElementById("returnDashboard"),
 };
 
 const state = {
@@ -68,8 +70,6 @@ let activeParalegal = null;
 const toast = window.toastUtils;
 const AUTH_LOCK_CLASS = "auth-locked";
 const AUTH_BLOCKER_READY_CLASS = "auth-blocker-ready";
-const AUTH_BLOCKER_DELAY_MS = 10000;
-let authBlockerTimer = null;
 
 function normalizeId(val) {
   if (!val) return "";
@@ -119,6 +119,21 @@ async function hydrateViewer() {
 function syncAuthButtons() {
   const signInLink = document.getElementById("authAction");
   const logoutBtn = document.getElementById("logoutAction");
+  if (elements.returnDashboard) {
+    if (state.isLoggedIn) {
+      const dashboardHref =
+        state.viewerRole === "paralegal"
+          ? "dashboard-paralegal.html"
+          : state.viewerRole === "admin"
+          ? "admin-dashboard.html"
+          : "dashboard-attorney.html";
+      elements.returnDashboard.href = dashboardHref;
+      elements.returnDashboard.textContent = "Return to Dashboard";
+    } else {
+      elements.returnDashboard.href = "login.html";
+      elements.returnDashboard.textContent = "Log In";
+    }
+  }
   if (state.isLoggedIn) {
     if (signInLink) signInLink.style.display = "none";
     if (logoutBtn) {
@@ -135,30 +150,33 @@ function syncAuthButtons() {
 }
 
 function toggleAuthBlocker() {
-  const blocker = document.getElementById("authBlocker");
-  if (!blocker || !document.body) return;
+  if (!elements.authBlocker || !document.body) return;
   if (state.isLoggedIn) {
-    document.body.classList.remove(AUTH_LOCK_CLASS);
-    document.body.classList.remove(AUTH_BLOCKER_READY_CLASS);
-    blocker.setAttribute("aria-hidden", "true");
-    if (authBlockerTimer) {
-      clearTimeout(authBlockerTimer);
-      authBlockerTimer = null;
-    }
-  } else {
-    document.body.classList.add(AUTH_LOCK_CLASS);
-    document.body.classList.remove(AUTH_BLOCKER_READY_CLASS);
-    blocker.setAttribute("aria-hidden", "true");
-    if (authBlockerTimer) {
-      clearTimeout(authBlockerTimer);
-    }
-    authBlockerTimer = setTimeout(() => {
-      if (!state.isLoggedIn && document.body) {
-        document.body.classList.add(AUTH_BLOCKER_READY_CLASS);
-        blocker.setAttribute("aria-hidden", "false");
-      }
-    }, AUTH_BLOCKER_DELAY_MS);
+    closeAuthBlocker();
   }
+  if (!state.isLoggedIn) closeAuthBlocker();
+}
+
+function openAuthBlocker() {
+  if (!elements.authBlocker || !document.body) return;
+  document.body.classList.add(AUTH_LOCK_CLASS);
+  document.body.classList.add(AUTH_BLOCKER_READY_CLASS);
+  elements.authBlocker.setAttribute("aria-hidden", "false");
+}
+
+function closeAuthBlocker() {
+  if (!elements.authBlocker || !document.body) return;
+  document.body.classList.remove(AUTH_LOCK_CLASS);
+  document.body.classList.remove(AUTH_BLOCKER_READY_CLASS);
+  elements.authBlocker.setAttribute("aria-hidden", "true");
+}
+
+function requireSignIn(event) {
+  if (state.isLoggedIn) return false;
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  openAuthBlocker();
+  return true;
 }
 
 function bindFilterEvents() {
@@ -254,6 +272,14 @@ function bindModalEvents() {
   elements.inquireMessage?.addEventListener("input", () => clearFieldError(elements.inquireMessage));
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closeInquireModal();
+  });
+  elements.authBlocker?.addEventListener("click", (event) => {
+    if (event.target === elements.authBlocker) {
+      closeAuthBlocker();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeAuthBlocker();
   });
 }
 
@@ -446,6 +472,9 @@ function buildParalegalCard(paralegal) {
   const photoLink = document.createElement("a");
   photoLink.className = "profile-photo-link profile-link";
   photoLink.href = buildParalegalProfileUrl(paralegalId);
+  photoLink.addEventListener("click", (event) => {
+    requireSignIn(event);
+  });
   const img = document.createElement("img");
   img.src = avatar;
   img.alt = `Portrait of ${name}`;
@@ -456,6 +485,9 @@ function buildParalegalCard(paralegal) {
   headingLink.href = buildParalegalProfileUrl(paralegalId);
   headingLink.textContent = name;
   headingLink.className = "profile-name-link profile-link";
+  headingLink.addEventListener("click", (event) => {
+    requireSignIn(event);
+  });
   heading.appendChild(headingLink);
   const content = document.createElement("div");
   content.className = "card-content";
@@ -494,6 +526,7 @@ function buildParalegalCard(paralegal) {
     const isAction = event.target.closest(".action-btn");
     const isProfileLink = event.target.closest(".profile-link");
     if (isAction || isProfileLink || !paralegalId) return;
+    if (requireSignIn(event)) return;
     window.location.href = buildParalegalProfileUrl(paralegalId);
   });
 

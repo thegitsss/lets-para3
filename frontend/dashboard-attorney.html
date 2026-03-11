@@ -3738,6 +3738,45 @@
       font-size:0.95rem;
     }
 
+    .view-billing .escrow-table .sort-btn {
+      display:inline-flex;
+      align-items:center;
+      gap:0.35rem;
+      border:0;
+      background:transparent;
+      padding:0;
+      color:inherit;
+      font:inherit;
+      text-transform:inherit;
+      letter-spacing:inherit;
+      cursor:pointer;
+    }
+
+    .view-billing .escrow-table .sort-btn:hover {
+      color:var(--ink);
+    }
+
+    .view-billing .escrow-table .sort-btn:focus-visible {
+      outline:none;
+      color:var(--ink);
+      box-shadow:0 0 0 3px rgba(180,153,106,0.16);
+      border-radius:999px;
+      padding-inline:0.35rem;
+    }
+
+    .view-billing .escrow-table .sort-indicator {
+      display:inline-block;
+      min-width:0.8rem;
+      color:var(--muted);
+      font-size:0.72rem;
+      line-height:1;
+    }
+
+    .view-billing .escrow-table th.is-sorted .sort-indicator,
+    .view-billing .escrow-table .sort-btn:hover .sort-indicator {
+      color:var(--accent);
+    }
+
     .view-billing .ghost-btn {
       border:1px solid var(--line);
       background:var(--panel);
@@ -4003,10 +4042,26 @@
       min-height:140px;
     }
 
+    .view-billing .active-funds-panel {
+      display:flex;
+      flex-direction:column;
+    }
+
+    .view-billing .active-funds-panel .table-wrapper {
+      height:320px;
+    }
+
+    .view-billing .active-funds-panel .escrow-pagination {
+      min-height:40px;
+      margin-top:auto;
+      visibility:visible;
+    }
+
     .view-billing .escrow-table {
       width:100%;
       border-collapse:collapse;
       min-width:640px;
+      table-layout:fixed;
     }
 
     .view-billing .escrow-table th,
@@ -4015,6 +4070,9 @@
       text-align:left;
       border-bottom:1px solid var(--line);
       background:var(--panel);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
 
     .view-billing .escrow-table th {
@@ -5031,7 +5089,7 @@
         </button>
       </section>
 
-      <section class="panel" aria-labelledby="escrow-heading">
+      <section class="panel active-funds-panel" aria-labelledby="escrow-heading">
         <div class="panel-header">
           <div>
             <h2 id="escrow-heading">Active Funds</h2>
@@ -5040,22 +5098,31 @@
         </div>
         <div class="table-wrapper">
           <table class="escrow-table" aria-describedby="escrow-heading">
+            <colgroup>
+              <col style="width:24%" />
+              <col style="width:24%" />
+              <col style="width:13%" />
+              <col style="width:13%" />
+              <col style="width:13%" />
+              <col style="width:13%" />
+            </colgroup>
             <thead>
               <tr>
-                <th>Case</th>
-                <th>Paralegal</th>
-                <th>Amount</th>
-                <th>Funded</th>
-                <th>Status</th>
+                <th data-escrow-sort-th="case"><button type="button" class="sort-btn" data-escrow-sort-key="case">Case <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                <th data-escrow-sort-th="paralegal"><button type="button" class="sort-btn" data-escrow-sort-key="paralegal">Paralegal <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                <th data-escrow-sort-th="amount"><button type="button" class="sort-btn" data-escrow-sort-key="amount">Amount <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                <th data-escrow-sort-th="funded"><button type="button" class="sort-btn" data-escrow-sort-key="funded">Funded <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                <th data-escrow-sort-th="case_status"><button type="button" class="sort-btn" data-escrow-sort-key="case_status">Case Status <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                <th data-escrow-sort-th="payment_status"><button type="button" class="sort-btn" data-escrow-sort-key="payment_status">Payment Status <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
               </tr>
             </thead>
             <tbody id="activeEscrowsBody">
-              <tr><td colspan="5" class="history-empty">Loading active funds...</td></tr>
+              <tr><td colspan="6" class="history-empty">Loading active funds...</td></tr>
             </tbody>
           </table>
         </div>
         <div class="escrow-pagination" data-escrow-pagination>
-          <button type="button" class="page-btn" data-escrow-page-action="prev">Back</button>
+          <button type="button" class="page-btn" data-escrow-page-action="prev">Previous</button>
           <span class="page-info" data-escrow-page-info>0 of 0</span>
           <button type="button" class="page-btn" data-escrow-page-action="next">Next</button>
         </div>

@@ -759,6 +759,7 @@ function normalizeCaseStatusValue(status) {
 }
 
 const CLOSED_CASE_STATUSES = new Set(["completed", "closed", "disputed"]);
+const ATTORNEY_ARCHIVED_BUCKET_STATUSES = ["completed", "closed", "paused", "cancelled", "canceled"];
 
 function isFinalCaseDoc(doc) {
   if (!doc) return false;
@@ -2576,7 +2577,28 @@ router.get(
       if (req.query.paralegal && isObjId(req.query.paralegal)) filter.paralegal = req.query.paralegal;
     }
 
-    if (typeof req.query.archived !== "undefined") {
+    if (role === "attorney" || role === "admin") {
+      const wantArchived = String(req.query.archived || "").toLowerCase() === "true";
+      if (wantArchived) {
+        filter.$and = [
+          ...(filter.$and || []),
+          {
+            $or: [
+              { archived: true },
+              { paymentReleased: true },
+              { status: { $in: ATTORNEY_ARCHIVED_BUCKET_STATUSES } },
+            ],
+          },
+        ];
+      } else {
+        filter.archived = { $ne: true };
+        filter.$and = [
+          ...(filter.$and || []),
+          { paymentReleased: { $ne: true } },
+          { status: { $nin: ATTORNEY_ARCHIVED_BUCKET_STATUSES } },
+        ];
+      }
+    } else if (typeof req.query.archived !== "undefined") {
       const wantArchived = String(req.query.archived).toLowerCase() === "true";
       filter.archived = wantArchived ? true : { $ne: true };
     } else {
