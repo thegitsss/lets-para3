@@ -497,8 +497,6 @@ async function initAttorneyTour(user = {}, options = {}) {
 
     if (step.view) {
       clearHighlight();
-      overlay.classList.remove("spotlight");
-      tooltip.classList.remove("is-active");
       setProfileMenuOpen(Boolean(step.openProfileMenu));
       navigateToView(step.view);
       setTimeout(() => {

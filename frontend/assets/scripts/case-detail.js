@@ -107,6 +107,7 @@ const state = {
   rejecting: false,
   partialPayoutSubmitting: false,
   relisting: false,
+  blockingFutureInteraction: false,
 };
 
 let taskUpdateInFlight = false;
@@ -134,6 +135,7 @@ function escapeHTML(value = "") {
 const weekdayFormatter = new Intl.DateTimeFormat(undefined, {
   weekday: "long",
 });
+const sharedDocumentsTwoColumnMedia = window.matchMedia("(max-width: 1200px) and (min-width: 901px)");
 
 const PAYMENT_METHOD_UPDATE_MESSAGE = "Payment method needs to be updated before funds can be released.";
 const POPUP_ANIMATION_MS = 180;
@@ -228,6 +230,25 @@ function scrollMessagesToBottom({ behavior = "auto" } = {}) {
     top: messageScroll.scrollHeight,
     behavior,
   });
+}
+
+function syncSharedDocumentsHeightLimit() {
+  if (!caseSharedDocuments) return;
+  if (!sharedDocumentsTwoColumnMedia.matches) {
+    caseSharedDocuments.style.removeProperty("--case-documents-visible-height");
+    return;
+  }
+  const items = Array.from(caseSharedDocuments.children).filter((node) => node instanceof HTMLElement);
+  if (items.length <= 3) {
+    caseSharedDocuments.style.removeProperty("--case-documents-visible-height");
+    return;
+  }
+  const computed = window.getComputedStyle(caseSharedDocuments);
+  const gap = parseFloat(computed.rowGap || computed.gap || "0") || 0;
+  const height = items
+    .slice(0, 3)
+    .reduce((total, item) => total + item.getBoundingClientRect().height, 0) + gap * 2;
+  caseSharedDocuments.style.setProperty("--case-documents-visible-height", `${Math.ceil(height)}px`);
 }
 
 function openAttachmentDB() {
@@ -2066,6 +2087,7 @@ function openParalegalFlagMenu(caseData) {
     ensureFlagMenuStyles();
     const canWithdraw = canRequestWithdrawal(caseData);
     const canDispute = canOpenDisputeFromCase(caseData);
+    const blockState = getBlockMenuState(caseData);
     const overlay = document.createElement("div");
     overlay.className = "case-flag-overlay";
     const options = [];
@@ -2079,12 +2101,25 @@ function openParalegalFlagMenu(caseData) {
         `<button type="button" class="case-action-btn secondary" data-flag-action="dispute">Open Dispute</button>`
       );
     }
+    if (blockState.canBlock) {
+      options.push(
+        `<button type="button" class="case-action-btn secondary" data-flag-action="block">Block future interaction</button>`
+      );
+    } else if (blockState.blocked) {
+      options.push(
+        `<button type="button" class="case-action-btn secondary" disabled>Blocked - manage in Settings</button>`
+      );
+    }
+    const blockNote = blockState.blocked
+      ? `<p class="case-flag-note">Manage unblocking from Settings in the Blocked Users section.</p>`
+      : "";
     const emptyCopy = !options.length
       ? `<p class="case-flag-muted">No actions are available right now.</p>`
       : "";
     overlay.innerHTML = `
       <div class="case-flag-modal" role="dialog" aria-modal="true" aria-labelledby="caseFlagTitle">
         <div class="case-flag-title" id="caseFlagTitle">Case Actions</div>
+        ${blockNote}
         ${emptyCopy}
         <div class="case-flag-actions">
           ${options.join("")}
@@ -2204,6 +2239,7 @@ function openAttorneyFlagMenu(caseData, actionState) {
     ensureFlagMenuStyles();
     const state = actionState?.eligible ? actionState : getAttorneyWithdrawalActionState(caseData);
     const canDispute = canOpenDisputeFromCase(caseData);
+    const blockState = getBlockMenuState(caseData);
     const overlay = document.createElement("div");
     overlay.className = "case-flag-overlay";
     const options = [];
@@ -2233,14 +2269,27 @@ function openAttorneyFlagMenu(caseData, actionState) {
         `<button type="button" class="case-action-btn secondary" data-flag-action="dispute">Open Dispute</button>`
       );
     }
+    if (blockState.canBlock) {
+      options.push(
+        `<button type="button" class="case-action-btn secondary" data-flag-action="block">Block future interaction</button>`
+      );
+    } else if (blockState.blocked) {
+      options.push(
+        `<button type="button" class="case-action-btn secondary" disabled>Blocked - manage in Settings</button>`
+      );
+    }
     const infoParts = [state.bannerText, state.statusText].filter(Boolean);
+    if (blockState.blocked) {
+      infoParts.push("Manage unblocking from Settings in the Blocked Users section.");
+    }
     const infoCopy = infoParts.length ? `<p class="case-flag-info">${infoParts.join(" ")}</p>` : "";
     const emptyCopy = !options.length
       ? `<p class="case-flag-muted">No actions are available right now.</p>`
       : "";
+    const title = state.eligible ? "Paralegal Withdrawal" : "Case Actions";
     overlay.innerHTML = `
       <div class="case-flag-modal" role="dialog" aria-modal="true" aria-labelledby="caseFlagTitle">
-        <div class="case-flag-title" id="caseFlagTitle">Paralegal Withdrawal</div>
+        <div class="case-flag-title" id="caseFlagTitle">${title}</div>
         ${infoCopy}
         ${emptyCopy}
         <div class="case-flag-actions">
@@ -2717,9 +2766,13 @@ function renderParticipants(data) {
 
   participants.forEach((entry) => {
     const li = document.createElement("li");
-    const label = document.createElement("span");
-    label.textContent = `${entry.label}: ${entry.value}`;
-    li.appendChild(label);
+    const role = document.createElement("span");
+    role.className = "participant-role";
+    role.textContent = entry.label;
+    const name = document.createElement("span");
+    name.className = "participant-name";
+    name.textContent = entry.value;
+    li.append(role, name);
     caseParticipants.appendChild(li);
   });
 }
@@ -3618,13 +3671,13 @@ function startReleaseFundsAnimation() {
   stopReleaseFundsAnimation();
   const frames = [".", "..", "..."];
   let frame = 0;
+  if (caseCompleteStatus) {
+    caseCompleteStatus.textContent = "Please do not refresh the page";
+  }
   const render = () => {
     const label = `Releasing funds${frames[frame % frames.length]}`;
     if (caseCompleteButton && !caseCompleteButton.hidden) {
       caseCompleteButton.textContent = label;
-    }
-    if (caseCompleteStatus) {
-      caseCompleteStatus.textContent = label;
     }
     frame += 1;
   };
@@ -4021,15 +4074,28 @@ function updateCompleteAction(caseData, caseState) {
   }
 }
 
+function getCaseBlockConfirmMessage() {
+  return "Block future interaction with this user? This will prevent future applications, invitations, hiring, and direct messaging between the two of you on Let's ParaConnect. This user will not be notified. Existing case and payment history will remain available.";
+}
+
+function getBlockMenuState(caseData) {
+  const blockStatus = caseData?.blockStatus || null;
+  return {
+    blocked: !!blockStatus?.blocked,
+    canBlock: !!blockStatus?.canBlock,
+  };
+}
+
 function updateDisputeAction(caseData) {
   if (!caseDisputeButton) return;
   const statusKey = normalizeCaseStatus(caseData?.status);
   const isDisputed = statusKey === "disputed" || caseData?.terminationStatus === "disputed";
   const isClosed = ["completed", "closed"].includes(statusKey);
   const role = getCurrentUserRole();
+  const blockState = getBlockMenuState(caseData);
+  const hasFutureInteractionAction = blockState.blocked || blockState.canBlock;
   const isWithdrawal = isWithdrawalCase(caseData);
   const isWithdrawn = isWithdrawnViewer(caseData);
-  const disputeActive = isDisputeWindowActive(caseData);
   let disabled = isDisputed || isClosed;
   let hidden = false;
   let message = "";
@@ -4063,8 +4129,26 @@ function updateDisputeAction(caseData) {
     message = "Workspace paused - Paralegal requested admin assistance. We'll resolve this within 24 hours.";
   }
 
+  const canDispute = canOpenDisputeFromCase(caseData);
+  const canWithdraw = canRequestWithdrawal(caseData);
+  const hasAttorneyWithdrawalAction =
+    !!attorneyActionState?.showPartial ||
+    !!attorneyActionState?.showReject ||
+    !!attorneyActionState?.showRelist;
+  const hasMenuActions =
+    role === "paralegal"
+      ? canWithdraw || canDispute || hasFutureInteractionAction
+      : role === "attorney"
+        ? hasAttorneyWithdrawalAction || canDispute || hasFutureInteractionAction
+        : canDispute;
+
+  hidden = !hasMenuActions;
+  disabled = !hasMenuActions;
+
   const flagLabel =
-    role === "paralegal" || (role === "attorney" && isWithdrawal) ? "Case actions" : "Flag dispute";
+    role === "paralegal" || (role === "attorney" && (isWithdrawal || hasFutureInteractionAction || isClosed))
+      ? "Case actions"
+      : "Flag dispute";
   caseDisputeButton.setAttribute("aria-label", flagLabel);
   const flagLabelNode = caseDisputeButton.querySelector("span");
   if (flagLabelNode) flagLabelNode.textContent = flagLabel;
@@ -4338,7 +4422,9 @@ async function handleRequestWithdrawal() {
   });
   if (!confirmed) return;
   state.withdrawing = true;
+  const originalText = caseWithdrawButton?.textContent || "Withdraw from Case";
   if (caseWithdrawButton) caseWithdrawButton.disabled = true;
+  if (caseWithdrawButton) caseWithdrawButton.textContent = "Withdrawing...";
   showMsg(caseWithdrawStatus, "Submitting withdrawal request...");
   try {
     await fetchCSRF().catch(() => "");
@@ -4358,7 +4444,40 @@ async function handleRequestWithdrawal() {
     showMsg(caseWithdrawStatus, err.message || "Unable to withdraw from case.");
   } finally {
     state.withdrawing = false;
-    if (caseWithdrawButton) caseWithdrawButton.disabled = false;
+    if (caseWithdrawButton) {
+      caseWithdrawButton.disabled = false;
+      caseWithdrawButton.textContent = originalText;
+    }
+  }
+}
+
+async function handleBlockFutureInteraction() {
+  if (state.blockingFutureInteraction) return;
+  const caseId = state.activeCaseId;
+  const caseData = state.activeCase || {};
+  const blockStatus = caseData?.blockStatus || null;
+  if (!caseId) return;
+  if (!blockStatus?.canBlock) return;
+
+  const confirmed = window.confirm(getCaseBlockConfirmMessage());
+  if (!confirmed) return;
+
+  state.blockingFutureInteraction = true;
+  const statusNode = resolveCaseActionStatusNode();
+  if (statusNode) showMsg(statusNode, "Blocking future interaction...");
+
+  try {
+    await fetchCSRF().catch(() => "");
+    await fetchJSON("/api/blocks", {
+      method: "POST",
+      body: { caseId },
+    });
+    if (statusNode) showMsg(statusNode, "Future interaction blocked. This user was not notified.");
+    await loadCase(caseId, { suppressStatus: true });
+  } catch (err) {
+    if (statusNode) showMsg(statusNode, err.message || "Unable to block future interaction.");
+  } finally {
+    state.blockingFutureInteraction = false;
   }
 }
 
@@ -4489,7 +4608,9 @@ async function handleRelistCase() {
   if (!caseId) return;
   const statusNode = resolveCaseActionStatusNode();
   state.relisting = true;
+  const originalText = caseRelistButton?.textContent || "Relist";
   if (caseRelistButton) caseRelistButton.disabled = true;
+  if (caseRelistButton) caseRelistButton.textContent = "Relisting...";
   if (statusNode) showMsg(statusNode, "Relisting case...");
   try {
     await fetchCSRF().catch(() => "");
@@ -4500,7 +4621,10 @@ async function handleRelistCase() {
     if (statusNode) showMsg(statusNode, err.message || "Unable to relist case.");
   } finally {
     state.relisting = false;
-    if (caseRelistButton) caseRelistButton.disabled = false;
+    if (caseRelistButton) {
+      caseRelistButton.disabled = false;
+      caseRelistButton.textContent = originalText;
+    }
   }
 }
 
@@ -4515,30 +4639,39 @@ async function handleFlagAction() {
     }
     if (action === "dispute") {
       await handleDisputeCase();
+      return;
+    }
+    if (action === "block") {
+      await handleBlockFutureInteraction();
     }
     return;
   }
   if (role === "attorney") {
     const actionState = getAttorneyWithdrawalActionState(caseData);
-    if (actionState.eligible) {
-    const action = await openAttorneyFlagMenu(caseData, actionState);
-    if (action === "partial") {
-      await handlePartialPayout({ returnToMenu: true, menuCaseData: caseData, menuActionState: actionState });
+    const blockState = getBlockMenuState(caseData);
+    if (actionState.eligible || blockState.blocked || blockState.canBlock) {
+      const action = await openAttorneyFlagMenu(caseData, actionState);
+      if (action === "partial") {
+        await handlePartialPayout({ returnToMenu: true, menuCaseData: caseData, menuActionState: actionState });
+        return;
+      }
+      if (action === "reject") {
+        await handleRejectPayout();
+        return;
+      }
+      if (action === "relist") {
+        await handleRelistCase();
+        return;
+      }
+      if (action === "dispute") {
+        await handleDisputeCase();
+        return;
+      }
+      if (action === "block") {
+        await handleBlockFutureInteraction();
+      }
       return;
     }
-    if (action === "reject") {
-      await handleRejectPayout();
-      return;
-    }
-    if (action === "relist") {
-      await handleRelistCase();
-      return;
-    }
-    if (action === "dispute") {
-      await handleDisputeCase();
-    }
-    return;
-  }
   }
   await handleDisputeCase();
 }
@@ -4557,7 +4690,9 @@ async function handleDisputeCase() {
   const { confirmed, message, amount } = await openDisputeConfirmModal({ showAmount });
   if (!confirmed) return;
   state.disputing = true;
+  const originalText = caseDisputeButton?.textContent || "Flag issue";
   if (caseDisputeButton) caseDisputeButton.disabled = true;
+  if (caseDisputeButton) caseDisputeButton.textContent = "Opening dispute...";
   showMsg(caseDisputeStatus, "Opening dispute...");
   try {
     await fetchCSRF().catch(() => "");
@@ -4577,9 +4712,12 @@ async function handleDisputeCase() {
     await loadCase(caseId);
   } catch (err) {
     showMsg(caseDisputeStatus, err.message || "Unable to open dispute.");
-    if (caseDisputeButton) caseDisputeButton.disabled = false;
   } finally {
     state.disputing = false;
+    if (caseDisputeButton) {
+      caseDisputeButton.disabled = false;
+      caseDisputeButton.textContent = originalText;
+    }
   }
 }
 
@@ -4710,6 +4848,7 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
   caseSharedDocuments.classList.toggle("case-documents-attorney", currentRole === "attorney");
   if (!visibleList.length) {
     caseSharedDocuments.hidden = true;
+    caseSharedDocuments.style.removeProperty("--case-documents-visible-height");
     caseSharedDocumentsEmpty.textContent = emptyMessage || "No documents shared yet.";
     caseSharedDocumentsEmpty.hidden = false;
     return;
@@ -4877,6 +5016,7 @@ function renderSharedDocuments(documents, caseId, { emptyMessage } = {}) {
     }
     caseSharedDocuments.appendChild(li);
   });
+  syncSharedDocumentsHeightLimit();
 }
 
 function buildMessageCard(message) {
@@ -5730,6 +5870,7 @@ function initProfileMenu() {
     profileMenu.classList.remove("show");
     profileToggle.setAttribute("aria-expanded", "false");
   });
+
 }
 
 function initTasksHelpPopover() {
@@ -5786,6 +5927,7 @@ function init() {
     messagePanel.addEventListener("dragleave", handleDragLeave);
     messagePanel.addEventListener("drop", handleDrop);
   }
+  window.addEventListener("resize", syncSharedDocumentsHeightLimit);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
       refreshCaseRealtime({ messages: true, documents: true, tasks: true });

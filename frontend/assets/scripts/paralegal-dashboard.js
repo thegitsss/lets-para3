@@ -121,7 +121,6 @@ const selectors = {
   deadlineList: document.getElementById('deadlineList'),
   assignmentList: document.getElementById('assignmentList'),
   recentActivityList: document.getElementById('recentActivityList'),
-  assignedCasesList: document.getElementById('assignedCasesList'),
   assignmentTemplate: document.getElementById('assignmentCardTemplate'),
   toastBanner: document.getElementById('toastBanner'),
   nameHeading: document.getElementById('user-name-heading'),
@@ -208,6 +207,74 @@ let lastDashboardRefreshAt = 0;
 const DASHBOARD_REFRESH_COOLDOWN_MS = 4000;
 let earningsMode = 'month';
 let earningsSnapshot = { month: 0, total: 0 };
+let clusterMenuBound = false;
+
+function bindClusterProfileMenu() {
+  if (clusterMenuBound) return;
+  clusterMenuBound = true;
+  document.addEventListener('click', (event) => {
+    const trigger = document.getElementById('clusterProfileTrigger');
+    const menu = document.getElementById('clusterProfileDropdown');
+    if (!trigger || !menu) return;
+    const logoutTarget = event.target?.closest?.('[data-cluster-logout]');
+    if (logoutTarget) {
+      window.logoutUser?.(event);
+      return;
+    }
+    if (trigger.contains(event.target) && !menu.contains(event.target)) {
+      const open = !menu.classList.contains('show');
+      menu.classList.toggle('show', open);
+      menu.setAttribute('aria-hidden', open ? 'false' : 'true');
+      trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+      return;
+    }
+    if (!menu.contains(event.target) && !trigger.contains(event.target)) {
+      menu.classList.remove('show');
+      menu.setAttribute('aria-hidden', 'true');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    const trigger = document.getElementById('clusterProfileTrigger');
+    const menu = document.getElementById('clusterProfileDropdown');
+    if (!trigger || !menu) return;
+    if ((event.key === 'Enter' || event.key === ' ') && document.activeElement === trigger) {
+      event.preventDefault();
+      const open = !menu.classList.contains('show');
+      menu.classList.toggle('show', open);
+      menu.setAttribute('aria-hidden', open ? 'false' : 'true');
+      trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+      return;
+    }
+    if (event.key === 'Escape' && menu.classList.contains('show')) {
+      menu.classList.remove('show');
+      menu.setAttribute('aria-hidden', 'true');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
+function updateUnreadDisplay(count = 0) {
+  const unread = Number(count) || 0;
+  setField('unreadMessages', unread);
+  unreadMessageCount = unread;
+  if (selectors.messageCount) {
+    selectors.messageCount.textContent = unread;
+  }
+  if (selectors.pluralText) {
+    selectors.pluralText.textContent = unread === 1 ? ' waiting' : 's waiting';
+  }
+}
+
+function notifyCasesApplicationsRefresh(reason = '', payload = {}) {
+  try {
+    window.dispatchEvent(
+      new CustomEvent('lpc:paralegal-dashboard-refresh', {
+        detail: { reason, ...payload },
+      })
+    );
+  } catch {}
+}
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -408,11 +475,7 @@ function updateStats(stats = {}) {
 
   setField('welcomeSubheading', `You have ${activeCases} active assignment${activeCases === 1 ? '' : 's'}`);
   setField('activeCases', activeCases);
-  setField('unreadMessages', unread);
-  unreadMessageCount = unread;
-  if (selectors.pluralText) {
-    selectors.pluralText.textContent = unread === 1 ? ' waiting' : 's waiting';
-  }
+  updateUnreadDisplay(unread);
   setField('nextDeadline', nextDeadline);
   const payoutDisplay = formatCurrency(payout30Days).replace(/^\$/, '');
   earningsSnapshot = { month: monthEarnings, total: totalEarnings };
@@ -428,19 +491,59 @@ async function refreshDashboardFromServer(reason = '') {
   dashboardRefreshInFlight = true;
   lastDashboardRefreshAt = now;
   try {
-    const dashboard = await fetchParalegalData({ fresh: true });
-    const caseDeadlines = buildCaseDeadlines(dashboard?.activeCases || []);
-    updateStats({
-      activeCases: dashboard?.metrics?.activeCases,
-      unreadMessages: unreadMessageCount,
-      nextDeadline: deriveNextDeadline(caseDeadlines),
-      monthEarnings: dashboard?.metrics?.earnings,
-      totalEarnings: dashboard?.metrics?.earningsTotal,
-      payout30Days: dashboard?.metrics?.earningsLast30Days,
-      nextPayout: dashboard?.metrics?.nextPayoutDate,
+    const [dashboard, invites, deadlines, threads, unreadCount] = await Promise.all([
+      fetchParalegalData({ fresh: true }).catch((err) => {
+        console.warn('Paralegal dashboard payload refresh failed', reason || '', err);
+        return null;
+      }),
+      loadInvites().catch((err) => {
+        console.warn('Paralegal invites refresh failed', reason || '', err);
+        return recentActivityState.invites;
+      }),
+      loadDeadlineEvents().catch((err) => {
+        console.warn('Paralegal deadlines refresh failed', reason || '', err);
+        return [];
+      }),
+      loadMessageThreads().catch((err) => {
+        console.warn('Paralegal threads refresh failed', reason || '', err);
+        return recentActivityState.threads;
+      }),
+      loadUnreadMessageCount().catch((err) => {
+        console.warn('Paralegal unread refresh failed', reason || '', err);
+        return unreadMessageCount;
+      }),
+    ]);
+
+    updateUnreadDisplay(unreadCount);
+    initLatestMessage(Array.isArray(threads) ? threads : []);
+
+    const activeCases = Array.isArray(dashboard?.activeCases) ? dashboard.activeCases : [];
+    const caseDeadlines = buildCaseDeadlines(activeCases);
+    const deadlineEvents = Array.isArray(deadlines) && deadlines.length ? deadlines : caseDeadlines;
+
+    if (dashboard) {
+      updateStats({
+        activeCases: dashboard?.metrics?.activeCases,
+        unreadMessages: unreadCount,
+        nextDeadline: deriveNextDeadline(deadlineEvents),
+        monthEarnings: dashboard?.metrics?.earnings,
+        totalEarnings: dashboard?.metrics?.earningsTotal,
+        payout30Days: dashboard?.metrics?.earningsLast30Days,
+        nextPayout: dashboard?.metrics?.nextPayoutDate,
+      });
+      renderAssignments(mapActiveCasesToAssignments(activeCases));
+    }
+
+    renderDeadlines(deadlineEvents);
+    renderRecentActivity({
+      invites: Array.isArray(invites) ? invites : [],
+      threads: Array.isArray(threads) ? threads : [],
+      deadlines: deadlineEvents,
     });
-    renderAssignments(mapActiveCasesToAssignments(dashboard?.activeCases || []));
-    renderDeadlines(caseDeadlines);
+    await loadAppliedJobs({ preservePage: true });
+    notifyCasesApplicationsRefresh(reason, {
+      activeCases: activeCases,
+    });
   } catch (err) {
     console.warn('Paralegal dashboard refresh failed', reason || '', err);
   } finally {
@@ -702,18 +805,24 @@ function renderRecentActivity({ invites = [], threads = [], deadlines = [] } = {
   });
 }
 
+let inviteResponseInFlight = false;
+
 async function respondToInvite(caseId, action, button) {
-  if (!caseId || !action) return;
+  if (!caseId || !action || inviteResponseInFlight) return;
   if (action === "accept" && !stripeConnected) {
     notifyStripeGate();
     return;
   }
   const endpoint = `/api/cases/${encodeURIComponent(caseId)}/invite/${action}`;
   const originalLabel = button?.textContent;
+  const siblingButton = action === "accept" ? selectors.inviteDeclineBtn : selectors.inviteAcceptBtn;
+  const siblingOriginalDisabled = !!siblingButton?.disabled;
+  inviteResponseInFlight = true;
   if (button) {
     button.disabled = true;
     button.textContent = action === 'accept' ? 'Accepting…' : 'Declining…';
   }
+  if (siblingButton) siblingButton.disabled = true;
   const toastHelper = window.toastUtils;
   let completed = false;
   try {
@@ -750,100 +859,15 @@ async function respondToInvite(caseId, action, button) {
       type: 'error',
     });
   } finally {
+    inviteResponseInFlight = false;
     if (button && !completed) {
       button.disabled = false;
       button.textContent = originalLabel || (action === 'accept' ? 'Accept' : 'Decline');
     }
-  }
-}
-
-async function loadAssignedCases() {
-  const list = selectors.assignedCasesList;
-  if (!list) return;
-  try {
-    const payload = await fetchJson('/api/cases/my-assigned');
-    renderAssignedCases(Array.isArray(payload?.items) ? payload.items : []);
-  } catch (error) {
-    renderAssignedCasesError(error.message || 'Unable to load assigned cases.');
-  }
-}
-
-function renderAssignedCases(items = []) {
-  const list = selectors.assignedCasesList;
-  if (!list) return;
-  const visibleItems = items.filter((item) => String(item?.status || '').toLowerCase() !== 'completed');
-  if (!visibleItems.length) {
-    list.innerHTML = `
-      <div class="dashboard-card full-width" id="recommendedPostingsCard">
-        <h3 class="card-title">Recommended for You</h3>
-        <ul class="recommendations-list"></ul>
-        <a href="browse-jobs.html" class="card-link">Refine filters →</a>
-      </div>
-    `;
-    void loadRecommendedJobs(viewerProfile || {});
-    return;
-  }
-  list.innerHTML = visibleItems
-    .map(
-      (c) => {
-        const caseId = getCaseId(c);
-        const safeCaseId = escapeHTML(caseId);
-        const eligible = caseId ? isWorkspaceEligibleCase(c) : false;
-        const buttonLabel = eligible ? 'Open Case' : 'Awaiting Attorney Funding';
-        const disabledAttr = eligible ? '' : ' disabled aria-disabled="true"';
-        const statusValue = String(c.status || 'Active');
-        const statusLabel = formatStatusLabel(statusValue).replace(/\s+/g, ' ').trim() || 'Active';
-        const statusKey = statusValue.toLowerCase().replace(/\s+/g, '_');
-      return `
-      <div class="case-item" data-id="${safeCaseId}">
-        <div class="case-title">${escapeHTML(c.title || 'Untitled Case')}</div>
-        <div class="case-meta">
-          <span>${escapeHTML(c.caseNumber || '')}</span>
-          <span>Attorney: ${escapeHTML(c.attorneyName || '')}</span>
-          <span>Status: ${escapeHTML(statusLabel)}</span>
-        </div>
-        <div class="case-actions">
-          <button class="open-case-btn" data-id="${safeCaseId}"${disabledAttr}>${buttonLabel}</button>
-        </div>
-      </div>`;
-      }
-    )
-    .join('');
-}
-
-async function withdrawFromCase(caseId, button) {
-  if (!caseId) return;
-  const toastHelper = window.toastUtils;
-  const originalLabel = button?.textContent;
-  if (button) {
-    button.disabled = true;
-    button.textContent = 'Withdrawing…';
-  }
-  try {
-    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/withdraw`, {
-      method: 'POST',
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(payload?.error || 'Unable to withdraw from this case.');
-    toastHelper?.show?.('Application withdrawn.', { targetId: selectors.toastBanner?.id, type: 'success' });
-    await loadAssignedCases();
-  } catch (error) {
-    toastHelper?.show?.(error.message || 'Unable to withdraw from this case.', {
-      targetId: selectors.toastBanner?.id,
-      type: 'error',
-    });
-  } finally {
-    if (button) {
-      button.disabled = false;
-      button.textContent = originalLabel || 'Withdraw application';
+    if (siblingButton && !completed) {
+      siblingButton.disabled = siblingOriginalDisabled;
     }
   }
-}
-
-function renderAssignedCasesError(message = 'Unable to load assigned cases.') {
-  const list = selectors.assignedCasesList;
-  if (!list) return;
-  list.innerHTML = `<p>${escapeHTML(message)}</p>`;
 }
 
 function handleCaseAction(action, title) {
@@ -1841,7 +1865,7 @@ async function loadRecommendedJobs(profile = {}) {
   }
 }
 
-async function loadAppliedJobs() {
+async function loadAppliedJobs({ preservePage = false } = {}) {
   const container = document.getElementById('appliedJobsList');
   if (!container) return;
   container.innerHTML = '';
@@ -1859,7 +1883,7 @@ async function loadAppliedJobs() {
     const apps = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
     const visibleApps = apps.filter((app) => isActiveApplication(app));
     appliedAppsCache = visibleApps;
-    appliedPage = 1;
+    appliedPage = preservePage ? appliedPage : 1;
     bindAppliedFilters();
     populateAppliedFilterOptions(visibleApps);
     applyAppliedFilters({ resetPage: false });
@@ -2211,7 +2235,6 @@ async function initDashboard() {
     loadRecommendedJobs({});
     loadAppliedJobs();
   }
-  await loadAssignedCases();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2221,34 +2244,17 @@ document.addEventListener('DOMContentLoaded', () => {
 async function bootParalegalDashboard() {
   const user = typeof window.requireRole === 'function' ? await window.requireRole('paralegal') : null;
   if (!user) return;
+  bindClusterProfileMenu();
   applyRoleVisibility(user);
   updateProfile(user || {});
   applyParalegalWelcomeNotice(user || {});
   initParalegalTour(user || {}, { force: consumeReplayFlag() });
   window.hydrateParalegalCluster?.(user || {});
-  window.initNotificationCenters?.();
   if (window.state) {
     window.state.viewerRole = String(user.role || '').toLowerCase();
   }
   await initDashboard();
   setupDashboardAutoRefresh();
-  selectors.assignedCasesList?.addEventListener('click', (event) => {
-    const withdrawBtn = event.target.closest('.withdraw-application-btn');
-    if (withdrawBtn) {
-      event.preventDefault();
-      withdrawFromCase(withdrawBtn.dataset.id, withdrawBtn);
-      return;
-    }
-    const btn = event.target.closest('.open-case-btn');
-    if (!btn) return;
-    if (btn.disabled || btn.getAttribute('aria-disabled') === 'true') {
-      event.preventDefault();
-      return;
-    }
-    const caseId = btn.dataset.id;
-    if (!caseId) return;
-    window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
-  });
 }
 
 function applyRoleVisibility(user) {

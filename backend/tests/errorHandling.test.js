@@ -19,6 +19,7 @@ jest.mock("../utils/stripe", () => ({
 
 const authRouter = require("../routes/auth");
 const casesRouter = require("../routes/cases");
+const User = require("../models/User");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 const app = (() => {
@@ -82,6 +83,16 @@ describe("Error handling", () => {
     // Description: Admin submits an invalid case (missing title/description).
     // Input values: admin auth cookie, empty payload.
     // Expected result: 400 Bad Request with validation error.
+
+    await User.create({
+      _id: "507f1f77bcf86cd799439011",
+      firstName: "Owner",
+      lastName: "Admin",
+      email: "owner@lets-paraconnect.com",
+      password: "not-used-in-this-test",
+      role: "admin",
+      status: "approved",
+    });
 
     const adminCookie = authCookieFor({
       id: "507f1f77bcf86cd799439011",

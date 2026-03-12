@@ -16,6 +16,8 @@ const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
 const { requireApproved, requireRole, requireCaseAccess, sameId } = require("../utils/authz");
 const Case = require("../models/Case");
 const CaseFile = require("../models/CaseFile");
+const Application = require("../models/Application");
+const Job = require("../models/Job");
 const User = require("../models/User");
 const { logAction } = require("../utils/audit");
 const { notifyUser } = require("../utils/notifyUser");
@@ -26,6 +28,7 @@ const {
   decryptCaseFilePayload,
   buildCaseFileNameQuery,
 } = require("../utils/dataEncryption");
+const { applyPublicParalegalFilter } = require("../utils/paralegalProfile");
 
 const execFileAsync = util.promisify(execFile);
 const ENABLE_DOC_PREVIEW_CONVERSION = process.env.ENABLE_DOC_PREVIEW_CONVERSION === "true";
@@ -234,6 +237,42 @@ function buildPersonalKey(type, ownerId, ext = "pdf") {
   return `${type}/${safeSegment(ownerId)}/${dir}-${Date.now()}-${nonce}.${ext}`;
 }
 
+async function attorneyCanAccessPersonalOwner(attorneyId, ownerId) {
+  if (!isObjId(attorneyId) || !isObjId(ownerId)) return false;
+
+  const hasCaseRelationship = await Case.exists({
+    attorneyId,
+    $or: [
+      { paralegal: ownerId },
+      { paralegalId: ownerId },
+      { withdrawnParalegalId: ownerId },
+      { "applicants.paralegalId": ownerId },
+    ],
+  });
+  if (hasCaseRelationship) return true;
+
+  const jobs = await Job.find({ attorneyId }).select("_id").lean();
+  if (!jobs.length) return false;
+
+  return !!(await Application.exists({
+    paralegalId: ownerId,
+    jobId: { $in: jobs.map((job) => job._id) },
+  }));
+}
+
+async function attorneyCanBrowsePersonalOwner(ownerId) {
+  if (!isObjId(ownerId)) return false;
+  const filter = {
+    _id: ownerId,
+    role: "paralegal",
+    status: "approved",
+    "preferences.hideProfile": { $ne: true },
+  };
+  applyPublicParalegalFilter(filter);
+  const doc = await User.findOne(filter).select("_id").lean();
+  return !!doc;
+}
+
 async function ensureKeyAccess(req, key, explicitCaseId) {
   if (!req.user) return false;
   const cleaned = normalizeKeyPath(key);
@@ -269,7 +308,10 @@ async function ensureKeyAccess(req, key, explicitCaseId) {
     const viewerRole = String(req.user.role || "").toLowerCase();
     const viewerId = String(req.user.id || req.user._id || "");
     if (viewerRole === "admin") return true;
-    if (viewerRole === "attorney") return true;
+    if (viewerRole === "attorney") {
+      if (await attorneyCanAccessPersonalOwner(viewerId, ownerId)) return true;
+      return attorneyCanBrowsePersonalOwner(ownerId);
+    }
     return ownerId === viewerId;
   }
 

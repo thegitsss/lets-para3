@@ -81,29 +81,73 @@ header {
 .user-chip {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
+  gap: 12px;
+  padding: 8px 12px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid transparent;
+  background: rgba(255,255,255,0.6);
+  border: none;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .user-chip img {
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
+  border: 2px solid #fff;
   object-fit: cover;
+  box-shadow: none;
 }
 
 .user-chip strong {
   display: block;
-  font-weight: 200;
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  color: #1a1a1a;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .user-chip span {
   display: block;
-  font-size: 0.9rem;
-  color: var(--muted);
+  font-size: 0.85rem;
+  color: #6b6b6b;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.theme-dark .user-chip {
+  background: rgba(15,23,42,0.4);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+body.theme-dark .user-chip strong {
+  color: #fff;
+}
+
+body.theme-dark .user-chip span {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+body.theme-mountain .user-chip {
+  background: rgba(255,255,255,0.65);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+body.theme-mountain .user-chip strong {
+  color: #1b1b1b;
+}
+
+body.theme-mountain .user-chip span {
+  color: #6b6b6b;
 }
 
 

@@ -169,8 +169,8 @@ function buildResetPasswordEmailHtml(user, resetUrl, opts = {}) {
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
   const unsubscribeLine = unsubscribeUrl
-    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe</a>`
-    : "Unsubscribe";
+    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
+    : "Unsubscribe from non-essential emails";
 
   return `
   <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
@@ -250,7 +250,7 @@ function buildResetPasswordEmailHtml(user, resetUrl, opts = {}) {
                 Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">help@lets-paraconnect.com</a>
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
-                No longer want to receive these emails? ${unsubscribeLine}
+                ${unsubscribeLine}. Required account and case notices may still be sent.
               </div>
             </td>
           </tr>
@@ -280,8 +280,8 @@ function buildApplicationSubmissionEmailHtml(user, opts = {}) {
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
   const unsubscribeLine = unsubscribeUrl
-    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe</a>`
-    : "Unsubscribe";
+    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
+    : "Unsubscribe from non-essential emails";
 
   return `
   <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
@@ -348,7 +348,7 @@ function buildApplicationSubmissionEmailHtml(user, opts = {}) {
                 Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">help@lets-paraconnect.com</a>
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
-                No longer want to receive these emails? ${unsubscribeLine}
+                ${unsubscribeLine}. Required account and case notices may still be sent.
               </div>
             </td>
           </tr>
@@ -368,7 +368,7 @@ const TWO_HOURS = "2h";
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const FIFTEEN_MIN = 15 * 60 * 1000;
 const RESET_PASSWORD_MINUTES = 48 * 60;
-const DISABLED_ACCOUNT_MSG = "This account has been disabled.";
+const DISABLED_ACCOUNT_MSG = "This account has been deactivated.";
 const BOT_NAME_GIBBERISH = /^[bcdfghjklmnpqrstvwxyz]{6,}$/;
 const BOT_REPEATED = /(.)\1{3,}/;
 const BOT_FORBIDDEN_CHARS = /[{}[\]|\\^<>]/;

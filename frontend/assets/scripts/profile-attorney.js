@@ -327,7 +327,6 @@ function renderProfile(profile) {
   const linkedIn = cleanUrl(profile.linkedInURL);
   const website = cleanUrl(profile.firmWebsite || profile.website);
   setHeroLink(elements.heroLinkedIn, linkedIn, "LinkedIn");
-  setHeroLink(elements.heroWebsite, website, "Firm Website");
 
   const summary = profile.practiceDescription || profile.bio || "";
   if (summary && elements.practiceBio) {
@@ -340,7 +339,7 @@ function renderProfile(profile) {
   }
 
   const hasLinkedIn = setLinkField(elements.contactLinkedIn, linkedIn, "View LinkedIn");
-  const hasWebsite = setLinkField(elements.contactWebsite, website, "Visit site");
+  const hasWebsite = setLinkField(elements.contactWebsite, website, "Firm site");
   const connectCard = elements.contactLinkedIn?.closest(".contact-card") || elements.contactWebsite?.closest(".contact-card");
   if (connectCard) {
     connectCard.classList.toggle("hidden", !hasLinkedIn && !hasWebsite);

@@ -537,6 +537,146 @@
     html.has-user-cache .header-skeleton {
       display: none;
     }
+
+    #paralegalFloatingCluster {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      z-index: 1200;
+      margin-left: auto;
+    }
+
+    #paralegalFloatingCluster .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: relative;
+      cursor: pointer;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.6);
+      border: none;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+
+    #paralegalFloatingCluster .user-profile strong {
+      display: block;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      letter-spacing: 0.02em;
+      color: #1a1a1a;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #paralegalFloatingCluster .user-profile span {
+      display: block;
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      color: #6b6b6b;
+      font-weight: 200;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #paralegalFloatingCluster img {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #fff;
+      box-shadow: none;
+    }
+
+    body.theme-dark #paralegalFloatingCluster .user-profile,
+    body.theme-mountain-dark #paralegalFloatingCluster .user-profile {
+      background: rgba(15,23,42,0.4);
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    body.theme-dark #paralegalFloatingCluster .user-profile strong,
+    body.theme-mountain-dark #paralegalFloatingCluster .user-profile strong {
+      color: #fff;
+    }
+
+    body.theme-dark #paralegalFloatingCluster .user-profile span,
+    body.theme-mountain-dark #paralegalFloatingCluster .user-profile span {
+      color: rgba(255,255,255,0.8);
+    }
+
+    body.theme-mountain #paralegalFloatingCluster .user-profile {
+      background: rgba(255,255,255,0.65);
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    body.theme-mountain #paralegalFloatingCluster .user-profile strong {
+      color: #1b1b1b;
+    }
+
+    body.theme-mountain #paralegalFloatingCluster .user-profile span {
+      color: #6b6b6b;
+    }
+
+    #paralegalFloatingCluster .profile-dropdown {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 10px);
+      min-width: 200px;
+      display: none;
+      flex-direction: column;
+      padding: 6px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 18px 30px rgba(0, 0, 0, 0.12);
+      z-index: 9999;
+    }
+
+    #paralegalFloatingCluster .profile-dropdown.show {
+      display: flex;
+    }
+
+    #paralegalFloatingCluster .profile-dropdown a,
+    #paralegalFloatingCluster .profile-dropdown button {
+      width: 100%;
+      border: none;
+      background: transparent;
+      color: inherit;
+      text-decoration: none;
+      text-align: left;
+      padding: 0.85rem 1.1rem;
+      margin: 0;
+      border-radius: 12px;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    #paralegalFloatingCluster .profile-dropdown a:hover,
+    #paralegalFloatingCluster .profile-dropdown button:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    #paralegalFloatingCluster .profile-dropdown button[data-cluster-logout] {
+      color: #b35f5f;
+      background: rgba(179, 95, 95, 0.08);
+    }
+
+    #paralegalFloatingCluster .profile-dropdown button[data-cluster-logout]:hover {
+      background: rgba(179, 95, 95, 0.14);
+    }
     .skeleton-circle {
       width: 44px;
       height: 44px;
@@ -560,11 +700,13 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 6px 14px;
+      padding: 8px 12px;
       border-radius: 999px;
-      border: 1px solid var(--line);
-      background: #fff;
-      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.06);
+      background: rgba(255,255,255,0.6);
+      border: none;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: border-color .2s ease, box-shadow .2s ease;
       text-decoration: none;
       color: inherit;
       cursor: pointer;
@@ -574,19 +716,31 @@
       width: 44px;
       height: 44px;
       border-radius: 50%;
+      border: 2px solid #fff;
       object-fit: cover;
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+      box-shadow: none;
     }
 
     .user-chip strong {
-      font-weight: 400;
       display: block;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      letter-spacing: 0.02em;
+      color: #1a1a1a;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .user-chip span {
       font-size: 0.85rem;
-      color: var(--muted);
+      color: #6b6b6b;
       display: block;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .pending-approval-banner {
@@ -2219,6 +2373,78 @@
     .file-actions {
       display: flex;
       gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .card-more-actions {
+      position: relative;
+    }
+
+    .card-more-actions summary {
+      list-style: none;
+      cursor: pointer;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.38rem 0.78rem;
+      user-select: none;
+    }
+
+    .card-more-actions summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .card-more-actions[open] summary {
+      color: var(--accent);
+      border-color: rgba(166, 142, 95, 0.4);
+    }
+
+    .card-more-actions-menu {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 8px);
+      min-width: 220px;
+      padding: 0.35rem;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+      display: grid;
+      gap: 0.2rem;
+      z-index: 20;
+    }
+
+    .card-more-actions-menu button,
+    .card-more-actions-menu span {
+      display: block;
+      width: 100%;
+      border: none;
+      background: transparent;
+      text-align: left;
+      padding: 0.72rem 0.85rem;
+      border-radius: 12px;
+      font: inherit;
+      font-size: 0.9rem;
+      color: var(--ink);
+    }
+
+    .card-more-actions-menu button {
+      cursor: pointer;
+    }
+
+    .card-more-actions-menu button:hover {
+      background: rgba(166, 142, 95, 0.08);
+      color: var(--accent);
+    }
+
+    .card-more-actions-menu span[aria-disabled="true"] {
+      color: var(--muted);
     }
 
     .completed-pagination {
@@ -2486,12 +2712,35 @@
     }
 
     body:not(.theme-dark) .user-chip {
-      border-color: rgba(15, 23, 42, 0.12);
-      box-shadow: var(--shadow-sm);
+      box-shadow: none;
     }
 
     body.theme-dark .user-chip {
-      box-shadow: var(--shadow-sm);
+      background: rgba(15,23,42,0.4);
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    body.theme-dark .user-chip strong {
+      color: #fff;
+    }
+
+    body.theme-dark .user-chip span {
+      color: rgba(255,255,255,0.8);
+    }
+
+    body.theme-mountain .user-chip {
+      background: rgba(255,255,255,0.65);
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    body.theme-mountain .user-chip strong {
+      color: #1b1b1b;
+    }
+
+    body.theme-mountain .user-chip span {
+      color: #6b6b6b;
     }
 
     a:focus-visible,
@@ -2524,11 +2773,37 @@
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <main id="main" tabindex="-1" class="main">
     <div class="topbar" data-attorney-header>
-      <div class="header-skeleton" aria-hidden="true">
-        <div class="skeleton-circle"></div>
-        <div class="skeleton-stack">
-          <div class="skeleton-line short"></div>
-          <div class="skeleton-line medium"></div>
+      <div id="paralegalFloatingCluster" data-notification-center="true">
+        <div class="notification-wrapper">
+          <button class="notification-icon" aria-label="View notifications" data-notification-toggle>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 01-3.46 0"></path>
+            </svg>
+            <span class="notification-badge" id="notificationBadge" data-notification-badge>0</span>
+          </button>
+          <div id="notificationPanel" class="notifications-panel notif-panel hidden" role="region" aria-live="polite" data-notification-panel>
+            <div class="notif-header" aria-label="Notifications"></div>
+            <div id="notifList" class="notif-scroll" data-notification-list></div>
+            <div class="notif-empty" data-notification-empty>Loading…</div>
+            <button id="markAllReadBtn" class="notif-markall" type="button" data-notification-mark>Mark All Read</button>
+          </div>
+        </div>
+        <div class="user-profile" id="clusterProfileTrigger" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-controls="clusterProfileDropdown" aria-label="Open profile menu">
+          <img
+            id="clusterAvatar"
+            class="nav-profile-photo"
+            src="data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%27220%27%20height%3D%27220%27%20viewBox%3D%270%200%20220%20220%27%3E%3Crect%20width%3D%27220%27%20height%3D%27220%27%20rx%3D%27110%27%20fill%3D%27%23f1f5f9%27/%3E%3Ccircle%20cx%3D%27110%27%20cy%3D%2790%27%20r%3D%2746%27%20fill%3D%27%23cbd5e1%27/%3E%3Cpath%20d%3D%27M40%20188c10-40%2045-68%2070-68s60%2028%2070%2068%27%20fill%3D%27none%27%20stroke%3D%27%23cbd5e1%27%20stroke-width%3D%2718%27%20stroke-linecap%3D%27round%27/%3E%3C/svg%3E"
+            alt="Paralegal avatar"
+          />
+          <div>
+            <strong id="clusterName">Paralegal</strong>
+            <span id="clusterRole">Paralegal</span>
+          </div>
+          <div class="profile-dropdown" id="clusterProfileDropdown" aria-hidden="true">
+            <a href="profile-settings.html">Account Settings</a>
+            <button type="button" data-cluster-logout>Log Out</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2553,12 +2828,12 @@
       </div>
 
       <section class="summary">
-        <div class="info-box">
+        <a class="info-box info-box-link" id="activeCasesCard" href="dashboard-paralegal.html#cases" aria-label="View active cases">
           <div class="info-value" data-field="activeCases">
             <span class="skeleton-line short"></span>
           </div>
           <div class="info-label">active cases</div>
-        </div>
+        </a>
         <div class="info-box message-box" id="messageBox">
           <div class="info-value" id="messageCount" data-field="unreadMessages">
             <span class="skeleton-line short"></span>
@@ -2632,6 +2907,11 @@
         <section class="cases-column" aria-label="Cases">
           <div class="cases-section">
             <div class="section-title">Active Cases</div>
+            <div class="completed-pagination" id="activeCasesPagination" aria-label="Active cases pagination">
+              <button type="button" class="completed-page-btn" id="activePrevBtn" disabled>Back</button>
+              <span class="completed-page-info" id="activePageInfo"></span>
+              <button type="button" class="completed-page-btn" id="activeNextBtn" disabled>Next</button>
+            </div>
             <div class="case-files" id="filesContainer">
               <p class="case-files-empty">Loading cases…</p>
             </div>
@@ -2808,6 +3088,7 @@
   </div>
   <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
   <script type="module" src="assets/scripts/utils/notifications.js"></script>
+  <script src="assets/scripts/paralegal-cluster.js"></script>
   <script src="assets/scripts/utils/toast.js?v=20260208"></script>
   <script>
     (function markReady() {
@@ -2819,28 +3100,6 @@
       }
     })();
   </script>
-  <script>
-    // Ensure notification dropdown binds even if modules load after DOM ready
-    (function ensureNotificationsInit() {
-      const init = () => {
-        if (typeof window.scanNotificationCenters === 'function') {
-          window.scanNotificationCenters();
-        } else if (typeof window.initNotificationCenters === 'function') {
-          window.initNotificationCenters();
-        }
-      };
-      if (document.readyState === "complete" || document.readyState === "interactive") {
-        init();
-      } else {
-        window.addEventListener('DOMContentLoaded', init, { once: true });
-      }
-    })();
-  </script>
-  <script>
-    window.__ATTORNEY_PAGE__ = "overview";
-    window.__TAB_ROLE__ = "paralegal";
-  </script>
-  <script type="module" src="assets/scripts/attorney-tabs.js"></script>
   <script>
     (function preloadStoredProfile() {
       document.addEventListener('DOMContentLoaded', () => {
@@ -2885,6 +3144,10 @@
       let activeKey = "home";
 
       const filesContainer = document.getElementById("filesContainer");
+      const activePagination = document.getElementById("activeCasesPagination");
+      const activePrevBtn = document.getElementById("activePrevBtn");
+      const activeNextBtn = document.getElementById("activeNextBtn");
+      const activePageInfo = document.getElementById("activePageInfo");
       const completedCasesContainer = document.getElementById("completedCasesContainer");
       const completedPagination = document.getElementById("completedCasesPagination");
       const completedPrevBtn = document.getElementById("completedPrevBtn");
@@ -2892,8 +3155,11 @@
       const completedPageInfo = document.getElementById("completedPageInfo");
       let activeCasesCache = [];
       let completedCasesCache = [];
+      let activePageIndex = 0;
       let completedPageIndex = 0;
       let completedMinHeight = 0;
+      let casesRefreshPromise = null;
+      const ACTIVE_PAGE_SIZE = 3;
       const COMPLETED_PAGE_SIZE = 3;
       const highlightCaseId = new URLSearchParams(window.location.search).get("highlightCase") || "";
       let highlightPending = highlightCaseId;
@@ -2919,19 +3185,6 @@
         return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
       }
 
-      function formatDateTime(value) {
-        if (!value) return "";
-        const parsed = new Date(value);
-        if (Number.isNaN(parsed.getTime())) return "";
-        return parsed.toLocaleString(undefined, {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-        });
-      }
-
       function formatStatus(value) {
         const raw = String(value || "").trim();
         if (!raw) return "";
@@ -2948,13 +3201,75 @@
         }
       }
 
+      function getBlockConfirmMessage() {
+        return "Block future interaction with this attorney? This prevents future applications, invitations, hiring, and direct messaging between the two of you on Let's ParaConnect. This user will not be notified. Existing case and payment history will remain available.";
+      }
+
+      function buildBlockAction(item) {
+        const blockStatus = item?.blockStatus || null;
+        const caseId = item?.caseId || item?.id || item?._id || "";
+        if (!blockStatus || !caseId) return "";
+        if (blockStatus.blocked) {
+          return `
+            <details class="card-more-actions">
+              <summary>More</summary>
+              <div class="card-more-actions-menu">
+                <span aria-disabled="true">Blocked - manage in Settings</span>
+              </div>
+            </details>
+          `;
+        }
+        if (!blockStatus.canBlock) return "";
+        return `
+          <details class="card-more-actions">
+            <summary>More</summary>
+            <div class="card-more-actions-menu">
+              <button type="button" data-block-future-interaction data-case-id="${escapeHTML(caseId)}">Block future interaction</button>
+            </div>
+          </details>
+        `;
+      }
+
+      function updateActivePagination(totalCount) {
+        if (!activePagination) return;
+        const totalPages = Math.max(1, Math.ceil(totalCount / ACTIVE_PAGE_SIZE));
+        const safeIndex = Math.min(activePageIndex, totalPages - 1);
+        activePageIndex = safeIndex;
+        const start = totalCount === 0 ? 0 : safeIndex * ACTIVE_PAGE_SIZE + 1;
+        const end = Math.min(totalCount, (safeIndex + 1) * ACTIVE_PAGE_SIZE);
+        if (activePageInfo) {
+          activePageInfo.textContent = totalCount ? `${start}-${end} of ${totalCount}` : "0 of 0";
+        }
+        if (activePrevBtn) activePrevBtn.disabled = safeIndex <= 0;
+        if (activeNextBtn) activeNextBtn.disabled = safeIndex >= totalPages - 1;
+        activePagination.style.display = totalCount > ACTIVE_PAGE_SIZE ? "flex" : "none";
+      }
+
+      function applyActiveCases(items = [], { preservePage = false } = {}) {
+        activeCasesCache = Array.isArray(items) ? items : [];
+        if (highlightPending) {
+          const matchIndex = activeCasesCache.findIndex((item) => {
+            const caseId = item.caseId || item.id || item._id || "";
+            return caseId && String(caseId) === String(highlightPending);
+          });
+          activePageIndex = matchIndex >= 0 ? Math.floor(matchIndex / ACTIVE_PAGE_SIZE) : 0;
+        } else if (!preservePage) {
+          activePageIndex = 0;
+        }
+        renderActiveCases(activeCasesCache);
+      }
+
       function renderActiveCases(items = activeCasesCache) {
         if (!filesContainer) return;
         if (!items.length) {
           filesContainer.innerHTML = `<p class="case-files-empty">No active cases yet. New assignments will show up here.</p>`;
+          updateActivePagination(0);
           return;
         }
-        filesContainer.innerHTML = items
+        const totalCount = items.length;
+        const start = activePageIndex * ACTIVE_PAGE_SIZE;
+        const pageItems = items.slice(start, start + ACTIVE_PAGE_SIZE);
+        filesContainer.innerHTML = pageItems
           .map((item) => {
             const caseId = item.caseId || item.id || item._id || "";
             const title = item.jobTitle || item.title || "Case";
@@ -2988,6 +3303,7 @@
             `;
           })
           .join("");
+        updateActivePagination(totalCount);
         if (highlightPending && filesContainer) {
           requestAnimationFrame(() => {
             const target = filesContainer.querySelector(`[data-case-id="${CSS.escape(highlightPending)}"]`);
@@ -3066,6 +3382,7 @@
                   caseId
                 )}">${escapeHTML(disputeSentence)}</button>`
               : "";
+            const blockAction = buildBlockAction(item);
             const highlightClass = highlightPending && caseId && String(caseId) === String(highlightPending)
               ? " is-highlighted"
               : "";
@@ -3078,6 +3395,7 @@
                 <div class="file-actions">
                   ${disputeAction}
                   ${receiptAction}
+                  ${blockAction}
                 </div>
               </article>
           `;
@@ -3112,8 +3430,12 @@
         highlightPending = "";
       }
 
-      async function loadActiveCases() {
+      async function loadActiveCases({ items = null, preservePage = false } = {}) {
         if (!filesContainer) return;
+        if (Array.isArray(items)) {
+          applyActiveCases(items, { preservePage });
+          return;
+        }
         filesContainer.innerHTML = `<p class="case-files-empty">Loading cases…</p>`;
         try {
           const res = await secureFetch("/api/paralegal/dashboard", {
@@ -3123,17 +3445,18 @@
           if (!res.ok) {
             throw new Error(payload?.error || "Unable to load active cases.");
           }
-          activeCasesCache = Array.isArray(payload?.activeCases) ? payload.activeCases : [];
-          renderActiveCases(activeCasesCache);
+          applyActiveCases(payload?.activeCases, { preservePage });
         } catch (err) {
           filesContainer.innerHTML = `<p class="case-files-empty">${escapeHTML(
             err?.message || "Unable to load active cases."
           )}</p>`;
+          updateActivePagination(0);
         }
       }
 
-      async function loadCompletedCases() {
+      async function loadCompletedCases({ preservePage = false } = {}) {
         if (!completedCasesContainer) return;
+        const previousPageIndex = completedPageIndex;
         completedCasesContainer.innerHTML = `<p class="case-files-empty">Loading completed cases…</p>`;
         try {
           const res = await secureFetch("/api/cases/my-completed", {
@@ -3156,6 +3479,8 @@
             });
             completedPageIndex =
               matchIndex >= 0 ? Math.floor(matchIndex / COMPLETED_PAGE_SIZE) : 0;
+          } else if (preservePage) {
+            completedPageIndex = previousPageIndex;
           } else {
             completedPageIndex = 0;
           }
@@ -3166,6 +3491,17 @@
           )}</p>`;
           updateCompletedPagination(0);
         }
+      }
+
+      async function refreshCasesView({ preserveCompletedPage = true, preserveActivePage = true, activeCases = null } = {}) {
+        if (casesRefreshPromise) return casesRefreshPromise;
+        casesRefreshPromise = Promise.all([
+          loadActiveCases({ items: activeCases, preservePage: preserveActivePage }),
+          loadCompletedCases({ preservePage: preserveCompletedPage }),
+        ]).finally(() => {
+          casesRefreshPromise = null;
+        });
+        return casesRefreshPromise;
       }
 
       function setActiveView(target = "home") {
@@ -3187,9 +3523,12 @@
         });
         if (key === "cases" && !casesReady) {
           casesReady = true;
-          loadActiveCases().catch((error) => console.warn("Active cases load failed", error));
-          loadCompletedCases().catch((error) =>
-            console.warn("Completed cases load failed", error)
+          refreshCasesView({ preserveCompletedPage: false, preserveActivePage: false }).catch((error) =>
+            console.warn("Cases view refresh failed", error)
+          );
+        } else if (key === "cases") {
+          refreshCasesView({ preserveCompletedPage: true, preserveActivePage: true }).catch((error) =>
+            console.warn("Cases view refresh failed", error)
           );
         }
         if (key === "cases" && window.location.hash.includes("completed")) {
@@ -3223,6 +3562,14 @@
 
       window.addEventListener("hashchange", () => {
         setActiveView(resolveViewFromHash());
+      });
+
+      window.addEventListener("lpc:paralegal-dashboard-refresh", (event) => {
+        if (!casesReady) return;
+        const activeCases = Array.isArray(event?.detail?.activeCases) ? event.detail.activeCases : null;
+        refreshCasesView({ preserveCompletedPage: true, preserveActivePage: true, activeCases }).catch((error) =>
+          console.warn("Cases view refresh failed", error)
+        );
       });
 
       setActiveView(resolveViewFromHash());
@@ -3293,6 +3640,22 @@
         }
       })();
 
+      if (activePrevBtn) {
+        activePrevBtn.addEventListener("click", () => {
+          if (activePageIndex <= 0) return;
+          activePageIndex -= 1;
+          renderActiveCases(activeCasesCache);
+        });
+      }
+      if (activeNextBtn) {
+        activeNextBtn.addEventListener("click", () => {
+          const totalPages = Math.max(1, Math.ceil(activeCasesCache.length / ACTIVE_PAGE_SIZE));
+          if (activePageIndex >= totalPages - 1) return;
+          activePageIndex += 1;
+          renderActiveCases(activeCasesCache);
+        });
+      }
+
       if (completedPrevBtn) {
         completedPrevBtn.addEventListener("click", () => {
           if (completedPageIndex <= 0) return;
@@ -3312,12 +3675,48 @@
       if (completedCasesContainer) {
         completedCasesContainer.addEventListener("click", async (event) => {
           const btn = event.target.closest("[data-dispute-withdrawn]");
-          if (!btn) return;
-          const caseId = btn.dataset.caseId || "";
-          if (!caseId) return;
-          openDisputeModal(caseId);
+          if (btn) {
+            const caseId = btn.dataset.caseId || "";
+            if (!caseId) return;
+            openDisputeModal(caseId);
+            return;
+          }
+          const blockBtn = event.target.closest("[data-block-future-interaction]");
+          if (blockBtn) {
+            const caseId = blockBtn.dataset.caseId || "";
+            if (!caseId) return;
+            const confirmed = window.confirm(getBlockConfirmMessage());
+            if (!confirmed) return;
+            blockBtn.disabled = true;
+            try {
+              await fetchCSRF().catch(() => "");
+              const res = await secureFetch("/api/blocks", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ caseId }),
+              });
+              const payload = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                throw new Error(payload?.error || "Unable to block future interaction.");
+              }
+              blockBtn.closest(".card-more-actions")?.removeAttribute("open");
+              notifyCase("Future interaction blocked. This user was not notified.", "success");
+              await refreshCasesView({ preserveCompletedPage: true });
+            } catch (error) {
+              blockBtn.disabled = false;
+              notifyCase(error?.message || "Unable to block future interaction.", "error");
+            }
+            return;
+          }
         });
       }
+
+      document.addEventListener("click", (event) => {
+        document.querySelectorAll(".card-more-actions[open]").forEach((menu) => {
+          if (menu.contains(event.target)) return;
+          menu.removeAttribute("open");
+        });
+      });
 
       let pendingDisputeCaseId = "";
       const disputeOverlay = document.getElementById("disputeFormOverlay");
@@ -3397,39 +3796,6 @@
       }
     });
   </script>
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const modal = document.getElementById("availabilityModal");
-      const link = document.getElementById("updateAvailabilityLink");
-      const cancel = document.getElementById("cancelAvailabilityBtn");
-      const quickAction = document.querySelector('.quick-actions button[data-action="availability"]');
-      const browseAction = document.querySelector('.quick-actions button[data-action="browse"]');
-
-      if (!modal) return;
-      if (modal.parentElement !== document.body) {
-        document.body.appendChild(modal);
-      }
-
-      const showModal = (event) => {
-        event?.preventDefault();
-        modal.classList.add("show");
-      };
-
-      const hideModal = () => {
-        modal.classList.remove("show");
-      };
-
-      link?.addEventListener("click", showModal);
-      quickAction?.addEventListener("click", showModal);
-      browseAction?.addEventListener("click", () => {
-        window.location.href = "browse-jobs.html";
-      });
-      cancel?.addEventListener("click", hideModal);
-      modal.addEventListener("click", (event) => {
-        if (event.target === modal) hideModal();
-      });
-    });
-  </script>
   <div class="invite-overlay" id="inviteOverlay">
     <div class="invite-dialog">
       <div class="invite-header">
@@ -3461,7 +3827,6 @@
   </div>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      window.checkSession('paralegal');
       const sidebarToggle = document.getElementById('sidebarToggle');
       const sidebarNav = document.getElementById('sidebarNav');
       const sidebarBackdrop = document.getElementById('sidebarBackdrop');

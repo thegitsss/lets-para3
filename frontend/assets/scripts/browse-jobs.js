@@ -24,10 +24,26 @@ let modalJob = null;
 let stripeConnected = false;
 let viewerRole = "";
 let viewerEmail = "";
+const applicationRequestsInFlight = new Set();
 const STRIPE_BYPASS_EMAILS = new Set([
   "samanthasider+11@gmail.com",
   "samanthasider+56@gmail.com",
 ]);
+
+function setApplicationButtonState(jobId, isLoading) {
+  const key = String(jobId || "");
+  if (!key) return;
+  document.querySelectorAll(".applyBtn[data-id]").forEach((btn) => {
+    if (String(btn.dataset.id || "") !== key) return;
+    btn.disabled = isLoading;
+    btn.textContent = isLoading ? "Applying..." : "Apply";
+  });
+  if (jobApplyBtn && String(modalJob?._id || modalJob?.id || "") === key) {
+    const stripeAllowed = stripeConnected || STRIPE_BYPASS_EMAILS.has(viewerEmail);
+    jobApplyBtn.disabled = isLoading || !stripeAllowed;
+    jobApplyBtn.textContent = isLoading ? "Applying..." : "Apply";
+  }
+}
 
 function getStoredUserEmail() {
   try {
@@ -205,6 +221,10 @@ function promptCoverLetter() {
 }
 
 async function submitQuickApplication(jobId, coverLetter) {
+  const jobKey = String(jobId || "");
+  if (!jobKey || applicationRequestsInFlight.has(jobKey)) return;
+  applicationRequestsInFlight.add(jobKey);
+  setApplicationButtonState(jobKey, true);
   try {
     const res = await secureFetch(`/api/jobs/${jobId}/apply`, {
       method: "POST",
@@ -222,7 +242,10 @@ async function submitQuickApplication(jobId, coverLetter) {
     }
     alert("Application submitted!");
   } catch (err) {
-    alert("Unable to submit application.");
+    alert(err?.message || "Unable to submit application.");
+  } finally {
+    applicationRequestsInFlight.delete(jobKey);
+    setApplicationButtonState(jobKey, false);
   }
 }
 

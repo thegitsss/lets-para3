@@ -20,14 +20,13 @@ const { cleanMessage } = require("../utils/sanitize");
 const {
   applyPublicParalegalFilter,
   hasRequiredParalegalFieldsForPublic,
-  hasRequiredParalegalFieldsForSave,
 } = require("../utils/paralegalProfile");
 const {
+  ACTIVE_BLOCK_FILTER,
   BLOCKED_MESSAGE,
+  deactivateBlock,
   getBlockedUserIds,
   isBlockedBetween,
-  isBlockPairAllowed,
-  isBlockableRole,
 } = require("../utils/blocks");
 
 // ----------------------------------------
@@ -595,7 +594,7 @@ router.post(
 router.get(
   "/me/blocked",
   asyncHandler(async (req, res) => {
-    const blocks = await Block.find({ blockerId: req.user.id })
+    const blocks = await Block.find({ blockerId: req.user.id, ...ACTIVE_BLOCK_FILTER })
       .sort({ createdAt: -1 })
       .select("blockedId")
       .lean();
@@ -625,32 +624,9 @@ router.post(
   csrfProtection,
   requireApprovedUser,
   asyncHandler(async (req, res) => {
-    const { userId } = req.body || {};
-    if (!isObjId(userId)) return res.status(400).json({ error: "Invalid userId" });
-    if (String(userId) === String(req.user.id)) {
-      return res.status(400).json({ error: "Cannot block yourself" });
-    }
-
-    const requesterRole = String(req.user.role || "").toLowerCase();
-    if (!isBlockableRole(requesterRole)) {
-      return res.status(403).json({ error: "Blocking is only available to attorneys and paralegals." });
-    }
-
-    const target = await User.findById(userId).select("_id firstName lastName email role");
-    if (!target) return res.status(404).json({ error: "Target not found" });
-    if (!isBlockPairAllowed(requesterRole, target.role)) {
-      return res.status(400).json({ error: "Blocking is only available between attorneys and paralegals." });
-    }
-
-    const already = await Block.findOne({
-      blockerId: req.user.id,
-      blockedId: target._id,
-    }).select("_id");
-    if (!already) {
-      await Block.create({ blockerId: req.user.id, blockedId: target._id });
-    }
-
-    res.json({ ok: true, blocked: true });
+    return res.status(403).json({
+      error: "Blocking can only be created from a finalized case outcome.",
+    });
   })
 );
 
@@ -662,7 +638,8 @@ router.post(
     const { userId } = req.body || {};
     if (!isObjId(userId)) return res.status(400).json({ error: "Invalid userId" });
 
-    await Block.deleteOne({ blockerId: req.user.id, blockedId: userId });
+    // Legacy unblock endpoint. Keep this silent: never notify the other user.
+    await deactivateBlock({ blockerId: req.user.id, blockedId: userId });
 
     res.json({ ok: true, blocked: false });
   })
@@ -877,10 +854,6 @@ router.patch(
         }
       });
       me.notificationPrefs = currentPrefs;
-    }
-
-    if (me.role === "paralegal" && !hasRequiredParalegalFieldsForSave(me, { allowMissingPhoto })) {
-      return res.status(400).json({ error: "Missing required fields" });
     }
 
     await me.save();
@@ -1396,7 +1369,6 @@ async function sendAttorney(attorneyId, res) {
       `${attorney.firstName || ""} ${attorney.lastName || ""}`.trim() ||
       attorney.email ||
       "Attorney",
-    email: attorney.email || "",
     linkedInURL: attorney.linkedInURL || "",
     firmWebsite: attorney.firmWebsite || "",
     practiceDescription:

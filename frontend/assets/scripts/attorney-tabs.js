@@ -188,6 +188,8 @@ const applicantDrawerCache = new Map();
 let applicantReturnHandled = false;
 let applicantReturnContext = null;
 let applicantsCaseHandled = false;
+let applicantReturnResolved = false;
+let applicantReturnOpening = false;
 const caseApplicationCounts = new Map();
 let applicationsCache = [];
 let applicationsPromise = null;
@@ -327,9 +329,11 @@ function bindNotificationAutoRefresh() {
     if (!Array.isArray(types) || !types.length) return;
     const lowerTypes = new Set(types.map((type) => String(type || "").toLowerCase()));
     if (!lowerTypes.has("application_submitted")) return;
+    if (applicantReturnContext) return;
     if (applicantAutoRefreshTimer) return;
     applicantAutoRefreshTimer = window.setTimeout(async () => {
       applicantAutoRefreshTimer = null;
+      if (applicantReturnContext) return;
       try {
         await refreshApplicationsOverview({ force: true });
       } catch (err) {
@@ -353,14 +357,14 @@ function ensureHeaderStyles() {
   .lpc-shared-header .btn:hover{transform:translateY(-1px);background:#9c8a63}
   .lpc-shared-header .btn.btn-outline{background:transparent;border-color:rgba(0,0,0,0.08);color:#1a1a1a}
   .lpc-shared-header .btn.btn-outline:hover{border-color:#b6a47a;color:#b6a47a;background:rgba(182,164,122,0.06)}
-  .lpc-shared-header .user-chip{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.4);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color .2s ease, box-shadow .2s ease}
+  .lpc-shared-header .user-chip{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:none;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color .2s ease, box-shadow .2s ease}
   .lpc-shared-header .user-chip img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:none;object-fit:cover}
   .lpc-shared-header .user-chip strong{display:block;font-family:var(--font-serif);font-weight:500;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lpc-shared-header .user-chip span{font-size:.85rem;color:#6b6b6b;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  body.theme-dark .lpc-shared-header .user-chip{background:rgba(15,23,42,0.4);border-color:rgba(255,255,255,0.15);box-shadow:none}
+  body.theme-dark .lpc-shared-header .user-chip{background:rgba(15,23,42,0.4);border-color:transparent;box-shadow:none}
   body.theme-dark .lpc-shared-header .user-chip strong{color:#fff}
   body.theme-dark .lpc-shared-header .user-chip span{color:rgba(255,255,255,0.8)}
-  body.theme-mountain .lpc-shared-header .user-chip{background:rgba(255,255,255,0.65);border-color:rgba(255,255,255,0.42);box-shadow:none}
+  body.theme-mountain .lpc-shared-header .user-chip{background:rgba(255,255,255,0.65);border-color:transparent;box-shadow:none}
   body.theme-mountain .lpc-shared-header .user-chip strong{color:#1b1b1b}
   body.theme-mountain .lpc-shared-header .user-chip span{color:#6b6b6b}
   .lpc-shared-header .profile-dropdown{position:absolute;right:0;top:calc(100% + 10px);background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:16px;box-shadow:0 18px 30px rgba(0,0,0,0.12);display:none;flex-direction:column;min-width:200px;z-index:9999;pointer-events:auto;overflow:visible;color:var(--ink,#1a1a1a)}
@@ -522,24 +526,6 @@ function bindHeaderEvents() {
   settingsBtn?.addEventListener("click", () => {
     window.location.href = "profile-settings.html";
   });
-
-  // Fallback notification toggle if notifications.js didn't bind yet
-  if (notifToggle && notifPanel && !notifToggle.dataset.boundNotifFallback) {
-    notifToggle.dataset.boundNotifFallback = "true";
-    notifToggle.addEventListener("click", () => {
-      const notificationCenter = notifToggle.closest("[data-notification-center]");
-      if (notificationCenter?.dataset?.boundNotificationCenter === "true") return;
-      const willShow = !notifPanel.classList.contains("show");
-      document.querySelectorAll("[data-notification-panel].show").forEach((panel) => {
-        if (panel !== notifPanel) panel.classList.remove("show");
-      });
-      notifPanel.classList.toggle("show", willShow);
-      notifPanel.classList.toggle("hidden", !willShow);
-      if (willShow && typeof window.refreshNotificationCenters === "function") {
-        window.refreshNotificationCenters();
-      }
-    });
-  }
 
   if (!headerDocListenersBound) {
     headerDocListenersBound = true;
@@ -3378,7 +3364,7 @@ function renderCasesView() {
     if (!pageItems.length) {
       const searchActive = state.casesSearchTerm && key === state.casesViewFilter;
       const message = searchActive ? "No cases match your search." : "No cases in this category.";
-      const span = key === "archived" ? 8 : key === "draft" ? 6 : 7;
+      const span = key === "archived" ? 8 : 7;
       body.innerHTML = `<tr><td colspan="${span}" class="empty-row">${message}</td></tr>`;
       updateCasesPagination(key, 0);
       return;
@@ -3778,6 +3764,7 @@ function renderCaseRow(item, filterKey = "active") {
     normalizedStatus !== "paused" &&
     normalizedStatus !== "disputed";
   const statusKey = item.localDraft ? "draft" : isManualArchived ? "archived" : normalizedStatus;
+  const moderationStatus = String(item?.moderationStatus || "none").toLowerCase();
   let statusText = statusKey === "draft" ? "Draft" : formatCaseStatus(statusKey);
   let statusClass = statusKey === "draft" ? "pending" : getStatusClass(statusKey);
   if (
@@ -3818,6 +3805,10 @@ function renderCaseRow(item, filterKey = "active") {
   } else if (showStatusBadge && relisted) {
     withdrawalBadge = `<span class="status relisted">Relisted</span>`;
   }
+  const moderationBadge =
+    moderationStatus === "flagged" || moderationStatus === "resolution_requested"
+      ? `<span class="status pending">Flagged</span>`
+      : "";
   const selectionCell =
     filterKey === "archived"
       ? item.archived
@@ -3870,18 +3861,18 @@ function renderCaseRow(item, filterKey = "active") {
   return `
     <tr data-case-id="${sanitize(caseId)}">
       ${selectionCell}
-      <td>${
+      <td class="case-title-cell">${
         item.localDraft
           ? `<a href="create-case.html?draftId=${encodeURIComponent(caseId)}#description">${sanitize(item.title || "Untitled Case")}</a>`
           : canOpenDetail
           ? `<a href="case-detail.html?caseId=${encodeURIComponent(caseId)}">${sanitize(item.title || "Untitled Case")}</a>`
           : `<span>${sanitize(item.title || "Untitled Case")}</span>`
       }</td>
-      ${filterKey === "draft" ? "" : `<td class="case-paralegal-cell">${sanitize(client)}</td>`}
-      <td>${sanitize(practice)}</td>
-      <td><span class="status ${statusClass}">${statusText}</span>${withdrawalBadge}</td>
-      <td>${sanitize(amountDisplay)}</td>
-      <td>${displayedDate}</td>
+      <td class="case-paralegal-cell">${filterKey === "draft" ? '<span class="muted">—</span>' : sanitize(client)}</td>
+      <td class="case-field-cell">${sanitize(practice)}</td>
+      <td class="case-status-cell"><span class="status ${statusClass}">${statusText}</span>${moderationBadge}${withdrawalBadge}</td>
+      <td class="case-amount-cell">${sanitize(amountDisplay)}</td>
+      <td class="case-date-cell">${displayedDate}</td>
       ${actionsCell}
     </tr>
     ${drawerRow}
@@ -3912,6 +3903,8 @@ function renderCaseMenu(item) {
     !hasInvites &&
     !applicantsCount &&
     (statusKey === "open" || statusKey === "draft" || !statusKey);
+  const moderationStatus = String(item?.moderationStatus || "none").toLowerCase();
+  const canMarkFlagResolved = item?.canMarkFlagResolved === true;
   if (item.localDraft) {
     return `
     <div class="case-actions" data-case-id="${baseCaseId}">
@@ -3932,6 +3925,21 @@ function renderCaseMenu(item) {
   if (!item.archived) {
     parts.push(
       `<button type="button" class="menu-item" data-case-action="details" data-case-id="${baseCaseId}">View Details</button>`
+    );
+  }
+  if (moderationStatus === "flagged") {
+    if (canMarkFlagResolved) {
+      parts.push(
+        `<button type="button" class="menu-item" data-case-action="flag-resolved" data-case-id="${baseCaseId}">Flag resolved</button>`
+      );
+    } else {
+      parts.push(
+        `<span class="menu-item" aria-disabled="true">Edit case to resolve flag</span>`
+      );
+    }
+  } else if (moderationStatus === "resolution_requested") {
+    parts.push(
+      `<span class="menu-item" aria-disabled="true">Awaiting admin review</span>`
     );
   }
   parts.push(
@@ -3991,8 +3999,14 @@ function renderCaseMenu(item) {
 }
 
 function closeApplicantsDrawer(drawerRow, toggleBtn) {
+  const caseId = drawerRow?.getAttribute("data-case-id") || toggleBtn?.dataset?.caseId || "";
   if (drawerRow) drawerRow.classList.add("hidden");
   if (toggleBtn) toggleBtn.setAttribute("aria-expanded", "false");
+  if (applicantReturnContext && caseId && String(applicantReturnContext.caseId) === String(caseId)) {
+    applicantReturnResolved = false;
+    applicantReturnContext = null;
+    clearApplicantReturnQuery();
+  }
 }
 
 function openApplicantsDrawer(drawerRow, toggleBtn, { skipAnimation = false } = {}) {
@@ -4645,6 +4659,7 @@ function clearApplicantReturnQuery() {
 }
 
 async function openApplicantFromQuery({ setFilter = true } = {}) {
+  if (applicantReturnOpening) return;
   const context = getApplicantReturnContext();
   if (!context) return;
   const { caseId, applicantId } = context;
@@ -4657,28 +4672,58 @@ async function openApplicantFromQuery({ setFilter = true } = {}) {
   const drawerRow = getDrawerRow(caseId, toggleBtn);
   const drawerEl = getDrawerElement(caseId, toggleBtn);
   if (!drawerEl) return;
-  if (drawerEl.dataset.loaded !== "true") {
-    await loadApplicantsForDrawer(caseId, drawerEl);
-  } else {
-    renderApplicantsInDrawer(caseId, applicantDrawerCache.get(caseId) || [], drawerEl);
+  const applicants = (applicantDrawerCache.get(caseId) || []).filter(
+    (entry) => !["accepted", "rejected"].includes(entry.status)
+  );
+  const targetIndex = applicants.findIndex((applicant) => String(applicant.paralegalId) === String(applicantId));
+  const activeRow =
+    targetIndex >= 0
+      ? drawerEl.querySelector(`[data-applicant-row][data-applicant-index="${targetIndex}"].is-active`)
+      : null;
+  const detail = drawerEl.querySelector("[data-applicant-detail]");
+  if (
+    drawerEl.dataset.loaded === "true" &&
+    drawerRow &&
+    !drawerRow.classList.contains("hidden") &&
+    activeRow &&
+    detail &&
+    !detail.classList.contains("hidden")
+  ) {
+    return;
   }
-  if (drawerRow) {
-    window.requestAnimationFrame(() => openApplicantsDrawer(drawerRow, toggleBtn, { skipAnimation: true }));
-  }
-  showApplicantDetailById(caseId, applicantId, drawerEl);
-  if (setFilter) {
-    clearApplicantReturnQuery();
+  applicantReturnOpening = true;
+  try {
+    if (drawerEl.dataset.loaded !== "true") {
+      await loadApplicantsForDrawer(caseId, drawerEl);
+    } else if (!drawerEl.querySelector("[data-applicant-row]") && !drawerEl.querySelector(".empty-card")) {
+      renderApplicantsInDrawer(caseId, applicantDrawerCache.get(caseId) || [], drawerEl);
+    }
+    if (drawerRow) {
+      openApplicantsDrawer(drawerRow, toggleBtn, { skipAnimation: true });
+    }
+    showApplicantDetailById(caseId, applicantId, drawerEl);
+    const targetIsActive =
+      targetIndex >= 0 &&
+      drawerEl.querySelector(`[data-applicant-row][data-applicant-index="${targetIndex}"].is-active`);
+    if (targetIsActive && detail && !detail.classList.contains("hidden")) {
+      applicantReturnResolved = true;
+    }
+    if (setFilter) {
+      clearApplicantReturnQuery();
+    }
+  } finally {
+    applicantReturnOpening = false;
   }
 }
 
 function restoreApplicantDrawerFromQuery() {
+  if (applicantReturnResolved) return;
   if (!applicantReturnContext) return;
-  void openApplicantFromQuery({ setFilter: false }).finally(() => {
-    applicantReturnContext = null;
-  });
+  void openApplicantFromQuery({ setFilter: false });
 }
 
 function maybeOpenApplicantFromQuery() {
+  if (applicantReturnResolved) return;
   if (applicantReturnHandled) return;
   const context = getApplicantContextFromQuery();
   if (!context) return;
@@ -5301,6 +5346,25 @@ async function handleCaseAction(action, caseId) {
     } else if (action === "edit-note") {
       openCaseNoteModal(caseId);
       return;
+    } else if (action === "flag-resolved") {
+      const confirmed = window.confirm(
+        "Mark this flagged post as resolved? This will notify admin to review and clear the flag if appropriate."
+      );
+      if (!confirmed) return;
+      const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/flags/mark-resolved`, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+        body: {},
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload?.error || "Unable to mark this flag as resolved.");
+      }
+      await loadCasesWithFiles(true);
+      await loadArchivedCases(true);
+      renderCasesView();
+      notifyCases("Admin has been notified that this flag is resolved.", "success");
+      return;
     } else if (action === "download") {
       await downloadCaseDeliverables(caseId);
     } else if (action === "download-receipt") {
@@ -5462,7 +5526,13 @@ async function ensureCaseOpenForDelete(_caseId, _suppressErrors = false) {
 
 function syncCaseCollections(updatedCase) {
   if (!updatedCase) return;
-  const normalized = Object.assign({}, updatedCase);
+  const nextId = String(updatedCase.id || updatedCase._id || "");
+  const existing =
+    state.caseLookup.get(nextId) ||
+    state.cases.find((item) => String(item.id || item._id || item.caseId || "") === nextId) ||
+    state.casesArchived.find((item) => String(item.id || item._id || item.caseId || "") === nextId) ||
+    null;
+  const normalized = Object.assign({}, existing || {}, updatedCase);
   normalized.id = String(normalized.id || normalized._id);
   const removeFromList = (list) => {
     const idx = list.findIndex((item) => String(item.id) === String(normalized.id));
@@ -6293,6 +6363,7 @@ function renderDocumentPreview(doc) {
   const meta = document.querySelector("[data-doc-meta]");
   const preview = document.querySelector("[data-doc-preview]");
   const table = document.getElementById("placeholderBody");
+  if (!meta || !preview || !table) return;
   if (!doc) {
     if (title) title.textContent = "Select a document";
     meta.innerHTML = `<span>Select a file from the list to view details.</span>`;
@@ -6530,7 +6601,13 @@ function isArchivedBucketCase(caseItem) {
   if (!caseItem || caseItem.localDraft) return false;
   if (caseItem.archived === true) return true;
   const status = normalizeCaseStatus(caseItem?.status);
-  if (status === "paused") return true;
+  if (status === "paused") {
+    const relisted =
+      !!caseItem?.relistRequestedAt ||
+      (!!caseItem?.payoutFinalizedAt && AUTO_RELIST_TYPES.has(String(caseItem?.payoutFinalizedType || "")));
+    if (relisted) return false;
+    return true;
+  }
   return isTerminalCase(caseItem);
 }
 
@@ -6890,7 +6967,7 @@ function extractCaseIdFromApplication(app = {}) {
     app.caseDoc;
   if (!candidate) return "";
   if (typeof candidate === "object") {
-    return String(candidate.id || candidate._id || candidate.caseId || "");
+    return String(candidate.id || candidate._id || candidate.caseId || candidate.toString?.() || "");
   }
   return String(candidate);
 }
@@ -6908,12 +6985,22 @@ function applyApplicationsToCases(apps = []) {
 
 function applyApplicationCountsToCases({ render = false } = {}) {
   if (!caseApplicationCounts.size || !Array.isArray(state.cases)) return;
+  let didChange = false;
   state.cases.forEach((caseItem) => {
     const caseId = String(caseItem?.id || caseItem?._id || caseItem?.caseId || "");
     if (!caseId || !caseApplicationCounts.has(caseId)) return;
-    caseItem.applicantsCount = caseApplicationCounts.get(caseId);
+    const nextCount = caseApplicationCounts.get(caseId);
+    const currentCount = Number(
+      caseItem.applicantsCount ??
+        (Array.isArray(caseItem.applicants) ? caseItem.applicants.length : caseItem.applicants) ??
+        0
+    );
+    if (currentCount !== nextCount) {
+      didChange = true;
+      caseItem.applicantsCount = nextCount;
+    }
   });
-  if (render && dashboardViewState.casesInitialized) {
+  if (render && didChange && dashboardViewState.casesInitialized) {
     renderCasesView();
     restoreApplicantDrawerFromQuery();
   }
@@ -7476,7 +7563,7 @@ function openHireConfirmModal({
   ensureHireModalStyles();
   const safeName = sanitize(paralegalName || "Paralegal");
   const feeNote =
-    "The platform fee supports secure Stripe payment processing and access to the Let’s-ParaConnect vetted paralegal network.";
+    "The platform fee supports tools that enable attorneys and paralegals to collaborate, including secure workspace, messaging, document sharing, case workflow tools, payment processing, identity verification, and platform administration. The platform fee is not a fee for legal services.";
   const feeRate = Number(feePct || 0);
   const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
   const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));

@@ -12,96 +12,12 @@ const FUNDED_WORKSPACE_STATUSES = new Set([
 
 export async function render(el, { escapeHTML, params: routeParams } = {}) {
   requireAuth();
-  ensureStyles();
-  const h = escapeHTML || ((s) => String(s ?? ""));
   const params = getRouteParams(routeParams);
   const caseId = params.get("caseId");
-
-  if (el.__chatPollId) {
-    clearInterval(el.__chatPollId);
-    el.__chatPollId = null;
+  if (el) {
+    el.innerHTML = `<section class="dash"><div class="empty">Redirecting to messages…</div></section>`;
   }
-
-  if (!caseId) {
-    el.innerHTML = `<section class="dash"><div class="error">Missing caseId.</div></section>`;
-    return;
-  }
-
-  try {
-    const caseData = await j(`/api/cases/${encodeURIComponent(caseId)}`);
-    if (!canUseMessaging(caseData)) {
-      redirectFromChat();
-      return;
-    }
-  } catch (err) {
-    if (err?.status === 403 || err?.status === 404) {
-      redirectFromChat();
-      return;
-    }
-    el.innerHTML = `<section class="dash"><div class="error">${h(err?.message || "Unable to load case.")}</div></section>`;
-    return;
-  }
-
-  el.innerHTML = template();
-
-  const list = el.querySelector("[data-chat-messages]");
-  const form = el.querySelector("[data-chat-form]");
-  const input = el.querySelector("[data-chat-input]");
-  const status = el.querySelector("[data-chat-status]");
-  const submitBtn = form?.querySelector('button[type="submit"]');
-  const defaultText = submitBtn?.textContent || "Send";
-
-  async function refresh() {
-    try {
-      const messages = await j(`/api/chat/${encodeURIComponent(caseId)}`);
-      renderMessages(list, messages, h);
-      if (status) status.textContent = "";
-    } catch (err) {
-      if (status) status.textContent = err?.message || "Unable to load messages.";
-    }
-  }
-
-  const scheduleSendReset = () => {
-    if (!submitBtn || !form) return;
-    const handler = () => {
-      submitBtn.disabled = false;
-      submitBtn.textContent = defaultText;
-      form.removeEventListener("input", handler);
-    };
-    form.addEventListener("input", handler, { once: true });
-  };
-
-  form?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const text = input?.value.trim();
-    if (!text) return;
-    if (status) status.textContent = "Sending…";
-    let restoreButton = true;
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Sending…";
-    }
-    try {
-      await j(`/api/chat/${encodeURIComponent(caseId)}`, {
-        method: "POST",
-        body: { text },
-      });
-      if (input) input.value = "";
-      await refresh();
-      scheduleSendReset();
-      restoreButton = false;
-    } catch (err) {
-      if (status) status.textContent = err?.message || "Unable to send that message.";
-    } finally {
-      if (restoreButton && submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = defaultText;
-      }
-    }
-  });
-
-  await refresh();
-  el.__chatPollId = setInterval(refresh, 2000);
+  redirectToMessages(caseId);
 }
 
 function normalizeCaseStatus(value) {
@@ -182,6 +98,14 @@ function redirectFromChat() {
     }
   }
   window.location.href = getDefaultBackUrl();
+}
+
+function redirectToMessages(caseId) {
+  if (caseId) {
+    window.location.replace(`case-detail.html?caseId=${encodeURIComponent(caseId)}#case-messages`);
+    return;
+  }
+  redirectFromChat();
 }
 
 function renderMessages(list, messages = [], escapeHTML) {

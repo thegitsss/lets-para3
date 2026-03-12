@@ -81,9 +81,6 @@ async function initBillingSurface() {
       targetBtn.classList.add("onboarding-pulse");
       targetBtn.addEventListener("click", () => targetBtn.classList.remove("onboarding-pulse"), { once: true });
     }
-    ensurePaymentOnboardingSkipButton();
-  } else {
-    removePaymentOnboardingSkipButton();
   }
   if (pendingHire && paymentStatus?.paymentMethod) {
     resumePendingHire(pendingHire);
@@ -156,30 +153,6 @@ function bindEvents() {
     if (paymentModalEl?.classList.contains("hidden")) return;
     cancelPaymentFlow();
   });
-}
-
-function ensurePaymentOnboardingSkipButton() {
-  if (!paymentPanelActionsEl) return;
-  let skipBtn = document.getElementById("skipPaymentOnboardingBtn");
-  if (!skipBtn) {
-    skipBtn = document.createElement("button");
-    skipBtn.type = "button";
-    skipBtn.id = "skipPaymentOnboardingBtn";
-    skipBtn.className = "ghost-btn";
-    skipBtn.textContent = "Skip onboarding";
-    paymentPanelActionsEl.appendChild(skipBtn);
-  }
-  skipBtn.onclick = () => {
-    setAttorneyOnboardingStep("");
-    window.location.href = "dashboard-attorney.html#home";
-  };
-}
-
-function removePaymentOnboardingSkipButton() {
-  const skipBtn = document.getElementById("skipPaymentOnboardingBtn");
-  if (skipBtn?.parentNode) {
-    skipBtn.parentNode.removeChild(skipBtn);
-  }
 }
 
 async function loadHistory() {

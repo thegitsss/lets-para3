@@ -93,8 +93,12 @@ async function syncApplicantsCount(jobId) {
 
 async function getCaseApplicationsForAttorney(attorneyId, blockedSet = null) {
   const attorneyKey = String(attorneyId || "");
+  const ownershipFilters = [];
+  if (attorneyId) {
+    ownershipFilters.push({ attorneyId }, { attorney: attorneyId });
+  }
   const cases = await Case.find({
-    attorneyId,
+    ...(ownershipFilters.length ? { $or: ownershipFilters } : {}),
     "applicants.0": { $exists: true },
   })
     .select("title practiceArea totalAmount lockedTotalAmount currency applicants createdAt")
@@ -429,7 +433,7 @@ router.get("/my-postings", ...authenticatedGuards, requireRole("attorney"), asyn
         jobTitle: job.title || "Job",
         practiceArea: job.practiceArea || "",
         budget: job.budget || null,
-        caseId: job.caseId || null,
+        caseId: job.caseId ? String(job.caseId._id || job.caseId) : null,
         paralegal: app.paralegalId || null,
         coverLetter: app.coverLetter || "",
         starred,

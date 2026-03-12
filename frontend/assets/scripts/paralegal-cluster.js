@@ -66,27 +66,30 @@
         right:16px;
         display:flex;
         align-items:center;
-        gap:10px;
-        padding:8px 12px;
-        background:#fff;
-        border:1px solid rgba(12,18,37,0.08);
-        border-radius:14px;
-        box-shadow:0 14px 40px rgba(0,0,0,0.1);
+        gap:12px;
         z-index:1200;
       }
       #paralegalFloatingCluster .user-profile{
         display:flex;
         align-items:center;
-        gap:8px;
+        gap:12px;
+        padding:8px 12px;
+        border-radius:999px;
+        background:rgba(255,255,255,0.6);
+        border:none;
+        backdrop-filter:blur(14px);
+        -webkit-backdrop-filter:blur(14px);
+        transition:border-color .2s ease, box-shadow .2s ease;
       }
-      #paralegalFloatingCluster .user-profile strong{display:block;font-weight:500;}
-      #paralegalFloatingCluster .user-profile span{display:block;font-size:0.85rem;color:#5c6475;font-weight:200;}
+      #paralegalFloatingCluster .user-profile strong{display:block;font-family:'Cormorant Garamond',serif;font-weight:300;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+      #paralegalFloatingCluster .user-profile span{display:block;font-size:0.85rem;color:#6b6b6b;font-weight:200;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
       #paralegalFloatingCluster img{
-        width:42px;
-        height:42px;
+        width:44px;
+        height:44px;
         border-radius:50%;
+        border:2px solid #fff;
         object-fit:cover;
-        box-shadow:0 6px 16px rgba(0,0,0,0.1);
+        box-shadow:none;
       }
     `;
     document.head.appendChild(style);
@@ -121,7 +124,7 @@
         <img id="clusterAvatar" class="nav-profile-photo" src="${FALLBACK_AVATAR}" alt="Paralegal avatar" />
         <div>
           <strong id="clusterName">Paralegal</strong>
-          <span id="clusterRole">Logged in</span>
+          <span id="clusterRole">Paralegal</span>
         </div>
       </div>
     `;
@@ -135,9 +138,8 @@
   }
 
   function formatRole(user={}){
-    if (user.title) return user.title;
     if (user.role) return String(user.role).charAt(0).toUpperCase() + String(user.role).slice(1);
-    return "";
+    return "Paralegal";
   }
 
   function isPendingPhoto(user = {}){

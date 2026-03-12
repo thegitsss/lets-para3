@@ -562,23 +562,29 @@
     .user-chip {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: var(--app-surface);
-      border: 1px solid var(--app-border-soft);
-      cursor: pointer;
-      font-family: var(--font-sans);
-      color: var(--app-text);
       text-align: left;
-    }
-    body.theme-dark .user-chip,
-    html.theme-dark .user-chip,
-    body.theme-mountain-dark .user-chip,
-    html.theme-mountain-dark .user-chip {
-      background: #1c2333;
-      border-color: rgba(255, 255, 255, 0.12);
+      text-decoration: none;
+      cursor: pointer;
+      border-radius: 999px;
       color: var(--app-text);
+    }
+    body.role-attorney .user-chip {
+      gap: 12px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.6);
+      border: none;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+    body:not(.role-attorney) .user-chip {
+      gap: 12px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.6);
+      border: none;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: border-color .2s ease, box-shadow .2s ease;
     }
 
     .user-chip img {
@@ -587,21 +593,105 @@
       border-radius: 50%;
       object-fit: cover;
     }
+    body.role-attorney .user-chip img {
+      width: 44px;
+      height: 44px;
+      border: 2px solid #fff;
+      box-shadow: none;
+    }
+    body:not(.role-attorney) .user-chip img {
+      width: 44px;
+      height: 44px;
+      border: 2px solid #fff;
+      box-shadow: none;
+    }
 
     .user-chip strong {
       display: block;
-      font-weight: 400;
+    }
+    body.role-attorney .user-chip strong {
+      font-family: var(--font-serif);
+      font-weight: 500;
+      letter-spacing: .02em;
+      color: #1a1a1a;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    body:not(.role-attorney) .user-chip strong {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      letter-spacing: .02em;
+      color: #1a1a1a;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .user-chip span {
-      font-size: 0.82rem;
-      color: var(--app-muted);
+      display: block;
     }
-    body.theme-dark .user-chip span,
-    html.theme-dark .user-chip span,
-    body.theme-mountain-dark .user-chip span,
-    html.theme-mountain-dark .user-chip span {
-      color: #9aa7c4;
+    body.role-attorney .user-chip span {
+      font-size: .85rem;
+      color: #6b6b6b;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    body:not(.role-attorney) .user-chip span {
+      font-size: .85rem;
+      color: #6b6b6b;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    body.theme-dark.role-attorney .user-chip {
+      background: rgba(15,23,42,0.4);
+      border-color: transparent;
+      box-shadow: none;
+    }
+    body.theme-dark.role-attorney .user-chip strong {
+      color: #fff;
+    }
+    body.theme-dark.role-attorney .user-chip span {
+      color: rgba(255,255,255,0.8);
+    }
+    body.theme-mountain.role-attorney .user-chip {
+      background: rgba(255,255,255,0.65);
+      border-color: transparent;
+      box-shadow: none;
+    }
+    body.theme-mountain.role-attorney .user-chip strong {
+      color: #1b1b1b;
+    }
+    body.theme-mountain.role-attorney .user-chip span {
+      color: #6b6b6b;
+    }
+    body.theme-dark:not(.role-attorney) .user-chip,
+    html.theme-dark body:not(.role-attorney) .user-chip,
+    body.theme-mountain-dark:not(.role-attorney) .user-chip,
+    html.theme-mountain-dark body:not(.role-attorney) .user-chip {
+      background: rgba(15,23,42,0.4);
+      border-color: transparent;
+      box-shadow: none;
+    }
+    body.theme-dark:not(.role-attorney) .user-chip strong,
+    body.theme-mountain-dark:not(.role-attorney) .user-chip strong {
+      color: #fff;
+    }
+    body.theme-dark:not(.role-attorney) .user-chip span,
+    body.theme-mountain-dark:not(.role-attorney) .user-chip span {
+      color: rgba(255, 255, 255, 0.8);
+    }
+    body.theme-mountain:not(.role-attorney) .user-chip strong {
+      color: #1b1b1b;
+    }
+    body.theme-mountain:not(.role-attorney) .user-chip span {
+      color: #6b6b6b;
     }
 
     .profile-dropdown {
@@ -1015,6 +1105,12 @@
       text-align: center;
     }
 
+    .case-participants h2 {
+      font-family: var(--font-serif);
+      font-weight: 300;
+      letter-spacing: 0.04em;
+    }
+
     .case-documents-panel {
       display: flex;
       flex-direction: column;
@@ -1126,16 +1222,31 @@
 
     .case-participants ul li {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      flex-direction: column;
+      align-items: flex-start;
       gap: 4px;
-      padding: 4px 6px;
+      padding: 8px 6px;
       border: none;
       border-radius: 10px;
       background: transparent;
       color: var(--app-text);
-      font-size: 0.82rem;
       line-height: 1.2;
+    }
+
+    .participant-role {
+      font-family: var(--font-sans);
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--app-muted);
+    }
+
+    .participant-name {
+      font-family: var(--font-serif);
+      font-size: 1.15rem;
+      font-weight: 300;
+      color: var(--app-text);
+      line-height: 1.15;
     }
 
     .message-list {
@@ -1857,6 +1968,53 @@
       font-weight: 250;
     }
 
+    .case-action-menu {
+      position: relative;
+      display: inline-block;
+    }
+
+    .case-action-menu summary {
+      list-style: none;
+      cursor: pointer;
+      border: 1px solid var(--app-border-soft);
+      background: var(--app-surface-contrast);
+      color: var(--app-muted);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      user-select: none;
+    }
+
+    .case-action-menu summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .case-action-menu[open] summary {
+      color: var(--app-accent);
+      border-color: rgba(166, 142, 95, 0.35);
+    }
+
+    .case-action-menu-panel {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 8px);
+      min-width: 240px;
+      padding: 6px;
+      border: 1px solid var(--app-border-soft);
+      border-radius: 16px;
+      background: var(--app-surface);
+      box-shadow: var(--app-shadow-soft);
+      z-index: 10;
+    }
+
+    .case-action-menu-panel .case-action-btn {
+      width: 100%;
+      justify-content: flex-start;
+    }
+
     .case-overview-footer {
       margin-top: auto;
       padding-top: 8px;
@@ -1913,8 +2071,8 @@
     .case-documents-list {
       display: grid;
       gap: 10px;
-      max-height: clamp(220px, 42vh, 520px);
-      overflow-y: auto;
+      max-height: none;
+      overflow-y: visible;
       padding-right: 4px;
     }
 
@@ -2075,6 +2233,12 @@
 
     .case-overview-tasks h3 {
       margin-right: 28px;
+    }
+
+    #caseTaskList {
+      max-height: calc(10 * 2.5rem);
+      overflow-y: auto;
+      padding-right: 4px;
     }
 
     #caseTaskList label {
@@ -2301,7 +2465,7 @@
     @media (max-width: 1200px) {
       .case-workspace {
         grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.9fr);
-        grid-template-rows: auto auto;
+        grid-template-rows: max-content minmax(0, 1fr);
       }
 
       .case-thread {
@@ -2323,6 +2487,13 @@
 
       .case-overview-panel {
         border-top: 1px solid var(--app-border-soft);
+      }
+    }
+
+    @media (max-width: 1200px) and (min-width: 901px) {
+      .case-documents-list {
+        max-height: var(--case-documents-visible-height, none);
+        overflow-y: auto;
       }
     }
 
@@ -2899,23 +3070,7 @@
     const bindNotifFallback = () => {
       if (!notifToggle || !notifPanel) return;
       const center = notifToggle.closest('[data-notification-center]');
-      if (center?.dataset?.boundNotificationCenter === 'true') return;
-      if (notifToggle.dataset.boundNotifFallback === 'true') return;
-      notifToggle.dataset.boundNotifFallback = 'true';
-      const toggleNotifPanel = () => {
-        const willShow = !notifPanel.classList.contains('show');
-        notifPanel.classList.toggle('show', willShow);
-        notifPanel.classList.toggle('hidden', !willShow);
-      };
-      notifToggle.addEventListener('click', (event) => {
-        event.preventDefault();
-        toggleNotifPanel();
-      });
-      notifToggle.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
-        toggleNotifPanel();
-      });
+      if (!center || center?.dataset?.boundNotificationCenter === 'true') return;
     };
     const initNotifFallback = () => {
       if (typeof window.scanNotificationCenters === 'function') {

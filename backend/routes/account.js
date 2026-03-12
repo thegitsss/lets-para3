@@ -5,8 +5,9 @@ const verifyToken = require("../utils/verifyToken");
 const { requireApproved } = require("../utils/authz");
 const User = require("../models/User");
 const AuditLog = require("../models/AuditLog");
-const { purgeAttorneyAccount } = require("../services/userDeletion");
+const { deactivateUserAccount, getAccountDeactivationEligibility } = require("../services/userDeletion");
 const { hasApprovedPhoto } = require("../utils/paralegalProfile");
+const sendEmail = require("../utils/email");
 
 // ----------------------------------------
 // CSRF (enabled in production or when ENABLE_CSRF=true)
@@ -255,33 +256,66 @@ router.post(
   })
 );
 
+async function handleDeactivateAccount(req, res) {
+  const generalBlockerCopy =
+    "Accounts cannot be deactivated while you are involved in an active matter or while escrow, payout, dispute, or other financial obligations remain unresolved.";
+  const user = await User.findById(req.user.id);
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const eligibility = await getAccountDeactivationEligibility(user);
+  if (!eligibility.canDeactivate) {
+    const specificMessage = eligibility.blockers[0]?.message || "This account cannot be deactivated yet.";
+    return res.status(409).json({
+      error: `${generalBlockerCopy} ${specificMessage}`.trim(),
+      blockers: eligibility.blockers,
+    });
+  }
+
+  await deactivateUserAccount(user, { now: new Date() });
+
+  try {
+    await AuditLog.logFromReq(req, "account.deactivate", {
+      targetType: "user",
+      targetId: user._id,
+      meta: { email: user.email || "", role: user.role || "" },
+    });
+  } catch {}
+
+  try {
+    await sendEmail.sendAccountDeactivatedEmail?.(user);
+  } catch (err) {
+    console.warn("[account] deactivation email failed", err?.message || err);
+  }
+
+  res.clearCookie("token");
+  const cookieName = process.env.JWT_COOKIE_NAME || "access";
+  if (cookieName && cookieName !== "token") {
+    res.clearCookie(cookieName);
+  }
+
+  return res.json({ ok: true, deactivated: true });
+}
+
+router.get(
+  "/deactivate-status",
+  asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user.id).select("_id role disabled deleted");
+    if (!user) return res.status(404).json({ error: "User not found" });
+    const eligibility = await getAccountDeactivationEligibility(user);
+    return res.json(eligibility);
+  })
+);
+
+router.delete(
+  "/deactivate",
+  csrfProtection,
+  asyncHandler(handleDeactivateAccount)
+);
+
 router.delete(
   "/delete",
   csrfProtection,
-  asyncHandler(async (req, res) => {
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    if (String(user.role || "").toLowerCase() === "attorney") {
-      await purgeAttorneyAccount(user._id);
-    } else {
-      user.deleted = true;
-      user.deletedAt = new Date();
-      user.disabled = true;
-      user.status = "denied";
-      await user.save();
-    }
-
-    try {
-      await AuditLog.logFromReq(req, "account.delete", {
-        targetType: "user",
-        targetId: user._id,
-        meta: { email: user.email || "", role: user.role || "" },
-      });
-    } catch {}
-
-    res.json({ ok: true });
-  })
+  asyncHandler(handleDeactivateAccount)
 );
 
 router.use((err, _req, res, _next) => {

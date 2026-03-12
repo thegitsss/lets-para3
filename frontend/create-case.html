@@ -274,10 +274,10 @@
     .main{flex:1;padding:40px;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;}
     .topbar{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:0.2rem;gap:1.5rem;position:relative;min-height:0;}
     #createCaseTopbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;}
-    .user-profile{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.4);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color 0.2s ease,box-shadow .2s ease;cursor:pointer;position:relative;}
-    .user-profile img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,0.08);object-fit:cover;}
-    .user-profile strong{display:block;font-weight:300;color:var(--ink);}
-    .user-profile span{font-size:0.85rem;color:var(--muted);}
+    .user-profile{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:none;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color 0.2s ease,box-shadow .2s ease;cursor:pointer;position:relative;}
+    .user-profile img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:none;object-fit:cover;}
+    .user-profile strong{display:block;font-family:var(--font-serif);font-weight:500;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .user-profile span{font-size:0.85rem;color:#6b6b6b;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .profile-dropdown{position:absolute;right:0;top:calc(100% + 10px);background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:16px;box-shadow:0 18px 30px rgba(0,0,0,0.12);display:none;flex-direction:column;min-width:200px;z-index:45;pointer-events:auto;overflow:visible;color:var(--ink,#1a1a1a);}
     .profile-dropdown.show{display:flex;pointer-events:auto;overflow:visible;}
     .profile-dropdown button,
@@ -286,14 +286,14 @@
     .profile-dropdown a:hover{background:rgba(0,0,0,0.04);}
     .profile-dropdown .logout-btn{color:#8f7240;background:rgba(182,164,122,0.14);border:1px solid rgba(182,164,122,0.35);}
     .profile-dropdown .logout-btn:hover{background:rgba(182,164,122,0.22);color:#6f552b;}
-    body.theme-dark .user-profile{background:rgba(15,23,42,0.4);border-color:rgba(255,255,255,0.15);box-shadow:0 10px 25px rgba(0,0,0,0.35);}
+    body.theme-dark .user-profile{background:rgba(15,23,42,0.4);border-color:transparent;box-shadow:none;}
     body.theme-dark .user-profile strong{color:#fff;}
     body.theme-dark .user-profile span{color:rgba(255,255,255,0.8);}
     body.theme-dark .profile-dropdown button:hover,
     body.theme-dark .profile-dropdown a:hover,
     body.theme-mountain-dark .profile-dropdown button:hover,
     body.theme-mountain-dark .profile-dropdown a:hover{background:rgba(255,255,255,0.06);}
-    body.theme-mountain .user-profile{background:rgba(255,255,255,0.65);border-color:rgba(255,255,255,0.42);box-shadow:0 18px 34px rgba(17,22,26,0.2);}
+    body.theme-mountain .user-profile{background:rgba(255,255,255,0.65);border-color:transparent;box-shadow:0 18px 34px rgba(17,22,26,0.2);}
     body.theme-mountain .user-profile strong{color:#fff;}
     body.theme-mountain .user-profile span{color:rgba(255,255,255,0.85);}
     body.theme-mountain #createCaseTopbar .user-profile strong{color:#1a1a1a;}
@@ -776,6 +776,7 @@ body.theme-dark .select-field select{
       line-height:1.35;
       color:#5f5542;
     }
+
     .fee-info{
       display:inline-flex;
       align-items:center;
@@ -1312,7 +1313,7 @@ body.theme-dark .select-field select{
         </div>
       </div>
       <div class="user-profile" id="createCaseUserChip" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false" aria-controls="createCaseProfileMenu" aria-label="Open profile menu">
-        <img id="createCaseAvatar" src="assets/images/default-avatar.png" alt="Attorney avatar" />
+        <img id="createCaseAvatar" src="assets/default-avatar.png" alt="Attorney avatar" />
         <div>
           <strong id="createCaseName">Attorney</strong>
           <span id="createCaseRole">Attorney</span>
@@ -1579,7 +1580,7 @@ body.theme-dark .select-field select{
           </div>
           <aside class="compliance-note" aria-label="Professional guidelines">
             <h3>Professional Guidelines</h3>
-            <p>Attorney-to-paralegal use only; attorney supervision required. Let&rsquo;s-ParaConnect does not provide legal advice. Payments are processed through Stripe.</p>
+            <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed securely through Stripe and are released upon attorney approval within the workspace after all tasks are checked.</p>
           </aside>
           <div class="summary-wide"></div>
         </div>
@@ -1600,7 +1601,7 @@ body.theme-dark .select-field select{
       <p><strong>Field of Law:</strong> <span id="previewField">—</span></p>
       <p><strong>Location:</strong> <span id="previewState">—</span></p>
       <p><strong>Compensation:</strong> <span id="previewComp">—</span></p>
-      <p><strong>Platform fee (22%):</strong> <span id="previewPlatformFee">—</span><span class="fee-info" tabindex="0" data-tooltip="Platform fee includes Stripe security, dispute support, payment processing, and vetted paralegal access.">?</span></p>
+      <p><strong>Platform fee (22%):</strong> <span id="previewPlatformFee">—</span><span class="fee-info" tabindex="0" data-tooltip="The platform fee supports tools that enable attorneys and paralegals to collaborate, including secure workspace, messaging, document sharing, case workflow tools, payment processing, identity verification, and platform administration. The platform fee is not a fee for legal services.">?</span></p>
       <p><strong>Estimated total due at hire:</strong> <span id="previewTotalDue">—</span></p>
       <p><strong>Experience:</strong> <span id="previewExperience">—</span></p>
       <p id="previewDeadlineRow" hidden><strong>Deadline:</strong> <span id="previewDeadline">—</span></p>
@@ -1633,7 +1634,7 @@ body.theme-dark .select-field select{
           user?.profileImage ||
           user?.avatarURL ||
           user?.pendingProfileImage ||
-          "assets/images/default-avatar.png"
+          "assets/default-avatar.png"
         );
       }
 
@@ -2175,7 +2176,7 @@ body.theme-dark .select-field select{
     const autoNoteCopy = "";
     const PLATFORM_FEE_PCT = 22;
     const PLATFORM_FEE_NOTE =
-      "Platform fee includes Stripe security, dispute support, payment processing, and vetted paralegal access.";
+      "The platform fee supports tools that enable attorneys and paralegals to collaborate, including secure workspace, messaging, document sharing, case workflow tools, payment processing, identity verification, and platform administration. The platform fee is not a fee for legal services.";
     const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
       "samanthasider+attorney@gmail.com",
       "samanthasider+56@gmail.com",
@@ -2741,7 +2742,7 @@ body.theme-dark .select-field select{
       const guidelinesHtml = `
         <aside class="compliance-note" aria-label="Professional guidelines">
           <h3>Professional Guidelines</h3>
-          <p>Attorney-to-paralegal use only; attorney supervision required. Let&rsquo;s-ParaConnect does not provide legal advice. Payments are processed through Stripe.</p>
+          <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed securely through Stripe and are released upon attorney approval within the workspace after all tasks are checked.</p>
         </aside>
       `;
       reviewSummary.innerHTML = `

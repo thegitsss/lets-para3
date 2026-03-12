@@ -1,5 +1,8 @@
 // backend/utils/verifyToken.js
 const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+
+const DEACTIVATED_ACCOUNT_MSG = "This account has been deactivated.";
 
 // -------------------------------
 // Helpers
@@ -128,7 +131,7 @@ function shapeUser(payload) {
 // Middleware factory
 // -------------------------------
 function makeVerifier(required = true) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const token = getToken(req);
 
     if (!token) {
@@ -149,7 +152,27 @@ function makeVerifier(required = true) {
       return res.status(403).json({ msg: "Invalid token" });
     }
 
-    req.user = Object.assign({ _id: user.id }, user);
+    try {
+      const currentUser = await User.findById(user.id)
+        .select("_id role email status disabled deleted")
+        .lean();
+      if (!currentUser || currentUser.deleted || currentUser.disabled) {
+        if (!required) return next();
+        return res.status(403).json({ error: DEACTIVATED_ACCOUNT_MSG, msg: DEACTIVATED_ACCOUNT_MSG });
+      }
+      req.user = {
+        _id: String(currentUser._id),
+        id: String(currentUser._id),
+        role: currentUser.role,
+        email: currentUser.email,
+        status: currentUser.status,
+        approved: String(currentUser.status || "").toLowerCase() === "approved",
+        scopes: user.scopes,
+        orgId: user.orgId,
+      };
+    } catch (err) {
+      return next(err);
+    }
     req.auth = { token, payload };
     return next();
   };

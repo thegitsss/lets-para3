@@ -13,7 +13,7 @@ const ALWAYS_STRIPE_BYPASS_EMAILS = new Set(["samanthasider+56@gmail.com"]);
 const DEV_STRIPE_QUERY_PARAM = "stripe";
 const DEV_STRIPE_QUERY_VALUE = "dev";
 
-export const STRIPE_GATE_MESSAGE = "Stripe Connect is required to receive payment. Connect it from your dashboard.";
+export const STRIPE_GATE_MESSAGE = "";
 
 let cachedStatus;
 let cachedAt = 0;

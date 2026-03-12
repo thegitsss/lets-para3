@@ -106,7 +106,7 @@ const templates = {
          <div style="margin-top:12px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8a8373;">Completed on</div>
          <div style="font-size:15px;color:${INK};margin-top:4px;">${completedDate}</div>
        </div>
-       <p style="margin:0;">Deliverables remain available for the next 6 months.</p>`
+       <p style="margin:0;">Deliverables will remain available in your account for six (6) months. Please download and save any files you wish to retain.</p>`
     );
     return { subject: "Your case has been completed", html };
   },

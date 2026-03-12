@@ -321,6 +321,7 @@ background:#fff;
 .status.pending{background:#fff4e5;color:#e67e22;padding:4px 8px;border-radius:6px;font-size:.8rem;}
 .status.approved{background:#e2fff7;color:#16a085;padding:4px 8px;border-radius:6px;font-size:.8rem;}
 .status.rejected{background:#fee2e2;color:#b91c1c;padding:4px 8px;border-radius:6px;font-size:.8rem;}
+.status-note{display:block;margin-top:.4rem;color:var(--muted);font-size:.85rem;line-height:1.35;max-width:260px;}
 .flagged-list{list-style:none;padding:0;margin:0;}
 .flagged-list li{padding:.6rem .4rem;border-bottom:1px solid var(--line);font-size:.95rem;}
 .flagged-list li:last-child{border-bottom:none;}
@@ -1362,6 +1363,19 @@ font-size:.95rem;
 </div>
 </div>
 
+<div id="postDetailsModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="postDetailsTitle">
+<div class="details-content">
+<div class="details-header">
+<h2 id="postDetailsTitle">Case details</h2>
+<button type="button" class="btn secondary" data-post-details-close>Close ✕</button>
+</div>
+<div class="author-posts-meta" id="postDetailsMeta"></div>
+<table class="details-table author-posts-table">
+<tbody id="postDetailsBody"></tbody>
+</table>
+</div>
+</div>
+
 <div id="authorPostsModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="authorPostsTitle">
 <div class="details-content">
 <div class="details-header">
@@ -2256,13 +2270,19 @@ const flagCount=Number(entry.flagCount||0);
 const flagReasons=Array.isArray(entry.flagReasons)?entry.flagReasons:[];
 const flagDetails=entry.flagDetails||"";
 const flaggedByReports=flagCount>0;
-const isFlagged=flaggedByStatus||flaggedByReports||quality.score<75;
+const moderationStatus=String(entry.moderationStatus||"none").toLowerCase();
+const isReported=flaggedByReports;
+const isFlagged=flaggedByStatus||moderationStatus==="flagged"||moderationStatus==="resolution_requested"||quality.score<75;
 const attorney=entry.attorney||{};
 const author=entry.authorName||attorney.name||`${attorney.firstName||""} ${attorney.lastName||""}`.trim()||attorney.email||"Unknown";
 const authorId=attorney.id||attorney._id||entry.attorneyId||entry.attorney||"";
 const state=deriveState(entry);
-const statusLabel=isFlagged?"Flagged":toTitle(status.replace(/_/g," "))||"Pending";
-const statusClass=isFlagged?"pending":"approved";
+const statusLabel=
+moderationStatus==="resolution_requested"?"Flag resolved":
+isFlagged?"Flagged":
+isReported?"Reported":
+toTitle(status.replace(/_/g," "))||"Pending";
+const statusClass=(isFlagged||isReported)?"pending":"approved";
 return{
 id:entry.id||entry._id,
 title:entry.title||"Untitled Post",
@@ -2276,6 +2296,8 @@ status,
 statusLabel,
 statusClass,
 isFlagged,
+isReported,
+moderationStatus,
 flaggedReason:flaggedByReports
 ? formatFlagReason(flagReasons[0]||"",flagDetails)
 : flaggedByStatus
@@ -2361,6 +2383,7 @@ handler();
 menu.appendChild(item);
 };
 
+addItem("View Details","",()=>openPostDetails(record));
 addItem("Edit","",()=>editPost({ closest: () => wrapper.closest("tr") }));
 addItem("Delete","danger",()=>deletePost(record));
 if(record.isFlagged){
@@ -2394,7 +2417,12 @@ const tr=document.createElement("tr");
 tr.dataset.caseId=record.id||"";
 tr.dataset.flagged=record.isFlagged?"true":"false";
 const titleCell=document.createElement("td");
-titleCell.textContent=record.title;
+const titleBtn=document.createElement("button");
+titleBtn.type="button";
+titleBtn.className="author-link";
+titleBtn.textContent=record.title;
+titleBtn.addEventListener("click",()=>openPostDetails(record));
+titleCell.appendChild(titleBtn);
 const authorCell=document.createElement("td");
 if(record.authorId){
 const authorBtn=document.createElement("button");
@@ -2417,6 +2445,12 @@ const statusSpan=document.createElement("span");
 statusSpan.className=`status ${record.statusClass}`;
 statusSpan.textContent=record.statusLabel;
 statusCell.appendChild(statusSpan);
+if(record.isReported || record.moderationStatus==="flagged" || record.moderationStatus==="resolution_requested"){
+const reasonNote=document.createElement("span");
+reasonNote.className="status-note";
+reasonNote.textContent=record.flaggedReason||"Needs admin review";
+statusCell.appendChild(reasonNote);
+}
 const actionCell=document.createElement("td");
 actionCell.appendChild(createActionMenu(record));
 tr.append(titleCell,authorCell,categoryCell,stateCell,dateCell,statusCell,actionCell);
@@ -2578,7 +2612,17 @@ return !!entry.relistRequestedAt && !!entry.payoutFinalizedAt;
 }
 return false;
 });
-adminPosts=postedCases.map((entry)=>shapeAdminPost(entry));
+adminPosts=postedCases
+.map((entry)=>shapeAdminPost(entry))
+.sort((a,b)=>{
+const aPriority=(a.isFlagged||a.isReported)?1:0;
+const bPriority=(b.isFlagged||b.isReported)?1:0;
+if(aPriority!==bPriority) return bPriority-aPriority;
+const aFlag=a.flaggedAt?new Date(a.flaggedAt).getTime():0;
+const bFlag=b.flaggedAt?new Date(b.flaggedAt).getTime():0;
+if(aFlag!==bFlag) return bFlag-aFlag;
+return new Date(b.createdAt||0)-new Date(a.createdAt||0);
+});
 const summaryOverrides=computePostSummaryOverrides(adminPostsSource);
 if(!adminPosts.length){
 setPostsTableMessage("No posts found.");
@@ -2694,6 +2738,76 @@ showToast(err?.message||"Unable to archive post.","err");
 }
 }
 
+const postDetailsModal=document.getElementById("postDetailsModal");
+const postDetailsTitle=document.getElementById("postDetailsTitle");
+const postDetailsMeta=document.getElementById("postDetailsMeta");
+const postDetailsBody=document.getElementById("postDetailsBody");
+const postDetailsCloseBtn=postDetailsModal?.querySelector("[data-post-details-close]");
+
+function buildPostDetailsRow(label,value){
+const tr=document.createElement("tr");
+const th=document.createElement("th");
+th.textContent=label;
+const td=document.createElement("td");
+td.innerHTML=value;
+tr.append(th,td);
+return tr;
+}
+
+function closePostDetails(){
+if(!postDetailsModal)return;
+postDetailsModal.classList.add("hidden");
+if(postDetailsBody) postDetailsBody.innerHTML="";
+if(postDetailsMeta) postDetailsMeta.textContent="";
+if(postDetailsTitle) postDetailsTitle.textContent="Case details";
+}
+
+async function openPostDetails(record){
+if(!record?.id||!postDetailsModal||!postDetailsBody)return;
+postDetailsModal.classList.remove("hidden");
+if(postDetailsTitle) postDetailsTitle.textContent=record.title||"Case details";
+if(postDetailsMeta) postDetailsMeta.textContent="Loading case details...";
+postDetailsBody.innerHTML=`<tr><td colspan="2" class="pending-empty">Loading case details...</td></tr>`;
+try{
+const res=await secureFetch(`/api/cases/${encodeURIComponent(record.id)}`,{headers:{Accept:"application/json"}});
+const payload=await res.json().catch(()=>({}));
+if(!res.ok){
+throw new Error(payload?.error||"Unable to load case details.");
+}
+const entry=payload?.case||payload||{};
+const deadline=entry.deadline?formatDate(entry.deadline):"—";
+const amount=entry.totalAmount?formatCurrencyCents(entry.totalAmount,entry.currency||"USD"):"—";
+const moderationStatus=String(entry.moderationStatus||"none").toLowerCase();
+const moderationLabel=
+moderationStatus==="resolution_requested"?"Flag resolved":
+moderationStatus==="flagged"?"Flagged":
+"—";
+const tasks=Array.isArray(entry.tasks)&&entry.tasks.length
+? `<ul>${entry.tasks.map((task)=>`<li>${escapeHtml(task?.title||"Task")}</li>`).join("")}</ul>`
+: "No tasks listed.";
+const description=escapeHtml(entry.details||entry.briefSummary||"No description provided.").replace(/\n/g,"<br>");
+postDetailsBody.innerHTML="";
+postDetailsBody.appendChild(buildPostDetailsRow("Status", escapeHtml(record.statusLabel||"—")));
+postDetailsBody.appendChild(buildPostDetailsRow("Moderation", escapeHtml(moderationLabel)));
+if(record.isReported || record.moderationStatus==="flagged" || record.moderationStatus==="resolution_requested"){
+postDetailsBody.appendChild(buildPostDetailsRow("Report reason", escapeHtml(record.flaggedReason||"Needs admin review")));
+}
+postDetailsBody.appendChild(buildPostDetailsRow("Category", escapeHtml(entry.practiceArea||record.category||"—")));
+postDetailsBody.appendChild(buildPostDetailsRow("Location", escapeHtml(entry.locationState||entry.state||record.state||"—")));
+postDetailsBody.appendChild(buildPostDetailsRow("Deadline", escapeHtml(deadline)));
+postDetailsBody.appendChild(buildPostDetailsRow("Amount", escapeHtml(amount)));
+postDetailsBody.appendChild(buildPostDetailsRow("Description", description));
+postDetailsBody.appendChild(buildPostDetailsRow("Tasks", tasks));
+if(postDetailsMeta){
+const updated=entry.updatedAt?formatDate(entry.updatedAt):"—";
+postDetailsMeta.textContent=`Last updated ${updated}`;
+}
+}catch(err){
+postDetailsBody.innerHTML=`<tr><td colspan="2" class="pending-empty">${escapeHtml(err?.message||"Unable to load case details.")}</td></tr>`;
+if(postDetailsMeta) postDetailsMeta.textContent="";
+}
+}
+
 function deletePost(target){
 const record=resolveDeleteTarget(target);
 if(!record?.id)return;
@@ -2710,12 +2824,22 @@ editPostCloseBtn?.addEventListener("click",(event)=>{
 event.preventDefault();
 closeEditModal();
 });
+postDetailsCloseBtn?.addEventListener("click",(event)=>{
+event.preventDefault();
+closePostDetails();
+});
 editPostModal?.addEventListener("click",(event)=>{
 if(event.target===editPostModal) closeEditModal();
+});
+postDetailsModal?.addEventListener("click",(event)=>{
+if(event.target===postDetailsModal) closePostDetails();
 });
 document.addEventListener("keydown",(event)=>{
 if(event.key==="Escape"&&editPostModal&&!editPostModal.classList.contains("hidden")){
 closeEditModal();
+}
+if(event.key==="Escape"&&postDetailsModal&&!postDetailsModal.classList.contains("hidden")){
+closePostDetails();
 }
 });
 const suspendUserModal=document.getElementById("suspendUserModal");
@@ -3063,6 +3187,7 @@ let approvedUsers = [];
 let approvedRequestId = 0;
 let deletedUsers = [];
 let deletedRequestId = 0;
+const AUDIT_LOG_LIMIT = 20;
 let auditLogs = [];
 let auditRequestId = 0;
 let massEmailUsers = [];
@@ -3210,6 +3335,10 @@ count === 1 ? '1 deleted user' : `${count} deleted users`;
 
 const updateAuditCount = (count = 0) => {
 if (auditLogsCountLabel) {
+if (count > AUDIT_LOG_LIMIT) {
+auditLogsCountLabel.textContent = `Showing ${AUDIT_LOG_LIMIT} of ${count} entries`;
+return;
+}
 auditLogsCountLabel.textContent =
 count === 1 ? '1 entry' : `${count} entries`;
 }
@@ -3828,6 +3957,7 @@ appendDetailRow('Timezone', user.timezone);
 appendDetailRow('State', user.state || user.location);
 appendDetailRow('Location', user.location);
 appendDetailRow('Bar Number', user.barNumber);
+appendDetailRow('LinkedIn', buildFileHref(user.linkedInURL), { link: true, linkLabel: 'Open' });
 appendDetailRow('Resume', buildFileHref(user.resumeURL), { link: true, linkLabel: 'Open' });
 appendDetailRow('Certification', buildFileHref(user.certificateURL), {
 link: true,
@@ -4185,7 +4315,7 @@ const requestId = ++auditRequestId;
 setAuditLoading(true);
 auditLogsBody.innerHTML =
 '<tr><td colspan="6" class="pending-empty">Loading activity logs…</td></tr>';
-const params = new URLSearchParams({ limit: '50' });
+const params = new URLSearchParams({ limit: String(AUDIT_LOG_LIMIT) });
 const roleValue = (auditRoleFilter?.value || '').toLowerCase();
 if (roleValue && roleValue !== 'all') params.set('role', roleValue);
 const targetValue = (auditTargetFilter?.value || '').toLowerCase();

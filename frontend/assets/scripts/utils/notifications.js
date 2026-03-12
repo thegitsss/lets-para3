@@ -669,10 +669,10 @@ function togglePanel(center) {
     return;
   }
   if (!center.loaded) {
-    center.panel.classList.add("hidden");
-    center.panel.classList.remove("show");
-    center.panel.dataset.pendingShow = "true";
-    fetchNotifications(center, { markReadOnLoad: true, openAfterLoad: true });
+    renderEmpty(center, "Loading...");
+    center.panel.dataset.pendingShow = "";
+    showPanel(center);
+    fetchNotifications(center, { markReadOnLoad: true });
     return;
   }
   showPanel(center);
@@ -682,6 +682,15 @@ function togglePanel(center) {
 function preload(center) {
   renderEmpty(center, "Loading...");
   fetchNotifications(center);
+}
+
+function markNotificationsReadQuiet() {
+  return secureFetch("/api/notifications/read-all", {
+    method: "POST",
+    credentials: "include",
+  }).catch((err) => {
+    console.warn("[notifications] mark read failed", err);
+  });
 }
 
 async function fetchNotifications(center, options = {}) {
@@ -705,9 +714,29 @@ async function fetchNotifications(center, options = {}) {
     const payload = await res.json();
     const items = Array.isArray(payload) ? payload : [];
     const filtered = await filterCompletedCaseNotifications(items);
-    center.notifications = Array.isArray(filtered) ? filtered.map(normalizeNotification) : [];
+    const normalized = Array.isArray(filtered) ? filtered.map(normalizeNotification) : [];
+    const shouldMarkReadOnLoad =
+      options.markReadOnLoad &&
+      center.panel.classList.contains("show") &&
+      normalized.some((item) => !isNotificationRead(item));
+    const nextNotifications = shouldMarkReadOnLoad
+      ? normalized.map((item) => ({ ...item, read: true, isRead: true }))
+      : normalized;
+    center.notifications = nextNotifications;
     center.unread = getUnreadCount(center.notifications);
     center.loaded = true;
+    if (shouldMarkReadOnLoad) {
+      centers.forEach((c) => {
+        if (!c || c === center) return;
+        c.notifications = (Array.isArray(c.notifications) ? c.notifications : []).map((item) => ({
+          ...item,
+          read: true,
+          isRead: true,
+        }));
+        c.unread = getUnreadCount(c.notifications);
+        updateBadge(c, c.unread);
+      });
+    }
     renderNotifications(center);
     emitNotificationRefresh({
       source: "center",
@@ -723,8 +752,8 @@ async function fetchNotifications(center, options = {}) {
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       showPanel(center);
     }
-    if (options.markReadOnLoad && center.unread > 0 && center.panel.classList.contains("show")) {
-      await markNotificationsRead(center);
+    if (shouldMarkReadOnLoad) {
+      void markNotificationsReadQuiet();
     }
   } catch (err) {
     console.warn("[notifications] load failed", err);
@@ -1156,7 +1185,10 @@ if (!notificationsOptOut) {
     if (notificationsBooted) return;
     notificationsBooted = true;
     ensureNotificationStyles();
-    loadNotifications();
+    scanNotificationCenters();
+    if (!centers.length) {
+      loadNotifications();
+    }
     initPushNotifications();
     bindMinimalToggleHandler();
     startNotificationStream();

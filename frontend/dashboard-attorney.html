@@ -2489,13 +2489,40 @@
     .view-cases .status + .status{margin-left:6px;}
     .view-cases th.case-title-col,
     .view-cases td.case-title-cell{
-      width:17.25%;
-      min-width:126px;
+      width:24.75%;
+      min-width:180px;
     }
     .view-cases th.case-paralegal-col,
     .view-cases td.case-paralegal-cell{
-      width:12.65%;
-      min-width:115px;
+      width:16.45%;
+      min-width:150px;
+    }
+    .view-cases th.case-field-col,
+    .view-cases td.case-field-cell{
+      width:14%;
+      min-width:118px;
+    }
+    .view-cases th.case-status-col,
+    .view-cases td.case-status-cell{
+      width:13%;
+      min-width:118px;
+    }
+    .view-cases th.case-amount-col,
+    .view-cases td.case-amount-cell{
+      width:11%;
+      min-width:96px;
+      white-space:nowrap;
+    }
+    .view-cases th.case-date-col,
+    .view-cases td.case-date-cell{
+      width:12%;
+      min-width:108px;
+      white-space:nowrap;
+    }
+    .view-cases th.case-actions-col,
+    .view-cases td.actions{
+      width:14%;
+      min-width:128px;
     }
 
     .status-history-list{
@@ -4903,11 +4930,11 @@
                   <tr>
                     <th class="case-title-col">Title</th>
                     <th class="case-paralegal-col">Paralegal Assigned</th>
-                    <th>Field</th>
-                    <th>Status</th>
-                    <th>Amount</th>
-                    <th>Posted</th>
-                    <th class="actions"></th>
+                    <th class="case-field-col">Field</th>
+                    <th class="case-status-col">Status</th>
+                    <th class="case-amount-col">Amount</th>
+                    <th class="case-date-col">Posted</th>
+                    <th class="actions case-actions-col"></th>
                   </tr>
                 </thead>
                 <tbody data-table-body="active">
@@ -4926,15 +4953,16 @@
                 <thead>
                   <tr>
                     <th class="case-title-col">Title</th>
-                    <th>Field</th>
-                    <th>Status</th>
-                    <th>Amount</th>
-                    <th>Last Edited</th>
-                    <th class="actions"></th>
-                  </tr>
-                </thead>
+                    <th class="case-paralegal-col">Paralegal Assigned</th>
+                    <th class="case-field-col">Field</th>
+                    <th class="case-status-col">Status</th>
+                    <th class="case-amount-col">Amount</th>
+                    <th class="case-date-col">Last Edited</th>
+                    <th class="actions case-actions-col"></th>
+                </tr>
+              </thead>
                 <tbody data-table-body="draft">
-                  <tr><td colspan="6" class="empty-row">Loading draft cases…</td></tr>
+                  <tr><td colspan="7" class="empty-row">Loading draft cases…</td></tr>
                 </tbody>
               </table>
               <div class="case-pagination" data-case-pagination="draft">
@@ -4967,11 +4995,11 @@
                     <th style="width:42px;">Select</th>
                     <th class="case-title-col">Title</th>
                     <th class="case-paralegal-col">Paralegal Assigned</th>
-                    <th>Field</th>
-                    <th>Status</th>
-                    <th>Amount</th>
-                    <th>Archived</th>
-                    <th class="actions"></th>
+                    <th class="case-field-col">Field</th>
+                    <th class="case-status-col">Status</th>
+                    <th class="case-amount-col">Amount</th>
+                    <th class="case-date-col">Archived</th>
+                    <th class="actions case-actions-col"></th>
                   </tr>
                 </thead>
                 <tbody data-table-body="archived">
@@ -4991,11 +5019,11 @@
                   <tr>
                     <th class="case-title-col">Title</th>
                     <th class="case-paralegal-col">Paralegal Assigned</th>
-                    <th>Field</th>
-                    <th>Status</th>
-                    <th>Amount</th>
-                    <th>Posted</th>
-                    <th class="actions"></th>
+                    <th class="case-field-col">Field</th>
+                    <th class="case-status-col">Status</th>
+                    <th class="case-amount-col">Amount</th>
+                    <th class="case-date-col">Posted</th>
+                    <th class="actions case-actions-col"></th>
                   </tr>
                 </thead>
                 <tbody data-table-body="inquiries">

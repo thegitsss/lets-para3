@@ -1,5 +1,5 @@
-import { secureFetch, persistSession, getStoredSession } from "./auth.js";
-import { STRIPE_GATE_MESSAGE } from "./utils/stripe-connect.js";
+import { secureFetch, persistSession, getStoredSession, clearSession } from "./auth.js";
+import { startStripeOnboarding } from "./utils/stripe-connect.js";
 
 const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
 const ATTORNEY_ONBOARDING_MODAL_SEEN_KEY = "lpc_attorney_onboarding_modal_seen";
@@ -11,6 +11,15 @@ const DEFAULT_AVATAR_DATA = `data:image/svg+xml;charset=UTF-8,${encodeURICompone
     <path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/>
   </svg>`
 )}`;
+
+function escapeHTML(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 function getAttorneyOnboardingStep() {
   try {
@@ -108,6 +117,7 @@ document.addEventListener("DOMContentLoaded", () => {
       section.style.removeProperty("display");
       section.style.display = "block";
     }
+    scheduleProfileScrollIndicatorUpdate();
   };
 
   Object.keys(navItems).forEach(navId => {
@@ -126,7 +136,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const helpBtn = document.getElementById("navHelp");
   if (helpBtn) {
     helpBtn.addEventListener("click", () => {
-      window.location.href = "help.html";
+      const session = getStoredSession();
+      const role = String(session?.role || session?.user?.role || "").toLowerCase();
+      window.location.href = role === "paralegal" ? "paralegalhelp.html" : "help.html";
     });
   }
 
@@ -135,6 +147,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ? navItems[initialNav.id]
     : navItems.navProfile;
   setActiveSection(initialSectionId);
+  bindProfileScrollIndicator();
   const stepToRun = String(requestedOnboardingStep || "").toLowerCase();
   if (stepToRun) {
     runAttorneyOnboardingStep(stepToRun, { silent: suppressProfileToast && stepToRun === "profile" });
@@ -346,6 +359,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const yearsExperienceInput = document.getElementById("yearsExperienceInput");
   if (yearsExperienceInput) {
     yearsExperienceInput.addEventListener("input", () => {
+      const digitsOnly = String(yearsExperienceInput.value || "").replace(/\D+/g, "").slice(0, 2);
+      if (yearsExperienceInput.value !== digitsOnly) {
+        yearsExperienceInput.value = digitsOnly;
+      }
       updateRoleLineFromExperience();
     });
   }
@@ -434,21 +451,26 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  const deleteButtons = document.querySelectorAll("[data-delete-account]");
-  if (deleteButtons.length) {
-    deleteButtons.forEach((btn) => {
+  const deactivateButtons = document.querySelectorAll("[data-deactivate-account]");
+  if (deactivateButtons.length) {
+    deactivateButtons.forEach((btn) => {
       btn.addEventListener("click", async () => {
         const confirmed = window.confirm(
-          "Delete your account and all data? This is permanent and cannot be undone."
+          "Deactivate your account? This will disable sign-in and remove you from active platform participation. Historical case, dispute, payment, audit, and financial records will be preserved. This is not full erasure. Accounts cannot be deactivated while you are involved in an active matter or while payout, dispute, or other financial obligations remain unresolved."
         );
         if (!confirmed) return;
 
-        const res = await secureFetch("/api/account/delete", { method: "DELETE" });
+        const res = await secureFetch("/api/account/deactivate", { method: "DELETE" });
+        const data = await res.json().catch(() => ({}));
 
         if (res.ok) {
-          window.location.href = "/goodbye.html";
+          clearSession();
+          window.location.href = "/index.html?deactivated=1";
         } else {
-          alert("Error deleting account.");
+          const blockerCopy = Array.isArray(data?.blockers) && data.blockers.length
+            ? data.blockers.map((item) => item.message).join("\n")
+            : "";
+          alert(blockerCopy || data?.error || "Unable to deactivate account.");
         }
       });
     });
@@ -644,12 +666,23 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSessionHistory();
 
   // --- BLOCKED USERS ---
+  async function requestUnblock(userId, name = "this user") {
+    const confirmed = window.confirm(
+      `Unblock ${name}? Future interaction restrictions will be removed for new activity only. This will not reopen old matters, messages, or prior workflows. This user will not be notified.`
+    );
+    if (!confirmed) return false;
+    await secureFetch(`/api/blocks/${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    });
+    return true;
+  }
+
   async function loadBlockedUsers() {
     const container = document.getElementById("blockedUsersList");
     if (!container) return;
 
     try {
-      const res = await fetch("/api/users/me/blocked", { credentials: "include" });
+      const res = await fetch("/api/blocks", { credentials: "include" });
       const data = await res.json();
 
       if (!Array.isArray(data) || !data.length) {
@@ -657,23 +690,37 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      container.innerHTML = data.map(
-        (u) => `
-        <div class="blocked-user-row">
-          ${u.name}
-          <button class="small-btn unblock-btn" data-id="${u._id}">Unblock</button>
-        </div>
-      `
-      ).join("");
+      container.innerHTML = data
+        .map((u) => {
+          const userId = u.blockedId || u._id || "";
+          const safeName = escapeHTML(u.name || "User");
+          return `
+            <div class="blocked-user-row">
+              <div class="blocked-user-name">${safeName}</div>
+              <button class="small-btn danger-lite unblock-btn" data-id="${escapeHTML(userId)}" data-name="${encodeURIComponent(
+                u.name || "User"
+              )}">Unblock</button>
+            </div>
+          `;
+        })
+        .join("");
 
       container.querySelectorAll(".unblock-btn").forEach((btn) => {
         btn.addEventListener("click", async () => {
-          await secureFetch("/api/users/unblock", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId: btn.dataset.id })
-          });
-          loadBlockedUsers();
+          try {
+            const didUnblock = await requestUnblock(
+              btn.dataset.id,
+              btn.dataset.name ? decodeURIComponent(btn.dataset.name) : "this user"
+            );
+            if (!didUnblock) return;
+            loadBlockedUsers();
+          } catch (error) {
+            console.error("Failed to unblock user", error);
+            container.insertAdjacentHTML(
+              "afterbegin",
+              "<p class='muted'>Unable to unblock this user right now.</p>"
+            );
+          }
         });
       });
     } catch (err) {
@@ -689,8 +736,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const cachedUser = getCachedUser();
   const cachedRole = String(cachedUser?.role || "").toLowerCase();
   const isParalegal = cachedRole === "paralegal";
-  const allowStripeConnect =
-    String(cachedUser?.email || "").toLowerCase().trim() === "samanthasider+0@gmail.com";
 
   const updateStripeStatus = (data = {}) => {
     const connected = !!data.details_submitted && !!data.payouts_enabled;
@@ -710,12 +755,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (connectStripeBtn) {
       connectStripeBtn.textContent = connected ? "Update Stripe Details" : "Connect Stripe Account →";
-      connectStripeBtn.disabled = !connected && !allowStripeConnect;
-      if (connectStripeBtn.disabled) {
-        connectStripeBtn.setAttribute("aria-disabled", "true");
-      } else {
-        connectStripeBtn.removeAttribute("aria-disabled");
-      }
+      connectStripeBtn.disabled = !isParalegal;
+      connectStripeBtn.setAttribute("aria-disabled", !isParalegal ? "true" : "false");
       connectStripeBtn.removeAttribute("title");
     }
   };
@@ -732,12 +773,8 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       if (stripeStatus) stripeStatus.textContent = "Stripe status unavailable.";
       if (connectStripeBtn) {
-        connectStripeBtn.disabled = !allowStripeConnect;
-        if (connectStripeBtn.disabled) {
-          connectStripeBtn.setAttribute("aria-disabled", "true");
-        } else {
-          connectStripeBtn.removeAttribute("aria-disabled");
-        }
+        connectStripeBtn.disabled = !isParalegal;
+        connectStripeBtn.setAttribute("aria-disabled", !isParalegal ? "true" : "false");
         connectStripeBtn.removeAttribute("title");
       }
     }
@@ -750,17 +787,7 @@ document.addEventListener("DOMContentLoaded", () => {
       connectStripeBtn.disabled = true;
       connectStripeBtn.textContent = "Connecting…";
       try {
-        const createRes = await secureFetch("/api/payments/connect/create-account", { method: "POST" });
-        if (!createRes.ok) throw new Error("Unable to prepare Stripe account");
-        const { accountId } = await createRes.json();
-        const linkRes = await secureFetch("/api/payments/connect/onboard-link", {
-          method: "POST",
-          body: { accountId },
-        });
-        if (!linkRes.ok) throw new Error("Unable to start Stripe onboarding");
-        const { url } = await linkRes.json();
-        if (!url) throw new Error("Invalid Stripe onboarding link");
-        window.location.href = url;
+        await startStripeOnboarding();
       } catch (err) {
         console.error("Failed to start Stripe connect flow", err);
         alert(err?.message || "Unable to connect Stripe right now.");
@@ -778,6 +805,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 const PREFILL_CACHE_KEY = "lpc_edit_profile_prefill";
+const PROFILE_SETTINGS_DRAFT_KEY = "lpc_profile_settings_draft_v1";
 
 const paralegalSettingsSection = document.getElementById("paralegalSettings");
 const attorneySettingsSection = document.getElementById("attorneySettings");
@@ -886,6 +914,47 @@ let paralegalEditBound = false;
 let paralegalVisibilityBound = false;
 let paralegalRequiredBound = false;
 let activeParalegalSection = null;
+let profileDraftPersistenceBound = false;
+let applyingProfileDraft = false;
+let profileDraftWriteTimer = null;
+let profileScrollIndicatorBound = false;
+
+function updateProfileScrollIndicator() {
+  const indicator = document.getElementById("paralegalScrollIndicator");
+  const content = document.getElementById("main");
+  const profileSection = document.getElementById("profileSection");
+  const isParalegal = String(currentUser?.role || "").toLowerCase() === "paralegal";
+  const profileVisible = Boolean(profileSection?.classList.contains("active"));
+  const paralegalVisible = !paralegalSettingsSection?.classList.contains("hidden");
+  const scrollRemaining = content ? content.scrollHeight - content.scrollTop - content.clientHeight : 0;
+  const shouldShow = Boolean(
+    indicator &&
+      content &&
+      isParalegal &&
+      profileVisible &&
+      paralegalVisible &&
+      scrollRemaining > 80
+  );
+  if (!indicator) return;
+  indicator.classList.toggle("is-visible", shouldShow);
+  indicator.setAttribute("aria-hidden", shouldShow ? "false" : "true");
+}
+
+function scheduleProfileScrollIndicatorUpdate() {
+  requestAnimationFrame(() => updateProfileScrollIndicator());
+}
+
+function bindProfileScrollIndicator() {
+  if (profileScrollIndicatorBound) return;
+  const content = document.getElementById("main");
+  if (!content) return;
+  content.addEventListener("scroll", scheduleProfileScrollIndicatorUpdate, { passive: true });
+  window.addEventListener("resize", scheduleProfileScrollIndicatorUpdate);
+  document.addEventListener("click", () => {
+    setTimeout(() => scheduleProfileScrollIndicatorUpdate(), 0);
+  });
+  profileScrollIndicatorBound = true;
+}
 
 const FIELD_OF_LAW_OPTIONS = [
   "Administrative Law",
@@ -1093,6 +1162,207 @@ function consumeEditPrefillUser() {
   }
 }
 
+function getProfileSettingsDraftStorageKey(user = currentUser || getCachedUser() || {}) {
+  const role = String(user?.role || "").trim().toLowerCase();
+  const identifier =
+    String(user?._id || user?.id || user?.email || "").trim().toLowerCase();
+  if (!role || !identifier) return "";
+  return `${PROFILE_SETTINGS_DRAFT_KEY}:${role}:${identifier}`;
+}
+
+function readProfileSettingsDraft(user = currentUser || getCachedUser() || {}) {
+  const key = getProfileSettingsDraftStorageKey(user);
+  if (!key) return null;
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearProfileSettingsDraft(user = currentUser || getCachedUser() || {}) {
+  const key = getProfileSettingsDraftStorageKey(user);
+  if (!key) return;
+  try {
+    sessionStorage.removeItem(key);
+  } catch {}
+}
+
+function collectAttorneyProfileDraft() {
+  return {
+    role: "attorney",
+    firstName: document.getElementById("attorneyFirstName")?.value.trim() || "",
+    lastName: document.getElementById("attorneyLastName")?.value.trim() || "",
+    linkedInURL: document.getElementById("attorneyLinkedIn")?.value.trim() || "",
+    lawFirm: document.getElementById("attorneyFirmName")?.value.trim() || "",
+    firmWebsite: document.getElementById("attorneyFirmWebsite")?.value.trim() || "",
+    practiceDescription: document.getElementById("attorneyPracticeDescription")?.value || "",
+    publications: (document.getElementById("attorneyPublications")?.value || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean),
+    practiceAreas: collectAttorneyPracticeAreas(),
+  };
+}
+
+function collectParalegalProfileDraft() {
+  syncNamePartsFromFullName();
+  return {
+    role: "paralegal",
+    firstName: document.getElementById("firstNameInput")?.value.trim() || "",
+    lastName: document.getElementById("lastNameInput")?.value.trim() || "",
+    email: document.getElementById("emailInput")?.value.trim() || "",
+    bio: document.getElementById("bioInput")?.value || "",
+    linkedInURL: document.getElementById("linkedInInput")?.value.trim() || "",
+    yearsExperience: document.getElementById("yearsExperienceInput")?.value || "",
+    practiceAreas: collectParalegalPracticeAreas(),
+    skills: readSkillsInput(),
+    stateExperience: readStateExperienceInput(),
+    bestFor: collectBestForEntries(),
+    experience: buildExperienceEntriesForSave(collectExperienceRows()),
+    education: collectEducationFromEditor(),
+    languages: collectLanguagesFromEditor(),
+  };
+}
+
+function collectProfileSettingsDraft() {
+  const role = String(currentUser?.role || "").trim().toLowerCase();
+  if (role === "attorney") return collectAttorneyProfileDraft();
+  if (role === "paralegal") return collectParalegalProfileDraft();
+  return null;
+}
+
+function persistProfileSettingsDraft() {
+  if (applyingProfileDraft) return;
+  const key = getProfileSettingsDraftStorageKey();
+  if (!key) return;
+  const draft = collectProfileSettingsDraft();
+  if (!draft) return;
+  try {
+    sessionStorage.setItem(
+      key,
+      JSON.stringify({
+        ...draft,
+        updatedAt: Date.now(),
+      })
+    );
+  } catch {}
+}
+
+function scheduleProfileSettingsDraftPersist(delay = 120) {
+  if (applyingProfileDraft) return;
+  if (profileDraftWriteTimer) {
+    clearTimeout(profileDraftWriteTimer);
+  }
+  profileDraftWriteTimer = setTimeout(() => {
+    profileDraftWriteTimer = null;
+    persistProfileSettingsDraft();
+  }, delay);
+}
+
+function applyProfileSettingsDraft(draft = null, user = currentUser || {}) {
+  if (!draft || typeof draft !== "object") return;
+  const role = String(user?.role || draft.role || "").trim().toLowerCase();
+  if (!role || (draft.role && String(draft.role).trim().toLowerCase() !== role)) return;
+
+  applyingProfileDraft = true;
+  try {
+    if (role === "attorney") {
+      const firstInput = document.getElementById("attorneyFirstName");
+      if (firstInput) firstInput.value = draft.firstName || "";
+      const lastInput = document.getElementById("attorneyLastName");
+      if (lastInput) lastInput.value = draft.lastName || "";
+      const linkedInInput = document.getElementById("attorneyLinkedIn");
+      if (linkedInInput) linkedInInput.value = draft.linkedInURL || "";
+      const firmNameInput = document.getElementById("attorneyFirmName");
+      if (firmNameInput) firmNameInput.value = draft.lawFirm || "";
+      const firmWebsiteInput = document.getElementById("attorneyFirmWebsite");
+      if (firmWebsiteInput) firmWebsiteInput.value = draft.firmWebsite || "";
+      const practiceInput = document.getElementById("attorneyPracticeDescription");
+      if (practiceInput) practiceInput.value = draft.practiceDescription || "";
+      const publicationsInput = document.getElementById("attorneyPublications");
+      if (publicationsInput) {
+        publicationsInput.value = Array.isArray(draft.publications) ? draft.publications.join("\n") : "";
+      }
+      renderAttorneyPracticeAreas(Array.isArray(draft.practiceAreas) ? draft.practiceAreas : []);
+      settingsState.practiceDescription = draft.practiceDescription || "";
+      updateAttorneyPracticeCount();
+      syncCluster({
+        ...(user || {}),
+        firstName: draft.firstName || user.firstName || "",
+        lastName: draft.lastName || user.lastName || "",
+      });
+      return;
+    }
+
+    setFullNameInputs({
+      ...(user || {}),
+      firstName: draft.firstName || user.firstName || "",
+      lastName: draft.lastName || user.lastName || "",
+    });
+    const emailInput = document.getElementById("emailInput");
+    if (emailInput) emailInput.value = draft.email || "";
+    const bioInput = document.getElementById("bioInput");
+    if (bioInput) bioInput.value = draft.bio || "";
+    const linkedInInput = document.getElementById("linkedInInput");
+    if (linkedInInput) linkedInInput.value = draft.linkedInURL || "";
+    const yearsExperienceInput = document.getElementById("yearsExperienceInput");
+    if (yearsExperienceInput) yearsExperienceInput.value = draft.yearsExperience || "";
+    renderParalegalPracticeAreas(Array.isArray(draft.practiceAreas) ? draft.practiceAreas : []);
+    applySkillsInput(Array.isArray(draft.skills) ? draft.skills : []);
+    bindSkillsInput();
+    applyStateExperienceInput(Array.isArray(draft.stateExperience) ? draft.stateExperience : []);
+    bindStateExperienceInput();
+    renderBestForList(Array.isArray(draft.bestFor) ? draft.bestFor : [], { editable: false });
+    renderExperienceRows(Array.isArray(draft.experience) ? draft.experience : []);
+    bindExperienceAddButton();
+    renderEducationEditor(Array.isArray(draft.education) ? draft.education : []);
+    renderLanguageEditor(Array.isArray(draft.languages) ? draft.languages : []);
+    settingsState.bio = draft.bio || "";
+    settingsState.linkedInURL = draft.linkedInURL || "";
+    settingsState.highlightedSkills = Array.isArray(draft.skills) ? draft.skills : [];
+    settingsState.stateExperience = Array.isArray(draft.stateExperience) ? draft.stateExperience : [];
+    settingsState.education = Array.isArray(draft.education) ? draft.education : [];
+    refreshParalegalSectionDisplays();
+    updateRoleLineFromExperience();
+    updateRequiredFieldMarkers();
+    syncCluster({
+      ...(user || {}),
+      firstName: draft.firstName || user.firstName || "",
+      lastName: draft.lastName || user.lastName || "",
+    });
+  } finally {
+    applyingProfileDraft = false;
+  }
+}
+
+function bindProfileDraftPersistence() {
+  if (profileDraftPersistenceBound) return;
+  const shouldTrack = (target) => {
+    if (!(target instanceof HTMLElement)) return false;
+    return Boolean(target.closest("#profileForm, #attorneySettings"));
+  };
+  const scheduleFromEvent = (event) => {
+    if (!currentUser || applyingProfileDraft || !shouldTrack(event.target)) return;
+    scheduleProfileSettingsDraftPersist();
+  };
+
+  document.addEventListener("input", scheduleFromEvent, true);
+  document.addEventListener("change", scheduleFromEvent, true);
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (!currentUser || applyingProfileDraft || !shouldTrack(event.target)) return;
+      setTimeout(() => scheduleProfileSettingsDraftPersist(), 0);
+    },
+    true
+  );
+  profileDraftPersistenceBound = true;
+}
+
 function seedSettingsState(user = {}) {
   settingsState.bio = user.bio || "";
   settingsState.education = user.education || [];
@@ -1133,6 +1403,88 @@ function resolveProfilePhotoStatus(user = {}) {
 
 function resolvePendingProfileImage(user = {}) {
   return user.pendingProfileImage || settingsState.pendingProfileImage || "";
+}
+
+function preserveProfileSettingsScrollPosition() {
+  const content = document.getElementById("main");
+  if (!content) return () => {};
+  const previousTop = content.scrollTop;
+  return () => {
+    requestAnimationFrame(() => {
+      content.scrollTop = previousTop;
+      scheduleProfileScrollIndicatorUpdate?.();
+    });
+  };
+}
+
+function bindDocumentFileChooser(triggerId, input, onAfterChoose = null) {
+  const trigger = document.getElementById(triggerId);
+  if (!trigger || !input) return;
+  trigger.addEventListener("click", () => {
+    const restoreScroll = preserveProfileSettingsScrollPosition();
+    input.click();
+    setTimeout(() => {
+      restoreScroll();
+      if (typeof onAfterChoose === "function") onAfterChoose();
+    }, 0);
+  });
+  input.addEventListener("change", () => {
+    const restoreScroll = preserveProfileSettingsScrollPosition();
+    setTimeout(() => {
+      restoreScroll();
+      if (typeof onAfterChoose === "function") onAfterChoose();
+    }, 0);
+  });
+}
+
+async function uploadParalegalPdfDocument({
+  input,
+  endpoint,
+  emptyMessage,
+  invalidMessage,
+  sizeMessage,
+  failureMessage,
+  pendingMessage,
+  successMessage,
+  onSuccess,
+  onFinally,
+}) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  if (!isPdfFile(file)) {
+    alert(invalidMessage);
+    input.value = "";
+    onFinally?.();
+    return;
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    alert(sizeMessage);
+    input.value = "";
+    onFinally?.();
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append("file", file);
+
+  try {
+    const res = await secureFetch(endpoint, {
+      method: "POST",
+      body: fd
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload.msg || failureMessage);
+    }
+    onSuccess?.(payload, file);
+    showToast(successMessage, "ok");
+  } catch (err) {
+    console.error(`Upload failed for ${endpoint}`, err);
+    alert(err?.message || failureMessage);
+  } finally {
+    input.value = "";
+    onFinally?.();
+  }
 }
 
 function resolvePendingProfileImageOriginal(user = {}) {
@@ -1215,11 +1567,10 @@ function getParalegalRequiredFieldStatus() {
   const bioValue = bioInput?.value ?? settingsState.bio;
   const bioOk = Boolean(String(bioValue || "").trim());
 
-  const skillsInput = document.getElementById("skillsInput");
-  const practiceInput = document.getElementById("practiceAreasInput");
-  const skills = parseCommaList(skillsInput?.value || "");
-  const focus = parseCommaList(practiceInput?.value || "");
-  const skillsFocusOk = skills.length > 0 && focus.length > 0;
+  const skills = readSkillsInput();
+  const practiceAreas = collectParalegalPracticeAreas();
+  const skillsOk = skills.length > 0;
+  const practiceAreasOk = practiceAreas.length > 0;
 
   const resumeKeyInput = document.getElementById("resumeKeyInput");
   const resumeValue =
@@ -1232,7 +1583,8 @@ function getParalegalRequiredFieldStatus() {
 
   return {
     bioOk,
-    skillsFocusOk,
+    skillsOk,
+    practiceAreasOk,
     resumeOk,
     photoOk,
   };
@@ -1246,7 +1598,9 @@ function updateRequiredFieldMarkers() {
   const bioLabel = document.querySelector("#bioSection .card-header-label");
   if (bioLabel) bioLabel.classList.toggle("required-missing", !status.bioOk);
   const skillsLabel = document.querySelector("#skillsCard .card-header-label");
-  if (skillsLabel) skillsLabel.classList.toggle("required-missing", !status.skillsFocusOk);
+  if (skillsLabel) skillsLabel.classList.toggle("required-missing", !status.skillsOk);
+  const practiceAreasLabel = document.querySelector("#practiceAreasCard .card-header-label");
+  if (practiceAreasLabel) practiceAreasLabel.classList.toggle("required-missing", !status.practiceAreasOk);
   const stateLabel = document.querySelector("#stateExperienceCard .card-header-label");
   if (stateLabel) stateLabel.classList.remove("required-missing");
   const resumeHeader = document.querySelector("#settingsResume h3");
@@ -1256,13 +1610,14 @@ function updateRequiredFieldMarkers() {
 
   const missing = [];
   if (!status.bioOk) missing.push("Bio");
-  if (!status.skillsFocusOk) missing.push("Skills & Focus Areas");
+  if (!status.skillsOk) missing.push("Skills");
+  if (!status.practiceAreasOk) missing.push("Practice Areas");
   if (!status.resumeOk) missing.push("Resume");
   if (!status.photoOk) missing.push("Profile photo");
 
   return {
     ...status,
-    ok: status.bioOk && status.skillsFocusOk && status.resumeOk && status.photoOk,
+    ok: status.bioOk && status.skillsOk && status.practiceAreasOk && status.resumeOk && status.photoOk,
     missing,
   };
 }
@@ -1272,10 +1627,7 @@ function bindParalegalRequiredFieldWatchers() {
   paralegalRequiredBound = true;
   const bioInput = document.getElementById("bioInput");
   if (bioInput) bioInput.addEventListener("input", updateRequiredFieldMarkers);
-  const skillsInput = document.getElementById("skillsInput");
-  if (skillsInput) skillsInput.addEventListener("input", updateRequiredFieldMarkers);
-  const practiceInput = document.getElementById("practiceAreasInput");
-  if (practiceInput) practiceInput.addEventListener("input", updateRequiredFieldMarkers);
+  bindSkillsInput();
   const stateInput = document.getElementById("stateExperienceInput");
   if (stateInput) stateInput.addEventListener("input", updateRequiredFieldMarkers);
 }
@@ -1858,11 +2210,13 @@ async function initParalegalProfileTour(user = {}) {
 function showParalegalSettings() {
   paralegalSettingsSection?.classList.remove("hidden");
   attorneySettingsSection?.classList.add("hidden");
+  scheduleProfileScrollIndicatorUpdate();
 }
 
 function showAttorneySettings() {
   attorneySettingsSection?.classList.remove("hidden");
   paralegalSettingsSection?.classList.add("hidden");
+  scheduleProfileScrollIndicatorUpdate();
 }
 
 function setFullNameInputs(user = {}) {
@@ -2069,6 +2423,111 @@ function parseCommaList(value) {
     .filter(Boolean);
 }
 
+function parseSkillsList(value) {
+  const entries = Array.isArray(value)
+    ? value
+    : String(value || "").split(/[,\n;]+/);
+  const seen = new Set();
+  return entries
+    .map((item) => String(item || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .filter((item) => {
+      const key = item.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function formatSkillsValue(value) {
+  return parseSkillsList(value).join(", ");
+}
+
+const MAX_PROFILE_SKILLS = 5;
+
+function renderSkillsChips(values = []) {
+  const container = document.getElementById("skillsChips");
+  if (!container) return;
+  const skills = parseSkillsList(values).slice(0, MAX_PROFILE_SKILLS);
+  container.innerHTML = "";
+  skills.forEach((skill) => {
+    const chip = document.createElement("span");
+    chip.className = "skill-chip";
+    chip.dataset.skillValue = skill;
+    chip.textContent = skill;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "chip-remove";
+    remove.setAttribute("aria-label", `Remove ${skill}`);
+    remove.textContent = "×";
+    remove.addEventListener("click", () => {
+      const updated = readSkillsInput().filter((value) => value.toLowerCase() !== skill.toLowerCase());
+      applySkillsInput(updated);
+      refreshParalegalSectionDisplays();
+      updateRequiredFieldMarkers();
+    });
+    chip.appendChild(remove);
+    container.appendChild(chip);
+  });
+}
+
+function readSkillsInput() {
+  const container = document.getElementById("skillsChips");
+  const input = document.getElementById("skillsInput");
+  const chipValues = container
+    ? Array.from(container.querySelectorAll("[data-skill-value]"))
+        .map((el) => String(el.dataset.skillValue || "").trim())
+        .filter(Boolean)
+    : [];
+  const pendingValues = input ? parseSkillsList(input.value) : [];
+  return parseSkillsList([...chipValues, ...pendingValues]).slice(0, MAX_PROFILE_SKILLS);
+}
+
+function applySkillsInput(values = []) {
+  renderSkillsChips(values);
+  const input = document.getElementById("skillsInput");
+  if (input) input.value = "";
+}
+
+function bindSkillsInput() {
+  const input = document.getElementById("skillsInput");
+  if (!input || input.dataset.bound === "true") return;
+  input.dataset.bound = "true";
+
+  const commitSkills = () => {
+    const container = document.getElementById("skillsChips");
+    const chipValues = container
+      ? Array.from(container.querySelectorAll("[data-skill-value]"))
+          .map((el) => String(el.dataset.skillValue || "").trim())
+          .filter(Boolean)
+      : [];
+    const pendingValues = parseSkillsList(input.value);
+    const combined = parseSkillsList([...chipValues, ...pendingValues]);
+    const exceeded = combined.length > MAX_PROFILE_SKILLS;
+    const nextSkills = combined.slice(0, MAX_PROFILE_SKILLS);
+    applySkillsInput(nextSkills);
+    refreshParalegalSectionDisplays();
+    updateRequiredFieldMarkers();
+    if (exceeded) {
+      showToast(`You can list up to ${MAX_PROFILE_SKILLS} skills.`, "info");
+    }
+  };
+
+  input.addEventListener("input", () => {
+    refreshParalegalSectionDisplays();
+    updateRequiredFieldMarkers();
+  });
+  input.addEventListener("keydown", (event) => {
+    if (!["Enter", ",", ";"].includes(event.key)) return;
+    event.preventDefault();
+    commitSkills();
+  });
+  input.addEventListener("blur", () => {
+    if (!String(input.value || "").trim()) return;
+    commitSkills();
+  });
+}
+
 function normalizeStateName(value = "") {
   return String(value || "").toLowerCase().replace(/[^a-z]/g, "");
 }
@@ -2083,6 +2542,26 @@ function normalizeStateCode(value = "") {
     return "DC";
   }
   return STATE_NAME_TO_CODE[normalized] || "";
+}
+
+function getDefaultStateExperienceValues(user = {}) {
+  const explicit = Array.isArray(user.stateExperience) ? user.stateExperience : [];
+  const normalizedExplicit = explicit.map((entry) => normalizeStateCode(entry)).filter(Boolean);
+  if (normalizedExplicit.length) return normalizedExplicit;
+
+  const directState = normalizeStateCode(user.state || "");
+  if (directState) return [directState];
+
+  const locationParts = String(user.location || "")
+    .split(/,|\||-/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  for (let index = locationParts.length - 1; index >= 0; index -= 1) {
+    const code = normalizeStateCode(locationParts[index]);
+    if (code) return [code];
+  }
+
+  return [];
 }
 
 function renderStateExperienceChips(values = []) {
@@ -2349,18 +2828,22 @@ function refreshParalegalSectionDisplays() {
   );
 
   const skillsDisplay = document.getElementById("skillsDisplay");
-  const skillsInput = document.getElementById("skillsInput");
-  const practiceInput = document.getElementById("practiceAreasInput");
-  const skills = parseCommaList(skillsInput?.value || "");
-  const focus = parseCommaList(practiceInput?.value || "");
+  const skills = readSkillsInput();
   if (skillsDisplay) {
-    const lines = [];
-    if (skills.length) lines.push(`Skills: ${skills.join(", ")}`);
-    if (focus.length) lines.push(`Focus Areas: ${focus.join(", ")}`);
     setSectionDisplayText(
       skillsDisplay,
-      lines.join("\n"),
-      "No skills or focus areas listed."
+      skills.join(", "),
+      "No skills listed."
+    );
+  }
+
+  const practiceAreasDisplay = document.getElementById("practiceAreasDisplay");
+  const practiceAreas = collectParalegalPracticeAreas();
+  if (practiceAreasDisplay) {
+    setSectionDisplayText(
+      practiceAreasDisplay,
+      practiceAreas.join(", "),
+      "No practice areas listed."
     );
   }
 
@@ -2467,9 +2950,25 @@ function setActiveParalegalSection(sectionKey) {
     const isActive = section.dataset.editSection === sectionKey;
     section.classList.toggle("is-editing", isActive);
     if (isActive) {
-      const baseRaw = parseFloat(getComputedStyle(section).getPropertyValue("--section-base-height"));
-      const base = Number.isFinite(baseRaw) && baseRaw > 0 ? baseRaw : Math.max(120, Math.ceil(section.getBoundingClientRect().height));
-      section.style.setProperty("--section-edit-max-height", `${Math.round(base)}px`);
+      if (section.dataset.editSection === "documents") {
+        const docsStack = section.querySelector(".profile-docs-stack");
+        const docsHeight = Math.max(0, Math.ceil(docsStack?.scrollHeight || 0));
+        const expandedHeight = Math.max(
+          120,
+          Math.ceil(section.querySelector(".section-header")?.getBoundingClientRect().height || 0) +
+            docsHeight +
+            24
+        );
+        section.style.setProperty("--documents-stack-height", `${docsHeight}px`);
+        section.style.setProperty("--section-base-height", `${expandedHeight}px`);
+        section.style.setProperty("--section-edit-max-height", `${expandedHeight}px`);
+      } else {
+        const baseRaw = parseFloat(getComputedStyle(section).getPropertyValue("--section-base-height"));
+        const base = Number.isFinite(baseRaw) && baseRaw > 0 ? baseRaw : Math.max(120, Math.ceil(section.getBoundingClientRect().height));
+        section.style.setProperty("--section-edit-max-height", `${Math.round(base)}px`);
+      }
+    } else if (section.dataset.editSection === "documents") {
+      section.style.setProperty("--documents-stack-height", "0px");
     }
     const toggle = section.querySelector(".section-edit-toggle");
     if (toggle) {
@@ -2578,6 +3077,12 @@ function hydrateAttorneyProfileForm(user = {}) {
   updateAttorneyAvatarPreview(user);
 }
 
+function syncPracticeAreasInput(inputId, values = []) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.value = (Array.isArray(values) ? values : [values]).filter(Boolean).join(", ");
+}
+
 function loadAvatarPreview({ preview, frame, initials, url, fallbackText = "" } = {}) {
   if (!preview) {
     if (initials && fallbackText) initials.textContent = fallbackText;
@@ -2665,10 +3170,17 @@ function bindAttorneyPublicationsToggle() {
   toggle.dataset.bound = "true";
 }
 
-function renderAttorneyPracticeAreas(selected = []) {
-  const panel = document.getElementById("attorneyPracticeDropdown");
-  const toggle = document.getElementById("attorneyPracticeDropdownToggle");
-  const summary = document.getElementById("attorneyPracticeSummary");
+function renderPracticeAreasDropdown({
+  panelId,
+  toggleId,
+  summaryId,
+  inputId = "",
+  selected = [],
+  onChange = null,
+} = {}) {
+  const panel = document.getElementById(panelId);
+  const toggle = document.getElementById(toggleId);
+  const summary = document.getElementById(summaryId);
   if (!panel || !toggle || !summary) return;
   panel.innerHTML = "";
 
@@ -2779,16 +3291,18 @@ function renderAttorneyPracticeAreas(selected = []) {
   };
 
   const updatePracticeDropdownLabel = () => {
-    const selected = collectAttorneyPracticeAreas();
+    const selectedValues = collectPracticeAreasFromPanel(panelId);
+    syncPracticeAreasInput(inputId, selectedValues);
     summary.innerHTML = "";
-    if (!selected.length) {
+    if (!selectedValues.length) {
       const span = document.createElement("span");
       span.className = "placeholder";
       span.textContent = "Select fields";
       summary.appendChild(span);
+      if (typeof onChange === "function") onChange([]);
       return;
     }
-    const chips = selected.slice(0, 3);
+    const chips = selectedValues.slice(0, 3);
     chips.forEach((value) => {
       const chip = document.createElement("span");
       chip.className = "chip";
@@ -2812,12 +3326,13 @@ function renderAttorneyPracticeAreas(selected = []) {
       chip.appendChild(remove);
       summary.appendChild(chip);
     });
-    if (selected.length > chips.length) {
+    if (selectedValues.length > chips.length) {
       const more = document.createElement("span");
       more.className = "chip";
-      more.textContent = `+${selected.length - chips.length} more`;
+      more.textContent = `+${selectedValues.length - chips.length} more`;
       summary.appendChild(more);
     }
+    if (typeof onChange === "function") onChange(selectedValues);
   };
 
   const filterOptions = () => {
@@ -2845,8 +3360,8 @@ function renderAttorneyPracticeAreas(selected = []) {
   }
 }
 
-function collectAttorneyPracticeAreas() {
-  const panel = document.getElementById("attorneyPracticeDropdown");
+function collectPracticeAreasFromPanel(panelId) {
+  const panel = document.getElementById(panelId);
   if (!panel) return [];
   return Array.from(panel.querySelectorAll(".dropdown-option input[type=\"checkbox\"]"))
     .filter((input) => input.value !== "Select all" && input.checked)
@@ -2854,13 +3369,77 @@ function collectAttorneyPracticeAreas() {
     .filter(Boolean);
 }
 
+function renderAttorneyPracticeAreas(selected = []) {
+  renderPracticeAreasDropdown({
+    panelId: "attorneyPracticeDropdown",
+    toggleId: "attorneyPracticeDropdownToggle",
+    summaryId: "attorneyPracticeSummary",
+    selected,
+  });
+}
+
+function collectAttorneyPracticeAreas() {
+  return collectPracticeAreasFromPanel("attorneyPracticeDropdown");
+}
+
+function renderParalegalPracticeAreas(selected = []) {
+  renderPracticeAreasDropdown({
+    panelId: "paralegalPracticeDropdown",
+    toggleId: "paralegalPracticeDropdownToggle",
+    summaryId: "paralegalPracticeSummary",
+    inputId: "practiceAreasInput",
+    selected,
+    onChange: () => {
+      refreshParalegalSectionDisplays();
+      updateRequiredFieldMarkers();
+    },
+  });
+}
+
+function collectParalegalPracticeAreas() {
+  return collectPracticeAreasFromPanel("paralegalPracticeDropdown");
+}
+
 function bindAttorneyNotificationToggles() {
   if (attorneyPrefsBound) return;
-  [
-    { id: "attorneyEmailNotifications", key: "email" },
+  const emailInput = document.getElementById("attorneyEmailNotifications");
+  const childToggles = [
     { id: "attorneyMessageAlerts", key: "emailMessages" },
-    { id: "attorneyCaseUpdates", key: "emailCase" }
-  ].forEach(({ id, key }) => {
+    { id: "attorneyCaseUpdates", key: "emailCase" },
+  ];
+
+  const syncChildren = () => {
+    const masterEnabled = emailInput ? emailInput.checked : settingsState.notificationPrefs.email !== false;
+    childToggles.forEach(({ id, key }) => {
+      const input = document.getElementById(id);
+      if (!input) return;
+      input.disabled = !masterEnabled;
+      input.checked = masterEnabled ? settingsState.notificationPrefs[key] !== false : false;
+      const row = input.closest(".toggle-row");
+      row?.classList.toggle("is-readonly", !masterEnabled);
+      if (row) row.setAttribute("aria-disabled", masterEnabled ? "false" : "true");
+    });
+  };
+
+  if (emailInput) {
+    emailInput.addEventListener("change", async () => {
+      const checked = emailInput.checked;
+      try {
+        await saveNotificationPref("email", checked);
+        settingsState.notificationPrefs.email = checked;
+        syncChildren();
+        showToast("Notification preference updated", "ok");
+      } catch (err) {
+        console.error("Unable to update notification preference", err);
+        emailInput.checked = !checked;
+        settingsState.notificationPrefs.email = emailInput.checked;
+        syncChildren();
+        showToast("Unable to update preference right now.", "err");
+      }
+    });
+  }
+
+  childToggles.forEach(({ id, key }) => {
     const input = document.getElementById(id);
     if (!input) return;
     input.addEventListener("change", async () => {
@@ -2868,23 +3447,61 @@ function bindAttorneyNotificationToggles() {
       try {
         await saveNotificationPref(key, checked);
         settingsState.notificationPrefs[key] = checked;
+        syncChildren();
         showToast("Notification preference updated", "ok");
       } catch (err) {
         console.error("Unable to update notification preference", err);
         input.checked = !checked;
+        syncChildren();
         showToast("Unable to update preference right now.", "err");
       }
     });
   });
+
+  syncChildren();
   attorneyPrefsBound = true;
 }
 
 function bindParalegalNotificationToggles() {
   if (paralegalPrefsBound) return;
-  [
+  const emailInput = document.getElementById("emailNotificationsToggle");
+  const childToggles = [
     { id: "paralegalMessageAlerts", key: "emailMessages" },
-    { id: "paralegalCaseUpdates", key: "emailCase" }
-  ].forEach(({ id, key }) => {
+    { id: "paralegalCaseUpdates", key: "emailCase" },
+  ];
+
+  const syncChildren = () => {
+    const masterEnabled = emailInput ? emailInput.checked : settingsState.notificationPrefs.email !== false;
+    childToggles.forEach(({ id, key }) => {
+      const input = document.getElementById(id);
+      if (!input) return;
+      input.disabled = !masterEnabled;
+      input.checked = masterEnabled ? settingsState.notificationPrefs[key] !== false : false;
+      const row = input.closest(".pref-row");
+      row?.classList.toggle("is-readonly", !masterEnabled);
+      if (row) row.setAttribute("aria-disabled", masterEnabled ? "false" : "true");
+    });
+  };
+
+  if (emailInput) {
+    emailInput.addEventListener("change", async () => {
+      const checked = emailInput.checked;
+      try {
+        await saveNotificationPref("email", checked);
+        settingsState.notificationPrefs.email = checked;
+        syncChildren();
+        showToast("Notification preference updated", "ok");
+      } catch (err) {
+        console.error("Unable to update notification preference", err);
+        emailInput.checked = !checked;
+        settingsState.notificationPrefs.email = emailInput.checked;
+        syncChildren();
+        showToast("Unable to update preference right now.", "err");
+      }
+    });
+  }
+
+  childToggles.forEach(({ id, key }) => {
     const input = document.getElementById(id);
     if (!input) return;
     input.addEventListener("change", async () => {
@@ -2892,14 +3509,18 @@ function bindParalegalNotificationToggles() {
       try {
         await saveNotificationPref(key, checked);
         settingsState.notificationPrefs[key] = checked;
+        syncChildren();
         showToast("Notification preference updated", "ok");
       } catch (err) {
         console.error("Unable to update notification preference", err);
         input.checked = !checked;
+        syncChildren();
         showToast("Unable to update preference right now.", "err");
       }
     });
   });
+
+  syncChildren();
   paralegalPrefsBound = true;
 }
 
@@ -2953,20 +3574,46 @@ function hydrateAttorneyNotificationPrefs(user = {}) {
     emailMessages: prefs.emailMessages !== false,
     emailCase: prefs.emailCase !== false
   };
+  const messageRow = messageToggle?.closest(".toggle-row");
+  const caseRow = caseToggle?.closest(".toggle-row");
+  const masterEnabled = prefs.email !== false;
+  if (messageToggle) {
+    messageToggle.disabled = !masterEnabled;
+    messageToggle.checked = masterEnabled ? prefs.emailMessages !== false : false;
+  }
+  if (caseToggle) {
+    caseToggle.disabled = !masterEnabled;
+    caseToggle.checked = masterEnabled ? prefs.emailCase !== false : false;
+  }
+  messageRow?.classList.toggle("is-readonly", !masterEnabled);
+  caseRow?.classList.toggle("is-readonly", !masterEnabled);
 }
 
 function hydrateParalegalNotificationPrefs(user = {}) {
   const prefs = user.notificationPrefs || {};
+  const emailToggle = document.getElementById("emailNotificationsToggle");
+  if (emailToggle) emailToggle.checked = prefs.email !== false;
   const messageToggle = document.getElementById("paralegalMessageAlerts");
-  if (messageToggle) messageToggle.checked = prefs.emailMessages !== false;
   const caseToggle = document.getElementById("paralegalCaseUpdates");
-  if (caseToggle) caseToggle.checked = prefs.emailCase !== false;
   settingsState.notificationPrefs = {
     ...settingsState.notificationPrefs,
     email: prefs.email !== false,
     emailMessages: prefs.emailMessages !== false,
     emailCase: prefs.emailCase !== false
   };
+  const masterEnabled = prefs.email !== false;
+  const messageRow = messageToggle?.closest(".pref-row");
+  const caseRow = caseToggle?.closest(".pref-row");
+  if (messageToggle) {
+    messageToggle.disabled = !masterEnabled;
+    messageToggle.checked = masterEnabled ? prefs.emailMessages !== false : false;
+  }
+  if (caseToggle) {
+    caseToggle.disabled = !masterEnabled;
+    caseToggle.checked = masterEnabled ? prefs.emailCase !== false : false;
+  }
+  messageRow?.classList.toggle("is-readonly", !masterEnabled);
+  caseRow?.classList.toggle("is-readonly", !masterEnabled);
 }
 
 function hydrateParalegalVisibilityPref(user = {}) {
@@ -3069,6 +3716,7 @@ async function handleAttorneyProfileSave() {
     currentUser = mergeSessionPreferences({ ...baseUser, ...updatedUser });
     persistSession({ user: currentUser });
     window.updateSessionUser?.(currentUser);
+    clearProfileSettingsDraft(currentUser);
     settingsState.profileImage =
       updatedUser.profileImage || updatedUser.avatarURL || settingsState.profileImage || preservedPhoto;
     settingsState.profileImageOriginal = updatedUser.profileImageOriginal || settingsState.profileImageOriginal;
@@ -3358,10 +4006,11 @@ function collectEducationFromEditor() {
     .filter(Boolean);
 }
 
-function buildEducationModalField({ label, field, placeholder, value, type = "text", span = false, isTextarea = false }) {
+function buildEducationModalField({ label, field, placeholder, value, type = "text", span = false, isTextarea = false, rowClass = "" }) {
   const row = document.createElement("div");
   row.className = "education-form-row";
   if (span) row.classList.add("education-form-span");
+  if (rowClass) row.classList.add(...String(rowClass).split(/\s+/).filter(Boolean));
 
   const labelEl = document.createElement("label");
   labelEl.textContent = label;
@@ -3478,8 +4127,9 @@ function buildEducationModalEntry(entry = {}) {
     buildEducationModalField({
       label: "GPA",
       field: "grade",
-      placeholder: "Ex: 3.8 GPA",
-      value: normalized.grade
+      placeholder: "Ex: 3.8",
+      value: normalized.grade,
+      rowClass: "education-form-row-inline"
     })
   );
   grid.appendChild(
@@ -3832,9 +4482,12 @@ function enforceUnifiedRoleStyling(user = {}) {
 
 function applyAvatar(user) {
   const rawUrl = getDisplayProfileImage(user, { allowPending: true });
+  const isSignedAssetUrl =
+    typeof rawUrl === "string" &&
+    /(X-Amz-(Algorithm|Credential|Date|Expires|SignedHeaders|Signature)=|AWSAccessKeyId=|Signature=)/i.test(rawUrl);
   const resolvedUrl = rawUrl || DEFAULT_AVATAR_DATA;
   const cacheBusted = rawUrl
-    ? rawUrl.startsWith("blob:") || rawUrl.startsWith("data:")
+    ? rawUrl.startsWith("blob:") || rawUrl.startsWith("data:") || isSignedAssetUrl
       ? rawUrl
       : `${rawUrl}${rawUrl.includes("?") ? "&" : "?"}t=${Date.now()}`
     : resolvedUrl;
@@ -3910,9 +4563,11 @@ async function loadSettings() {
     window.currentUser = currentUser;
     persistSession({ user: currentUser });
     hydrateStatePreference(user);
+    bindProfileDraftPersistence();
 
     if (!hasSettingsAccess(user)) {
       showPendingSettingsNotice();
+      scheduleProfileScrollIndicatorUpdate();
       return;
     }
     const titleEl = document.getElementById("accountSettingsTitle");
@@ -3952,14 +4607,13 @@ async function loadSettings() {
     if (user.role === "paralegal") {
       const linkedInInput = document.getElementById("linkedInInput");
       if (linkedInInput) linkedInInput.value = user.linkedInURL || "";
-      const yearsExperienceInput = document.getElementById("yearsExperienceInput");
-      if (yearsExperienceInput) yearsExperienceInput.value = user.yearsExperience ?? "";
-      const practiceAreasInput = document.getElementById("practiceAreasInput");
-      if (practiceAreasInput) practiceAreasInput.value = (user.practiceAreas || []).join(", ");
-      const skillsInput = document.getElementById("skillsInput");
+    const yearsExperienceInput = document.getElementById("yearsExperienceInput");
+    if (yearsExperienceInput) yearsExperienceInput.value = user.yearsExperience ?? "";
+    renderParalegalPracticeAreas(user.practiceAreas || []);
       const skillValues = user.highlightedSkills || user.skills || [];
-      if (skillsInput) skillsInput.value = skillValues.join(", ");
-      applyStateExperienceInput(user.stateExperience || []);
+      applySkillsInput(skillValues);
+      bindSkillsInput();
+      applyStateExperienceInput(getDefaultStateExperienceValues(user));
       bindStateExperienceInput();
       renderExperienceRows(Array.isArray(user.experience) ? user.experience : []);
       bindExperienceAddButton();
@@ -3995,7 +4649,13 @@ async function loadSettings() {
   try { await loadSkills(user); } catch { renderFallback("settingsSkills", "Skills"); }
   try { await loadLinkedIn(user); } catch { renderFallback("settingsLinkedIn", "LinkedIn"); }
   try { await loadNotifications(user); } catch { renderFallback("settingsNotifications", "Notifications"); }
-  syncCluster(user);
+  const draft = readProfileSettingsDraft(user);
+  if (draft) {
+    applyProfileSettingsDraft(draft, user);
+  } else {
+    syncCluster(user);
+  }
+  scheduleProfileScrollIndicatorUpdate();
 
 }
 
@@ -4015,18 +4675,16 @@ function hydrateProfileForm(user = {}) {
     if (linkedInInput) linkedInInput.value = user.linkedInURL || "";
     const yearsExperienceInput = document.getElementById("yearsExperienceInput");
     if (yearsExperienceInput) yearsExperienceInput.value = user.yearsExperience ?? "";
-    const practiceAreasInput = document.getElementById("practiceAreasInput");
-    const practiceValues = Array.isArray(user.practiceAreas) ? user.practiceAreas : [];
-    if (practiceAreasInput) practiceAreasInput.value = practiceValues.join(", ");
-    const skillsInput = document.getElementById("skillsInput");
+    renderParalegalPracticeAreas(user.practiceAreas || []);
     const skillsSource =
       Array.isArray(user.highlightedSkills) && user.highlightedSkills.length
         ? user.highlightedSkills
         : Array.isArray(user.skills)
         ? user.skills
         : [];
-    if (skillsInput) skillsInput.value = skillsSource.join(", ");
-    applyStateExperienceInput(user.stateExperience || []);
+    applySkillsInput(skillsSource);
+    bindSkillsInput();
+    applyStateExperienceInput(getDefaultStateExperienceValues(user));
     bindStateExperienceInput();
     renderBestForList(Array.isArray(user.bestFor) ? user.bestFor : [], { editable: false });
     renderExperienceRows(Array.isArray(user.experience) ? user.experience : []);
@@ -4046,86 +4704,72 @@ function loadCertificate(user) {
   if (!section) return;
   settingsState.removeCertificate = false;
   const hasCertificate = Boolean(user.certificateURL || settingsState.pendingCertificateKey);
-  const statusText = hasCertificate ? "Certificate on file" : "No file uploaded";
   section.innerHTML = `
     <div class="paralegal-doc-row">
       <div class="paralegal-doc-meta">
         <h3>Upload Certificate (PDF)</h3>
         <p>Share verified certifications or licenses with attorneys.</p>
-        <p class="doc-status" id="certificateStatus">${statusText}</p>
+        <p class="doc-status" id="certificateStatus"></p>
       </div>
       <div class="paralegal-doc-actions">
         <div class="file-input-row">
-          <label for="certificateInput" class="file-trigger">Choose File</label>
-          <span id="certificateFileName" class="file-name">${statusText}</span>
+          <button type="button" id="certificateChooseBtn" class="file-trigger">${hasCertificate ? "Certificate on file" : "Choose File"}</button>
+          <button id="removeCertificateBtn" class="file-trigger remove-action-btn" type="button" ${hasCertificate ? "" : "disabled"}>Remove</button>
+          <span id="certificateFileName" class="file-name"></span>
         </div>
         <input id="certificateInput" type="file" accept="application/pdf" class="file-input-hidden">
-        <button id="uploadCertificateBtn" class="file-trigger upload-action-btn" type="button">Upload Certificate</button>
-        <button id="removeCertificateBtn" class="file-trigger remove-action-btn" type="button" ${hasCertificate ? "" : "disabled"}>Remove</button>
       </div>
     </div>
   `;
 
   const certInput = document.getElementById("certificateInput");
   const certFileName = document.getElementById("certificateFileName");
+  bindDocumentFileChooser("certificateChooseBtn", certInput);
   if (certInput) {
-    certInput.addEventListener("change", (event) => {
+    certInput.addEventListener("change", async (event) => {
       const file = event.target.files?.[0] || null;
-      if (certFileName) {
-        certFileName.textContent = file ? file.name : "No file chosen";
-      }
+      if (!file) return;
+      if (certFileName) certFileName.textContent = file.name;
+      const status = document.getElementById("certificateStatus");
+      if (status) status.textContent = "Uploading…";
+      await uploadParalegalPdfDocument({
+        input: certInput,
+        endpoint: "/api/uploads/paralegal-certificate",
+        invalidMessage: "Certificate must be a PDF.",
+        sizeMessage: "Certificate must be 10 MB or smaller.",
+        failureMessage: "Certificate upload failed.",
+        successMessage: "Certificate uploaded. Click Save changes to publish the update.",
+        onSuccess: (payload) => {
+          const certHidden = document.getElementById("certificateKeyInput") || (() => {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.id = "certificateKeyInput";
+            input.name = "certificateKey";
+            section.appendChild(input);
+            return input;
+          })();
+          const latestKey = payload.url || payload.key || "";
+          certHidden.value = latestKey;
+          settingsState.pendingCertificateKey = latestKey;
+          settingsState.removeCertificate = false;
+          if (certFileName) certFileName.textContent = file?.name || "";
+          if (status) status.textContent = "";
+          const chooseBtn = document.getElementById("certificateChooseBtn");
+          if (chooseBtn) chooseBtn.textContent = "Certificate on file";
+          const removeBtn = document.getElementById("removeCertificateBtn");
+          if (removeBtn) removeBtn.disabled = false;
+        },
+        onFinally: () => {
+          if (status && status.textContent === "Uploading…") {
+            status.textContent = "";
+          }
+          if (certFileName && certFileName.textContent === file?.name) {
+            certFileName.textContent = "";
+          }
+        },
+      });
     });
   }
-
-  document.getElementById("uploadCertificateBtn")?.addEventListener("click", async () => {
-    const file = certInput?.files?.[0];
-    if (!file) {
-      alert("Please choose a PDF certificate first.");
-      return;
-    }
-    if (!isPdfFile(file)) {
-      alert("Certificate must be a PDF.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      alert("Certificate must be 10 MB or smaller.");
-      return;
-    }
-
-    const fd = new FormData();
-    fd.append("file", file);
-
-    const res = await secureFetch("/api/uploads/paralegal-certificate", {
-      method: "POST",
-      body: fd
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      alert(payload.msg || "Certificate upload failed.");
-      return;
-    }
-
-    alert("Certificate uploaded! Click Save to publish the update.");
-
-    const certHidden = document.getElementById("certificateKeyInput") || (() => {
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.id = "certificateKeyInput";
-      input.name = "certificateKey";
-      section.appendChild(input);
-      return input;
-    })();
-    const latestKey = payload.url || payload.key || "";
-    certHidden.value = latestKey;
-    settingsState.pendingCertificateKey = latestKey;
-    settingsState.removeCertificate = false;
-    if (certInput) certInput.value = "";
-    if (certFileName) certFileName.textContent = "Uploaded!";
-    const status = document.getElementById("certificateStatus");
-    if (status) status.textContent = "Certificate on file";
-    const removeBtn = document.getElementById("removeCertificateBtn");
-    if (removeBtn) removeBtn.disabled = false;
-  });
 
   document.getElementById("removeCertificateBtn")?.addEventListener("click", () => {
     const confirmed = window.confirm("Remove certificate? This will update after you save.");
@@ -4135,9 +4779,11 @@ function loadCertificate(user) {
     const certHidden = document.getElementById("certificateKeyInput");
     if (certHidden) certHidden.value = "";
     if (certInput) certInput.value = "";
-    if (certFileName) certFileName.textContent = "No file chosen";
+    if (certFileName) certFileName.textContent = "";
     const status = document.getElementById("certificateStatus");
     if (status) status.textContent = "Removed. Click Save to publish the update.";
+    const chooseBtn = document.getElementById("certificateChooseBtn");
+    if (chooseBtn) chooseBtn.textContent = "Choose File";
     const removeBtn = document.getElementById("removeCertificateBtn");
     if (removeBtn) removeBtn.disabled = true;
   });
@@ -4148,90 +4794,73 @@ function loadResume(user) {
   if (!section) return;
   settingsState.removeResume = false;
   const hasResume = Boolean(user.resumeURL || settingsState.pendingResumeKey);
-  const statusText = hasResume ? "Résumé on file" : "No file uploaded";
   section.innerHTML = `
     <div class="paralegal-doc-row">
       <div class="paralegal-doc-meta">
-        <h3>Upload Résumé (PDF)</h3>
+        <h3>Résumé (PDF)</h3>
         <p>Upload a polished résumé so attorneys can verify your expertise.</p>
-        <p class="doc-status" id="resumeStatus">${statusText}</p>
+        <p class="doc-status" id="resumeStatus"></p>
       </div>
       <div class="paralegal-doc-actions">
         <div class="file-input-row">
-          <label for="resumeInput" class="file-trigger">Choose File</label>
-          <span id="resumeFileName" class="file-name">${statusText}</span>
+          <button type="button" id="resumeChooseBtn" class="file-trigger">${hasResume ? "Résumé on file" : "Choose File"}</button>
+          <button id="removeResumeBtn" class="file-trigger remove-action-btn" type="button" ${hasResume ? "" : "disabled"}>Remove</button>
+          <span id="resumeFileName" class="file-name"></span>
         </div>
         <input id="resumeInput" type="file" accept="application/pdf" class="file-input-hidden">
-        <button id="uploadResumeBtn" class="file-trigger upload-action-btn" type="button">Upload Résumé</button>
-        <button id="removeResumeBtn" class="file-trigger remove-action-btn" type="button" ${hasResume ? "" : "disabled"}>Remove</button>
       </div>
     </div>
   `;
 
   const resumeInput = document.getElementById("resumeInput");
   const resumeFileName = document.getElementById("resumeFileName");
+  bindDocumentFileChooser("resumeChooseBtn", resumeInput);
   if (resumeInput) {
-    resumeInput.addEventListener("change", (event) => {
+    resumeInput.addEventListener("change", async (event) => {
       const file = event.target.files?.[0] || null;
-      if (resumeFileName) {
-        resumeFileName.textContent = file ? file.name : "No file chosen";
-      }
+      if (!file) return;
+      if (resumeFileName) resumeFileName.textContent = file.name;
+      const status = document.getElementById("resumeStatus");
+      if (status) status.textContent = "Uploading…";
+      await uploadParalegalPdfDocument({
+        input: resumeInput,
+        endpoint: "/api/uploads/paralegal-resume",
+        invalidMessage: "Résumé must be a PDF.",
+        sizeMessage: "Résumé must be 10 MB or smaller.",
+        failureMessage: "Resume upload failed.",
+        successMessage: "Résumé uploaded. Click Save changes to publish the update.",
+        onSuccess: (payload) => {
+          const resumeHidden = document.getElementById("resumeKeyInput") || (() => {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.id = "resumeKeyInput";
+            input.name = "resumeKey";
+            section.appendChild(input);
+            return input;
+          })();
+          const latestKey = payload.url || payload.key || "";
+          resumeHidden.value = latestKey;
+          settingsState.pendingResumeKey = latestKey;
+          settingsState.removeResume = false;
+          if (resumeFileName) resumeFileName.textContent = file?.name || "";
+          if (status) status.textContent = "";
+          const chooseBtn = document.getElementById("resumeChooseBtn");
+          if (chooseBtn) chooseBtn.textContent = "Résumé on file";
+          const removeBtn = document.getElementById("removeResumeBtn");
+          if (removeBtn) removeBtn.disabled = false;
+          updateRequiredFieldMarkers();
+        },
+        onFinally: () => {
+          if (status && status.textContent === "Uploading…") {
+            status.textContent = "";
+          }
+          if (resumeFileName && resumeFileName.textContent === file?.name) {
+            resumeFileName.textContent = "";
+          }
+        },
+      });
     });
   }
-
-  document.getElementById("uploadResumeBtn")?.addEventListener("click", async () => {
-    const file = resumeInput?.files?.[0];
-    if (!file) {
-      alert("Please choose a PDF résumé first.");
-      return;
-    }
-    if (!isPdfFile(file)) {
-      alert("Résumé must be a PDF.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      alert("Résumé must be 10 MB or smaller.");
-      return;
-    }
-
-    const fd = new FormData();
-    fd.append("file", file);
-
-    const res = await secureFetch("/api/uploads/paralegal-resume", {
-      method: "POST",
-      body: fd
-    });
-
-    const payload = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      alert(payload.msg || "Resume upload failed.");
-      return;
-    }
-
-    alert("Résumé uploaded! Click Save to publish the update.");
-
-    // Populate hidden field so Save captures the new key
-    const resumeHidden = document.getElementById("resumeKeyInput") || (() => {
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.id = "resumeKeyInput";
-      input.name = "resumeKey";
-      section.appendChild(input);
-      return input;
-    })();
-    const latestKey = payload.url || payload.key || "";
-    resumeHidden.value = latestKey;
-    settingsState.pendingResumeKey = latestKey;
-    settingsState.removeResume = false;
-    if (resumeInput) resumeInput.value = "";
-    if (resumeFileName) resumeFileName.textContent = "Uploaded!";
-    const status = document.getElementById("resumeStatus");
-    if (status) status.textContent = "Résumé on file";
-    const removeBtn = document.getElementById("removeResumeBtn");
-    if (removeBtn) removeBtn.disabled = false;
-    updateRequiredFieldMarkers();
-  });
 
   document.getElementById("removeResumeBtn")?.addEventListener("click", () => {
     const confirmed = window.confirm("Remove résumé? This will update after you save.");
@@ -4241,9 +4870,11 @@ function loadResume(user) {
     const resumeHidden = document.getElementById("resumeKeyInput");
     if (resumeHidden) resumeHidden.value = "";
     if (resumeInput) resumeInput.value = "";
-    if (resumeFileName) resumeFileName.textContent = "No file chosen";
+    if (resumeFileName) resumeFileName.textContent = "";
     const status = document.getElementById("resumeStatus");
     if (status) status.textContent = "Removed. Click Save to publish the update.";
+    const chooseBtn = document.getElementById("resumeChooseBtn");
+    if (chooseBtn) chooseBtn.textContent = "Choose File";
     const removeBtn = document.getElementById("removeResumeBtn");
     if (removeBtn) removeBtn.disabled = true;
     updateRequiredFieldMarkers();
@@ -4257,86 +4888,72 @@ function loadWritingSample(user) {
   if (!section) return;
   settingsState.removeWritingSample = false;
   const hasSample = Boolean(user.writingSampleURL || settingsState.pendingWritingSampleKey);
-  const statusText = hasSample ? "Writing sample on file" : "No file uploaded";
   section.innerHTML = `
     <div class="paralegal-doc-row">
       <div class="paralegal-doc-meta">
         <h3>Upload Writing Sample (PDF)</h3>
         <p>Attach a representative writing sample for attorneys to review.</p>
-        <p class="doc-status" id="writingSampleStatus">${statusText}</p>
+        <p class="doc-status" id="writingSampleStatus"></p>
       </div>
       <div class="paralegal-doc-actions">
         <div class="file-input-row">
-          <label for="writingSampleInput" class="file-trigger">Choose File</label>
-          <span id="writingSampleFileName" class="file-name">${statusText}</span>
+          <button type="button" id="writingSampleChooseBtn" class="file-trigger">${hasSample ? "Writing sample on file" : "Choose File"}</button>
+          <button id="removeWritingSampleBtn" class="file-trigger remove-action-btn" type="button" ${hasSample ? "" : "disabled"}>Remove</button>
+          <span id="writingSampleFileName" class="file-name"></span>
         </div>
         <input id="writingSampleInput" type="file" accept="application/pdf" class="file-input-hidden">
-        <button id="uploadWritingSampleBtn" class="file-trigger upload-action-btn" type="button">Upload Writing Sample</button>
-        <button id="removeWritingSampleBtn" class="file-trigger remove-action-btn" type="button" ${hasSample ? "" : "disabled"}>Remove</button>
       </div>
     </div>
   `;
 
   const sampleInput = document.getElementById("writingSampleInput");
   const sampleFileName = document.getElementById("writingSampleFileName");
+  bindDocumentFileChooser("writingSampleChooseBtn", sampleInput);
   if (sampleInput) {
-    sampleInput.addEventListener("change", (event) => {
+    sampleInput.addEventListener("change", async (event) => {
       const file = event.target.files?.[0] || null;
-      if (sampleFileName) {
-        sampleFileName.textContent = file ? file.name : "No file chosen";
-      }
+      if (!file) return;
+      if (sampleFileName) sampleFileName.textContent = file.name;
+      const status = document.getElementById("writingSampleStatus");
+      if (status) status.textContent = "Uploading…";
+      await uploadParalegalPdfDocument({
+        input: sampleInput,
+        endpoint: "/api/uploads/paralegal-writing-sample",
+        invalidMessage: "Writing sample must be a PDF.",
+        sizeMessage: "Writing sample must be 10 MB or smaller.",
+        failureMessage: "Writing sample upload failed.",
+        successMessage: "Writing sample uploaded. Click Save changes to publish the update.",
+        onSuccess: (payload) => {
+          const hidden = document.getElementById("writingSampleKeyInput") || (() => {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.id = "writingSampleKeyInput";
+            input.name = "writingSampleKey";
+            section.appendChild(input);
+            return input;
+          })();
+          const latestKey = payload.url || payload.key || "";
+          hidden.value = latestKey;
+          settingsState.pendingWritingSampleKey = latestKey;
+          settingsState.removeWritingSample = false;
+          if (sampleFileName) sampleFileName.textContent = file?.name || "";
+          if (status) status.textContent = "";
+          const chooseBtn = document.getElementById("writingSampleChooseBtn");
+          if (chooseBtn) chooseBtn.textContent = "Writing sample on file";
+          const removeBtn = document.getElementById("removeWritingSampleBtn");
+          if (removeBtn) removeBtn.disabled = false;
+        },
+        onFinally: () => {
+          if (status && status.textContent === "Uploading…") {
+            status.textContent = "";
+          }
+          if (sampleFileName && sampleFileName.textContent === file?.name) {
+            sampleFileName.textContent = "";
+          }
+        },
+      });
     });
   }
-
-  document.getElementById("uploadWritingSampleBtn")?.addEventListener("click", async () => {
-    const file = sampleInput?.files?.[0];
-    if (!file) {
-      alert("Please choose a PDF writing sample first.");
-      return;
-    }
-    if (!isPdfFile(file)) {
-      alert("Writing sample must be a PDF.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      alert("Writing sample must be 10 MB or smaller.");
-      return;
-    }
-
-    const fd = new FormData();
-    fd.append("file", file);
-
-    const res = await secureFetch("/api/uploads/paralegal-writing-sample", {
-      method: "POST",
-      body: fd
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      alert(payload.msg || "Writing sample upload failed.");
-      return;
-    }
-
-    alert("Writing sample uploaded! Click Save to publish the update.");
-
-    const hidden = document.getElementById("writingSampleKeyInput") || (() => {
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.id = "writingSampleKeyInput";
-      input.name = "writingSampleKey";
-      section.appendChild(input);
-      return input;
-    })();
-    const latestKey = payload.url || payload.key || "";
-    hidden.value = latestKey;
-    settingsState.pendingWritingSampleKey = latestKey;
-    settingsState.removeWritingSample = false;
-    if (sampleInput) sampleInput.value = "";
-    if (sampleFileName) sampleFileName.textContent = "Uploaded!";
-    const status = document.getElementById("writingSampleStatus");
-    if (status) status.textContent = "Writing sample on file";
-    const removeBtn = document.getElementById("removeWritingSampleBtn");
-    if (removeBtn) removeBtn.disabled = false;
-  });
 
   document.getElementById("removeWritingSampleBtn")?.addEventListener("click", () => {
     const confirmed = window.confirm("Remove writing sample? This will update after you save.");
@@ -4346,9 +4963,11 @@ function loadWritingSample(user) {
     const sampleHidden = document.getElementById("writingSampleKeyInput");
     if (sampleHidden) sampleHidden.value = "";
     if (sampleInput) sampleInput.value = "";
-    if (sampleFileName) sampleFileName.textContent = "No file chosen";
+    if (sampleFileName) sampleFileName.textContent = "";
     const status = document.getElementById("writingSampleStatus");
     if (status) status.textContent = "Removed. Click Save to publish the update.";
+    const chooseBtn = document.getElementById("writingSampleChooseBtn");
+    if (chooseBtn) chooseBtn.textContent = "Choose File";
     const removeBtn = document.getElementById("removeWritingSampleBtn");
     if (removeBtn) removeBtn.disabled = true;
   });
@@ -4604,17 +5223,7 @@ function loadNotifications(user) {
 
 async function saveSettings() {
   syncNamePartsFromFullName();
-  if (String(currentUser?.role || "").toLowerCase() === "paralegal") {
-    const requiredStatus = updateRequiredFieldMarkers();
-    if (!requiredStatus.ok) {
-      const missingList =
-        Array.isArray(requiredStatus.missing) && requiredStatus.missing.length
-          ? requiredStatus.missing.join(", ")
-          : "required fields";
-      showToast(`Missing required fields: ${missingList}.`, "err");
-      return;
-    }
-  }
+  const isParalegal = String(currentUser?.role || "").toLowerCase() === "paralegal";
   const stagedPhoto = !!settingsState.stagedProfilePhotoFile;
   let uploadedPhotoPendingReview = false;
   const firstNameInput = document.getElementById("firstNameInput");
@@ -4625,7 +5234,6 @@ async function saveSettings() {
   const bioInput = document.getElementById("bioInput");
   const linkedInInput = document.getElementById("linkedInInput");
   const yearsExperienceInput = document.getElementById("yearsExperienceInput");
-  const practiceAreasInput = document.getElementById("practiceAreasInput");
   const skillsInput = document.getElementById("skillsInput");
   const resumeKeyInput = document.getElementById("resumeKeyInput");
   const certificateKeyInput = document.getElementById("certificateKeyInput");
@@ -4649,8 +5257,6 @@ async function saveSettings() {
     firstName: firstNameInput ? firstNameInput.value.trim() : "",
     lastName: lastNameInput ? lastNameInput.value.trim() : "",
     email: emailInput?.value || "",
-    phoneNumber: phoneInput?.value || "",
-    lawFirm: lawFirmInput?.value || "",
     bio: bioInput?.value ?? settingsState.bio,
     education: settingsState.education,
     awards: settingsState.awards,
@@ -4659,21 +5265,17 @@ async function saveSettings() {
     notificationPrefs: settingsState.notificationPrefs,
     digestFrequency: settingsState.digestFrequency
   };
+  if (phoneInput) {
+    body.phoneNumber = phoneInput.value || "";
+  }
+  if (lawFirmInput) {
+    body.lawFirm = lawFirmInput.value || "";
+  }
 
   body.linkedInURL = linkedInInput?.value.trim() || null;
   body.yearsExperience = yearsExperienceInput ? Number(yearsExperienceInput.value) || null : null;
-  body.practiceAreas = practiceAreasInput
-    ? practiceAreasInput.value
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-    : [];
-  body.highlightedSkills = skillsInput
-    ? skillsInput.value
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-    : [];
+  body.practiceAreas = collectParalegalPracticeAreas();
+  body.highlightedSkills = readSkillsInput();
   body.stateExperience = readStateExperienceInput();
   body.bestFor = collectBestForEntries();
   body.skills = body.highlightedSkills;
@@ -4714,9 +5316,24 @@ async function saveSettings() {
   }
 
   const updatedUser = await secureFetch("/api/users/me").then((r) => r.json());
+  const approvedPhotoFallback =
+    currentUser?.profileImage ||
+    currentUser?.avatarURL ||
+    settingsState.profileImage ||
+    "";
+  const approvedOriginalFallback =
+    settingsState.profileImageOriginal || currentUser?.profileImageOriginal || "";
   const pendingFallback = settingsState.pendingProfileImage || currentUser?.pendingProfileImage || "";
   const pendingOriginalFallback =
     settingsState.pendingProfileImageOriginal || currentUser?.pendingProfileImageOriginal || "";
+  if (approvedPhotoFallback && !updatedUser?.profileImage && !updatedUser?.avatarURL) {
+    updatedUser.profileImage = approvedPhotoFallback;
+    updatedUser.avatarURL = approvedPhotoFallback;
+    updatedUser.profilePhotoStatus = updatedUser.profilePhotoStatus || "approved";
+  }
+  if (approvedOriginalFallback && !updatedUser?.profileImageOriginal) {
+    updatedUser.profileImageOriginal = approvedOriginalFallback;
+  }
   if (pendingFallback && !updatedUser?.pendingProfileImage) {
     updatedUser.pendingProfileImage = pendingFallback;
     updatedUser.profilePhotoStatus = updatedUser.profilePhotoStatus || "pending_review";
@@ -4763,6 +5380,7 @@ async function saveSettings() {
 
   persistSession({ user: mergedUser });
   window.updateSessionUser?.(mergedUser);
+  clearProfileSettingsDraft(mergedUser);
 
   applyAvatar?.(mergedUser);
   updateAvatarRemoveButton(mergedUser);
@@ -4770,6 +5388,7 @@ async function saveSettings() {
   hydrateProfileForm(mergedUser);
   renderLanguageEditor(mergedUser.languages || []);
   bootstrapProfileSettings(mergedUser);
+  const requiredStatus = isParalegal ? updateRequiredFieldMarkers() : { ok: true, missing: [] };
   syncCluster?.(mergedUser);
   window.hydrateParalegalCluster?.(mergedUser);
   try {
@@ -4778,6 +5397,15 @@ async function saveSettings() {
   try {
     localStorage.removeItem(PREFILL_CACHE_KEY);
   } catch {}
+  if (isParalegal && !requiredStatus.ok) {
+    const missingList =
+      Array.isArray(requiredStatus.missing) && requiredStatus.missing.length
+        ? requiredStatus.missing.join(", ")
+        : "your remaining profile fields";
+    showToast(`Settings saved. Complete ${missingList} to finish your profile for attorney review.`, "info");
+    return;
+  }
+
   showToast(
     stagedPhoto
       ? uploadedPhotoPendingReview

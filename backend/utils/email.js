@@ -295,12 +295,96 @@ async function sendProfilePhotoRejectedEmail(user, opts = {}) {
   return module.exports(email, subject, html);
 }
 
+async function sendAccountDeactivatedEmail(user, opts = {}) {
+  const email = user?.email;
+  if (!email) return;
+  const firstName = user?.firstName || "";
+  const baseUrl =
+    (opts.baseUrl && String(opts.baseUrl).trim()) ||
+    (process.env.EMAIL_BASE_URL || process.env.APP_BASE_URL || "https://www.lets-paraconnect.com");
+  const assetBase = String(baseUrl).replace(/\/+$/, "").replace(/\/profile-settings\.html$/, "");
+  const loginUrl = `${assetBase}/login.html`;
+  const logoUrl = `${assetBase}/Cleanfav.png`;
+  const heroUrl = `${assetBase}/hero-mountain.jpg`;
+
+  const subject = "Your Let’s-ParaConnect account has been deactivated";
+  const html = `
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td align="center" style="padding:24px 24px 8px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding-right:12px;">
+                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
+                  </td>
+                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
+                    Let's-ParaConnect
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 24px 20px;">
+              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 32px 0;">
+              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:34px;letter-spacing:0.06em;color:#6e6e6e;">
+                Account deactivated
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:16px 32px 0;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.08em;color:#1f1f1f;line-height:1.6;text-align:left;">
+                ${firstName ? `Hi ${firstName},<br><br>` : ""}
+                Your Let&rsquo;s-ParaConnect account has been successfully deactivated.<br><br>
+                You will no longer be able to sign in or participate in active platform activity unless your account is reactivated by support.<br><br>
+                Historical case, dispute, payment, audit, and related financial records have been preserved in accordance with platform policy. Deactivation does not reopen prior matters or change historical outcomes.
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:24px 32px 16px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td bgcolor="#ffbd59" style="border-radius:999px;">
+                    <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
+                      Go to sign in
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:0 32px 28px;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;text-align:left;">
+                If you did not intend to deactivate your account, please contact us at <a href="mailto:help@lets-paraconnect.com" style="color:#1f1f1f;text-decoration:underline;">help@lets-paraconnect.com</a>.
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  `;
+
+  return module.exports(email, subject, html);
+}
+
 module.exports.sendPendingReviewEmail = sendPendingReviewEmail;
 module.exports.sendAdditionalInfoEmail = sendAdditionalInfoEmail;
 module.exports.sendAcceptedEmail = sendAcceptedEmail;
 module.exports.sendNotAcceptedEmail = sendNotAcceptedEmail;
 module.exports.sendWelcomePacket = sendWelcomePacket;
 module.exports.sendProfilePhotoRejectedEmail = sendProfilePhotoRejectedEmail;
+module.exports.sendAccountDeactivatedEmail = sendAccountDeactivatedEmail;
 
 async function sendVerificationEmail(user, code) {
   if (!user?.email) return;

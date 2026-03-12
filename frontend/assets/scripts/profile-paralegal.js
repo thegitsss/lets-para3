@@ -1114,7 +1114,7 @@ function renderStatus(profile) {
   const nextExpired = nextDate && !Number.isNaN(nextDate.getTime()) && nextDate.getTime() <= Date.now();
   const message = nextExpired ? "Available Now" : profile.availability || "Availability on request";
   const nextAvailable = nextExpired ? "" : friendlyAvailabilityDate(nextRaw);
-  elements.statusChip.textContent = nextAvailable ? `${message} · Next opening ${nextAvailable}` : message;
+  elements.statusChip.textContent = nextAvailable ? `Next opening ${nextAvailable}` : message;
 }
 
 function renderMetadata(profile) {
@@ -2045,7 +2045,7 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   ensureHireModalStyles();
   const safeName = escapeHtml(paralegalName || "Paralegal");
   const feeNote =
-    "The platform fee supports secure Stripe payment processing and access to the Let’s-ParaConnect vetted paralegal network.";
+    "The platform fee supports tools that enable attorneys and paralegals to collaborate, including secure workspace, messaging, document sharing, case workflow tools, payment processing, identity verification, and platform administration. The platform fee is not a fee for legal services.";
   const feeRate = Number(feePct || 0);
   const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
   const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));

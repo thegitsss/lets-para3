@@ -449,8 +449,16 @@
       margin-top: 3px;
     }
 
-    .flag-menu-other textarea {
+    .flag-menu-other {
       width: 100%;
+      max-width: 100%;
+      margin-top: 6px;
+    }
+
+    .flag-menu-other textarea {
+      display: block;
+      width: 100%;
+      max-width: 100%;
       min-height: 70px;
       border: 1px solid rgba(26, 34, 48, 0.12);
       border-radius: 12px;
@@ -458,6 +466,7 @@
       font-family: 'Sarabun', sans-serif;
       font-size: 0.9rem;
       resize: vertical;
+      box-sizing: border-box;
     }
 
     .flag-menu-actions {
@@ -969,6 +978,8 @@
       <div class="region">United States</div>
     </div>
   </footer>
+
+  <div id="toastBanner" class="toast" role="status" aria-live="polite"></div>
 
   <script src="assets/scripts/utils/toast.js?v=20260208"></script>
   <script type="module" src="assets/scripts/views/browse-jobs.js"></script>

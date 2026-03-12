@@ -16,6 +16,7 @@ const sendEmail = require("../utils/email");
 const { sendWelcomePacket, sendProfilePhotoRejectedEmail } = sendEmail;
 const { notifyUser } = require("../utils/notifyUser");
 const { getAppSettings, normalizeTaxRate, serializeAppSettings } = require("../utils/appSettings");
+const { triageSupportIssue } = require("../ai/supportAgent");
 
 // -----------------------------------------
 // CSRF (enabled in production or when ENABLE_CSRF=true)
@@ -168,7 +169,7 @@ lastLoginAt, lockedUntil, failedLogins, audit, createdAt, updatedAt,
 specialties, jurisdictions, skills, yearsExperience, languages,
 avatarURL, timezone, location, state, kycStatus, stripeCustomerId, stripeAccountId,
 barNumber, resumeURL, certificateURL, practiceAreas, experience, education,
-disabled, profileImage, pendingProfileImage, profilePhotoStatus,
+disabled, profileImage, pendingProfileImage, profilePhotoStatus, linkedInURL,
 } = u;
 return {
 id: _id,
@@ -189,6 +190,7 @@ profileImage,
 pendingProfileImage,
 profilePhotoStatus,
 barNumber,
+linkedInURL,
 resumeURL: toFileViewUrl(resumeURL),
 certificateURL: toFileViewUrl(certificateURL),
 practiceAreas,
@@ -248,8 +250,8 @@ function buildApprovalEmailHtml(user, opts = {}) {
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
 
   const unsubscribeLine = unsubscribeUrl
-    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe</a>`
-    : "Unsubscribe";
+    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
+    : "Unsubscribe from non-essential emails";
 
   return `
   <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
@@ -340,7 +342,7 @@ function buildApprovalEmailHtml(user, opts = {}) {
                 Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">help@lets-paraconnect.com</a>
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
-                No longer want to receive these emails? ${unsubscribeLine}
+                ${unsubscribeLine}. Required account and case notices may still be sent.
               </div>
             </td>
           </tr>
@@ -359,8 +361,8 @@ function buildDenialEmailHtml(user, opts = {}) {
   const friendlyName = formatFullName(user) || "there";
 
   const unsubscribeLine = unsubscribeUrl
-    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe</a>`
-    : "Unsubscribe";
+    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
+    : "Unsubscribe from non-essential emails";
 
   return `
   <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
@@ -416,7 +418,7 @@ function buildDenialEmailHtml(user, opts = {}) {
                 Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">help@lets-paraconnect.com</a>
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
-                No longer want to receive these emails? ${unsubscribeLine}
+                ${unsubscribeLine}. Required account and case notices may still be sent.
               </div>
             </td>
           </tr>
@@ -436,8 +438,8 @@ function buildCompleteProfileEmailHtml(user, opts = {}) {
   const friendlyName = formatFullName(user) || "there";
 
   const unsubscribeLine = unsubscribeUrl
-    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe</a>`
-    : "Unsubscribe";
+    ? `<a href="${unsubscribeUrl}" style="color:#f6f5f1;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
+    : "Unsubscribe from non-essential emails";
 
   return `
   <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
@@ -518,7 +520,7 @@ function buildCompleteProfileEmailHtml(user, opts = {}) {
                 Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#f6f5f1;text-decoration:none;">help@lets-paraconnect.com</a>
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#bfc3c8;line-height:1.4;margin-top:14px;">
-                No longer want to receive these emails? ${unsubscribeLine}
+                ${unsubscribeLine}. Required account and case notices may still be sent.
               </div>
             </td>
           </tr>
@@ -615,6 +617,26 @@ return user;
 
 // All admin routes are protected & admin-only
 router.use(verifyToken, requireApproved, requireRole("admin"));
+
+router.post(
+  "/ai/support-triage-test",
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const { messageText, userEmail, source, saveIssue } = req.body || {};
+    if (!String(messageText || "").trim()) {
+      return res.status(400).json({ error: "messageText is required" });
+    }
+
+    const result = await triageSupportIssue({
+      messageText,
+      userEmail,
+      source: source || "admin_test",
+      saveToDb: Boolean(saveIssue),
+    });
+
+    res.json(result);
+  })
+);
 
 router.get(
   "/settings",

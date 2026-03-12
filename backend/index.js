@@ -15,7 +15,7 @@ const app = express();
 app.use("/api/webhooks/stripe", require("./routes/paymentsWebhook"));
 app.set("trust proxy", 1);
 const PROD = process.env.NODE_ENV === "production";
-const PORT = 5050;
+const PORT = Number(process.env.PORT || 5050);
 const FRONTEND_DIR = path.join(__dirname, "../frontend");
 const PUBLIC_DIR = path.join(__dirname, "../public");
 
@@ -75,6 +75,14 @@ const csrfProtection = csrf({
 
 app.use("/api/auth/login", rateLimit({ windowMs: 60 * 1000, max: 10 }));
 app.use("/api/auth/signup", rateLimit({ windowMs: 60 * 1000, max: 10 }));
+app.use(
+  "/api/auth/request-password-reset",
+  rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false })
+);
+app.use(
+  "/api/auth/resend-verification",
+  rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false })
+);
 app.use(
   "/api/messages",
   rateLimit({
@@ -140,6 +148,7 @@ const stripeRouter = require("./routes/stripe");
 const notificationRouter = require("./routes/notifications");
 const blocksRouter = require("./routes/blocks");
 const { startPurgeWorker } = require("./services/caseLifecycle");
+const { startAgentScheduler } = require("./scheduler/agentScheduler");
 
 app.use(express.json({ limit: "1mb" }));
 app.use("/api/waitlist", waitlistRouter);
@@ -241,3 +250,4 @@ app.listen(PORT, () => {
 });
 
 startPurgeWorker();
+startAgentScheduler();

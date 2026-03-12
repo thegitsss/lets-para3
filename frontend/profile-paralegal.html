@@ -306,11 +306,13 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 6px 14px;
+      padding: 8px 12px;
       border-radius: 999px;
-      border: 1px solid var(--line);
-      background: #fff;
-      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.06);
+      background: rgba(255,255,255,0.6);
+      border: none;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
       text-decoration: none;
       color: inherit;
       cursor: pointer;
@@ -320,26 +322,60 @@
       width: 44px;
       height: 44px;
       border-radius: 50%;
+      border: 2px solid #fff;
       object-fit: cover;
-      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+      box-shadow: none;
     }
 
     .user-chip strong {
-      font-weight: 400;
       display: block;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      letter-spacing: 0.02em;
+      color: #1a1a1a;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .user-chip span {
       font-size: 0.85rem;
-      color: var(--muted);
+      color: #6b6b6b;
       display: block;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    body.theme-dark .user-chip {
+      background: rgba(15,23,42,0.4);
+      border-color: transparent;
+      box-shadow: none;
+    }
+
+    body.theme-dark .user-chip strong {
+      color: #fff;
+    }
+
+    body.theme-dark .user-chip span {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    body.theme-mountain .user-chip strong {
+      color: #1b1b1b;
+    }
+
+    body.theme-mountain .user-chip span {
+      color: #6b6b6b;
     }
 
     body.viewer-attorney .profile-header-controls .user-chip {
       padding: 8px 12px;
       border-radius: 999px;
       background: rgba(255, 255, 255, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.4);
+      border: none;
       box-shadow: none;
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);

@@ -248,6 +248,16 @@ const caseSchema = new Schema(
     files: [fileSchema],
     disputes: [disputeSchema],
     flags: { type: [flagSchema], default: [] },
+    moderationStatus: {
+      type: String,
+      enum: ["none", "flagged", "resolution_requested"],
+      default: "none",
+      index: true,
+    },
+    moderationFlaggedAt: { type: Date, default: null },
+    moderationFlaggedBy: { type: Types.ObjectId, ref: "User", default: null },
+    moderationResolutionRequestedAt: { type: Date, default: null },
+    moderationResolutionRequestedBy: { type: Types.ObjectId, ref: "User", default: null },
 
     // Lightweight progress updates/changelog
     updates: [

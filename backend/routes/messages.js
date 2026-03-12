@@ -13,6 +13,7 @@ const { containsProfanity, maskProfanity } = require("../utils/badWords");
 const { CASE_STATE, normalizeCaseStatus, canUseWorkspace } = require("../utils/caseState");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
 const { publishCaseEvent } = require("../utils/caseEvents");
+const { publishNotificationEvent } = require("../utils/notificationEvents");
 const { decryptMessagePayload, decryptString } = require("../utils/dataEncryption");
 
 // ----------------------------------------
@@ -128,21 +129,28 @@ function buildMessagesBeforeBoundary(createdAt, messageId) {
   };
 }
 
-async function shouldNotifyAttorneyForParalegalMessage({ caseId, messageDoc }) {
+const MESSAGE_NOTIFY_COOLDOWN_MS = Math.max(
+  0,
+  parseInt(process.env.MESSAGE_NOTIFY_COOLDOWN_MS, 10) || 2 * 60 * 60 * 1000
+);
+
+async function shouldNotifyForMessage({ caseId, messageDoc, senderRole }) {
   const caseObjectId = toObjectId(caseId);
   const currentMessageId = toObjectId(messageDoc?._id);
   const currentCreatedAt = messageDoc?.createdAt ? new Date(messageDoc.createdAt) : null;
+  const normalizedSenderRole = normalizeSenderRole(senderRole);
   if (!caseObjectId || !currentMessageId || !currentCreatedAt || Number.isNaN(currentCreatedAt.getTime())) {
     return true;
   }
-
-  const PARLEGAL_NOTIFY_COOLDOWN_MS = 2 * 60 * 60 * 1000;
+  if (!normalizedSenderRole || MESSAGE_NOTIFY_COOLDOWN_MS <= 0) {
+    return true;
+  }
   const currentBoundary = buildMessagesBeforeBoundary(currentCreatedAt, currentMessageId);
 
-  const latestParalegalMessage = await Message.findOne({
+  const latestMessageFromSenderRole = await Message.findOne({
     caseId: caseObjectId,
     deleted: { $ne: true },
-    senderRole: "paralegal",
+    senderRole: normalizedSenderRole,
     _id: { $ne: currentMessageId },
     $and: [currentBoundary],
   })
@@ -150,21 +158,19 @@ async function shouldNotifyAttorneyForParalegalMessage({ caseId, messageDoc }) {
     .select("_id createdAt")
     .lean();
 
-  if (!latestParalegalMessage) {
+  if (!latestMessageFromSenderRole) {
     return true;
   }
 
-  const latestParalegalCreatedAt = latestParalegalMessage?.createdAt
-    ? new Date(latestParalegalMessage.createdAt)
+  const latestMessageCreatedAt = latestMessageFromSenderRole?.createdAt
+    ? new Date(latestMessageFromSenderRole.createdAt)
     : null;
-  if (!latestParalegalCreatedAt || Number.isNaN(latestParalegalCreatedAt.getTime())) {
+  if (!latestMessageCreatedAt || Number.isNaN(latestMessageCreatedAt.getTime())) {
     return true;
   }
 
-  const latestParalegalId = toObjectId(latestParalegalMessage?._id);
-
-  const gapMs = currentCreatedAt.getTime() - latestParalegalCreatedAt.getTime();
-  return gapMs >= PARLEGAL_NOTIFY_COOLDOWN_MS;
+  const gapMs = currentCreatedAt.getTime() - latestMessageCreatedAt.getTime();
+  return gapMs >= MESSAGE_NOTIFY_COOLDOWN_MS;
 }
 
 async function createMessageNotification({ caseDoc, senderDoc, previewText, messageDoc }) {
@@ -175,17 +181,21 @@ async function createMessageNotification({ caseDoc, senderDoc, previewText, mess
     recipientId = toObjectId(caseDoc.paralegal) || toObjectId(caseDoc.paralegalId);
   } else if (role === "paralegal") {
     recipientId = toObjectId(caseDoc.attorney) || toObjectId(caseDoc.attorneyId);
-    const shouldNotify = await shouldNotifyAttorneyForParalegalMessage({
-      caseId: caseDoc._id,
-      messageDoc,
-    });
-    if (!shouldNotify) return;
   } else {
     return;
   }
   if (!recipientId) return;
   const senderId = toObjectId(senderDoc._id || senderDoc.id);
   if (senderId && String(recipientId) === String(senderId)) return;
+  const shouldNotify = await shouldNotifyForMessage({
+    caseId: caseDoc._id,
+    messageDoc,
+    senderRole: role,
+  });
+  if (!shouldNotify) {
+    publishNotificationEvent(recipientId, "notifications", { at: new Date().toISOString(), type: "message_refresh" });
+    return;
+  }
 
   const senderName = `${senderDoc.firstName || ""} ${senderDoc.lastName || ""}`.trim() || "Someone";
   try {

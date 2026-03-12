@@ -32,6 +32,7 @@
       --line: #dfe3ea;
       --accent: #0b4bb3;
       --subtle: #f5f7fb;
+      --font-serif: 'Cormorant Garamond', serif;
       --font-sans: 'Sarabun', sans-serif;
     }
 
@@ -120,9 +121,10 @@
     }
 
     #profileName {
+      font-family: var(--font-serif);
       font-size: 3rem;
       line-height: 1.1;
-      font-weight: 700;
+      font-weight: 300;
       margin-bottom: 8px;
       color: var(--ink);
     }
@@ -163,12 +165,13 @@
     }
 
     .contact-card h4 {
+      font-family: var(--font-serif);
       font-size: 0.9rem;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--muted);
       margin-bottom: 6px;
-      font-weight: 700;
+      font-weight: 400;
     }
 
     .contact-line {
@@ -242,10 +245,12 @@
     }
 
     .practice-header h3 {
+      font-family: var(--font-serif);
       font-size: 1.05rem;
       letter-spacing: 0.08em;
       color: var(--muted);
       text-transform: uppercase;
+      font-weight: 400;
     }
 
     .practice-close {
@@ -328,11 +333,13 @@
     }
 
     .meta-card h4 {
+      font-family: var(--font-serif);
       font-size: 0.95rem;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--muted);
       margin-bottom: 12px;
+      font-weight: 400;
     }
 
     .timeline {
@@ -442,7 +449,6 @@
           <h1 id="profileName">Loading…</h1>
           <div class="link-strip">
             <a id="heroLinkedIn" class="inline-link hidden" target="_blank" rel="noopener">LinkedIn</a>
-            <a id="heroWebsite" class="inline-link hidden" target="_blank" rel="noopener">Firm Website</a>
           </div>
           <hr class="hairline" />
           <div class="contact-grid">
