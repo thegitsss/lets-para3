@@ -2444,6 +2444,7 @@ function formatSkillsValue(value) {
 }
 
 const MAX_PROFILE_SKILLS = 5;
+const MAX_PROFILE_BEST_FOR = 5;
 
 function renderSkillsChips(values = []) {
   const container = document.getElementById("skillsChips");
@@ -2665,7 +2666,8 @@ function collectBestForEntries() {
   if (list.dataset.mode === "placeholder") return [];
   return Array.from(list.querySelectorAll("li"))
     .map((item) => sanitizeBestForEntry(item.textContent))
-    .filter(Boolean);
+    .filter(Boolean)
+    .slice(0, MAX_PROFILE_BEST_FOR);
 }
 
 function createBestForListItem(text = "") {
@@ -2680,18 +2682,22 @@ function createBestForListItem(text = "") {
 function renderBestForList(entries = [], { editable = false } = {}) {
   const list = document.getElementById("bestForDisplay");
   if (!list) return;
-  const hasEntries = Array.isArray(entries) && entries.length > 0;
+  const safeEntries = (Array.isArray(entries) ? entries : [])
+    .map((entry) => sanitizeBestForEntry(entry))
+    .filter(Boolean)
+    .slice(0, MAX_PROFILE_BEST_FOR);
+  const hasEntries = safeEntries.length > 0;
   list.innerHTML = "";
 
   if (editable) {
-    const editItems = hasEntries ? entries : [""];
+    const editItems = hasEntries ? safeEntries : [""];
     editItems.forEach((item) => list.appendChild(createBestForListItem(item)));
     list.dataset.mode = "edit";
     list.classList.remove("is-placeholder");
     return;
   }
 
-  const items = hasEntries ? entries : BEST_FOR_SUGGESTIONS;
+  const items = hasEntries ? safeEntries : BEST_FOR_SUGGESTIONS;
   items.forEach((item) => {
     const li = document.createElement("li");
     li.textContent = item;
@@ -2723,6 +2729,12 @@ function handleBestForListKeydown(event) {
   if (!item) return;
 
   if (event.key === "Enter") {
+    const currentEntries = collectBestForEntries();
+    if (currentEntries.length >= MAX_PROFILE_BEST_FOR && sanitizeBestForEntry(item.textContent)) {
+      event.preventDefault();
+      showToast(`You can list up to ${MAX_PROFILE_BEST_FOR} Best For items.`, "info");
+      return;
+    }
     event.preventDefault();
     const nextItem = createBestForListItem("");
     item.insertAdjacentElement("afterend", nextItem);
@@ -2765,8 +2777,23 @@ function handleBestForListKeydown(event) {
 function handleBestForListInput() {
   const list = document.getElementById("bestForDisplay");
   if (!list || list.dataset.mode !== "edit") return;
-  const items = list.querySelectorAll("li");
-  if (!items.length) {
+  const items = Array.from(list.querySelectorAll("li"));
+  if (items.length > MAX_PROFILE_BEST_FOR) {
+    items.slice(MAX_PROFILE_BEST_FOR).forEach((item) => item.remove());
+    showToast(`You can list up to ${MAX_PROFILE_BEST_FOR} Best For items.`, "info");
+  }
+  const activeItem = document.activeElement?.closest?.("#bestForDisplay li") || null;
+  Array.from(list.querySelectorAll("li")).forEach((item) => {
+    const normalized = sanitizeBestForEntry(item.textContent);
+    if (item.textContent !== normalized) {
+      item.textContent = normalized;
+      if (item === activeItem) {
+        focusBestForItem(item, true);
+      }
+    }
+  });
+  const refreshedItems = list.querySelectorAll("li");
+  if (!refreshedItems.length) {
     list.appendChild(createBestForListItem(""));
   }
   const hasText = collectBestForEntries().length > 0;
