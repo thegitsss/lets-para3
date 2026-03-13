@@ -233,7 +233,10 @@
     }
 
     .slider-field span { font-size: 0.85rem; color: #475569; }
-    input[type="range"] { flex: 1; }
+    input[type="range"] {
+      flex: 1;
+      accent-color: #0a84ff;
+    }
 
     .filter-actions {
       display: flex;
@@ -252,7 +255,11 @@
       letter-spacing: 0.04em;
     }
 
-    .filter-actions button.primary { background: #887244; color: #fff; }
+    .filter-actions button.primary {
+      background: #eef6ff;
+      border-color: #c8ddfb;
+      color: #3f5f8f;
+    }
     .filter-actions #clearFilters {
       border: none;
       background: none;
@@ -917,8 +924,8 @@
         <div class="filter-group">
           <label for="filterMinPay">Minimum Compensation</label>
           <div class="slider-field">
-            <input type="range" id="filterMinPay" min="0" max="500" step="10" value="0" />
-            <span id="minPayValue">$0</span>
+            <input type="range" id="filterMinPay" min="400" max="900" step="25" value="400" />
+            <span id="minPayValue">$400</span>
           </div>
         </div>
         <div class="filter-group">

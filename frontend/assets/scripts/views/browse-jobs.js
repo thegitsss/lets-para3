@@ -48,6 +48,9 @@ let viewerState = "";
 let viewerStateExperience = [];
 let autoStateFilterApplied = false;
 const PAGE_SIZE = 15;
+const PAY_FILTER_STOPS = [400, 425, 450, 475, 500, 525, 550, 600, 650, 700, 800, 900];
+const MIN_CASE_COMPENSATION = PAY_FILTER_STOPS[0];
+const MAX_FILTER_COMPENSATION = PAY_FILTER_STOPS[PAY_FILTER_STOPS.length - 1];
 let currentPage = 1;
 let userPageOverride = false;
 const initialJobParam = (idParam || explicitCaseId || "").trim();
@@ -339,18 +342,23 @@ if (filterToggle && filterMenu) {
 }
 
 function quantizePayValue(raw) {
-  const value = Math.max(0, Math.min(500, Number(raw) || 0));
-  if (value <= 100) {
-    return Math.max(0, Math.min(100, Math.round(value / 20) * 20));
-  }
-  const remainder = value - 100;
-  const increments = Math.ceil(remainder / 50);
-  return Math.min(500, 100 + increments * 50);
+  const value = Math.max(
+    MIN_CASE_COMPENSATION,
+    Math.min(MAX_FILTER_COMPENSATION, Number(raw) || MIN_CASE_COMPENSATION)
+  );
+
+  return PAY_FILTER_STOPS.reduce((closest, stop) => {
+    const closestDistance = Math.abs(closest - value);
+    const stopDistance = Math.abs(stop - value);
+    if (stopDistance < closestDistance) return stop;
+    if (stopDistance === closestDistance && stop > closest) return stop;
+    return closest;
+  }, PAY_FILTER_STOPS[0]);
 }
 
 function updatePayLabel(value) {
   if (!minPayValue) return;
-  const display = value >= 500 ? "$500+" : `$${value.toLocaleString()}`;
+  const display = value >= MAX_FILTER_COMPENSATION ? "$900+" : `$${value.toLocaleString()}`;
   minPayValue.textContent = display;
 }
 
@@ -390,11 +398,11 @@ function populateFilters() {
     `<option value="">Any</option>` + states.map((s) => `<option value="${s}">${s}</option>`).join("");
 
   // Pay slider
-  minPaySlider.min = 0;
-  minPaySlider.max = 500;
-  minPaySlider.step = 10;
-  minPaySlider.value = 0;
-  updatePayLabel(0);
+  minPaySlider.min = MIN_CASE_COMPENSATION;
+  minPaySlider.max = MAX_FILTER_COMPENSATION;
+  minPaySlider.step = 25;
+  minPaySlider.value = MIN_CASE_COMPENSATION;
+  updatePayLabel(MIN_CASE_COMPENSATION);
 
   // Experience slider
   minExpSlider.min = 0;
@@ -422,7 +430,7 @@ function applyFilters(options = {}) {
   const { render = true } = options;
   const area = practiceAreaSelect?.value || "";
   const state = stateSelect?.value || "";
-  const minPay = quantizePayValue(minPaySlider?.value || 0);
+  const minPay = quantizePayValue(minPaySlider?.value || MIN_CASE_COMPENSATION);
   const maxExpValue = clampExperienceValue(minExpSlider?.value || 0);
   const expLimit = maxExpValue >= 10 ? Infinity : maxExpValue;
 
@@ -475,8 +483,8 @@ function clearFilters() {
   if (practiceAreaSelect) practiceAreaSelect.value = "";
   if (stateSelect) stateSelect.value = "";
   if (minPaySlider) {
-    minPaySlider.value = 0;
-    updatePayLabel(0);
+    minPaySlider.value = MIN_CASE_COMPENSATION;
+    updatePayLabel(MIN_CASE_COMPENSATION);
   }
   if (minExpSlider) {
     minExpSlider.value = 0;
