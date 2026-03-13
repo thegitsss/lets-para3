@@ -669,7 +669,7 @@ body.theme-dark .select-field select{
       width:100%;
     }
 
-    #create-step-description .form-wrapper .tips{
+    #create-step-description .form-wrapper > .tips{
       width:100%;
     }
 
@@ -724,22 +724,23 @@ body.theme-dark .select-field select{
       right: 0;
       top: 36px;
       margin-top:0;
-      width: min(360px, 90vw);
+      width: min(280px, 82vw);
+      padding: 0.9rem 1rem;
       box-shadow:0 12px 30px rgba(0,0,0,0.08);
     }
     .tips h3{
       font-family:var(--font-serif);
-      font-size:1.15rem;
+      font-size:1rem;
       font-weight:300;
-      margin-bottom:0.75rem;
+      margin-bottom:0.45rem;
       color:var(--ink);
     }
     .tips ul{
-      margin:0 0 0.75rem 1.1rem;
+      margin:0 0 0.2rem 1rem;
       padding:0;
       display:flex;
       flex-direction:column;
-      gap:0.35rem;
+      gap:0.25rem;
     }
 
     .summary-layout{
@@ -1287,7 +1288,7 @@ body.theme-dark .select-field select{
     </nav>
     <div class="sidebar-bottom">
       <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-      <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2025</a></div>
+      <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2026</a></div>
     </div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
@@ -1513,17 +1514,6 @@ body.theme-dark .select-field select{
       </div>
 
       <div class="form-wrapper">
-        <details class="tips-help">
-          <summary aria-label="Tips for a Great Description">?</summary>
-          <div class="tips">
-            <h3>Tips for a Great Description</h3>
-            <ul>
-              <li>Be clear, well-written, and detailed about your case needs.</li>
-              <li>Include the scope of work, deliverables, and deadlines.</li>
-              <li>Avoid sensitive or identifying details in the posting.</li>
-            </ul>
-          </div>
-        </details>
         <form>
           <div class="case-title-preview" id="caseTitlePreview">
             <span class="label">Matter Title</span>
