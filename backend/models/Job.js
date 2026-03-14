@@ -21,7 +21,7 @@ const JobSchema = new mongoose.Schema({
   budget: {
     type: Number,
     required: true,
-    min: 50,
+    min: 1,
   },
 
   status: {

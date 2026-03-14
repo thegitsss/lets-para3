@@ -55,8 +55,8 @@ function assertMinComp(res, compAmount) {
     res.status(400).json({ error: "Compensation amount must be a number." });
     return false;
   }
-  if (parsed < 400) {
-    res.status(400).json({ error: "Compensation amount must be at least $400." });
+  if (parsed <= 0) {
+    res.status(400).json({ error: "Compensation amount must be greater than $0." });
     return false;
   }
   return true;

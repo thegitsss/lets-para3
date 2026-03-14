@@ -1755,8 +1755,8 @@ router.patch(
     }
 
     const cents = Math.round(Number(amountUsd || 0) * 100);
-    if (!Number.isFinite(cents) || cents < 40000) {
-      return res.status(400).json({ msg: "Amount must be at least $400." });
+    if (!Number.isFinite(cents) || cents < 1) {
+      return res.status(400).json({ msg: "Amount must be greater than $0." });
     }
 
     const before = c.totalAmount;

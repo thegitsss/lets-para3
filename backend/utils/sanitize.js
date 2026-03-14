@@ -36,7 +36,7 @@ function cleanFilename(str, max = 255) {
   return cleaned.slice(0, max) || "file";
 }
 
-function cleanBudget(value, { min = 400, max = 30000 } = {}) {
+function cleanBudget(value, { min = 0.01, max = 30000 } = {}) {
   const parsed =
     typeof value === "number"
       ? value
@@ -47,7 +47,8 @@ function cleanBudget(value, { min = 400, max = 30000 } = {}) {
     throw new Error("Budget must be a number");
   }
   if (parsed < min || parsed > max) {
-    throw new Error(`Budget must be between $${min} and $${max}`);
+    const minLabel = Number.isInteger(min) ? String(min) : min.toFixed(2);
+    throw new Error(`Budget must be between $${minLabel} and $${max}`);
   }
   return parsed;
 }

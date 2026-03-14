@@ -74,7 +74,7 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
 const isObjId = (id) => mongoose.isValidObjectId(id);
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const FILE_STATUS = ["pending_review", "approved", "attorney_revision"];
-const MIN_CASE_AMOUNT_CENTS = 40000;
+const MIN_CASE_AMOUNT_CENTS = 1; // Temporary: lowered for live Stripe funds-flow testing.
 const DISPUTE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const PRACTICE_AREAS = [
   "administrative law",
@@ -2376,7 +2376,7 @@ router.post(
       return res.status(400).json({ error: "Budget must be greater than $0." });
     }
     if (amountCents < MIN_CASE_AMOUNT_CENTS) {
-      return res.status(400).json({ error: "Budget must be at least $400." });
+      return res.status(400).json({ error: "Budget must be greater than $0." });
     }
 
     const deadlineDate = parseDeadline(deadline);
@@ -2414,7 +2414,7 @@ router.post(
     ]);
 
     try {
-      const budgetDollars = Math.max(400, Math.round((amountCents || 0) / 100) || 0);
+      const budgetDollars = Math.max(1, Math.round((amountCents || 0) / 100) || 0);
       const attorneyProfile = await User.findById(req.user.id).select("state");
       const attorneyState = String(attorneyProfile?.state || "").trim().toUpperCase();
       const job = await Job.create({
@@ -3094,7 +3094,7 @@ router.patch(
         return res.status(400).json({ error: "Budget must be greater than $0." });
       }
       if (cents < MIN_CASE_AMOUNT_CENTS) {
-        return res.status(400).json({ error: "Budget must be at least $400." });
+        return res.status(400).json({ error: "Budget must be greater than $0." });
       }
       if (cents > 0) {
         if (!doc.paralegalId && !hasPendingInvites(doc)) {
@@ -4794,7 +4794,7 @@ router.post(
     const amountToCharge = selectedCase.lockedTotalAmount;
     const budgetCents = Math.round(Number(amountToCharge) || 0);
     if (!Number.isFinite(budgetCents) || budgetCents < MIN_CASE_AMOUNT_CENTS) {
-      return res.status(400).json({ error: "Case amount must be at least $400 before hiring." });
+      return res.status(400).json({ error: "Case amount must be greater than $0 before hiring." });
     }
 
     const attorney = await User.findById(req.user.id).select("firstName lastName email role stripeCustomerId");

@@ -1469,7 +1469,7 @@ body.theme-dark .select-field select{
   <label for="comp">Compensation</label>
   <div class="comp-wrapper">
     <span class="dollar-sign">$</span>
-    <input id="comp" type="number" min="0" placeholder="400 minimum" />
+    <input id="comp" type="number" min="0" placeholder="Enter compensation" />
   </div>
   <p class="muted lock-note" id="compLockNotice">You may edit the amount until a paralegal applies or you send the first invitation. After that, the amount is locked.</p>
 </div>
@@ -2196,8 +2196,8 @@ body.theme-dark .select-field select{
       },
       {
         field: fields.comp,
-        check: (value) => Number(value) >= 400,
-        message: "Enter a valid compensation amount with a minimum of $400.",
+        check: (value) => Number(value) > 0,
+        message: "Enter a valid compensation amount greater than $0.",
       },
     ];
 
