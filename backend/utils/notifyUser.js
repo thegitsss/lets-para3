@@ -43,7 +43,7 @@ function buildDisplayMessage(type, payload = {}) {
     case "profile_photo_rejected":
       return "Your profile photo was rejected. Please upload a new one that meets our photo guidelines, including a plain or neutral background.";
     case "payout_released":
-      return `Your payout was released${payload.amount ? ` (${payload.amount})` : ""}.`;
+      return "Funds are being sent to your connected bank account via Stripe. Deposit timing typically ranges from 3–5 business days, depending on your bank.";
     case "application_submitted": {
       const paralegal = payload.paralegalName || actorName || "A paralegal";
       return `${paralegal} applied${caseFragment || ""}`.trim();

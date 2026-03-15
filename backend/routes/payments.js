@@ -181,7 +181,7 @@ function buildDisputeReceiptPayloads({
 
   const paralegalMessage =
     action === "refund"
-      ? `The review for ${caseTitle} was resolved. No payout was released.`
+      ? `The review for ${caseTitle} was resolved. No payout will be issued.`
       : action === "release_partial"
       ? `The review for ${caseTitle} was resolved with a partial payout.`
       : `The review for ${caseTitle} was resolved and your payout was released.`;
@@ -1559,6 +1559,9 @@ router.post(
         caseTitle: c.title || "Case",
         amount: payoutDisplay,
         link,
+        receiptUrl: `/api/payments/receipt/paralegal/${encodeURIComponent(c._id)}`,
+        message:
+          "Funds are being sent to your connected bank account via Stripe. Deposit timing typically ranges from 3–5 business days, depending on your bank.",
       };
       const alreadySent = await hasCaseNotification(paralegalObjectId, "payout_released", c, payload);
       if (!alreadySent) {
@@ -2216,6 +2219,9 @@ router.post(
         caseTitle: c.title || "Case",
         amount: payoutDisplay,
         link,
+        receiptUrl: `/api/payments/receipt/paralegal/${encodeURIComponent(c._id)}`,
+        message:
+          "Funds are being sent to your connected bank account via Stripe. Deposit timing typically ranges from 3–5 business days, depending on your bank.",
       };
       const alreadySent = await hasCaseNotification(paralegalId, "payout_released", c, payload);
       if (!alreadySent) {
@@ -2430,7 +2436,7 @@ router.post(
         const baseMessage =
           gross > 0
             ? `Admin finalized the withdrawal payout for ${caseTitle}. Payout: ${payoutLabel}.`
-            : `Admin finalized the withdrawal payout for ${caseTitle}. No payout was released.`;
+            : `Admin finalized the withdrawal payout for ${caseTitle}. No payout will be issued.`;
         const receiptNote = "A receipt is available in your dashboard with payout details.";
         const attorneyId = c.attorney?._id || c.attorneyId || c.attorney;
         const paralegalId = payoutParalegal?._id || c.withdrawnParalegalId;

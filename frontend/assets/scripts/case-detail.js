@@ -1051,8 +1051,8 @@ function openWithdrawalConfirmModal({ completedCount = 0, totalTasks = 0 } = {})
     overlay.className = "case-withdraw-overlay";
     const bodyCopy =
       completedCount === 0
-        ? "Withdrawing will pause the case. A $0 payout will be issued since no tasks were completed."
-        : "Withdrawing will close this case for you. You will no longer be able to submit work on this matter.";
+        ? "Withdrawing will pause the case. No payout will be issued because no tasks were completed."
+        : "Withdrawing will close this case for you. The attorney will then decide whether to issue a partial payout based on completed work.";
     overlay.innerHTML = `
       <div class="case-withdraw-modal" role="dialog" aria-modal="true" aria-labelledby="caseWithdrawTitle">
         <div class="case-withdraw-title" id="caseWithdrawTitle">Withdraw from Case</div>
@@ -2171,8 +2171,8 @@ function getAttorneyWithdrawalActionState(caseData) {
   const completedCount = countCompletedTasks(caseData);
   const totalTasks = getCaseTasks(caseData).length;
   const holdActive = isDisputeWindowActive(caseData);
-  const adminReviewHold = !!caseData?.disputeDeadlineAt && !payoutFinalized;
   const payoutFinalized = !!caseData?.payoutFinalizedAt;
+  const adminReviewHold = !!caseData?.disputeDeadlineAt && !payoutFinalized;
   const partialCents = Number(caseData?.partialPayoutAmount || 0);
   const currency = String(caseData?.currency || "USD").toUpperCase();
   let remainingCents = resolveRemainingAmount(caseData);
@@ -2206,7 +2206,7 @@ function getAttorneyWithdrawalActionState(caseData) {
     disablePartial = true;
     disableReject = true;
   } else if (completedCount === 0) {
-    bannerText = "Paralegal withdrew before any tasks were completed. A $0 payout was issued.";
+    bannerText = "Paralegal withdrew before any tasks were completed. No payout will be issued.";
     statusText = "Case relisted and ready for hiring.";
   } else if (completedCount > 0 && completedCount < totalTasks) {
     bannerText =
@@ -4428,16 +4428,28 @@ async function handleRequestWithdrawal() {
   showMsg(caseWithdrawStatus, "Submitting withdrawal request...");
   try {
     await fetchCSRF().catch(() => "");
-    await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/withdraw`, { method: "POST" });
+    const payload = await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/withdraw`, { method: "POST" });
     try {
-      const title = caseData?.title || "this case";
       sessionStorage.removeItem("lpc-case-completed-toast");
       sessionStorage.setItem(
         "lpc-withdrawal-toast",
-        JSON.stringify({ message: "You have successfully withdrawn from this case.", type: "success" })
+        JSON.stringify({
+          message:
+            payload?.message ||
+            (completedCount === 0
+              ? "You withdrew from this case. No payout will be issued because no tasks were completed, and the case has been relisted."
+              : "You withdrew from this case. The attorney will now decide whether to issue a partial payout based on completed work."),
+          type: "success",
+        })
       );
     } catch {}
-    showMsg(caseWithdrawStatus, "You have successfully withdrawn from this case.");
+    showMsg(
+      caseWithdrawStatus,
+      payload?.message ||
+        (completedCount === 0
+          ? "You withdrew from this case. No payout will be issued because no tasks were completed, and the case has been relisted."
+          : "You withdrew from this case. The attorney will now decide whether to issue a partial payout based on completed work.")
+    );
     window.location.href = "dashboard-paralegal.html#cases";
     return;
   } catch (err) {

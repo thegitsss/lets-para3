@@ -1545,9 +1545,13 @@ async function ensureFundsReleased(req, caseDoc) {
   try {
     const link = "dashboard-paralegal.html#cases-completed";
     const payload = {
+      caseId: String(caseDoc._id),
+      caseTitle: caseDoc.title || "Case",
       amount: payoutDisplay,
       link,
-      message: `Case "${caseDoc.title || "Case"}" completed. Funds released.`,
+      receiptUrl: `/api/payments/receipt/paralegal/${encodeURIComponent(caseDoc._id)}`,
+      message:
+        "Funds are being sent to your connected bank account via Stripe. Deposit timing typically ranges from 3–5 business days, depending on your bank.",
     };
     const alreadySent = await hasCaseNotification(paralegalObjectId, "payout_released", caseDoc, payload);
     if (!alreadySent) {
@@ -4373,7 +4377,7 @@ router.post(
         {
           summary:
             completedCount === 0
-              ? "Paralegal withdrew before any tasks were completed. A $0 payout was issued and the case was relisted."
+              ? "Paralegal withdrew before any tasks were completed. No payout will be issued and the case was relisted."
               : "Paralegal withdrew. Choose a partial payout or close without release.",
         },
         { actorUserId: req.user.id }
@@ -4386,7 +4390,7 @@ router.post(
       {
         summary:
           completedCount === 0
-            ? `You withdrew from ${caseDoc.title || "this case"}. A $0 payout was issued and the case was relisted.`
+            ? `You withdrew from ${caseDoc.title || "this case"}. No payout will be issued and the case was relisted.`
             : `You withdrew from ${caseDoc.title || "this case"}.`,
       },
       { actorUserId: req.user.id }
@@ -4397,6 +4401,11 @@ router.post(
       status: caseDoc.status,
       pausedReason: caseDoc.pausedReason,
       disputeDeadlineAt: caseDoc.disputeDeadlineAt,
+      withdrawalOutcome: completedCount === 0 ? "zero_auto" : "awaiting_attorney_decision",
+      message:
+        completedCount === 0
+          ? "You withdrew from this case. No payout will be issued because no tasks were completed, and the case has been relisted."
+          : "You withdrew from this case. The attorney will now decide whether to issue a partial payout based on completed work.",
     });
   })
 );

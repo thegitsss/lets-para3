@@ -429,6 +429,16 @@ function formatNotificationBody(item = {}) {
   }
 }
 
+function resolvePayoutReceiptLink(item = {}) {
+  const payload = item.payload || {};
+  const explicit = typeof payload.receiptUrl === "string" ? payload.receiptUrl.trim() : "";
+  if (explicit) return explicit;
+  if (item.type !== "payout_released") return "";
+  const caseId = extractCaseId(item);
+  if (!caseId) return "";
+  return `/api/payments/receipt/paralegal/${encodeURIComponent(caseId)}`;
+}
+
 function formatTimeAgo(dateString) {
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return "";
@@ -1289,6 +1299,40 @@ function buildNotificationNode(item = {}, center = null, options = {}) {
   copy.className = "notif-copy";
   copy.appendChild(message);
   copy.appendChild(time);
+
+  const receiptLink = resolvePayoutReceiptLink(normalized);
+  if (receiptLink) {
+    const actions = document.createElement("div");
+    actions.style.display = "flex";
+    actions.style.alignItems = "center";
+    actions.style.gap = "10px";
+    actions.style.marginTop = "4px";
+
+    const actionLink = document.createElement("a");
+    actionLink.href = receiptLink;
+    actionLink.className = "receipt-link";
+    actionLink.textContent = "Receipt";
+    actionLink.target = "_blank";
+    actionLink.rel = "noopener";
+    actionLink.style.color = "var(--accent, #b98a44)";
+    actionLink.style.textDecoration = "none";
+    actionLink.style.fontSize = "0.78rem";
+    actionLink.style.fontWeight = "600";
+    actionLink.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const id = normalized._id || normalized.id;
+      if (!isNotificationRead(normalized) && id) {
+        const success = await markNotificationRead(id);
+        if (success) {
+          normalized.isRead = true;
+          normalized.read = true;
+        }
+      }
+    });
+
+    actions.appendChild(actionLink);
+    copy.appendChild(actions);
+  }
 
   const actorName = String(
     normalized.actorFirstName ||
