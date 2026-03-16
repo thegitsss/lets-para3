@@ -395,6 +395,9 @@
       margin-top: -8px;
       margin-bottom: 16px;
     }
+    .file-hint:empty {
+      display: none;
+    }
     .file-hint.selected {
       color: var(--navy);
       font-weight: 300;
@@ -681,7 +684,7 @@
           hintEl.textContent = `Selected: ${file.name || 'file'}`;
           hintEl.classList.add('selected');
         } else {
-          hintEl.textContent = 'No file selected';
+          hintEl.textContent = '';
           hintEl.classList.remove('selected');
         }
         if (labelEl && labelText) labelEl.textContent = labelText;
@@ -819,7 +822,7 @@
                  <input id="resumeUpload" type="file" accept=".pdf,.doc,.docx" class="upload-input" aria-label="Resume" required />
                  <label for="resumeUpload" class="upload-placeholder">Resume</label>
                </div>
-               <div class="file-hint" id="resumeFileHint">No file selected</div>
+               <div class="file-hint" id="resumeFileHint"></div>
              </div>
              <div class="field-col">
                <label for="paralegalExperience" class="sr-only-label"><span class="sr-only">Years of experience</span></label>
@@ -835,12 +838,11 @@
            </div>
            <label for="paralegalLinkedIn"><span class="sr-only">LinkedIn</span></label>
            <input id="paralegalLinkedIn" type="url" autocomplete="url" placeholder="https://www.linkedin.com/in/username" />
-           <label for="certUpload"><span class="sr-only">Certification or License</span></label>
            <div class="upload-wrapper">
              <input id="certUpload" type="file" accept=".pdf,.doc,.docx" class="upload-input" aria-label="Certification document" />
              <label for="certUpload" class="upload-placeholder">Certificate / License</label>
            </div>
-           <div class="file-hint" id="certFileHint">No file selected</div>`;
+           <div class="file-hint" id="certFileHint"></div>`;
       const attorneyConfirmWrap = document.getElementById('attorneyConfirmWrap');
       const attorneyConfirm = document.getElementById('attorneyGoodStanding');
       const attorneyPricingAck = document.getElementById('attorneyPricingAck');
