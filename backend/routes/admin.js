@@ -170,7 +170,7 @@ lastLoginAt, lockedUntil, failedLogins, audit, createdAt, updatedAt,
 specialties, jurisdictions, skills, yearsExperience, languages,
 avatarURL, timezone, location, state, kycStatus, stripeCustomerId, stripeAccountId,
 barNumber, resumeURL, certificateURL, practiceAreas, experience, education,
-disabled, profileImage, pendingProfileImage, profilePhotoStatus, linkedInURL,
+disabled, deleted, deletedAt, profileImage, pendingProfileImage, profilePhotoStatus, linkedInURL,
 } = u;
 return {
 id: _id,
@@ -198,6 +198,8 @@ practiceAreas,
 experience,
 education,
 disabled,
+deleted,
+deletedAt,
 };
 }
 
@@ -1714,8 +1716,8 @@ const { skip, limit, page } = parsePagination(req, { defaultLimit: 25 });
 
 const filter = {};
 const rawStatus = String(status || "").trim().toLowerCase();
-if (rawStatus === "deleted") {
-filter.$or = [{ deleted: true }, { status: { $in: ["denied", "rejected", "suspended"] } }];
+if (["deleted", "deactivated"].includes(rawStatus)) {
+filter.deleted = true;
 } else {
 if (String(req.query?.includeDeleted || "").toLowerCase() !== "true") {
 filter.deleted = { $ne: true };

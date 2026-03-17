@@ -52,6 +52,7 @@ const STRIPE_BYPASS_ATTORNEY_EMAILS = new Set([
   "game4funwithme1@gmail.com",
 ]);
 const REAPPLY_BYPASS_EMAILS = new Set(["samanthasider+0@gmail.com"]);
+const PROFILE_PHOTO_REQUIRED_MESSAGE = "Complete your profile before applying.";
 const WITHDRAWAL_WORKER_INTERVAL_MS = Number(
   process.env.WITHDRAWAL_WORKER_INTERVAL_MS || 5 * 60 * 1000
 );
@@ -3682,6 +3683,9 @@ router.post(
     );
     if (!applicant) {
       return res.status(404).json({ error: "Unable to load your profile details." });
+    }
+    if (!applicant.profileImage && !applicant.avatarURL) {
+      return res.status(403).json({ error: PROFILE_PHOTO_REQUIRED_MESSAGE });
     }
     const applicantEmail = String(applicant.email || req.user?.email || "").toLowerCase().trim();
     const bypassStripe = STRIPE_BYPASS_PARALEGAL_EMAILS.has(applicantEmail);

@@ -783,7 +783,6 @@ font-size:.95rem;
 </div>
 </section>
 
-
 <!-- USER MANAGEMENT -->
 <section id="section-user-management" class="section">
 <header>
@@ -900,18 +899,18 @@ font-size:.95rem;
 
 <div class="panel collapsed" id="deletedUsersPanel">
 <div class="panel-header">
-<h2 role="button" tabindex="0" aria-expanded="false" data-panel-toggle="deletedUsersPanel">Deleted Users <span>▾</span></h2>
-<p id="deletedUsersCountLabel" class="pending-count">0 deleted users</p>
+<h2 role="button" tabindex="0" aria-expanded="false" data-panel-toggle="deletedUsersPanel">Deactivated Users <span>▾</span></h2>
+<p id="deletedUsersCountLabel" class="pending-count">0 deactivated users</p>
 </div>
 <div class="panel-content">
 <div class="pending-controls">
-<input type="search" id="deletedSearch" class="search" placeholder="Search name or email…" aria-label="Search deleted users" />
+<input type="search" id="deletedSearch" class="search" placeholder="Search name or email…" aria-label="Search deactivated users" />
 <select id="deletedRoleFilter" aria-label="Filter by role">
 <option value="all">All Roles</option>
 <option value="attorney">Attorneys</option>
 <option value="paralegal">Paralegals</option>
 </select>
-<select id="deletedPageSelect" aria-label="Deleted users page"></select>
+<select id="deletedPageSelect" aria-label="Deactivated users page"></select>
 <button class="btn secondary" type="button" id="refreshDeletedUsers">Refresh</button>
 <button class="btn danger" type="button" id="purgeDeletedSelected">Permanently Delete Selected</button>
 </div>
@@ -919,7 +918,7 @@ font-size:.95rem;
 <table class="pending-users-table">
 <thead>
 <tr>
-<th><input type="checkbox" id="deletedSelectAll" aria-label="Select all deleted users"></th>
+<th><input type="checkbox" id="deletedSelectAll" aria-label="Select all deactivated users"></th>
 <th>Name</th>
 <th>Role</th>
 <th>Email</th>
@@ -928,7 +927,7 @@ font-size:.95rem;
 </tr>
 </thead>
 <tbody id="deletedUsersBody">
-<tr><td colspan="6" class="pending-empty">Loading deleted users…</td></tr>
+<tr><td colspan="6" class="pending-empty">Loading deactivated users…</td></tr>
 </tbody>
 </table>
 </div>
@@ -3343,7 +3342,7 @@ count === 1 ? '1 approved user' : `${count} approved users`;
 const updateDeletedCount = (count = 0) => {
 if (deletedCountLabel) {
 deletedCountLabel.textContent =
-count === 1 ? '1 deleted user' : `${count} deleted users`;
+count === 1 ? '1 deactivated user' : `${count} deactivated users`;
 }
 };
 
@@ -3638,7 +3637,7 @@ updatePageSelect(deletedPageSelect, total, deletedPage);
 const pageItems = getPageSlice(deletedUsers, deletedPage);
 if (!total) {
 deletedTableBody.innerHTML =
-'<tr><td colspan="6" class="pending-empty">No deleted users found.</td></tr>';
+'<tr><td colspan="6" class="pending-empty">No deactivated users found.</td></tr>';
 if (deletedSelectAll) deletedSelectAll.checked = false;
 return;
 }
@@ -3668,7 +3667,7 @@ deletedTd.textContent = formatDate(user.deletedAt || user.updatedAt || user.crea
 const statusTd = document.createElement('td');
 const badge = document.createElement('span');
 badge.className = 'status held';
-badge.textContent = 'Deleted';
+badge.textContent = 'Deactivated';
 statusTd.appendChild(badge);
 
 [selectTd, nameTd, roleTd, emailTd, deletedTd, statusTd].forEach((td) =>
@@ -4347,8 +4346,8 @@ if (!deletedTableBody) return;
 const requestId = ++deletedRequestId;
 setDeletedLoading(true);
 deletedTableBody.innerHTML =
-'<tr><td colspan="6" class="pending-empty">Loading deleted users…</td></tr>';
-const params = new URLSearchParams({ status: 'deleted', limit: '50' });
+'<tr><td colspan="6" class="pending-empty">Loading deactivated users…</td></tr>';
+const params = new URLSearchParams({ status: 'deactivated', limit: '50' });
 const roleValue = (deletedRoleFilter?.value || '').toLowerCase();
 if (roleValue && roleValue !== 'all') params.set('role', roleValue);
 const query = deletedSearch?.value.trim();
@@ -4369,7 +4368,7 @@ typeof data.total === 'number' ? data.total : deletedUsers.length
 if (requestId !== deletedRequestId) return;
 deletedUsers = [];
 updateDeletedCount(0);
-deletedTableBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${err?.message || 'Unable to load deleted users.'}</td></tr>`;
+deletedTableBody.innerHTML = `<tr><td colspan="6" class="pending-empty">${err?.message || 'Unable to load deactivated users.'}</td></tr>`;
 } finally {
 if (requestId === deletedRequestId) setDeletedLoading(false);
 }

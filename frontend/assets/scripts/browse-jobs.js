@@ -29,6 +29,7 @@ const STRIPE_BYPASS_EMAILS = new Set([
   "samanthasider+11@gmail.com",
   "samanthasider+56@gmail.com",
 ]);
+const PROFILE_PHOTO_REQUIRED_MESSAGE = "Complete your profile before applying.";
 
 function setApplicationButtonState(jobId, isLoading) {
   const key = String(jobId || "");
@@ -52,6 +53,16 @@ function getStoredUserEmail() {
     return String(parsed?.email || "").toLowerCase().trim();
   } catch {
     return "";
+  }
+}
+
+function hasStoredProfilePhoto() {
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    const parsed = raw ? JSON.parse(raw) : null;
+    return Boolean(parsed?.profileImage || parsed?.avatarURL);
+  } catch {
+    return false;
   }
 }
 
@@ -194,6 +205,10 @@ function bindJobListEvents() {
         alert("Only paralegals can apply for jobs.");
         return;
       }
+      if (!hasStoredProfilePhoto()) {
+        alert(PROFILE_PHOTO_REQUIRED_MESSAGE);
+        return;
+      }
       if (!stripeConnected && !STRIPE_BYPASS_EMAILS.has(viewerEmail)) {
         alert(STRIPE_GATE_MESSAGE);
         return;
@@ -234,6 +249,10 @@ async function submitQuickApplication(jobId, coverLetter) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const message = data?.error || "Unable to submit application.";
+      if (res.status === 403 && /profile photo/i.test(message)) {
+        alert(message);
+        return;
+      }
       if (res.status === 403 && /stripe/i.test(message)) {
         alert(STRIPE_GATE_MESSAGE);
         return;

@@ -17,6 +17,36 @@ const ACTIVE_JOB_STATUSES = ["open", "in_review", "assigned"];
 const ACTIVE_CASE_STATUSES = ["open", "in progress", "in_progress", "paused", "disputed"];
 const ACTIVE_APPLICATION_STATUSES = ["submitted", "viewed", "shortlisted"];
 
+function buildAttorneyCaseOwnershipFilter(userId) {
+  return {
+    $or: [{ attorney: userId }, { attorneyId: userId }],
+  };
+}
+
+function buildParalegalCaseParticipationFilter(userId) {
+  return {
+    $or: [{ paralegal: userId }, { paralegalId: userId }, { withdrawnParalegalId: userId }],
+  };
+}
+
+function buildClearableAttorneyCaseFilter(userId) {
+  return {
+    ...buildAttorneyCaseOwnershipFilter(userId),
+    status: "open",
+    paymentReleased: { $ne: true },
+    escrowStatus: { $ne: "funded" },
+  };
+}
+
+function buildClearableSelectedCaseFilter(userId) {
+  return {
+    $or: [{ paralegal: userId }, { paralegalId: userId }],
+    status: "open",
+    paymentReleased: { $ne: true },
+    escrowStatus: { $ne: "funded" },
+  };
+}
+
 function uniqueBlockers(items = []) {
   const seen = new Set();
   return items.filter((item) => {
@@ -32,41 +62,51 @@ function makeBlocker(code, message, count = 0) {
 }
 
 async function getAttorneyDeactivationBlockers(userId) {
-  const [activeJobs, activeCases, unresolvedDisputes, unresolvedFunds, pendingPayouts] = await Promise.all([
-    Job.countDocuments({ attorneyId: userId, status: { $in: ACTIVE_JOB_STATUSES } }),
+  const [activeCases, clearableOpenCases, unresolvedDisputes, unresolvedFunds, pendingPayouts] = await Promise.all([
     Case.countDocuments({
-      $or: [{ attorney: userId }, { attorneyId: userId }],
+      ...buildAttorneyCaseOwnershipFilter(userId),
       status: { $in: ACTIVE_CASE_STATUSES },
     }),
+    Case.countDocuments(buildClearableAttorneyCaseFilter(userId)),
     Case.countDocuments({
-      $or: [{ attorney: userId }, { attorneyId: userId }],
-      $or: [
-        { "disputes.status": "open" },
-        { status: "disputed" },
-        { pausedReason: "dispute" },
-        { terminationStatus: "disputed" },
+      $and: [
+        buildAttorneyCaseOwnershipFilter(userId),
+        {
+          $or: [
+            { "disputes.status": "open" },
+            { status: "disputed" },
+            { pausedReason: "dispute" },
+            { terminationStatus: "disputed" },
+          ],
+        },
       ],
     }),
     Case.countDocuments({
-      $or: [{ attorney: userId }, { attorneyId: userId }],
-      $or: [
-        { escrowStatus: "funded", paymentReleased: { $ne: true } },
-        { pausedReason: "paralegal_withdrew", payoutFinalizedAt: null },
+      $and: [
+        buildAttorneyCaseOwnershipFilter(userId),
+        {
+          $or: [
+            { escrowStatus: "funded", paymentReleased: { $ne: true } },
+            { pausedReason: "paralegal_withdrew", payoutFinalizedAt: null },
+          ],
+        },
       ],
     }),
     Case.countDocuments({
-      $or: [{ attorney: userId }, { attorneyId: userId }],
+      ...buildAttorneyCaseOwnershipFilter(userId),
       paymentReleased: true,
       paidOutAt: null,
     }),
   ]);
+  const blockingActiveCases = Math.max(0, activeCases - clearableOpenCases);
 
   return uniqueBlockers([
-    activeJobs
-      ? makeBlocker("active_jobs", "Close your open or in-review jobs before deactivating your account.", activeJobs)
-      : null,
-    activeCases
-      ? makeBlocker("active_matters", "Finish or close your active matters before deactivating your account.", activeCases)
+    blockingActiveCases
+      ? makeBlocker(
+          "active_matters",
+          "Finish or close your active matters before deactivating your account.",
+          blockingActiveCases
+        )
       : null,
     unresolvedDisputes
       ? makeBlocker("open_disputes", "Resolve all open disputes before deactivating your account.", unresolvedDisputes)
@@ -85,39 +125,52 @@ async function getAttorneyDeactivationBlockers(userId) {
 }
 
 async function getParalegalDeactivationBlockers(userId) {
-  const [activeCases, unresolvedDisputes, unresolvedFunds, pendingPayouts, acceptedApplications] =
+  const [activeCases, clearableSelectedCases, unresolvedDisputes, unresolvedFunds, pendingPayouts] =
     await Promise.all([
       Case.countDocuments({
-        $or: [{ paralegal: userId }, { paralegalId: userId }],
+        ...buildParalegalCaseParticipationFilter(userId),
         status: { $in: ACTIVE_CASE_STATUSES },
       }),
+      Case.countDocuments(buildClearableSelectedCaseFilter(userId)),
       Case.countDocuments({
-        $or: [{ paralegal: userId }, { paralegalId: userId }, { withdrawnParalegalId: userId }],
-        $or: [
-          { "disputes.status": "open" },
-          { status: "disputed" },
-          { pausedReason: "dispute" },
-          { terminationStatus: "disputed" },
+        $and: [
+          buildParalegalCaseParticipationFilter(userId),
+          {
+            $or: [
+              { "disputes.status": "open" },
+              { status: "disputed" },
+              { pausedReason: "dispute" },
+              { terminationStatus: "disputed" },
+            ],
+          },
         ],
       }),
       Case.countDocuments({
-        $or: [{ paralegal: userId }, { paralegalId: userId }, { withdrawnParalegalId: userId }],
-        $or: [
-          { escrowStatus: "funded", paymentReleased: { $ne: true } },
-          { pausedReason: "paralegal_withdrew", payoutFinalizedAt: null },
+        $and: [
+          buildParalegalCaseParticipationFilter(userId),
+          {
+            $or: [
+              { escrowStatus: "funded", paymentReleased: { $ne: true } },
+              { pausedReason: "paralegal_withdrew", payoutFinalizedAt: null },
+            ],
+          },
         ],
       }),
       Case.countDocuments({
-        $or: [{ paralegal: userId }, { paralegalId: userId }, { withdrawnParalegalId: userId }],
+        ...buildParalegalCaseParticipationFilter(userId),
         paymentReleased: true,
         paidOutAt: null,
       }),
-      Application.countDocuments({ paralegalId: userId, status: "accepted" }),
     ]);
+  const blockingActiveCases = Math.max(0, activeCases - clearableSelectedCases);
 
   return uniqueBlockers([
-    activeCases
-      ? makeBlocker("active_matters", "Finish or close your active matters before deactivating your account.", activeCases)
+    blockingActiveCases
+      ? makeBlocker(
+          "active_matters",
+          "Finish or close your active matters before deactivating your account.",
+          blockingActiveCases
+        )
       : null,
     unresolvedDisputes
       ? makeBlocker("open_disputes", "Resolve all open disputes before deactivating your account.", unresolvedDisputes)
@@ -131,13 +184,6 @@ async function getParalegalDeactivationBlockers(userId) {
       : null,
     pendingPayouts
       ? makeBlocker("pending_payouts", "Wait for pending payouts to complete before deactivating your account.", pendingPayouts)
-      : null,
-    acceptedApplications
-      ? makeBlocker(
-          "accepted_applications",
-          "Resolve accepted applications or pending hires before deactivating your account.",
-          acceptedApplications
-        )
       : null,
   ].filter(Boolean));
 }
@@ -174,7 +220,7 @@ async function getAccountDeactivationEligibility(userOrId) {
 
 async function clearPendingParalegalParticipation(userId, now = new Date()) {
   await Application.updateMany(
-    { paralegalId: userId, status: { $in: ACTIVE_APPLICATION_STATUSES } },
+    { paralegalId: userId, status: { $in: [...ACTIVE_APPLICATION_STATUSES, "accepted"] } },
     { $set: { status: "rejected" } }
   );
 
@@ -183,15 +229,18 @@ async function clearPendingParalegalParticipation(userId, now = new Date()) {
       { "applicants.paralegalId": userId },
       { "invites.paralegalId": userId },
       { pendingParalegalId: userId },
+      buildClearableSelectedCaseFilter(userId),
     ],
-  }).select("applicants invites pendingParalegalId pendingParalegalInvitedAt");
+  }).select(
+    "applicants invites pendingParalegalId pendingParalegalInvitedAt paralegal paralegalId paralegalNameSnapshot hiredAt tasksLocked status paymentReleased escrowStatus"
+  );
 
   for (const caseDoc of cases) {
     if (Array.isArray(caseDoc.applicants)) {
       caseDoc.applicants.forEach((applicant) => {
         if (
           String(applicant?.paralegalId || "") === String(userId) &&
-          String(applicant?.status || "").toLowerCase() === "pending"
+          ["pending", "accepted"].includes(String(applicant?.status || "").toLowerCase())
         ) {
           applicant.status = "rejected";
         }
@@ -201,7 +250,7 @@ async function clearPendingParalegalParticipation(userId, now = new Date()) {
       caseDoc.invites.forEach((invite) => {
         if (
           String(invite?.paralegalId || "") === String(userId) &&
-          String(invite?.status || "").toLowerCase() === "pending"
+          ["pending", "accepted"].includes(String(invite?.status || "").toLowerCase())
         ) {
           invite.status = "expired";
           invite.respondedAt = now;
@@ -212,6 +261,59 @@ async function clearPendingParalegalParticipation(userId, now = new Date()) {
       caseDoc.pendingParalegalId = null;
       caseDoc.pendingParalegalInvitedAt = null;
     }
+    const assignedParalegalId = String(caseDoc.paralegalId || caseDoc.paralegal || "");
+    const clearAssignedSelection =
+      assignedParalegalId === String(userId) &&
+      String(caseDoc.status || "").toLowerCase() === "open" &&
+      String(caseDoc.escrowStatus || "").toLowerCase() !== "funded" &&
+      caseDoc.paymentReleased !== true;
+    if (clearAssignedSelection) {
+      caseDoc.paralegal = null;
+      caseDoc.paralegalId = null;
+      caseDoc.paralegalNameSnapshot = "";
+      caseDoc.hiredAt = null;
+      caseDoc.tasksLocked = false;
+      caseDoc.pendingParalegalId = null;
+      caseDoc.pendingParalegalInvitedAt = null;
+    }
+    await caseDoc.save({ validateBeforeSave: false });
+  }
+}
+
+async function clearPendingAttorneyParticipation(userId, now = new Date()) {
+  await Job.updateMany({ attorneyId: userId, status: { $in: ACTIVE_JOB_STATUSES } }, { $set: { status: "closed" } });
+
+  const cases = await Case.find(buildClearableAttorneyCaseFilter(userId)).select(
+    "applicants invites pendingParalegalId pendingParalegalInvitedAt paralegal paralegalId paralegalNameSnapshot hiredAt tasksLocked status paymentReleased escrowStatus paymentStatus archived"
+  );
+
+  for (const caseDoc of cases) {
+    if (Array.isArray(caseDoc.applicants)) {
+      caseDoc.applicants.forEach((applicant) => {
+        if (["pending", "accepted"].includes(String(applicant?.status || "").toLowerCase())) {
+          applicant.status = "rejected";
+        }
+      });
+    }
+    if (Array.isArray(caseDoc.invites)) {
+      caseDoc.invites.forEach((invite) => {
+        if (["pending", "accepted"].includes(String(invite?.status || "").toLowerCase())) {
+          invite.status = "expired";
+          invite.respondedAt = invite.respondedAt || now;
+        }
+      });
+    }
+    caseDoc.pendingParalegalId = null;
+    caseDoc.pendingParalegalInvitedAt = null;
+    caseDoc.paralegal = null;
+    caseDoc.paralegalId = null;
+    caseDoc.paralegalNameSnapshot = "";
+    caseDoc.hiredAt = null;
+    caseDoc.tasksLocked = false;
+    caseDoc.escrowStatus = null;
+    caseDoc.paymentStatus = "cancelled";
+    caseDoc.status = "closed";
+    caseDoc.archived = true;
     await caseDoc.save({ validateBeforeSave: false });
   }
 }
@@ -237,6 +339,8 @@ async function deactivateUserAccount(userOrId, { now = new Date() } = {}) {
 
   if (String(user.role || "").toLowerCase() === "paralegal") {
     await clearPendingParalegalParticipation(user._id, now);
+  } else if (String(user.role || "").toLowerCase() === "attorney") {
+    await clearPendingAttorneyParticipation(user._id, now);
   }
 
   user.deleted = true;

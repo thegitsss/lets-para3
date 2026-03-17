@@ -58,7 +58,9 @@ const STRIPE_BYPASS_EMAILS = new Set([
   "samanthasider+11@gmail.com",
   "samanthasider+56@gmail.com",
 ]);
+const PROFILE_PHOTO_REQUIRED_MESSAGE = "Complete your profile before applying.";
 let viewerEmail = "";
+let viewerHasProfilePhoto = false;
 const FLAG_REASONS = [
   { value: "inappropriate", label: "Inappropriate content" },
   { value: "spam", label: "Spam or misleading" },
@@ -179,6 +181,17 @@ function readStoredUserEmail() {
   }
 }
 
+function readStoredProfilePhoto() {
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    if (!raw) return "";
+    const user = JSON.parse(raw);
+    return String(user?.profileImage || user?.avatarURL || "").trim();
+  } catch {
+    return "";
+  }
+}
+
 function isReapplyBypassUser() {
   return REAPPLY_BYPASS_EMAILS.has(viewerEmail);
 }
@@ -269,6 +282,9 @@ async function ensureSession() {
     viewerRole = String(session?.role || session?.user?.role || "").toLowerCase();
     viewerId = String(session?.user?.id || session?.user?._id || session?.id || session?._id || readStoredUserId());
     viewerEmail = String(session?.user?.email || session?.email || "").toLowerCase().trim();
+    viewerHasProfilePhoto = Boolean(
+      session?.user?.profileImage || session?.user?.avatarURL || readStoredProfilePhoto()
+    );
     if (!viewerEmail) viewerEmail = readStoredUserEmail();
     viewerState = normalizeViewerState(session?.user?.state || session?.user?.location || readStoredState());
     viewerStateExperience = normalizeStateExperience(
@@ -320,6 +336,10 @@ function notifyStripeGate(message = STRIPE_GATE_MESSAGE) {
 
 function stripeAllowed() {
   return stripeConnected || STRIPE_BYPASS_EMAILS.has(viewerEmail);
+}
+
+function profilePhotoAllowed() {
+  return viewerHasProfilePhoto;
 }
 
 async function refreshStripeStatus() {
@@ -1122,6 +1142,12 @@ async function submitApplication() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const message = data?.error || "Unable to submit application.";
+      if (res.status === 403 && /profile photo/i.test(message)) {
+        applyStatus.textContent = message;
+        applySubmitBtn.disabled = false;
+        applySubmitBtn.textContent = "Submit application";
+        return;
+      }
       if (res.status === 403 && /stripe/i.test(message)) {
         applyStatus.textContent = STRIPE_GATE_MESSAGE;
         applySubmitBtn.disabled = false;
@@ -1281,6 +1307,14 @@ async function openJobModal(job) {
       jobApplyBtn.classList.add("is-disabled");
       jobApplyBtn.removeAttribute("data-stripe-required");
       jobApplyBtn.removeAttribute("data-hover-label");
+    } else if (!profilePhotoAllowed()) {
+      jobApplyBtn.disabled = false;
+      jobApplyBtn.textContent = "Apply for this case";
+      jobApplyBtn.title = PROFILE_PHOTO_REQUIRED_MESSAGE;
+      jobApplyBtn.classList.add("is-disabled");
+      jobApplyBtn.setAttribute("aria-disabled", "true");
+      jobApplyBtn.removeAttribute("data-stripe-required");
+      jobApplyBtn.removeAttribute("data-hover-label");
     } else if (!stripeAllowed()) {
       jobApplyBtn.disabled = false;
       jobApplyBtn.textContent = "Apply for this case";
@@ -1379,6 +1413,10 @@ jobApplyBtn?.addEventListener("click", (event) => {
   event.stopPropagation();
   if (!allowApply) {
     showToast("Only paralegals can apply to cases.", "info");
+    return;
+  }
+  if (!profilePhotoAllowed()) {
+    showToast(PROFILE_PHOTO_REQUIRED_MESSAGE, "error");
     return;
   }
   if (!stripeAllowed()) {
@@ -1715,6 +1753,15 @@ function buildApplyButton(job, jobId, appliedAt) {
       applyBtn.textContent = `✓ ${formatAppliedLabel(appliedAt)}`;
       applyBtn.removeAttribute("data-stripe-required");
       applyBtn.removeAttribute("data-hover-label");
+    } else if (!profilePhotoAllowed()) {
+      applyBtn.textContent = "Apply for this case";
+      applyBtn.title = PROFILE_PHOTO_REQUIRED_MESSAGE;
+      applyBtn.classList.add("is-disabled");
+      applyBtn.setAttribute("aria-disabled", "true");
+      applyBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        showToast(PROFILE_PHOTO_REQUIRED_MESSAGE, "error");
+      });
     } else if (!stripeAllowed()) {
       applyBtn.textContent = "Apply for this case";
       applyBtn.title = STRIPE_GATE_MESSAGE;

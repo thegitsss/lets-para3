@@ -1,4 +1,4 @@
-import { secureFetch, persistSession, getStoredSession, clearSession } from "./auth.js";
+import { secureFetch, fetchCSRF, persistSession, getStoredSession, clearSession } from "./auth.js";
 import { startStripeOnboarding } from "./utils/stripe-connect.js";
 
 const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
@@ -19,6 +19,18 @@ function escapeHTML(value = "") {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function redirectAfterDeactivation(message = "This account has been deactivated.") {
+  try {
+    sessionStorage.setItem("disabledAccountMsg", message);
+  } catch {}
+  clearSession();
+  try {
+    window.location.replace("/login.html?deactivated=1");
+  } catch {
+    window.location.href = "/login.html?deactivated=1";
+  }
 }
 
 function getAttorneyOnboardingStep() {
@@ -459,18 +471,43 @@ document.addEventListener("DOMContentLoaded", () => {
           "Deactivate your account? This will disable sign-in and remove you from active platform participation. Historical case, dispute, payment, audit, and financial records will be preserved. This is not full erasure. Accounts cannot be deactivated while you are involved in an active matter or while payout, dispute, or other financial obligations remain unresolved."
         );
         if (!confirmed) return;
+        btn.disabled = true;
+        try {
+          const csrfToken = await fetchCSRF().catch(() => "");
+          const res = await fetch("/api/account/deactivate", {
+            method: "DELETE",
+            credentials: "include",
+            headers: csrfToken ? { "X-CSRF-Token": csrfToken } : {},
+          });
+          const data = await res.json().catch(() => ({}));
 
-        const res = await secureFetch("/api/account/deactivate", { method: "DELETE" });
-        const data = await res.json().catch(() => ({}));
+          if (res.ok) {
+            redirectAfterDeactivation("Your account has been deactivated.");
+            return;
+          }
 
-        if (res.ok) {
-          clearSession();
-          window.location.href = "/index.html?deactivated=1";
-        } else {
+          const alreadyDeactivated =
+            (Array.isArray(data?.blockers) && data.blockers.some((item) => item?.code === "already_deactivated")) ||
+            /account has been (disabled|deactivated)/i.test(String(data?.error || data?.msg || ""));
+          if (alreadyDeactivated) {
+            redirectAfterDeactivation(
+              data?.blockers?.[0]?.message || data?.error || data?.msg || "This account has been deactivated."
+            );
+            return;
+          }
+
           const blockerCopy = Array.isArray(data?.blockers) && data.blockers.length
             ? data.blockers.map((item) => item.message).join("\n")
             : "";
           alert(blockerCopy || data?.error || "Unable to deactivate account.");
+        } catch (err) {
+          if (/session expired|account has been (disabled|deactivated)/i.test(String(err?.message || ""))) {
+            redirectAfterDeactivation(err?.message || "This account has been deactivated.");
+            return;
+          }
+          alert(err?.message || "Unable to deactivate account.");
+        } finally {
+          btn.disabled = false;
         }
       });
     });

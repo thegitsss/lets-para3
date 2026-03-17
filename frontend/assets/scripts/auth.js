@@ -90,6 +90,12 @@ export function requireAuth(expectedRole) {
     throw new Error("Authentication required");
   }
 
+  if (user?.disabled || user?.deleted) {
+    clearSession();
+    redirectToLoginOnce();
+    throw new Error("Account deactivated");
+  }
+
   if (expected && normalizedRole !== expected) {
     clearSession();
     redirectToLoginOnce();
@@ -259,7 +265,19 @@ window.addEventListener("DOMContentLoaded", async () => {
   if (!isPublicPage) {
     try {
       const r = await fetch("/api/users/me", { credentials: "include" });
-      const me = r.ok ? await r.json() : null;
+      const payload = await r.json().catch(() => ({}));
+      const me = r.ok ? payload : null;
+      if (!r.ok && (r.status === 401 || r.status === 403)) {
+        const message = payload?.error || payload?.msg || "";
+        clearSession();
+        if (/account has been (disabled|deactivated)/i.test(message)) {
+          try {
+            sessionStorage.setItem("disabledAccountMsg", message);
+          } catch {}
+        }
+        redirectToLoginOnce();
+        return;
+      }
       if (me?.role) applyRoleVisibility(me.role);
     } catch {
       // non-fatal for public/unauthenticated pages

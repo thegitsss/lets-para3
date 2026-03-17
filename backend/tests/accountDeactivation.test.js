@@ -8,12 +8,14 @@ const Case = require("../models/Case");
 const Job = require("../models/Job");
 const Application = require("../models/Application");
 const accountRouter = require("../routes/account");
+const authRouter = require("../routes/auth");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 const app = (() => {
   const instance = express();
   instance.use(cookieParser());
   instance.use(express.json({ limit: "1mb" }));
+  instance.use("/api/auth", authRouter);
   instance.use("/api/account", accountRouter);
   instance.use((err, _req, res, _next) => {
     console.error(err);
@@ -95,27 +97,64 @@ describe("Account deactivation", () => {
     expect(refreshed.disabled).toBe(false);
   });
 
-  test("attorney cannot deactivate while open jobs remain live", async () => {
+  test("attorney deactivation closes open jobs and unfunded open matters", async () => {
     const attorney = await createApprovedUser({
       email: "samanthasider+deactivate-attorney-job@gmail.com",
       role: "attorney",
     });
+    const paralegal = await createApprovedUser({
+      email: "samanthasider+deactivate-paralegal-job@gmail.com",
+      role: "paralegal",
+    });
+
+    const caseDoc = await Case.create({
+      title: "Open posting",
+      practiceArea: "probate",
+      details: "This unfunded matter should be closed on deactivation.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      paralegalNameSnapshot: "Test User",
+      status: "open",
+      escrowStatus: "awaiting_funding",
+      paymentStatus: "pending",
+      totalAmount: 30000,
+      currency: "usd",
+      hiredAt: new Date(),
+      tasksLocked: true,
+      applicants: [{ paralegalId: paralegal._id, status: "accepted" }],
+      invites: [{ paralegalId: paralegal._id, status: "accepted", invitedAt: new Date() }],
+      pendingParalegalId: paralegal._id,
+      pendingParalegalInvitedAt: new Date(),
+    });
 
     await Job.create({
       attorneyId: attorney._id,
+      caseId: caseDoc._id,
       title: "Open posting",
       practiceArea: "probate",
       description: "This job is still active.",
       budget: 300,
-      status: "open",
+      status: "assigned",
     });
 
     const res = await request(app)
       .delete("/api/account/deactivate")
       .set("Cookie", authCookieFor(attorney));
 
-    expect(res.status).toBe(409);
-    expect(res.body.error).toMatch(/open or in-review jobs/i);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, deactivated: true });
+
+    const refreshedJob = await Job.findOne({ attorneyId: attorney._id }).lean();
+    expect(refreshedJob.status).toBe("closed");
+
+    const refreshedCase = await Case.findById(caseDoc._id).lean();
+    expect(refreshedCase.status).toBe("closed");
+    expect(refreshedCase.archived).toBe(true);
+    expect(refreshedCase.paralegal).toBeFalsy();
+    expect(refreshedCase.paralegalId).toBeFalsy();
+    expect(refreshedCase.pendingParalegalId).toBeFalsy();
   });
 
   test("deactivation preserves historical cases and blocks further access with the same token", async () => {
@@ -169,6 +208,13 @@ describe("Account deactivation", () => {
 
     expect(preferencesRes.status).toBe(403);
     expect(preferencesRes.body.error || preferencesRes.body.msg).toMatch(/deactivated/i);
+
+    const loginRes = await request(app).post("/api/auth/login").send({
+      email: attorney.email,
+      password: "Password123!",
+    });
+    expect(loginRes.status).toBe(403);
+    expect(loginRes.body.error || loginRes.body.msg).toMatch(/deactivated/i);
   });
 
   test("legacy /delete alias performs the same deactivation flow", async () => {
@@ -243,5 +289,167 @@ describe("Account deactivation", () => {
       (entry) => String(entry.paralegalId) === String(paralegal._id)
     );
     expect(applicantEntry?.status).toBe("rejected");
+  });
+
+  test("paralegal deactivation clears accepted-but-unfunded participation", async () => {
+    const attorney = await createApprovedUser({
+      email: "samanthasider+deactivate-attorney-accepted@gmail.com",
+      role: "attorney",
+    });
+    const paralegal = await createApprovedUser({
+      email: "samanthasider+deactivate-paralegal-accepted@gmail.com",
+      role: "paralegal",
+    });
+
+    const caseDoc = await Case.create({
+      title: "Accepted participation",
+      practiceArea: "family law",
+      details: "Accepted but not hired participation should be cleared on deactivation.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      status: "open",
+      escrowStatus: null,
+      totalAmount: 24000,
+      currency: "usd",
+      applicants: [{ paralegalId: paralegal._id, status: "accepted" }],
+      invites: [{ paralegalId: paralegal._id, status: "accepted", invitedAt: new Date() }],
+      pendingParalegalId: paralegal._id,
+      pendingParalegalInvitedAt: new Date(),
+    });
+
+    const job = await Job.create({
+      attorneyId: attorney._id,
+      caseId: caseDoc._id,
+      title: "Accepted participation",
+      practiceArea: "family law",
+      description: "Job linked to accepted application.",
+      budget: 240,
+      status: "closed",
+    });
+
+    await Application.create({
+      jobId: job._id,
+      paralegalId: paralegal._id,
+      coverLetter: "Interested in helping.",
+      status: "accepted",
+    });
+
+    const res = await request(app)
+      .delete("/api/account/deactivate")
+      .set("Cookie", authCookieFor(paralegal));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, deactivated: true });
+
+    const application = await Application.findOne({ jobId: job._id, paralegalId: paralegal._id }).lean();
+    expect(application.status).toBe("rejected");
+
+    const refreshedCase = await Case.findById(caseDoc._id).lean();
+    const applicantEntry = (refreshedCase.applicants || []).find(
+      (entry) => String(entry.paralegalId) === String(paralegal._id)
+    );
+    expect(applicantEntry?.status).toBe("rejected");
+    const inviteEntry = (refreshedCase.invites || []).find(
+      (entry) => String(entry.paralegalId) === String(paralegal._id)
+    );
+    expect(inviteEntry?.status).toBe("expired");
+    expect(refreshedCase.pendingParalegalId).toBeFalsy();
+  });
+
+  test("paralegal deactivation clears selected unfunded case assignments", async () => {
+    const attorney = await createApprovedUser({
+      email: "samanthasider+deactivate-attorney-selected@gmail.com",
+      role: "attorney",
+    });
+    const paralegal = await createApprovedUser({
+      email: "samanthasider+deactivate-paralegal-selected@gmail.com",
+      role: "paralegal",
+    });
+
+    const caseDoc = await Case.create({
+      title: "Selected unfunded matter",
+      practiceArea: "immigration",
+      details: "Selected but unfunded matters should not block deactivation.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      paralegalNameSnapshot: "Test User",
+      status: "open",
+      escrowStatus: "awaiting_funding",
+      totalAmount: 32000,
+      lockedTotalAmount: 32000,
+      currency: "usd",
+      hiredAt: new Date(),
+      tasksLocked: true,
+      applicants: [{ paralegalId: paralegal._id, status: "accepted" }],
+      invites: [{ paralegalId: paralegal._id, status: "accepted", invitedAt: new Date() }],
+    });
+
+    const res = await request(app)
+      .delete("/api/account/deactivate")
+      .set("Cookie", authCookieFor(paralegal));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, deactivated: true });
+
+    const refreshedCase = await Case.findById(caseDoc._id).lean();
+    expect(refreshedCase.paralegal).toBeFalsy();
+    expect(refreshedCase.paralegalId).toBeFalsy();
+    expect(refreshedCase.hiredAt).toBeFalsy();
+    expect(refreshedCase.tasksLocked).toBe(false);
+    const applicantEntry = (refreshedCase.applicants || []).find(
+      (entry) => String(entry.paralegalId) === String(paralegal._id)
+    );
+    expect(applicantEntry?.status).toBe("rejected");
+    const inviteEntry = (refreshedCase.invites || []).find(
+      (entry) => String(entry.paralegalId) === String(paralegal._id)
+    );
+    expect(inviteEntry?.status).toBe("expired");
+  });
+
+  test("attorney deactivation ignores unrelated disputes and unresolved funds", async () => {
+    const attorney = await createApprovedUser({
+      email: "samanthasider+deactivate-attorney-unrelated@gmail.com",
+      role: "attorney",
+    });
+    const otherAttorney = await createApprovedUser({
+      email: "samanthasider+deactivate-attorney-other@gmail.com",
+      role: "attorney",
+    });
+    const paralegal = await createApprovedUser({
+      email: "samanthasider+deactivate-paralegal-other@gmail.com",
+      role: "paralegal",
+    });
+
+    await Case.create({
+      title: "Another attorney dispute",
+      practiceArea: "immigration",
+      details: "This should not block a different attorney.",
+      attorney: otherAttorney._id,
+      attorneyId: otherAttorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      status: "disputed",
+      pausedReason: "dispute",
+      escrowStatus: "funded",
+      paymentReleased: false,
+      totalAmount: 50000,
+      currency: "usd",
+      disputes: [
+        {
+          message: "Open dispute",
+          raisedBy: otherAttorney._id,
+          status: "open",
+        },
+      ],
+    });
+
+    const res = await request(app)
+      .delete("/api/account/deactivate")
+      .set("Cookie", authCookieFor(attorney));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ ok: true, deactivated: true });
   });
 });

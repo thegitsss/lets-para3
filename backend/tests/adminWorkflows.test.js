@@ -188,4 +188,52 @@ describe("Admin workflows", () => {
       .send({ note: "Trying to approve" });
     expect(res.status).toBe(403);
   });
+
+  test("Admin deactivated-users list only returns actually deactivated accounts", async () => {
+    const admin = await User.create({
+      firstName: "Admin",
+      lastName: "Owner",
+      email: "owner3@lets-paraconnect.com",
+      password: "Password123!",
+      role: "admin",
+      status: "approved",
+      state: "CA",
+    });
+
+    const deactivatedUser = await User.create({
+      firstName: "Dee",
+      lastName: "Activated",
+      email: "dee.activated@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "denied",
+      disabled: true,
+      deleted: true,
+      deletedAt: new Date("2026-03-16T12:00:00.000Z"),
+      state: "CA",
+    });
+
+    await User.create({
+      firstName: "Susie",
+      lastName: "Denied",
+      email: "susie.denied@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "denied",
+      disabled: true,
+      deleted: false,
+      state: "CA",
+    });
+
+    const res = await request(app)
+      .get("/api/admin/pending-users?status=deactivated")
+      .set("Cookie", authCookieFor(admin));
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.users)).toBe(true);
+    expect(res.body.users).toHaveLength(1);
+    expect(String(res.body.users[0].id)).toBe(String(deactivatedUser._id));
+    expect(res.body.users[0].deleted).toBe(true);
+    expect(res.body.users[0].deletedAt).toBeTruthy();
+  });
 });

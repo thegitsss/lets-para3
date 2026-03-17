@@ -1,5 +1,5 @@
 (function () {
-  const DISABLED_ERROR = "This account has been disabled.";
+  const DISABLED_ERROR = "This account has been deactivated.";
   const DISABLED_MSG_KEY = "disabledAccountMsg";
   let hasRedirected = false;
   let nukedOnRedirect = false;
@@ -212,6 +212,10 @@
     } catch (_) {}
   }
 
+  function isDisabledAccountMessage(message) {
+    return /account has been (disabled|deactivated)/i.test(String(message || ""));
+  }
+
   function handleDisabledAccount(message) {
     rememberDisabled(message);
     clearServerSession();
@@ -230,8 +234,8 @@
           const payload = await res.json().catch(() => ({}));
           if (!res.ok) {
             const message = payload?.error || payload?.msg;
-            if (message === DISABLED_ERROR) {
-              handleDisabledAccount(message);
+            if (isDisabledAccountMessage(message)) {
+              handleDisabledAccount(message || DISABLED_ERROR);
               lastSessionFailure = "disabled";
               return null;
             }

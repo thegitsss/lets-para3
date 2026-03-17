@@ -16,6 +16,7 @@ const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
   "game4funwithme1+1@gmail.com",
   "game4funwithme1@gmail.com",
 ]);
+const PROFILE_PHOTO_REQUIRED_MESSAGE = "Complete your profile before applying.";
 const REAPPLY_BYPASS_EMAILS = new Set(["samanthasider+0@gmail.com"]);
 const ACTIVE_APPLICATION_FILTER = { status: { $nin: ["accepted", "rejected"] } };
 const authenticatedGuards = [auth, requireApproved];
@@ -236,6 +237,11 @@ async function createApplicationForJob(jobId, user, coverLetter) {
   if (!applicant) {
     const err = new Error("Unable to load your profile details.");
     err.status = 404;
+    throw err;
+  }
+  if (!applicant.profileImage && !applicant.avatarURL) {
+    const err = new Error(PROFILE_PHOTO_REQUIRED_MESSAGE);
+    err.status = 403;
     throw err;
   }
   const stripeBypassEmails = new Set(["samanthasider+11@gmail.com", "samanthasider+56@gmail.com"]);

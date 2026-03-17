@@ -9,6 +9,7 @@ let stylesInjected = false;
 let applyConfirmModal = null;
 let applyConfirmTitle = null;
 let applyConfirmMessage = null;
+const PROFILE_PHOTO_REQUIRED_MESSAGE = "Complete your profile before applying.";
 
 export async function render(el, { escapeHTML, params: routeParams } = {}) {
   requireAuth("paralegal");
@@ -85,6 +86,10 @@ function wire(root, jobId, jobTitle = "") {
 
   form?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!hasStoredProfilePhoto()) {
+      if (statusNode) statusNode.textContent = PROFILE_PHOTO_REQUIRED_MESSAGE;
+      return;
+    }
     if (!stripeConnected) {
       if (statusNode) statusNode.textContent = STRIPE_GATE_MESSAGE;
       return;
@@ -128,6 +133,16 @@ function wire(root, jobId, jobTitle = "") {
       }
     }
   });
+}
+
+function hasStoredProfilePhoto() {
+  try {
+    const raw = localStorage.getItem("lpc_user");
+    const user = raw ? JSON.parse(raw) : null;
+    return Boolean(user?.profileImage || user?.avatarURL);
+  } catch {
+    return false;
+  }
 }
 
 function openApplyConfirmModal(jobTitle = "") {

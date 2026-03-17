@@ -369,6 +369,9 @@ const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 const FIFTEEN_MIN = 15 * 60 * 1000;
 const RESET_PASSWORD_MINUTES = 48 * 60;
 const DISABLED_ACCOUNT_MSG = "This account has been deactivated.";
+function isDeactivatedUser(user) {
+  return !!(user && (user.disabled || user.deleted));
+}
 const BOT_NAME_GIBBERISH = /^[bcdfghjklmnpqrstvwxyz]{6,}$/;
 const BOT_REPEATED = /(.)\1{3,}/;
 const BOT_FORBIDDEN_CHARS = /[{}[\]|\\^<>]/;
@@ -762,7 +765,7 @@ router.post(
       return res.status(400).json({ msg: "Invalid credentials" });
     }
 
-    if (user.disabled) {
+    if (isDeactivatedUser(user)) {
       return res.status(403).json({ error: DISABLED_ACCOUNT_MSG, msg: DISABLED_ACCOUNT_MSG });
     }
 
@@ -880,6 +883,9 @@ router.post(
     if (!user || !user.twoFactorEnabled) {
       return res.status(400).json({ error: "Invalid 2FA attempt." });
     }
+    if (isDeactivatedUser(user)) {
+      return res.status(403).json({ error: DISABLED_ACCOUNT_MSG, msg: DISABLED_ACCOUNT_MSG });
+    }
 
     if (!user.twoFactorTempCode || !user.twoFactorExpiresAt || user.twoFactorExpiresAt < new Date()) {
       return res.status(400).json({ error: "Code expired." });
@@ -954,6 +960,9 @@ router.post(
     if (!user || !user.twoFactorEnabled) {
       return res.status(400).json({ error: "Invalid request." });
     }
+    if (isDeactivatedUser(user)) {
+      return res.status(403).json({ error: DISABLED_ACCOUNT_MSG, msg: DISABLED_ACCOUNT_MSG });
+    }
 
     if (!Array.isArray(user.twoFactorBackupCodes) || user.twoFactorBackupCodes.length === 0) {
       return res.status(400).json({ error: "No backup codes available." });
@@ -1026,8 +1035,8 @@ router.get(
       // freshen user info (role/status might have changed)
       const u = await User.findById(payload.id).lean();
       if (!u) return res.json({ user: null });
-      if (u.disabled) {
-        return res.status(403).json({ error: DISABLED_ACCOUNT_MSG });
+      if (isDeactivatedUser(u)) {
+        return res.status(403).json({ error: DISABLED_ACCOUNT_MSG, msg: DISABLED_ACCOUNT_MSG });
       }
       res.json({
         user: {

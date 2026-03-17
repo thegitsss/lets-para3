@@ -303,7 +303,6 @@ async function sendAccountDeactivatedEmail(user, opts = {}) {
     (opts.baseUrl && String(opts.baseUrl).trim()) ||
     (process.env.EMAIL_BASE_URL || process.env.APP_BASE_URL || "https://www.lets-paraconnect.com");
   const assetBase = String(baseUrl).replace(/\/+$/, "").replace(/\/profile-settings\.html$/, "");
-  const loginUrl = `${assetBase}/login.html`;
   const logoUrl = `${assetBase}/Cleanfav.png`;
   const heroUrl = `${assetBase}/hero-mountain.jpg`;
 
@@ -350,20 +349,7 @@ async function sendAccountDeactivatedEmail(user, opts = {}) {
             </td>
           </tr>
           <tr>
-            <td align="center" style="padding:24px 32px 16px;">
-              <table cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td bgcolor="#ffbd59" style="border-radius:999px;">
-                    <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
-                      Go to sign in
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          <tr>
-            <td align="center" style="padding:0 32px 28px;">
+            <td align="center" style="padding:24px 32px 28px;">
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;text-align:left;">
                 If you did not intend to deactivate your account, please contact us at <a href="mailto:help@lets-paraconnect.com" style="color:#1f1f1f;text-decoration:underline;">help@lets-paraconnect.com</a>.
               </div>
