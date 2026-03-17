@@ -4,6 +4,9 @@ const jwt = require("jsonwebtoken");
 const request = require("supertest");
 
 const User = require("../models/User");
+const Case = require("../models/Case");
+const Job = require("../models/Job");
+const Application = require("../models/Application");
 const adminRouter = require("../routes/admin");
 const authRouter = require("../routes/auth");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
@@ -235,5 +238,87 @@ describe("Admin workflows", () => {
     expect(String(res.body.users[0].id)).toBe(String(deactivatedUser._id));
     expect(res.body.users[0].deleted).toBe(true);
     expect(res.body.users[0].deletedAt).toBeTruthy();
+  });
+
+  test("Admin can force-delete a hired funded case from the posts workflow", async () => {
+    const admin = await User.create({
+      firstName: "Admin",
+      lastName: "Owner",
+      email: "owner4@lets-paraconnect.com",
+      password: "Password123!",
+      role: "admin",
+      status: "approved",
+      state: "CA",
+    });
+
+    const attorney = await User.create({
+      firstName: "Avery",
+      lastName: "Stone",
+      email: "avery.stone@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const paralegal = await User.create({
+      firstName: "Jamie",
+      lastName: "Lee",
+      email: "jamie.lee@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+
+    const caseDoc = await Case.create({
+      title: "Force delete test",
+      practiceArea: "probate",
+      details: "Admin delete should override hired and funded restrictions.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      status: "in progress",
+      escrowStatus: "funded",
+      escrowIntentId: "pi_force_delete",
+      totalAmount: 50000,
+      currency: "usd",
+    });
+
+    const job = await Job.create({
+      attorneyId: attorney._id,
+      caseId: caseDoc._id,
+      title: "Force delete test",
+      practiceArea: "probate",
+      description: "Linked job should also be removed.",
+      budget: 500,
+      status: "assigned",
+    });
+
+    await Application.create({
+      jobId: job._id,
+      paralegalId: paralegal._id,
+      coverLetter: "Interested in helping.",
+      status: "accepted",
+    });
+
+    const res = await request(app)
+      .delete(`/api/admin/cases/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(admin))
+      .send({ reason: "Policy violation", message: "Remove immediately." });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+
+    const [deletedCase, deletedJob, deletedApplication] = await Promise.all([
+      Case.findById(caseDoc._id).lean(),
+      Job.findById(job._id).lean(),
+      Application.findOne({ jobId: job._id, paralegalId: paralegal._id }).lean(),
+    ]);
+
+    expect(deletedCase).toBeNull();
+    expect(deletedJob).toBeNull();
+    expect(deletedApplication).toBeNull();
   });
 });

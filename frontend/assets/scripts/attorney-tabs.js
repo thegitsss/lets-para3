@@ -328,7 +328,7 @@ function bindNotificationAutoRefresh() {
     const types = event?.detail?.types;
     if (!Array.isArray(types) || !types.length) return;
     const lowerTypes = new Set(types.map((type) => String(type || "").toLowerCase()));
-    if (!lowerTypes.has("application_submitted")) return;
+    if (!lowerTypes.has("application_submitted") && !lowerTypes.has("pre_engagement_submitted")) return;
     if (applicantReturnContext) return;
     if (applicantAutoRefreshTimer) return;
     applicantAutoRefreshTimer = window.setTimeout(async () => {
@@ -3582,6 +3582,26 @@ function normalizeApplicantData(applicant = {}) {
   const resumeURL = applicant?.resumeURL || "";
   const linkedInURL = applicant?.linkedInURL || "";
   const status = String(applicant?.status || "pending").toLowerCase();
+  const preEngagementRaw = applicant?.preEngagement && typeof applicant.preEngagement === "object"
+    ? applicant.preEngagement
+    : null;
+  const preEngagement = preEngagementRaw
+    ? {
+        status: String(preEngagementRaw.status || "").toLowerCase(),
+        confidentialityAgreementRequired: !!preEngagementRaw.confidentialityAgreementRequired,
+        conflictsCheckRequired: !!preEngagementRaw.conflictsCheckRequired,
+        conflictsDetails: String(preEngagementRaw.conflictsDetails || ""),
+        confidentialityDocument: preEngagementRaw.confidentialityDocument || null,
+        paralegalConfidentialityDocument: preEngagementRaw.paralegalConfidentialityDocument || null,
+        confidentialityAcknowledged: !!preEngagementRaw.confidentialityAcknowledged,
+        confidentialityAcknowledgedAt: preEngagementRaw.confidentialityAcknowledgedAt || null,
+        conflictsResponseType: String(preEngagementRaw.conflictsResponseType || "").toLowerCase(),
+        conflictsDisclosureText: String(preEngagementRaw.conflictsDisclosureText || ""),
+        submittedAt: preEngagementRaw.submittedAt || null,
+        reviewedAt: preEngagementRaw.reviewedAt || null,
+        reviewedBy: String(preEngagementRaw.reviewedBy || ""),
+      }
+    : null;
   return {
     paralegalId,
     name,
@@ -3598,7 +3618,22 @@ function normalizeApplicantData(applicant = {}) {
     resumeURL,
     linkedInURL,
     status,
+    preEngagement,
   };
+}
+
+function formatApplicantPreEngagementStatus(preEngagement = null) {
+  const status = String(preEngagement?.status || "").toLowerCase();
+  if (status === "submitted") return "Pre-engagement submitted";
+  if (status === "approved") return "Pre-engagement approved";
+  if (status === "changes_requested") return "Changes requested";
+  return "";
+}
+
+function formatApplicantConflictsResponse(type = "") {
+  if (String(type || "").toLowerCase() === "disclosure") return "Possible conflict disclosed";
+  if (String(type || "").toLowerCase() === "none_known") return "No known conflict";
+  return "No response";
 }
 
 function buildApplicantDrawerRow(applicant, index, caseId) {
@@ -3610,6 +3645,7 @@ function buildApplicantDrawerRow(applicant, index, caseId) {
   const experienceText = formatApplicantExperience(applicant.yearsExperience);
   const metaParts = [appliedText, stateText, experienceText].filter(Boolean);
   const metaHtml = metaParts.map((part) => `<span>${sanitize(part)}</span>`).join('<span class="dot">•</span>');
+  const preEngagementLabel = formatApplicantPreEngagementStatus(applicant.preEngagement);
   return `
     <div class="applicant-card" data-applicant-row data-case-id="${sanitize(caseId)}" data-applicant-index="${index}">
       <div class="applicant-card-top">
@@ -3619,6 +3655,7 @@ function buildApplicantDrawerRow(applicant, index, caseId) {
             <span class="applicant-name legacy-font">${sanitize(applicant.name)}</span>
           </div>
           <div class="applicant-card-meta">${metaHtml}</div>
+          ${preEngagementLabel ? `<div class="applicant-preengagement-flag">${sanitize(preEngagementLabel)}</div>` : ""}
         </div>
       </div>
     </div>
@@ -3679,6 +3716,8 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
   const linkedInMarkup = safeLinkedInUrl
     ? `<a href="${sanitize(safeLinkedInUrl)}" target="_blank" rel="noopener" class="applicant-side-btn">LinkedIn</a>`
     : "";
+  const preEngagement = applicant.preEngagement || null;
+  const preEngagementStatus = formatApplicantPreEngagementStatus(preEngagement);
   const firstName = String(applicant.name || "Paralegal").split(" ")[0] || "Paralegal";
   const hireMarkup = canHire
     ? `<button type="button" class="applicant-side-hire" data-hire-paralegal data-case-id="${sanitize(
@@ -3693,6 +3732,58 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
           caseId
         )}" data-paralegal-id="${sanitize(applicant.paralegalId)}">Remove applicant</button>`
       : "";
+  const confidentialityDoc = preEngagement?.confidentialityDocument || null;
+  const signedDoc = preEngagement?.paralegalConfidentialityDocument || null;
+  const preEngagementMarkup = preEngagement
+    ? `
+        <div class="applicant-detail-section">
+          <div class="applicant-detail-section-title">Pre-Engagement</div>
+          <div class="applicant-preengagement-box">
+            ${preEngagementStatus ? `<div class="applicant-preengagement-status">${sanitize(preEngagementStatus)}</div>` : ""}
+            <div class="applicant-preengagement-grid">
+              ${preEngagement.confidentialityAgreementRequired ? `
+                <div class="applicant-preengagement-item">
+                  <span>Confidentiality</span>
+                  <strong>${preEngagement.confidentialityAcknowledged ? "Acknowledged" : "Pending"}</strong>
+                  ${preEngagement.confidentialityAcknowledgedAt ? `<div class="applicant-preengagement-sub">Acknowledged ${sanitize(formatApplicantDate(preEngagement.confidentialityAcknowledgedAt))}</div>` : ""}
+                </div>
+              ` : ""}
+              ${preEngagement.conflictsCheckRequired ? `
+                <div class="applicant-preengagement-item">
+                  <span>Conflicts response</span>
+                  <strong>${sanitize(formatApplicantConflictsResponse(preEngagement.conflictsResponseType))}</strong>
+                  ${preEngagement.submittedAt ? `<div class="applicant-preengagement-sub">Submitted ${sanitize(formatApplicantDate(preEngagement.submittedAt))}</div>` : ""}
+                </div>
+              ` : ""}
+            </div>
+            ${confidentialityDoc || signedDoc ? `
+              <div class="applicant-detail-actions">
+                ${confidentialityDoc?.key ? `<button type="button" class="applicant-detail-chip" data-applicant-doc data-doc-key="${sanitize(confidentialityDoc.key)}">Attorney confidentiality document</button>` : ""}
+                ${signedDoc?.key ? `<button type="button" class="applicant-detail-chip" data-applicant-doc data-doc-key="${sanitize(signedDoc.key)}">Signed confidentiality upload</button>` : ""}
+              </div>
+            ` : ""}
+            ${preEngagement.conflictsCheckRequired && preEngagement.conflictsDetails ? `
+              <div class="applicant-cover-box">
+                <strong>Conflicts check details</strong>
+                <div>${sanitize(preEngagement.conflictsDetails).replace(/\n/g, "<br>")}</div>
+              </div>
+            ` : ""}
+            ${preEngagement.conflictsResponseType === "disclosure" && preEngagement.conflictsDisclosureText ? `
+              <div class="applicant-cover-box">
+                <strong>Disclosure</strong>
+                <div>${sanitize(preEngagement.conflictsDisclosureText).replace(/\n/g, "<br>")}</div>
+              </div>
+            ` : ""}
+            ${preEngagement.status === "submitted" ? `
+              <div class="applicant-preengagement-actions">
+                <button type="button" class="applicant-detail-chip hire-primary" data-preengagement-review-action="approve" data-case-id="${sanitize(caseId)}" data-paralegal-id="${sanitize(applicant.paralegalId)}">Approve and continue</button>
+                <button type="button" class="applicant-detail-chip" data-preengagement-review-action="request_changes" data-case-id="${sanitize(caseId)}" data-paralegal-id="${sanitize(applicant.paralegalId)}">Request changes</button>
+              </div>
+            ` : ""}
+          </div>
+        </div>
+      `
+    : "";
   return `
     <div class="applicant-detail-grid">
       <div class="applicant-detail-main">
@@ -3705,6 +3796,7 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
           <div class="applicant-detail-section-title">Profile details</div>
           ${profileDetailsMarkup}
         </div>
+        ${preEngagementMarkup}
       </div>
       <aside class="applicant-detail-side">
         <div class="applicant-side-card">
@@ -4171,6 +4263,64 @@ async function openApplicantDocument(key) {
     window.open(payload.url, "_blank", "noopener");
   } catch (err) {
     notifyCases(err?.message || "Unable to open document.", "error");
+  }
+}
+
+function updateApplicantPreEngagement(caseId, paralegalId, preEngagement) {
+  const applicants = applicantDrawerCache.get(caseId) || [];
+  const next = applicants.map((entry) =>
+    String(entry?.paralegalId || "") === String(paralegalId || "")
+      ? { ...entry, preEngagement: preEngagement || null }
+      : entry
+  );
+  applicantDrawerCache.set(caseId, next);
+}
+
+async function reviewApplicantPreEngagement(caseId, paralegalId, action, button) {
+  if (!caseId || !paralegalId) return;
+  const originalLabel = button?.textContent || "Approve and continue";
+  if (button) {
+    button.disabled = true;
+    button.textContent = action === "approve" ? "Approving..." : "Requesting...";
+  }
+  try {
+    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/pre-engagement/review`, {
+      method: "POST",
+      body: { action },
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload?.error || "Unable to review pre-engagement.");
+    }
+    updateApplicantPreEngagement(caseId, paralegalId, payload?.preEngagement || null);
+    const drawerEl = getDrawerElement(caseId, document.querySelector(`[data-applicants-toggle][data-case-id="${caseId}"]`));
+    if (drawerEl) {
+      renderApplicantsInDrawer(caseId, applicantDrawerCache.get(caseId) || [], drawerEl);
+      showApplicantDetailById(caseId, paralegalId, drawerEl);
+    }
+    notifyCases(
+      action === "approve" ? "Pre-engagement approved." : "Changes requested for pre-engagement.",
+      "success"
+    );
+    if (action === "approve") {
+      const applicants = applicantDrawerCache.get(caseId) || [];
+      const approvedApplicant = applicants.find(
+        (entry) => String(entry?.paralegalId || "") === String(paralegalId)
+      );
+      await handleHireFromApplications({
+        caseId,
+        paralegalId,
+        paralegalName: approvedApplicant?.name || "Paralegal",
+        button,
+        skipPreEngagementStep: true,
+      });
+    }
+  } catch (err) {
+    notifyCases(err?.message || "Unable to review pre-engagement.", "error");
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
   }
 }
 
@@ -5151,6 +5301,16 @@ function onCasesTableClick(event) {
     if (!caseId || !paralegalId) return;
     const drawerEl = removeBtn.closest("[data-applicants-drawer]");
     void removeApplicantFromCase(caseId, paralegalId, drawerEl);
+    return;
+  }
+  const preEngagementActionBtn = event.target.closest("[data-preengagement-review-action]");
+  if (preEngagementActionBtn) {
+    event.preventDefault();
+    const caseId = preEngagementActionBtn.dataset.caseId || "";
+    const paralegalId = preEngagementActionBtn.dataset.paralegalId || "";
+    const action = preEngagementActionBtn.dataset.preengagementReviewAction || "";
+    if (!caseId || !paralegalId || !action) return;
+    void reviewApplicantPreEngagement(caseId, paralegalId, action, preEngagementActionBtn);
     return;
   }
   const applicantRow = event.target.closest("[data-applicant-row]");
@@ -7378,7 +7538,7 @@ function bindApplicationsActions() {
   applicationsActionsBound = true;
 }
 
-async function handleHireFromApplications({ caseId, paralegalId, paralegalName, button }) {
+async function handleHireFromApplications({ caseId, paralegalId, paralegalName, button, skipPreEngagementStep = false }) {
   if (button) {
     button.classList.add("is-pressed");
     window.setTimeout(() => button.classList.remove("is-pressed"), 180);
@@ -7439,14 +7599,27 @@ async function handleHireFromApplications({ caseId, paralegalId, paralegalName, 
     amountCents,
     feePct: PLATFORM_FEE_PCT,
     reuseEscrow,
+    skipPreEngagementStep,
+    existingPreEngagement:
+      !skipPreEngagementStep &&
+      caseDetails?.preEngagement &&
+      String(caseDetails.preEngagement.requestedParalegalId || "") === String(paralegalId || "") &&
+      String(caseDetails.preEngagement.status || "").toLowerCase() === "requested"
+        ? caseDetails.preEngagement
+        : null,
     continueHref: `case-detail.html?caseId=${encodeURIComponent(caseId)}`,
-    onConfirm: async () => {
+    onSendPreEngagement: async ({ preEngagement } = {}) => {
+      await savePreEngagementDraft(caseId, paralegalId, preEngagement);
+      await refreshApplicationsOverview({ force: true });
+    },
+    onConfirm: async ({ preEngagement } = {}) => {
       const originalText = button?.textContent || "Hire";
       if (button) {
         button.textContent = "Processing...";
         button.setAttribute("disabled", "disabled");
       }
       try {
+        void preEngagement;
         await hireParalegal(caseId, paralegalId);
         await refreshApplicationsOverview({ force: true });
       } catch (err) {
@@ -7511,6 +7684,35 @@ async function hireParalegal(caseId, paralegalId) {
   return payload;
 }
 
+async function savePreEngagementDraft(caseId, paralegalId, preEngagement) {
+  const formData = new FormData();
+  formData.set(
+    "confidentialityAgreementRequired",
+    preEngagement?.confidentialityAgreementSelected ? "true" : "false"
+  );
+  formData.set(
+    "conflictsCheckRequired",
+    preEngagement?.conflictsCheckSelected ? "true" : "false"
+  );
+  formData.set("conflictsDetails", String(preEngagement?.conflictsDetails || ""));
+  if (preEngagement?.confidentialityFile) {
+    formData.append(
+      "confidentialityFile",
+      preEngagement.confidentialityFile,
+      preEngagement.confidentialityFileName || preEngagement.confidentialityFile.name || "confidentiality-agreement"
+    );
+  }
+  const res = await secureFetch(
+    `/api/cases/${encodeURIComponent(caseId)}/pre-engagement/${encodeURIComponent(paralegalId)}/request`,
+    { method: "POST", body: formData }
+  );
+  const payload = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(payload?.error || "Unable to save pre-engagement requirements.");
+  }
+  return payload;
+}
+
 function ensureHireModalStyles() {
   if (document.getElementById("hire-confirm-styles")) return;
   const style = document.createElement("style");
@@ -7521,10 +7723,30 @@ function ensureHireModalStyles() {
     .hire-confirm-overlay.is-closing{pointer-events:none}
     .hire-confirm-modal{background:var(--panel,#fff);border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:var(--radius,18px);padding:28px;max-width:580px;width:min(94%,580px);box-shadow:0 24px 50px rgba(0,0,0,.2);display:grid;gap:16px;font-family:'Cormorant Garamond',serif;font-weight:300;color:var(--ink,#1a1a1a);font-size:1.05rem;opacity:0;transform:translateY(10px) scale(.985);transition:opacity .16s ease,transform .16s ease}
     .hire-confirm-overlay.is-visible .hire-confirm-modal{opacity:1;transform:translateY(0) scale(1)}
+    .hire-confirm-stage{transition:opacity .18s ease,transform .18s ease}
+    .hire-confirm-stage.is-leaving,.hire-confirm-stage.is-entering{opacity:0;transform:translateY(8px)}
     .hire-confirm-modal button,
     .hire-confirm-modal a{font-family:'Cormorant Garamond',serif}
     .hire-confirm-modal p{font-weight:300;color:var(--muted,#666)}
     .hire-confirm-title{font-weight:300;font-size:1.6rem;letter-spacing:0.01em;text-align:center}
+    .hire-pre-helper{margin:0 0 16px;color:var(--muted,#666);line-height:1.5}
+    .hire-pre-options{display:grid;gap:10px;margin-bottom:14px}
+    .hire-pre-option{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:var(--radius,14px);background:var(--panel,#fff);cursor:pointer;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease}
+    .hire-pre-option:hover{border-color:rgba(182,164,122,.65);box-shadow:0 10px 24px rgba(15,23,42,.06)}
+    .hire-pre-option.is-selected{border-color:rgba(182,164,122,.85);background:#faf7ef}
+    .hire-pre-option input{margin-top:3px}
+    .hire-pre-option-copy{display:grid;gap:2px}
+    .hire-pre-option-copy strong{font-size:1rem;font-weight:400;color:var(--ink,#1a1a1a)}
+    .hire-pre-reveal{display:grid;gap:10px;margin-top:12px;padding:12px;border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:var(--radius,14px);background:#fbfbfa}
+    .hire-pre-reveal label{font-size:0.9rem;font-weight:400;color:var(--ink,#1a1a1a)}
+    .hire-pre-upload{display:grid;gap:8px}
+    .hire-pre-upload input[type="file"]{display:none}
+    .hire-pre-upload-trigger{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border:1px solid var(--line,rgba(0,0,0,0.12));border-radius:999px;background:var(--panel,#fff);color:var(--ink,#1a1a1a);font-weight:400;cursor:pointer;width:max-content}
+    .hire-pre-upload-name{font-size:0.9rem;color:var(--muted,#666)}
+    .hire-pre-reveal textarea{border:1px solid var(--line,rgba(0,0,0,0.12));border-radius:12px;padding:10px;font:inherit;min-height:104px;resize:vertical;background:var(--panel,#fff);color:var(--ink,#1a1a1a)}
+    .hire-pre-reveal textarea.is-invalid{border-color:rgba(185,28,28,.45);background:rgba(254,242,242,.55)}
+    .hire-pre-upload-trigger.is-invalid{border-color:rgba(185,28,28,.45);color:#991b1b;background:rgba(254,242,242,.55)}
+    .hire-pre-field-help{font-size:0.85rem;color:#991b1b;margin-top:-2px}
     .hire-confirm-summary{border:1px solid var(--line,rgba(0,0,0,0.08));border-radius:var(--radius,14px);padding:14px 18px;display:grid;gap:12px;background:var(--panel,#fff)}
     .hire-confirm-row{display:flex;justify-content:space-between;gap:16px;align-items:baseline}
     .hire-confirm-row span{text-transform:uppercase;font-size:0.75rem;letter-spacing:0.08em;color:var(--muted,#666);font-weight:300}
@@ -7558,7 +7780,10 @@ function openHireConfirmModal({
   feePct,
   continueHref,
   onConfirm,
+  onSendPreEngagement,
   reuseEscrow = false,
+  skipPreEngagementStep = false,
+  existingPreEngagement = null,
 }) {
   ensureHireModalStyles();
   const safeName = sanitize(paralegalName || "Paralegal");
@@ -7567,6 +7792,30 @@ function openHireConfirmModal({
   const feeRate = Number(feePct || 0);
   const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
   const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
+  const normalizedExistingPreEngagement =
+    existingPreEngagement &&
+    typeof existingPreEngagement === "object" &&
+    String(existingPreEngagement.status || "").toLowerCase() === "requested"
+      ? {
+          status: "requested",
+          confidentialityAgreementRequired: !!existingPreEngagement.confidentialityAgreementRequired,
+          conflictsCheckRequired: !!existingPreEngagement.conflictsCheckRequired,
+          conflictsDetails: String(existingPreEngagement.conflictsDetails || ""),
+          confidentialityDocument: existingPreEngagement.confidentialityDocument || null,
+        }
+      : null;
+  const preEngagementState = {
+    confidentialityAgreement: !!normalizedExistingPreEngagement?.confidentialityAgreementRequired,
+    conflictsCheck: !!normalizedExistingPreEngagement?.conflictsCheckRequired,
+    none: !normalizedExistingPreEngagement,
+    confidentialityFile: null,
+    fileName: String(normalizedExistingPreEngagement?.confidentialityDocument?.name || ""),
+    conflictsDetails: String(normalizedExistingPreEngagement?.conflictsDetails || ""),
+    confidentialityTouched: false,
+    conflictsTouched: false,
+    submitError: "",
+    submitting: false,
+  };
   const summaryMarkup = reuseEscrow
     ? `
         <div class="hire-confirm-row">
@@ -7608,26 +7857,10 @@ function openHireConfirmModal({
   overlay.className = "hire-confirm-overlay";
   overlay.innerHTML = `
     <div class="hire-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
-      <div class="hire-confirm-title" id="hireConfirmTitle">Confirm &amp; Hire</div>
-      <p>${copy}</p>
-      <div class="hire-confirm-summary">
-        ${summaryMarkup}
-      </div>
-      ${infoMarkup}
-      <div class="hire-confirm-error" data-hire-error hidden></div>
-      <div class="hire-confirm-success" data-hire-success hidden>${successCopy}</div>
-      <div class="hire-confirm-actions" data-hire-actions>
-        <button class="btn secondary" type="button" data-hire-cancel>Cancel</button>
-        <button class="btn primary" type="button" data-hire-confirm>Confirm Hire</button>
-        <a class="btn primary" href="${sanitize(continueHref || "#")}" data-hire-continue hidden>Continue to case</a>
-      </div>
+      <div class="hire-confirm-stage" data-hire-stage></div>
     </div>
   `;
-  const errorEl = overlay.querySelector("[data-hire-error]");
-  const successEl = overlay.querySelector("[data-hire-success]");
-  const continueEl = overlay.querySelector("[data-hire-continue]");
-  const confirmBtn = overlay.querySelector("[data-hire-confirm]");
-  const cancelBtn = overlay.querySelector("[data-hire-cancel]");
+  const stageEl = overlay.querySelector("[data-hire-stage]");
 
   const close = () => {
     if (overlay.classList.contains("is-closing")) return;
@@ -7644,70 +7877,328 @@ function openHireConfirmModal({
     window.setTimeout(removeOverlay, 200);
   };
   const canClose = () => {
+    const successEl = stageEl?.querySelector("[data-hire-success]");
     if (successEl && !successEl.hidden) return true;
-    return !confirmBtn?.disabled;
+    const confirmBtn = stageEl?.querySelector("[data-hire-confirm]");
+    if (!confirmBtn) return true;
+    return !confirmBtn.disabled;
   };
-  const setLoading = (isLoading) => {
-    if (confirmBtn) {
-      confirmBtn.disabled = isLoading;
-      const loadingLabel = reuseEscrow ? "Assigning..." : "Charging...";
-      confirmBtn.textContent = isLoading ? loadingLabel : "Confirm Hire";
+  const buildPreEngagementDraft = () => {
+    const hasRequirements = preEngagementState.confidentialityAgreement || preEngagementState.conflictsCheck;
+    if (!hasRequirements || preEngagementState.none) return null;
+    return {
+      confidentialityAgreementSelected: !!preEngagementState.confidentialityAgreement,
+      conflictsCheckSelected: !!preEngagementState.conflictsCheck,
+      confidentialityFile: preEngagementState.confidentialityAgreement ? preEngagementState.confidentialityFile || null : null,
+      confidentialityFileName: preEngagementState.confidentialityAgreement ? preEngagementState.fileName || "" : "",
+      conflictsDetails: preEngagementState.conflictsCheck ? String(preEngagementState.conflictsDetails || "") : "",
+    };
+  };
+  const getPreEngagementValidation = () => {
+    const requiresConfidentiality = !!preEngagementState.confidentialityAgreement;
+    const requiresConflicts = !!preEngagementState.conflictsCheck;
+    const missingConfidentialityFile = requiresConfidentiality && !preEngagementState.confidentialityFile;
+    const missingConflictsDetails =
+      requiresConflicts && !String(preEngagementState.conflictsDetails || "").trim();
+    return {
+      missingConfidentialityFile,
+      missingConflictsDetails,
+      showConfidentialityError: missingConfidentialityFile && preEngagementState.confidentialityTouched,
+      showConflictsError: missingConflictsDetails && preEngagementState.conflictsTouched,
+      hasErrors: missingConfidentialityFile || missingConflictsDetails,
+    };
+  };
+  const getPreEngagementPrimaryLabel = () => {
+    if (preEngagementState.none || (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck)) {
+      return "Next: Fund and Hire";
     }
-    if (cancelBtn) cancelBtn.disabled = isLoading;
+    return normalizedExistingPreEngagement ? "Update and resend" : `Send to ${safeName}`;
   };
-  if (errorEl) {
-    errorEl.addEventListener("click", (event) => {
-      const link = event.target?.closest?.("a");
-      if (!link) return;
+  const renderPreEngagementStep = () => `
+    ${(() => {
+      const validation = getPreEngagementValidation();
+      return `
+    <div data-hire-step="pre-engagement">
+      <div class="hire-confirm-title" id="hireConfirmTitle">Pre-Engagement</div>
+      ${
+        normalizedExistingPreEngagement
+          ? `<div class="hire-confirm-success">Pre-engagement sent - awaiting paralegal response.</div>`
+          : ""
+      }
+      <p class="hire-pre-helper">Before moving forward, you may require pre-engagement items for this paralegal.</p>
+      <div class="hire-pre-options">
+        <label class="hire-pre-option${preEngagementState.confidentialityAgreement ? " is-selected" : ""}">
+          <input type="checkbox" data-pre-option="confidentiality"${preEngagementState.confidentialityAgreement ? " checked" : ""}>
+          <span class="hire-pre-option-copy">
+            <strong>Confidentiality agreement</strong>
+          </span>
+        </label>
+        <label class="hire-pre-option${preEngagementState.conflictsCheck ? " is-selected" : ""}">
+          <input type="checkbox" data-pre-option="conflicts"${preEngagementState.conflictsCheck ? " checked" : ""}>
+          <span class="hire-pre-option-copy">
+            <strong>Conflicts check</strong>
+          </span>
+        </label>
+        <label class="hire-pre-option${preEngagementState.none ? " is-selected" : ""}">
+          <input type="checkbox" data-pre-option="none"${preEngagementState.none ? " checked" : ""}>
+          <span class="hire-pre-option-copy">
+            <strong>None</strong>
+          </span>
+        </label>
+      </div>
+      ${
+        preEngagementState.confidentialityAgreement
+          ? `
+            <div class="hire-pre-reveal">
+              <div class="hire-pre-upload">
+                <label>Upload confidentiality agreement</label>
+                <label class="hire-pre-upload-trigger${validation.showConfidentialityError ? " is-invalid" : ""}" for="hirePreConfidentialityUpload">Choose file</label>
+                <input id="hirePreConfidentialityUpload" type="file" data-pre-confidentiality-upload>
+                <div class="hire-pre-upload-name">${sanitize(preEngagementState.fileName || "No file selected")}</div>
+                ${
+                  validation.showConfidentialityError
+                    ? `<div class="hire-pre-field-help">Upload a confidentiality agreement to continue.</div>`
+                    : ""
+                }
+              </div>
+            </div>
+          `
+          : ""
+      }
+      ${
+        preEngagementState.conflictsCheck
+          ? `
+            <div class="hire-pre-reveal">
+              <label for="hirePreConflictsDetails">Conflicts check details</label>
+              <textarea id="hirePreConflictsDetails" class="${validation.showConflictsError ? "is-invalid" : ""}" data-pre-conflicts-details placeholder="Enter the names, parties, or details the paralegal should review for conflicts.">${sanitize(
+                preEngagementState.conflictsDetails
+              )}</textarea>
+              ${
+                validation.showConflictsError
+                  ? `<div class="hire-pre-field-help">Enter conflicts check details to continue.</div>`
+                  : ""
+              }
+            </div>
+          `
+          : ""
+      }
+      <div class="hire-confirm-error"${preEngagementState.submitError ? "" : " hidden"} data-pre-error>${sanitize(
+        preEngagementState.submitError || ""
+      )}</div>
+      <div class="hire-confirm-actions">
+        <button class="btn secondary" type="button" data-hire-cancel${preEngagementState.submitting ? " disabled aria-disabled=\"true\"" : ""}>Cancel</button>
+        <button class="btn primary" type="button" data-pre-next${validation.hasErrors || preEngagementState.submitting ? " disabled aria-disabled=\"true\"" : ""}>${sanitize(
+          preEngagementState.submitting ? "Sending..." : getPreEngagementPrimaryLabel()
+        )}</button>
+      </div>
+    </div>
+  `;})()}
+  `;
+  const renderFundHireStep = () => `
+    <div data-hire-step="fund-hire">
+      <div class="hire-confirm-title" id="hireConfirmTitle">Confirm &amp; Hire</div>
+      <p>${copy}</p>
+      <div class="hire-confirm-summary">
+        ${summaryMarkup}
+      </div>
+      ${infoMarkup}
+      <div class="hire-confirm-error" data-hire-error hidden></div>
+      <div class="hire-confirm-success" data-hire-success hidden>${successCopy}</div>
+      <div class="hire-confirm-actions" data-hire-actions>
+        <button class="btn secondary" type="button" data-hire-back>Back</button>
+        <button class="btn secondary" type="button" data-hire-cancel>Cancel</button>
+        <button class="btn primary" type="button" data-hire-confirm>Confirm Hire</button>
+        <a class="btn primary" href="${sanitize(continueHref || "#")}" data-hire-continue hidden>Continue to case</a>
+      </div>
+    </div>
+  `;
+  const renderPreEngagementSentStep = () => `
+    <div data-hire-step="pre-engagement-sent">
+      <div class="hire-confirm-title" id="hireConfirmTitle">${normalizedExistingPreEngagement ? "Pre-Engagement Updated" : "Pre-Engagement Sent"}</div>
+      <p>${normalizedExistingPreEngagement ? `Updated pre-engagement requirements for ${safeName} have been saved. Hiring and funding will continue after the paralegal completes the requested items and you review them.` : `Pre-engagement requirements for ${safeName} are ready to send. Hiring and funding will continue after the paralegal completes the requested items and you review them.`}</p>
+      <div class="hire-confirm-success">${normalizedExistingPreEngagement ? "Pre-engagement requirements updated successfully." : "Pre-engagement requirements prepared successfully."}</div>
+      <div class="hire-confirm-actions">
+        <button class="btn secondary" type="button" data-hire-close>Close</button>
+      </div>
+    </div>
+  `;
+  const transitionStage = (html, bindFn) => {
+    if (!stageEl) return;
+    stageEl.classList.add("is-leaving");
+    window.setTimeout(() => {
+      stageEl.innerHTML = html;
+      bindFn?.();
+      stageEl.classList.remove("is-leaving");
+      stageEl.classList.add("is-entering");
+      window.requestAnimationFrame(() => {
+        stageEl.classList.remove("is-entering");
+      });
+    }, 140);
+  };
+  const bindCancel = () => {
+    stageEl?.querySelector("[data-hire-cancel]")?.addEventListener("click", () => {
+      if (canClose()) close();
+    });
+  };
+  const bindPreEngagementSentStep = () => {
+    stageEl?.querySelector("[data-hire-close]")?.addEventListener("click", () => {
       close();
     });
-  }
-  const showError = (message) => {
-    if (!errorEl) return;
-    if (!message) {
-      errorEl.hidden = true;
-      errorEl.textContent = "";
-      return;
-    }
-    const safe = sanitize(message);
-    const phrase = "update your payment method";
-    if (safe.toLowerCase().includes(phrase)) {
-      const linked = safe.replace(
-        new RegExp(phrase, "i"),
-        `<a href="dashboard-attorney.html#billing">update your payment method</a>`
-      );
-      errorEl.innerHTML = linked;
-    } else {
-      errorEl.textContent = safe;
-    }
-    errorEl.hidden = false;
   };
-  const showSuccess = () => {
-    if (successEl) successEl.hidden = false;
-    if (confirmBtn) confirmBtn.hidden = true;
-    if (cancelBtn) {
-      cancelBtn.disabled = false;
-      cancelBtn.textContent = "Close";
+  const bindPreEngagementStep = () => {
+    bindCancel();
+    stageEl?.querySelectorAll("[data-pre-option]").forEach((input) => {
+      input.addEventListener("change", (event) => {
+        const option = event.target?.dataset?.preOption || "";
+        const checked = !!event.target?.checked;
+        if (option === "none") {
+          preEngagementState.submitError = "";
+          preEngagementState.none = checked || (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck);
+          if (preEngagementState.none) {
+            preEngagementState.confidentialityAgreement = false;
+            preEngagementState.conflictsCheck = false;
+            preEngagementState.confidentialityFile = null;
+            preEngagementState.fileName = "";
+            preEngagementState.confidentialityTouched = false;
+            preEngagementState.conflictsTouched = false;
+          }
+        } else if (option === "confidentiality") {
+          preEngagementState.submitError = "";
+          preEngagementState.confidentialityAgreement = checked;
+          if (checked) preEngagementState.none = false;
+          if (!checked) {
+            preEngagementState.confidentialityFile = null;
+            preEngagementState.fileName = "";
+            preEngagementState.confidentialityTouched = false;
+          }
+        } else if (option === "conflicts") {
+          preEngagementState.submitError = "";
+          preEngagementState.conflictsCheck = checked;
+          if (checked) preEngagementState.none = false;
+          if (!checked) preEngagementState.conflictsTouched = false;
+        }
+        if (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck) {
+          preEngagementState.none = true;
+        }
+        transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
+      });
+    });
+    stageEl?.querySelector("[data-pre-confidentiality-upload]")?.addEventListener("click", () => {
+      preEngagementState.confidentialityTouched = true;
+    });
+    stageEl?.querySelector("[data-pre-confidentiality-upload]")?.addEventListener("change", (event) => {
+      const file = event.target?.files?.[0] || null;
+      preEngagementState.confidentialityTouched = true;
+      preEngagementState.submitError = "";
+      preEngagementState.confidentialityFile = file;
+      preEngagementState.fileName = file?.name || "";
+      transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
+    });
+    stageEl?.querySelector("[data-pre-conflicts-details]")?.addEventListener("blur", () => {
+      preEngagementState.conflictsTouched = true;
+      transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
+    });
+    stageEl?.querySelector("[data-pre-conflicts-details]")?.addEventListener("input", (event) => {
+      preEngagementState.conflictsTouched = true;
+      preEngagementState.submitError = "";
+      preEngagementState.conflictsDetails = event.target?.value || "";
+    });
+    stageEl?.querySelector("[data-pre-next]")?.addEventListener("click", async () => {
+      const draft = buildPreEngagementDraft();
+      if (draft) {
+        preEngagementState.submitError = "";
+        preEngagementState.submitting = true;
+        transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
+        try {
+          await onSendPreEngagement?.({ preEngagement: draft });
+          transitionStage(renderPreEngagementSentStep(), bindPreEngagementSentStep);
+        } catch (err) {
+          preEngagementState.submitting = false;
+          preEngagementState.submitError = formatHireErrorMessage(err?.message) || "Unable to save pre-engagement requirements.";
+          transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
+        }
+        return;
+      }
+      transitionStage(renderFundHireStep(), bindFundHireStep);
+    });
+  };
+  const bindFundHireStep = () => {
+    bindCancel();
+    const errorEl = stageEl?.querySelector("[data-hire-error]");
+    const successEl = stageEl?.querySelector("[data-hire-success]");
+    const continueEl = stageEl?.querySelector("[data-hire-continue]");
+    const confirmBtn = stageEl?.querySelector("[data-hire-confirm]");
+    const cancelBtn = stageEl?.querySelector("[data-hire-cancel]");
+    const backBtn = stageEl?.querySelector("[data-hire-back]");
+    if (skipPreEngagementStep && backBtn) {
+      backBtn.hidden = true;
+    } else {
+      backBtn?.addEventListener("click", () => {
+        if (confirmBtn?.disabled) return;
+        transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
+      });
     }
-    if (continueEl) continueEl.hidden = false;
+    const setLoading = (isLoading) => {
+      if (confirmBtn) {
+        confirmBtn.disabled = isLoading;
+        const loadingLabel = reuseEscrow ? "Assigning..." : "Charging...";
+        confirmBtn.textContent = isLoading ? loadingLabel : "Confirm Hire";
+      }
+      if (cancelBtn) cancelBtn.disabled = isLoading;
+      if (backBtn) backBtn.disabled = isLoading;
+    };
+    if (errorEl) {
+      errorEl.addEventListener("click", (event) => {
+        const link = event.target?.closest?.("a");
+        if (!link) return;
+        close();
+      });
+    }
+    const showError = (message) => {
+      if (!errorEl) return;
+      if (!message) {
+        errorEl.hidden = true;
+        errorEl.textContent = "";
+        return;
+      }
+      const safe = sanitize(message);
+      const phrase = "update your payment method";
+      if (safe.toLowerCase().includes(phrase)) {
+        const linked = safe.replace(
+          new RegExp(phrase, "i"),
+          `<a href="dashboard-attorney.html#billing">update your payment method</a>`
+        );
+        errorEl.innerHTML = linked;
+      } else {
+        errorEl.textContent = safe;
+      }
+      errorEl.hidden = false;
+    };
+    const showSuccess = () => {
+      if (successEl) successEl.hidden = false;
+      if (confirmBtn) confirmBtn.hidden = true;
+      if (backBtn) backBtn.hidden = true;
+      if (cancelBtn) {
+        cancelBtn.disabled = false;
+        cancelBtn.textContent = "Close";
+      }
+      if (continueEl) continueEl.hidden = false;
+    };
+    confirmBtn?.addEventListener("click", async () => {
+      showError("");
+      setLoading(true);
+      try {
+        await onConfirm?.({ preEngagement: buildPreEngagementDraft() });
+        showSuccess();
+      } catch (err) {
+        showError(formatHireErrorMessage(err?.message));
+        setLoading(false);
+      }
+    });
   };
 
   overlay.addEventListener("click", (event) => {
     if (event.target === overlay && canClose()) close();
-  });
-  cancelBtn?.addEventListener("click", () => {
-    if (canClose()) close();
-  });
-  confirmBtn?.addEventListener("click", async () => {
-    showError("");
-    setLoading(true);
-    try {
-      await onConfirm?.();
-      showSuccess();
-    } catch (err) {
-      showError(formatHireErrorMessage(err?.message));
-      setLoading(false);
-    }
   });
   document.addEventListener(
     "keydown",
@@ -7717,6 +8208,13 @@ function openHireConfirmModal({
     { once: true }
   );
   document.body.appendChild(overlay);
+  if (skipPreEngagementStep) {
+    stageEl.innerHTML = renderFundHireStep();
+    bindFundHireStep();
+  } else {
+    stageEl.innerHTML = renderPreEngagementStep();
+    bindPreEngagementStep();
+  }
   window.requestAnimationFrame(() => overlay.classList.add("is-visible"));
 }
 

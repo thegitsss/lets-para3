@@ -1516,6 +1516,23 @@ function ensureHireConfirmTooltipStyles() {
   const style = document.createElement("style");
   style.id = "hire-confirm-tooltip-styles";
   style.textContent = `
+    .hire-modal-stage{transition:opacity .2s ease,transform .2s ease}
+    .hire-modal-stage.is-leaving,.hire-modal-stage.is-entering{opacity:0;transform:translateY(8px)}
+    .hire-pre-helper{margin:0 0 16px;color:#6b7280;font-size:.95rem;line-height:1.5}
+    .hire-pre-options{display:grid;gap:10px;margin-bottom:14px}
+    .hire-pre-option{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid rgba(15,23,42,.08);border-radius:12px;background:#fff;cursor:pointer;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease}
+    .hire-pre-option:hover{border-color:rgba(182,164,122,.65);box-shadow:0 10px 24px rgba(15,23,42,.06)}
+    .hire-pre-option.is-selected{border-color:rgba(182,164,122,.85);background:#faf7ef}
+    .hire-pre-option input{margin-top:3px}
+    .hire-pre-option-copy{display:grid;gap:2px}
+    .hire-pre-option-copy strong{font-size:.96rem;font-weight:600;color:#111827}
+    .hire-pre-reveal{display:grid;gap:10px;margin:12px 0 0;padding:12px;border:1px solid rgba(15,23,42,.08);border-radius:12px;background:#fbfbfa}
+    .hire-pre-reveal label{font-size:.85rem;font-weight:600;color:#374151}
+    .hire-pre-upload{display:grid;gap:8px}
+    .hire-pre-upload input[type="file"]{display:none}
+    .hire-pre-upload-trigger{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border:1px solid #d1d5db;border-radius:999px;background:#fff;color:#111827;font-weight:600;cursor:pointer;width:max-content}
+    .hire-pre-upload-name{font-size:.85rem;color:#6b7280}
+    .hire-pre-reveal textarea{border:1px solid #d1d5db;border-radius:12px;padding:10px;font:inherit;resize:vertical;min-height:104px}
     .hire-confirm-help{display:flex;justify-content:flex-end;margin-top:6px}
     .hire-confirm-info{width:24px;height:24px;border-radius:50%;border:1px solid var(--line,rgba(0,0,0,0.08));background:var(--panel,#fff);color:var(--muted,#6b7280);font-size:0.75rem;font-weight:250;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0;transition:border-color .2s ease,color .2s ease,transform .15s ease}
     .hire-confirm-info:hover,
@@ -1530,15 +1547,100 @@ function ensureHireConfirmTooltipStyles() {
 function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref, onConfirm }) {
   ensureHireConfirmTooltipStyles();
   const safeName = String(paralegalName || "Paralegal");
+  const escapeText = (value = "") =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   const feeNote =
     "The platform fee supports tools that enable attorneys and paralegals to collaborate, including secure workspace, messaging, document sharing, case workflow tools, payment processing, identity verification, and platform administration. The platform fee is not a fee for legal services.";
   const feeRate = Number(feePct || 0);
   const feeCents = Math.max(0, Math.round(Number(amountCents || 0) * (feeRate / 100)));
   const totalCents = Math.max(0, Math.round(Number(amountCents || 0) + feeCents));
+  const preEngagementState = {
+    confidentialityAgreement: false,
+    conflictsCheck: false,
+    none: true,
+    fileName: "",
+    conflictsDetails: "",
+  };
   const overlay = document.createElement("div");
   overlay.className = "case-modal-overlay";
   overlay.innerHTML = `
     <div class="case-modal" role="dialog" aria-modal="true" aria-labelledby="hireConfirmTitle">
+      <div class="hire-modal-stage" data-hire-stage></div>
+    </div>
+  `;
+  const stageEl = overlay.querySelector("[data-hire-stage]");
+
+  const close = () => overlay.remove();
+
+  const getPreEngagementPrimaryLabel = () => {
+    if (preEngagementState.none || (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck)) {
+      return "Next: Fund and Hire";
+    }
+    return "Next: Review Hire";
+  };
+
+  const renderPreEngagementStep = () => `
+    <div data-hire-step="pre-engagement">
+      <div class="case-modal-title" id="hireConfirmTitle">Pre-Engagement</div>
+      <p class="hire-pre-helper">Before moving forward, you may require pre-engagement items for this paralegal.</p>
+      <div class="hire-pre-options">
+        <label class="hire-pre-option${preEngagementState.confidentialityAgreement ? " is-selected" : ""}">
+          <input type="checkbox" data-pre-option="confidentiality"${preEngagementState.confidentialityAgreement ? " checked" : ""}>
+          <span class="hire-pre-option-copy">
+            <strong>Confidentiality agreement</strong>
+          </span>
+        </label>
+        <label class="hire-pre-option${preEngagementState.conflictsCheck ? " is-selected" : ""}">
+          <input type="checkbox" data-pre-option="conflicts"${preEngagementState.conflictsCheck ? " checked" : ""}>
+          <span class="hire-pre-option-copy">
+            <strong>Conflicts check</strong>
+          </span>
+        </label>
+        <label class="hire-pre-option${preEngagementState.none ? " is-selected" : ""}">
+          <input type="checkbox" data-pre-option="none"${preEngagementState.none ? " checked" : ""}>
+          <span class="hire-pre-option-copy">
+            <strong>None</strong>
+          </span>
+        </label>
+      </div>
+      ${
+        preEngagementState.confidentialityAgreement
+          ? `
+            <div class="hire-pre-reveal">
+              <div class="hire-pre-upload">
+                <label>Upload confidentiality agreement</label>
+                <label class="hire-pre-upload-trigger" for="hirePreConfidentialityUpload">Choose file</label>
+                <input id="hirePreConfidentialityUpload" type="file" data-pre-confidentiality-upload>
+                <div class="hire-pre-upload-name">${escapeText(preEngagementState.fileName || "No file selected")}</div>
+              </div>
+            </div>
+          `
+          : ""
+      }
+      ${
+        preEngagementState.conflictsCheck
+          ? `
+            <div class="hire-pre-reveal">
+              <label for="hirePreConflictsDetails">Conflicts check details</label>
+              <textarea id="hirePreConflictsDetails" data-pre-conflicts-details placeholder="Enter the names, parties, or details the paralegal should review for conflicts.">${escapeText(
+                preEngagementState.conflictsDetails
+              )}</textarea>
+            </div>
+          `
+          : ""
+      }
+      <div class="case-modal-actions">
+        <button class="btn" data-hire-cancel>Cancel</button>
+        <button class="btn primary" data-pre-next>${getPreEngagementPrimaryLabel()}</button>
+      </div>
+    </div>
+  `;
+
+  const renderFundHireStep = () => `
+    <div data-hire-step="fund-and-hire">
       <div class="case-modal-title" id="hireConfirmTitle">Confirm Hire</div>
       <p>You’re about to hire ${safeName}. This will fund the case immediately.</p>
       <div style="border:1px solid rgba(15,23,42,.08);border-radius:12px;padding:12px 14px;display:grid;gap:8px;">
@@ -1564,6 +1666,7 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
       <div class="case-modal-alert" data-hire-error hidden style="border:1px solid rgba(185,28,28,.4);background:rgba(254,242,242,.9);color:#991b1b;border-radius:10px;padding:8px 10px;font-size:0.9rem;"></div>
       <div class="case-modal-alert success" data-hire-success hidden style="border:1px solid rgba(22,163,74,.35);background:rgba(240,253,244,.9);color:#166534;border-radius:10px;padding:8px 10px;font-size:0.9rem;">Case funded. Work can begin.</div>
       <div class="case-modal-actions" data-hire-actions>
+        <button class="btn" data-hire-back>Back</button>
         <button class="btn" data-hire-cancel>Cancel</button>
         <button class="btn primary" data-hire-confirm>Confirm &amp; Hire</button>
       </div>
@@ -1572,61 +1675,128 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
       </div>
     </div>
   `;
-  const errorEl = overlay.querySelector("[data-hire-error]");
-  const successEl = overlay.querySelector("[data-hire-success]");
-  const actionsEl = overlay.querySelector("[data-hire-actions]");
-  const continueEl = overlay.querySelector("[data-hire-continue]");
-  const confirmBtn = overlay.querySelector("[data-hire-confirm]");
-  const cancelBtn = overlay.querySelector("[data-hire-cancel]");
 
-  const close = () => overlay.remove();
-  const setLoading = (isLoading) => {
-    if (confirmBtn) {
-      confirmBtn.disabled = isLoading;
-      confirmBtn.textContent = isLoading ? "Charging..." : "Confirm & Hire";
-    }
-    if (cancelBtn) cancelBtn.disabled = isLoading;
+  const transitionStage = (html, bindFn) => {
+    if (!stageEl) return;
+    stageEl.classList.add("is-leaving");
+    window.setTimeout(() => {
+      stageEl.innerHTML = html;
+      bindFn?.();
+      stageEl.classList.remove("is-leaving");
+      stageEl.classList.add("is-entering");
+      window.requestAnimationFrame(() => {
+        stageEl.classList.remove("is-entering");
+      });
+    }, 140);
   };
-  const showError = (message) => {
-    if (!errorEl) return;
-    if (!message) {
-      errorEl.hidden = true;
-      errorEl.textContent = "";
-      return;
-    }
-    errorEl.textContent = message;
-    errorEl.hidden = false;
+
+  const bindCancel = () => {
+    stageEl.querySelector("[data-hire-cancel]")?.addEventListener("click", () => {
+      const confirmBtn = stageEl.querySelector("[data-hire-confirm]");
+      if (!confirmBtn?.disabled) close();
+    });
   };
-  const showSuccess = () => {
-    if (successEl) successEl.hidden = false;
-    if (actionsEl) actionsEl.hidden = true;
-    if (continueEl) continueEl.hidden = false;
+
+  const bindPreEngagementStep = () => {
+    bindCancel();
+    stageEl.querySelectorAll("[data-pre-option]").forEach((input) => {
+      input.addEventListener("change", (event) => {
+        const option = event.target?.dataset?.preOption || "";
+        const checked = !!event.target?.checked;
+        if (option === "none") {
+          preEngagementState.none = checked || (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck);
+          if (preEngagementState.none) {
+            preEngagementState.confidentialityAgreement = false;
+            preEngagementState.conflictsCheck = false;
+          }
+        } else if (option === "confidentiality") {
+          preEngagementState.confidentialityAgreement = checked;
+          if (checked) preEngagementState.none = false;
+        } else if (option === "conflicts") {
+          preEngagementState.conflictsCheck = checked;
+          if (checked) preEngagementState.none = false;
+        }
+        if (!preEngagementState.confidentialityAgreement && !preEngagementState.conflictsCheck) {
+          preEngagementState.none = true;
+        }
+        transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
+      });
+    });
+    stageEl.querySelector("[data-pre-confidentiality-upload]")?.addEventListener("change", (event) => {
+      const file = event.target?.files?.[0] || null;
+      preEngagementState.fileName = file?.name || "";
+      transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
+    });
+    stageEl.querySelector("[data-pre-conflicts-details]")?.addEventListener("input", (event) => {
+      preEngagementState.conflictsDetails = event.target?.value || "";
+    });
+    stageEl.querySelector("[data-pre-next]")?.addEventListener("click", () => {
+      transitionStage(renderFundHireStep(), bindFundHireStep);
+    });
+  };
+
+  const bindFundHireStep = () => {
+    bindCancel();
+    const errorEl = stageEl.querySelector("[data-hire-error]");
+    const successEl = stageEl.querySelector("[data-hire-success]");
+    const actionsEl = stageEl.querySelector("[data-hire-actions]");
+    const continueEl = stageEl.querySelector("[data-hire-continue]");
+    const confirmBtn = stageEl.querySelector("[data-hire-confirm]");
+    stageEl.querySelector("[data-hire-back]")?.addEventListener("click", () => {
+      transitionStage(renderPreEngagementStep(), bindPreEngagementStep);
+    });
+    const setLoading = (isLoading) => {
+      if (confirmBtn) {
+        confirmBtn.disabled = isLoading;
+        confirmBtn.textContent = isLoading ? "Charging..." : "Confirm & Hire";
+      }
+      const cancelBtn = stageEl.querySelector("[data-hire-cancel]");
+      if (cancelBtn) cancelBtn.disabled = isLoading;
+    };
+    const showError = (message) => {
+      if (!errorEl) return;
+      if (!message) {
+        errorEl.hidden = true;
+        errorEl.textContent = "";
+        return;
+      }
+      errorEl.textContent = message;
+      errorEl.hidden = false;
+    };
+    const showSuccess = () => {
+      if (successEl) successEl.hidden = false;
+      if (actionsEl) actionsEl.hidden = true;
+      if (continueEl) continueEl.hidden = false;
+    };
+    confirmBtn?.addEventListener("click", async () => {
+      showError("");
+      setLoading(true);
+      try {
+        await onConfirm?.();
+        showSuccess();
+      } catch (err) {
+        showError(formatHireErrorMessage(err?.message));
+        setLoading(false);
+      }
+    });
   };
 
   overlay.addEventListener("click", (event) => {
-    if (event.target === overlay && !confirmBtn?.disabled) close();
-  });
-  cancelBtn?.addEventListener("click", () => {
-    if (!confirmBtn?.disabled) close();
-  });
-  confirmBtn?.addEventListener("click", async () => {
-    showError("");
-    setLoading(true);
-    try {
-      await onConfirm?.();
-      showSuccess();
-    } catch (err) {
-      showError(formatHireErrorMessage(err?.message));
-      setLoading(false);
+    if (event.target === overlay) {
+      const activeConfirm = stageEl.querySelector("[data-hire-confirm]");
+      if (!activeConfirm?.disabled) close();
     }
   });
   document.addEventListener(
     "keydown",
     (event) => {
-      if (event.key === "Escape" && !confirmBtn?.disabled) close();
+      const activeConfirm = stageEl.querySelector("[data-hire-confirm]");
+      if (event.key === "Escape" && !activeConfirm?.disabled) close();
     },
     { once: true }
   );
+  stageEl.innerHTML = renderPreEngagementStep();
+  bindPreEngagementStep();
   document.body.appendChild(overlay);
 }
 

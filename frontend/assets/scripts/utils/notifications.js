@@ -682,11 +682,10 @@ function togglePanel(center) {
     renderEmpty(center, "Loading...");
     center.panel.dataset.pendingShow = "";
     showPanel(center);
-    fetchNotifications(center, { markReadOnLoad: true });
+    fetchNotifications(center);
     return;
   }
   showPanel(center);
-  markNotificationsRead(center);
 }
 
 function preload(center) {
@@ -725,28 +724,9 @@ async function fetchNotifications(center, options = {}) {
     const items = Array.isArray(payload) ? payload : [];
     const filtered = await filterCompletedCaseNotifications(items);
     const normalized = Array.isArray(filtered) ? filtered.map(normalizeNotification) : [];
-    const shouldMarkReadOnLoad =
-      options.markReadOnLoad &&
-      center.panel.classList.contains("show") &&
-      normalized.some((item) => !isNotificationRead(item));
-    const nextNotifications = shouldMarkReadOnLoad
-      ? normalized.map((item) => ({ ...item, read: true, isRead: true }))
-      : normalized;
-    center.notifications = nextNotifications;
+    center.notifications = normalized;
     center.unread = getUnreadCount(center.notifications);
     center.loaded = true;
-    if (shouldMarkReadOnLoad) {
-      centers.forEach((c) => {
-        if (!c || c === center) return;
-        c.notifications = (Array.isArray(c.notifications) ? c.notifications : []).map((item) => ({
-          ...item,
-          read: true,
-          isRead: true,
-        }));
-        c.unread = getUnreadCount(c.notifications);
-        updateBadge(c, c.unread);
-      });
-    }
     renderNotifications(center);
     emitNotificationRefresh({
       source: "center",
@@ -761,9 +741,6 @@ async function fetchNotifications(center, options = {}) {
       center.panel.dataset.pendingShow = "";
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       showPanel(center);
-    }
-    if (shouldMarkReadOnLoad) {
-      void markNotificationsReadQuiet();
     }
   } catch (err) {
     console.warn("[notifications] load failed", err);
@@ -1144,6 +1121,31 @@ function resolveNotificationLink(item = {}) {
       return `dashboard-attorney.html?caseId=${encodeURIComponent(
         caseId
       )}&applicantId=${encodeURIComponent(applicantId)}&openApplicant=1#cases:inquiries`;
+    }
+    return "dashboard-attorney.html#cases:inquiries";
+  }
+  if (role === "paralegal" && (type === "pre_engagement_requested" || type === "pre_engagement_changes_requested")) {
+    const applicationId = extractId(
+      item.applicationId ||
+        payload.applicationId ||
+        payload.applicationID ||
+        payload.appId ||
+        payload.application
+    );
+    if (applicationId) {
+      return `dashboard-paralegal.html?applicationId=${encodeURIComponent(applicationId)}#cases`;
+    }
+    return "dashboard-paralegal.html#cases";
+  }
+  if (type === "pre_engagement_submitted" && role === "attorney") {
+    const applicantId = extractApplicantId(item);
+    if (caseId && applicantId) {
+      return `dashboard-attorney.html?caseId=${encodeURIComponent(
+        caseId
+      )}&applicantId=${encodeURIComponent(applicantId)}&openApplicant=1#cases:inquiries`;
+    }
+    if (caseId) {
+      return `dashboard-attorney.html?openApplicants=1&caseId=${encodeURIComponent(caseId)}#cases:inquiries`;
     }
     return "dashboard-attorney.html#cases:inquiries";
   }

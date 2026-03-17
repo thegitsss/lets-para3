@@ -15,6 +15,7 @@ const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../uti
 const { publishCaseEvent } = require("../utils/caseEvents");
 const { publishNotificationEvent } = require("../utils/notificationEvents");
 const { decryptMessagePayload, decryptString } = require("../utils/dataEncryption");
+const { isWorkspacePresenceActive } = require("../utils/workspacePresence");
 
 // ----------------------------------------
 // CSRF (enabled in production or when ENABLE_CSRF=true)
@@ -187,6 +188,9 @@ async function createMessageNotification({ caseDoc, senderDoc, previewText, mess
   if (!recipientId) return;
   const senderId = toObjectId(senderDoc._id || senderDoc.id);
   if (senderId && String(recipientId) === String(senderId)) return;
+  if (isWorkspacePresenceActive(recipientId, caseDoc._id)) {
+    return;
+  }
   const shouldNotify = await shouldNotifyForMessage({
     caseId: caseDoc._id,
     messageDoc,

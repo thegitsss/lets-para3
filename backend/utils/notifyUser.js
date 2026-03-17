@@ -58,6 +58,12 @@ function buildDisplayMessage(type, payload = {}) {
       return `${payload.caseTitle || "A case"} is awaiting funding`;
     case "case_work_ready":
       return `${payload.caseTitle || "A case"} is funded. Work can begin.`;
+    case "pre_engagement_requested":
+      return `${payload.caseTitle || "A case"} requires pre-engagement before hiring can continue.`;
+    case "pre_engagement_submitted":
+      return `${payload.caseTitle || "A case"} has a submitted pre-engagement response ready for review.`;
+    case "pre_engagement_changes_requested":
+      return `${payload.caseTitle || "A case"} needs updates to your pre-engagement response.`;
     case "case_file_uploaded": {
       const fileName = payload.fileName || "a document";
       return `${actorName || "Someone"} uploaded ${fileName}${caseFragment || ""}`.trim();
@@ -226,6 +232,21 @@ function emailTemplate(type, payload) {
         subject: `Work can begin on ${payload.caseTitle || "your case"}`,
         html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is funded and ready to begin.</p><p>Log in to get started.</p>`,
       };
+    case "pre_engagement_requested":
+      return {
+        subject: `Pre-engagement requested${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
+        html: `<p>The attorney requested pre-engagement items for <strong>${payload.caseTitle || "this application"}</strong>.</p><p>Log in to review and respond.</p>`,
+      };
+    case "pre_engagement_submitted":
+      return {
+        subject: `Pre-engagement ready for review${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
+        html: `<p>A submitted pre-engagement response is ready for review on <strong>${payload.caseTitle || "this case"}</strong>.</p><p>Log in to review and continue hiring.</p>`,
+      };
+    case "pre_engagement_changes_requested":
+      return {
+        subject: `Pre-engagement changes requested${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
+        html: `<p>The attorney requested updates to your pre-engagement response for <strong>${payload.caseTitle || "this application"}</strong>.</p><p>Log in to revise and resubmit.</p>`,
+      };
     case "case_file_uploaded":
       return {
         subject: `New document on ${payload.caseTitle || "your case"}`,
@@ -328,6 +349,9 @@ const CASE_EMAIL_TYPES = new Set([
   "application_submitted",
   "application_accepted",
   "application_denied",
+  "pre_engagement_requested",
+  "pre_engagement_submitted",
+  "pre_engagement_changes_requested",
   "payout_released",
   "dispute_resolved",
 ]);

@@ -1,9 +1,14 @@
 const express = require("express");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
+const Case = require("../models/Case");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved } = require("../utils/authz");
 const { addSubscriber, publishNotificationEvent } = require("../utils/notificationEvents");
+const {
+  markWorkspacePresence,
+  clearWorkspacePresence,
+} = require("../utils/workspacePresence");
 
 const router = express.Router();
 
@@ -27,6 +32,53 @@ const protectMutations = (req, res, next) => {
 
 router.use(verifyToken, requireApproved);
 router.use(protectMutations);
+
+async function canTrackWorkspacePresence(user, caseId) {
+  if (!caseId) return false;
+  if (String(user?.role || "").toLowerCase() === "admin") {
+    const exists = await Case.exists({ _id: caseId });
+    return !!exists;
+  }
+  const exists = await Case.exists({
+    _id: caseId,
+    $or: [
+      { attorney: user.id },
+      { attorneyId: user.id },
+      { paralegal: user.id },
+      { paralegalId: user.id },
+    ],
+  });
+  return !!exists;
+}
+
+router.post("/workspace-presence", async (req, res) => {
+  try {
+    const caseId = String(req.body?.caseId || "").trim();
+    if (!caseId) return res.status(400).json({ message: "caseId is required" });
+    const allowed = await canTrackWorkspacePresence(req.user, caseId);
+    if (!allowed) return res.status(404).json({ message: "Case not found" });
+    markWorkspacePresence(req.user.id, caseId);
+    return res.json({ success: true, caseId });
+  } catch (err) {
+    console.error("Failed to set workspace presence:", err);
+    return res.status(500).json({ message: "Unable to update workspace presence" });
+  }
+});
+
+router.delete("/workspace-presence", async (req, res) => {
+  try {
+    const caseId = String(req.body?.caseId || "").trim();
+    if (!caseId) {
+      clearWorkspacePresence(req.user.id);
+      return res.json({ success: true });
+    }
+    clearWorkspacePresence(req.user.id, caseId);
+    return res.json({ success: true, caseId });
+  } catch (err) {
+    console.error("Failed to clear workspace presence:", err);
+    return res.status(500).json({ message: "Unable to update workspace presence" });
+  }
+});
 
 // SSE stream for live notifications
 router.get("/stream", (req, res) => {

@@ -2970,14 +2970,14 @@ deleteConfirmBtn.textContent="Deleting...";
 }
 try{
 await fetchCSRF?.();
-const res=await secureFetch(`/api/cases/${encodeURIComponent(deleteTarget.id)}`,{
+const res=await secureFetch(`/api/admin/cases/${encodeURIComponent(deleteTarget.id)}`,{
 method:"DELETE",
 headers:{Accept:"application/json"},
 body:{reason,message}
 });
 if(!res.ok){
 const payload=await res.json().catch(()=>({}));
-throw new Error(payload?.error||"Unable to delete post.");
+throw new Error(payload?.error||payload?.msg||"Unable to delete post.");
 }
 showToast("Post deleted and email sent.","info");
 closeDeleteModal();

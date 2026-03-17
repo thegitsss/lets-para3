@@ -7,6 +7,8 @@ const User = require("../models/User");
 const Case = require("../models/Case");
 const Message = require("../models/Message");
 const Notification = require("../models/Notification");
+const notificationsRouter = require("../routes/notifications");
+const { resetWorkspacePresence } = require("../utils/workspacePresence");
 
 jest.mock("../utils/email", () => jest.fn(async () => ({ ok: true })));
 const sendEmail = require("../utils/email");
@@ -19,6 +21,7 @@ const app = (() => {
   instance.use(cookieParser());
   instance.use(express.json({ limit: "1mb" }));
   instance.use("/api/messages", messagesRouter);
+  instance.use("/api/notifications", notificationsRouter);
   instance.use((err, _req, res, _next) => {
     console.error(err);
     res.status(500).json({ msg: "Server error", error: err?.message || "Unknown error" });
@@ -65,6 +68,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await clearDatabase();
   sendEmail.mockClear();
+  resetWorkspacePresence();
 });
 
 describe("Messaging + notifications", () => {
@@ -265,6 +269,48 @@ describe("Messaging + notifications", () => {
     const notif = await Notification.findOne({ userId: attorney._id, type: "message" }).lean();
     expect(notif).toBeTruthy();
 
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  test("Message notification is suppressed while the recipient is active in case detail", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "samanthasider+attorney5@gmail.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "samanthasider+paralegal5@gmail.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+
+    const caseDoc = await seedFundedCase({ attorney, paralegal });
+
+    const presenceRes = await request(app)
+      .post("/api/notifications/workspace-presence")
+      .set("Cookie", authCookieFor(attorney))
+      .send({ caseId: String(caseDoc._id) });
+
+    expect(presenceRes.status).toBe(200);
+
+    const res = await request(app)
+      .post(`/api/messages/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(paralegal))
+      .send({ text: "This should stay in the live workspace only." });
+
+    expect(res.status).toBe(201);
+
+    const notif = await Notification.findOne({ userId: attorney._id, type: "message" }).lean();
+    expect(notif).toBeFalsy();
     expect(sendEmail).not.toHaveBeenCalled();
   });
 });

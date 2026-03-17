@@ -2,7 +2,8 @@
 const router = require("express").Router();
 const crypto = require("crypto");
 const mongoose = require("mongoose");
-const { S3Client, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
+const multer = require("multer");
+const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole, requireCaseAccess } = require("../utils/authz");
@@ -75,6 +76,7 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
 const isObjId = (id) => mongoose.isValidObjectId(id);
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const FILE_STATUS = ["pending_review", "approved", "attorney_revision"];
+const PRE_ENGAGEMENT_MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MIN_CASE_AMOUNT_CENTS = 1; // Temporary: lowered for live Stripe funds-flow testing.
 const DISPUTE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const PRACTICE_AREAS = [
@@ -154,9 +156,56 @@ const PRACTICE_AREA_LOOKUP = PRACTICE_AREAS.reduce((acc, name) => {
   acc[name.toLowerCase()] = name;
   return acc;
 }, {});
+const preEngagementUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: PRE_ENGAGEMENT_MAX_FILE_BYTES },
+});
 
 function normalizeEmail(value) {
   return String(value || "").toLowerCase().trim();
+}
+
+function parseBooleanField(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on";
+}
+
+function normalizeUploadedFileName(value = "", fallback = "") {
+  const cleaned = String(value || "").replace(/[\u0000-\u001F\u007F]/g, "").trim();
+  if (cleaned) return cleaned.slice(0, 500);
+  return fallback || `pre-engagement-${Date.now()}`;
+}
+
+function safeStorageSegment(value = "") {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/gi, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function buildPreEngagementDocumentKey(caseId, filename) {
+  const safeName = safeStorageSegment(filename) || `document-${Date.now()}`;
+  return `cases/${String(caseId || "")}/pre-engagement/${Date.now()}-${crypto.randomBytes(6).toString("hex")}-${safeName}`;
+}
+
+function buildPreEngagementResponseDocumentKey(caseId, filename) {
+  const safeName = safeStorageSegment(filename) || `signed-document-${Date.now()}`;
+  return `cases/${String(caseId || "")}/pre-engagement/responses/${Date.now()}-${crypto.randomBytes(6).toString("hex")}-${safeName}`;
+}
+
+async function findPreEngagementApplicationId(caseId, paralegalId) {
+  if (!isObjId(caseId) || !isObjId(paralegalId)) return "";
+  const jobs = await Job.find({ caseId }).select("_id").lean();
+  const jobIds = jobs.map((job) => job?._id).filter(Boolean);
+  if (!jobIds.length) return "";
+  const application = await Application.findOne({
+    jobId: { $in: jobIds },
+    paralegalId,
+  })
+    .select("_id")
+    .lean();
+  return application?._id ? String(application._id) : "";
 }
 
 async function resolveFundingIdempotencyKey(caseDoc, amount, { mode, forceNew = false } = {}) {
@@ -1219,6 +1268,32 @@ function caseSummary(doc, { includeFiles = false, viewerRole = "" } = {}) {
   summary.moderationFlaggedAt = doc.moderationFlaggedAt || null;
   summary.moderationResolutionRequestedAt = doc.moderationResolutionRequestedAt || null;
   summary.canMarkFlagResolved = String(doc.moderationStatus || "none") === "flagged" && hasModerationRevision(doc);
+  if (doc.preEngagement) {
+    summary.preEngagement = {
+      status: doc.preEngagement.status || "requested",
+      requestedParalegalId: doc.preEngagement.requestedParalegalId
+        ? String(doc.preEngagement.requestedParalegalId)
+        : null,
+      confidentialityAgreementRequired: !!doc.preEngagement.confidentialityAgreementRequired,
+      conflictsCheckRequired: !!doc.preEngagement.conflictsCheckRequired,
+      conflictsDetails: doc.preEngagement.conflictsDetails || "",
+      confidentialityDocument: doc.preEngagement.confidentialityDocument || null,
+      paralegalConfidentialityDocument: doc.preEngagement.paralegalConfidentialityDocument || null,
+      requestedAt: doc.preEngagement.requestedAt || null,
+      requestedBy: doc.preEngagement.requestedBy ? String(doc.preEngagement.requestedBy) : null,
+      confidentialityAcknowledged: !!doc.preEngagement.confidentialityAcknowledged,
+      confidentialityAcknowledgedAt: doc.preEngagement.confidentialityAcknowledgedAt || null,
+      confidentialityAcknowledgedBy: doc.preEngagement.confidentialityAcknowledgedBy
+        ? String(doc.preEngagement.confidentialityAcknowledgedBy)
+        : null,
+      conflictsResponseType: doc.preEngagement.conflictsResponseType || "",
+      conflictsDisclosureText: doc.preEngagement.conflictsDisclosureText || "",
+      submittedAt: doc.preEngagement.submittedAt || null,
+      submittedBy: doc.preEngagement.submittedBy ? String(doc.preEngagement.submittedBy) : null,
+      reviewedAt: doc.preEngagement.reviewedAt || null,
+      reviewedBy: doc.preEngagement.reviewedBy ? String(doc.preEngagement.reviewedBy) : null,
+    };
+  }
   if (includeFiles && !isAdmin) {
     summary.files = Array.isArray(doc.files) ? doc.files.map(normalizeFile) : [];
   }
@@ -1868,12 +1943,12 @@ router.get(
       return false;
     },
     project:
-      "status paralegal paralegalId attorney applicants archived withdrawnParalegalId paralegalNameSnapshot pausedReason disputeDeadlineAt payoutFinalizedAt relistRequestedAt relistPending readOnly totalAmount lockedTotalAmount remainingAmount paymentReleased practiceArea jobId job",
+      "status paralegal paralegalId attorney applicants archived withdrawnParalegalId paralegalNameSnapshot pausedReason disputeDeadlineAt payoutFinalizedAt relistRequestedAt relistPending readOnly totalAmount lockedTotalAmount remainingAmount paymentReleased practiceArea jobId job preEngagement",
   }),
   asyncHandler(async (req, res) => {
     const doc = await Case.findById(req.params.caseId)
       .select(
-        "title status practiceArea paymentReleased totalAmount lockedTotalAmount remainingAmount readOnly paralegal paralegalId applicants jobId job relistRequestedAt relistPending payoutFinalizedAt disputeDeadlineAt"
+        "title status practiceArea paymentReleased totalAmount lockedTotalAmount remainingAmount readOnly paralegal paralegalId applicants jobId job relistRequestedAt relistPending payoutFinalizedAt disputeDeadlineAt preEngagement"
       )
       .populate("paralegal", "firstName lastName email role")
       .populate("applicants.paralegalId", "firstName lastName email role");
@@ -1912,6 +1987,30 @@ router.get(
             starred,
             paralegalId: entry.paralegalId ? String(entry.paralegalId._id || entry.paralegalId) : null,
             paralegal: summarizeUser(entry.paralegalId),
+            preEngagement:
+              doc.preEngagement &&
+              doc.preEngagement.requestedParalegalId &&
+              String(doc.preEngagement.requestedParalegalId) ===
+                String(entry.paralegalId?._id || entry.paralegalId || "") &&
+              ["submitted", "approved", "changes_requested"].includes(
+                String(doc.preEngagement.status || "").toLowerCase()
+              )
+                ? {
+                    status: doc.preEngagement.status || "submitted",
+                    confidentialityAgreementRequired: !!doc.preEngagement.confidentialityAgreementRequired,
+                    conflictsCheckRequired: !!doc.preEngagement.conflictsCheckRequired,
+                    conflictsDetails: doc.preEngagement.conflictsDetails || "",
+                    confidentialityDocument: doc.preEngagement.confidentialityDocument || null,
+                    paralegalConfidentialityDocument: doc.preEngagement.paralegalConfidentialityDocument || null,
+                    confidentialityAcknowledged: !!doc.preEngagement.confidentialityAcknowledged,
+                    confidentialityAcknowledgedAt: doc.preEngagement.confidentialityAcknowledgedAt || null,
+                    conflictsResponseType: doc.preEngagement.conflictsResponseType || "",
+                    conflictsDisclosureText: doc.preEngagement.conflictsDisclosureText || "",
+                    submittedAt: doc.preEngagement.submittedAt || null,
+                    reviewedAt: doc.preEngagement.reviewedAt || null,
+                    reviewedBy: doc.preEngagement.reviewedBy ? String(doc.preEngagement.reviewedBy) : null,
+                  }
+                : null,
           };
         })
       : [];
@@ -1943,6 +2042,30 @@ router.get(
               starred,
               paralegalId: paralegalId ? String(paralegalId) : null,
               paralegal: summarizeUser(paralegalDoc),
+              preEngagement:
+                doc.preEngagement &&
+                doc.preEngagement.requestedParalegalId &&
+                paralegalId &&
+                String(doc.preEngagement.requestedParalegalId) === String(paralegalId) &&
+                ["submitted", "approved", "changes_requested"].includes(
+                  String(doc.preEngagement.status || "").toLowerCase()
+                )
+                  ? {
+                      status: doc.preEngagement.status || "submitted",
+                      confidentialityAgreementRequired: !!doc.preEngagement.confidentialityAgreementRequired,
+                      conflictsCheckRequired: !!doc.preEngagement.conflictsCheckRequired,
+                      conflictsDetails: doc.preEngagement.conflictsDetails || "",
+                      confidentialityDocument: doc.preEngagement.confidentialityDocument || null,
+                      paralegalConfidentialityDocument: doc.preEngagement.paralegalConfidentialityDocument || null,
+                      confidentialityAcknowledged: !!doc.preEngagement.confidentialityAcknowledged,
+                      confidentialityAcknowledgedAt: doc.preEngagement.confidentialityAcknowledgedAt || null,
+                      conflictsResponseType: doc.preEngagement.conflictsResponseType || "",
+                      conflictsDisclosureText: doc.preEngagement.conflictsDisclosureText || "",
+                      submittedAt: doc.preEngagement.submittedAt || null,
+                      reviewedAt: doc.preEngagement.reviewedAt || null,
+                      reviewedBy: doc.preEngagement.reviewedBy ? String(doc.preEngagement.reviewedBy) : null,
+                    }
+                  : null,
             };
           })
           .filter((entry) => {
@@ -4577,6 +4700,378 @@ router.post(
 );
 
 /**
+ * POST /api/cases/:caseId/pre-engagement/:paralegalId/request
+ * Persists a pre-engagement draft for a case/paralegal pairing (attorney-only).
+ */
+router.post(
+  "/:caseId/pre-engagement/:paralegalId/request",
+  requireCaseAccess("caseId"),
+  csrfProtection,
+  preEngagementUpload.single("confidentialityFile"),
+  asyncHandler(async (req, res) => {
+    if (!req.acl?.isAttorney) {
+      return res.status(403).json({ error: "Only the case attorney can request pre-engagement items" });
+    }
+
+    const { caseId, paralegalId } = req.params;
+    if (!isObjId(caseId) || !isObjId(paralegalId)) {
+      return res.status(400).json({ error: "Invalid caseId or paralegalId" });
+    }
+
+    const selectedCase = await Case.findById(caseId);
+    if (!selectedCase) return res.status(404).json({ error: "Case not found" });
+    if (isFinalCaseDoc(selectedCase)) {
+      return res.status(400).json({ error: "Completed cases cannot be modified." });
+    }
+    if (selectedCase.paralegalId || selectedCase.paralegal) {
+      return res.status(400).json({ error: "A paralegal has already been hired" });
+    }
+    if (!hasScopeTasks(selectedCase)) {
+      return res.status(400).json({
+        error: "Add at least one task before requesting pre-engagement items for this case.",
+      });
+    }
+
+    const rawAttorney = selectedCase.attorney || selectedCase.attorneyId;
+    const attorneyOnCase =
+      rawAttorney && typeof rawAttorney === "object" && rawAttorney._id
+        ? String(rawAttorney._id)
+        : String(rawAttorney || "");
+    if (!attorneyOnCase || attorneyOnCase !== String(req.user.id)) {
+      return res.status(403).json({ error: "You are not the attorney for this case" });
+    }
+
+    const paralegal = await User.findById(paralegalId).select("firstName lastName email role");
+    if (!paralegal) return res.status(404).json({ error: "Paralegal not found" });
+    if (await isBlockedBetween(attorneyOnCase, paralegal._id)) {
+      return res.status(403).json({ error: BLOCKED_MESSAGE });
+    }
+
+    const confidentialityAgreementRequired = parseBooleanField(req.body?.confidentialityAgreementRequired);
+    const conflictsCheckRequired = parseBooleanField(req.body?.conflictsCheckRequired);
+    if (!confidentialityAgreementRequired && !conflictsCheckRequired) {
+      return res.status(400).json({ error: "Select at least one pre-engagement requirement." });
+    }
+
+    const conflictsDetails = conflictsCheckRequired
+      ? cleanMessage(req.body?.conflictsDetails || "").slice(0, 5000)
+      : "";
+    if (conflictsCheckRequired && !conflictsDetails.trim()) {
+      return res.status(400).json({ error: "Conflicts check details are required." });
+    }
+    if (confidentialityAgreementRequired && !req.file) {
+      return res.status(400).json({ error: "A confidentiality agreement file is required." });
+    }
+
+    let confidentialityDocument = null;
+    if (confidentialityAgreementRequired && req.file) {
+      if (!S3_BUCKET) {
+        return res.status(500).json({ error: "File uploads are unavailable right now." });
+      }
+      const originalName = normalizeUploadedFileName(
+        req.file.originalname,
+        `pre-engagement-${Date.now()}`
+      );
+      const key = buildPreEngagementDocumentKey(caseId, originalName);
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: S3_BUCKET,
+          Key: key,
+          Body: req.file.buffer,
+          ContentType: req.file.mimetype || "application/octet-stream",
+          ContentLength: req.file.size,
+        })
+      );
+      confidentialityDocument = {
+        key,
+        name: originalName,
+        mimeType: req.file.mimetype || "",
+        size: req.file.size || 0,
+        uploadedAt: new Date(),
+      };
+    }
+
+    const requestedAt = new Date();
+    selectedCase.preEngagement = {
+      status: "requested",
+      requestedParalegalId: paralegal._id,
+      confidentialityAgreementRequired,
+      conflictsCheckRequired,
+      conflictsDetails,
+      confidentialityDocument,
+      requestedAt,
+      requestedBy: req.user.id,
+    };
+    await selectedCase.save();
+
+    try {
+      const applicationId = await findPreEngagementApplicationId(caseId, paralegal._id);
+      await notifyUser(paralegal._id, "pre_engagement_requested", {
+        actorUserId: req.user.id,
+        caseId: String(selectedCase._id),
+        caseTitle: selectedCase.title || "this application",
+        applicationId: applicationId || undefined,
+        paralegalId: String(paralegal._id),
+        status: "requested",
+      });
+    } catch (err) {
+      console.warn("[cases] Failed to notify paralegal of pre-engagement request", err?.message || err);
+    }
+
+    return res.json({
+      success: true,
+      preEngagement: {
+        status: "requested",
+        requestedParalegalId: String(paralegal._id),
+        confidentialityAgreementRequired,
+        conflictsCheckRequired,
+        conflictsDetails,
+        confidentialityDocument,
+        requestedAt,
+        requestedBy: String(req.user.id),
+      },
+    });
+  })
+);
+
+router.post(
+  "/:caseId/pre-engagement/respond",
+  requireCaseAccess("caseId", {
+    allowApplicants: true,
+    alsoAllow: (req, caseDoc) => {
+      if (String(req.user?.role || "").toLowerCase() !== "paralegal") return false;
+      const requestedId = caseDoc?.preEngagement?.requestedParalegalId;
+      return !!requestedId && String(requestedId) === String(req.user.id || "");
+    },
+    project: "status archived applicants preEngagement",
+  }),
+  csrfProtection,
+  preEngagementUpload.single("paralegalConfidentialityFile"),
+  asyncHandler(async (req, res) => {
+    if (String(req.user?.role || "").toLowerCase() !== "paralegal") {
+      return res.status(403).json({ error: "Only the requested paralegal can respond to pre-engagement items." });
+    }
+
+    const { caseId } = req.params;
+    if (!isObjId(caseId)) {
+      return res.status(400).json({ error: "Invalid caseId" });
+    }
+
+    const caseDoc = await Case.findById(caseId);
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+    if (isFinalCaseDoc(caseDoc)) {
+      return res.status(400).json({ error: "Completed cases cannot be modified." });
+    }
+    const preEngagement = caseDoc.preEngagement || null;
+    if (!preEngagement || !preEngagement.requestedParalegalId) {
+      return res.status(400).json({ error: "No pre-engagement request is available for this case." });
+    }
+    if (String(preEngagement.requestedParalegalId) !== String(req.user.id || "")) {
+      return res.status(403).json({ error: "You are not the requested paralegal for this case." });
+    }
+
+    const confidentialityAcknowledged = parseBooleanField(req.body?.confidentialityAcknowledged);
+    const conflictsResponseType = String(req.body?.conflictsResponseType || "").trim().toLowerCase();
+    const conflictsDisclosureText = cleanMessage(req.body?.conflictsDisclosureText || "").slice(0, 5000);
+
+    if (preEngagement.confidentialityAgreementRequired && !confidentialityAcknowledged) {
+      return res.status(400).json({ error: "Review and acknowledge the confidentiality agreement to continue." });
+    }
+    if (preEngagement.conflictsCheckRequired) {
+      if (!["none_known", "disclosure"].includes(conflictsResponseType)) {
+        return res.status(400).json({ error: "Choose a conflicts check response." });
+      }
+      if (conflictsResponseType === "disclosure" && !conflictsDisclosureText.trim()) {
+        return res.status(400).json({ error: "Enter your conflicts disclosure details." });
+      }
+    }
+
+    let paralegalConfidentialityDocument = preEngagement.paralegalConfidentialityDocument || null;
+    if (preEngagement.confidentialityAgreementRequired && req.file) {
+      if (!S3_BUCKET) {
+        return res.status(500).json({ error: "File uploads are unavailable right now." });
+      }
+      const originalName = normalizeUploadedFileName(
+        req.file.originalname,
+        `signed-confidentiality-${Date.now()}`
+      );
+      const key = buildPreEngagementResponseDocumentKey(caseId, originalName);
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: S3_BUCKET,
+          Key: key,
+          Body: req.file.buffer,
+          ContentType: req.file.mimetype || "application/octet-stream",
+          ContentLength: req.file.size,
+        })
+      );
+      paralegalConfidentialityDocument = {
+        key,
+        name: originalName,
+        mimeType: req.file.mimetype || "",
+        size: req.file.size || 0,
+        uploadedAt: new Date(),
+      };
+    }
+
+    const submittedAt = new Date();
+    preEngagement.status = "submitted";
+    preEngagement.confidentialityAcknowledged = !!(
+      preEngagement.confidentialityAgreementRequired ? confidentialityAcknowledged : false
+    );
+    preEngagement.confidentialityAcknowledgedAt =
+      preEngagement.confidentialityAcknowledged ? submittedAt : null;
+    preEngagement.confidentialityAcknowledgedBy =
+      preEngagement.confidentialityAcknowledged ? req.user.id : null;
+    preEngagement.paralegalConfidentialityDocument = paralegalConfidentialityDocument;
+    preEngagement.conflictsResponseType = preEngagement.conflictsCheckRequired
+      ? conflictsResponseType
+      : "";
+    preEngagement.conflictsDisclosureText =
+      preEngagement.conflictsCheckRequired && conflictsResponseType === "disclosure"
+        ? conflictsDisclosureText
+        : "";
+    preEngagement.submittedAt = submittedAt;
+    preEngagement.submittedBy = req.user.id;
+    preEngagement.reviewedAt = null;
+    preEngagement.reviewedBy = null;
+    caseDoc.markModified("preEngagement");
+    await caseDoc.save();
+
+    try {
+      const rawAttorneyId = caseDoc.attorney || caseDoc.attorneyId || null;
+      const attorneyId =
+        rawAttorneyId && typeof rawAttorneyId === "object" && rawAttorneyId._id
+          ? String(rawAttorneyId._id)
+          : String(rawAttorneyId || "");
+      if (attorneyId) {
+        await notifyUser(attorneyId, "pre_engagement_submitted", {
+          actorUserId: req.user.id,
+          caseId: String(caseDoc._id),
+          caseTitle: caseDoc.title || "your case",
+          applicantId: String(preEngagement.requestedParalegalId),
+          paralegalId: String(preEngagement.requestedParalegalId),
+          status: "submitted",
+        });
+      }
+    } catch (err) {
+      console.warn("[cases] Failed to notify attorney of pre-engagement submission", err?.message || err);
+    }
+
+    return res.json({
+      success: true,
+      preEngagement: {
+        status: preEngagement.status,
+        requestedParalegalId: String(preEngagement.requestedParalegalId),
+        confidentialityAgreementRequired: !!preEngagement.confidentialityAgreementRequired,
+        conflictsCheckRequired: !!preEngagement.conflictsCheckRequired,
+        conflictsDetails: preEngagement.conflictsDetails || "",
+        confidentialityDocument: preEngagement.confidentialityDocument || null,
+        paralegalConfidentialityDocument: preEngagement.paralegalConfidentialityDocument || null,
+        requestedAt: preEngagement.requestedAt || null,
+        requestedBy: preEngagement.requestedBy ? String(preEngagement.requestedBy) : null,
+        confidentialityAcknowledged: !!preEngagement.confidentialityAcknowledged,
+        confidentialityAcknowledgedAt: preEngagement.confidentialityAcknowledgedAt || null,
+        confidentialityAcknowledgedBy: preEngagement.confidentialityAcknowledgedBy
+          ? String(preEngagement.confidentialityAcknowledgedBy)
+          : null,
+        conflictsResponseType: preEngagement.conflictsResponseType || "",
+        conflictsDisclosureText: preEngagement.conflictsDisclosureText || "",
+        submittedAt: preEngagement.submittedAt || null,
+        submittedBy: preEngagement.submittedBy ? String(preEngagement.submittedBy) : null,
+        reviewedAt: preEngagement.reviewedAt || null,
+        reviewedBy: preEngagement.reviewedBy ? String(preEngagement.reviewedBy) : null,
+      },
+    });
+  })
+);
+
+router.post(
+  "/:caseId/pre-engagement/review",
+  requireCaseAccess("caseId", {
+    project: "status archived attorney attorneyId preEngagement",
+  }),
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    if (String(req.user?.role || "").toLowerCase() !== "attorney") {
+      return res.status(403).json({ error: "Only the case attorney can review pre-engagement items." });
+    }
+
+    const { caseId } = req.params;
+    if (!isObjId(caseId)) {
+      return res.status(400).json({ error: "Invalid caseId" });
+    }
+
+    const caseDoc = await Case.findById(caseId);
+    if (!caseDoc) return res.status(404).json({ error: "Case not found" });
+    if (isFinalCaseDoc(caseDoc)) {
+      return res.status(400).json({ error: "Completed cases cannot be modified." });
+    }
+    const preEngagement = caseDoc.preEngagement || null;
+    if (!preEngagement || !preEngagement.requestedParalegalId) {
+      return res.status(400).json({ error: "No pre-engagement submission is available for review." });
+    }
+    if (String(preEngagement.status || "").toLowerCase() !== "submitted") {
+      return res.status(400).json({ error: "Pre-engagement is not ready for attorney review." });
+    }
+
+    const action = String(req.body?.action || "").trim().toLowerCase();
+    if (!["approve", "request_changes"].includes(action)) {
+      return res.status(400).json({ error: "Choose a valid review action." });
+    }
+
+    const reviewedAt = new Date();
+    preEngagement.status = action === "approve" ? "approved" : "changes_requested";
+    preEngagement.reviewedAt = reviewedAt;
+    preEngagement.reviewedBy = req.user.id;
+    caseDoc.markModified("preEngagement");
+    await caseDoc.save();
+
+    if (preEngagement.status === "changes_requested") {
+      try {
+        const applicationId = await findPreEngagementApplicationId(caseId, preEngagement.requestedParalegalId);
+        await notifyUser(preEngagement.requestedParalegalId, "pre_engagement_changes_requested", {
+          actorUserId: req.user.id,
+          caseId: String(caseDoc._id),
+          caseTitle: caseDoc.title || "this application",
+          applicationId: applicationId || undefined,
+          paralegalId: String(preEngagement.requestedParalegalId),
+          status: "changes_requested",
+        });
+      } catch (err) {
+        console.warn("[cases] Failed to notify paralegal of pre-engagement changes request", err?.message || err);
+      }
+    }
+
+    return res.json({
+      success: true,
+      preEngagement: {
+        status: preEngagement.status,
+        requestedParalegalId: String(preEngagement.requestedParalegalId),
+        confidentialityAgreementRequired: !!preEngagement.confidentialityAgreementRequired,
+        conflictsCheckRequired: !!preEngagement.conflictsCheckRequired,
+        conflictsDetails: preEngagement.conflictsDetails || "",
+        confidentialityDocument: preEngagement.confidentialityDocument || null,
+        paralegalConfidentialityDocument: preEngagement.paralegalConfidentialityDocument || null,
+        requestedAt: preEngagement.requestedAt || null,
+        requestedBy: preEngagement.requestedBy ? String(preEngagement.requestedBy) : null,
+        confidentialityAcknowledged: !!preEngagement.confidentialityAcknowledged,
+        confidentialityAcknowledgedAt: preEngagement.confidentialityAcknowledgedAt || null,
+        confidentialityAcknowledgedBy: preEngagement.confidentialityAcknowledgedBy
+          ? String(preEngagement.confidentialityAcknowledgedBy)
+          : null,
+        conflictsResponseType: preEngagement.conflictsResponseType || "",
+        conflictsDisclosureText: preEngagement.conflictsDisclosureText || "",
+        submittedAt: preEngagement.submittedAt || null,
+        submittedBy: preEngagement.submittedBy ? String(preEngagement.submittedBy) : null,
+        reviewedAt: preEngagement.reviewedAt || null,
+        reviewedBy: preEngagement.reviewedBy ? String(preEngagement.reviewedBy) : null,
+      },
+    });
+  })
+);
+
+/**
  * POST /api/cases/:caseId/hire/:paralegalId
  * Assigns a paralegal to an existing case (attorney-only).
  */
@@ -5722,12 +6217,12 @@ router.get(
       return false;
     },
     project:
-      "status paralegal attorney applicants archived withdrawnParalegalId paralegalNameSnapshot pausedReason disputeDeadlineAt payoutFinalizedAt relistRequestedAt",
+      "status paralegal attorney applicants archived withdrawnParalegalId paralegalNameSnapshot pausedReason disputeDeadlineAt payoutFinalizedAt relistRequestedAt preEngagement",
   }),
   asyncHandler(async (req, res) => {
     const doc = await Case.findById(req.params.caseId)
       .select(
-        "title status practiceArea details state locationState deadline zoomLink paymentReleased escrowIntentId escrowStatus totalAmount lockedTotalAmount remainingAmount currency files attorney paralegal applicants hiredAt completedAt briefSummary archived downloadUrl terminationReason terminationStatus terminationRequestedAt terminationRequestedBy terminationDisputeId terminatedAt paralegalAccessRevokedAt archiveReadyAt archiveDownloadedAt purgeScheduledFor readOnly jobId job tasks tasksLocked pausedReason pausedAt disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType withdrawnParalegalId paralegalNameSnapshot relistRequestedAt relistPending disputes disputeSettlement moderationStatus moderationFlaggedAt moderationFlaggedBy moderationResolutionRequestedAt moderationResolutionRequestedBy"
+        "title status practiceArea details state locationState deadline zoomLink paymentReleased escrowIntentId escrowStatus totalAmount lockedTotalAmount remainingAmount currency files attorney paralegal applicants hiredAt completedAt briefSummary archived downloadUrl terminationReason terminationStatus terminationRequestedAt terminationRequestedBy terminationDisputeId terminatedAt paralegalAccessRevokedAt archiveReadyAt archiveDownloadedAt purgeScheduledFor readOnly jobId job tasks tasksLocked pausedReason pausedAt disputeDeadlineAt partialPayoutAmount payoutFinalizedAt payoutFinalizedType withdrawnParalegalId paralegalNameSnapshot relistRequestedAt relistPending disputes disputeSettlement moderationStatus moderationFlaggedAt moderationFlaggedBy moderationResolutionRequestedAt moderationResolutionRequestedBy preEngagement"
       )
       .populate("paralegal", "firstName lastName email role")
       .populate("attorney", "firstName lastName email role")
@@ -5885,6 +6380,32 @@ router.get(
         disputeId: doc.terminationDisputeId || null,
         terminatedAt: doc.terminatedAt || null,
       },
+      preEngagement: doc.preEngagement
+        ? {
+            status: doc.preEngagement.status || "requested",
+            requestedParalegalId: doc.preEngagement.requestedParalegalId
+              ? String(doc.preEngagement.requestedParalegalId)
+              : null,
+            confidentialityAgreementRequired: !!doc.preEngagement.confidentialityAgreementRequired,
+            conflictsCheckRequired: !!doc.preEngagement.conflictsCheckRequired,
+            conflictsDetails: doc.preEngagement.conflictsDetails || "",
+            confidentialityDocument: doc.preEngagement.confidentialityDocument || null,
+            paralegalConfidentialityDocument: doc.preEngagement.paralegalConfidentialityDocument || null,
+            requestedAt: doc.preEngagement.requestedAt || null,
+            requestedBy: doc.preEngagement.requestedBy ? String(doc.preEngagement.requestedBy) : null,
+            confidentialityAcknowledged: !!doc.preEngagement.confidentialityAcknowledged,
+            confidentialityAcknowledgedAt: doc.preEngagement.confidentialityAcknowledgedAt || null,
+            confidentialityAcknowledgedBy: doc.preEngagement.confidentialityAcknowledgedBy
+              ? String(doc.preEngagement.confidentialityAcknowledgedBy)
+              : null,
+            conflictsResponseType: doc.preEngagement.conflictsResponseType || "",
+            conflictsDisclosureText: doc.preEngagement.conflictsDisclosureText || "",
+            submittedAt: doc.preEngagement.submittedAt || null,
+            submittedBy: doc.preEngagement.submittedBy ? String(doc.preEngagement.submittedBy) : null,
+            reviewedAt: doc.preEngagement.reviewedAt || null,
+            reviewedBy: doc.preEngagement.reviewedBy ? String(doc.preEngagement.reviewedBy) : null,
+          }
+        : null,
     });
   })
 );

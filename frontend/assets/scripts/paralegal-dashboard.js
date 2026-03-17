@@ -193,6 +193,8 @@ let pendingApprovalReady = false;
 let appliedAppsCache = [];
 let appliedFiltersBound = false;
 let activeApplication = null;
+let applicationPreEngagementDraft = null;
+let applicationPreEngagementExpandedKey = '';
 const APPLIED_PAGE_SIZE = 3;
 let appliedPage = 1;
 let appliedTotalPages = 1;
@@ -1581,6 +1583,311 @@ function formatMultiline(value) {
   return escapeHtml(value).replace(/\r?\n/g, '<br>');
 }
 
+function getApplicationPreEngagement(app) {
+  const pre = app?.preEngagement;
+  if (!pre || typeof pre !== 'object') return null;
+  const status = String(pre.status || '').trim().toLowerCase();
+  if (!['requested', 'submitted', 'changes_requested'].includes(status)) return null;
+  return {
+    status,
+    requestedParalegalId: String(pre.requestedParalegalId || ''),
+    confidentialityAgreementRequired: !!pre.confidentialityAgreementRequired,
+    conflictsCheckRequired: !!pre.conflictsCheckRequired,
+    conflictsDetails: String(pre.conflictsDetails || ''),
+    confidentialityDocument: pre.confidentialityDocument || null,
+    paralegalConfidentialityDocument: pre.paralegalConfidentialityDocument || null,
+    requestedAt: pre.requestedAt || null,
+    requestedBy: String(pre.requestedBy || ''),
+    requestedByName: String(pre.requestedByName || ''),
+    confidentialityAcknowledged: !!pre.confidentialityAcknowledged,
+    confidentialityAcknowledgedAt: pre.confidentialityAcknowledgedAt || null,
+    conflictsResponseType: String(pre.conflictsResponseType || '').trim().toLowerCase(),
+    conflictsDisclosureText: String(pre.conflictsDisclosureText || ''),
+    submittedAt: pre.submittedAt || null,
+    submittedBy: String(pre.submittedBy || ''),
+    reviewedAt: pre.reviewedAt || null,
+    reviewedBy: String(pre.reviewedBy || ''),
+  };
+}
+
+function getApplicationPreEngagementAttorneyName(app, pre) {
+  return (
+    String(pre?.requestedByName || '').trim() ||
+    String(app?.jobId?.attorneyId?.name || app?.job?.attorneyId?.name || '').trim() ||
+    [app?.jobId?.attorneyId?.firstName, app?.jobId?.attorneyId?.lastName].filter(Boolean).join(' ').trim() ||
+    [app?.job?.attorneyId?.firstName, app?.job?.attorneyId?.lastName].filter(Boolean).join(' ').trim()
+  );
+}
+
+function createApplicationPreEngagementDraft(app) {
+  const pre = getApplicationPreEngagement(app);
+  if (!pre || pre.status === 'submitted') return null;
+  return {
+    confidentialityAcknowledged: !!pre.confidentialityAcknowledged,
+    signedConfidentialityFile: null,
+    signedConfidentialityFileName: String(pre.paralegalConfidentialityDocument?.name || ''),
+    conflictsResponseType: pre.conflictsCheckRequired ? pre.conflictsResponseType || '' : '',
+    conflictsDisclosureText: pre.conflictsDisclosureText || '',
+  };
+}
+
+function isApplicationPreEngagementValid(pre, draft) {
+  if (!pre) return true;
+  if (pre.status === 'submitted') return true;
+  if (pre.confidentialityAgreementRequired && !draft?.confidentialityAcknowledged) return false;
+  if (pre.conflictsCheckRequired) {
+    if (!['none_known', 'disclosure'].includes(String(draft?.conflictsResponseType || ''))) return false;
+    if (
+      String(draft?.conflictsResponseType || '') === 'disclosure' &&
+      !String(draft?.conflictsDisclosureText || '').trim()
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function getApplicationPreEngagementCompletion(pre, draft = {}) {
+  const confidentialityComplete =
+    !pre?.confidentialityAgreementRequired ||
+    (pre.status === 'submitted'
+      ? !!pre.confidentialityAcknowledged
+      : !!draft?.confidentialityAcknowledged);
+  const conflictsResponseType =
+    pre?.status === 'submitted'
+      ? String(pre.conflictsResponseType || '')
+      : String(draft?.conflictsResponseType || '');
+  const conflictsDisclosureText =
+    pre?.status === 'submitted'
+      ? String(pre.conflictsDisclosureText || '')
+      : String(draft?.conflictsDisclosureText || '');
+  const conflictsComplete =
+    !pre?.conflictsCheckRequired ||
+    (['none_known', 'disclosure'].includes(conflictsResponseType) &&
+      (conflictsResponseType !== 'disclosure' || Boolean(conflictsDisclosureText.trim())));
+  return {
+    confidentiality: confidentialityComplete,
+    conflicts: conflictsComplete,
+  };
+}
+
+function getApplicationPreEngagementCards(pre, draft = {}) {
+  if (!pre) return [];
+  const completion = getApplicationPreEngagementCompletion(pre, draft);
+  const cards = [];
+  if (pre.confidentialityAgreementRequired) {
+    cards.push({
+      key: 'confidentiality',
+      title: 'Confidentiality Agreement',
+      stepLabel: 'Step 1',
+      complete: completion.confidentiality,
+    });
+  }
+  if (pre.conflictsCheckRequired) {
+    cards.push({
+      key: 'conflicts',
+      title: 'Conflicts Check',
+      stepLabel: pre.confidentialityAgreementRequired ? 'Step 2' : 'Step 1',
+      complete: completion.conflicts,
+    });
+  }
+  return cards;
+}
+
+function resolveDefaultPreEngagementExpandedKey(pre, draft = {}) {
+  const cards = getApplicationPreEngagementCards(pre, draft);
+  if (!cards.length) return '';
+  const firstIncomplete = cards.find((card) => !card.complete);
+  return firstIncomplete?.key || cards[0].key;
+}
+
+function resolveApplicationPreEngagementExpandedKey(pre, draft = {}) {
+  const cards = getApplicationPreEngagementCards(pre, draft);
+  if (!cards.length) return '';
+  if (cards.some((card) => card.key === applicationPreEngagementExpandedKey)) {
+    return applicationPreEngagementExpandedKey;
+  }
+  return resolveDefaultPreEngagementExpandedKey(pre, draft);
+}
+
+function buildApplicationPreEngagementSection(app) {
+  const pre = getApplicationPreEngagement(app);
+  if (!pre) return '';
+  const requestedAt = pre.requestedAt ? formatDate(pre.requestedAt) : 'Recently';
+  const requestedByName = getApplicationPreEngagementAttorneyName(app, pre);
+  const isSubmitted = pre.status === 'submitted';
+  const isChangesRequested = pre.status === 'changes_requested';
+  const draft = applicationPreEngagementDraft || createApplicationPreEngagementDraft(app) || {};
+  const submitDisabled = !isApplicationPreEngagementValid(pre, draft);
+  const showDisclosure = pre.conflictsCheckRequired && draft.conflictsResponseType === 'disclosure';
+  const doc = pre.confidentialityDocument || null;
+  const docName = escapeHtml(doc?.name || 'Confidentiality agreement');
+  const signedDoc = pre.paralegalConfidentialityDocument || null;
+  const signedDocName = escapeHtml(
+    draft.signedConfidentialityFileName || signedDoc?.name || 'No file selected'
+  );
+  const cards = getApplicationPreEngagementCards(pre, draft);
+  const expandedKey = resolveApplicationPreEngagementExpandedKey(pre, draft);
+
+  const confidentialityCard = pre.confidentialityAgreementRequired
+    ? `
+      <article class="application-preengagement-card ${
+        cards.find((card) => card.key === 'confidentiality')?.complete ? 'is-complete' : ''
+      } ${expandedKey === 'confidentiality' ? 'is-expanded' : ''}">
+        <button
+          type="button"
+          class="application-preengagement-card-toggle"
+          data-preengagement-card-toggle="confidentiality"
+          aria-expanded="${expandedKey === 'confidentiality' ? 'true' : 'false'}"
+        >
+          <div class="application-preengagement-card-main">
+            <div class="application-preengagement-card-copy">
+              <div class="application-preengagement-item-title">Confidentiality Agreement</div>
+            </div>
+          </div>
+          <div class="application-preengagement-card-status ${
+            cards.find((card) => card.key === 'confidentiality')?.complete ? 'is-complete' : ''
+          }">
+            <span class="application-preengagement-card-check" aria-hidden="true">${
+              cards.find((card) => card.key === 'confidentiality')?.complete ? '&#10003;' : ''
+            }</span>
+            <span>${
+              cards.find((card) => card.key === 'confidentiality')?.complete ? 'Complete' : 'Required'
+            }</span>
+          </div>
+        </button>
+        <div class="application-preengagement-card-body" ${expandedKey === 'confidentiality' ? '' : 'hidden'}>
+          ${isSubmitted ? `
+            <div class="application-preengagement-summary">
+              Acknowledged${pre.confidentialityAcknowledgedAt ? ` on ${escapeHtml(formatDate(pre.confidentialityAcknowledgedAt))}` : ''}.
+              ${signedDoc?.name ? `<div style="margin-top:8px;"><strong>Signed agreement uploaded:</strong> ${escapeHtml(signedDoc.name)}</div>` : ''}
+            </div>
+          ` : `
+            <div class="application-preengagement-doc">
+              <div class="application-preengagement-doc-copy">
+                <strong>${docName}</strong>
+              </div>
+              ${doc?.key && app?.caseId ? `
+                <button type="button" class="btn secondary application-preengagement-action-btn" data-preengagement-review-document>Review document</button>
+              ` : ''}
+            </div>
+            <label class="application-preengagement-check">
+              <input type="checkbox" data-preengagement-acknowledge ${draft.confidentialityAcknowledged ? 'checked' : ''} />
+              <span>I reviewed and acknowledge this confidentiality agreement.</span>
+            </label>
+            <div class="application-preengagement-optional">
+              <div class="application-preengagement-upload-label">Optional signed copy</div>
+              <div class="application-preengagement-doc application-preengagement-doc-upload">
+                <div class="application-preengagement-doc-copy">
+                  <strong>${signedDocName}</strong>
+                  <div class="application-preengagement-doc-sub">Only upload a signed version if the attorney needs a returned copy.</div>
+                </div>
+                <label class="btn secondary application-preengagement-action-btn application-preengagement-upload-trigger">
+                  <input type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" data-preengagement-signed-file hidden />
+                  Upload signed file
+                </label>
+              </div>
+            </div>
+          `}
+        </div>
+      </article>
+    `
+    : '';
+
+  const conflictsCard = pre.conflictsCheckRequired
+    ? `
+      <article class="application-preengagement-card ${
+        cards.find((card) => card.key === 'conflicts')?.complete ? 'is-complete' : ''
+      } ${expandedKey === 'conflicts' ? 'is-expanded' : ''}">
+        <button
+          type="button"
+          class="application-preengagement-card-toggle"
+          data-preengagement-card-toggle="conflicts"
+          aria-expanded="${expandedKey === 'conflicts' ? 'true' : 'false'}"
+        >
+          <div class="application-preengagement-card-main">
+            <div class="application-preengagement-card-copy">
+              <div class="application-preengagement-item-title">Conflicts Check</div>
+            </div>
+          </div>
+          <div class="application-preengagement-card-status ${
+            cards.find((card) => card.key === 'conflicts')?.complete ? 'is-complete' : ''
+          }">
+            <span class="application-preengagement-card-check" aria-hidden="true">${
+              cards.find((card) => card.key === 'conflicts')?.complete ? '&#10003;' : ''
+            }</span>
+            <span>${
+              cards.find((card) => card.key === 'conflicts')?.complete ? 'Complete' : 'Required'
+            }</span>
+          </div>
+        </button>
+        <div class="application-preengagement-card-body" ${expandedKey === 'conflicts' ? '' : 'hidden'}>
+          ${isSubmitted ? `
+            <div class="application-preengagement-summary">
+              <strong>Response:</strong>
+              ${pre.conflictsResponseType === 'disclosure' ? 'Disclosed a possible conflict' : 'No known conflict'}
+              ${pre.conflictsResponseType === 'disclosure' && pre.conflictsDisclosureText
+                ? `<div style="margin-top:8px;">${formatMultiline(pre.conflictsDisclosureText)}</div>`
+                : ''}
+            </div>
+          ` : `
+            <div class="application-preengagement-instructions">${formatMultiline(pre.conflictsDetails) || 'No conflicts details provided.'}</div>
+            <div class="application-preengagement-response">
+              <div class="application-preengagement-response-label">Your response</div>
+              <div class="application-preengagement-choices">
+                <label class="application-preengagement-choice">
+                  <input type="radio" name="preengagement-conflicts" value="none_known" data-preengagement-conflicts ${draft.conflictsResponseType === 'none_known' ? 'checked' : ''} />
+                  <span>No known conflict</span>
+                </label>
+                <label class="application-preengagement-choice">
+                  <input type="radio" name="preengagement-conflicts" value="disclosure" data-preengagement-conflicts ${draft.conflictsResponseType === 'disclosure' ? 'checked' : ''} />
+                  <span>Disclose a possible conflict</span>
+                </label>
+              </div>
+              <div ${showDisclosure ? '' : 'hidden'}>
+                <textarea
+                  rows="4"
+                  placeholder="Describe the possible conflict for the attorney to review."
+                  data-preengagement-disclosure
+                >${escapeHtml(draft.conflictsDisclosureText || '')}</textarea>
+                ${showDisclosure && !String(draft.conflictsDisclosureText || '').trim()
+                  ? '<div class="application-preengagement-help">Enter disclosure details to continue.</div>'
+                  : ''}
+              </div>
+            </div>
+          `}
+        </div>
+      </article>
+    `
+    : '';
+
+  return `
+    <section class="application-preengagement">
+      <h4>Pre-Engagement</h4>
+      <div class="application-preengagement-meta">
+        <span class="application-preengagement-status">${
+          isChangesRequested && pre.reviewedAt
+            ? `Changes requested ${escapeHtml(formatDate(pre.reviewedAt))}${requestedByName ? ` by ${escapeHtml(requestedByName)}` : ''}`
+            : `Requested ${escapeHtml(requestedAt)}${requestedByName ? ` by ${escapeHtml(requestedByName)}` : ''}`
+        }</span>
+      </div>
+      <div class="application-preengagement-card-list">
+        ${confidentialityCard}
+        ${conflictsCard}
+      </div>
+      ${isSubmitted ? `
+        <div class="application-preengagement-actions">
+          <span class="application-preengagement-status">Submitted${pre.submittedAt ? ` on ${escapeHtml(formatDate(pre.submittedAt))}` : ''}.</span>
+        </div>
+      ` : `
+        <div class="application-preengagement-actions">
+          <button type="button" class="btn primary application-preengagement-submit-btn" data-preengagement-submit ${submitDisabled ? 'disabled' : ''}>Submit to attorney</button>
+        </div>
+      `}
+    </section>
+  `;
+}
+
 function buildApplicationDetail(app) {
   if (!app) {
     return '<p class="muted">Application not found.</p>';
@@ -1628,7 +1935,180 @@ function buildApplicationDetail(app) {
       <strong>Cover message</strong>
       <p>${cover || 'No cover message available.'}</p>
     </div>
+    ${buildApplicationPreEngagementSection(app)}
   `;
+}
+
+function renderActiveApplicationModal() {
+  if (!applicationDetail) return;
+  applicationDetail.innerHTML = buildApplicationDetail(activeApplication);
+  bindApplicationPreEngagementActions();
+}
+
+function updateActiveApplicationInCache(updatedApp = {}) {
+  const activeId = String(updatedApp?._id || updatedApp?.id || '');
+  if (!activeId) return;
+  appliedAppsCache = appliedAppsCache.map((entry) => {
+    const entryId = String(entry?._id || entry?.id || '');
+    return entryId === activeId ? { ...entry, ...updatedApp } : entry;
+  });
+}
+
+async function reviewApplicationPreEngagementDocument(app) {
+  const pre = getApplicationPreEngagement(app);
+  const caseId = String(app?.caseId || '');
+  const key = String(pre?.confidentialityDocument?.key || '');
+  if (!caseId || !key) return;
+  const toastHelper = window.toastUtils;
+  try {
+    const params = new URLSearchParams({ caseId, key });
+    const res = await secureFetch(`/api/uploads/signed-get?${params.toString()}`, {
+      headers: { Accept: 'application/json' },
+      noRedirect: true,
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || !payload?.url) {
+      throw new Error(payload?.error || 'Unable to open this document.');
+    }
+    window.open(payload.url, '_blank', 'noopener');
+  } catch (error) {
+    toastHelper?.show?.(error.message || 'Unable to open this document.', {
+      targetId: selectors.toastBanner?.id,
+      type: 'error',
+    });
+  }
+}
+
+async function submitApplicationPreEngagement(app, button) {
+  const pre = getApplicationPreEngagement(app);
+  const caseId = String(app?.caseId || '');
+  if (!pre || pre.status === 'submitted' || !caseId) return;
+  const draft = applicationPreEngagementDraft || createApplicationPreEngagementDraft(app) || {};
+  if (!isApplicationPreEngagementValid(pre, draft)) {
+    renderActiveApplicationModal();
+    return;
+  }
+  const toastHelper = window.toastUtils;
+  const originalLabel = button?.textContent || 'Submit pre-engagement';
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Submitting...';
+  }
+  try {
+    const formData = new FormData();
+    formData.set('confidentialityAcknowledged', draft.confidentialityAcknowledged ? 'true' : 'false');
+    formData.set('conflictsResponseType', draft.conflictsResponseType || '');
+    formData.set('conflictsDisclosureText', draft.conflictsDisclosureText || '');
+    if (draft.signedConfidentialityFile) {
+      formData.set(
+        'paralegalConfidentialityFile',
+        draft.signedConfidentialityFile,
+        draft.signedConfidentialityFileName || draft.signedConfidentialityFile.name || 'signed-confidentiality'
+      );
+    }
+    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/pre-engagement/respond`, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      body: formData,
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload?.error || 'Unable to submit pre-engagement.');
+    const updatedApp = {
+      ...app,
+      preEngagement: payload?.preEngagement || pre,
+    };
+    activeApplication = updatedApp;
+    applicationPreEngagementDraft = createApplicationPreEngagementDraft(updatedApp);
+    updateActiveApplicationInCache(updatedApp);
+    renderActiveApplicationModal();
+    applyAppliedFilters({ resetPage: false });
+    toastHelper?.show?.(pre?.status === 'changes_requested' ? 'Pre-engagement resubmitted.' : 'Pre-engagement submitted.', {
+      targetId: selectors.toastBanner?.id,
+      type: 'success',
+    });
+  } catch (error) {
+    toastHelper?.show?.(error.message || 'Unable to submit pre-engagement.', {
+      targetId: selectors.toastBanner?.id,
+      type: 'error',
+    });
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
+  }
+}
+
+function bindApplicationPreEngagementActions() {
+  if (!applicationDetail || !activeApplication) return;
+  const pre = getApplicationPreEngagement(activeApplication);
+  if (!pre) return;
+
+  applicationDetail.querySelectorAll('[data-preengagement-card-toggle]').forEach((toggle) => {
+    toggle.addEventListener('click', () => {
+      const key = String(toggle.dataset.preengagementCardToggle || '');
+      if (!key) return;
+      applicationPreEngagementExpandedKey =
+        applicationPreEngagementExpandedKey === key ? '' : key;
+      renderActiveApplicationModal();
+    });
+  });
+
+  const reviewBtn = applicationDetail.querySelector('[data-preengagement-review-document]');
+  reviewBtn?.addEventListener('click', () => {
+    reviewApplicationPreEngagementDocument(activeApplication);
+  });
+
+  const acknowledge = applicationDetail.querySelector('[data-preengagement-acknowledge]');
+  acknowledge?.addEventListener('change', (event) => {
+    applicationPreEngagementDraft = {
+      ...(applicationPreEngagementDraft || createApplicationPreEngagementDraft(activeApplication) || {}),
+      confidentialityAcknowledged: !!event.target.checked,
+    };
+    renderActiveApplicationModal();
+  });
+
+  const signedFileInput = applicationDetail.querySelector('[data-preengagement-signed-file]');
+  signedFileInput?.addEventListener('change', (event) => {
+    const file = event.target?.files?.[0] || null;
+    applicationPreEngagementDraft = {
+      ...(applicationPreEngagementDraft || createApplicationPreEngagementDraft(activeApplication) || {}),
+      signedConfidentialityFile: file,
+      signedConfidentialityFileName: file?.name || '',
+    };
+    renderActiveApplicationModal();
+  });
+
+  applicationDetail.querySelectorAll('[data-preengagement-conflicts]').forEach((input) => {
+    input.addEventListener('change', (event) => {
+      const value = String(event.target.value || '');
+      applicationPreEngagementDraft = {
+        ...(applicationPreEngagementDraft || createApplicationPreEngagementDraft(activeApplication) || {}),
+        conflictsResponseType: value,
+        conflictsDisclosureText:
+          value === 'disclosure'
+            ? String(applicationPreEngagementDraft?.conflictsDisclosureText || '')
+            : '',
+      };
+      renderActiveApplicationModal();
+    });
+  });
+
+  const disclosure = applicationDetail.querySelector('[data-preengagement-disclosure]');
+  disclosure?.addEventListener('input', (event) => {
+    applicationPreEngagementDraft = {
+      ...(applicationPreEngagementDraft || createApplicationPreEngagementDraft(activeApplication) || {}),
+      conflictsDisclosureText: String(event.target.value || ''),
+    };
+    const submitButton = applicationDetail.querySelector('[data-preengagement-submit]');
+    if (submitButton) {
+      submitButton.disabled = !isApplicationPreEngagementValid(pre, applicationPreEngagementDraft);
+    }
+  });
+
+  const submitBtn = applicationDetail.querySelector('[data-preengagement-submit]');
+  submitBtn?.addEventListener('click', async () => {
+    await submitApplicationPreEngagement(activeApplication, submitBtn);
+  });
 }
 
 function findAppliedApplication(applicationId, jobId) {
@@ -1724,6 +2204,11 @@ function openApplicationModal(app) {
     return;
   }
   activeApplication = app || null;
+  applicationPreEngagementDraft = createApplicationPreEngagementDraft(app);
+  applicationPreEngagementExpandedKey = resolveDefaultPreEngagementExpandedKey(
+    getApplicationPreEngagement(app),
+    applicationPreEngagementDraft || {}
+  );
   const revokeBtn = applicationModal.querySelector('[data-application-revoke]');
   if (revokeBtn) {
     const statusKey = getApplicationStatusKey(app);
@@ -1734,7 +2219,7 @@ function openApplicationModal(app) {
     revokeBtn.disabled = disabled;
     revokeBtn.textContent = disabled ? 'Revoke unavailable' : 'Revoke application';
   }
-  applicationDetail.innerHTML = buildApplicationDetail(app);
+  renderActiveApplicationModal();
   applicationModal.classList.remove('hidden');
 }
 
@@ -1742,6 +2227,8 @@ function closeApplicationModal() {
   if (!applicationModal) return;
   applicationModal.classList.add('hidden');
   activeApplication = null;
+  applicationPreEngagementDraft = null;
+  applicationPreEngagementExpandedKey = '';
   clearApplicationQuery();
 }
 
@@ -2084,6 +2571,7 @@ function renderAppliedJobs(container, apps, total, { startIndex = 0, endIndex = 
       const when = app.createdAt
         ? new Date(app.createdAt).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })
         : 'Recently';
+      const pre = getApplicationPreEngagement(app);
       const applicationId = app._id || app.id || '';
       const jobId = job._id || job.id || app.jobId || '';
       const appIdValue = String(applicationId || '');
@@ -2106,7 +2594,7 @@ function renderAppliedJobs(container, apps, total, { startIndex = 0, endIndex = 
               <div class="case-subinfo">Applied on ${when}</div>
             </div>
             <div class="case-actions">
-              <a class="card-link" href="${href}" data-application-view data-application-id="${escapeHtml(applicationId)}" data-job-id="${escapeHtml(jobId)}">View →</a>
+              <a class="card-link" href="${href}" data-application-view data-application-id="${escapeHtml(applicationId)}" data-job-id="${escapeHtml(jobId)}">${escapeHtml(['requested', 'changes_requested'].includes(pre?.status) ? 'Complete pre-engagement →' : 'View →')}</a>
             </div>
           </div>
         </div>

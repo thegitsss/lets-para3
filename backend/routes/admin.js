@@ -7,6 +7,8 @@ const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const User = require("../models/User");
 const Case = require("../models/Case");
+const Job = require("../models/Job");
+const Application = require("../models/Application");
 const AuditLog = require("../models/AuditLog"); // NOTE: file name fix
 const Payout = require("../models/Payout");
 const PlatformIncome = require("../models/PlatformIncome");
@@ -97,6 +99,10 @@ return mongoose.isValidObjectId(id);
 
 function isEmail(value = "") {
 return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).toLowerCase());
+}
+
+function sanitizeAdminNote(value = "", max = 4000) {
+return String(value || "").trim().slice(0, max);
 }
 
 function isTypoEmailDomain(value = "") {
@@ -2292,6 +2298,83 @@ const populated = await Case.findById(id)
 .populate("attorney paralegal", "firstName lastName email role")
 .lean();
 res.json({ ok: true, msg: "Case updated", case: sanitizeCaseForAdmin(populated) });
+}));
+
+/**
+* DELETE /api/admin/cases/:id
+* Body: { reason, message }
+* Force-delete a case from the admin posts workflow regardless of normal case-state restrictions.
+*/
+router.delete("/cases/:id", csrfProtection, asyncHandler(async (req, res) => {
+const { id } = req.params;
+if (!isObjId(id)) return res.status(400).json({ msg: "Invalid case id" });
+
+const doc = await Case.findById(id).select(
+  "title attorney attorneyId jobId job"
+).lean();
+if (!doc) return res.status(404).json({ msg: "Case not found" });
+
+const reason = sanitizeAdminNote(req.body?.reason || "", 2000);
+const message = sanitizeAdminNote(req.body?.message || "", 4000);
+const attorneyRef = doc.attorneyId || doc.attorney || null;
+
+const relatedJobIds = [doc.jobId, doc.job].filter(Boolean).map((jobId) => String(jobId));
+try {
+  const extraJobs = await Job.find({ caseId: doc._id }).select("_id").lean();
+  extraJobs.forEach((job) => {
+    const jobId = job?._id ? String(job._id) : "";
+    if (jobId && !relatedJobIds.includes(jobId)) relatedJobIds.push(jobId);
+  });
+} catch (jobListErr) {
+  console.warn("[admin] Unable to load related jobs for force delete", doc._id, jobListErr);
+}
+
+await Case.deleteOne({ _id: doc._id });
+
+try {
+  if (relatedJobIds.length) {
+    await Job.deleteMany({ _id: { $in: relatedJobIds } });
+  } else {
+    await Job.deleteMany({ caseId: doc._id });
+  }
+} catch (jobErr) {
+  console.warn("[admin] Unable to clean up related jobs for deleted case", doc._id, jobErr);
+}
+
+try {
+  if (relatedJobIds.length) {
+    await Application.deleteMany({ jobId: { $in: relatedJobIds } });
+  }
+} catch (appErr) {
+  console.warn("[admin] Unable to clean up applications for deleted case", doc._id, appErr);
+}
+
+await AuditLog.logFromReq(req, "admin.case.force_delete", {
+targetType: "case",
+targetId: doc._id,
+caseId: doc._id,
+meta: { reason, message },
+});
+
+if (attorneyRef && (reason || message)) {
+  try {
+    await notifyUser(
+      attorneyRef,
+      "case_deleted",
+      {
+        caseTitle: doc.title || "Case",
+        reason: reason || "Admin review",
+        customNote: message || "",
+        message: `Your case posting "${doc.title || "Case"}" was removed by the platform.`,
+      },
+      { actorUserId: req.user?.id || req.user?._id || null }
+    );
+  } catch (err) {
+    console.warn("[admin] notifyUser case_deleted failed", err?.message || err);
+  }
+}
+
+res.json({ ok: true });
 }));
 
 /**

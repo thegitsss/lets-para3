@@ -2227,6 +2227,142 @@
       margin: 0;
     }
 
+    .case-overview-pre-engagement {
+      display: grid;
+      gap: 12px;
+    }
+
+    .pre-engagement-card {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid var(--app-border-soft);
+      background: var(--app-surface-contrast);
+    }
+
+    .pre-engagement-card p {
+      margin: 0;
+      color: var(--app-muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .pre-engagement-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pre-engagement-pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 0.32rem 0.7rem;
+      font-size: 0.76rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: rgba(182, 164, 122, 0.14);
+      color: var(--app-text);
+    }
+
+    .pre-engagement-block {
+      display: grid;
+      gap: 8px;
+    }
+
+    .pre-engagement-block label,
+    .pre-engagement-block legend {
+      font-size: 0.82rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--app-muted);
+    }
+
+    .pre-engagement-doc {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--app-border-soft);
+      background: var(--app-surface);
+    }
+
+    .pre-engagement-doc strong {
+      font-weight: 500;
+    }
+
+    .pre-engagement-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.92rem;
+      color: var(--app-text);
+    }
+
+    .pre-engagement-check input,
+    .pre-engagement-choice input {
+      margin-top: 0.2rem;
+    }
+
+    .pre-engagement-choices {
+      display: grid;
+      gap: 10px;
+      border: 0;
+      padding: 0;
+      margin: 0;
+    }
+
+    .pre-engagement-choice {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.92rem;
+      color: var(--app-text);
+    }
+
+    .pre-engagement-card textarea {
+      width: 100%;
+      min-height: 110px;
+      resize: vertical;
+      border-radius: 12px;
+      border: 1px solid var(--app-border-soft);
+      padding: 0.8rem 0.95rem;
+      background: var(--app-surface);
+      color: var(--app-text);
+      font: inherit;
+      line-height: 1.5;
+    }
+
+    .pre-engagement-card textarea.is-invalid {
+      border-color: rgba(185, 28, 28, 0.45);
+    }
+
+    .pre-engagement-field-help {
+      font-size: 0.82rem;
+      color: #991b1b;
+      margin: 0;
+    }
+
+    .pre-engagement-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .pre-engagement-summary {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(22, 163, 74, 0.22);
+      background: rgba(240, 253, 244, 0.88);
+      color: #166534;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
     .case-overview-tasks {
       position: relative;
     }
@@ -2955,6 +3091,12 @@
             <section class="case-overview-summary">
               <h3>Case summary</h3>
               <p id="caseSummary">-</p>
+            </section>
+
+            <section class="case-overview-pre-engagement" id="casePreEngagementSection" hidden>
+              <h3>Pre-engagement</h3>
+              <div id="casePreEngagementCard"></div>
+              <p class="case-overview-note" id="casePreEngagementStatus" role="status" aria-live="polite"></p>
             </section>
 
             <section class="case-overview-hire">

@@ -337,10 +337,66 @@ async function createApplicationForJob(jobId, user, coverLetter) {
 router.get("/my", ...authenticatedGuards, requireRole("paralegal"), async (req, res) => {
   try {
     const apps = await Application.find({ paralegalId: req.user._id })
-      .populate("jobId")
+      .populate({
+        path: "jobId",
+        populate: {
+          path: "attorneyId",
+          select: "firstName lastName name",
+        },
+      })
       .lean();
     const visible = apps.filter((app) => app?.jobId && typeof app.jobId === "object");
-    res.json(visible);
+    const caseIds = visible
+      .map((app) => app?.jobId?.caseId)
+      .filter((value) => mongoose.isValidObjectId(value));
+    const caseDocs = caseIds.length
+      ? await Case.find({ _id: { $in: caseIds } })
+          .select("_id preEngagement")
+          .lean()
+      : [];
+    const casesById = new Map(caseDocs.map((doc) => [String(doc._id), doc]));
+    const viewerId = String(req.user._id || "");
+    const payload = visible.map((app) => {
+      const job = app.jobId && typeof app.jobId === "object" ? app.jobId : null;
+      const caseId = job?.caseId ? String(job.caseId) : "";
+      const caseDoc = caseId ? casesById.get(caseId) : null;
+      const pre = caseDoc?.preEngagement || null;
+      const attorneyName =
+        job?.attorneyId?.name ||
+        [job?.attorneyId?.firstName, job?.attorneyId?.lastName].filter(Boolean).join(" ").trim() ||
+        "";
+      const matchesRequestedParalegal =
+        !!pre?.requestedParalegalId &&
+        String(pre.requestedParalegalId) === viewerId &&
+        ["requested", "submitted", "changes_requested"].includes(String(pre.status || "").toLowerCase());
+      return {
+        ...app,
+        caseId: caseId || null,
+        preEngagement: matchesRequestedParalegal
+          ? {
+              status: String(pre.status || "requested").toLowerCase(),
+              requestedParalegalId: String(pre.requestedParalegalId),
+              confidentialityAgreementRequired: !!pre.confidentialityAgreementRequired,
+              conflictsCheckRequired: !!pre.conflictsCheckRequired,
+              conflictsDetails: pre.conflictsDetails || "",
+              confidentialityDocument: pre.confidentialityDocument || null,
+              paralegalConfidentialityDocument: pre.paralegalConfidentialityDocument || null,
+              requestedAt: pre.requestedAt || null,
+              requestedBy: pre.requestedBy ? String(pre.requestedBy) : null,
+              requestedByName: attorneyName || null,
+              confidentialityAcknowledged: !!pre.confidentialityAcknowledged,
+              confidentialityAcknowledgedAt: pre.confidentialityAcknowledgedAt || null,
+              conflictsResponseType: pre.conflictsResponseType || "",
+              conflictsDisclosureText: pre.conflictsDisclosureText || "",
+              submittedAt: pre.submittedAt || null,
+              submittedBy: pre.submittedBy ? String(pre.submittedBy) : null,
+              reviewedAt: pre.reviewedAt || null,
+              reviewedBy: pre.reviewedBy ? String(pre.reviewedBy) : null,
+            }
+          : null,
+      };
+    });
+    res.json(payload);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

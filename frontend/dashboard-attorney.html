@@ -3102,6 +3102,64 @@
       text-align:center;
     }
 
+    .view-cases .applicant-preengagement-flag {
+      margin-top:0.35rem;
+      font-size:0.76rem;
+      letter-spacing:0.05em;
+      text-transform:uppercase;
+      color:var(--accent);
+    }
+
+    .view-cases .applicant-preengagement-box {
+      display:grid;
+      gap:0.85rem;
+      padding:0.9rem 1rem;
+      border:1px solid rgba(182,164,122,0.22);
+      border-radius:14px;
+      background:#fcfaf5;
+    }
+
+    .view-cases .applicant-preengagement-status {
+      font-size:0.82rem;
+      letter-spacing:0.05em;
+      text-transform:uppercase;
+      color:var(--accent);
+    }
+
+    .view-cases .applicant-preengagement-grid {
+      display:grid;
+      gap:0.75rem;
+    }
+
+    .view-cases .applicant-preengagement-item {
+      display:grid;
+      gap:0.18rem;
+    }
+
+    .view-cases .applicant-preengagement-item span {
+      font-size:0.72rem;
+      letter-spacing:0.08em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+
+    .view-cases .applicant-preengagement-item strong {
+      font-size:0.96rem;
+      font-weight:500;
+      color:var(--ink);
+    }
+
+    .view-cases .applicant-preengagement-sub {
+      font-size:0.84rem;
+      color:var(--muted);
+    }
+
+    .view-cases .applicant-preengagement-actions {
+      display:flex;
+      flex-wrap:wrap;
+      gap:0.6rem;
+    }
+
     @media (max-width: 1100px) {
       .view-cases .applicant-layout {
         grid-template-columns:1fr;
@@ -4721,7 +4779,7 @@
     <div class="logo">Dashboard</div>
     <nav>
       <a href="#home" class="active" data-view-target="home">Home</a>
-      <a href="#cases" data-view-target="cases">Cases &amp; Files</a>
+      <a href="#cases" data-view-target="cases">Cases</a>
       <a href="#billing" data-view-target="billing">Funds &amp; Payments</a>
       <a href="help.html">Help</a>
     </nav>
@@ -4901,8 +4959,8 @@
       <div class="cases-shell">
         <header class="cases-header">
           <div>
-            <h1>Active Cases</h1>
-            <p>Manage and monitor your open matters below.</p>
+            <h1>Cases</h1>
+            <p>Manage and monitor your matters below.</p>
           </div>
           <button type="button" class="cases-onboarding-skip" id="caseOnboardingSkipBtn" hidden>Skip onboarding</button>
         </header>

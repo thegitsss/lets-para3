@@ -29,6 +29,7 @@ const {
   buildCaseFileNameQuery,
 } = require("../utils/dataEncryption");
 const { applyPublicParalegalFilter } = require("../utils/paralegalProfile");
+const { isWorkspacePresenceActive } = require("../utils/workspacePresence");
 
 const execFileAsync = util.promisify(execFile);
 const ENABLE_DOC_PREVIEW_CONVERSION = process.env.ENABLE_DOC_PREVIEW_CONVERSION === "true";
@@ -295,6 +296,19 @@ async function ensureKeyAccess(req, key, explicitCaseId) {
         const { caseDoc, isAdmin } = await loadCaseForUser(req, caseId);
         if (!caseDoc) return false;
         if (!isAdmin && isCaseClosedForAccess(caseDoc)) return false;
+        const preDocKey = normalizeKeyPath(caseDoc?.preEngagement?.confidentialityDocument?.key || "");
+        const preResponseDocKey = normalizeKeyPath(
+          caseDoc?.preEngagement?.paralegalConfidentialityDocument?.key || ""
+        );
+        const requestedParalegalId = String(caseDoc?.preEngagement?.requestedParalegalId || "");
+        const viewerId = String(req.user?.id || req.user?._id || "");
+        const isRequestedPreEngagementDocument =
+          String(req.user?.role || "").toLowerCase() === "paralegal" &&
+          !!requestedParalegalId &&
+          requestedParalegalId === viewerId &&
+          ((!!preDocKey && preDocKey === cleaned) ||
+            (!!preResponseDocKey && preResponseDocKey === cleaned));
+        if (isRequestedPreEngagementDocument) return true;
         return true;
       } catch {
         return false;
@@ -1005,7 +1019,7 @@ router.post(
           : actorRole === "paralegal"
           ? caseDoc.attorney || caseDoc.attorneyId
           : null;
-      if (recipientId) {
+      if (recipientId && !isWorkspacePresenceActive(recipientId, caseDoc._id)) {
         const caseId = String(caseDoc._id);
         await notifyUser(
           recipientId,
@@ -1187,7 +1201,7 @@ async function loadCaseForUser(req, caseId) {
     throw error;
   }
   const doc = await Case.findById(caseId).select(
-    "_id attorney attorneyId paralegal paralegalId title escrowIntentId escrowStatus status paymentReleased readOnly paralegalAccessRevokedAt"
+    "_id attorney attorneyId paralegal paralegalId title escrowIntentId escrowStatus status paymentReleased readOnly paralegalAccessRevokedAt preEngagement.requestedParalegalId preEngagement.confidentialityDocument.key preEngagement.paralegalConfidentialityDocument.key"
   );
   if (!doc) {
     const error = new Error("Case not found");
@@ -1198,17 +1212,19 @@ async function loadCaseForUser(req, caseId) {
   const isAdmin = req.user?.role === "admin";
   const isAttorney = sameId(doc.attorney, userId) || sameId(doc.attorneyId, userId);
   const isParalegal = sameId(doc.paralegal, userId) || sameId(doc.paralegalId, userId);
+  const requestedParalegalId = doc?.preEngagement?.requestedParalegalId;
+  const isRequestedPreEngagementParalegal = sameId(requestedParalegalId, userId);
   if (!isAdmin && isParalegal && doc.paralegalAccessRevokedAt) {
     const error = new Error("Access revoked");
     error.statusCode = 403;
     throw error;
   }
-  if (!isAdmin && !isAttorney && !isParalegal) {
+  if (!isAdmin && !isAttorney && !isParalegal && !isRequestedPreEngagementParalegal) {
     const error = new Error("Forbidden");
     error.statusCode = 403;
     throw error;
   }
-  return { caseDoc: doc, isAdmin, isAttorney, isParalegal };
+  return { caseDoc: doc, isAdmin, isAttorney, isParalegal, isRequestedPreEngagementParalegal };
 }
 
 function serializeCaseFile(doc) {

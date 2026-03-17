@@ -1,10 +1,13 @@
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 const request = require("supertest");
 
 process.env.S3_BUCKET = process.env.S3_BUCKET || "test-bucket";
 process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_stub";
+
+jest.mock("../utils/email", () => jest.fn(async () => ({ ok: true })));
 
 const mockSend = jest.fn();
 const mockGetSignedUrl = jest.fn(async () => "https://signed-url.test/object");
@@ -47,7 +50,10 @@ const Case = require("../models/Case");
 const CaseFile = require("../models/CaseFile");
 const uploadsRouter = require("../routes/uploads");
 const casesRouter = require("../routes/cases");
+const notificationsRouter = require("../routes/notifications");
+const sendEmail = require("../utils/email");
 const { buildCaseFileKeyQuery } = require("../utils/dataEncryption");
+const { resetWorkspacePresence } = require("../utils/workspacePresence");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 const app = (() => {
@@ -56,6 +62,7 @@ const app = (() => {
   instance.use(express.json({ limit: "1mb" }));
   instance.use("/api/uploads", uploadsRouter);
   instance.use("/api/cases", casesRouter);
+  instance.use("/api/notifications", notificationsRouter);
   instance.use((err, _req, res, _next) => {
     console.error(err);
     res.status(500).json({ msg: "Server error", error: err?.message || "Unknown error" });
@@ -86,6 +93,8 @@ beforeEach(async () => {
   await clearDatabase();
   mockSend.mockReset();
   mockGetSignedUrl.mockClear();
+  sendEmail.mockClear();
+  resetWorkspacePresence();
   mockSend.mockImplementation((cmd) => {
     const key = cmd?.input?.Key || "";
     if (String(key).includes("missing")) {
@@ -244,6 +253,187 @@ describe("File uploads + downloads", () => {
       .set("Cookie", authCookieFor(paralegal));
     expect(res.status).toBe(404);
     expect(res.body.msg).toMatch(/File not found/i);
+  });
+
+  test("Requested pre-engagement paralegal can access confidentiality document signed-get", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "alex.stone-pre@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "priya.ng-pre@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const key = `cases/${new mongoose.Types.ObjectId()}/pre-engagement/confidentiality-agreement.pdf`;
+    const caseId = key.match(/cases\/([a-f0-9]{24})\//i)?.[1];
+    const caseDoc = await Case.create({
+      _id: caseId,
+      title: "Pre-engagement confidentiality review",
+      details: "Requested confidentiality review before hire.",
+      status: "open",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      totalAmount: 50000,
+      currency: "usd",
+      tasks: [{ title: "Prepare first draft", completed: false }],
+      preEngagement: {
+        status: "requested",
+        requestedParalegalId: paralegal._id,
+        confidentialityAgreementRequired: true,
+        conflictsCheckRequired: false,
+        confidentialityDocument: {
+          key,
+          name: "confidentiality-agreement.pdf",
+          mimeType: "application/pdf",
+          size: 1024,
+          uploadedAt: new Date(),
+        },
+        requestedAt: new Date(),
+        requestedBy: attorney._id,
+      },
+    });
+
+    const res = await request(app)
+      .get(`/api/uploads/signed-get?caseId=${caseDoc._id}&key=${encodeURIComponent(key)}`)
+      .set("Cookie", authCookieFor(paralegal));
+
+    expect(res.status).toBe(200);
+    expect(res.body.url).toBe("https://signed-url.test/object");
+  });
+
+  test("Requested paralegal can upload a signed confidentiality agreement with pre-engagement response", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "alex.stone-pre2@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "priya.ng-pre2@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Signed confidentiality upload",
+      details: "Requested signed agreement upload before hire.",
+      status: "open",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      totalAmount: 50000,
+      currency: "usd",
+      tasks: [{ title: "Prepare first draft", completed: false }],
+      applicants: [
+        {
+          paralegalId: paralegal._id,
+          status: "pending",
+          appliedAt: new Date(),
+          note: "Application submitted.",
+        },
+      ],
+      preEngagement: {
+        status: "requested",
+        requestedParalegalId: paralegal._id,
+        confidentialityAgreementRequired: true,
+        conflictsCheckRequired: false,
+        confidentialityDocument: {
+          key: `cases/${new mongoose.Types.ObjectId()}/pre-engagement/original-confidentiality.pdf`,
+          name: "original-confidentiality.pdf",
+          mimeType: "application/pdf",
+          size: 1024,
+          uploadedAt: new Date(),
+        },
+        requestedAt: new Date(),
+        requestedBy: attorney._id,
+      },
+    });
+
+    const res = await request(app)
+      .post(`/api/cases/${caseDoc._id}/pre-engagement/respond`)
+      .set("Cookie", authCookieFor(paralegal))
+      .field("confidentialityAcknowledged", "true")
+      .field("conflictsResponseType", "")
+      .field("conflictsDisclosureText", "")
+      .attach("paralegalConfidentialityFile", Buffer.from("signed agreement"), "signed-confidentiality.pdf");
+
+    expect(res.status).toBe(200);
+    expect(res.body.preEngagement?.status).toBe("submitted");
+    expect(res.body.preEngagement?.paralegalConfidentialityDocument).toBeTruthy();
+    expect(res.body.preEngagement?.paralegalConfidentialityDocument?.name).toBe("signed-confidentiality.pdf");
+
+    const updated = await Case.findById(caseDoc._id).lean();
+    expect(updated?.preEngagement?.paralegalConfidentialityDocument).toBeTruthy();
+    expect(updated?.preEngagement?.paralegalConfidentialityDocument?.name).toBe("signed-confidentiality.pdf");
+  });
+
+  test("Case file upload notification is suppressed while the recipient is active in case detail", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "alex.stone-upload@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "priya.ng-upload@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Workspace document upload",
+      details: "Recipient is already in the workspace.",
+      status: "in progress",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowIntentId: "pi_567",
+      escrowStatus: "funded",
+      totalAmount: 100000,
+      currency: "usd",
+    });
+
+    const presenceRes = await request(app)
+      .post("/api/notifications/workspace-presence")
+      .set("Cookie", authCookieFor(paralegal))
+      .send({ caseId: String(caseDoc._id) });
+
+    expect(presenceRes.status).toBe(200);
+
+    const res = await request(app)
+      .post(`/api/uploads/case/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(attorney))
+      .attach("file", Buffer.from("draft content"), "draft.pdf");
+
+    expect(res.status).toBe(201);
+
+    const notif = await require("../models/Notification")
+      .findOne({ userId: paralegal._id, type: "case_file_uploaded" })
+      .lean();
+    expect(notif).toBeFalsy();
+    expect(sendEmail).not.toHaveBeenCalled();
   });
 
   test("Unauthorized user cannot presign uploads", async () => {

@@ -157,6 +157,45 @@ const flagSchema = new Schema(
   { _id: false }
 );
 
+const preEngagementDocumentSchema = new Schema(
+  {
+    key: { type: String, trim: true, default: "" },
+    name: { type: String, trim: true, default: "" },
+    mimeType: { type: String, trim: true, default: "" },
+    size: { type: Number, default: 0, min: 0 },
+    uploadedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const preEngagementSchema = new Schema(
+  {
+    status: { type: String, enum: ["requested", "submitted", "approved", "changes_requested"], default: "requested" },
+    requestedParalegalId: { type: Types.ObjectId, ref: "User", default: null },
+    confidentialityAgreementRequired: { type: Boolean, default: false },
+    conflictsCheckRequired: { type: Boolean, default: false },
+    conflictsDetails: { type: String, trim: true, maxlength: 5000, default: "" },
+    confidentialityDocument: { type: preEngagementDocumentSchema, default: null },
+    paralegalConfidentialityDocument: { type: preEngagementDocumentSchema, default: null },
+    requestedAt: { type: Date, default: null },
+    requestedBy: { type: Types.ObjectId, ref: "User", default: null },
+    confidentialityAcknowledged: { type: Boolean, default: false },
+    confidentialityAcknowledgedAt: { type: Date, default: null },
+    confidentialityAcknowledgedBy: { type: Types.ObjectId, ref: "User", default: null },
+    conflictsResponseType: {
+      type: String,
+      enum: ["none_known", "disclosure", ""],
+      default: "",
+    },
+    conflictsDisclosureText: { type: String, trim: true, maxlength: 5000, default: "" },
+    submittedAt: { type: Date, default: null },
+    submittedBy: { type: Types.ObjectId, ref: "User", default: null },
+    reviewedAt: { type: Date, default: null },
+    reviewedBy: { type: Types.ObjectId, ref: "User", default: null },
+  },
+  { _id: false }
+);
+
 /** ----------------------------------------
  * Main Case Schema
  * -----------------------------------------*/
@@ -220,6 +259,7 @@ const caseSchema = new Schema(
     fundingRequestFingerprint: { type: String, default: "" },
     paralegalNameSnapshot: { type: String, trim: true, default: "" },
     attorneyNameSnapshot: { type: String, trim: true, default: "" },
+    preEngagement: { type: preEngagementSchema, default: null },
     terminationReason: { type: String, trim: true, maxlength: 2000, default: "" },
     terminationStatus: { type: String, enum: ["none", "auto_cancelled", "disputed", "resolved"], default: "none", index: true },
     terminationRequestedAt: { type: Date, default: null },
