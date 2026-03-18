@@ -29,6 +29,9 @@ function buildDisplayMessage(type, payload = {}) {
       return `${actorName || "An attorney"} invited you${caseFragment || " to a case"}`;
     case "case_invite_response": {
       const response = String(payload.response || "").toLowerCase();
+      if (response === "accepted") {
+        return `${actorName || "The paralegal"} accepted your invitation${caseFragment || ""}. Confirm hire and fund case to get started.`.trim();
+      }
       const verb = response === "declined" ? "declined" : "accepted";
       return `${actorName || "The paralegal"} ${verb} your invitation${caseFragment || ""}`.trim();
     }
@@ -189,7 +192,7 @@ function emailTemplate(type, payload) {
           payload.response === "accepted"
             ? `<p>${payload.paralegalName || "The invited paralegal"} accepted your invitation${
                 payload.caseTitle ? ` for <strong>${payload.caseTitle}</strong>.` : "."
-              }</p>`
+              }</p><p>Confirm hire and fund the case to get started.</p>`
             : payload.response === "filled"
             ? `<p>The position for <strong>${payload.caseTitle || "this case"}</strong> has been filled.</p>`
             : `<p>${payload.paralegalName || "The invited paralegal"} declined your invitation${

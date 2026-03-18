@@ -20,6 +20,7 @@ const PROFILE_PHOTO_REQUIRED_MESSAGE = "Complete your profile before applying.";
 const REAPPLY_BYPASS_EMAILS = new Set(["samanthasider+0@gmail.com"]);
 const ACTIVE_APPLICATION_FILTER = { status: { $nin: ["accepted", "rejected"] } };
 const authenticatedGuards = [auth, requireApproved];
+const INVITE_STATUSES = new Set(["pending", "accepted", "declined", "expired"]);
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const noop = (_req, _res, next) => next();
@@ -46,6 +47,20 @@ function sanitizeMessage(value, { min = 0, max = 2000 } = {}) {
   const stripped = value.replace(/<[^>]*>/g, "").replace(/[\u0000-\u001F\u007F]/g, "").trim();
   if (!stripped) return "";
   return stripped.slice(0, Math.max(1, max));
+}
+
+function normalizeInviteStatus(value) {
+  const key = String(value || "").toLowerCase();
+  return INVITE_STATUSES.has(key) ? key : "pending";
+}
+
+function normalizeInviteParalegalId(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    return String(value._id || value.id || value.userId || "");
+  }
+  return String(value);
 }
 
 async function ensureStripeOnboardedUser(userDoc) {
@@ -349,9 +364,23 @@ router.get("/my", ...authenticatedGuards, requireRole("paralegal"), async (req, 
     const caseIds = visible
       .map((app) => app?.jobId?.caseId)
       .filter((value) => mongoose.isValidObjectId(value));
-    const caseDocs = caseIds.length
-      ? await Case.find({ _id: { $in: caseIds } })
-          .select("_id preEngagement")
+    const invitedCases = await Case.find({
+      archived: { $ne: true },
+      applicants: { $elemMatch: { paralegalId: req.user._id } },
+    })
+      .select(
+        "_id title practiceArea details briefSummary totalAmount lockedTotalAmount currency status createdAt jobId attorney attorneyId paralegal paralegalId applicants preEngagement invites"
+      )
+      .populate("attorney", "firstName lastName name")
+      .populate("attorneyId", "firstName lastName name")
+      .lean();
+    const combinedCaseIds = [
+      ...caseIds,
+      ...invitedCases.map((doc) => doc?._id).filter((value) => mongoose.isValidObjectId(value)),
+    ];
+    const caseDocs = combinedCaseIds.length
+      ? await Case.find({ _id: { $in: combinedCaseIds } })
+          .select("_id preEngagement paymentReleased escrowStatus")
           .lean()
       : [];
     const casesById = new Map(caseDocs.map((doc) => [String(doc._id), doc]));
@@ -372,6 +401,8 @@ router.get("/my", ...authenticatedGuards, requireRole("paralegal"), async (req, 
       return {
         ...app,
         caseId: caseId || null,
+        casePaymentReleased: caseDoc?.paymentReleased === true,
+        caseEscrowStatus: caseDoc?.escrowStatus || null,
         preEngagement: matchesRequestedParalegal
           ? {
               status: String(pre.status || "requested").toLowerCase(),
@@ -396,7 +427,92 @@ router.get("/my", ...authenticatedGuards, requireRole("paralegal"), async (req, 
           : null,
       };
     });
-    res.json(payload);
+    const visibleCaseIdSet = new Set(
+      visible
+        .map((app) => {
+          const job = app?.jobId && typeof app.jobId === "object" ? app.jobId : null;
+          return String(job?.caseId || "");
+        })
+        .filter(Boolean)
+    );
+    const inviteEntries = invitedCases
+      .map((caseDoc) => {
+        const caseId = String(caseDoc?._id || "");
+        if (!caseId || visibleCaseIdSet.has(caseId)) return null;
+        if (caseDoc?.paralegal || caseDoc?.paralegalId) return null;
+        const applicantEntry = Array.isArray(caseDoc?.applicants)
+          ? caseDoc.applicants.find((entry) => String(entry?.paralegalId || "") === viewerId)
+          : null;
+        if (!applicantEntry) return null;
+        const relatedInvite = Array.isArray(caseDoc?.invites)
+          ? caseDoc.invites.find(
+              (invite) =>
+                normalizeInviteParalegalId(invite?.paralegalId) === viewerId &&
+                normalizeInviteStatus(invite?.status) === "accepted"
+            )
+          : null;
+        if (!relatedInvite) return null;
+        const pre = caseDocs.length ? casesById.get(caseId)?.preEngagement || caseDoc?.preEngagement || null : caseDoc?.preEngagement || null;
+        const attorneyName =
+          caseDoc?.attorney?.name ||
+          caseDoc?.attorneyId?.name ||
+          [caseDoc?.attorney?.firstName, caseDoc?.attorney?.lastName].filter(Boolean).join(" ").trim() ||
+          [caseDoc?.attorneyId?.firstName, caseDoc?.attorneyId?.lastName].filter(Boolean).join(" ").trim() ||
+          "";
+        const matchesRequestedParalegal =
+          !!pre?.requestedParalegalId &&
+          String(pre.requestedParalegalId) === viewerId &&
+          ["requested", "submitted", "changes_requested"].includes(String(pre.status || "").toLowerCase());
+        const amountCents = Number.isFinite(caseDoc?.lockedTotalAmount) ? caseDoc.lockedTotalAmount : caseDoc?.totalAmount;
+        const budget = typeof amountCents === "number" ? Math.round(amountCents / 100) : null;
+        return {
+          id: "",
+          _id: "",
+          status: String(applicantEntry?.status || "pending").toLowerCase(),
+          createdAt: applicantEntry?.appliedAt || relatedInvite?.respondedAt || relatedInvite?.invitedAt || caseDoc?.createdAt || null,
+          updatedAt: caseDoc?.updatedAt || null,
+          coverLetter: applicantEntry?.note || "Accepted invitation",
+          caseId,
+          casePaymentReleased: caseDoc?.paymentReleased === true,
+          caseEscrowStatus: caseDoc?.escrowStatus || null,
+          applicationSource: "invite_accept",
+          jobId: {
+            _id: caseDoc?.jobId ? String(caseDoc.jobId) : caseId,
+            id: caseDoc?.jobId ? String(caseDoc.jobId) : caseId,
+            caseId,
+            title: caseDoc?.title || "Case",
+            practiceArea: caseDoc?.practiceArea || "",
+            description: caseDoc?.details || caseDoc?.briefSummary || "",
+            budget,
+            status: String(caseDoc?.status || "open").toLowerCase(),
+            attorneyId: caseDoc?.attorneyId || caseDoc?.attorney || null,
+          },
+          preEngagement: matchesRequestedParalegal
+            ? {
+                status: String(pre.status || "requested").toLowerCase(),
+                requestedParalegalId: String(pre.requestedParalegalId),
+                confidentialityAgreementRequired: !!pre.confidentialityAgreementRequired,
+                conflictsCheckRequired: !!pre.conflictsCheckRequired,
+                conflictsDetails: pre.conflictsDetails || "",
+                confidentialityDocument: pre.confidentialityDocument || null,
+                paralegalConfidentialityDocument: pre.paralegalConfidentialityDocument || null,
+                requestedAt: pre.requestedAt || null,
+                requestedBy: pre.requestedBy ? String(pre.requestedBy) : null,
+                requestedByName: attorneyName || null,
+                confidentialityAcknowledged: !!pre.confidentialityAcknowledged,
+                confidentialityAcknowledgedAt: pre.confidentialityAcknowledgedAt || null,
+                conflictsResponseType: pre.conflictsResponseType || "",
+                conflictsDisclosureText: pre.conflictsDisclosureText || "",
+                submittedAt: pre.submittedAt || null,
+                submittedBy: pre.submittedBy ? String(pre.submittedBy) : null,
+                reviewedAt: pre.reviewedAt || null,
+                reviewedBy: pre.reviewedBy ? String(pre.reviewedBy) : null,
+              }
+            : null,
+        };
+      })
+      .filter(Boolean);
+    res.json([...payload, ...inviteEntries]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -420,12 +536,28 @@ router.post(
       if (!application) {
         return res.status(404).json({ error: "Application not found." });
       }
-      if (String(application.status || "").toLowerCase() === "accepted") {
-        return res.status(400).json({ error: "Accepted applications cannot be revoked." });
+      let caseDoc = null;
+      if (application.jobId && mongoose.isValidObjectId(application.jobId)) {
+        const job = await Job.findById(application.jobId).select("caseId");
+        if (job?.caseId && mongoose.isValidObjectId(job.caseId)) {
+          caseDoc = await Case.findById(job.caseId).select("paymentReleased escrowStatus applicants");
+        }
+      }
+      const funded =
+        caseDoc?.paymentReleased === true ||
+        String(caseDoc?.escrowStatus || "").toLowerCase() === "funded";
+      if (String(application.status || "").toLowerCase() === "accepted" && funded) {
+        return res.status(400).json({ error: "Accepted applications cannot be revoked after funding." });
       }
 
       const jobId = application.jobId;
       await application.deleteOne();
+      if (caseDoc && Array.isArray(caseDoc.applicants)) {
+        await Case.updateOne(
+          { _id: caseDoc._id },
+          { $pull: { applicants: { paralegalId: req.user._id } } }
+        );
+      }
       if (jobId) {
         await syncApplicantsCount(jobId);
       }

@@ -235,6 +235,7 @@
       position: relative;
       z-index: 201;
       pointer-events: auto;
+      overflow: visible;
     }
 
     .back-row {
@@ -407,6 +408,8 @@
     }
     .profile-menu {
       position: relative;
+      z-index: 10010;
+      isolation: isolate;
     }
     .profile-dropdown {
       position: absolute;
@@ -422,11 +425,13 @@
       flex-direction: column;
       gap: 0.25rem;
       z-index: 6000;
+      pointer-events: auto;
     }
     .profile-dropdown.show {
       display: flex;
     }
-    .profile-dropdown button {
+    .profile-dropdown button,
+    .profile-dropdown a {
       border: none;
       background: transparent;
       text-align: left;
@@ -436,24 +441,31 @@
       cursor: pointer;
       color: var(--ink);
       transition: background 0.2s ease;
+      text-decoration: none;
+      display: block;
     }
-    .profile-dropdown button:hover {
+    .profile-dropdown button:hover,
+    .profile-dropdown a:hover {
       background: rgba(182, 164, 122, 0.14);
     }
 
     body.viewer-attorney .profile-dropdown {
+      position: fixed;
+      top: 116px;
+      right: 24px;
       background: var(--panel, #fff);
       border: 1px solid var(--line, rgba(0, 0, 0, 0.08));
       border-radius: 16px;
       box-shadow: 0 18px 30px rgba(0, 0, 0, 0.12);
       min-width: 200px;
-      z-index: 9999;
+      z-index: 20000;
       pointer-events: auto;
-      overflow: visible;
+      overflow: hidden;
       color: var(--ink, #1a1a1a);
     }
 
-    body.viewer-attorney .profile-dropdown button {
+    body.viewer-attorney .profile-dropdown button,
+    body.viewer-attorney .profile-dropdown a {
       background: none;
       border: none;
       padding: 0.85rem 1.1rem;
@@ -469,7 +481,8 @@
       width: calc(100% - 12px);
     }
 
-    body.viewer-attorney .profile-dropdown button:hover {
+    body.viewer-attorney .profile-dropdown button:hover,
+    body.viewer-attorney .profile-dropdown a:hover {
       background: rgba(0, 0, 0, 0.04);
     }
 
@@ -1686,6 +1699,13 @@
         overflow-wrap: anywhere;
         word-break: break-word;
       }
+
+      body.viewer-attorney .profile-dropdown {
+        top: 96px;
+        right: 16px;
+        left: auto;
+        min-width: min(240px, calc(100vw - 32px));
+      }
     }
   </style>
 </head>
@@ -1758,8 +1778,8 @@
             </div>
           </a>
           <div class="profile-dropdown" id="profileDropdown">
-            <button type="button" data-settings>Account Settings</button>
-            <button type="button" class="logout-btn" data-logout>Log out</button>
+            <a href="/profile-settings.html" data-settings>Account Settings</a>
+            <a href="/login.html" class="logout-btn" data-logout>Log out</a>
           </div>
         </div>
       </div>
@@ -1800,9 +1820,11 @@
           </div>
         </article>
 
-        <article class="profile-section" id="practiceSection">
-          <div class="card-header-label" style="text-align:center;">Practice Areas</div>
-          <div id="practiceList" class="chip-cloud"></div>
+        <article class="profile-section" id="skillsCard">
+          <div class="chip-section" id="skillsSection">
+            <span class="card-header-label" style="text-align:center; width:100%;">Skills</span>
+            <div id="skillsList" class="chip-cloud"></div>
+          </div>
         </article>
 
         <article class="profile-section hidden" id="stateExperienceRow">
@@ -1860,11 +1882,9 @@
             <div class="card-header-label" style="text-align:center;">Best For</div>
             <ul id="bestForList" class="best-for-list"></ul>
           </article>
-          <article class="profile-section" id="skillsCard">
-            <div class="chip-section" id="skillsSection">
-              <span class="card-header-label" style="text-align:center; width:100%;">Skills</span>
-              <div id="skillsList" class="chip-cloud"></div>
-            </div>
+          <article class="profile-section" id="practiceSection">
+            <div class="card-header-label" style="text-align:center;">Practice Areas</div>
+            <div id="practiceList" class="chip-cloud"></div>
           </article>
         </div>
 
@@ -1912,7 +1932,6 @@
     window.__SKIP_NOTIFICATIONS__ = true;
   </script>
   <script type="module" src="assets/scripts/utils/notifications.js"></script>
-  <script src="assets/scripts/paralegal-cluster.js"></script>
   <script type="module" src="assets/scripts/profile-paralegal.js"></script>
   <script>
     (function bindNotificationToggle() {

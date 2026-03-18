@@ -72,6 +72,33 @@ function setAttorneyOnboardingModalSeen(step = "profile") {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  const closeSettingsHelpTooltips = (exceptTooltip = null) => {
+    document.querySelectorAll(".settings-help-tooltip[open]").forEach((tooltip) => {
+      if (exceptTooltip && tooltip === exceptTooltip) return;
+      tooltip.removeAttribute("open");
+    });
+  };
+
+  document.addEventListener("click", (event) => {
+    const tooltip = event.target instanceof Element
+      ? event.target.closest(".settings-help-tooltip")
+      : null;
+    if (tooltip) return;
+    closeSettingsHelpTooltips();
+  });
+
+  document.querySelectorAll(".settings-help-tooltip summary").forEach((summary) => {
+    summary.addEventListener("click", () => {
+      const tooltip = summary.closest(".settings-help-tooltip");
+      if (!tooltip) return;
+      window.requestAnimationFrame(() => {
+        if (tooltip.hasAttribute("open")) {
+          closeSettingsHelpTooltips(tooltip);
+        }
+      });
+    });
+  });
+
   let suppressProfileToast = false;
   let showOnboardingModal = false;
   let requestedOnboardingStep = "";

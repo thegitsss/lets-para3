@@ -315,6 +315,121 @@ describe("Case flow notifications", () => {
     expect(String(notif?.payload?.paralegalId || "")).toBe(String(paralegal._id));
   });
 
+  test("Accepted invitation notifies the attorney but does not create a self-notification for the paralegal", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "alex.invite.accept@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "priya.invite.accept@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+      stripeAccountId: "acct_123",
+      stripeOnboarded: true,
+      stripePayoutsEnabled: true,
+    });
+
+    const caseDoc = await Case.create({
+      title: "Invitation acceptance flow",
+      practiceArea: "contracts",
+      details: "Invitation acceptance should notify only the attorney.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      status: "open",
+      totalAmount: 70000,
+      currency: "usd",
+      pendingParalegalId: paralegal._id,
+      pendingParalegalInvitedAt: new Date(),
+      invites: [{ paralegalId: paralegal._id, status: "pending", invitedAt: new Date() }],
+      tasks: [{ title: "Review contract", completed: false }],
+    });
+
+    const res = await request(app)
+      .post(`/api/cases/${caseDoc._id}/invite/accept`)
+      .set("Cookie", authCookieFor(paralegal))
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body?.success).toBe(true);
+
+    const attorneyNotif = await Notification.findOne({
+      userId: attorney._id,
+      type: "case_invite_response",
+      "payload.response": "accepted",
+    }).lean();
+    expect(attorneyNotif).toBeTruthy();
+    expect(String(attorneyNotif?.payload?.paralegalId || "")).toBe(String(paralegal._id));
+
+    const paralegalNotif = await Notification.findOne({
+      userId: paralegal._id,
+      type: "case_invite_response",
+      "payload.response": "accepted",
+    }).lean();
+    expect(paralegalNotif).toBeFalsy();
+  });
+
+  test("Revoking an accepted invitation creates a paralegal self-notification", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "alex.invite.revoke.notify@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "priya.invite.revoke.notify@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+
+    const caseDoc = await Case.create({
+      title: "Revoked invitation flow",
+      practiceArea: "contracts",
+      details: "Revoking an accepted invitation should notify the paralegal.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      status: "open",
+      totalAmount: 70000,
+      currency: "usd",
+      invites: [{ paralegalId: paralegal._id, status: "accepted", invitedAt: new Date(), respondedAt: new Date() }],
+      applicants: [{ paralegalId: paralegal._id, status: "pending", appliedAt: new Date() }],
+      tasks: [{ title: "Review contract", completed: false }],
+    });
+
+    const res = await request(app)
+      .post(`/api/cases/${caseDoc._id}/invite/revoke`)
+      .set("Cookie", authCookieFor(paralegal))
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body?.success).toBe(true);
+
+    const paralegalNotif = await Notification.findOne({
+      userId: paralegal._id,
+      type: "case_invite_response",
+      "payload.caseId": caseDoc._id,
+      "payload.message": `You revoked your application for ${caseDoc.title}.`,
+    }).lean();
+    expect(paralegalNotif).toBeTruthy();
+  });
+
   test("Attorney can approve a submitted pre-engagement response", async () => {
     const attorney = await User.create({
       firstName: "Alex",
@@ -603,6 +718,133 @@ describe("Case flow notifications", () => {
     expect(res.body[0]?.preEngagement?.status).toBe("requested");
     expect(res.body[0]?.preEngagement?.conflictsCheckRequired).toBe(true);
     expect(res.body[0]?.preEngagement?.conflictsDetails).toContain("ACME Corp");
+  });
+
+  test("Accepted invited paralegal sees requested pre-engagement in applications list", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "game4funwithme1@gmail.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "samanthasider+paralegal@gmail.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+      profileImage: "https://example.com/paralegal-photo.jpg",
+    });
+
+    const caseDoc = await Case.create({
+      title: "Invited case pre-engagement support",
+      practiceArea: "business law",
+      details: "Case details for invited pre-engagement list test.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      status: "open",
+      totalAmount: 80000,
+      currency: "usd",
+      applicants: [{ paralegalId: paralegal._id, status: "pending", appliedAt: new Date() }],
+      invites: [{ paralegalId: paralegal._id, status: "accepted", invitedAt: new Date(), respondedAt: new Date() }],
+      tasks: [{ title: "Prepare intake summary", completed: false }],
+      preEngagement: {
+        status: "requested",
+        requestedParalegalId: paralegal._id,
+        confidentialityAgreementRequired: true,
+        conflictsCheckRequired: true,
+        conflictsDetails: "Check ACME Corp and all related subsidiaries.",
+        requestedAt: new Date(),
+        requestedBy: attorney._id,
+      },
+    });
+
+    const res = await request(app)
+      .get("/api/applications/my")
+      .set("Cookie", authCookieFor(paralegal));
+
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    const match = res.body.find((entry) => String(entry?.caseId || "") === String(caseDoc._id));
+    expect(match).toBeTruthy();
+    expect(match?.coverLetter).toBe("Accepted invitation");
+    expect(match?.preEngagement).toBeTruthy();
+    expect(match?.preEngagement?.status).toBe("requested");
+    expect(match?.preEngagement?.confidentialityAgreementRequired).toBe(true);
+    expect(match?.preEngagement?.conflictsCheckRequired).toBe(true);
+  });
+
+  test("Accepted application can be revoked before the case is funded", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "game4funwithme1@gmail.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "samanthasider+paralegal@gmail.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+      profileImage: "https://example.com/paralegal-photo.jpg",
+    });
+
+    const caseDoc = await Case.create({
+      title: "Accepted application revoke",
+      practiceArea: "business law",
+      details: "Accepted application should still be revocable before funding.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      status: "open",
+      totalAmount: 80000,
+      currency: "usd",
+      applicants: [{ paralegalId: paralegal._id, status: "accepted", appliedAt: new Date() }],
+      tasks: [{ title: "Prepare intake summary", completed: false }],
+    });
+
+    const job = await Job.create({
+      title: "Accepted application revoke",
+      description: "Help organize intake details.",
+      practiceArea: "business law",
+      attorneyId: attorney._id,
+      caseId: caseDoc._id,
+      status: "open",
+      budget: 80000,
+    });
+
+    const application = await Application.create({
+      jobId: job._id,
+      paralegalId: paralegal._id,
+      coverLetter: "I can help with this intake.",
+      status: "accepted",
+    });
+
+    const res = await request(app)
+      .post(`/api/applications/${application._id}/revoke`)
+      .set("Cookie", authCookieFor(paralegal))
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body?.success).toBe(true);
+
+    const deleted = await Application.findById(application._id).lean();
+    expect(deleted).toBeFalsy();
+    const updatedCase = await Case.findById(caseDoc._id).lean();
+    expect(Array.isArray(updatedCase?.applicants)).toBe(true);
+    expect(updatedCase.applicants.some((entry) => String(entry?.paralegalId || "") === String(paralegal._id))).toBe(false);
   });
 
   test("Paralegal applications list includes matching changes-requested pre-engagement data", async () => {

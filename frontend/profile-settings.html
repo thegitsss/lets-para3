@@ -996,11 +996,12 @@
     }
 
     body.paralegal-flat #securitySection {
-      max-width: var(--paralegal-max-width);
-      margin: 0 auto 28px;
-      height: 100%;
-      overflow-y: auto;
-      padding-right: 8px;
+      max-width: none;
+      width: 100%;
+      margin: 0 0 28px;
+      height: auto;
+      overflow: visible;
+      padding-right: 0;
       padding-bottom: 12px;
     }
 
@@ -1082,6 +1083,106 @@
       color: var(--muted);
       font-size: 0.92rem;
       line-height: 1.55;
+    }
+
+    .settings-title-with-help {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .settings-help-tooltip {
+      position: relative;
+      display: inline-flex;
+    }
+
+    .settings-help-tooltip summary {
+      list-style: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.6);
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-serif);
+      font-size: 0.95rem;
+      font-weight: 300;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .settings-help-tooltip summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .settings-help-tooltip-panel {
+      position: absolute;
+      top: calc(100% + 10px);
+      left: 0;
+      right: auto;
+      transform: none;
+      width: min(340px, calc(100vw - 48px));
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.55;
+      box-shadow: 0 18px 36px rgba(10, 15, 25, 0.12);
+      z-index: 20;
+    }
+
+    .settings-help-tooltip-panel::after {
+      content: "";
+      position: absolute;
+      left: 10px;
+      top: -7px;
+      width: 12px;
+      height: 12px;
+      transform: rotate(45deg);
+      background: var(--panel);
+      border-left: 1px solid var(--line);
+      border-top: 1px solid var(--line);
+    }
+
+    .settings-help-tooltip:not([open]) .settings-help-tooltip-panel {
+      display: none;
+    }
+
+    body.paralegal-flat #securitySection.settings-section.active {
+      overflow: visible;
+      height: auto;
+    }
+
+    html.theme-dark .settings-help-tooltip summary,
+    body.theme-dark .settings-help-tooltip summary,
+    html.theme-mountain-dark .settings-help-tooltip summary,
+    body.theme-mountain-dark .settings-help-tooltip summary {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.12);
+      color: var(--muted);
+    }
+
+    html.theme-dark .settings-help-tooltip-panel,
+    body.theme-dark .settings-help-tooltip-panel,
+    html.theme-mountain-dark .settings-help-tooltip-panel,
+    body.theme-mountain-dark .settings-help-tooltip-panel {
+      background: #151b29;
+      border-color: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 22px 40px rgba(4, 6, 12, 0.5);
+    }
+
+    html.theme-dark .settings-help-tooltip-panel::after,
+    body.theme-dark .settings-help-tooltip-panel::after,
+    html.theme-mountain-dark .settings-help-tooltip-panel::after,
+    body.theme-mountain-dark .settings-help-tooltip-panel::after {
+      background: #151b29;
+      border-left-color: rgba(255, 255, 255, 0.12);
+      border-top-color: rgba(255, 255, 255, 0.12);
     }
 
     .blocked-user-row {
@@ -3548,14 +3649,14 @@ input[type="number"],
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 42px;
-      padding: 10px 20px;
+      min-height: 36px;
+      padding: 8px 16px;
       border-radius: 999px;
       border: none;
       background: var(--danger);
       color: #fff;
-      font-size: 0.76rem;
-      letter-spacing: 0.18em;
+      font-size: 0.68rem;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
       font-weight: 300;
       line-height: 1;
@@ -4756,8 +4857,15 @@ input[type="number"],
       <div class="security-grid">
         <div class="security-column">
           <div class="settings-block" data-paralegal-only>
-            <h3>Payouts Setup</h3>
-            <p>Connect your Stripe account to receive payouts.</p>
+            <div class="settings-title-with-help">
+              <h3>Payouts Setup</h3>
+              <details class="settings-help-tooltip">
+                <summary aria-label="Payout timing information">i</summary>
+                <div class="settings-help-tooltip-panel" role="note">
+                  Please note: first-time payouts through Stripe may take approximately 7-14 days to reach your bank account. Subsequent payouts are typically faster.
+                </div>
+              </details>
+            </div>
             <p class="muted"><strong>Stripe onboarding is required before you can receive payouts on Let’s-ParaConnect.</strong></p>
             <button id="connectStripeBtn" class="btn btn-primary">Connect Stripe Account →</button>
             <p id="stripeStatus" class="muted"></p>
@@ -4809,8 +4917,15 @@ input[type="number"],
           </div>
 
           <div class="settings-block security-card">
-            <h3>Blocked Users</h3>
-            <p class="blocked-users-copy">Manage active blocks here. Removing a block only restores future interaction. It does not reopen old matters, messages, or prior workflows. This user will not be notified.</p>
+            <div class="settings-title-with-help">
+              <h3>Blocked Users</h3>
+              <details class="settings-help-tooltip">
+                <summary aria-label="Blocked users help">?</summary>
+                <div class="settings-help-tooltip-panel" role="note">
+                  Manage active blocks here. Removing a block only restores future interaction. It does not reopen old matters, messages, or prior workflows. This user will not be notified.
+                </div>
+              </details>
+            </div>
             <div id="blockedUsersList">Loading…</div>
           </div>
         </div>
@@ -4875,11 +4990,18 @@ input[type="number"],
 
       <div class="security-extras">
         <div class="settings-block">
-          <h3>Deactivate My Account</h3>
+          <div class="settings-title-with-help">
+            <h3>Deactivate My Account</h3>
+            <details class="settings-help-tooltip">
+              <summary aria-label="Deactivate account help">?</summary>
+              <div class="settings-help-tooltip-panel" role="note">
+                Deactivate your account and remove it from active platform participation. Historical case, dispute, payment, audit, and financial records will be preserved. This is not full erasure. Accounts cannot be deactivated while you are involved in an active matter or while payout, dispute, or other financial obligations remain unresolved.
+              </div>
+            </details>
+          </div>
           <div class="deactivate-actions">
             <button class="btn danger-btn" type="button" data-deactivate-account>Deactivate</button>
           </div>
-          <p class="muted">Deactivate your account and remove it from active platform participation. Historical case, dispute, payment, audit, and financial records will be preserved. This is not full erasure. Accounts cannot be deactivated while you are involved in an active matter or while payout, dispute, or other financial obligations remain unresolved.</p>
         </div>
       </div>
     </section>

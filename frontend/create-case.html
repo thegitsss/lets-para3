@@ -789,7 +789,8 @@ body.theme-dark .select-field select{
       border:1px solid rgba(26,34,48,0.25);
       color:rgba(26,34,48,0.7);
       font-size:0.75rem;
-      font-weight:600;
+      font-family:var(--font-serif);
+      font-weight:400;
       position:relative;
       cursor:default;
       transition:border-color 0.2s ease,color 0.2s ease,transform 0.2s ease;
@@ -807,6 +808,7 @@ body.theme-dark .select-field select{
       background:#ffffff;
       color:#1a2230;
       font-size:0.78rem;
+      font-weight:300;
       line-height:1.4;
       font-family:var(--font-sans);
       box-shadow:0 16px 32px rgba(15,23,42,0.18);
@@ -1466,12 +1468,11 @@ body.theme-dark .select-field select{
 </div>
 
   <div class="field">
-  <label for="comp">Compensation</label>
+  <label for="comp">Compensation<span class="fee-info" tabindex="0" data-tooltip="You may edit the amount until a paralegal applies or you send the first invitation. After that, the amount is locked.">?</span></label>
   <div class="comp-wrapper">
     <span class="dollar-sign">$</span>
-    <input id="comp" type="number" min="0" placeholder="Enter compensation" />
+    <input id="comp" type="text" inputmode="numeric" placeholder="3,500+" />
   </div>
-  <p class="muted lock-note" id="compLockNotice">You may edit the amount until a paralegal applies or you send the first invitation. After that, the amount is locked.</p>
 </div>
 
       <div class="field select-field">
@@ -1525,7 +1526,7 @@ body.theme-dark .select-field select{
             <div class="char-count" id="descriptionCharCount">0 / 4000</div>
           </div>
           <div class="field" id="caseTasksField">
-            <label for="caseTaskInput">Tasks</label>
+            <label for="caseTaskInput">Required Tasks</label>
             <div class="task-input-row">
               <input id="caseTaskInput" type="text" placeholder="e.g., Draft initial motion" />
               <button type="button" class="btn secondary" id="addCaseTaskBtn">Add</button>
@@ -2196,10 +2197,32 @@ body.theme-dark .select-field select{
       },
       {
         field: fields.comp,
-        check: (value) => Number(value) > 0,
+        check: (value) => parseCompAmount(value) > 0,
         message: "Enter a valid compensation amount greater than $0.",
       },
     ];
+
+    function normalizeCompInputValue(value) {
+      return String(value || "").replace(/[^0-9.]/g, "");
+    }
+
+    function formatCompInputValue(value) {
+      const normalized = normalizeCompInputValue(value);
+      if (!normalized) return "";
+      const [wholeRaw, decimalRaw = ""] = normalized.split(".");
+      const whole = wholeRaw.replace(/^0+(?=\d)/, "") || "0";
+      const withCommas = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      return decimalRaw ? `${withCommas}.${decimalRaw.slice(0, 2)}` : withCommas;
+    }
+
+    function getCompFieldRawValue() {
+      return normalizeCompInputValue(fields.comp?.value || "");
+    }
+
+    function setCompFieldValue(value) {
+      if (!fields.comp) return;
+      fields.comp.value = formatCompInputValue(value);
+    }
 
     const stepForms = document.querySelectorAll(".step-panel form");
     stepForms.forEach((form) => {
@@ -2432,13 +2455,17 @@ body.theme-dark .select-field select{
       const storageKeyCamel = `case${key.charAt(0).toUpperCase() + key.slice(1)}`;
       const storedValue = isEditing ? "" : getStoredValue(storageKeyCamel, `case_${key}`);
       if (storedValue && field.value !== storedValue) {
-        field.value = storedValue;
+        if (key === "comp") {
+          setCompFieldValue(storedValue);
+        } else {
+          field.value = storedValue;
+        }
       }
       if (key === "title") {
         updateTitlePreview(field.value || storedValue || "");
       }
       field.addEventListener(eventName, () => {
-        const value = field.value || "";
+        const value = key === "comp" ? getCompFieldRawValue() : field.value || "";
         setDraftField(storageKeyCamel, value);
         queueDraftSave();
         if (key === "title") {
@@ -2446,6 +2473,16 @@ body.theme-dark .select-field select{
         }
       });
     });
+
+    if (fields.comp) {
+      fields.comp.addEventListener("input", () => {
+        const raw = getCompFieldRawValue();
+        const formatted = formatCompInputValue(raw);
+        if (fields.comp.value !== formatted) {
+          fields.comp.value = formatted;
+        }
+      });
+    }
 
     if (descriptionInput) {
       const storedDescription = isEditing
@@ -2507,7 +2544,7 @@ body.theme-dark .select-field select{
           if (fields.title) fields.title.value = draftCache.title;
           if (fields.specialty) setSelectValue(fields.specialty, draftCache.practiceArea);
           if (fields.state) setSelectValue(fields.state, draftCache.state);
-          if (fields.comp) fields.comp.value = draftCache.compAmount;
+          if (fields.comp) setCompFieldValue(draftCache.compAmount);
           if (fields.experience) fields.experience.value = draftCache.experience;
           if (fields.deadline) fields.deadline.value = draftCache.deadline;
           if (descriptionInput) {
@@ -2549,8 +2586,8 @@ body.theme-dark .select-field select{
       setDraftField("caseTitle", fields.title?.value?.trim() || "");
       setDraftField("caseSpecialty", fields.specialty?.value || "");
       setDraftField("caseState", fields.state?.value || "");
-      setDraftField("caseComp", fields.comp?.value || "");
-      setDraftField("caseCompAmount", fields.comp?.value || "");
+      setDraftField("caseComp", getCompFieldRawValue());
+      setDraftField("caseCompAmount", getCompFieldRawValue());
       setDraftField("caseExperience", fields.experience?.value || "");
       setDraftField("caseDeadline", fields.deadline?.value || "");
       setDraftField("caseDescription", descriptionInput?.value || "");
@@ -2597,7 +2634,7 @@ body.theme-dark .select-field select{
 
     function formatComp(amount) {
       if (!amount) return "—";
-      const numeric = Number(amount);
+      const numeric = Number(normalizeCompInputValue(amount));
       if (!Number.isFinite(numeric)) return `$${amount}`;
       return numeric.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
     }
@@ -2614,7 +2651,7 @@ body.theme-dark .select-field select{
     }
 
     function parseCompAmount(value) {
-      const numeric = Number(value);
+      const numeric = Number(normalizeCompInputValue(value));
       if (!Number.isFinite(numeric) || numeric <= 0) return null;
       return numeric;
     }
@@ -2639,7 +2676,7 @@ body.theme-dark .select-field select{
       const title = (fields.title?.value || "").trim() || getStoredValue("caseTitle", "case_title");
       const field = fields.specialty?.value || getStoredValue("caseSpecialty", "case_specialty");
       const state = fields.state?.value || getStoredValue("caseState", "case_state");
-      const compRaw = fields.comp?.value || getStoredValue("caseCompAmount", "case_comp_amount");
+      const compRaw = getCompFieldRawValue() || getStoredValue("caseCompAmount", "case_comp_amount");
       const experience = fields.experience?.value || getStoredValue("caseExperience", "case_experience");
       const deadline = fields.deadline?.value || getStoredValue("caseDeadline", "case_deadline");
       let description = (descriptionInput?.value || "").trim() || getStoredValue("caseDescription", "case_description").trim();
@@ -2751,7 +2788,7 @@ body.theme-dark .select-field select{
             <hr>
             <p>${displayDescription}</p>
             <div style="margin-top:16px;">
-              <div class="description-label" style="margin-bottom:6px;">TASKS</div>
+              <div class="description-label" style="margin-bottom:6px;font-family:var(--font-serif);">Required Tasks</div>
               <div class="review-task-list">${tasksMarkup}</div>
             </div>
             ${extraTasks > 0 ? `<p class="auto-note">+${extraTasks} more tasks will be included when you post.</p>` : ""}
@@ -2772,7 +2809,7 @@ body.theme-dark .select-field select{
       const visibleTasks = tasks.slice(0, MAX_REVIEW_TASKS);
       const extraTasks = tasks.length - visibleTasks.length;
       const tasksMarkup = visibleTasks.length
-        ? `<div class="description-label" style="margin-bottom:6px;">TASKS</div>
+        ? `<div class="description-label" style="margin-bottom:6px;font-family:var(--font-serif);">Required Tasks</div>
            <ul class="task-list">${visibleTasks
              .map((task) => `<li>${escapeHTML(task.title)}</li>`)
              .join("")}</ul>${extraTasks > 0 ? `<p class="auto-note">+${extraTasks} more tasks will be included when you post.</p>` : ""}`
@@ -2908,6 +2945,19 @@ body.theme-dark .select-field select{
         throw new Error(message || "Unable to save draft.");
       }
       return data?.draft || null;
+    }
+
+    function syncDraftIdInUrl(draftId) {
+      if (isEditing) return;
+      try {
+        const url = new URL(window.location.href);
+        if (draftId) {
+          url.searchParams.set("draftId", draftId);
+        } else {
+          url.searchParams.delete("draftId");
+        }
+        window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      } catch {}
     }
 
     async function deleteDraftRemote(draftId) {
@@ -3137,6 +3187,7 @@ body.theme-dark .select-field select{
         const saved = await saveDraftRemote(payload);
         if (saved?.id) {
           currentDraftId = saved.id;
+          syncDraftIdInUrl(currentDraftId);
           draftLoaded = true;
         }
         lastDraftSaveSnapshot = snapshot;
@@ -3178,6 +3229,7 @@ body.theme-dark .select-field select{
         console.warn("Unable to delete draft", err);
       } finally {
         currentDraftId = "";
+        syncDraftIdInUrl("");
       }
     }
 
@@ -3387,7 +3439,7 @@ body.theme-dark .select-field select{
         ? caseData.lockedTotalAmount
         : Number(caseData.totalAmount) || 0;
       if (fields.comp) {
-        fields.comp.value = amountCents ? Math.round(amountCents / 100) : "";
+        setCompFieldValue(amountCents ? Math.round(amountCents / 100) : "");
       }
       const hasParalegal = !!(caseData.paralegal || caseData.paralegalId);
       const hasPendingInvites = Array.isArray(caseData.invites)

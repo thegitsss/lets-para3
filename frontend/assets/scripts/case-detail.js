@@ -23,10 +23,8 @@ const caseEscrowStatus = document.getElementById("caseEscrowStatus");
 const caseHireDate = document.getElementById("caseHireDate");
 const caseMatterType = document.getElementById("caseMatterType");
 const caseDeadlineList = document.getElementById("caseDeadlineList");
+const caseOverviewDeadlines = document.querySelector(".case-overview-deadlines");
 const caseSummary = document.getElementById("caseSummary");
-const casePreEngagementSection = document.getElementById("casePreEngagementSection");
-const casePreEngagementCard = document.getElementById("casePreEngagementCard");
-const casePreEngagementStatus = document.getElementById("casePreEngagementStatus");
 const caseTaskList = document.getElementById("caseTaskList");
 const caseOverviewTasks = document.querySelector(".case-overview-tasks");
 const caseSharedDocuments = document.getElementById("caseSharedDocuments");
@@ -112,7 +110,6 @@ const state = {
   partialPayoutSubmitting: false,
   relisting: false,
   blockingFutureInteraction: false,
-  preEngagementDraft: null,
   workspacePresenceCaseId: "",
   workspacePresenceTimer: null,
 };
@@ -2492,7 +2489,7 @@ function isWorkspaceEligibleCase(caseData) {
 function shouldAllowCaseDetail(caseData) {
   if (!caseData) return false;
   const status = normalizeCaseStatus(caseData?.status);
-  return status === "paused" || status === "disputed" || hasViewerPreEngagement(caseData);
+  return status === "paused" || status === "disputed";
 }
 
 const CASE_SELECT_EXCLUDE_STATUSES = new Set([
@@ -2512,12 +2509,6 @@ function isSelectableCase(caseData) {
 }
 
 function workspaceLockCopy(caseState, caseData) {
-  if (hasViewerPreEngagement(caseData)) {
-    const status = normalizePreEngagement(caseData)?.status || "requested";
-    return status === "submitted"
-      ? "Your pre-engagement response has been submitted. Workspace access will open once the attorney completes the next steps."
-      : "Complete the requested pre-engagement items to continue on this matter.";
-  }
   if (caseState === CASE_STATES.DRAFT) {
     return "Draft cases stay in the planning view.";
   }
@@ -2544,57 +2535,6 @@ function workspaceLockCopy(caseState, caseData) {
     return "Case is paused. Workspace is currently locked.";
   }
   return "Workspace unlocks once the case is funded and in progress.";
-}
-
-function normalizePreEngagement(caseData) {
-  const value = caseData?.preEngagement;
-  if (!value || typeof value !== "object") return null;
-  return {
-    status: String(value.status || "requested").toLowerCase(),
-    requestedParalegalId: normalizeUserId(value.requestedParalegalId),
-    confidentialityAgreementRequired: !!value.confidentialityAgreementRequired,
-    conflictsCheckRequired: !!value.conflictsCheckRequired,
-    conflictsDetails: String(value.conflictsDetails || ""),
-    confidentialityDocument: value.confidentialityDocument || null,
-    requestedAt: value.requestedAt || null,
-    requestedBy: normalizeUserId(value.requestedBy),
-    confidentialityAcknowledged: !!value.confidentialityAcknowledged,
-    conflictsResponseType: String(value.conflictsResponseType || ""),
-    conflictsDisclosureText: String(value.conflictsDisclosureText || ""),
-    submittedAt: value.submittedAt || null,
-    submittedBy: normalizeUserId(value.submittedBy),
-  };
-}
-
-function hasViewerPreEngagement(caseData) {
-  if (getCurrentUserRole() !== "paralegal") return false;
-  const preEngagement = normalizePreEngagement(caseData);
-  const viewerId = getCurrentUserId();
-  if (!preEngagement || !viewerId) return false;
-  if (String(preEngagement.requestedParalegalId || "") !== String(viewerId)) return false;
-  return preEngagement.status === "requested" || preEngagement.status === "submitted";
-}
-
-function ensurePreEngagementDraft(caseData) {
-  const preEngagement = normalizePreEngagement(caseData);
-  if (!preEngagement) {
-    state.preEngagementDraft = null;
-    return null;
-  }
-  const caseId = getCaseId(caseData);
-  const current = state.preEngagementDraft;
-  if (current && current.caseId === caseId) return current;
-  state.preEngagementDraft = {
-    caseId,
-    confidentialityAcknowledged: !!preEngagement.confidentialityAcknowledged,
-    conflictsResponseType: preEngagement.conflictsResponseType || "",
-    conflictsDisclosureText: preEngagement.conflictsDisclosureText || "",
-    touchedConfidentiality: false,
-    touchedConflicts: false,
-    submitting: false,
-    statusMessage: "",
-  };
-  return state.preEngagementDraft;
 }
 
 function isWithdrawalPause(caseData) {
@@ -2869,6 +2809,7 @@ function renderCaseList() {
 function setActiveCase(caseId) {
   const previousCaseId = String(state.activeCaseId || "");
   state.activeCaseId = caseId;
+  syncActiveCaseUrl(caseId);
   if (previousCaseId && previousCaseId !== String(caseId || "")) {
     stopWorkspacePresence({ caseId: previousCaseId });
   }
@@ -2878,6 +2819,19 @@ function setActiveCase(caseId) {
   renderPendingAttachment();
   renderCaseList();
   updateCaseSelectSelection();
+}
+
+function syncActiveCaseUrl(caseId) {
+  if (typeof window === "undefined" || !window.history?.replaceState) return;
+  try {
+    const url = new URL(window.location.href);
+    if (caseId) {
+      url.searchParams.set("caseId", String(caseId));
+    } else {
+      url.searchParams.delete("caseId");
+    }
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  } catch (_) {}
 }
 
 function renderParticipants(data) {
@@ -4092,13 +4046,13 @@ function renderCaseOverview(data) {
     }
   }
 
+  if (caseOverviewDeadlines) {
+    caseOverviewDeadlines.hidden = !deadlines.length;
+  }
+
   if (caseDeadlineList) {
     emptyNode(caseDeadlineList);
-    if (!deadlines.length) {
-      const li = document.createElement("li");
-      li.textContent = "No deadlines set.";
-      caseDeadlineList.appendChild(li);
-    } else {
+    if (deadlines.length) {
       deadlines.forEach((deadline) => {
         const li = document.createElement("li");
         const date = formatDate(deadline?.date || deadline);
@@ -4323,232 +4277,6 @@ function updateDisputeAction(caseData) {
     } else {
       caseDisputeStatus.textContent = message;
     }
-  }
-
-  renderPreEngagementSection(caseData);
-}
-
-function getPreEngagementValidation(caseData) {
-  const preEngagement = normalizePreEngagement(caseData);
-  const draft = ensurePreEngagementDraft(caseData);
-  if (!preEngagement || !draft) {
-    return {
-      requiresConfidentiality: false,
-      requiresConflicts: false,
-      showConfidentialityError: false,
-      showConflictsError: false,
-      hasErrors: false,
-    };
-  }
-  const requiresConfidentiality = !!preEngagement.confidentialityAgreementRequired;
-  const requiresConflicts = !!preEngagement.conflictsCheckRequired;
-  const missingConfidentiality = requiresConfidentiality && !draft.confidentialityAcknowledged;
-  const missingConflictsResponse =
-    requiresConflicts && !["none_known", "disclosure"].includes(draft.conflictsResponseType);
-  const missingDisclosureText =
-    requiresConflicts &&
-    draft.conflictsResponseType === "disclosure" &&
-    !String(draft.conflictsDisclosureText || "").trim();
-  return {
-    requiresConfidentiality,
-    requiresConflicts,
-    showConfidentialityError: missingConfidentiality && draft.touchedConfidentiality,
-    showConflictsError: (missingConflictsResponse || missingDisclosureText) && draft.touchedConflicts,
-    hasErrors: missingConfidentiality || missingConflictsResponse || missingDisclosureText,
-  };
-}
-
-function renderPreEngagementSection(caseData) {
-  if (!casePreEngagementSection || !casePreEngagementCard || !casePreEngagementStatus) return;
-  const preEngagement = normalizePreEngagement(caseData);
-  const shouldShow = hasViewerPreEngagement(caseData);
-  casePreEngagementSection.hidden = !shouldShow;
-  if (!shouldShow || !preEngagement) {
-    casePreEngagementCard.innerHTML = "";
-    casePreEngagementStatus.textContent = "";
-    return;
-  }
-
-  const draft = ensurePreEngagementDraft(caseData);
-  const validation = getPreEngagementValidation(caseData);
-  const hasSubmitted = preEngagement.status === "submitted";
-  const docMeta = preEngagement.confidentialityDocument || null;
-
-  casePreEngagementCard.innerHTML = `
-    <div class="pre-engagement-card">
-      <p>Review the requested pre-engagement items below. Your response will be saved for attorney review.</p>
-      <div class="pre-engagement-meta">
-        ${preEngagement.confidentialityAgreementRequired ? '<span class="pre-engagement-pill">Confidentiality agreement</span>' : ""}
-        ${preEngagement.conflictsCheckRequired ? '<span class="pre-engagement-pill">Conflicts check</span>' : ""}
-      </div>
-      ${
-        preEngagement.confidentialityAgreementRequired
-          ? `
-            <div class="pre-engagement-block">
-              <label>Confidentiality agreement</label>
-              <div class="pre-engagement-doc">
-                <div>
-                  <strong>${escapeHTML(docMeta?.name || "Confidentiality agreement")}</strong>
-                  <p>${docMeta?.uploadedAt ? `Uploaded ${formatDate(docMeta.uploadedAt)}` : "Document ready for review."}</p>
-                </div>
-                <button type="button" class="case-action-btn secondary" data-preengagement-download${docMeta?.key ? "" : " disabled aria-disabled=\"true\""}>Review document</button>
-              </div>
-              ${
-                hasSubmitted
-                  ? `<div class="pre-engagement-summary">Acknowledged ${preEngagement.confidentialityAcknowledgedAt ? `on ${escapeHTML(formatDate(preEngagement.confidentialityAcknowledgedAt))}` : ""}.</div>`
-                  : `
-                    <label class="pre-engagement-check">
-                      <input type="checkbox" data-preengagement-confidentiality${draft?.confidentialityAcknowledged ? " checked" : ""}>
-                      <span>I reviewed the confidentiality agreement and acknowledge it for this matter.</span>
-                    </label>
-                    ${validation.showConfidentialityError ? '<p class="pre-engagement-field-help">Review and acknowledge the confidentiality agreement to continue.</p>' : ""}
-                  `
-              }
-            </div>
-          `
-          : ""
-      }
-      ${
-        preEngagement.conflictsCheckRequired
-          ? `
-            <div class="pre-engagement-block">
-              <label>Conflicts check details</label>
-              <p>${escapeHTML(preEngagement.conflictsDetails || "No details provided.")}</p>
-              ${
-                hasSubmitted
-                  ? `
-                    <div class="pre-engagement-summary">
-                      ${
-                        preEngagement.conflictsResponseType === "disclosure"
-                          ? `Disclosure submitted: ${escapeHTML(preEngagement.conflictsDisclosureText || "")}`
-                          : "No known conflict confirmed."
-                      }
-                    </div>
-                  `
-                  : `
-                    <fieldset class="pre-engagement-choices">
-                      <legend>Your response</legend>
-                      <label class="pre-engagement-choice">
-                        <input type="radio" name="preEngagementConflictsResponse" value="none_known"${draft?.conflictsResponseType === "none_known" ? " checked" : ""} data-preengagement-conflicts-choice>
-                        <span>Confirm no known conflict</span>
-                      </label>
-                      <label class="pre-engagement-choice">
-                        <input type="radio" name="preEngagementConflictsResponse" value="disclosure"${draft?.conflictsResponseType === "disclosure" ? " checked" : ""} data-preengagement-conflicts-choice>
-                        <span>Submit a disclosure</span>
-                      </label>
-                    </fieldset>
-                    ${
-                      draft?.conflictsResponseType === "disclosure"
-                        ? `
-                          <textarea data-preengagement-disclosure class="${validation.showConflictsError ? "is-invalid" : ""}" placeholder="Describe any relationship, party, or information that may create a conflict.">${escapeHTML(draft?.conflictsDisclosureText || "")}</textarea>
-                        `
-                        : ""
-                    }
-                    ${validation.showConflictsError ? '<p class="pre-engagement-field-help">Choose a conflicts response and add disclosure details if needed.</p>' : ""}
-                  `
-              }
-            </div>
-          `
-          : ""
-      }
-      ${
-        hasSubmitted
-          ? ""
-          : `
-            <div class="pre-engagement-actions">
-              <button type="button" class="case-action-btn" data-preengagement-submit${draft?.submitting || validation.hasErrors ? " disabled aria-disabled=\"true\"" : ""}>${
-                draft?.submitting ? "Submitting..." : "Submit pre-engagement response"
-              }</button>
-            </div>
-          `
-      }
-    </div>
-  `;
-  casePreEngagementStatus.textContent = draft?.statusMessage || "";
-
-  casePreEngagementCard.querySelector("[data-preengagement-download]")?.addEventListener("click", async () => {
-    const key = preEngagement?.confidentialityDocument?.key || "";
-    const caseId = getCaseId(caseData);
-    if (!key || !caseId) return;
-    try {
-      const url = await getSignedDownloadUrl({ caseId, storageKey: key });
-      if (!url) throw new Error("Unable to load the agreement.");
-      window.open(url, "_blank", "noopener");
-    } catch (err) {
-      casePreEngagementStatus.textContent = err?.message || "Unable to open the confidentiality agreement.";
-    }
-  });
-
-  casePreEngagementCard.querySelector("[data-preengagement-confidentiality]")?.addEventListener("change", (event) => {
-    draft.confidentialityAcknowledged = !!event.target?.checked;
-    draft.touchedConfidentiality = true;
-    draft.statusMessage = "";
-    renderPreEngagementSection(caseData);
-  });
-
-  casePreEngagementCard.querySelectorAll("[data-preengagement-conflicts-choice]").forEach((input) => {
-    input.addEventListener("change", (event) => {
-      draft.conflictsResponseType = String(event.target?.value || "");
-      draft.touchedConflicts = true;
-      draft.statusMessage = "";
-      if (draft.conflictsResponseType !== "disclosure") {
-        draft.conflictsDisclosureText = "";
-      }
-      renderPreEngagementSection(caseData);
-    });
-  });
-
-  casePreEngagementCard.querySelector("[data-preengagement-disclosure]")?.addEventListener("input", (event) => {
-    draft.conflictsResponseType = "disclosure";
-    draft.touchedConflicts = true;
-    draft.statusMessage = "";
-    draft.conflictsDisclosureText = event.target?.value || "";
-  });
-
-  casePreEngagementCard.querySelector("[data-preengagement-disclosure]")?.addEventListener("blur", () => {
-    draft.touchedConflicts = true;
-    renderPreEngagementSection(caseData);
-  });
-
-  casePreEngagementCard.querySelector("[data-preengagement-submit]")?.addEventListener("click", async () => {
-    await submitPreEngagementResponse(caseData);
-  });
-}
-
-async function submitPreEngagementResponse(caseData) {
-  const caseId = getCaseId(caseData);
-  const preEngagement = normalizePreEngagement(caseData);
-  const draft = ensurePreEngagementDraft(caseData);
-  if (!caseId || !preEngagement || !draft) return;
-  draft.touchedConfidentiality = true;
-  draft.touchedConflicts = true;
-  const validation = getPreEngagementValidation(caseData);
-  if (validation.hasErrors) {
-    renderPreEngagementSection(caseData);
-    return;
-  }
-  draft.submitting = true;
-  draft.statusMessage = "";
-  renderPreEngagementSection(caseData);
-  try {
-    const payload = await fetchJSON(`/api/cases/${encodeURIComponent(caseId)}/pre-engagement/respond`, {
-      method: "POST",
-      body: {
-        confidentialityAcknowledged: draft.confidentialityAcknowledged ? "true" : "false",
-        conflictsResponseType: draft.conflictsResponseType || "",
-        conflictsDisclosureText: draft.conflictsDisclosureText || "",
-      },
-    });
-    if (state.activeCase) {
-      state.activeCase.preEngagement = payload?.preEngagement || state.activeCase.preEngagement;
-    }
-    state.preEngagementDraft = null;
-    renderCaseOverview(state.activeCase || caseData);
-    casePreEngagementStatus.textContent = "Pre-engagement response submitted.";
-  } catch (err) {
-    draft.submitting = false;
-    draft.statusMessage = err?.message || "Unable to submit your pre-engagement response.";
-    renderPreEngagementSection(caseData);
   }
 }
 

@@ -138,6 +138,10 @@ const selectors = {
   inviteCloseBtn: document.getElementById('inviteCloseBtn'),
   inviteAcceptBtn: document.getElementById('inviteAcceptBtn'),
   inviteDeclineBtn: document.getElementById('inviteDeclineBtn'),
+  revokeConfirmModal: document.getElementById('revokeConfirmModal'),
+  revokeConfirmClose: document.querySelector('[data-revoke-confirm-close]'),
+  revokeConfirmCancel: document.querySelector('[data-revoke-confirm-cancel]'),
+  revokeConfirmSubmit: document.querySelector('[data-revoke-confirm-submit]'),
   welcomeNotice: document.getElementById('paralegalWelcomeNotice'),
   welcomeNoticeDismiss: document.getElementById('dismissWelcomeNotice'),
   earningsCard: document.getElementById('earnedThisMonthCard'),
@@ -418,6 +422,12 @@ function formatCurrency(value = 0) {
   return amount.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 }
 
+function formatCaseCompensation(cents = 0) {
+  const value = Number(cents);
+  if (!Number.isFinite(value) || value <= 0) return '';
+  return formatCurrency(value / 100);
+}
+
 function deriveNextDeadline(events = []) {
   const next = Array.isArray(events) ? events[0] : null;
   if (!next) return '--';
@@ -542,6 +552,7 @@ async function refreshDashboardFromServer(reason = '') {
       threads: Array.isArray(threads) ? threads : [],
       deadlines: deadlineEvents,
     });
+    maybeOpenInviteFromQuery();
     await loadAppliedJobs({ preservePage: true });
     notifyCasesApplicationsRefresh(reason, {
       activeCases: activeCases,
@@ -698,12 +709,44 @@ function renderInvites(invites = []) {
   return renderRecentActivity({ invites });
 }
 
+function findInviteByCaseId(caseId = '') {
+  const target = String(caseId || '').trim();
+  if (!target) return null;
+  return (recentActivityState.invites || []).find(
+    (invite) => String(invite?.id || invite?._id || '') === target
+  ) || null;
+}
+
+function setInviteQuery(caseId) {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('inviteCase');
+    if (caseId) {
+      url.searchParams.set('inviteCase', caseId);
+    }
+    if (!url.hash) {
+      url.hash = '#home';
+    }
+    window.history.replaceState({}, '', url.toString());
+  } catch {}
+}
+
+function clearInviteQuery() {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('inviteCase');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  } catch {}
+}
+
 function buildRecentActivityEntries({ invites = [], threads = [], deadlines = [] } = {}) {
   const entries = [];
 
   invites.forEach((invite) => {
     const inviteId = invite?.id || invite?._id;
     if (!inviteId) return;
+    const inviteStatus = String(invite?.inviteStatus || '').toLowerCase();
+    if (inviteStatus && inviteStatus !== 'pending') return;
     const invitedAt = invite.inviteInvitedAt || invite.pendingParalegalInvitedAt || invite.createdAt || null;
     const timestamp = invitedAt ? new Date(invitedAt).getTime() : 0;
     const attorneyName =
@@ -718,7 +761,7 @@ function buildRecentActivityEntries({ invites = [], threads = [], deadlines = []
       title,
       meta: ['Invitation received', attorneyName].filter(Boolean).join(' · '),
       time: formatActivityDate(invitedAt),
-      href: `case-detail.html?caseId=${encodeURIComponent(inviteId)}`,
+      href: `dashboard-paralegal.html?inviteCase=${encodeURIComponent(inviteId)}#home`,
     });
   });
 
@@ -785,7 +828,9 @@ function renderRecentActivity({ invites = [], threads = [], deadlines = [] } = {
       item.className = 'activity-item';
       const time = entry.time ? `<div class="activity-time">${escapeHtml(entry.time)}</div>` : '';
       const title = entry.href
-        ? `<a class="activity-link" href="${escapeHtml(entry.href)}">${escapeHtml(entry.title)}</a>`
+        ? `<a class="activity-link" href="${escapeHtml(entry.href)}"${
+            entry.type === 'invite' ? ` data-invite-case-id="${escapeHtml(entry.caseId || '')}"` : ''
+          }>${escapeHtml(entry.title)}</a>`
         : escapeHtml(entry.title);
       item.innerHTML = `
         <div class="activity-row">
@@ -803,7 +848,16 @@ function renderRecentActivity({ invites = [], threads = [], deadlines = [] } = {
   container.appendChild(card);
 
   container.querySelectorAll('.activity-link').forEach((link) => {
-    link.addEventListener('click', (event) => event.stopPropagation());
+    link.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const caseId = String(link.getAttribute('data-invite-case-id') || '').trim();
+      if (!caseId) return;
+      const invite = findInviteByCaseId(caseId);
+      if (!invite) return;
+      event.preventDefault();
+      setInviteQuery(caseId);
+      openInviteOverlay(invite);
+    });
   });
 }
 
@@ -835,7 +889,24 @@ async function respondToInvite(caseId, action, button) {
     toastHelper?.show?.(message, { targetId: selectors.toastBanner?.id, type: 'success' });
     completed = true;
     if (action === 'accept') {
-      window.location.reload();
+      recentActivityState.invites = recentActivityState.invites.filter(
+        (invite) => String(invite?.id || invite?._id || '') !== String(caseId)
+      );
+      renderRecentActivity({
+        invites: recentActivityState.invites,
+        threads: recentActivityState.threads,
+        deadlines: recentActivityState.deadlines,
+      });
+      if (typeof window.refreshNotificationCenters === 'function') {
+        window.refreshNotificationCenters();
+      }
+      const nextInvite = {
+        ...(activeInvite || findInviteByCaseId(caseId) || {}),
+        id: caseId,
+        _id: caseId,
+        inviteStatus: 'accepted',
+      };
+      openInviteOverlay(nextInvite);
       return;
     }
     // Optimistically remove the invite card and close the overlay
@@ -872,6 +943,46 @@ async function respondToInvite(caseId, action, button) {
   }
 }
 
+async function revokeAcceptedInvite(caseId, button) {
+  if (!caseId || inviteResponseInFlight) return;
+  const originalLabel = button?.textContent || 'Revoke application';
+  inviteResponseInFlight = true;
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Revoking…';
+  }
+  const toastHelper = window.toastUtils;
+  try {
+    const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}/invite/revoke`, { method: 'POST' });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(payload?.error || 'Unable to revoke this application.');
+    recentActivityState.invites = recentActivityState.invites.filter(
+      (invite) => String(invite?.id || invite?._id || '') !== String(caseId)
+    );
+    renderRecentActivity({
+      invites: recentActivityState.invites,
+      threads: recentActivityState.threads,
+      deadlines: recentActivityState.deadlines,
+    });
+    if (typeof window.refreshNotificationCenters === 'function') {
+      window.refreshNotificationCenters();
+    }
+    closeInviteOverlay();
+    toastHelper?.show?.('Application revoked.', { targetId: selectors.toastBanner?.id, type: 'success' });
+  } catch (error) {
+    toastHelper?.show?.(error.message || 'Unable to revoke this application.', {
+      targetId: selectors.toastBanner?.id,
+      type: 'error',
+    });
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
+  } finally {
+    inviteResponseInFlight = false;
+  }
+}
+
 function handleCaseAction(action, title) {
   const toastHelper = window.toastUtils;
   const message = `${action} for “${title}” is coming soon.`;
@@ -904,9 +1015,32 @@ function attachUIHandlers() {
   if (selectors.inviteDeclineBtn) {
     selectors.inviteDeclineBtn.addEventListener('click', () => {
       const caseId = selectors.inviteDeclineBtn.dataset.caseId;
+      const action = String(selectors.inviteDeclineBtn.dataset.inviteAction || 'decline').toLowerCase();
+      if (action === 'revoke') {
+        openRevokeConfirmModal(async () => {
+          closeRevokeConfirmModal();
+          await revokeAcceptedInvite(caseId, selectors.inviteDeclineBtn);
+        });
+        return;
+      }
       respondToInvite(caseId, 'decline', selectors.inviteDeclineBtn);
     });
   }
+  selectors.revokeConfirmClose?.addEventListener('click', closeRevokeConfirmModal);
+  selectors.revokeConfirmCancel?.addEventListener('click', closeRevokeConfirmModal);
+  selectors.revokeConfirmSubmit?.addEventListener('click', async () => {
+    const action = pendingRevokeAction;
+    if (!action) {
+      closeRevokeConfirmModal();
+      return;
+    }
+    await action();
+  });
+  selectors.revokeConfirmModal?.addEventListener('click', (event) => {
+    if (event.target === selectors.revokeConfirmModal) {
+      closeRevokeConfirmModal();
+    }
+  });
   if (selectors.messageBox) {
     selectors.messageBox.addEventListener('click', () => {
       if (unreadMessageCount < 1) return;
@@ -927,10 +1061,25 @@ function attachUIHandlers() {
     if (event.key === 'Escape' && selectors.inviteOverlay?.classList.contains('show')) {
       closeInviteOverlay();
     }
+    if (event.key === 'Escape' && !selectors.revokeConfirmModal?.classList.contains('hidden')) {
+      closeRevokeConfirmModal();
+    }
   });
 }
 
 let activeInvite = null;
+let pendingRevokeAction = null;
+
+function closeRevokeConfirmModal() {
+  selectors.revokeConfirmModal?.classList.add('hidden');
+  pendingRevokeAction = null;
+}
+
+function openRevokeConfirmModal(onConfirm) {
+  pendingRevokeAction = typeof onConfirm === 'function' ? onConfirm : null;
+  selectors.revokeConfirmModal?.classList.remove('hidden');
+}
+
 function openInviteOverlay(invite) {
   activeInvite = invite || null;
   const {
@@ -947,6 +1096,7 @@ function openInviteOverlay(invite) {
     inviteAcceptBtn,
     inviteDeclineBtn,
   } = selectors;
+  const inviteActions = inviteOverlay?.querySelector('.actions');
   if (!inviteOverlay) return;
   const title = invite?.title || 'Case Invitation';
   const attorneyName =
@@ -954,10 +1104,14 @@ function openInviteOverlay(invite) {
     [invite?.attorney?.firstName, invite?.attorney?.lastName].filter(Boolean).join(' ').trim() ||
     'Attorney';
   const practice = invite?.practiceArea || 'General matter';
-  const status = invite?.status ? formatStatusLabel(invite.status) : '';
-  const numericBudget = typeof invite?.budget === 'number' ? invite.budget : Number.NaN;
+  const numericBudget =
+    typeof invite?.lockedTotalAmount === 'number'
+      ? invite.lockedTotalAmount
+      : typeof invite?.totalAmount === 'number'
+      ? invite.totalAmount
+      : Number.NaN;
   const pay =
-    (Number.isFinite(numericBudget) && `$${numericBudget.toLocaleString()} compensation`) ||
+    (Number.isFinite(numericBudget) && `${formatCaseCompensation(numericBudget)}`) ||
     invite?.compensationDisplay ||
     invite?.payDisplay ||
     invite?.compensation ||
@@ -975,10 +1129,21 @@ function openInviteOverlay(invite) {
     invite?.summary ||
     invite?.caseDescription ||
     '';
+  const tasks = Array.isArray(invite?.tasks)
+    ? invite.tasks
+        .map((task) => escapeHtml(task?.title || '').trim())
+        .filter(Boolean)
+    : [];
+  const inviteStatus = String(invite?.inviteStatus || '').toLowerCase();
+  const isAccepted = inviteStatus === 'accepted';
 
-  if (inviteCaseTitle) inviteCaseTitle.textContent = "You've been invited to a case";
+  if (inviteCaseTitle) inviteCaseTitle.textContent = isAccepted ? 'Await attorney action' : "You've been invited to a case";
   if (inviteJobTitle) inviteJobTitle.textContent = title;
-  if (inviteLead) inviteLead.textContent = `${attorneyName} has invited you to collaborate on this case.`;
+  if (inviteLead) {
+    inviteLead.textContent = isAccepted
+      ? 'You accepted this invitation. The attorney must confirm hire and fund the case next.'
+      : '';
+  }
   if (inviteMeta) {
     const metaPieces = [
       practice ? `<span class="pill">${escapeHtml(practice)}</span>` : '',
@@ -995,7 +1160,21 @@ function openInviteOverlay(invite) {
     inviteMeta.innerHTML = metaPieces.join('');
   }
   if (inviteDetails) {
-    inviteDetails.textContent = brief || 'Full case details will be shared after you accept.';
+    const detailParts = [];
+    if (brief) {
+      detailParts.push(`<p>${escapeHtml(brief)}</p>`);
+    }
+    if (tasks.length) {
+      detailParts.push(`
+        <div class="invite-task-block">
+          <div class="invite-task-label">Required Tasks</div>
+          <ul class="invite-task-list">
+            ${tasks.map((task) => `<li>${task}</li>`).join('')}
+          </ul>
+        </div>
+      `);
+    }
+    inviteDetails.innerHTML = detailParts.join('') || '<p>No case description provided.</p>';
   }
   if (inviteAttorneyName) inviteAttorneyName.textContent = attorneyName;
   if (inviteAttorneyFirm) inviteAttorneyFirm.textContent = invite?.attorney?.firm || invite?.attorney?.lawFirm || '';
@@ -1018,8 +1197,10 @@ function openInviteOverlay(invite) {
   if (inviteAcceptBtn) {
     inviteAcceptBtn.dataset.caseId = caseId;
     inviteAcceptBtn.dataset.stripeApply = "true";
-    inviteAcceptBtn.disabled = !caseId || !stripeConnected;
-    if (!stripeConnected) {
+    inviteAcceptBtn.hidden = false;
+    inviteAcceptBtn.textContent = isAccepted ? 'Accepted' : 'Accept Invitation';
+    inviteAcceptBtn.disabled = isAccepted || !caseId || !stripeConnected;
+    if (!isAccepted && !stripeConnected) {
       inviteAcceptBtn.title = STRIPE_GATE_MESSAGE;
     } else {
       inviteAcceptBtn.removeAttribute("title");
@@ -1027,15 +1208,39 @@ function openInviteOverlay(invite) {
   }
   if (inviteDeclineBtn) {
     inviteDeclineBtn.dataset.caseId = caseId;
+    inviteDeclineBtn.dataset.inviteAction = isAccepted ? 'revoke' : 'decline';
+    inviteDeclineBtn.textContent = isAccepted ? 'Revoke application' : 'Decline';
     inviteDeclineBtn.disabled = !caseId;
   }
+  inviteActions?.classList.toggle('is-accepted', isAccepted);
 
+  setInviteQuery(caseId);
   inviteOverlay.classList.add('show');
 }
 
 function closeInviteOverlay() {
   selectors.inviteOverlay?.classList.remove('show');
   activeInvite = null;
+  clearInviteQuery();
+}
+
+let inviteQueryHandled = false;
+function maybeOpenInviteFromQuery() {
+  if (inviteQueryHandled) return;
+  const currentHash = String(window.location.hash || '').trim();
+  if (currentHash && currentHash !== '#home') return;
+  let caseId = '';
+  try {
+    const params = new URLSearchParams(window.location.search);
+    caseId = (params.get('inviteCase') || '').trim();
+  } catch {
+    caseId = '';
+  }
+  if (!caseId) return;
+  const invite = findInviteByCaseId(caseId);
+  if (!invite) return;
+  inviteQueryHandled = true;
+  openInviteOverlay(invite);
 }
 
 function getStoredUserSnapshot() {
@@ -1776,7 +1981,6 @@ function buildApplicationPreEngagementSection(app) {
               <span>I reviewed and acknowledge this confidentiality agreement.</span>
             </label>
             <div class="application-preengagement-optional">
-              <div class="application-preengagement-upload-label">Optional signed copy</div>
               <div class="application-preengagement-doc application-preengagement-doc-upload">
                 <div class="application-preengagement-doc-copy">
                   <strong>${signedDocName}</strong>
@@ -2156,6 +2360,21 @@ async function revokeApplication(app, button) {
   }
 }
 
+function isApplicationFunded(app) {
+  const job = app?.jobId || app?.job || {};
+  if (app?.casePaymentReleased === true || job?.paymentReleased === true) return true;
+  return String(app?.caseEscrowStatus || job?.escrowStatus || '').toLowerCase() === 'funded';
+}
+
+function isApplicationRevocable(app) {
+  const hasId = Boolean(app?._id || app?.id);
+  const isInviteAcceptedEntry = String(app?.applicationSource || '').toLowerCase() === 'invite_accept' && !!app?.caseId;
+  const jobStatus = String(app?.jobId?.status || '').toLowerCase();
+  if (isApplicationFunded(app)) return false;
+  if (jobStatus && jobStatus !== 'open' && !isInviteAcceptedEntry) return false;
+  return hasId || isInviteAcceptedEntry;
+}
+
 function setApplicationQuery(appId, jobId) {
   try {
     const url = new URL(window.location.href);
@@ -2211,11 +2430,7 @@ function openApplicationModal(app) {
   );
   const revokeBtn = applicationModal.querySelector('[data-application-revoke]');
   if (revokeBtn) {
-    const statusKey = getApplicationStatusKey(app);
-    const hasId = Boolean(app?._id || app?.id);
-    const jobStatus = String(app?.jobId?.status || '').toLowerCase();
-    const locked = jobStatus && jobStatus !== 'open';
-    const disabled = !hasId || statusKey === 'accepted' || locked;
+    const disabled = !isApplicationRevocable(app);
     revokeBtn.disabled = disabled;
     revokeBtn.textContent = disabled ? 'Revoke unavailable' : 'Revoke application';
   }
@@ -2242,7 +2457,20 @@ function bindApplicationModal() {
   if (revokeBtn) {
     revokeBtn.addEventListener('click', async () => {
       if (!activeApplication) return;
-      await revokeApplication(activeApplication, revokeBtn);
+      openRevokeConfirmModal(async () => {
+        if (String(activeApplication?.applicationSource || '').toLowerCase() === 'invite_accept' && activeApplication?.caseId) {
+          const caseId = String(activeApplication.caseId || '');
+          closeRevokeConfirmModal();
+          await revokeAcceptedInvite(activeApplication.caseId, revokeBtn);
+          closeApplicationModal();
+          appliedAppsCache = appliedAppsCache.filter((entry) => String(entry?.caseId || '') !== caseId);
+          populateAppliedFilterOptions(appliedAppsCache);
+          applyAppliedFilters();
+          return;
+        }
+        closeRevokeConfirmModal();
+        await revokeApplication(activeApplication, revokeBtn);
+      });
     });
   }
   applicationModal.addEventListener('click', (event) => {
@@ -2714,6 +2942,7 @@ async function initDashboard() {
     initLatestMessage(threads);
     renderAssignments(mapActiveCasesToAssignments(dashboard?.activeCases || []));
     renderRecentActivity({ invites, threads, deadlines: deadlineEvents });
+    maybeOpenInviteFromQuery();
   } catch (err) {
     console.warn('Paralegal dashboard init failed', err);
     renderAssignments([]);

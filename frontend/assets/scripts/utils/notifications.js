@@ -391,8 +391,17 @@ function formatNotificationBody(item = {}) {
     case "case_invite":
       return `You've been invited to "${payload.caseTitle || "a case"}"`;
     case "case_invite_response":
+      if (payload.message) return payload.message;
+      if (item.userRole === "paralegal") {
+        if (payload.response === "accepted") {
+          return `You accepted the invitation for "${payload.caseTitle || "this case"}".`;
+        }
+        if (payload.response === "declined") {
+          return `You declined the invitation for "${payload.caseTitle || "this case"}".`;
+        }
+      }
       if (payload.response === "accepted") {
-        return `${payload.paralegalName || "Paralegal"} accepted your invitation`;
+        return `${payload.paralegalName || "Paralegal"} accepted your invitation. Confirm hire and fund case to get started.`;
       }
       if (payload.response === "filled") {
         return `The position for "${payload.caseTitle || "this case"}" has been filled.`;
@@ -786,9 +795,17 @@ function renderNotifications(center) {
   }
   center.empty.style.display = "none";
   center.notifications.forEach((item) => {
-    const node = buildNotificationNode(item, center);
-    center.list.appendChild(node);
+    try {
+      const node = buildNotificationNode(item, center);
+      center.list.appendChild(node);
+    } catch (err) {
+      console.warn("[notifications] render item failed", item?.type, err);
+    }
   });
+  if (!center.list.children.length) {
+    renderEmpty(center, "You're all caught up.");
+    return;
+  }
   scheduleNotificationListViewportSync(center.list);
   const total = totalUnread();
   lastKnownUnread = total;
@@ -1124,6 +1141,18 @@ function resolveNotificationLink(item = {}) {
     }
     return "dashboard-attorney.html#cases:inquiries";
   }
+  if (type === "case_invite_response" && role === "attorney" && String(payload.response || "").toLowerCase() === "accepted") {
+    const applicantId = extractApplicantId(item);
+    if (caseId && applicantId) {
+      return `dashboard-attorney.html?caseId=${encodeURIComponent(
+        caseId
+      )}&applicantId=${encodeURIComponent(applicantId)}&openApplicant=1&continueHire=1#cases:inquiries`;
+    }
+    if (caseId) {
+      return `dashboard-attorney.html?openApplicants=1&caseId=${encodeURIComponent(caseId)}#cases:inquiries`;
+    }
+    return "dashboard-attorney.html#cases:inquiries";
+  }
   if (role === "paralegal" && (type === "pre_engagement_requested" || type === "pre_engagement_changes_requested")) {
     const applicationId = extractId(
       item.applicationId ||
@@ -1163,9 +1192,12 @@ function resolveNotificationLink(item = {}) {
     const base = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
     if (type === "message") return `${base}#case-messages`;
     if (type === "case_file_uploaded") return `${base}#caseFilesSection`;
-    if (type === "case_invite") return "paralegal-invitations.html";
+    if (type === "case_invite" && role === "paralegal") {
+      return `dashboard-paralegal.html?inviteCase=${encodeURIComponent(caseId)}#home`;
+    }
     return base;
   }
+  if (type === "case_invite" && role === "paralegal") return "dashboard-paralegal.html#home";
   if (type === "case_invite") return "paralegal-invitations.html";
   const jobId = extractId(item.jobId || payload.jobId || payload.job || payload.job_id || payload.jobRef);
   if (type === "application_accepted") {
@@ -1465,20 +1497,32 @@ function renderNotificationList(listEl, emptyEl, items = []) {
   if (emptyEl) emptyEl.style.display = "none";
   const panel = listEl.closest("[data-notification-panel]");
   if (panel) panel.style.display = "block";
-  normalized.forEach((item) =>
-    listEl.appendChild(
-      buildNotificationNode(item, null, {
-        store: normalized,
-        onDismiss: () => {
-          if (!listEl.children.length && emptyEl) {
-            emptyEl.style.display = "block";
-            emptyEl.textContent = "You're all caught up.";
-          }
-          scheduleNotificationListViewportSync(listEl);
-        },
-      })
-    )
-  );
+  normalized.forEach((item) => {
+    try {
+      listEl.appendChild(
+        buildNotificationNode(item, null, {
+          store: normalized,
+          onDismiss: () => {
+            if (!listEl.children.length && emptyEl) {
+              emptyEl.style.display = "block";
+              emptyEl.textContent = "You're all caught up.";
+            }
+            scheduleNotificationListViewportSync(listEl);
+          },
+        })
+      );
+    } catch (err) {
+      console.warn("[notifications] list item render failed", item?.type, err);
+    }
+  });
+  if (!listEl.children.length) {
+    if (emptyEl) {
+      emptyEl.style.display = "block";
+      emptyEl.textContent = "You're all caught up.";
+    }
+    listEl.style.removeProperty("--notif-three-card-max-height");
+    return;
+  }
   scheduleNotificationListViewportSync(listEl);
 }
 

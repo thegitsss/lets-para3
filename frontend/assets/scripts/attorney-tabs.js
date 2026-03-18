@@ -3627,6 +3627,7 @@ function normalizeApplicantData(applicant = {}) {
   const languages = normalizeListEntries(snapshot.languages || profile.languages);
   const bio = snapshot.bio || profile.bio || "";
   const coverLetter = applicant?.coverLetter || applicant?.note || "";
+  const acceptedInvitation = String(coverLetter || "").trim().toLowerCase() === "accepted invitation";
   const resumeURL = applicant?.resumeURL || "";
   const linkedInURL = applicant?.linkedInURL || "";
   const status = String(applicant?.status || "pending").toLowerCase();
@@ -3663,6 +3664,7 @@ function normalizeApplicantData(applicant = {}) {
     languages,
     bio,
     coverLetter,
+    acceptedInvitation,
     resumeURL,
     linkedInURL,
     status,
@@ -3747,9 +3749,13 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
     ? `<ul class="applicant-detail-list">${profileDetails.map((item) => `<li>${sanitize(item)}</li>`).join("")}</ul>`
     : `<div class="applicant-detail-empty">Profile details not provided.</div>`;
   const cover = (applicant.coverLetter || "").trim();
-  const coverMarkup = cover
+  const acceptedInvitation = !!applicant.acceptedInvitation;
+  const coverMarkup = acceptedInvitation
+    ? `<div class="applicant-cover-box">Accepted invitation</div>`
+    : cover
     ? `<div class="applicant-cover-box">${sanitize(cover).replace(/\n/g, "<br>")}</div>`
     : `<div class="applicant-cover-box muted">No cover note provided.</div>`;
+  const coverLabel = acceptedInvitation ? "Accepted invitation" : "Cover note";
   const safeProfileLink = sanitizeUrl(profileLink);
   const safeResumeUrl = sanitizeUrl(resumeURL);
   const safeLinkedInUrl = sanitizeUrl(linkedInURL);
@@ -3835,7 +3841,7 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
   return `
     <div class="applicant-detail-grid">
       <div class="applicant-detail-main">
-        <div class="applicant-detail-name">Cover note</div>
+        <div class="applicant-detail-name">${sanitize(coverLabel)}</div>
         <div class="applicant-detail-divider"></div>
         <div class="applicant-detail-section">
           ${coverMarkup}
@@ -4824,9 +4830,10 @@ function getApplicantContextFromQuery() {
   const applicantId = params.get("applicantId") || "";
   const returnFromProfile = params.get("returnFromProfile") === "1";
   const openApplicant = params.get("openApplicant") === "1";
+  const continueHire = params.get("continueHire") === "1";
   if (!returnFromProfile && !openApplicant) return null;
   if (!caseId || !applicantId) return null;
-  return { caseId, applicantId };
+  return { caseId, applicantId, continueHire };
 }
 
 function getApplicantReturnContext() {
@@ -4843,13 +4850,15 @@ function clearApplicantReturnQuery() {
       !url.searchParams.has("caseId") &&
       !url.searchParams.has("applicantId") &&
       !url.searchParams.has("returnFromProfile") &&
-      !url.searchParams.has("openApplicant")
+      !url.searchParams.has("openApplicant") &&
+      !url.searchParams.has("continueHire")
     )
       return;
     url.searchParams.delete("caseId");
     url.searchParams.delete("applicantId");
     url.searchParams.delete("returnFromProfile");
     url.searchParams.delete("openApplicant");
+    url.searchParams.delete("continueHire");
     const nextQuery = url.searchParams.toString();
     const nextUrl = `${url.pathname}${nextQuery ? `?${nextQuery}` : ""}${url.hash}`;
     window.history.replaceState({}, "", nextUrl);
@@ -4860,7 +4869,7 @@ async function openApplicantFromQuery({ setFilter = true } = {}) {
   if (applicantReturnOpening) return;
   const context = getApplicantReturnContext();
   if (!context) return;
-  const { caseId, applicantId } = context;
+  const { caseId, applicantId, continueHire } = context;
   applicantReturnContext = context;
   if (setFilter) {
     setCaseFilter("inquiries", { render: false });
@@ -4908,6 +4917,18 @@ async function openApplicantFromQuery({ setFilter = true } = {}) {
     }
     if (setFilter) {
       clearApplicantReturnQuery();
+    }
+    if (continueHire && targetIndex >= 0) {
+      clearApplicantReturnQuery();
+      applicantReturnContext = { caseId, applicantId, continueHire: false };
+      const applicant = applicants[targetIndex] || null;
+      await handleHireFromApplications({
+        caseId,
+        paralegalId: applicantId,
+        paralegalName: applicant?.name || "Paralegal",
+        button: null,
+        skipPreEngagementStep: true,
+      });
     }
   } finally {
     applicantReturnOpening = false;
@@ -7970,10 +7991,14 @@ function openHireConfirmModal({
       <div class="hire-confirm-title" id="hireConfirmTitle">Pre-Engagement</div>
       ${
         normalizedExistingPreEngagement
-          ? `<div class="hire-confirm-success">Pre-engagement sent - awaiting paralegal response.</div>`
+          ? `<div class="hire-confirm-success">Sent to ${safeName}. Awaiting completion from the paralegal.</div>`
           : ""
       }
-      <p class="hire-pre-helper">Before moving forward, you may require pre-engagement items for this paralegal.</p>
+      <p class="hire-pre-helper">${
+        normalizedExistingPreEngagement
+          ? `Sent to ${safeName}. Awaiting completion from the paralegal.`
+          : "Before moving forward, you may require pre-engagement items for this paralegal."
+      }</p>
       <div class="hire-pre-options">
         <label class="hire-pre-option${preEngagementState.confidentialityAgreement ? " is-selected" : ""}">
           <input type="checkbox" data-pre-option="confidentiality"${preEngagementState.confidentialityAgreement ? " checked" : ""}>
@@ -8063,8 +8088,8 @@ function openHireConfirmModal({
   const renderPreEngagementSentStep = () => `
     <div data-hire-step="pre-engagement-sent">
       <div class="hire-confirm-title" id="hireConfirmTitle">${normalizedExistingPreEngagement ? "Pre-Engagement Updated" : "Pre-Engagement Sent"}</div>
-      <p>${normalizedExistingPreEngagement ? `Updated pre-engagement requirements for ${safeName} have been saved. Hiring and funding will continue after the paralegal completes the requested items and you review them.` : `Pre-engagement requirements for ${safeName} are ready to send. Hiring and funding will continue after the paralegal completes the requested items and you review them.`}</p>
-      <div class="hire-confirm-success">${normalizedExistingPreEngagement ? "Pre-engagement requirements updated successfully." : "Pre-engagement requirements prepared successfully."}</div>
+      <p>${normalizedExistingPreEngagement ? `Updated pre-engagement requirements for ${safeName} have been saved. Hiring and funding will continue after the paralegal completes the requested items and you review them.` : `Pre-engagement requirements for ${safeName} have been sent. Hiring and funding will continue after the paralegal completes the requested items and you review them.`}</p>
+      <div class="hire-confirm-success">${normalizedExistingPreEngagement ? "Pre-engagement requirements updated successfully." : "Pre-engagement requirements sent successfully."}</div>
       <div class="hire-confirm-actions">
         <button class="btn secondary" type="button" data-hire-close>Close</button>
       </div>

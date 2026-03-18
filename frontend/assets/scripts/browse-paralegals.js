@@ -422,13 +422,28 @@ async function loadParalegals() {
 
 async function loadCases() {
   try {
-    const res = await secureFetch("/api/cases/my?limit=50&archived=false", {
+    const res = await secureFetch("/api/cases/my-active", {
       headers: { Accept: "application/json" },
     });
-    const data = await res.json();
-    availableCases = Array.isArray(data)
-      ? data.filter((c) => !["completed", "closed", "archived"].includes(String(c.status || "").toLowerCase()))
+    const payload = await res.json().catch(() => ({}));
+    const items = Array.isArray(payload?.items)
+      ? payload.items
+      : Array.isArray(payload)
+      ? payload
       : [];
+    availableCases = items.filter((item) => {
+      const archived = Boolean(item.archived);
+      const assigned = Boolean(
+        item.acceptedParalegal ||
+          item.assignedTo?.id ||
+          item.assignedTo?._id ||
+          item.paralegal?.id ||
+          item.paralegal?._id ||
+          item.paralegal ||
+          item.paralegalId
+      );
+      return !archived && !assigned;
+    });
   } catch (error) {
     console.warn("Unable to load cases", error);
     availableCases = [];
@@ -613,19 +628,31 @@ function renderCaseOptions() {
       (invite) => normalizeId(invite?.paralegalId) && String(normalizeId(invite.paralegalId)) === targetId
     );
     const inviteStatus = String(matchingInvite?.status || "").toLowerCase();
-    const assignedId = normalizeId(c.paralegalId) || normalizeId(c.paralegal);
+    const assignedId =
+      normalizeId(c.assignedTo?.id) ||
+      normalizeId(c.assignedTo?._id) ||
+      normalizeId(c.paralegalId) ||
+      normalizeId(c.paralegal?.id) ||
+      normalizeId(c.paralegal?._id) ||
+      normalizeId(c.paralegal);
+    const assigned = Boolean(assignedId || c.acceptedParalegal);
     const invited = targetId && (inviteStatus === "pending" || inviteStatus === "accepted");
-    const assigned = targetId && String(assignedId || "") === targetId;
     const disabled = invited || assigned;
     const statusLabel = invited
       ? "Invitation already sent to this paralegal"
       : assigned
-      ? "Paralegal already assigned"
+      ? "A paralegal is already assigned"
       : "";
     return { caseId, title: c.title || "Untitled matter", disabled, statusLabel };
   });
-  const hasSelectable = options.some((opt) => !opt.disabled);
-  elements.jobList.innerHTML = options
+  const visibleOptions = options.filter((opt) => opt.statusLabel !== "A paralegal is already assigned");
+  const hasSelectable = visibleOptions.some((opt) => !opt.disabled);
+  if (!visibleOptions.length) {
+    elements.jobList.innerHTML = "<p>No open cases available. Post a job to invite paralegals.</p>";
+    elements.confirmInquire.disabled = true;
+    return;
+  }
+  elements.jobList.innerHTML = visibleOptions
     .map(
       (opt) => `
       <label class="job-option${opt.disabled ? " disabled" : ""}">
@@ -655,13 +682,19 @@ async function sendInquiry() {
       (invite) => normalizeId(invite?.paralegalId) && String(normalizeId(invite.paralegalId)) === targetId
     );
     const inviteStatus = String(matchingInvite?.status || "").toLowerCase();
-    const assignedId = normalizeId(caseMeta.paralegalId) || normalizeId(caseMeta.paralegal);
+    const assignedId =
+      normalizeId(caseMeta.assignedTo?.id) ||
+      normalizeId(caseMeta.assignedTo?._id) ||
+      normalizeId(caseMeta.paralegalId) ||
+      normalizeId(caseMeta.paralegal?.id) ||
+      normalizeId(caseMeta.paralegal?._id) ||
+      normalizeId(caseMeta.paralegal);
     if (inviteStatus === "pending" || inviteStatus === "accepted") {
       showToast("Invitation already sent to this paralegal for this case.", "err");
       return;
     }
-    if (String(assignedId) === targetId) {
-      showToast("This paralegal is already assigned to this case.", "err");
+    if (assignedId || caseMeta.acceptedParalegal) {
+      showToast("A paralegal is already assigned to this case.", "err");
       return;
     }
   }

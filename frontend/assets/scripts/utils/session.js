@@ -459,12 +459,6 @@
       if (footer.querySelector(".beta-footer")) return;
       const wrap = document.createElement("div");
       wrap.className = "beta-footer";
-      const pill = document.createElement("span");
-      pill.className = "beta-pill";
-      pill.textContent = "Beta";
-      const sep = document.createElement("span");
-      sep.className = "beta-sep";
-      sep.textContent = "•";
       const link = document.createElement("a");
       link.className = "beta-link";
       link.href = href;
@@ -475,8 +469,6 @@
       wrap.addEventListener("click", (event) => {
         event.stopPropagation();
       });
-      wrap.appendChild(pill);
-      wrap.appendChild(sep);
       wrap.appendChild(link);
       footer.prepend(wrap);
     });

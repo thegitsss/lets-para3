@@ -151,9 +151,9 @@ const elements = {
   notificationPanel: document.getElementById("notificationPanel"),
   userChip: document.getElementById("userChip"),
   profileDropdown: document.getElementById("profileDropdown"),
-  chipAvatar: document.getElementById("chipAvatar"),
-  chipName: document.getElementById("chipName"),
-  chipRole: document.getElementById("chipRole"),
+  chipAvatar: document.getElementById("clusterAvatar"),
+  chipName: document.getElementById("clusterName"),
+  chipRole: document.getElementById("clusterRole"),
   profileFormSection: document.getElementById("profileFormSection"),
   profileForm: document.getElementById("paralegalProfileForm"),
   linkedInInput: document.getElementById("linkedInURL"),
@@ -202,6 +202,7 @@ const state = {
 };
 let inviteCutoutLayer = null;
 let inviteCutoutAlignRaf = null;
+let attorneyDropdownPortaled = false;
 
 const PREFILL_CACHE_KEY = "lpc_edit_profile_prefill";
 
@@ -328,10 +329,16 @@ async function init() {
   applyRoleVisibility(sessionUser);
 
   const storedUser = window.getStoredUser ? window.getStoredUser() : null;
-  state.viewerUser = storedUser || sessionUser || null;
-  if (sessionUser?.status && state.viewerUser && !state.viewerUser.status) {
-    state.viewerUser = { ...state.viewerUser, status: sessionUser.status };
-  }
+  const sessionViewerId = String(sessionUser?.id || sessionUser?._id || "");
+  const storedViewerId = String(storedUser?.id || storedUser?._id || "");
+  const sameViewer =
+    storedUser &&
+    sessionUser &&
+    storedViewerId &&
+    sessionViewerId &&
+    storedViewerId === sessionViewerId &&
+    String(storedUser.role || "").toLowerCase() === String(sessionUser.role || "").toLowerCase();
+  state.viewerUser = sameViewer ? { ...storedUser, ...sessionUser } : sessionUser || storedUser || null;
   state.viewerRole = String(state.viewerUser?.role || "").toLowerCase();
   state.viewerId = String(state.viewerUser?.id || state.viewerUser?._id || "");
   document.body.classList.toggle("viewer-attorney", state.viewerRole === "attorney");
@@ -762,6 +769,21 @@ function hydrateHeader() {
   if (!state.viewerUser) return;
   if (elements.chipName) elements.chipName.textContent = formatName(state.viewerUser);
   if (elements.chipRole) elements.chipRole.textContent = prettyRole(state.viewerUser.role);
+  if (elements.userChip) {
+    elements.userChip.setAttribute(
+      "href",
+      state.viewerRole === "attorney" ? "/dashboard-attorney.html#home" : "/dashboard-paralegal.html"
+    );
+  }
+  const settingsButton = elements.profileDropdown?.querySelector("[data-settings]");
+  if (settingsButton) {
+    settingsButton.textContent = state.viewerRole === "attorney" ? "Dashboard" : "Account Settings";
+    settingsButton.setAttribute("href", state.viewerRole === "attorney" ? "/dashboard-attorney.html#home" : "/profile-settings.html");
+  }
+  const logoutButton = elements.profileDropdown?.querySelector("[data-logout]");
+  if (logoutButton) {
+    logoutButton.setAttribute("href", "/login.html");
+  }
   const avatarSrc =
     getProfileImageUrl(state.viewerUser, { allowPending: canEditProfile() }) ||
     buildInitialAvatar(getInitials(formatName(state.viewerUser)));
@@ -769,25 +791,71 @@ function hydrateHeader() {
     elements.chipAvatar.src = avatarSrc;
     elements.chipAvatar.alt = `${formatName(state.viewerUser)} avatar`;
   }
+  positionAttorneyProfileDropdown();
+}
+
+function positionAttorneyProfileDropdown() {
+  if (state.viewerRole !== "attorney" || !elements.userChip || !elements.profileDropdown) return;
+  if (window.innerWidth <= 960) {
+    elements.profileDropdown.style.removeProperty("top");
+    elements.profileDropdown.style.removeProperty("right");
+    elements.profileDropdown.style.removeProperty("left");
+    return;
+  }
+  if (!attorneyDropdownPortaled) {
+    document.body.appendChild(elements.profileDropdown);
+    attorneyDropdownPortaled = true;
+  }
+  const chipRect = elements.userChip.getBoundingClientRect();
+  const viewportRightGap = Math.max(16, window.innerWidth - chipRect.right);
+  elements.profileDropdown.style.top = `${Math.round(chipRect.bottom + 10)}px`;
+  elements.profileDropdown.style.right = `${Math.round(viewportRightGap)}px`;
+  elements.profileDropdown.style.left = "auto";
 }
 
 function bindHeaderEvents() {
-  if (elements.userChip && elements.profileDropdown) {
-    elements.userChip.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      elements.profileDropdown.classList.toggle("show");
-    });
-    document.addEventListener("click", (event) => {
-      if (!elements.userChip.contains(event.target) && !elements.profileDropdown.contains(event.target)) {
-        elements.profileDropdown.classList.remove("show");
+  if (!elements.userChip || !elements.profileDropdown) return;
+
+  elements.userChip.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    positionAttorneyProfileDropdown();
+    elements.profileDropdown.classList.toggle("show");
+  });
+
+  document.addEventListener(
+    "click",
+    (event) => {
+      const settingsBtn = event.target.closest("[data-settings]");
+      if (settingsBtn && elements.profileDropdown.contains(settingsBtn)) {
+        event.preventDefault();
+        event.stopPropagation();
+        const targetHref =
+          settingsBtn.getAttribute("href") ||
+          (state.viewerRole === "attorney" ? "/dashboard-attorney.html#home" : "/profile-settings.html");
+        window.location.href = targetHref;
+        return;
       }
-    });
-    elements.profileDropdown.querySelector("[data-settings]")?.addEventListener("click", () => {
-      window.location.href = "profile-settings.html";
-    });
-    elements.profileDropdown.querySelector("[data-logout]")?.addEventListener("click", () => logout("login.html"));
-  }
+
+      const logoutBtn = event.target.closest("[data-logout]");
+      if (logoutBtn && elements.profileDropdown.contains(logoutBtn)) {
+        event.preventDefault();
+        event.stopPropagation();
+        elements.profileDropdown.classList.remove("show");
+        logout("login.html");
+        return;
+      }
+    },
+    true
+  );
+
+  document.addEventListener("click", (event) => {
+    if (!elements.userChip.contains(event.target) && !elements.profileDropdown.contains(event.target)) {
+      elements.profileDropdown.classList.remove("show");
+    }
+  });
+  window.addEventListener("resize", positionAttorneyProfileDropdown);
+  window.addEventListener("scroll", positionAttorneyProfileDropdown, { passive: true });
 }
 
 async function loadProfile() {
@@ -1609,7 +1677,7 @@ function renderEducation(entries) {
     if (item.grade) {
       const grade = document.createElement("div");
       grade.className = "edu-meta";
-      grade.textContent = String(item.grade);
+      grade.textContent = `${String(item.grade)} GPA`;
       entry.appendChild(grade);
     }
 
@@ -1804,7 +1872,15 @@ async function loadAttorneyCases() {
       : [];
     state.openCases = items.filter((item) => {
       const archived = Boolean(item.archived);
-      const assigned = Boolean(item.paralegal || item.paralegalId);
+      const assigned = Boolean(
+        item.acceptedParalegal ||
+          item.assignedTo?.id ||
+          item.assignedTo?._id ||
+          item.paralegal?.id ||
+          item.paralegal?._id ||
+          item.paralegal ||
+          item.paralegalId
+      );
       return !archived && !assigned;
     });
   } catch (err) {
@@ -2201,10 +2277,14 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
       <div class="hire-confirm-title" id="hireConfirmTitle">Pre-Engagement</div>
       ${
         normalizedExistingPreEngagement
-          ? `<div class="hire-confirm-success">Pre-engagement sent - awaiting paralegal response.</div>`
+          ? `<div class="hire-confirm-success">Sent to <strong>${safeName}</strong>. Awaiting completion from the paralegal.</div>`
           : ""
       }
-      <p class="hire-pre-helper">Before moving forward, you may require pre-engagement items for this paralegal.</p>
+      <p class="hire-pre-helper">${
+        normalizedExistingPreEngagement
+          ? `Sent to <strong>${safeName}</strong>. Awaiting completion from the paralegal.`
+          : "Before moving forward, you may require pre-engagement items for this paralegal."
+      }</p>
       <div class="hire-pre-options">
         <label class="hire-pre-option${preEngagementState.confidentialityAgreement ? " is-selected" : ""}">
           <input type="checkbox" data-pre-option="confidentiality"${preEngagementState.confidentialityAgreement ? " checked" : ""}>
@@ -2312,8 +2392,8 @@ function openHireConfirmModal({ paralegalName, amountCents, feePct, continueHref
   const renderPreEngagementSentStep = () => `
     <div data-hire-step="pre-engagement-sent">
       <div class="hire-confirm-title" id="hireConfirmTitle">${normalizedExistingPreEngagement ? "Pre-Engagement Updated" : "Pre-Engagement Sent"}</div>
-      <p>${normalizedExistingPreEngagement ? `Updated pre-engagement requirements for <strong>${safeName}</strong> have been saved. Hiring and funding will continue after the paralegal completes the requested items and you review them.` : `Pre-engagement requirements for <strong>${safeName}</strong> are ready to send. Hiring and funding will continue after the paralegal completes the requested items and you review them.`}</p>
-      <div class="hire-confirm-success">${normalizedExistingPreEngagement ? "Pre-engagement requirements updated successfully." : "Pre-engagement requirements prepared successfully."}</div>
+      <p>${normalizedExistingPreEngagement ? `Updated pre-engagement requirements for <strong>${safeName}</strong> have been saved. Hiring and funding will continue after the paralegal completes the requested items and you review them.` : `Pre-engagement requirements for <strong>${safeName}</strong> have been sent. Hiring and funding will continue after the paralegal completes the requested items and you review them.`}</p>
+      <div class="hire-confirm-success">${normalizedExistingPreEngagement ? "Pre-engagement requirements updated successfully." : "Pre-engagement requirements sent successfully."}</div>
       <div class="hire-confirm-actions">
         <button class="btn secondary" type="button" data-hire-close>Close</button>
       </div>
