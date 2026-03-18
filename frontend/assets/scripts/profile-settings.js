@@ -5590,6 +5590,7 @@ function initAvatarUploaders() {
 
 function updateAvatarRemoveButton(user = currentUser || {}) {
   const removeBtn = document.getElementById("removeAvatarBtn");
+  const attorneyRemoveBtn = document.getElementById("removeAttorneyAvatarBtn");
   const editBtn = document.getElementById("editAvatarBtn");
   const attorneyEditBtn = document.getElementById("editAttorneyAvatarBtn");
   const rawUrl = user.profileImage || user.avatarURL || settingsState.profileImage || "";
@@ -5599,6 +5600,10 @@ function updateAvatarRemoveButton(user = currentUser || {}) {
   if (removeBtn) {
     removeBtn.classList.toggle("hidden", !hasPhoto);
     removeBtn.disabled = !hasPhoto;
+  }
+  if (attorneyRemoveBtn) {
+    attorneyRemoveBtn.classList.toggle("hidden", !hasPhoto);
+    attorneyRemoveBtn.disabled = !hasPhoto;
   }
   if (editBtn) {
     editBtn.classList.toggle("hidden", !hasPhoto);
@@ -5683,54 +5688,57 @@ function applyProfilePhotoUploadResult(payload = {}, { suppressToast = false } =
 }
 
 function bindAvatarRemoval() {
-  const removeBtn = document.getElementById("removeAvatarBtn");
-  if (!removeBtn) return;
-  if (removeBtn.dataset.bound === "true") return;
-  removeBtn.dataset.bound = "true";
-  removeBtn.addEventListener("click", async () => {
-    if (settingsState.stagedProfilePhotoFile) {
-      clearStagedProfilePhoto();
-      applyAvatar(currentUser || {});
-      updateAvatarRemoveButton(currentUser || {});
-      updatePhotoReviewStatus(currentUser || {});
-      updateRequiredFieldMarkers();
-      return;
-    }
-    if (!currentUser) return;
-    const originalLabel = removeBtn.textContent;
-    removeBtn.disabled = true;
-    removeBtn.textContent = "Removing…";
-    try {
-      const res = await secureFetch("/api/users/me", {
-        method: "PATCH",
-        body: { profileImage: "", avatarURL: "" }
-      });
-      const updatedUser = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(updatedUser?.error || "Unable to remove photo");
+  const bindRemoveButton = (button) => {
+    if (!button || button.dataset.bound === "true") return;
+    button.dataset.bound = "true";
+    button.addEventListener("click", async () => {
+      if (settingsState.stagedProfilePhotoFile) {
+        clearStagedProfilePhoto();
+        applyAvatar(currentUser || {});
+        updateAvatarRemoveButton(currentUser || {});
+        updatePhotoReviewStatus(currentUser || {});
+        updateRequiredFieldMarkers();
+        return;
       }
-      const mergedUser = mergeSessionPreferences(updatedUser);
-      currentUser = mergedUser;
-      settingsState.profileImage = updatedUser.profileImage || "";
-      settingsState.profileImageOriginal = updatedUser.profileImageOriginal || "";
-      settingsState.pendingProfileImage = updatedUser.pendingProfileImage || "";
-      settingsState.pendingProfileImageOriginal = updatedUser.pendingProfileImageOriginal || "";
-      settingsState.profilePhotoStatus = resolveProfilePhotoStatus(updatedUser);
-      persistSession({ user: mergedUser });
-      window.updateSessionUser?.(mergedUser);
-      applyAvatar(mergedUser);
-      updateAvatarRemoveButton(mergedUser);
-      updatePhotoReviewStatus(mergedUser);
-      updateRequiredFieldMarkers();
-      showToast("Profile photo removed.", "ok");
-    } catch (err) {
-      console.error("Unable to remove profile photo", err);
-      showToast(err.message || "Unable to remove photo.", "err");
-    } finally {
-      removeBtn.textContent = originalLabel;
-      updateAvatarRemoveButton(currentUser);
-    }
-  });
+      if (!currentUser) return;
+      const originalLabel = button.textContent;
+      button.disabled = true;
+      button.textContent = "Removing…";
+      try {
+        const res = await secureFetch("/api/users/me", {
+          method: "PATCH",
+          body: { profileImage: "", avatarURL: "" }
+        });
+        const updatedUser = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(updatedUser?.error || "Unable to remove photo");
+        }
+        const mergedUser = mergeSessionPreferences(updatedUser);
+        currentUser = mergedUser;
+        settingsState.profileImage = updatedUser.profileImage || "";
+        settingsState.profileImageOriginal = updatedUser.profileImageOriginal || "";
+        settingsState.pendingProfileImage = updatedUser.pendingProfileImage || "";
+        settingsState.pendingProfileImageOriginal = updatedUser.pendingProfileImageOriginal || "";
+        settingsState.profilePhotoStatus = resolveProfilePhotoStatus(updatedUser);
+        persistSession({ user: mergedUser });
+        window.updateSessionUser?.(mergedUser);
+        applyAvatar(mergedUser);
+        updateAvatarRemoveButton(mergedUser);
+        updatePhotoReviewStatus(mergedUser);
+        updateRequiredFieldMarkers();
+        showToast("Profile photo removed.", "ok");
+      } catch (err) {
+        console.error("Unable to remove profile photo", err);
+        showToast(err.message || "Unable to remove photo.", "err");
+      } finally {
+        button.textContent = originalLabel;
+        updateAvatarRemoveButton(currentUser);
+      }
+    });
+  };
+
+  bindRemoveButton(document.getElementById("removeAvatarBtn"));
+  bindRemoveButton(document.getElementById("removeAttorneyAvatarBtn"));
 }
 
 function bindAvatarEditing() {

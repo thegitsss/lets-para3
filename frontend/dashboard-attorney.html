@@ -1150,7 +1150,7 @@
       border: 1px solid rgba(182, 164, 122, 0.42);
       border-radius: 14px;
       padding: 0.9rem 1rem;
-      background: linear-gradient(135deg, rgba(182, 164, 122, 0.16), rgba(255, 255, 255, 0.96));
+      background: rgba(255, 255, 255, 0.96);
       box-shadow: var(--card-shadow-soft);
       cursor: pointer;
       transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
@@ -1251,7 +1251,7 @@
     }
     body.theme-dark .onboarding-attention-card,
     body.theme-mountain-dark .onboarding-attention-card {
-      background: linear-gradient(135deg, rgba(148, 163, 184, 0.22), rgba(15, 23, 42, 0.86));
+      background: rgba(15, 23, 42, 0.86);
       border-color: rgba(148, 163, 184, 0.38);
     }
     .weekly-notes {
@@ -4046,6 +4046,12 @@
       font-size: 14px;
       font-weight: 200;
       cursor: pointer;
+    }
+    body.theme-dark .payment-modal .ghost-btn,
+    html.theme-dark body .payment-modal .ghost-btn {
+      background: rgba(255, 255, 255, 0.08);
+      color: #f8fbff;
+      border-color: rgba(255, 255, 255, 0.16);
     }
 
     .view-billing .finance-alerts {

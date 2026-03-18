@@ -26,7 +26,8 @@ const elements = {
   publications: document.getElementById("publicationsList"),
   avatar: document.getElementById("profileAvatar"),
   avatarShell: document.getElementById("avatarShell"),
-  avatarFallback: document.getElementById("avatarFallback")
+  avatarFallback: document.getElementById("avatarFallback"),
+  heroPhoto: document.querySelector(".hero-photo")
 };
 
 function hasProfileAccess(user = {}) {
@@ -395,12 +396,14 @@ function renderAvatar(name, src) {
   const initials = buildInitials(name);
   if (elements.avatarFallback) elements.avatarFallback.textContent = initials || "A";
   if (src) {
+    elements.heroPhoto?.classList.remove("no-photo");
     elements.avatarShell?.classList.add("has-photo");
     if (elements.avatar) {
       elements.avatar.src = cacheBust(src);
       elements.avatar.alt = `${name} portrait`;
     }
   } else {
+    elements.heroPhoto?.classList.add("no-photo");
     elements.avatarShell?.classList.remove("has-photo");
     if (elements.avatar) elements.avatar.removeAttribute("src");
   }

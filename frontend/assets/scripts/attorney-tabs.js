@@ -40,13 +40,30 @@ const PARALEGAL_AVATAR_FALLBACK = `data:image/svg+xml;charset=UTF-8,${encodeURIC
   "<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'><rect width='220' height='220' rx='110' fill='#f1f5f9'/><circle cx='110' cy='90' r='46' fill='#cbd5e1'/><path d='M40 188c10-40 45-68 70-68s60 28 70 68' fill='none' stroke='#cbd5e1' stroke-width='18' stroke-linecap='round'/></svg>"
 )}`;
 const ATTORNEY_AVATAR_FALLBACK = PARALEGAL_AVATAR_FALLBACK;
+function getInitials(name = "", fallback = "A") {
+  const trimmed = String(name || "").trim();
+  if (!trimmed) return fallback;
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  const letters = parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("");
+  return letters || fallback;
+}
+function buildAttorneyInitialsAvatar(name = "") {
+  const initials = getInitials(name, "A");
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'><rect width='220' height='220' rx='110' fill='#f1f5f9'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='#5b6472' font-family='Georgia, serif' font-size='74' letter-spacing='4'>${initials}</text></svg>`
+  )}`;
+}
 function getProfileImageUrl(user = {}) {
   const role = String(user.role || "").toLowerCase();
   const pending = role === "paralegal" ? user.pendingProfileImage : "";
   const stored = user.profileImage || user.avatarURL;
   if (pending) return pending;
   if (stored) return stored;
-  return role === "paralegal" ? PARALEGAL_AVATAR_FALLBACK : ATTORNEY_AVATAR_FALLBACK;
+  if (role === "attorney") {
+    const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.name || "Attorney";
+    return buildAttorneyInitialsAvatar(name);
+  }
+  return PARALEGAL_AVATAR_FALLBACK;
 }
 
 const INVITE_AVATAR_FALLBACK = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
@@ -129,6 +146,7 @@ const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
 const ATTORNEY_ONBOARDING_MODAL_SEEN_KEY = "lpc_attorney_onboarding_modal_seen_case";
 const ATTORNEY_ONBOARDING_MODAL_SEEN_PREFIX = "lpc_attorney_onboarding_modal_seen";
 const ATTORNEY_ONBOARDING_COMPLETE_NOTICE_KEY = "lpc_attorney_onboarding_complete_notice_seen";
+const ATTORNEY_ONBOARDING_DISMISSED_KEY = "lpc_attorney_onboarding_dismissed";
 let onboardingChecklistApi = null;
 let caseOnboardingPrompted = false;
 let caseOnboardingModalBound = false;
@@ -279,6 +297,16 @@ function applyRoleVisibility(user) {
   }
 }
 
+function bindImmediateCreateCaseActions() {
+  document.querySelectorAll('[data-case-quick="create"]').forEach((btn) => {
+    if (btn.dataset.boundCreateCase === "true") return;
+    btn.dataset.boundCreateCase = "true";
+    btn.addEventListener("click", () => {
+      window.location.href = "create-case.html";
+    });
+  });
+}
+
 async function bootstrap() {
 
   if (!state.archiveHighlightCaseId) {
@@ -290,6 +318,7 @@ async function bootstrap() {
   const headerOnly = HEADER_ONLY_ROUTES[role]?.has(pageKey);
   const skipNotifications = role !== "paralegal" && headerOnly && pageKey !== "profile-settings";
   await initHeader({ skipNotifications });
+  bindImmediateCreateCaseActions();
   bindNotificationAutoRefresh();
   if (headerOnly) {
     return;
@@ -683,7 +712,7 @@ function isAttorneyProfileComplete(user = {}) {
     : [];
   const description = String(user.practiceDescription || user.bio || "").trim();
   const hasPractice = practiceAreas.length > 0;
-  const hasSummary = description.length >= 40 || Boolean(user.lawFirm) || Boolean(user.linkedInURL);
+  const hasSummary = Boolean(description) || Boolean(user.lawFirm) || Boolean(user.linkedInURL);
   return hasPractice && hasSummary;
 }
 
@@ -758,6 +787,24 @@ function clearOnboardingCompleteNoticeSeen() {
   } catch {}
 }
 
+function isAttorneyOnboardingDismissed() {
+  try {
+    return sessionStorage.getItem(ATTORNEY_ONBOARDING_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function setAttorneyOnboardingDismissed(value) {
+  try {
+    if (value) {
+      sessionStorage.setItem(ATTORNEY_ONBOARDING_DISMISSED_KEY, "1");
+    } else {
+      sessionStorage.removeItem(ATTORNEY_ONBOARDING_DISMISSED_KEY);
+    }
+  } catch {}
+}
+
 function clearOnboardingAttentionCompleteTimer() {
   if (!onboardingAttentionCompleteTimer) return;
   clearTimeout(onboardingAttentionCompleteTimer);
@@ -774,6 +821,7 @@ function updateCaseOnboardingSkipButton() {
 
 function skipAttorneyOnboardingFlow() {
   clearAttorneyOnboardingStep();
+  setAttorneyOnboardingDismissed(true);
   clearOnboardingModalSeen("profile");
   clearOnboardingModalSeen("payment");
   clearOnboardingModalSeen("case");
@@ -788,6 +836,7 @@ function skipAttorneyOnboardingFlow() {
 
 function openOnboardingStepWithPopup(step) {
   if (!step) return;
+  setAttorneyOnboardingDismissed(false);
   if (step === "profile") {
     setAttorneyOnboardingStep("profile");
     clearOnboardingModalSeen("profile");
@@ -851,6 +900,12 @@ function updateOnboardingAttentionCard(progress = getAttorneyOnboardingProgress(
   onboardingAttentionWasComplete = isComplete;
 
   if (!isComplete) {
+    if (isAttorneyOnboardingDismissed()) {
+      clearOnboardingAttentionCompleteTimer();
+      card.hidden = true;
+      card.setAttribute("aria-hidden", "true");
+      return;
+    }
     clearOnboardingAttentionCompleteTimer();
     clearOnboardingCompleteNoticeSeen();
     card.classList.remove("is-static", "is-complete");
@@ -873,6 +928,7 @@ function updateOnboardingAttentionCard(progress = getAttorneyOnboardingProgress(
   }
 
   card.dataset.step = "";
+  setAttorneyOnboardingDismissed(false);
   card.classList.add("is-static", "is-complete");
   if (titleEl) titleEl.textContent = "Onboarding Complete";
   if (textEl) {
@@ -3226,14 +3282,6 @@ async function initCasesPage() {
   window.addEventListener("resize", repositionOpenCaseMenu);
   window.addEventListener("scroll", repositionOpenCaseMenu, true);
 
-  document.querySelectorAll("[data-case-quick]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const quick = btn.dataset.caseQuick;
-      if (quick === "create") {
-        window.location.href = "create-case.html";
-      }
-    });
-  });
   document.querySelectorAll("[data-archived-bulk]").forEach((btn) => {
     btn.addEventListener("click", onArchivedBulkAction);
   });
