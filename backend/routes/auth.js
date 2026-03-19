@@ -427,6 +427,16 @@ function isEmail(v = "") {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).toLowerCase());
 }
 
+function isHttpUrl(v = "") {
+  if (!v || typeof v !== "string") return false;
+  try {
+    const u = new URL(String(v).trim());
+    return ["http:", "https:"].includes(u.protocol);
+  } catch {
+    return false;
+  }
+}
+
 function isTypoEmailDomain(v = "") {
   return /@[^@\s]+\.con$/i.test(String(v).trim());
 }
@@ -577,6 +587,7 @@ router.post(
     const normalizedBarState =
       typeof barState === "string" ? barState.trim().toUpperCase() : "";
     const normalizedBarNumber = String(barNumber || "").trim();
+    const normalizedLinkedInURL = linkedInURL ? String(linkedInURL).trim() : "";
     if (roleLc === "attorney") {
       if (!normalizedBarNumber) {
         return res.status(400).json({ msg: "State Bar Number is required for attorneys." });
@@ -586,6 +597,9 @@ router.post(
       }
       if (!/^[A-Z]{2}$/.test(normalizedBarState)) {
         return res.status(400).json({ msg: "Bar State must be a valid 2-letter code." });
+      }
+      if (normalizedLinkedInURL && !isHttpUrl(normalizedLinkedInURL)) {
+        return res.status(400).json({ msg: "LinkedIn URL must start with http:// or https://" });
       }
     }
 
@@ -649,7 +663,7 @@ router.post(
       barNumber: roleLc === "attorney" ? String(barNumber || "") : "",
       resumeURL: roleLc === "paralegal" ? "" : "",
       certificateURL: roleLc === "paralegal" ? String(certificateURL || "") : "",
-      linkedInURL: linkedInURL ? String(linkedInURL).trim() : "",
+      linkedInURL: normalizedLinkedInURL,
       lawFirm: roleLc === "attorney" ? (String(lawFirm || "").trim() || null) : null,
       termsAccepted: true,
       phoneNumber: phoneNumber ? String(phoneNumber).trim() || null : null,

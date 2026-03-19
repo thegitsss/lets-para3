@@ -74,7 +74,7 @@ const csrfProtection = csrf({
 });
 
 app.use("/api/auth/login", rateLimit({ windowMs: 60 * 1000, max: 10 }));
-app.use("/api/auth/signup", rateLimit({ windowMs: 60 * 1000, max: 10 }));
+app.use("/api/auth/register", rateLimit({ windowMs: 60 * 1000, max: 10 }));
 app.use(
   "/api/auth/request-password-reset",
   rateLimit({ windowMs: 15 * 60 * 1000, max: 10, standardHeaders: true, legacyHeaders: false })
@@ -186,9 +186,13 @@ app.get("/api/csrf", csrfProtection, (req, res) => {
   res.json({ csrfToken: req.csrfToken() });
 });
 
-app.get("/ping", (_req, res) => {
+app.get(
+  "/ping",
+  rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: false, legacyHeaders: false }),
+  (_req, res) => {
   res.json({ ping: "pong" });
-});
+  }
+);
 
 app.get("/api/health", (_req, res) => {
   const dbState = mongoose.connection.readyState;

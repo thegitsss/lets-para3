@@ -325,8 +325,8 @@ function renderProfile(profile) {
     locationCard?.classList.add("hidden");
   }
 
-  const linkedIn = cleanUrl(profile.linkedInURL);
-  const website = cleanUrl(profile.firmWebsite || profile.website);
+  const linkedIn = sanitizeHttpUrl(profile.linkedInURL);
+  const website = sanitizeHttpUrl(profile.firmWebsite || profile.website);
   setHeroLink(elements.heroLinkedIn, linkedIn, "LinkedIn");
 
   const summary = profile.practiceDescription || profile.bio || "";
@@ -596,12 +596,16 @@ function describeExperience(value) {
 }
 
 
-function cleanUrl(value) {
+function sanitizeHttpUrl(value) {
   if (!value) return "";
-  const trimmed = String(value).trim();
-  if (!trimmed) return "";
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  return `https://${trimmed}`;
+  try {
+    const url = new URL(String(value).trim());
+    const protocol = url.protocol.toLowerCase();
+    if (protocol === "http:" || protocol === "https:") {
+      return url.href;
+    }
+  } catch {}
+  return "";
 }
 
 function buildInitials(name) {

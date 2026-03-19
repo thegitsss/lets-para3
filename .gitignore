@@ -68,6 +68,16 @@ coverage/
 lib/
 backend/node_modules/
 
+# --- AI CHAT HELPERS (bottom-corner widgets only) ---
+backend/ai/
+backend/models/AiConversation.js
+backend/models/AiIssueReport.js
+backend/routes/aiChat.js
+frontend/assets/scripts/ai-chat.js
+frontend/assets/scripts/public-concierge.js
+frontend/assets/styles/ai-chat.css
+frontend/assets/styles/public-concierge.css
+
 # --- SSL / KEYS ---
 *.pem
 *.crt

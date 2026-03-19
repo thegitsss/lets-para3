@@ -749,13 +749,19 @@ router.patch(
       me.timezone = timezone;
     }
 
-    if (typeof body.linkedInURL === "string") {
+    if (me.role === "attorney" && typeof body.linkedInURL === "string") {
       const trimmed = body.linkedInURL.trim();
+      if (trimmed && !isURL(trimmed)) {
+        return res.status(400).json({ error: "LinkedIn URL must start with http:// or https://" });
+      }
       me.linkedInURL = trimmed ? normStr(trimmed, { len: 500 }) : null;
     }
 
-    if (typeof body.firmWebsite === "string") {
+    if (me.role === "attorney" && typeof body.firmWebsite === "string") {
       const trimmed = body.firmWebsite.trim();
+      if (trimmed && !isURL(trimmed)) {
+        return res.status(400).json({ error: "Firm website must start with http:// or https://" });
+      }
       me.firmWebsite = trimmed ? normStr(trimmed, { len: 500 }) : "";
     }
 

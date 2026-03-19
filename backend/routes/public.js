@@ -57,6 +57,13 @@ router.use(
 // ----------------------------------------
 router.get(
   "/unsubscribe",
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many unsubscribe requests. Please try again later." },
+  }),
   asyncHandler(async (req, res) => {
     const redirect = (status, reason) => {
       const params = new URLSearchParams({ status });
@@ -291,6 +298,13 @@ router.get(
 // ----------------------------------------
 router.get(
   "/paralegals",
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 60,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many directory requests. Please slow down." },
+  }),
   verifyToken.optional,
   asyncHandler(async (req, res) => {
     const page = clamp(parseInt(req.query.page, 10) || 1, 1, 10_000);
@@ -379,6 +393,13 @@ router.get(
 
 router.get(
   "/paralegals/:id",
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: 90,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many profile requests. Please slow down." },
+  }),
   verifyToken.optional,
   asyncHandler(async (req, res) => {
     const { id } = req.params;
