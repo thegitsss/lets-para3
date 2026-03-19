@@ -90,12 +90,14 @@ describe("Webhook handling", () => {
 
     const event = {
       id: "evt_123",
+      livemode: false,
       type: "payment_intent.succeeded",
       data: {
         object: {
           id: "pi_123",
           amount: 100000,
           currency: "usd",
+          livemode: false,
           metadata: { caseId: String(caseDoc._id) },
         },
       },
@@ -117,10 +119,12 @@ describe("Webhook handling", () => {
     expect(updated.paymentStatus).toBe("succeeded");
     expect(updated.escrowIntentId).toBe("pi_123");
     expect(updated.status).toBe("in progress");
+    expect(updated.stripeMode).toBe("test");
 
     const webhookRecord = await WebhookEvent.findOne({ eventId: "evt_123" }).lean();
     expect(webhookRecord).toBeTruthy();
     expect(webhookRecord.status).toBe("processed");
+    expect(webhookRecord.stripeMode).toBe("test");
 
     const audit = await AuditLog.findOne({
       action: "payment.intent.succeeded",

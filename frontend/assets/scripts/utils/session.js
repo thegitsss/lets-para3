@@ -451,6 +451,7 @@
 
   function injectBetaFooter(user) {
     if (!user || typeof document === "undefined") return;
+    if (String(user.role || "").toLowerCase() === "admin") return;
     const footers = document.querySelectorAll(".sidebar-footer");
     if (!footers.length) return;
     ensureBetaFooterStyles();

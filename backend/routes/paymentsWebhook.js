@@ -16,6 +16,7 @@ const Case = require("../models/Case");
 const AuditLog = require("../models/AuditLog"); // match filename
 const WebhookEvent = require("../models/WebhookEvent");
 const { notifyUser } = require("../utils/notifyUser");
+const { currentStripeMode, pickStripeMode, stripeModeFromLivemode } = require("../utils/stripeMode");
 
 // ----------------------------------------
 // Durable dedupe (db-backed) with retry-safe status tracking
@@ -24,6 +25,7 @@ async function claimWebhookEvent(event) {
   if (!event?.id) return { deduped: false };
   const now = new Date();
   const staleCutoff = new Date(Date.now() - 10 * 60 * 1000);
+  const stripeMode = pickStripeMode(stripeModeFromLivemode(event?.livemode), currentStripeMode());
   try {
     const record = await WebhookEvent.findOneAndUpdate(
       {
@@ -35,7 +37,7 @@ async function claimWebhookEvent(event) {
       },
       {
         $setOnInsert: { provider: "stripe", eventId: event.id, type: event.type },
-        $set: { status: "processing", lastAttemptAt: now },
+        $set: { status: "processing", lastAttemptAt: now, stripeMode },
         $inc: { attempts: 1 },
       },
       { upsert: true, new: true }
@@ -141,6 +143,12 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
       case "payment_intent.succeeded": {
         const pi = event.data.object;
         const c = await findCaseForPaymentIntent(pi);
+        const stripeMode = pickStripeMode(
+          stripeModeFromLivemode(pi?.livemode),
+          stripeModeFromLivemode(event?.livemode),
+          c?.stripeMode,
+          currentStripeMode()
+        );
 
         if (c) {
           // Snapshot funding info (do NOT auto-release or payout here)
@@ -148,6 +156,7 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
           if (!c.escrowIntentId) c.escrowIntentId = pi.id;
           if (!c.paymentIntentId) c.paymentIntentId = pi.id;
           if (!c.currency) c.currency = pi.currency || c.currency || "usd";
+          c.stripeMode = stripeMode;
           if (c.lockedTotalAmount == null && (!c.totalAmount || c.totalAmount <= 0)) {
             c.totalAmount = pi.amount || c.totalAmount || 0;
           }
@@ -202,6 +211,7 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
               eventId: event.id,
               amount: pi.amount,
               currency: pi.currency,
+              stripeMode,
               transfer_group: pi.transfer_group || null,
             },
           });

@@ -161,11 +161,70 @@ const baseMatch = Object.assign({}, match);
 return [
 { $match: baseMatch },
 { $addFields: { amountForCalc: { $ifNull: ["$lockedTotalAmount", "$totalAmount"] } } },
-{ $addFields: { attorneyRef: { $ifNull: ["$attorney", "$attorneyId"] } } },
-{ $lookup: { from: "users", localField: "attorneyRef", foreignField: "_id", as: "attorneyDoc" } },
-{ $unwind: "$attorneyDoc" },
-{ $match: { "attorneyDoc.status": "approved" } },
 ];
+}
+
+function getFinancialReportingStartDate() {
+  const raw = String(
+    process.env.ADMIN_FINANCIAL_REPORTING_START_AT ||
+      process.env.FINANCIAL_REPORTING_START_AT ||
+      ""
+  ).trim();
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function withCreatedAtFloor(match = {}, floor = null) {
+  const next = { ...(match || {}) };
+  if (!floor) return next;
+
+  const current = next.createdAt;
+  if (!current || current instanceof Date) {
+    next.createdAt = current ? { $gte: floor, $lte: current } : { $gte: floor };
+    return next;
+  }
+
+  if (typeof current === "object" && !Array.isArray(current)) {
+    next.createdAt = { ...current };
+    const existingGte = next.createdAt.$gte;
+    if (!existingGte || new Date(existingGte) < floor) {
+      next.createdAt.$gte = floor;
+    }
+    return next;
+  }
+
+  next.createdAt = { $gte: floor };
+  return next;
+}
+
+function stripeModeGroupId(field = "$stripeMode") {
+  return { $ifNull: [field, "unknown"] };
+}
+
+function buildCaseStripeModeAggregate(match = {}, amountExpr = CASE_AMOUNT_EXPR) {
+  return buildApprovedCasePipeline(match).concat([
+    {
+      $group: {
+        _id: stripeModeGroupId(),
+        total: { $sum: amountExpr },
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+}
+
+function buildModelStripeModeAggregate(match = {}, amountField = "$feeAmount") {
+  return [
+    { $match: match },
+    {
+      $group: {
+        _id: stripeModeGroupId(),
+        total: { $sum: amountField },
+        count: { $sum: 1 },
+      },
+    },
+  ];
 }
 
 function pickUserSafe(u) {
@@ -952,12 +1011,11 @@ router.put(
 );
 
 const ACTIVE_USER_MATCH = {
-  status: "approved",
+  status: { $nin: ["denied", "rejected"] },
   disabled: { $ne: true },
   deleted: { $ne: true },
-  role: { $ne: "admin" },
 };
-const PENDING_USER_MATCH = { status: "pending", deleted: { $ne: true } };
+const PENDING_USER_MATCH = { status: "pending", deleted: { $ne: true }, disabled: { $ne: true } };
 
 router.get("/metrics", asyncHandler(async (_req, res) => {
 const ACTIVE_CASE_STATUSES = [
@@ -969,6 +1027,7 @@ const ACTIVE_CASE_STATUSES = [
   "in progress",
   "in_progress",
 ];
+const financialStart = getFinancialReportingStartDate();
 
 const [roleAggregation, pendingApprovals, recentUsersRaw, monthlyRegistrationsRaw, caseAggregation, escrowAggregation, revenueAggregation] =
 await Promise.all([
@@ -986,9 +1045,9 @@ User.aggregate([
 ]),
 Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
 Case.aggregate(
-  buildApprovedCasePipeline({ paymentReleased: { $ne: true } }).concat([{ $group: { _id: null, total: { $sum: "$totalAmount" } } }])
+  buildApprovedCasePipeline(withCreatedAtFloor({ paymentReleased: { $ne: true } }, financialStart)).concat([{ $group: { _id: null, total: { $sum: "$totalAmount" } } }])
 ),
-PlatformIncome.aggregate([{ $group: { _id: null, total: { $sum: "$feeAmount" }, count: { $sum: 1 } } }]),
+PlatformIncome.aggregate([{ $match: withCreatedAtFloor({}, financialStart) }, { $group: { _id: null, total: { $sum: "$feeAmount" }, count: { $sum: 1 } } }]),
 ]);
 
 const roleMap = roleAggregation.reduce((acc, item) => {
@@ -1299,17 +1358,18 @@ const ACTIVE_CASE_STATUSES = [
   "in progress",
   "in_progress",
 ];
+const financialStart = getFinancialReportingStartDate();
 const [roleAggregation, pendingUsers, caseAggregation, escrowHeldAgg, escrowReleasedAgg] = await Promise.all([
 User.aggregate([{ $match: ACTIVE_USER_MATCH }, { $group: { _id: "$role", count: { $sum: 1 } } }]),
 User.countDocuments(PENDING_USER_MATCH),
 Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
 Case.aggregate(
-  buildApprovedCasePipeline({ paymentReleased: { $ne: true } }).concat([
+  buildApprovedCasePipeline(withCreatedAtFloor({ paymentReleased: { $ne: true } }, financialStart)).concat([
     { $group: { _id: null, total: { $sum: CASE_AMOUNT_EXPR } } },
   ])
 ),
 Case.aggregate(
-  buildApprovedCasePipeline({ paymentReleased: true }).concat([
+  buildApprovedCasePipeline(withCreatedAtFloor({ paymentReleased: true }, financialStart)).concat([
     { $group: { _id: null, total: { $sum: CASE_AMOUNT_EXPR } } },
   ])
 ),
@@ -1349,6 +1409,8 @@ router.get(
 asyncHandler(async (_req, res) => {
 const MONTHS_WINDOW = 12;
 const startWindow = startOfMonthWindow(MONTHS_WINDOW);
+const financialStart = getFinancialReportingStartDate();
+const financeWindowStart = financialStart && financialStart > startWindow ? financialStart : startWindow;
 const ACTIVE_CASE_STATUSES = [
   "open",
   "assigned",
@@ -1368,17 +1430,22 @@ pendingApprovalsCount,
 registrationsAgg,
 escrowHeldAgg,
 escrowReleasedAgg,
+escrowHeldByModeAgg,
+escrowReleasedByModeAgg,
       escrowHeldByMonthAgg,
       escrowReleasedByMonthAgg,
 grossVolumeAgg,
+grossVolumeByModeAgg,
 monthlyGrossAgg,
 platformFeeAgg,
+platformFeeByModeAgg,
 monthlyFeesAgg,
 jobsPostedAgg,
 jobsCompletedAgg,
 practiceAgg,
 escrowInProgressCount,
 pendingPayoutAgg,
+pendingPayoutByModeAgg,
 payoutTotalsAgg,
 caseStatusAgg,
 caseLedgerDocs,
@@ -1396,21 +1463,22 @@ User.aggregate([
 { $sort: { "_id.year": 1, "_id.month": 1 } },
 ]),
 Case.aggregate(
-  buildApprovedCasePipeline({ paymentReleased: { $ne: true } }).concat([
+  buildApprovedCasePipeline(withCreatedAtFloor({ paymentReleased: { $ne: true } }, financialStart)).concat([
     { $group: { _id: null, total: { $sum: CASE_AMOUNT_EXPR } } },
   ])
 ),
 Case.aggregate(
-  buildApprovedCasePipeline({ paymentReleased: true }).concat([
+  buildApprovedCasePipeline(withCreatedAtFloor({ paymentReleased: true }, financialStart)).concat([
     { $group: { _id: null, total: { $sum: CASE_AMOUNT_EXPR } } },
   ])
 ),
+Case.aggregate(buildCaseStripeModeAggregate(withCreatedAtFloor({ paymentReleased: { $ne: true } }, financialStart))),
+Case.aggregate(buildCaseStripeModeAggregate(withCreatedAtFloor({ paymentReleased: true }, financialStart))),
       Case.aggregate(
-        buildApprovedCasePipeline({
-          createdAt: { $gte: startWindow },
+        buildApprovedCasePipeline(withCreatedAtFloor({
           paymentReleased: { $ne: true },
           amountForCalc: { $gt: 0 },
-        }).concat([
+        }, financeWindowStart)).concat([
           {
             $group: {
               _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
@@ -1421,7 +1489,7 @@ Case.aggregate(
         ])
       ),
       Payout.aggregate([
-        { $match: { createdAt: { $gte: startWindow } } },
+        { $match: withCreatedAtFloor({}, financeWindowStart) },
         {
           $group: {
             _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
@@ -1430,9 +1498,10 @@ Case.aggregate(
         },
         { $sort: { "_id.year": 1, "_id.month": 1 } },
       ]),
-Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: null, total: { $sum: "$totalAmount" }, count: { $sum: 1 } } }])),
+Case.aggregate(buildApprovedCasePipeline(withCreatedAtFloor({}, financialStart)).concat([{ $group: { _id: null, total: { $sum: "$totalAmount" }, count: { $sum: 1 } } }])),
+Case.aggregate(buildCaseStripeModeAggregate(withCreatedAtFloor({}, financialStart))),
 Case.aggregate(
-  buildApprovedCasePipeline({ createdAt: { $gte: startWindow } }).concat([
+  buildApprovedCasePipeline(withCreatedAtFloor({}, financeWindowStart)).concat([
     {
       $group: {
         _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
@@ -1442,14 +1511,15 @@ Case.aggregate(
     { $sort: { "_id.year": 1, "_id.month": 1 } },
   ])
 ),
-PlatformIncome.aggregate([{ $group: { _id: null, total: { $sum: "$feeAmount" } } }]),
+PlatformIncome.aggregate([{ $match: withCreatedAtFloor({}, financialStart) }, { $group: { _id: null, total: { $sum: "$feeAmount" }, count: { $sum: 1 } } }]),
+PlatformIncome.aggregate(buildModelStripeModeAggregate(withCreatedAtFloor({}, financialStart), "$feeAmount")),
 PlatformIncome.aggregate([
-{ $match: { createdAt: { $gte: startWindow } } },
+{ $match: withCreatedAtFloor({}, financeWindowStart) },
 { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, revenue: { $sum: "$feeAmount" } } },
 { $sort: { "_id.year": 1, "_id.month": 1 } },
 ]),
 Case.aggregate(
-  buildApprovedCasePipeline({ createdAt: { $gte: startWindow } }).concat([
+  buildApprovedCasePipeline(withCreatedAtFloor({}, financeWindowStart)).concat([
     { $group: { _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } }, count: { $sum: 1 } } },
     { $sort: { "_id.year": 1, "_id.month": 1 } },
   ])
@@ -1470,32 +1540,38 @@ Case.aggregate(
   buildApprovedCasePipeline({ paymentReleased: { $ne: true }, status: { $in: ACTIVE_CASE_STATUSES } }).concat([{ $count: "count" }])
 ),
 Case.aggregate(
-  buildApprovedCasePipeline({ paymentReleased: { $ne: true }, status: { $in: COMPLETED_CASE_STATUSES } }).concat([
+  buildApprovedCasePipeline(withCreatedAtFloor({ paymentReleased: { $ne: true }, status: { $in: COMPLETED_CASE_STATUSES } }, financialStart)).concat([
     { $group: { _id: null, total: { $sum: CASE_PAYOUT_EXPR }, count: { $sum: 1 } } },
   ])
 ),
-Payout.aggregate([{ $group: { _id: null, total: { $sum: "$amountPaid" }, count: { $sum: 1 } } }]),
+Case.aggregate(
+  buildCaseStripeModeAggregate(
+    withCreatedAtFloor({ paymentReleased: { $ne: true }, status: { $in: COMPLETED_CASE_STATUSES } }, financialStart),
+    CASE_PAYOUT_EXPR
+  )
+),
+Payout.aggregate([{ $match: withCreatedAtFloor({}, financialStart) }, { $group: { _id: null, total: { $sum: "$amountPaid" }, count: { $sum: 1 } } }]),
 Case.aggregate(buildApprovedCasePipeline({}).concat([{ $group: { _id: "$status", count: { $sum: 1 } } }])),
-Case.find({ $or: [{ lockedTotalAmount: { $gt: 0 } }, { totalAmount: { $gt: 0 } }] })
+Case.find(withCreatedAtFloor({ $or: [{ lockedTotalAmount: { $gt: 0 } }, { totalAmount: { $gt: 0 } }] }, financialStart))
 .sort({ createdAt: -1 })
 .limit(LEDGER_LIMIT)
 .select("title practiceArea totalAmount lockedTotalAmount paymentStatus paymentReleased createdAt")
 .lean(),
-Payout.find()
+Payout.find(withCreatedAtFloor({}, financialStart))
 .sort({ createdAt: -1 })
 .limit(LEDGER_LIMIT)
 .select("caseId amountPaid transferId createdAt")
 .lean(),
-PlatformIncome.find()
+PlatformIncome.find(withCreatedAtFloor({}, financialStart))
 .sort({ createdAt: -1 })
 .limit(LEDGER_LIMIT)
 .select("caseId feeAmount createdAt")
 .lean(),
-Case.find({
+Case.find(withCreatedAtFloor({
   paymentReleased: { $ne: true },
   paralegal: { $ne: null },
   $or: [{ lockedTotalAmount: { $gt: 0 } }, { totalAmount: { $gt: 0 } }],
-})
+}, financialStart))
 .sort({ deadline: 1, createdAt: 1 })
 .limit(5)
 .select("deadline totalAmount lockedTotalAmount feeParalegalAmount feeParalegalPct paralegalNameSnapshot paralegal createdAt")
@@ -2393,9 +2469,10 @@ res.json({ users, cases });
 }));
 
 router.get("/payouts", asyncHandler(async (_req, res) => {
+const financialStart = getFinancialReportingStartDate();
 const [items, summary] = await Promise.all([
-Payout.find().sort({ createdAt: -1 }).limit(200).lean(),
-Payout.aggregate([{ $group: { _id: null, total: { $sum: "$amountPaid" }, count: { $sum: 1 } } }]),
+Payout.find(withCreatedAtFloor({}, financialStart)).sort({ createdAt: -1 }).limit(200).lean(),
+Payout.aggregate([{ $match: withCreatedAtFloor({}, financialStart) }, { $group: { _id: null, total: { $sum: "$amountPaid" }, count: { $sum: 1 } } }]),
 ]);
 res.json({
 totalAmount: summary[0]?.total || 0,
@@ -2405,9 +2482,10 @@ items,
 }));
 
 router.get("/income", asyncHandler(async (_req, res) => {
+const financialStart = getFinancialReportingStartDate();
 const [items, summary] = await Promise.all([
-PlatformIncome.find().sort({ createdAt: -1 }).limit(200).lean(),
-PlatformIncome.aggregate([{ $group: { _id: null, total: { $sum: "$feeAmount" }, count: { $sum: 1 } } }]),
+PlatformIncome.find(withCreatedAtFloor({}, financialStart)).sort({ createdAt: -1 }).limit(200).lean(),
+PlatformIncome.aggregate([{ $match: withCreatedAtFloor({}, financialStart) }, { $group: { _id: null, total: { $sum: "$feeAmount" }, count: { $sum: 1 } } }]),
 ]);
 res.json({
 totalAmount: summary[0]?.total || 0,

@@ -7,6 +7,7 @@ const platformIncomeSchema = new Schema(
     attorneyId: { type: Types.ObjectId, ref: "User", required: true, index: true },
     paralegalId: { type: Types.ObjectId, ref: "User", required: true, index: true },
     feeAmount: { type: Number, required: true, min: 0 },
+    stripeMode: { type: String, enum: ["live", "test", "unknown"], default: "unknown", index: true },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },

@@ -13,6 +13,7 @@ const mockStripe = {
   refunds: { create: jest.fn() },
   paymentIntents: { retrieve: jest.fn() },
   transfers: { create: jest.fn() },
+  isTransferablePaymentIntent: jest.fn(),
   sanitizeStripeError: jest.fn((_err, message) => message),
 };
 
@@ -62,6 +63,7 @@ beforeEach(async () => {
   mockStripe.refunds.create.mockReset();
   mockStripe.paymentIntents.retrieve.mockReset();
   mockStripe.transfers.create.mockReset();
+  mockStripe.isTransferablePaymentIntent.mockReset();
 });
 
 describe("Disputes + refunds", () => {
@@ -193,9 +195,9 @@ describe("Disputes + refunds", () => {
     expect(notesRes.body.notes).toBe("Refund approved");
   });
 
-  test("Partial release settles dispute with payout and partial refund", async () => {
+  test("Partial release settles dispute with payout-target input and partial refund", async () => {
     // Description: Admin resolves dispute with partial release.
-    // Input values: action="release_partial", grossAmountCents=50000.
+    // Input values: action="release_partial", payoutAmountCents=41000.
     // Expected result: payout transfer recorded, settlement saved, case closed.
 
     const admin = await User.create({
@@ -219,7 +221,7 @@ describe("Disputes + refunds", () => {
     const paralegal = await User.create({
       firstName: "Priya",
       lastName: "Ng",
-      email: "samanthasider+11@gmail.com", // payout bypass email
+      email: "priya.ng.release@example.com",
       password: "Password123!",
       role: "paralegal",
       status: "approved",
@@ -246,21 +248,117 @@ describe("Disputes + refunds", () => {
 
     const disputeId = caseDoc.disputes[0].disputeId || String(caseDoc.disputes[0]._id);
 
-    mockStripe.paymentIntents.retrieve.mockResolvedValue({ id: "pi_partial_123", status: "succeeded" });
+    mockStripe.paymentIntents.retrieve.mockResolvedValue({
+      id: "pi_partial_123",
+      status: "succeeded",
+      charges: { data: [{ id: "ch_partial_123" }] },
+    });
+    mockStripe.isTransferablePaymentIntent.mockReturnValue({
+      transferable: true,
+      charge: { id: "ch_partial_123" },
+    });
     mockStripe.refunds.create.mockResolvedValue({ id: "re_partial", amount: 10000 });
     mockStripe.transfers.create.mockResolvedValue({ id: "tr_123" });
 
     const res = await request(app)
       .post(`/api/payments/dispute/settle/${caseDoc._id}`)
       .set("Cookie", authCookieFor(admin))
-      .send({ action: "release_partial", disputeId, grossAmountCents: 50000 });
+      .send({ action: "release_partial", disputeId, payoutAmountCents: 41000 });
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
     expect(res.body.transferId).toBeTruthy();
+    expect(mockStripe.transfers.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source_transaction: "ch_partial_123",
+      })
+    );
 
     const updated = await Case.findById(caseDoc._id).lean();
     expect(updated.disputeSettlement?.action).toBe("release_partial");
     expect(updated.status).toBe("closed");
     expect(updated.paymentReleased).toBe(true);
+  });
+
+  test("Partial release retries only the remaining refund delta after a previous refund succeeded", async () => {
+    const admin = await User.create({
+      firstName: "Admin",
+      lastName: "Owner",
+      email: "owner4@lets-paraconnect.com",
+      password: "Password123!",
+      role: "admin",
+      status: "approved",
+      state: "CA",
+    });
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "alex.stone4@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "priya.ng.retry@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+      stripeAccountId: "acct_retry_123",
+      stripeOnboarded: true,
+      stripePayoutsEnabled: true,
+    });
+
+    const caseDoc = await Case.create({
+      title: "Retry partial release",
+      details: "Case details for retrying a partial dispute release.",
+      status: "disputed",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowIntentId: "pi_partial_retry_123",
+      escrowStatus: "funded",
+      totalAmount: 100,
+      lockedTotalAmount: 100,
+      currency: "usd",
+      disputes: [{ message: "Retry dispute", raisedBy: attorney._id, status: "open" }],
+    });
+
+    const disputeId = caseDoc.disputes[0].disputeId || String(caseDoc.disputes[0]._id);
+
+    mockStripe.paymentIntents.retrieve.mockResolvedValue({
+      id: "pi_partial_retry_123",
+      status: "succeeded",
+      amount: 122,
+      amount_received: 122,
+      charges: { data: [{ id: "ch_retry_123", amount: 122, amount_refunded: 61 }] },
+    });
+    mockStripe.isTransferablePaymentIntent.mockReturnValue({
+      transferable: true,
+      charge: { id: "ch_retry_123", amount: 122, amount_refunded: 61 },
+    });
+    mockStripe.refunds.create.mockResolvedValue({ id: "re_retry_123", amount: 30 });
+    mockStripe.transfers.create.mockResolvedValue({ id: "tr_retry_123" });
+
+    const res = await request(app)
+      .post(`/api/payments/dispute/settle/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(admin))
+      .send({ action: "release_partial", disputeId, payoutAmountCents: 25 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(mockStripe.refunds.create).toHaveBeenCalledWith({
+      payment_intent: "pi_partial_retry_123",
+      amount: 24,
+    });
+    expect(mockStripe.transfers.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source_transaction: "ch_retry_123",
+        amount: 25,
+      })
+    );
   });
 });

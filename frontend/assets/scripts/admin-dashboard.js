@@ -184,7 +184,7 @@ function resolveDisputeResolution(item = {}) {
 }
 
 function getDisputeColspan(status) {
-  return status === "resolved" ? 5 : 6;
+  return status === "resolved" || status === "rejected" ? 5 : 6;
 }
 
 function renderDisputeHeader(status) {
@@ -196,6 +196,16 @@ function renderDisputeHeader(status) {
       <th>Resolution</th>
       <th>Resolved</th>
       <th>Notes</th>
+    `;
+    return;
+  }
+  if (status === "rejected") {
+    disputesHeaderRow.innerHTML = `
+      <th>Case</th>
+      <th>Parties</th>
+      <th>Dispute</th>
+      <th>Status</th>
+      <th>Updated</th>
     `;
     return;
   }
@@ -301,6 +311,13 @@ const status = document.getElementById("settingsStatus");
 if (status) status.textContent = message;
 }
 
+let adminThemeManuallyChanged = false;
+
+function normalizeAdminTheme(value) {
+const candidate = String(value || "").toLowerCase();
+return candidate === "light" || candidate === "mountain" ? candidate : "mountain";
+}
+
 function applySettingsToForm(settings = {}) {
 const allowInput = document.getElementById("settingAllowSignups");
 if (allowInput) allowInput.checked = settings.allowSignups !== false;
@@ -314,6 +331,45 @@ const updatedLabel = document.getElementById("settingsUpdatedAt");
 if (updatedLabel) {
 const updated = settings.updatedAt ? formatDate(settings.updatedAt) : "";
 updatedLabel.textContent = updated ? `Last updated ${updated}` : "";
+}
+}
+
+function applyAdminThemeToForm(theme) {
+const themeInput = document.getElementById("settingAdminTheme");
+if (themeInput) themeInput.value = normalizeAdminTheme(theme);
+}
+
+function previewAdminTheme(theme) {
+const normalizedTheme = normalizeAdminTheme(theme);
+applyAdminThemeToForm(normalizedTheme);
+if (typeof window.applyThemePreference === "function") {
+window.applyThemePreference(normalizedTheme);
+}
+return normalizedTheme;
+}
+
+async function loadAdminThemePreference() {
+const fallbackTheme =
+  typeof window.getThemePreference === "function" ? window.getThemePreference() : "mountain";
+try {
+  const res = await secureFetch("/api/account/preferences", {
+    headers: { Accept: "application/json" },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || data?.msg || "Unable to load theme preference.");
+  }
+  const resolvedTheme = normalizeAdminTheme(data?.theme || fallbackTheme);
+  if (!adminThemeManuallyChanged) {
+    previewAdminTheme(resolvedTheme);
+  }
+  return resolvedTheme;
+} catch (err) {
+  console.error("Failed to load admin theme preference", err);
+  if (!adminThemeManuallyChanged) {
+    previewAdminTheme(fallbackTheme);
+  }
+  return normalizeAdminTheme(fallbackTheme);
 }
 }
 
@@ -359,6 +415,23 @@ payload.taxRate = normalized / 100;
 return payload;
 }
 
+async function saveAdminThemePreference() {
+const themeInput = document.getElementById("settingAdminTheme");
+const normalizedTheme = normalizeAdminTheme(themeInput?.value);
+const res = await secureFetch("/api/account/preferences", {
+method: "POST",
+body: { theme: normalizedTheme },
+});
+const data = await res.json().catch(() => ({}));
+if (!res.ok) {
+throw new Error(data?.error || data?.msg || "Unable to save theme preference.");
+}
+const savedTheme = normalizeAdminTheme(data?.preferences?.theme || data?.theme || normalizedTheme);
+adminThemeManuallyChanged = false;
+previewAdminTheme(savedTheme);
+return savedTheme;
+}
+
 async function saveAdminSettings() {
 const saveBtn = document.getElementById("saveAdminSettings");
 const original = saveBtn?.textContent || "Save Settings";
@@ -377,6 +450,7 @@ const data = await res.json().catch(() => ({}));
 if (!res.ok) {
 throw new Error(data?.error || data?.msg || "Unable to save settings.");
 }
+await saveAdminThemePreference();
 const settings = data.settings || data;
 adminSettingsCache = settings;
 applySettingsToForm(settings);
@@ -400,9 +474,17 @@ saveBtn.textContent = original;
 function bindSettingsActions() {
 if (settingsBound) return;
 const saveBtn = document.getElementById("saveAdminSettings");
+const themeInput = document.getElementById("settingAdminTheme");
 if (saveBtn) {
 saveBtn.addEventListener("click", () => {
 saveAdminSettings();
+});
+}
+if (themeInput) {
+themeInput.addEventListener("change", () => {
+adminThemeManuallyChanged = true;
+previewAdminTheme(themeInput.value);
+setSettingsStatus("Theme preview updated. Save settings to keep it.");
 });
 }
 settingsBound = true;
@@ -495,12 +577,10 @@ updateText("#metricParalegals", formatNumber(userMetrics.totalParalegals));
 updateText("#metricPending", formatNumber(userMetrics.pendingApprovals));
 
 populateQuickStats(userMetrics, caseMetrics, escrowMetrics);
-
-const revenueCards = document.querySelectorAll("#section-revenue .grid-four .card p");
-if (revenueCards[0]) revenueCards[0].textContent = formatCurrency(revenueMetrics.totalRevenue);
-if (revenueCards[1]) revenueCards[1].textContent = formatCurrency(escrowMetrics.totalEscrowReleased);
-if (revenueCards[2]) revenueCards[2].textContent = formatCurrency(escrowMetrics.pendingPayouts);
-if (revenueCards[3]) revenueCards[3].textContent = formatCurrency(revenueMetrics.platformFeesCollected);
+updateText("#revenueTotalValue", formatCurrency(revenueMetrics.totalRevenue));
+updateText("#fundsReleasedValue", formatCurrency(escrowMetrics.totalEscrowReleased));
+updateText("#pendingPayoutsValue", formatCurrency(escrowMetrics.pendingPayouts));
+updateText("#platformFeesCollectedValue", formatCurrency(revenueMetrics.platformFeesCollected));
 
 updateText("#payoutTotal", formatCurrency(expenses.payoutTotal));
 const payoutCountEl = document.getElementById("payoutCount");
@@ -602,6 +682,7 @@ tbody.appendChild(row);
 const receiptsBody = document.getElementById("receiptsBody");
 const receiptSearchInput = document.getElementById("receiptSearch");
 const receiptRefreshBtn = document.getElementById("receiptRefreshBtn");
+const RECEIPTS_PAGE_SIZE = 10;
 let receiptSearchTimer = null;
 
 function renderReceipts(items = []) {
@@ -612,6 +693,7 @@ function renderReceipts(items = []) {
     return;
   }
   receiptsBody.innerHTML = items
+    .slice(0, RECEIPTS_PAGE_SIZE)
     .map((item) => {
       const issuedAt = item?.issuedAt ? formatDate(item.issuedAt) : "—";
       const receiptId = escapeHTML(item.receiptId || "—");
@@ -639,7 +721,7 @@ async function loadReceipts() {
     '<tr><td colspan="6" style="text-align:center;color:var(--muted)">Loading receipts…</td></tr>';
   try {
     const q = String(receiptSearchInput?.value || "").trim();
-    const params = new URLSearchParams({ limit: "200" });
+    const params = new URLSearchParams({ limit: String(RECEIPTS_PAGE_SIZE) });
     if (q) params.set("q", q);
     const res = await secureFetch(`/api/payments/receipts?${params.toString()}`, {
       headers: { Accept: "application/json" },
@@ -985,12 +1067,12 @@ function renderOpenDisputes(items = []) {
               <button class="btn secondary" type="button" data-dispute-action="refund" data-case-id="${escapeAttribute(
                 caseId
               )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Zero payout</button>
-              <input type="number" min="0" step="0.01" placeholder="Payout $" data-dispute-amount${actionDisabled} />
+              <input type="number" min="0" step="0.01" placeholder="Payout to paralegal $" data-dispute-amount${actionDisabled} />
               <button class="btn primary" type="button" data-dispute-action="release-partial" data-case-id="${escapeAttribute(
                 caseId
               )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Finalize payout</button>
             </div>
-            ${recommendedLabel ? `<div class="dispute-meta">Recommended: no more than ${recommendedLabel} (70% of original case amount).</div>` : ""}
+            ${recommendedLabel ? `<div class="dispute-meta">Enter the payout amount to release to the paralegal. Recommended: no more than ${recommendedLabel} (70% of original case payout).</div>` : ""}
             ${actionNote}
       `;
       const standardActions = `
@@ -1001,15 +1083,16 @@ function renderOpenDisputes(items = []) {
               <button class="btn primary" type="button" data-dispute-action="release-full" data-case-id="${escapeAttribute(
                 caseId
               )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Full release</button>
-              <input type="number" min="0" step="0.01" placeholder="Partial $" data-dispute-amount${actionDisabled} />
+              <input type="number" min="0" step="0.01" placeholder="Payout to paralegal $" data-dispute-amount${actionDisabled} />
               <button class="btn secondary" type="button" data-dispute-action="release-partial" data-case-id="${escapeAttribute(
                 caseId
               )}" data-dispute-id="${escapeAttribute(disputeId)}"${actionDisabled}>Partial release</button>
             </div>
+            <div class="dispute-meta">Enter the payout amount to release to the paralegal. Platform fees are handled automatically.</div>
             ${actionNote}
       `;
       return `
-        <tr data-case-id="${escapeAttribute(caseId)}" data-dispute-id="${escapeAttribute(disputeId)}" data-gross-max="${baseAmount}">
+        <tr data-case-id="${escapeAttribute(caseId)}" data-dispute-id="${escapeAttribute(disputeId)}" data-gross-max="${baseAmount}" data-payout-max="${amounts.payoutAmount}">
           <td>
             <div>
               <a class="btn-link" href="/api/cases/${escapeAttribute(caseId)}/archive/download" target="_blank" rel="noopener">
@@ -1106,6 +1189,44 @@ function renderResolvedDisputes(items = []) {
     .join("");
 }
 
+function renderRejectedDisputes(items = []) {
+  if (!disputesBody) return;
+  if (!items.length) {
+    disputesBody.innerHTML = '<tr><td colspan="5" class="pending-empty">No rejected disputes found.</td></tr>';
+    return;
+  }
+  disputesBody.innerHTML = items
+    .map((item) => {
+      const caseId = String(item.caseId || "");
+      const dispute = item.dispute || {};
+      const attorneyLabel = buildPersonLabel(item.attorney);
+      const paralegalLabel = buildPersonLabel(item.paralegal);
+      const messageRaw = String(dispute.message || dispute.reason || "").trim();
+      const reason = messageRaw ? escapeHTML(messageRaw) : "—";
+      const updatedAt = dispute.updatedAt || dispute.createdAt || null;
+      return `
+        <tr data-case-id="${escapeAttribute(caseId)}">
+          <td>
+            <div>
+              <a class="btn-link" href="/api/cases/${escapeAttribute(caseId)}/archive/download" target="_blank" rel="noopener">
+                ${escapeHTML(item.caseTitle || "Case")}
+              </a>
+            </div>
+            <div class="dispute-meta">${escapeHTML(caseId)}</div>
+          </td>
+          <td>
+            <div>${escapeHTML(attorneyLabel)}</div>
+            <div class="dispute-meta">${escapeHTML(paralegalLabel)}</div>
+          </td>
+          <td><div class="dispute-message">${reason}</div></td>
+          <td><span class="dispute-status">rejected</span></td>
+          <td>${escapeHTML(updatedAt ? formatDate(updatedAt) : "—")}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
 function renderDisputes(items = [], status = "open") {
   renderDisputeHeader(status);
   if (!disputesBody) return;
@@ -1115,6 +1236,10 @@ function renderDisputes(items = [], status = "open") {
   }
   if (status === "resolved") {
     renderResolvedDisputes(items.filter((item) => resolveDisputeResolution(item)));
+    return;
+  }
+  if (status === "rejected") {
+    renderRejectedDisputes(items);
     return;
   }
   renderOpenDisputes(items);
@@ -1176,13 +1301,15 @@ async function loadDisputes() {
   }
 }
 
-async function settleDispute({ action, caseId, disputeId, grossAmountCents }) {
+async function settleDispute({ action, caseId, disputeId, payoutAmountCents, grossAmountCents }) {
   if (!caseId || !disputeId) return;
   try {
     await fetchCSRF();
   } catch (_) {}
   const body = { action, disputeId };
-  if (Number.isFinite(grossAmountCents)) {
+  if (Number.isFinite(payoutAmountCents)) {
+    body.payoutAmountCents = payoutAmountCents;
+  } else if (Number.isFinite(grossAmountCents)) {
     body.grossAmountCents = grossAmountCents;
   }
   const res = await secureFetch(`/api/payments/dispute/settle/${encodeURIComponent(caseId)}`, {
@@ -1300,7 +1427,7 @@ if (disputesBody) {
     if (!actionKey || !caseId || !disputeId) return;
 
     const row = button.closest("tr");
-    let grossAmountCents;
+    let payoutAmountCents;
     if (actionKey === "release-partial") {
       const input = row?.querySelector("[data-dispute-amount]");
       const amountUsd = Number(input?.value || 0);
@@ -1308,10 +1435,10 @@ if (disputesBody) {
         showToast("Enter a valid partial amount.", "info");
         return;
       }
-      grossAmountCents = Math.round(amountUsd * 100);
-      const max = Number(row?.dataset?.grossMax || 0);
-      if (Number.isFinite(max) && max > 0 && grossAmountCents > max) {
-        showToast("Partial amount exceeds case total.", "info");
+      payoutAmountCents = Math.round(amountUsd * 100);
+      const max = Number(row?.dataset?.payoutMax || 0);
+      if (Number.isFinite(max) && max > 0 && payoutAmountCents > max) {
+        showToast("Payout amount exceeds the maximum available payout for this case.", "info");
         return;
       }
     }
@@ -1333,7 +1460,7 @@ if (disputesBody) {
 
     try {
       button.disabled = true;
-      const payload = await settleDispute({ action, caseId, disputeId, grossAmountCents });
+      const payload = await settleDispute({ action, caseId, disputeId, payoutAmountCents });
       if (payload?.refundId) {
         showToast("Dispute settled. Refund issued.", "success");
       } else {
@@ -1382,6 +1509,7 @@ if (!user) return;
 
 bindSettingsActions();
 await loadAdminSettings();
+await loadAdminThemePreference();
 await hydrateAnalytics();
 await loadDisputeSummary();
 await loadReceipts();

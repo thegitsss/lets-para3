@@ -19,6 +19,7 @@ const { buildReceiptPdfBuffer, uploadPdfToS3, getReceiptKey, generateArchiveZip 
 const { notifyUser } = require("../utils/notifyUser");
 const Message = require("../models/Message");
 const CaseFile = require("../models/CaseFile");
+const { currentStripeMode, pickStripeMode, stripeModeFromLivemode } = require("../utils/stripeMode");
 
 // ----------------------------------------
 // Helpers
@@ -538,11 +539,17 @@ async function applyPaymentIntentSnapshot(caseDoc, paymentIntent, { notifyOnSucc
   const wasFunded = String(caseDoc.escrowStatus || "").toLowerCase() === "funded";
   const hasParalegal = !!(caseDoc.paralegal || caseDoc.paralegalId);
   const piStatus = paymentIntent.status || "";
+  const stripeMode = pickStripeMode(
+    stripeModeFromLivemode(paymentIntent?.livemode),
+    caseDoc.stripeMode,
+    currentStripeMode()
+  );
   const { transferable } = stripe.isTransferablePaymentIntent(paymentIntent, { caseId: caseDoc._id });
 
   if (!caseDoc.paymentIntentId) caseDoc.paymentIntentId = paymentIntent.id;
   if (!caseDoc.escrowIntentId) caseDoc.escrowIntentId = paymentIntent.id;
   if (!caseDoc.currency) caseDoc.currency = paymentIntent.currency || caseDoc.currency || "usd";
+  caseDoc.stripeMode = stripeMode;
   if (caseDoc.lockedTotalAmount == null && (!caseDoc.totalAmount || caseDoc.totalAmount <= 0) && Number.isFinite(paymentIntent.amount)) {
     caseDoc.totalAmount = paymentIntent.amount;
   }
@@ -907,6 +914,17 @@ function computeParalegalFeeFromGross(grossCents, caseDoc) {
   const fee = Math.max(0, Math.round((gross * (Number(pct) || 0)) / 100));
   const net = Math.max(0, gross - fee);
   return { gross, feePct: pct, feeAmount: fee, net };
+}
+
+function computeGrossFromDesiredPayout(desiredNetCents, caseDoc, maxGrossCents) {
+  const desiredNet = Math.max(0, Math.round(Number(desiredNetCents || 0)));
+  const maxGross = Math.max(desiredNet, Math.round(Number(maxGrossCents || 0)));
+  if (!Number.isFinite(desiredNet) || desiredNet <= 0) return null;
+  for (let gross = desiredNet; gross <= maxGross; gross += 1) {
+    const result = computeParalegalFeeFromGross(gross, caseDoc);
+    if (result.net === desiredNet) return result;
+  }
+  return null;
 }
 
 function buildReceiptRow({
@@ -1305,6 +1323,11 @@ router.post(
 
     selectedCase.paymentIntentId = paymentIntent.id;
     selectedCase.escrowIntentId = paymentIntent.id;
+    selectedCase.stripeMode = pickStripeMode(
+      stripeModeFromLivemode(paymentIntent?.livemode),
+      selectedCase.stripeMode,
+      currentStripeMode()
+    );
     await selectedCase.save();
 
     await AuditLog.logFromReq(req, "payment.intent.start", {
@@ -1502,6 +1525,7 @@ router.post(
 
     const attorneyObjectId = c.attorney?._id || c.attorneyId || c.attorney;
     const paralegalObjectId = c.paralegal?._id || c.paralegalId || c.paralegal;
+    const stripeMode = pickStripeMode(c.stripeMode, currentStripeMode());
 
     const existingIncome = await PlatformIncome.findOne({ caseId: c._id })
       .select("_id")
@@ -1515,6 +1539,7 @@ router.post(
             caseId: c._id,
             amountPaid: payout,
             transferId: transfer.id,
+            stripeMode,
           },
         },
         { upsert: true }
@@ -1529,6 +1554,7 @@ router.post(
             attorneyId: attorneyObjectId,
             paralegalId: paralegalObjectId,
             feeAmount: Math.max(0, (c.feeAttorneyAmount || attorneyFee || 0) + (paralegalFee || 0)),
+            stripeMode,
           }).catch((err) => {
             if (err?.code === 11000) return null;
             throw err;
@@ -1877,6 +1903,11 @@ router.post(
     );
 
     c.escrowIntentId = intent.id;
+    c.stripeMode = pickStripeMode(
+      stripeModeFromLivemode(intent?.livemode),
+      c.stripeMode,
+      currentStripeMode()
+    );
     if (!Number.isFinite(c.feeAttorneyPct)) c.feeAttorneyPct = attorneyPct;
     if (!Number.isFinite(c.feeAttorneyAmount)) c.feeAttorneyAmount = attorneyFee;
     if (!Number.isFinite(c.feeParalegalPct)) c.feeParalegalPct = paralegalPct;
@@ -2185,6 +2216,7 @@ router.post(
 
     c.payoutTransferId = transfer.id;
     c.paidOutAt = new Date();
+    c.stripeMode = pickStripeMode(c.stripeMode, currentStripeMode());
     await c.save();
 
     await Payout.updateOne(
@@ -2195,6 +2227,7 @@ router.post(
           caseId: c._id,
           amountPaid: payout,
           transferId: transfer.id,
+          stripeMode: pickStripeMode(c.stripeMode, currentStripeMode()),
         },
       },
       { upsert: true }
@@ -2245,7 +2278,7 @@ router.post(
   requireRole("admin"),
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
-    const { action, disputeId, grossAmountCents } = req.body || {};
+    const { action, disputeId, grossAmountCents, payoutAmountCents } = req.body || {};
     const allowed = new Set(["refund", "release_full", "release_partial"]);
     if (!allowed.has(String(action || ""))) {
       return res.status(400).json({ error: "Invalid dispute action." });
@@ -2303,7 +2336,12 @@ router.post(
       } else if (action === "release_full") {
         gross = baseAmount;
       } else {
-        gross = Number(grossAmountCents);
+        const payoutTarget = payoutAmountCents ?? grossAmountCents;
+        const payoutPlan = computeGrossFromDesiredPayout(payoutTarget, c, baseAmount);
+        if (!payoutPlan) {
+          return res.status(400).json({ error: "Payout amount is invalid." });
+        }
+        gross = payoutPlan.gross;
       }
       if (!Number.isFinite(gross) || gross < 0) {
         return res.status(400).json({ error: "Settlement amount is invalid." });
@@ -2332,7 +2370,8 @@ router.post(
           console.error("[payments] withdrawal dispute intent lookup failed", err?.message || err);
           return res.status(502).json({ error: "Unable to verify case funding." });
         }
-        if (pi.status !== "succeeded") {
+        const { transferable, charge } = stripe.isTransferablePaymentIntent(pi, { caseId: c._id });
+        if (!transferable) {
           return res.status(400).json({ error: "Stripe payment is not ready to release yet." });
         }
 
@@ -2356,19 +2395,23 @@ router.post(
         if (!pending) {
           let transfer;
           try {
+            const transferPayload = {
+              amount: net,
+              currency: c.currency || "usd",
+              destination: payoutParalegal.stripeAccountId,
+              transfer_group: `case_${c._id.toString()}`,
+              metadata: {
+                caseId: c._id.toString(),
+                disputeId: String(targetDispute.disputeId || targetDispute._id || ""),
+                action: "withdrawal_admin",
+              },
+            };
+            if (charge?.id) {
+              transferPayload.source_transaction = charge.id;
+            }
             transfer = bypassPayouts
               ? { id: `bypass_${Date.now()}` }
-              : await stripe.transfers.create({
-                  amount: net,
-                  currency: c.currency || "usd",
-                  destination: payoutParalegal.stripeAccountId,
-                  transfer_group: `case_${c._id.toString()}`,
-                  metadata: {
-                    caseId: c._id.toString(),
-                    disputeId: String(targetDispute.disputeId || targetDispute._id || ""),
-                    action: "withdrawal_admin",
-                  },
-                });
+              : await stripe.transfers.create(transferPayload);
           } catch (err) {
             console.error("[payments] withdrawal dispute payout transfer failed", err?.message || err);
             const message = stripe.sanitizeStripeError(
@@ -2579,7 +2622,8 @@ router.post(
       console.error("[payments] dispute intent lookup failed", err?.message || err);
       return res.status(502).json({ error: "Unable to verify case funding." });
     }
-    if (pi.status !== "succeeded") {
+    const { transferable, charge } = stripe.isTransferablePaymentIntent(pi, { caseId: c._id });
+    if (!transferable) {
       return res.status(400).json({ error: "Stripe payment is not ready to release yet." });
     }
 
@@ -2601,8 +2645,12 @@ router.post(
       }
     }
 
+    const payoutPlan =
+      action === "release_partial"
+        ? computeGrossFromDesiredPayout(payoutAmountCents ?? grossAmountCents, c, baseAmount)
+        : null;
     const settlementBase =
-      action === "release_partial" ? Number(grossAmountCents) : baseAmount;
+      action === "release_partial" ? Number(payoutPlan?.gross) : baseAmount;
     if (!Number.isFinite(settlementBase) || settlementBase <= 0) {
       return res.status(400).json({ error: "Settlement amount is invalid." });
     }
@@ -2612,26 +2660,42 @@ router.post(
 
     const feeParalegalPct = resolveParalegalFeePct(c);
     const feeAttorneyPct = resolveAttorneyFeePct(c);
-    const paralegalFee = Math.max(0, Math.round((settlementBase * feeParalegalPct) / 100));
+    const paralegalFee =
+      action === "release_partial" && payoutPlan
+        ? payoutPlan.feeAmount
+        : Math.max(0, Math.round((settlementBase * feeParalegalPct) / 100));
     const attorneyFee = Math.max(0, Math.round((settlementBase * feeAttorneyPct) / 100));
-    const payout = Math.max(0, settlementBase - paralegalFee);
+    const payout =
+      action === "release_partial" && payoutPlan
+        ? payoutPlan.net
+        : Math.max(0, settlementBase - paralegalFee);
     if (payout <= 0) {
       return res.status(400).json({ error: "Calculated payout must be positive." });
     }
 
     let refund = null;
+    const chargeAmount = Math.max(0, Number(charge?.amount ?? pi.amount_received ?? pi.amount ?? 0));
+    const alreadyRefunded = Math.max(0, Number(charge?.amount_refunded || 0));
+    let effectiveRefunded = alreadyRefunded;
     if (action === "release_partial") {
       const originalAttorneyFee = Math.max(0, Math.round((baseAmount * feeAttorneyPct) / 100));
-      const refundAmount = Math.max(
+      const desiredTotalRefund = Math.max(
         0,
-        Math.round((baseAmount + originalAttorneyFee) - (settlementBase + attorneyFee))
+        Math.min(chargeAmount, Math.round((baseAmount + originalAttorneyFee) - (settlementBase + attorneyFee)))
       );
+      if (alreadyRefunded > desiredTotalRefund) {
+        return res.status(400).json({
+          error: "A previous partial refund already reduced the available charge amount. Enter a lower partial amount.",
+        });
+      }
+      const refundAmount = Math.max(0, desiredTotalRefund - alreadyRefunded);
       if (refundAmount > 0) {
         try {
           refund = await stripe.refunds.create({
             payment_intent: c.escrowIntentId,
             amount: refundAmount,
           });
+          effectiveRefunded = alreadyRefunded + (refund?.amount || refundAmount);
         } catch (err) {
           if (!isRefundAlreadyProcessed(err)) {
             console.error("[payments] dispute partial refund failed", err?.message || err);
@@ -2642,7 +2706,17 @@ router.post(
             return res.status(400).json({ error: message });
           }
           refund = { id: `already_refunded_${Date.now()}`, amount: refundAmount };
+          effectiveRefunded = alreadyRefunded + refundAmount;
         }
+      }
+    }
+
+    if (chargeAmount > 0) {
+      const remainingSourceAmount = Math.max(0, chargeAmount - effectiveRefunded);
+      if (payout > remainingSourceAmount) {
+        return res.status(400).json({
+          error: "The selected partial amount exceeds what remains available on the funded charge after refunds.",
+        });
       }
     }
 
@@ -2651,7 +2725,7 @@ router.post(
       transfer = { id: `bypass_${Date.now()}` };
     } else {
       try {
-        transfer = await stripe.transfers.create({
+        const transferPayload = {
           amount: payout,
           currency: c.currency || "usd",
           destination: c.paralegal.stripeAccountId,
@@ -2661,7 +2735,11 @@ router.post(
             disputeId: disputeKey,
             action,
           },
-        });
+        };
+        if (charge?.id) {
+          transferPayload.source_transaction = charge.id;
+        }
+        transfer = await stripe.transfers.create(transferPayload);
       } catch (err) {
         console.error("[payments] dispute payout transfer failed", err?.message || err);
         const message = stripe.sanitizeStripeError(
@@ -2701,6 +2779,7 @@ router.post(
       resolvedAt,
       disputeId: disputeKey,
     };
+    c.stripeMode = pickStripeMode(c.stripeMode, currentStripeMode());
     await c.save();
 
     await Payout.updateOne(
@@ -2711,6 +2790,7 @@ router.post(
           caseId: c._id,
           amountPaid: payout,
           transferId: transfer.id,
+          stripeMode: pickStripeMode(c.stripeMode, currentStripeMode()),
         },
       },
       { upsert: true }
@@ -2729,6 +2809,7 @@ router.post(
           attorneyId: attorneyObjectId,
           paralegalId: paralegalObjectId,
           feeAmount: Math.max(0, attorneyFee + paralegalFee),
+          stripeMode: pickStripeMode(c.stripeMode, currentStripeMode()),
         }).catch((err) => {
           if (err?.code === 11000) return null;
           throw err;

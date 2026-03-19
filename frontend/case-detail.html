@@ -1443,10 +1443,10 @@
       border-radius: 12px;
       padding: 6px 10px;
       box-shadow: none;
-      display: inline-flex;
-      align-items: center;
+      display: flex;
+      align-items: flex-start;
       gap: 8px;
-      width: auto;
+      width: fit-content;
       min-width: 0;
       max-width: 72%;
     }
@@ -1496,13 +1496,13 @@
     }
 
     .document-link {
-      display: inline-flex;
-      align-items: center;
+      display: flex;
+      align-items: flex-start;
       gap: 8px;
       color: inherit;
       text-decoration: none;
       min-width: 0;
-      max-width: min(240px, 100%);
+      max-width: 100%;
     }
 
     .document-link:hover {
@@ -1519,6 +1519,7 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      flex: 0 0 auto;
       width: 20px;
       height: 20px;
       border-radius: 6px;
@@ -1533,10 +1534,11 @@
     }
 
     .document-label {
+      display: block;
       min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      white-space: normal;
     }
 
     .message-composer {
@@ -1827,9 +1829,9 @@
     .attachment-name {
       font-weight: 600;
       font-size: 0.85rem;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      white-space: normal;
     }
 
     .attachment-meta {

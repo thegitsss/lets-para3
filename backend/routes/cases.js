@@ -25,6 +25,7 @@ const { logAction } = require("../utils/audit");
 const AuditLog = require("../models/AuditLog");
 const { generateArchiveZip, buildReceiptPdfBuffer, uploadPdfToS3, getReceiptKey } = require("../services/caseLifecycle");
 const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
+const { currentStripeMode, pickStripeMode, stripeModeFromLivemode } = require("../utils/stripeMode");
 const {
   BLOCKED_MESSAGE,
   buildBlockLookup,
@@ -1551,6 +1552,11 @@ async function ensureFundsReleased(req, caseDoc) {
   if (!caseDoc.paymentIntentId) caseDoc.paymentIntentId = paymentIntent.id;
   if (!caseDoc.escrowIntentId) caseDoc.escrowIntentId = paymentIntent.id;
   if (!caseDoc.currency) caseDoc.currency = paymentIntent.currency || caseDoc.currency || "usd";
+  caseDoc.stripeMode = pickStripeMode(
+    stripeModeFromLivemode(paymentIntent?.livemode),
+    caseDoc.stripeMode,
+    currentStripeMode()
+  );
 
   const { transferable, charge } = stripe.isTransferablePaymentIntent(paymentIntent, {
     caseId: caseDoc._id,
@@ -1619,6 +1625,7 @@ async function ensureFundsReleased(req, caseDoc) {
 
   const attorneyObjectId = caseDoc.attorney?._id || caseDoc.attorneyId || caseDoc.attorney;
   const paralegalObjectId = paralegal._id || caseDoc.paralegalId || caseDoc.paralegal;
+  const stripeMode = pickStripeMode(caseDoc.stripeMode, currentStripeMode());
 
   const existingIncome = await PlatformIncome.findOne({ caseId: caseDoc._id })
     .select("_id")
@@ -1632,6 +1639,7 @@ async function ensureFundsReleased(req, caseDoc) {
           caseId: caseDoc._id,
           amountPaid: payout,
           transferId: transfer.id,
+          stripeMode,
         },
       },
       { upsert: true }
@@ -1646,6 +1654,7 @@ async function ensureFundsReleased(req, caseDoc) {
           attorneyId: attorneyObjectId,
           paralegalId: paralegalObjectId,
           feeAmount: Math.max(0, (caseDoc.feeAttorneyAmount || attorneyFee || 0) + (paralegalFee || 0)),
+          stripeMode,
         }).catch((err) => {
           if (err?.code === 11000) return null;
           throw err;
@@ -1753,6 +1762,11 @@ async function createPartialPayoutTransfer(req, caseDoc, paralegal, grossAmount)
   if (!caseDoc.paymentIntentId) caseDoc.paymentIntentId = paymentIntent.id;
   if (!caseDoc.escrowIntentId) caseDoc.escrowIntentId = paymentIntent.id;
   if (!caseDoc.currency) caseDoc.currency = paymentIntent.currency || caseDoc.currency || "usd";
+  caseDoc.stripeMode = pickStripeMode(
+    stripeModeFromLivemode(paymentIntent?.livemode),
+    caseDoc.stripeMode,
+    currentStripeMode()
+  );
 
   const { transferable, charge } = stripe.isTransferablePaymentIntent(paymentIntent, {
     caseId: caseDoc._id,
@@ -5507,6 +5521,11 @@ router.post(
     selectedCase.paralegalNameSnapshot = formatPersonName(paralegal);
     selectedCase.paymentIntentId = paymentIntent.id;
     selectedCase.escrowIntentId = paymentIntent.id;
+    selectedCase.stripeMode = pickStripeMode(
+      stripeModeFromLivemode(paymentIntent?.livemode),
+      selectedCase.stripeMode,
+      currentStripeMode()
+    );
     selectedCase.paymentStatus = paymentIntent.status || selectedCase.paymentStatus || "succeeded";
     selectedCase.escrowStatus = "funded";
     selectedCase.currency = paymentIntent.currency || selectedCase.currency || "usd";

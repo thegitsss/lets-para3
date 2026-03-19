@@ -35,6 +35,28 @@ function dollarsToCents(input) {
   return Math.max(0, Math.round(value * 100));
 }
 
+function buildDisputeStatusMatch(status) {
+  if (!status) return null;
+  if (status === "open") {
+    return {
+      "disputes.status": { $nin: ["resolved", "rejected"] },
+    };
+  }
+  if (["resolved", "rejected"].includes(status)) {
+    return { "disputes.status": status };
+  }
+  return null;
+}
+
+function normalizeDisputeShape(dispute) {
+  const shaped = dispute && typeof dispute === "object" ? { ...dispute } : {};
+  const normalizedStatus = String(shaped.status || "").trim().toLowerCase();
+  if (!normalizedStatus) {
+    shaped.status = "open";
+  }
+  return shaped;
+}
+
 // ----------------------------------------
 // All dispute routes require auth + approval
 // ----------------------------------------
@@ -73,15 +95,18 @@ router.get(
       { $unwind: { path: "$paralegalDoc", preserveNullAndEmptyArrays: true } },
     ];
 
-    const match = {};
-    if (status && ["open", "resolved", "rejected"].includes(status)) {
-      match["disputes.status"] = status;
+    const andClauses = [];
+    const statusMatch = buildDisputeStatusMatch(status);
+    if (statusMatch) {
+      andClauses.push(statusMatch);
     }
     if (q.trim()) {
-      match.$or = [
+      andClauses.push({
+        $or: [
         { "disputes.message": { $regex: q.trim(), $options: "i" } },
         { title: { $regex: q.trim(), $options: "i" } },
-      ];
+        ],
+      });
     }
     if (finalized) {
       const settlementMatch = {
@@ -93,16 +118,14 @@ router.get(
         payoutFinalizedType: { $ne: null },
         "disputes.status": "resolved",
       };
-      const finalizedMatch = { $or: [settlementMatch, withdrawalMatch] };
-      if (match.$or) {
-        match.$and = [{ $or: match.$or }, finalizedMatch];
-        delete match.$or;
-      } else {
-        Object.assign(match, finalizedMatch);
-      }
+      andClauses.push({ $or: [settlementMatch, withdrawalMatch] });
     }
 
-    if (Object.keys(match).length) basePipeline.push({ $match: match });
+    if (andClauses.length === 1) {
+      basePipeline.push({ $match: andClauses[0] });
+    } else if (andClauses.length > 1) {
+      basePipeline.push({ $match: { $and: andClauses } });
+    }
 
     const dataPipeline = basePipeline.concat([
       { $sort: { "disputes.createdAt": -1 } },
@@ -170,7 +193,11 @@ router.get(
     ]);
 
     const total = count[0]?.n || 0;
-    res.json({ page, limit, total, pages: Math.ceil(total / limit), items });
+    const normalizedItems = items.map((item) => ({
+      ...item,
+      dispute: normalizeDisputeShape(item?.dispute),
+    }));
+    res.json({ page, limit, total, pages: Math.ceil(total / limit), items: normalizedItems });
   })
 );
 
@@ -239,7 +266,7 @@ router.get(
     const isAdmin = String(req.user?.role || "").toLowerCase() === "admin";
     const disputes = (c.disputes || []).map((d) => {
       const shaped = {
-        ...d,
+        ...normalizeDisputeShape(d),
         id: d.disputeId || String(d._id),
       };
       if (!isAdmin) {

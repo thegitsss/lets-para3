@@ -316,6 +316,7 @@ const caseSchema = new Schema(
     escrowIntentId: { type: String, default: null, index: true },
     escrowSessionId: { type: String, default: null, index: true }, // if using Checkout
     paymentIntentId: { type: String, default: null, index: true },
+    stripeMode: { type: String, enum: ["live", "test", "unknown"], default: "unknown", index: true },
     escrowStatus: { type: String, default: null, index: true }, // awaiting_funding, funded
     paymentReleased: { type: Boolean, default: false }, // funds released to paralegal
     paidOutAt: { type: Date, default: null },
@@ -505,7 +506,7 @@ caseSchema.methods.acceptApplicant = function (paralegalId) {
 // Create a dispute embedded record
 caseSchema.methods.createDispute = function ({ message, raisedBy, amountRequestedCents }) {
   if (!message || !raisedBy) throw new Error("message and raisedBy are required to create a dispute.");
-  const payload = { message: String(message).trim(), raisedBy };
+  const payload = { message: String(message).trim(), raisedBy, status: "open" };
   if (Number.isFinite(amountRequestedCents) && amountRequestedCents > 0) {
     payload.amountRequestedCents = amountRequestedCents;
   }

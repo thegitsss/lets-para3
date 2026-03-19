@@ -7,6 +7,8 @@ const User = require("../models/User");
 const Case = require("../models/Case");
 const Job = require("../models/Job");
 const Application = require("../models/Application");
+const Payout = require("../models/Payout");
+const PlatformIncome = require("../models/PlatformIncome");
 const adminRouter = require("../routes/admin");
 const authRouter = require("../routes/auth");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
@@ -320,5 +322,232 @@ describe("Admin workflows", () => {
     expect(deletedCase).toBeNull();
     expect(deletedJob).toBeNull();
     expect(deletedApplication).toBeNull();
+  });
+
+  test("Admin analytics aggregates payment totals for the dashboard", async () => {
+    const admin = await User.create({
+      firstName: "Admin",
+      lastName: "Owner",
+      email: "analytics-owner@lets-paraconnect.com",
+      password: "Password123!",
+      role: "admin",
+      status: "approved",
+      state: "CA",
+    });
+
+    const attorney = await User.create({
+      firstName: "Jamie",
+      lastName: "Attorney",
+      email: "jamie.attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const paralegal = await User.create({
+      firstName: "Taylor",
+      lastName: "Paralegal",
+      email: "taylor.paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+
+    const [liveCase, testCase, unknownCase] = await Case.create([
+      {
+        title: "Live funded case",
+        details: "Live payment data",
+        status: "completed",
+        attorney: attorney._id,
+        attorneyId: attorney._id,
+        paralegal: paralegal._id,
+        paralegalId: paralegal._id,
+        lockedTotalAmount: 100000,
+        totalAmount: 100000,
+        paymentReleased: true,
+        stripeMode: "live",
+        paidOutAt: new Date("2026-03-10T12:00:00.000Z"),
+      },
+      {
+        title: "Test funded case",
+        details: "Test payment data",
+        status: "completed",
+        attorney: attorney._id,
+        attorneyId: attorney._id,
+        paralegal: paralegal._id,
+        paralegalId: paralegal._id,
+        lockedTotalAmount: 50000,
+        totalAmount: 50000,
+        paymentReleased: false,
+        stripeMode: "test",
+        completedAt: new Date("2026-03-11T12:00:00.000Z"),
+      },
+      {
+        title: "Unknown funded case",
+        details: "Legacy payment data",
+        status: "open",
+        attorney: attorney._id,
+        attorneyId: attorney._id,
+        paralegal: paralegal._id,
+        paralegalId: paralegal._id,
+        lockedTotalAmount: 25000,
+        totalAmount: 25000,
+        paymentReleased: false,
+        stripeMode: "unknown",
+      },
+    ]);
+
+    await Payout.create({
+      paralegalId: paralegal._id,
+      caseId: liveCase._id,
+      amountPaid: 82000,
+      transferId: "tr_live_123",
+      stripeMode: "live",
+    });
+
+    await PlatformIncome.create([
+      {
+        caseId: liveCase._id,
+        attorneyId: attorney._id,
+        paralegalId: paralegal._id,
+        feeAmount: 40000,
+        stripeMode: "live",
+      },
+      {
+        caseId: testCase._id,
+        attorneyId: attorney._id,
+        paralegalId: paralegal._id,
+        feeAmount: 20000,
+        stripeMode: "test",
+      },
+    ]);
+
+    const analyticsRes = await request(app)
+      .get("/api/admin/analytics")
+      .set("Cookie", authCookieFor(admin));
+
+    expect(analyticsRes.status).toBe(200);
+    expect(analyticsRes.body.escrowMetrics.totalEscrowReleased).toBe(100000);
+    expect(analyticsRes.body.escrowMetrics.totalEscrowHeld).toBe(75000);
+    expect(analyticsRes.body.revenueMetrics.platformFeesCollected).toBe(60000);
+
+    const payoutsRes = await request(app)
+      .get("/api/admin/payouts")
+      .set("Cookie", authCookieFor(admin));
+
+    expect(payoutsRes.status).toBe(200);
+    expect(payoutsRes.body.totalAmount).toBe(82000);
+    expect(payoutsRes.body.count).toBe(1);
+
+    const incomeRes = await request(app)
+      .get("/api/admin/income")
+      .set("Cookie", authCookieFor(admin));
+
+    expect(incomeRes.status).toBe(200);
+    expect(incomeRes.body.totalAmount).toBe(60000);
+    expect(incomeRes.body.count).toBe(2);
+  });
+
+  test("Admin financial reporting start date hides older money totals", async () => {
+    const originalStart = process.env.ADMIN_FINANCIAL_REPORTING_START_AT;
+    process.env.ADMIN_FINANCIAL_REPORTING_START_AT = "2030-01-01T00:00:00Z";
+
+    try {
+      const admin = await User.create({
+        firstName: "Admin",
+        lastName: "Owner",
+        email: "baseline-owner@lets-paraconnect.com",
+        password: "Password123!",
+        role: "admin",
+        status: "approved",
+        state: "CA",
+      });
+
+      const attorney = await User.create({
+        firstName: "Future",
+        lastName: "Attorney",
+        email: "future.attorney@example.com",
+        password: "Password123!",
+        role: "attorney",
+        status: "approved",
+        state: "CA",
+      });
+
+      const paralegal = await User.create({
+        firstName: "Future",
+        lastName: "Paralegal",
+        email: "future.paralegal@example.com",
+        password: "Password123!",
+        role: "paralegal",
+        status: "approved",
+        state: "CA",
+      });
+
+      const caseDoc = await Case.create({
+        title: "Old funded case",
+        details: "Should be hidden by reporting baseline",
+        status: "completed",
+        attorney: attorney._id,
+        attorneyId: attorney._id,
+        paralegal: paralegal._id,
+        paralegalId: paralegal._id,
+        lockedTotalAmount: 90000,
+        totalAmount: 90000,
+        paymentReleased: true,
+        stripeMode: "live",
+        createdAt: new Date("2026-03-01T12:00:00.000Z"),
+      });
+
+      await Payout.create({
+        paralegalId: paralegal._id,
+        caseId: caseDoc._id,
+        amountPaid: 70000,
+        transferId: "tr_old_hidden",
+        stripeMode: "live",
+        createdAt: new Date("2026-03-02T12:00:00.000Z"),
+      });
+
+      await PlatformIncome.create({
+        caseId: caseDoc._id,
+        attorneyId: attorney._id,
+        paralegalId: paralegal._id,
+        feeAmount: 20000,
+        stripeMode: "live",
+        createdAt: new Date("2026-03-02T12:00:00.000Z"),
+      });
+
+      const analyticsRes = await request(app)
+        .get("/api/admin/analytics")
+        .set("Cookie", authCookieFor(admin));
+
+      expect(analyticsRes.status).toBe(200);
+      expect(analyticsRes.body.escrowMetrics.totalEscrowHeld).toBe(0);
+      expect(analyticsRes.body.escrowMetrics.totalEscrowReleased).toBe(0);
+      expect(analyticsRes.body.revenueMetrics.platformFeesCollected).toBe(0);
+
+      const payoutsRes = await request(app)
+        .get("/api/admin/payouts")
+        .set("Cookie", authCookieFor(admin));
+
+      expect(payoutsRes.status).toBe(200);
+      expect(payoutsRes.body.totalAmount).toBe(0);
+      expect(payoutsRes.body.count).toBe(0);
+
+      const incomeRes = await request(app)
+        .get("/api/admin/income")
+        .set("Cookie", authCookieFor(admin));
+
+      expect(incomeRes.status).toBe(200);
+      expect(incomeRes.body.totalAmount).toBe(0);
+      expect(incomeRes.body.count).toBe(0);
+    } finally {
+      if (originalStart == null) {
+        delete process.env.ADMIN_FINANCIAL_REPORTING_START_AT;
+      } else {
+        process.env.ADMIN_FINANCIAL_REPORTING_START_AT = originalStart;
+      }
+    }
   });
 });
