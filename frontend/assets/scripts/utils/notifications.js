@@ -33,7 +33,14 @@ function summarizeNotificationTypes(items = []) {
 }
 
 function ensureNotificationStyles() {
-  return;
+  if (document.getElementById(NOTIFICATION_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = NOTIFICATION_STYLE_ID;
+  style.textContent = `
+  .notif-fade-ready{opacity:0;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease}
+  .notif-fade-in{opacity:1;transform:translateY(0)}
+  `;
+  document.head.appendChild(style);
 }
 
 function syncNotificationListViewport(listEl) {
