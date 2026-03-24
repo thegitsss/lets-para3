@@ -84,6 +84,11 @@ function pickSecret(req) {
     : process.env.STRIPE_WEBHOOK_SECRET;
 }
 
+function stripeAccountOpts(req) {
+  const acct = req.headers["stripe-account"];
+  return acct ? { stripeAccount: acct } : {};
+}
+
 function safeObjId(v) {
   try { return mongoose.isValidObjectId(v) ? new mongoose.Types.ObjectId(v) : null; }
   catch { return null; }
@@ -337,11 +342,23 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
         // Try to link back to a case if we can hop via payment_intent
         let caseForRefund = null;
         if (obj.payment_intent) {
-          const pi =
-            typeof obj.payment_intent === "string"
-              ? await stripe.paymentIntents.retrieve(obj.payment_intent)
-              : obj.payment_intent;
-          caseForRefund = await findCaseForPaymentIntent(pi);
+          try {
+            const pi =
+              typeof obj.payment_intent === "string"
+                ? await stripe.paymentIntents.retrieve(
+                    obj.payment_intent,
+                    stripeAccountOpts(req)
+                  )
+                : obj.payment_intent;
+            caseForRefund = await findCaseForPaymentIntent(pi);
+          } catch (err) {
+            console.error("[stripe] refund webhook PI lookup failed:", {
+              eventId: event.id,
+              paymentIntent: obj.payment_intent,
+              stripeAccount: req.headers["stripe-account"] || null,
+              message: err.message,
+            });
+          }
         }
 
         await AuditLog.create({
@@ -433,9 +450,9 @@ router.post("/", express.raw({ type: "application/json" }), async (req, res) => 
   } catch (err) {
     console.error("[stripe] Webhook handling error:", err);
     await markWebhookEventFailed(event.id, err);
-    // Return 2xx so Stripe doesn't retry forever if the error is non-retriable,
-    // but in most cases 500 is okay. Keep 500 for now.
-    return res.status(500).send("Webhook handler error");
+    // Preserve 400 for signature failures only. For downstream processing errors,
+    // acknowledge the event so Stripe stops retrying and investigate from logs.
+    return res.json({ received: true, handled: false });
   }
 
   await markWebhookEventProcessed(event.id);

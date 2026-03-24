@@ -7,6 +7,9 @@ const mockStripe = {
   webhooks: {
     constructEvent: jest.fn(),
   },
+  paymentIntents: {
+    retrieve: jest.fn(),
+  },
   isTransferablePaymentIntent: jest.fn(() => ({ transferable: true })),
 };
 const mockNotifyUser = jest.fn(async () => ({ ok: true }));
@@ -46,6 +49,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await clearDatabase();
   mockStripe.webhooks.constructEvent.mockReset();
+  mockStripe.paymentIntents.retrieve.mockReset();
   mockStripe.isTransferablePaymentIntent.mockClear();
   mockNotifyUser.mockClear();
 });
@@ -207,5 +211,111 @@ describe("Webhook handling", () => {
 
     const count = await WebhookEvent.countDocuments({ eventId: "evt_dedupe" });
     expect(count).toBe(1);
+  });
+
+  test("refund webhooks retrieve payment intents with connected account context and do not fail on lookup errors", async () => {
+    const event = {
+      id: "evt_refund_connect",
+      type: "refund.updated",
+      data: {
+        object: {
+          id: "re_connect",
+          amount: 5000,
+          currency: "usd",
+          payment_intent: "pi_connect_refund",
+        },
+      },
+    };
+
+    mockStripe.webhooks.constructEvent.mockImplementation(() => event);
+    mockStripe.paymentIntents.retrieve.mockRejectedValue(new Error("No such payment_intent"));
+
+    const res = await request(app)
+      .post("/api/payments/webhook")
+      .set("Stripe-Signature", "test-signature")
+      .set("Stripe-Account", "acct_connected_refund")
+      .set("Content-Type", "application/json")
+      .send(Buffer.from(JSON.stringify({})));
+
+    expect(res.status).toBe(200);
+    expect(res.body.received).toBe(true);
+    expect(mockStripe.paymentIntents.retrieve).toHaveBeenCalledWith("pi_connect_refund", {
+      stripeAccount: "acct_connected_refund",
+    });
+
+    const audit = await AuditLog.findOne({
+      action: "refund.updated",
+      "meta.externalRef": "re_connect",
+    }).lean();
+    expect(audit).toBeTruthy();
+
+    const webhookRecord = await WebhookEvent.findOne({ eventId: "evt_refund_connect" }).lean();
+    expect(webhookRecord.status).toBe("processed");
+  });
+
+  test("downstream webhook processing errors are acknowledged instead of returning 500", async () => {
+    const attorney = await User.create({
+      firstName: "Webhook",
+      lastName: "Attorney",
+      email: "webhook-processing-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Webhook",
+      lastName: "Paralegal",
+      email: "webhook-processing-paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+    const caseDoc = await Case.create({
+      title: "Webhook processing failure case",
+      details: "Trigger a downstream webhook write failure.",
+      status: "assigned",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowStatus: "awaiting_funding",
+      totalAmount: 1000,
+      currency: "usd",
+    });
+
+    const event = {
+      id: "evt_processing_failure",
+      type: "payment_intent.succeeded",
+      livemode: false,
+      data: {
+        object: {
+          id: "pi_processing_failure",
+          amount: 1000,
+          currency: "usd",
+          livemode: false,
+          metadata: { caseId: String(caseDoc._id) },
+        },
+      },
+    };
+
+    mockStripe.webhooks.constructEvent.mockImplementation(() => event);
+    const saveSpy = jest.spyOn(AuditLog, "create").mockRejectedValueOnce(new Error("audit write failed"));
+
+    const res = await request(app)
+      .post("/api/payments/webhook")
+      .set("Stripe-Signature", "test-signature")
+      .set("Content-Type", "application/json")
+      .send(Buffer.from(JSON.stringify({})));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ received: true, handled: false });
+
+    const webhookRecord = await WebhookEvent.findOne({ eventId: "evt_processing_failure" }).lean();
+    expect(webhookRecord.status).toBe("failed");
+    expect(webhookRecord.lastError).toMatch(/audit write failed/i);
+
+    saveSpy.mockRestore();
   });
 });
