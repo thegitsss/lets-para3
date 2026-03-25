@@ -136,9 +136,29 @@ document.addEventListener("DOMContentLoaded", () => {
     navPreferences: "preferencesSection",
     navDelete: "deleteSection"
   };
+  const sectionToNav = Object.entries(navItems).reduce((acc, [navId, sectionId]) => {
+    acc[sectionId] = navId;
+    return acc;
+  }, {});
   const topLevelSections = Object.values(navItems)
     .map((id) => document.getElementById(id))
     .filter(Boolean);
+  const hashSectionMap = {
+    "#securitysection": "securitySection",
+    "#security": "securitySection",
+    "#profilesection": "profileSection",
+    "#profile": "profileSection",
+    "#preferencessection": "preferencesSection",
+    "#preferences": "preferencesSection",
+    "#deletesection": "deleteSection",
+    "#delete": "deleteSection",
+  };
+  const syncActiveNav = (sectionId) => {
+    const activeNavId = sectionToNav[sectionId] || "navProfile";
+    document.querySelectorAll(".settings-item").forEach((el) => {
+      el.classList.toggle("active", el.id === activeNavId);
+    });
+  };
   const setActiveSection = (sectionId) => {
     topLevelSections.forEach((sec) => {
       sec.classList.remove("active");
@@ -156,7 +176,15 @@ document.addEventListener("DOMContentLoaded", () => {
       section.style.removeProperty("display");
       section.style.display = "block";
     }
+    syncActiveNav(sectionId);
     scheduleProfileScrollIndicatorUpdate();
+  };
+
+  const applySectionFromHash = (hashValue = window.location.hash) => {
+    const requestedSection = hashSectionMap[String(hashValue || "").trim().toLowerCase()] || "";
+    if (!requestedSection) return false;
+    setActiveSection(requestedSection);
+    return true;
   };
 
   Object.keys(navItems).forEach(navId => {
@@ -166,9 +194,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!btn) return;
 
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".settings-item").forEach(el => el.classList.remove("active"));
-      btn.classList.add("active");
       setActiveSection(sectionId);
+      const nextHash = `#${sectionId}`;
+      if (window.location.hash !== nextHash) {
+        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${nextHash}`);
+      }
     });
   });
 
@@ -182,10 +212,16 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const initialNav = document.querySelector(".settings-item.active");
-  const initialSectionId = initialNav && navItems[initialNav.id]
-    ? navItems[initialNav.id]
-    : navItems.navProfile;
+  const requestedHashSection = hashSectionMap[String(window.location.hash || "").trim().toLowerCase()] || "";
+  const initialSectionId = requestedHashSection || (
+    initialNav && navItems[initialNav.id]
+      ? navItems[initialNav.id]
+      : navItems.navProfile
+  );
   setActiveSection(initialSectionId);
+  window.addEventListener("hashchange", () => {
+    applySectionFromHash();
+  });
   bindProfileScrollIndicator();
   const stepToRun = String(requestedOnboardingStep || "").toLowerCase();
   if (stepToRun) {
