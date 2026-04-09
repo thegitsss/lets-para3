@@ -5891,6 +5891,7 @@ function buildReplyPayload({ analysis = {}, pageContext = {}, supportFacts = {},
 
 function serializeConversation(conversation = {}) {
   const supportState = getConversationPolicyState(conversation);
+  const supportMetadata = conversation.metadata?.support || {};
   return {
     id: String(conversation._id || conversation.id || ""),
     userId: String(conversation.userId || ""),
@@ -5907,9 +5908,17 @@ function serializeConversation(conversation = {}) {
         ? formatSupportTicketReference(conversation.escalation.ticketId)
         : "",
       note: conversation.escalation?.note || "",
-      engineeringReviewStarted: conversation.escalation?.engineeringReviewStarted === true,
-      engineeringReviewStartedAt: conversation.escalation?.engineeringReviewStartedAt || null,
-      diagnosisRunId: conversation.escalation?.diagnosisRunId || "",
+      engineeringReviewStarted:
+        conversation.escalation?.engineeringReviewStarted === true || supportMetadata.engineeringReviewStarted === true,
+      engineeringReviewStartedAt:
+        conversation.escalation?.engineeringReviewStartedAt || supportMetadata.engineeringReviewStartedAt || null,
+      diagnosisRunId: conversation.escalation?.diagnosisRunId || supportMetadata.diagnosisRunId || "",
+      engineeringExecutionStarted:
+        conversation.escalation?.engineeringExecutionStarted === true || supportMetadata.engineeringExecutionStarted === true,
+      engineeringExecutionStartedAt:
+        conversation.escalation?.engineeringExecutionStartedAt || supportMetadata.engineeringExecutionStartedAt || null,
+      executionRunId: conversation.escalation?.executionRunId || supportMetadata.executionRunId || "",
+      executionStatus: conversation.escalation?.executionStatus || supportMetadata.executionStatus || "",
     },
     supportState,
     lastMessageAt: conversation.lastMessageAt || conversation.updatedAt || conversation.createdAt || null,
@@ -6746,12 +6755,25 @@ async function reopenConversationIssue({
         ? "Issue reopened from support chat and returned to engineering."
         : "Issue reopened from support chat.",
     engineeringReviewStarted:
-      diagnosisKickoff?.ok === true || conversation.escalation?.engineeringReviewStarted === true,
+      (ticketDoc.linkedIncidentIds || []).length > 0 ||
+      diagnosisKickoff?.ok === true ||
+      diagnosisKickoff?.executionStarted === true ||
+      conversation.escalation?.engineeringReviewStarted === true,
     engineeringReviewStartedAt:
-      diagnosisKickoff?.ok === true
+      (ticketDoc.linkedIncidentIds || []).length > 0 || diagnosisKickoff?.ok === true
         ? assistantMessage?.createdAt || new Date()
         : conversation.escalation?.engineeringReviewStartedAt || null,
     diagnosisRunId: diagnosisKickoff?.runId || conversation.escalation?.diagnosisRunId || "",
+    engineeringExecutionStarted:
+      (ticketDoc.linkedIncidentIds || []).length > 0 ||
+      diagnosisKickoff?.executionStarted === true ||
+      conversation.escalation?.engineeringExecutionStarted === true,
+    engineeringExecutionStartedAt:
+      (ticketDoc.linkedIncidentIds || []).length > 0 || diagnosisKickoff?.executionStarted === true
+        ? assistantMessage?.createdAt || new Date()
+        : conversation.escalation?.engineeringExecutionStartedAt || null,
+    executionRunId: diagnosisKickoff?.executionRunId || conversation.escalation?.executionRunId || "",
+    executionStatus: diagnosisKickoff?.executionStatus || conversation.escalation?.executionStatus || "",
   };
   conversation.metadata = {
     ...(conversation.metadata || {}),
@@ -6764,6 +6786,26 @@ async function reopenConversationIssue({
       proactiveTicketId: normalizeId(ticketDoc._id),
       proactiveTicketStatus: trimString(ticketDoc.status, 80),
       proactiveHandedOffToEngineering: (ticketDoc.linkedIncidentIds || []).length > 0,
+      engineeringReviewStarted:
+        (ticketDoc.linkedIncidentIds || []).length > 0 ||
+        diagnosisKickoff?.ok === true ||
+        diagnosisKickoff?.executionStarted === true ||
+        conversation.metadata?.support?.engineeringReviewStarted === true,
+      engineeringReviewStartedAt:
+        (ticketDoc.linkedIncidentIds || []).length > 0 || diagnosisKickoff?.ok === true
+          ? assistantMessage?.createdAt || new Date()
+          : conversation.metadata?.support?.engineeringReviewStartedAt || null,
+      diagnosisRunId: diagnosisKickoff?.runId || conversation.metadata?.support?.diagnosisRunId || "",
+      engineeringExecutionStarted:
+        (ticketDoc.linkedIncidentIds || []).length > 0 ||
+        diagnosisKickoff?.executionStarted === true ||
+        conversation.metadata?.support?.engineeringExecutionStarted === true,
+      engineeringExecutionStartedAt:
+        (ticketDoc.linkedIncidentIds || []).length > 0 || diagnosisKickoff?.executionStarted === true
+          ? assistantMessage?.createdAt || new Date()
+          : conversation.metadata?.support?.engineeringExecutionStartedAt || null,
+      executionRunId: diagnosisKickoff?.executionRunId || conversation.metadata?.support?.executionRunId || "",
+      executionStatus: diagnosisKickoff?.executionStatus || conversation.metadata?.support?.executionStatus || "",
     },
   };
   await conversation.save();
@@ -7498,9 +7540,14 @@ async function ensureConversationEscalated({
     requestedAt,
     ticketId: ticketId || null,
     note: buildEscalationMessageText(ticketReference, handoffSummary),
-    engineeringReviewStarted: diagnosisKickoff?.ok === true,
-    engineeringReviewStartedAt: diagnosisKickoff?.ok === true ? requestedAt : null,
+    engineeringReviewStarted: true,
+    engineeringReviewStartedAt:
+      requestedAt,
     diagnosisRunId: diagnosisKickoff?.runId || "",
+    engineeringExecutionStarted: true,
+    engineeringExecutionStartedAt: requestedAt,
+    executionRunId: diagnosisKickoff?.executionRunId || "",
+    executionStatus: diagnosisKickoff?.executionStatus || "",
   };
   conversation.status = "escalated";
   conversation.lastMessageAt = systemMessage?.createdAt || requestedAt;
@@ -7510,6 +7557,14 @@ async function ensureConversationEscalated({
       ...(conversation.metadata?.support || {}),
       escalationOffered: true,
       escalationSent: true,
+      engineeringReviewStarted: true,
+      engineeringReviewStartedAt:
+        requestedAt,
+      diagnosisRunId: diagnosisKickoff?.runId || "",
+      engineeringExecutionStarted: true,
+      engineeringExecutionStartedAt: requestedAt,
+      executionRunId: diagnosisKickoff?.executionRunId || "",
+      executionStatus: diagnosisKickoff?.executionStatus || "",
     },
   };
   await conversation.save();

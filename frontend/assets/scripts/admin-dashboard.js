@@ -903,6 +903,43 @@ function buildAIControlRoomUnavailableFocus(title, body) {
   };
 }
 
+function buildAIControlRoomFounderFallbackView(isUnavailable = false) {
+  return {
+    title: "Decision Copilot",
+    status: isUnavailable ? "Partial data" : "Loading",
+    tone: isUnavailable ? "blocked" : "active",
+    queueLabel: isUnavailable ? "Partial live data" : "Loading live data",
+    primary: {
+      title: "What Needs Your Attention Today",
+      body: isUnavailable
+        ? "Some founder-facing Control Room data is temporarily unavailable, but this console remains the right place to review what is still loaded."
+        : "Loading founder-facing decision data.",
+    },
+    secondary: {
+      title: "Current Ops Facts",
+      items: [
+        isUnavailable ? "Some founder-facing decision sources are temporarily unavailable." : "Founder-facing decision data is still loading.",
+        isUnavailable ? "Live queue totals may be incomplete until the next refresh." : "Live queue totals will appear here when loading finishes.",
+        "The founder console stays visible so the decision workflow does not disappear during refreshes.",
+      ],
+    },
+    tertiary: {
+      title: "Decision Queue",
+      items: [isUnavailable ? "Decision queue data is partially unavailable right now." : "No live founder queue items have loaded yet."],
+    },
+    quaternary: {
+      title: "Audit Trail",
+      items: [isUnavailable ? "Audit records are partially unavailable right now." : "Audit and blocked-item records will appear here when loading finishes."],
+    },
+    decisionQueue: [],
+    autonomyUpgradeSuggestion: null,
+    autoHandledItems: [],
+    blockedItems: [],
+    infoItems: [],
+    surfaceMode: "decision_hub",
+  };
+}
+
 function buildAIControlRoomFallbackData() {
   const isUnavailable = aiControlRoomState.loadStatus === "error";
   const buildNeutralFocus = isUnavailable
@@ -1022,7 +1059,7 @@ function buildAIControlRoomFallbackData() {
     focusViews: {
       marketing: buildNeutralFocus("Marketing / CMO"),
       sales: buildNeutralFocus("Sales / Awareness"),
-      founder: buildNeutralFocus("Decision Copilot"),
+      founder: buildAIControlRoomFounderFallbackView(isUnavailable),
       admissions: buildNeutralFocus("Admissions / Review"),
       support: buildNeutralFocus("Support Ops"),
       engineering: buildAIControlRoomUnavailableFocus(
@@ -1166,10 +1203,19 @@ async function syncAIControlRoomInBackground({ refreshIncidentWorkspace = false 
               .filter((key) => AI_CONTROL_ROOM_FOCUS_ENDPOINTS[key])
           )
         );
-        const [summaryPayload, ...views] = await Promise.all([
+        const [summaryResult, ...viewResults] = await Promise.allSettled([
           fetchAIControlRoomSummaryPayload(),
           ...focusKeys.map(async (key) => ({ key, view: await fetchAIControlRoomFocusPayload(key) })),
         ]);
+
+        if (summaryResult.status !== "fulfilled") {
+          throw summaryResult.reason;
+        }
+
+        const summaryPayload = summaryResult.value;
+        const views = viewResults
+          .filter((result) => result.status === "fulfilled" && result.value?.key)
+          .map((result) => result.value);
 
         aiControlRoomState.summary = summaryPayload;
         aiControlRoomState.lastLoadedAt = Date.now();
@@ -1256,14 +1302,19 @@ function deepCloneAIControlRoomValue(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function buildAIControlRoomSummaryNotes({ needsDecisionCount = 0, autoHandledCount = 0, blockedWaitingCount = 0 } = {}) {
+function buildAIControlRoomSummaryNotes({
+  urgentDecisionCount = 0,
+  needsDecisionCount = 0,
+  autoHandledCount = 0,
+  blockedWaitingCount = 0,
+} = {}) {
   return {
     urgent: {
-      value: String(needsDecisionCount),
+      value: String(urgentDecisionCount),
       note:
-        needsDecisionCount > 0
-          ? `${pluralizeAIControlRoom(needsDecisionCount, "decision")} need a yes or no right now across the live lanes.`
-          : "No decision is currently required across the live lanes.",
+        urgentDecisionCount > 0
+          ? `${pluralizeAIControlRoom(urgentDecisionCount, "decision")} need a yes or no right now across the live lanes.`
+          : "No urgent decision is currently required across the live lanes.",
     },
     review: {
       value: String(autoHandledCount),
@@ -1633,6 +1684,9 @@ function applyAIControlRoomDecisionGroupingToData(data = {}) {
     .filter(Boolean);
 
   const needsDecisionCount = groupedDecisionQueue.length;
+  const urgentDecisionCount = groupedDecisionQueue.filter((item) =>
+    /urgent/i.test(String(item?.urgencyLabel || ""))
+  ).length;
   const autoHandledCount = Array.isArray(founderView.autoHandledItems) ? founderView.autoHandledItems.length : 0;
   const blockedWaitingCount = founderView.blockedItems.reduce((sum, item) => {
     const laneKey = String(item?.laneKey || "").trim().toLowerCase();
@@ -1699,6 +1753,7 @@ function applyAIControlRoomDecisionGroupingToData(data = {}) {
   });
 
   const summaryNotes = buildAIControlRoomSummaryNotes({
+    urgentDecisionCount,
     needsDecisionCount,
     autoHandledCount,
     blockedWaitingCount,
@@ -2004,7 +2059,7 @@ function buildAIControlRoomFounderUpgradeCard(item = {}) {
   if (!item) return "";
   const previewLines = uniqueAIControlRoomTexts([item.preview, item.proposedAction]);
   return `
-    <article class="ai-room-founder-decision-card">
+    <article class="ai-room-founder-upgrade-card">
       <div class="ai-room-founder-decision-top">
         <div>
           <p class="ai-room-founder-role">Autonomy Upgrade · ${escapeHTML(item.agentRole || "Lane")}</p>
@@ -2125,14 +2180,18 @@ function renderAIControlRoomFounderConsole(view) {
   const bodyEl = document.getElementById("aiRoomFounderConsoleBody");
   if (!host || !bodyEl) return;
 
-  if (!view || view.surfaceMode !== "decision_hub") {
+  if (!view) {
     host.hidden = true;
     bodyEl.innerHTML = "";
     return;
   }
 
   host.hidden = false;
-  const decisionQueue = groupAIControlRoomDecisionQueueItems(Array.isArray(view.decisionQueue) ? view.decisionQueue : []);
+  const decisionQueue =
+    view.surfaceMode === "decision_hub"
+      ? groupAIControlRoomDecisionQueueItems(Array.isArray(view.decisionQueue) ? view.decisionQueue : [])
+      : [];
+  const urgentDecisionCount = decisionQueue.filter((item) => /urgent/i.test(String(item?.urgencyLabel || ""))).length;
   const autonomyUpgradeSuggestion = view.autonomyUpgradeSuggestion || null;
   const autoHandledItems = Array.isArray(view.autoHandledItems) ? view.autoHandledItems : [];
   const blockedItems = Array.isArray(view.blockedItems) ? view.blockedItems : [];
@@ -2156,13 +2215,13 @@ function renderAIControlRoomFounderConsole(view) {
       }
       <section class="ai-room-founder-section ai-room-founder-section--priority">
         <div class="ai-room-founder-section-top">
-          <div>
-            <p class="ai-room-section-label">Decision Queue</p>
-            <h3>Decision Queue</h3>
-            <p class="ai-room-founder-queue-progress" aria-live="polite">${decisionQueue.length} remaining</p>
-          </div>
-          <span class="pending-count">${decisionQueue.length} remaining</span>
-        </div>
+              <div>
+                <p class="ai-room-section-label">Decision Queue</p>
+                <h3>Decision Queue</h3>
+                <p class="ai-room-founder-queue-progress" aria-live="polite">${urgentDecisionCount} urgent remaining</p>
+              </div>
+              <span class="pending-count">${decisionQueue.length} total</span>
+            </div>
         ${
           decisionQueue.length
             ? `<div class="ai-room-founder-decision-list">${decisionQueue.map((item) => buildAIControlRoomFounderDecisionCard(item)).join("")}</div>`
@@ -2507,11 +2566,21 @@ async function renderAIControlRoom(force = false) {
   }
 
   try {
-    await Promise.all([
+    const loadResults = await Promise.allSettled([
       loadAIControlRoomSummary(force),
       loadAIControlRoomFocus(activeAIControlRoomKey, force),
       loadAIControlRoomFocus("founder", force),
     ]);
+
+    const failures = loadResults.filter((result) => result.status === "rejected");
+    if (failures.length) {
+      hasLoadError = true;
+      const primaryFailure = failures[0]?.reason;
+      if (refreshBadge) refreshBadge.textContent = "Partial live data";
+      if (timestamp && primaryFailure?.message) {
+        timestamp.textContent = primaryFailure.message;
+      }
+    }
   } catch (err) {
     hasLoadError = true;
     if (refreshBadge) refreshBadge.textContent = "Partial live data";

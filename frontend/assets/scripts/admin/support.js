@@ -79,6 +79,86 @@ function badgeToneForUrgency(urgency = "") {
   return "active";
 }
 
+function isResolvedTicketStatus(status = "") {
+  const normalized = String(status || "").trim().toLowerCase();
+  return normalized === "resolved" || normalized === "closed";
+}
+
+function buildSimpleIssueLifecycle(ticket = {}) {
+  const normalizedStatus = String(ticket.status || "").trim().toLowerCase();
+  const issueText =
+    ticket.latestIssuePreview || ticket.issuePreview || ticket.latestUserMessage || ticket.message || "No issue summary available.";
+  const incidents = Array.isArray(ticket.linkedIncidents) ? ticket.linkedIncidents.filter(Boolean) : [];
+  const primaryIncident = incidents[0] || null;
+  const engineeringReviewStarted = ticket.conversation?.escalation?.engineeringReviewStarted === true;
+  const engineeringExecutionStarted = ticket.conversation?.escalation?.engineeringExecutionStarted === true;
+  const executionStatus = String(ticket.conversation?.escalation?.executionStatus || "").trim().toLowerCase();
+  const resolutionSummary = String(ticket.resolutionSummary || "").trim();
+  const verificationReady = ["ready_for_test", "ready_for_review", "ready_for_deploy"].includes(executionStatus);
+
+  if (isResolvedTicketStatus(normalizedStatus)) {
+    return {
+      label: "Fixed",
+      tone: "healthy",
+      owner: primaryIncident ? "Engineering" : "Support",
+      progress: primaryIncident ? "Engineering resolved the linked issue." : "Support resolved this issue.",
+      incidentLabel: primaryIncident?.publicId || "—",
+      summary: resolutionSummary || "The issue was resolved and closed out.",
+      issueText,
+    };
+  }
+
+  if (ticket.handedOffToEngineering) {
+    if (verificationReady) {
+      return {
+        label: "Fix ready for verification",
+        tone: "healthy",
+        owner: "Engineering",
+        progress: "Code has been revised to fix the error. Please verify before committing.",
+        incidentLabel: primaryIncident?.publicId || "Pending",
+        summary: primaryIncident?.summary || "Engineering prepared a code revision for verification.",
+        issueText,
+      };
+    }
+
+    return {
+      label: engineeringExecutionStarted || engineeringReviewStarted ? "In engineering" : "Sent to engineering",
+      tone: engineeringExecutionStarted ? "active" : engineeringReviewStarted ? "needs-review" : "active",
+      owner: "Engineering",
+      progress: engineeringExecutionStarted
+        ? `Engineering started fix planning${executionStatus ? ` (${executionStatus.replace(/_/g, " ")})` : ""}.`
+        : engineeringReviewStarted
+          ? "Engineering is actively reviewing this issue."
+          : "Engineering has the issue queued for review.",
+      incidentLabel: primaryIncident?.publicId || "Pending",
+      summary: primaryIncident?.summary || "The issue was escalated out of support and linked to engineering.",
+      issueText,
+    };
+  }
+
+  if (normalizedStatus === "waiting_on_user" || normalizedStatus === "waiting_on_info") {
+    return {
+      label: "Waiting on user",
+      tone: "priority",
+      owner: "Support",
+      progress: "Support needs one more detail before engineering work starts.",
+      incidentLabel: "—",
+      summary: "The issue is still in support review.",
+      issueText,
+    };
+  }
+
+  return {
+    label: "Reported",
+    tone: normalizedStatus === "in_review" ? "needs-review" : "active",
+    owner: "Support",
+    progress: normalizedStatus === "in_review" ? "Support is reviewing the issue now." : "The issue has been captured and is waiting for review.",
+    incidentLabel: "—",
+    summary: "The issue is still support-owned.",
+    issueText,
+  };
+}
+
 function supportMessageVariant(message = {}) {
   if (message.sender === "user") return "user";
   if (message.metadata?.kind === "team_reply") return "team";
@@ -173,6 +253,7 @@ function renderTicketList(tickets = []) {
     .map((ticket) => {
       const active = String(ticket.id || ticket._id) === state.activeTicketId;
       const requester = ticket.requester || {};
+      const ticketLifecycle = buildSimpleIssueLifecycle(ticket);
       return `
         <article
           class="ai-room-list-item support-list-card${active ? " support-list-card--active" : ""}"
@@ -187,19 +268,18 @@ function renderTicketList(tickets = []) {
               <strong class="ai-room-list-item-title">${escapeHTML(ticket.subject || "Support ticket")}</strong>
             </div>
             <div class="support-ticket-row-badges">
+              <span class="ai-room-badge ai-room-badge--${ticketLifecycle.tone}">${escapeHTML(ticketLifecycle.label)}</span>
               <span class="ai-room-badge ai-room-badge--${badgeToneForUrgency(ticket.urgency)}">${escapeHTML(
                 titleize(ticket.urgency || "medium")
               )}</span>
-              <span class="ai-room-badge ai-room-badge--${badgeToneForStatus(ticket.status)}">${escapeHTML(
-                statusLabel(ticket.status)
-              )}</span>
             </div>
           </div>
-          <p>${escapeHTML(ticket.issuePreview || ticket.latestIssuePreview || "No issue preview available.")}</p>
+          <p>${escapeHTML(ticketLifecycle.issueText)}</p>
           <div class="support-ticket-list-meta">
             <span>${escapeHTML(requester.name || "Unknown user")}</span>
             <span>${escapeHTML(requester.email || ticket.requesterEmail || "—")}</span>
             <span>${escapeHTML(titleize(requester.role || ticket.requesterRole || "unknown"))}</span>
+            <span>${escapeHTML(ticketLifecycle.owner)}</span>
             <span>${escapeHTML(titleize(ticket.classification?.category || "general_support"))}</span>
             <span>${escapeHTML(formatDate(ticket.createdAt, { relative: true }))}</span>
           </div>
@@ -402,7 +482,7 @@ function renderConversationThread(messages = []) {
 function renderLinkedIncidents(ticket = {}) {
   const incidents = Array.isArray(ticket.linkedIncidents) ? ticket.linkedIncidents.filter(Boolean) : [];
   if (!incidents.length) {
-    return `<p class="small">This ticket is still support-owned.</p>`;
+    return `<p class="small">No engineering incident is linked yet.</p>`;
   }
 
   return `
@@ -413,7 +493,7 @@ function renderLinkedIncidents(ticket = {}) {
             <article class="support-note-card">
               <div class="support-note-meta">
                 <span>${escapeHTML(incident.publicId || incident.id || "Incident")}</span>
-                <span>${escapeHTML(titleize(incident.state || "open"))}</span>
+                <span>${escapeHTML(titleize(incident.userVisibleStatus || incident.state || "open"))}</span>
               </div>
               <p>${escapeHTML(incident.summary || "Engineering-linked incident.")}</p>
               <div class="support-admin-actions">
@@ -537,6 +617,16 @@ function renderTicketDetail(ticket = null) {
   const ticketStatus = ticket.status || "open";
   const replyStatusDefault =
     ticketStatus === "resolved" || ticketStatus === "closed" ? ticketStatus : "waiting_on_user";
+  const lifecycle = buildSimpleIssueLifecycle(ticket);
+  const primaryIncident = Array.isArray(ticket.linkedIncidents) ? ticket.linkedIncidents[0] || null : null;
+  const incidentAction =
+    primaryIncident?.publicId || primaryIncident?.id
+      ? `
+        <button class="btn secondary" type="button" data-support-open-incident="${escapeHTML(
+          primaryIncident.publicId || primaryIncident.id || ""
+        )}">Open Engineering Context</button>
+      `
+      : "";
 
   root.innerHTML = `
     <section class="support-ticket-hero">
@@ -551,31 +641,52 @@ function renderTicketDetail(ticket = null) {
         <span class="ai-room-badge ai-room-badge--${badgeToneForUrgency(ticket.urgency)}">${escapeHTML(
           titleize(ticket.urgency || "medium")
         )}</span>
-        <span class="ai-room-badge ai-room-badge--${badgeToneForStatus(ticket.status)}">${escapeHTML(
-          statusLabel(ticket.status)
-        )}</span>
+        <span class="ai-room-badge ai-room-badge--${lifecycle.tone}">${escapeHTML(lifecycle.label)}</span>
         <span class="ai-room-badge ai-room-badge--active">${escapeHTML(
           titleize(ticket.classification?.category || "general_support")
         )}</span>
-        ${
-          ticket.handedOffToEngineering
-            ? `<span class="ai-room-badge ai-room-badge--needs-review">Handed Off to Engineering</span>`
-            : ""
-        }
       </div>
     </section>
 
-    ${
-      ticket.handedOffToEngineering
-        ? `
-          <section class="ai-room-focus-block">
-            <h3>Engineering Handoff</h3>
-            <p>This issue is already with Engineering. This support view is now reference-only.</p>
-            ${renderLinkedIncidents(ticket)}
-          </section>
-        `
-        : ""
-    }
+    <section class="support-issue-lifecycle-card">
+      <div class="support-issue-lifecycle-grid">
+        <article class="support-issue-lifecycle-item support-issue-lifecycle-item--wide">
+          <span class="support-issue-lifecycle-label">User reported</span>
+          <strong>${escapeHTML(lifecycle.issueText)}</strong>
+        </article>
+        <article class="support-issue-lifecycle-item">
+          <span class="support-issue-lifecycle-label">Status</span>
+          <strong>${escapeHTML(lifecycle.label)}</strong>
+        </article>
+        <article class="support-issue-lifecycle-item">
+          <span class="support-issue-lifecycle-label">Owner</span>
+          <strong>${escapeHTML(lifecycle.owner)}</strong>
+        </article>
+        <article class="support-issue-lifecycle-item">
+          <span class="support-issue-lifecycle-label">Engineering</span>
+          <strong>${escapeHTML(lifecycle.progress)}</strong>
+        </article>
+        <article class="support-issue-lifecycle-item">
+          <span class="support-issue-lifecycle-label">Incident</span>
+          <strong>${escapeHTML(lifecycle.incidentLabel)}</strong>
+        </article>
+        <article class="support-issue-lifecycle-item">
+          <span class="support-issue-lifecycle-label">Last update</span>
+          <strong>${escapeHTML(formatDate(ticket.updatedAt, { relative: true }))}</strong>
+        </article>
+      </div>
+      <div class="support-issue-lifecycle-footer">
+        <p>${escapeHTML(lifecycle.summary)}</p>
+        <div class="support-admin-actions">
+          ${incidentAction}
+        </div>
+      </div>
+    </section>
+
+    <section class="ai-room-focus-block">
+      <h3>Engineering Context</h3>
+      ${renderLinkedIncidents(ticket)}
+    </section>
 
     <section class="support-ticket-sticky-actions">
       <div class="support-ticket-action-group">

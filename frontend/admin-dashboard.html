@@ -920,6 +920,7 @@ display:grid;
 gap:.85rem;
 }
 #section-ai-control-room .ai-room-founder-decision-card,
+#section-ai-control-room .ai-room-founder-upgrade-card,
 #section-ai-control-room .ai-room-founder-feed-item{
 border:1px solid rgba(26,26,26,.08);
 border-radius:18px;
@@ -948,7 +949,8 @@ letter-spacing:.14em;
 text-transform:uppercase;
 color:rgba(26,26,26,.5);
 }
-#section-ai-control-room .ai-room-founder-decision-card h3{
+#section-ai-control-room .ai-room-founder-decision-card h3,
+#section-ai-control-room .ai-room-founder-upgrade-card h3{
 margin:0;
 font-size:1.08rem;
 font-weight:500;
@@ -1708,6 +1710,17 @@ font-size:.95rem;
 </div>
 <div id="aiRoomFocusBody"></div>
 </div>
+
+<details id="aiRoomFounderConsole" class="ai-room-secondary-console" open>
+<summary class="ai-room-secondary-console-summary">
+<div>
+<p class="ai-room-secondary-console-note">Founder Console</p>
+<h2>Decision Queue &amp; Audit</h2>
+</div>
+<span class="pending-count">Live founder view</span>
+</summary>
+<div id="aiRoomFounderConsoleBody"></div>
+</details>
 
 </section>
 

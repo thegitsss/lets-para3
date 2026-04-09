@@ -5852,6 +5852,12 @@ describe("Support assistant API", () => {
         ticketId: escalateRes.body.ticket.id,
       })
     );
+    expect(escalateRes.body.conversation.escalation).toEqual(
+      expect.objectContaining({
+        engineeringReviewStarted: true,
+        engineeringExecutionStarted: true,
+      })
+    );
     expect(escalateRes.body.systemMessage.text).toMatch(/Sent to the team for review/i);
     expect(escalateRes.body.systemMessage.text).toMatch(/won't need to repeat yourself/i);
     expect(escalateRes.body.confirmation.handoffSummary).toMatch(/Issue:/i);

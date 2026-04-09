@@ -110,7 +110,15 @@ const casesRateLimiter = rateLimit({
 });
 
 app.use("/api/cases", casesRateLimiter);
-app.use("/api/", rateLimit({ windowMs: 60 * 1000, max: 300 }));
+app.use(
+  "/api/",
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: PROD ? 300 : 10000,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
 
 app.use("/api", (req, res, next) => {
   if (mongoose.connection.readyState !== 1) {

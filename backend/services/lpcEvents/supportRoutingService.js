@@ -7,7 +7,8 @@ const { createIncidentFromSupportSignal } = require("../incidents/intakeService"
 const { notifyFounderSupportEngineeringIssue } = require("../incidents/notificationService");
 const { resolveLifecycleFollowUps } = require("../lifecycle/followUpService");
 const { createSupportTicket, linkTicketToIncident } = require("../support/ticketService");
-const { runEngineeringDiagnosis } = require("../engineering/workspaceService");
+const { runEngineeringDiagnosis, buildEngineeringExecution } = require("../engineering/workspaceService");
+const { buildExecutionPacket } = require("../ai/ctoExecutionService");
 const { countKeywordHits } = require("../support/shared");
 
 const SUPPORT_INTENT_KEYWORDS = Object.freeze([
@@ -239,6 +240,40 @@ async function startEngineeringDiagnosisForIncident(incident = {}) {
     return { ok: false, started: false, reused: false, runId: "", reason: "Incident identifier unavailable." };
   }
 
+  const buildFallbackExecutionKickoff = async (reason = "") => {
+    const fallback = await buildExecutionPacket({
+      saveRun: true,
+      issueId: String(incident?._id || "").trim(),
+      category: String(incident?.classification?.domain || "incident_watch").trim().toLowerCase(),
+      urgency: String(incident?.classification?.severity || "high").trim().toLowerCase(),
+      technicalSeverity: String(incident?.classification?.severity || "high").trim().toLowerCase(),
+      diagnosisSummary: String(incident?.summary || incident?.originalReportText || "Support-linked engineering issue").trim(),
+      likelyAffectedAreas: [incident?.context?.routePath || incident?.context?.pageUrl || incident?.context?.featureKey || ""].filter(Boolean),
+      filesToInspect: Array.isArray(incident?.classification?.suspectedFiles) ? incident.classification.suspectedFiles : [],
+      recommendedFixStrategy:
+        "Reproduce the user-reported issue from the linked support context, confirm the failing path in code, and implement the narrowest safe fix before targeted regression checks.",
+      testPlan: [
+        "Reproduce the reported issue using the linked support route and context.",
+        "Run targeted regression checks on the affected LPC flow after the fix.",
+      ],
+      executionStatus: "in_progress",
+      metadata: {
+        incidentId: String(incident?._id || "").trim(),
+        incidentPublicId: String(incident?.publicId || "").trim(),
+        page: incident?.context?.pageUrl || "",
+        routePath: incident?.context?.routePath || "",
+        surface: incident?.context?.surface || "",
+        featureKey: incident?.context?.featureKey || "",
+        triggerSource: "support_auto_execution_fallback",
+        fallbackReason: reason,
+      },
+    });
+    return {
+      reused: false,
+      execution: fallback,
+    };
+  };
+
   try {
     const result = await runEngineeringDiagnosis({
       incidentIdentifier,
@@ -246,21 +281,44 @@ async function startEngineeringDiagnosisForIncident(incident = {}) {
       autoDiagnosis: true,
       triggerLabel: "Support escalation auto-start",
     });
+    let execution = null;
+    if (result?.diagnosis?.runId) {
+      try {
+        execution = await buildEngineeringExecution({
+          incidentIdentifier,
+        });
+      } catch (executionError) {
+        execution = await buildFallbackExecutionKickoff(executionError?.message || "Engineering execution kickoff failed.");
+      }
+    } else {
+      execution = await buildFallbackExecutionKickoff("Diagnosis run was unavailable.");
+    }
     return {
       ok: true,
       started: result?.reused !== true,
       reused: result?.reused === true,
       runId: String(result?.diagnosis?.runId || ""),
+      executionStarted: execution?.reused === true || execution?.execution?.ok === true,
+      executionReused: execution?.reused === true,
+      executionRunId: String(execution?.execution?.executionRunId || ""),
+      executionStatus: String(execution?.execution?.executionStatus || ""),
+      executionError: execution?.execution?.ok === false ? String(execution?.execution?.error || "") : "",
       incidentId: String(result?.item?.id || incident?._id || ""),
       incidentPublicId: String(result?.item?.publicId || incident?.publicId || ""),
     };
   } catch (error) {
     console.error("Unable to start engineering diagnosis for support incident", error);
+    const execution = await buildFallbackExecutionKickoff(error?.message || "Engineering diagnosis kickoff failed.");
     return {
-      ok: false,
+      ok: execution?.execution?.ok === true,
       started: false,
       reused: false,
       runId: "",
+      executionStarted: execution?.execution?.ok === true,
+      executionReused: false,
+      executionRunId: String(execution?.execution?.executionRunId || ""),
+      executionStatus: String(execution?.execution?.executionStatus || ""),
+      executionError: execution?.execution?.ok === false ? String(execution?.execution?.error || "") : "",
       reason: error?.message || "Engineering diagnosis kickoff failed.",
       incidentId: String(incident?._id || ""),
       incidentPublicId: String(incident?.publicId || ""),

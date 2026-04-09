@@ -61,6 +61,13 @@ function buildFounderSupportIssueBody({ incident, ticket = null, diagnosisKickof
     : diagnosisKickoff?.reused
       ? "Engineering diagnosis was already in progress."
       : "Engineering diagnosis has not started yet.";
+  const executionLine = diagnosisKickoff?.executionStarted
+    ? diagnosisKickoff?.executionReused
+      ? "Execution planning was already in progress."
+      : "Execution planning started automatically."
+    : diagnosisKickoff?.executionError
+      ? "Execution planning did not start automatically."
+      : "Execution planning has not started yet.";
 
   return {
     subject: `New engineering issue from support: ${compactText(issueLabel, 90)}`,
@@ -71,7 +78,7 @@ function buildFounderSupportIssueBody({ incident, ticket = null, diagnosisKickof
       ticketRef ? `<p><strong>Support ticket:</strong> ${ticketRef}</p>` : "",
       `<p><strong>Reporter:</strong> ${compactText(`${requesterRole}${requesterEmail ? ` · ${requesterEmail}` : ""}`, 220)}</p>`,
       `<p><strong>Area:</strong> ${routeLabel}</p>`,
-      `<p><strong>Status:</strong> ${linkedToExisting ? "Linked to an existing engineering incident." : "Created as a new engineering incident."} ${diagnosisLine}</p>`,
+      `<p><strong>Status:</strong> ${linkedToExisting ? "Linked to an existing engineering incident." : "Created as a new engineering incident."} ${diagnosisLine} ${executionLine}</p>`,
       `<p><a href="${adminIncidentLink(incident)}">Open in Admin Dashboard</a></p>`,
     ]
       .filter(Boolean)
@@ -83,13 +90,13 @@ function buildFounderSupportIssueBody({ incident, ticket = null, diagnosisKickof
       ticketRef ? `Support ticket: ${ticketRef}` : "",
       `Reporter: ${requesterRole}${requesterEmail ? ` · ${requesterEmail}` : ""}`,
       `Area: ${routeLabel}`,
-      `Status: ${linkedToExisting ? "Linked to an existing engineering incident." : "Created as a new engineering incident."} ${diagnosisLine}`,
+      `Status: ${linkedToExisting ? "Linked to an existing engineering incident." : "Created as a new engineering incident."} ${diagnosisLine} ${executionLine}`,
       `Admin: ${adminIncidentLink(incident)}`,
     ]
       .filter(Boolean)
       .join("\n"),
     preview: compactText(
-      `${issueLabel}. ${linkedToExisting ? "Linked to an existing engineering incident." : "Created as a new engineering incident."} ${diagnosisLine}`,
+      `${issueLabel}. ${linkedToExisting ? "Linked to an existing engineering incident." : "Created as a new engineering incident."} ${diagnosisLine} ${executionLine}`,
       240
     ),
   };
