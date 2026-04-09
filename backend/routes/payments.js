@@ -1374,8 +1374,12 @@ router.post(
     if (c.status === "completed" || c.paymentReleased) {
       return res.json({ ok: true, alreadyReleased: true });
     }
-    const existingPayout = await Payout.findOne({ caseId: c._id })
+    const existingPayout = await Payout.findOne({
+      caseId: c._id,
+      paralegalId: c.paralegal?._id || c.paralegalId || c.paralegal,
+    })
       .select("amountPaid transferId")
+      .sort({ createdAt: -1 })
       .lean();
     if (existingPayout) {
       return res.json({
@@ -1532,7 +1536,7 @@ router.post(
       .lean();
     await Promise.all([
       Payout.updateOne(
-        { caseId: c._id },
+        { caseId: c._id, paralegalId: paralegalObjectId },
         {
           $setOnInsert: {
             paralegalId: paralegalObjectId,
@@ -2066,8 +2070,12 @@ router.post(
     }
     const c = await Case.findById(req.params.caseId);
     if (!c) return res.status(404).json({ error: "Case not found" });
-    const existingPayout = await Payout.findOne({ caseId: c._id })
+    const existingPayout = await Payout.findOne({
+      caseId: c._id,
+      paralegalId: c.paralegal || c.paralegalId,
+    })
       .select("amountPaid transferId")
+      .sort({ createdAt: -1 })
       .lean();
     if (c.paymentReleased || existingPayout || c.payoutTransferId) {
       return res.json({
@@ -2142,8 +2150,12 @@ router.post(
       "stripeAccountId stripeOnboarded stripeChargesEnabled stripePayoutsEnabled firstName lastName email role"
     );
     if (!c) return res.status(404).json({ error: "Case not found" });
-    const existingPayout = await Payout.findOne({ caseId: c._id })
+    const existingPayout = await Payout.findOne({
+      caseId: c._id,
+      paralegalId: c.paralegal?._id || c.paralegalId || c.paralegal,
+    })
       .select("amountPaid transferId")
+      .sort({ createdAt: -1 })
       .lean();
     if (c.paymentReleased || existingPayout || c.payoutTransferId) {
       return res.json({
@@ -2220,7 +2232,7 @@ router.post(
     await c.save();
 
     await Payout.updateOne(
-      { caseId: c._id },
+      { caseId: c._id, paralegalId: c.paralegal._id || c.paralegalId },
       {
         $setOnInsert: {
           paralegalId: c.paralegal._id || c.paralegalId,
@@ -2530,8 +2542,12 @@ router.post(
       return res.status(400).json({ error: "Case does not have an active dispute." });
     }
 
-    const existingPayout = await Payout.findOne({ caseId: c._id })
+    const existingPayout = await Payout.findOne({
+      caseId: c._id,
+      paralegalId: c.paralegal?._id || c.paralegalId || c.paralegal,
+    })
       .select("amountPaid transferId")
+      .sort({ createdAt: -1 })
       .lean();
     if (existingPayout || c.payoutTransferId) {
       return res.status(400).json({ error: "Payout already exists for this case." });
@@ -2783,7 +2799,7 @@ router.post(
     await c.save();
 
     await Payout.updateOne(
-      { caseId: c._id },
+      { caseId: c._id, paralegalId: c.paralegal._id || c.paralegalId },
       {
         $setOnInsert: {
           paralegalId: c.paralegal._id || c.paralegalId,
@@ -3130,7 +3146,13 @@ router.get(
       return;
     }
 
-    const payoutDoc = await Payout.findOne({ caseId: doc._id }).select("amountPaid transferId").lean();
+    const payoutDoc = await Payout.findOne({
+      caseId: doc._id,
+      paralegalId: req.user._id || req.user.id,
+    })
+      .select("amountPaid transferId")
+      .sort({ createdAt: -1 })
+      .lean();
     const payload = buildParalegalReceiptPayload(doc, payoutDoc);
     const key = getReceiptKey(doc._id, "paralegal");
     const filename = safeReceiptFilename(doc.title, "payout-receipt");
@@ -3239,11 +3261,13 @@ router.get(
           .select("caseId transferId amountPaid createdAt paralegalId")
           .lean()
       : [];
-    const payoutMap = new Map();
+    const payoutsByCase = new Map();
     payouts.forEach((p) => {
       const key = String(p.caseId || "");
-      if (!key || payoutMap.has(key)) return;
-      payoutMap.set(key, p);
+      if (!key) return;
+      const bucket = payoutsByCase.get(key) || [];
+      bucket.push(p);
+      payoutsByCase.set(key, bucket);
     });
 
     const rows = [];
@@ -3274,7 +3298,12 @@ router.get(
         );
       }
 
-      const payoutDoc = payoutMap.get(caseId);
+      const casePayouts = payoutsByCase.get(caseId) || [];
+      const activeParalegalId = String(doc.paralegal?._id || doc.paralegalId || "");
+      const payoutDoc =
+        casePayouts.find((p) => String(p.paralegalId || "") === activeParalegalId) ||
+        casePayouts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ||
+        null;
       const payoutReceiptId = payoutDoc?.transferId || doc.payoutTransferId || "";
       if (payoutReceiptId) {
         const payoutAmount = Number.isFinite(Number(payoutDoc?.amountPaid))

@@ -34,7 +34,7 @@ const blockSchema = new Schema({
   sourceDisputeId: { type: String, trim: true, default: "" },
   sourceType: {
     type: String,
-    enum: ["resolved_dispute", "withdrawal_zero_payout", "withdrawal_partial_payout", "closed_case", "legacy", ""],
+    enum: ["resolved_dispute", "withdrawal_zero_payout", "withdrawal_partial_payout", "closed_case", "application_screening", "legacy", ""],
     default: "legacy",
     index: true,
   },

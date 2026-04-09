@@ -167,4 +167,95 @@ describe("Case lifecycle transitions", () => {
     expect(res.status).toBe(400);
     expect(res.body.msg).toMatch(/Invalid transition/i);
   });
+
+  test("Attorney can delete an archived completed case after hiring and payment release", async () => {
+    const attorney = await User.create({
+      firstName: "Dana",
+      lastName: "Hart",
+      email: "dana.hart@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Robin",
+      lastName: "Cole",
+      email: "robin.cole@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+
+    const caseDoc = await Case.create({
+      title: "Archived completion delete",
+      details: "Completed archived cases should be removable from the dashboard archive.",
+      status: "completed",
+      archived: true,
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowStatus: "funded",
+      paymentReleased: true,
+      hiredAt: new Date("2026-03-01T00:00:00.000Z"),
+      completedAt: new Date("2026-03-10T00:00:00.000Z"),
+      totalAmount: 100000,
+      currency: "usd",
+    });
+
+    const res = await request(app)
+      .delete(`/api/cases/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(attorney));
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(await Case.findById(caseDoc._id).lean()).toBeNull();
+  });
+
+  test("Attorney still cannot delete an active hired funded case", async () => {
+    const attorney = await User.create({
+      firstName: "Morgan",
+      lastName: "Bell",
+      email: "morgan.bell@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+    const paralegal = await User.create({
+      firstName: "Taylor",
+      lastName: "Reed",
+      email: "taylor.reed@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+
+    const caseDoc = await Case.create({
+      title: "Active hire delete guardrail",
+      details: "Active hired cases should still be protected from deletion.",
+      status: "in progress",
+      archived: false,
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      escrowStatus: "funded",
+      paymentReleased: false,
+      hiredAt: new Date("2026-03-05T00:00:00.000Z"),
+      totalAmount: 80000,
+      currency: "usd",
+    });
+
+    const res = await request(app)
+      .delete(`/api/cases/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(attorney));
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Cannot delete a case after hiring a paralegal");
+    expect(await Case.findById(caseDoc._id).lean()).not.toBeNull();
+  });
 });

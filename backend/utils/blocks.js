@@ -159,7 +159,7 @@ function getWithdrawalBlockMeta(caseDoc) {
 
 function getClosedCaseBlockMeta(caseDoc) {
   const status = normalizeRole(caseDoc?.status);
-  if (caseDoc?.paymentReleased === true && (status === "completed" || status === "closed")) {
+  if (status === "completed" || status === "closed" || caseDoc?.paymentReleased === true) {
     return {
       sourceType: "closed_case",
       sourceDisputeId: "",

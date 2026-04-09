@@ -46,7 +46,7 @@ function buildDisplayMessage(type, payload = {}) {
     case "profile_photo_rejected":
       return "Your profile photo was rejected. Please upload a new one that meets our photo guidelines, including a plain or neutral background.";
     case "payout_released":
-      return "Funds are being sent to your connected bank account via Stripe. Deposit timing typically ranges from 3–5 business days, depending on your bank.";
+      return "Your payout is on the way to your bank account. Deposit timing typically ranges from 3–5 business days, depending on your bank.";
     case "application_submitted": {
       const paralegal = payload.paralegalName || actorName || "A paralegal";
       return `${paralegal} applied${caseFragment || ""}`.trim();
@@ -80,7 +80,7 @@ function buildDisplayMessage(type, payload = {}) {
     case "dispute_opened":
       return `A review was opened for ${caseTitle || "a case"}.`;
     case "admin_review_overdue":
-      return payload.message || "Admin is still reviewing this request and will resolve it soon.";
+      return payload.message || "Our team is still reviewing this request and will follow up soon.";
     default:
       return "You have a new notification.";
   }
@@ -219,7 +219,7 @@ function emailTemplate(type, payload) {
     case "case_awaiting_funding":
       return {
         subject: `Fund ${payload.caseTitle || "your case"}`,
-        html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is awaiting funding.</p><p>Please fund the case to continue.</p>`,
+        html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is ready for payment.</p><p>Please add payment to continue.</p>`,
       };
     case "payout_released":
       return emailTemplates.payoutReleased({
@@ -233,7 +233,7 @@ function emailTemplate(type, payload) {
     case "case_work_ready":
       return {
         subject: `Work can begin on ${payload.caseTitle || "your case"}`,
-        html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is funded and ready to begin.</p><p>Log in to get started.</p>`,
+        html: `<p>The case <strong>${payload.caseTitle || "Case"}</strong> is ready to begin.</p><p>Log in to get started.</p>`,
       };
     case "pre_engagement_requested":
       return {
@@ -276,7 +276,7 @@ function emailTemplate(type, payload) {
       const title = payload.caseTitle || "your case";
       return {
         subject: `Review update${payload.caseTitle ? `: ${payload.caseTitle}` : ""}`,
-        html: `<p>Our admin team is still reviewing <strong>${title}</strong>.</p><p>We will resolve this in a timely manner. Thank you for your patience.</p>`,
+        html: `<p>Our team is still reviewing <strong>${title}</strong>.</p><p>We will follow up as soon as the review is complete. Thank you for your patience.</p>`,
       };
     }
     case "account_suspended":
@@ -294,7 +294,7 @@ function emailTemplate(type, payload) {
       });
     default:
       return {
-        subject: "LPC Notification",
+        subject: "LPC Update",
         html: "<p>You have a new notification.</p>"
       };
   }

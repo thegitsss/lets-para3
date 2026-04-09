@@ -16,8 +16,12 @@
       <string>__MONGO_URI__</string>
       <key>BACKUP_DIR</key>
       <string>__BACKUP_DIR__</string>
+      <key>BACKUP_STATUS_FILE</key>
+      <string>__BACKUP_DIR__/last-backup.json</string>
       <key>BACKUP_RETENTION_DAYS</key>
       <string>14</string>
+      <key>OWNER_ALERT_EMAILS</key>
+      <string>__OWNER_ALERT_EMAILS__</string>
     </dict>
     <key>StartCalendarInterval</key>
     <dict>

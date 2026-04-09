@@ -1393,6 +1393,19 @@ async function sendCaseNotification(userId, type, caseDoc, payload = {}, options
   }
 }
 
+async function sendCaseUpdateEmail(recipient, caseDoc, summary) {
+  if (!recipient?.email) return;
+  try {
+    const template = emailTemplates.caseUpdate({
+      caseTitle: caseDoc?.title || "your case",
+      summary,
+    });
+    await sendEmail(recipient.email, template.subject, template.html);
+  } catch (err) {
+    console.warn("[cases] case update email failed", err?.message || err);
+  }
+}
+
 async function hasCaseNotification(userId, type, caseDoc, payload = {}) {
   if (!userId || !caseDoc?._id) return false;
   const query = {
@@ -1502,8 +1515,12 @@ async function signDownload(key) {
 
 async function ensureFundsReleased(req, caseDoc) {
   if (caseDoc.paymentReleased) return null;
-  const existingPayout = await Payout.findOne({ caseId: caseDoc._id })
+  const activeParalegalId = caseDoc.paralegal?._id || caseDoc.paralegalId || caseDoc.paralegal || null;
+  const existingPayout = await Payout.findOne(
+    activeParalegalId ? { caseId: caseDoc._id, paralegalId: activeParalegalId } : { caseId: caseDoc._id }
+  )
     .select("amountPaid transferId")
+    .sort({ createdAt: -1 })
     .lean();
   if (existingPayout) {
     caseDoc.paymentReleased = true;
@@ -1632,7 +1649,7 @@ async function ensureFundsReleased(req, caseDoc) {
     .lean();
   await Promise.all([
     Payout.updateOne(
-      { caseId: caseDoc._id },
+      { caseId: caseDoc._id, paralegalId: paralegalObjectId },
       {
         $setOnInsert: {
           paralegalId: paralegalObjectId,
@@ -1906,6 +1923,7 @@ router.get(
     const items = [];
     const addedEntries = new Set();
     const hasLabel = (label) => items.some((item) => item.label === label);
+    const hasStatusKey = (statusKey) => items.some((item) => item.statusKey === statusKey);
     const pushItem = (label, at, statusKey) => {
       if (!label || !at) return;
       const date = new Date(at);
@@ -1923,20 +1941,26 @@ router.get(
       pushItem(mapping.label, entry.createdAt, mapping.statusKey);
     });
 
-    pushItem("Posted", caseDoc.createdAt, "open");
+    if (!hasStatusKey("open")) {
+      pushItem("Posted", caseDoc.createdAt, "open");
+    }
     if (caseDoc.hiredAt) {
-      pushItem("In Progress", caseDoc.hiredAt, "in progress");
+      if (!hasStatusKey("in progress")) {
+        pushItem("In Progress", caseDoc.hiredAt, "in progress");
+      }
     }
 
     if (caseDoc.pausedReason === "paralegal_withdrew") {
-      pushItem("Withdrawn", caseDoc.pausedAt, "withdrawn");
+      if (!hasStatusKey("withdrawn")) {
+        pushItem("Withdrawn", caseDoc.pausedAt, "withdrawn");
+      }
       if (caseDoc.disputeDeadlineAt && !caseDoc.payoutFinalizedAt) {
         const holdStart = new Date(caseDoc.disputeDeadlineAt).getTime() - DISPUTE_WINDOW_MS;
-        if (holdStart > 0) {
+        if (holdStart > 0 && !hasStatusKey("hold")) {
           pushItem("24 Hour Hold", new Date(holdStart), "hold");
         }
       }
-    } else if (String(caseDoc.status || "").toLowerCase() === "paused" && caseDoc.pausedAt) {
+    } else if (String(caseDoc.status || "").toLowerCase() === "paused" && caseDoc.pausedAt && !hasStatusKey("paused")) {
       pushItem("Paused", caseDoc.pausedAt, "paused");
     }
 
@@ -1947,13 +1971,17 @@ router.get(
         .filter(Boolean)
         .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
         .pop();
-      if (latest) {
+      if (latest && !hasStatusKey("disputed")) {
         pushItem("Disputed", latest, "disputed");
       }
     }
 
-    pushItem("Payout Finalized", caseDoc.payoutFinalizedAt, "payout_finalized");
-    pushItem("Relisted", caseDoc.relistRequestedAt, "relisted");
+    if (!hasStatusKey("payout_finalized")) {
+      pushItem("Payout Finalized", caseDoc.payoutFinalizedAt, "payout_finalized");
+    }
+    if (!hasStatusKey("relisted")) {
+      pushItem("Relisted", caseDoc.relistRequestedAt, "relisted");
+    }
     if ((caseDoc.completedAt || caseDoc.paymentReleased) && !hasLabel("Completed")) {
       pushItem("Completed", caseDoc.completedAt || caseDoc.updatedAt, "completed");
     }
@@ -3338,19 +3366,24 @@ router.patch(
 router.delete(
   "/:caseId",
   csrfProtection,
-  requireCaseAccess("caseId", { project: "status paralegal paralegalId attorney attorneyId title escrowStatus escrowIntentId paymentReleased" }),
+  requireCaseAccess("caseId", {
+    project: "status archived paralegal paralegalId attorney attorneyId title escrowStatus escrowIntentId paymentReleased",
+  }),
   asyncHandler(async (req, res) => {
     if (!req.acl?.isAttorney && !req.acl?.isAdmin) {
       return res.status(403).json({ error: "Only the case attorney can delete this case" });
     }
     const doc = req.case;
+    const statusKey = normalizeCaseStatusValue(doc.status);
     const hasParalegal = !!(doc.paralegal || doc.paralegalId);
-    if (hasParalegal) {
+    const isArchivedFinalCase =
+      doc.archived === true && (doc.paymentReleased === true || ["completed", "closed"].includes(statusKey));
+    if (hasParalegal && !isArchivedFinalCase) {
       return res.status(400).json({ error: "Cannot delete a case after hiring a paralegal" });
     }
     const escrowStatus = String(doc.escrowStatus || "").toLowerCase();
     const escrowFunded = escrowStatus === "funded" || doc.paymentReleased === true;
-    if (escrowFunded) {
+    if (escrowFunded && !isArchivedFinalCase) {
       return res.status(400).json({ error: "Cannot delete a case after Stripe is funded" });
     }
 
@@ -4607,18 +4640,22 @@ router.post(
       });
     } catch {}
 
+    const attorneySummary =
+      completedCount === 0
+        ? "Paralegal withdrew before any tasks were completed. No payout will be issued and the case was relisted."
+        : "Paralegal withdrew. Choose a partial payout or close without release.";
+    const paralegalSummary =
+      completedCount === 0
+        ? `You withdrew from ${caseDoc.title || "this case"}. No payout will be issued and the case was relisted.`
+        : `You withdrew from ${caseDoc.title || "this case"}.`;
+
     const attorneyId = caseDoc.attorney?._id || caseDoc.attorneyId || null;
     if (attorneyId) {
       await sendCaseNotification(
         attorneyId,
         "case_update",
         caseDoc,
-        {
-          summary:
-            completedCount === 0
-              ? "Paralegal withdrew before any tasks were completed. No payout will be issued and the case was relisted."
-              : "Paralegal withdrew. Choose a partial payout or close without release.",
-        },
+        { summary: attorneySummary },
         { actorUserId: req.user.id }
       );
     }
@@ -4626,14 +4663,14 @@ router.post(
       req.user.id,
       "case_update",
       caseDoc,
-      {
-        summary:
-          completedCount === 0
-            ? `You withdrew from ${caseDoc.title || "this case"}. No payout will be issued and the case was relisted.`
-            : `You withdrew from ${caseDoc.title || "this case"}.`,
-      },
+      { summary: paralegalSummary },
       { actorUserId: req.user.id }
     );
+
+    await Promise.all([
+      attorneyId ? sendCaseUpdateEmail(caseDoc.attorney, caseDoc, attorneySummary) : Promise.resolve(null),
+      sendCaseUpdateEmail(caseDoc.paralegal, caseDoc, paralegalSummary),
+    ]);
 
     res.json({
       ok: true,
@@ -6219,6 +6256,25 @@ router.post(
     await ensureCaseJobOpen(doc);
 
     await doc.save();
+
+    if (amountCents > 0 && transferResult?.transferId) {
+      await Payout.updateOne(
+        { caseId: doc._id, paralegalId: payoutParalegal._id || doc.withdrawnParalegalId },
+        {
+          $setOnInsert: {
+            paralegalId: payoutParalegal._id || doc.withdrawnParalegalId,
+            caseId: doc._id,
+            amountPaid: transferResult.payout || 0,
+            transferId: transferResult.transferId,
+            stripeMode: pickStripeMode(doc.stripeMode, currentStripeMode()),
+          },
+        },
+        { upsert: true }
+      ).catch((err) => {
+        if (err?.code === 11000) return null;
+        throw err;
+      });
+    }
 
     try {
       await generateWithdrawalReceipts(doc, { grossAmount: amountCents });

@@ -7,6 +7,9 @@ const MONGO_URI = process.env.MONGO_URI || process.env.MONGO_URL || process.env.
 const BACKUP_FILE = process.env.BACKUP_FILE;
 const CONFIRM_RESTORE = String(process.env.CONFIRM_RESTORE || "").toUpperCase();
 const RESTORE_DROP = String(process.env.RESTORE_DROP || "").toLowerCase() === "true";
+const RESTORE_NS_INCLUDE = String(process.env.RESTORE_NS_INCLUDE || "").trim();
+const RESTORE_NS_FROM = String(process.env.RESTORE_NS_FROM || "").trim();
+const RESTORE_NS_TO = String(process.env.RESTORE_NS_TO || "").trim();
 
 if (!MONGO_URI) {
   console.error("Missing MONGO_URI (or MONGO_URL/DATABASE_URL).");
@@ -25,6 +28,12 @@ if (CONFIRM_RESTORE !== "YES") {
 
 const args = ["--uri", MONGO_URI, `--archive=${BACKUP_FILE}`, "--gzip"];
 if (RESTORE_DROP) args.push("--drop");
+if (RESTORE_NS_INCLUDE) {
+  args.push("--nsInclude", RESTORE_NS_INCLUDE);
+}
+if (RESTORE_NS_FROM && RESTORE_NS_TO) {
+  args.push("--nsFrom", RESTORE_NS_FROM, "--nsTo", RESTORE_NS_TO);
+}
 
 const restore = spawn("mongorestore", args, { stdio: "inherit" });
 

@@ -4,7 +4,7 @@ const { Schema, Types } = mongoose;
 const payoutSchema = new Schema(
   {
     paralegalId: { type: Types.ObjectId, ref: "User", required: true, index: true },
-    caseId: { type: Types.ObjectId, ref: "Case", required: true, index: true, unique: true },
+    caseId: { type: Types.ObjectId, ref: "Case", required: true, index: true },
     amountPaid: { type: Number, required: true, min: 0 },
     transferId: { type: String, required: true, trim: true, index: true },
     stripeMode: { type: String, enum: ["live", "test", "unknown"], default: "unknown", index: true },
@@ -14,5 +14,7 @@ const payoutSchema = new Schema(
     versionKey: false,
   }
 );
+
+payoutSchema.index({ caseId: 1, paralegalId: 1 }, { unique: true });
 
 module.exports = mongoose.model("Payout", payoutSchema);

@@ -109,7 +109,6 @@ const state = {
   rejecting: false,
   partialPayoutSubmitting: false,
   relisting: false,
-  blockingFutureInteraction: false,
   workspacePresenceCaseId: "",
   workspacePresenceTimer: null,
 };
@@ -2159,7 +2158,6 @@ function openParalegalFlagMenu(caseData) {
     ensureFlagMenuStyles();
     const canWithdraw = canRequestWithdrawal(caseData);
     const canDispute = canOpenDisputeFromCase(caseData);
-    const blockState = getBlockMenuState(caseData);
     const overlay = document.createElement("div");
     overlay.className = "case-flag-overlay";
     const options = [];
@@ -2173,25 +2171,12 @@ function openParalegalFlagMenu(caseData) {
         `<button type="button" class="case-action-btn secondary" data-flag-action="dispute">Open Dispute</button>`
       );
     }
-    if (blockState.canBlock) {
-      options.push(
-        `<button type="button" class="case-action-btn secondary" data-flag-action="block">Block future interaction</button>`
-      );
-    } else if (blockState.blocked) {
-      options.push(
-        `<button type="button" class="case-action-btn secondary" disabled>Blocked - manage in Settings</button>`
-      );
-    }
-    const blockNote = blockState.blocked
-      ? `<p class="case-flag-note">Manage unblocking from Settings in the Blocked Users section.</p>`
-      : "";
     const emptyCopy = !options.length
       ? `<p class="case-flag-muted">No actions are available right now.</p>`
       : "";
     overlay.innerHTML = `
       <div class="case-flag-modal" role="dialog" aria-modal="true" aria-labelledby="caseFlagTitle">
         <div class="case-flag-title" id="caseFlagTitle">Case Actions</div>
-        ${blockNote}
         ${emptyCopy}
         <div class="case-flag-actions">
           ${options.join("")}
@@ -2311,7 +2296,6 @@ function openAttorneyFlagMenu(caseData, actionState) {
     ensureFlagMenuStyles();
     const state = actionState?.eligible ? actionState : getAttorneyWithdrawalActionState(caseData);
     const canDispute = canOpenDisputeFromCase(caseData);
-    const blockState = getBlockMenuState(caseData);
     const overlay = document.createElement("div");
     overlay.className = "case-flag-overlay";
     const options = [];
@@ -2341,19 +2325,7 @@ function openAttorneyFlagMenu(caseData, actionState) {
         `<button type="button" class="case-action-btn secondary" data-flag-action="dispute">Open Dispute</button>`
       );
     }
-    if (blockState.canBlock) {
-      options.push(
-        `<button type="button" class="case-action-btn secondary" data-flag-action="block">Block future interaction</button>`
-      );
-    } else if (blockState.blocked) {
-      options.push(
-        `<button type="button" class="case-action-btn secondary" disabled>Blocked - manage in Settings</button>`
-      );
-    }
     const infoParts = [state.bannerText, state.statusText].filter(Boolean);
-    if (blockState.blocked) {
-      infoParts.push("Manage unblocking from Settings in the Blocked Users section.");
-    }
     const infoCopy = infoParts.length ? `<p class="case-flag-info">${infoParts.join(" ")}</p>` : "";
     const emptyCopy = !options.length
       ? `<p class="case-flag-muted">No actions are available right now.</p>`
@@ -4165,26 +4137,12 @@ function updateCompleteAction(caseData, caseState) {
   }
 }
 
-function getCaseBlockConfirmMessage() {
-  return "Block future interaction with this user? This will prevent future applications, invitations, hiring, and direct messaging between the two of you on Let's ParaConnect. This user will not be notified. Existing case and payment history will remain available.";
-}
-
-function getBlockMenuState(caseData) {
-  const blockStatus = caseData?.blockStatus || null;
-  return {
-    blocked: !!blockStatus?.blocked,
-    canBlock: !!blockStatus?.canBlock,
-  };
-}
-
 function updateDisputeAction(caseData) {
   if (!caseDisputeButton) return;
   const statusKey = normalizeCaseStatus(caseData?.status);
   const isDisputed = statusKey === "disputed" || caseData?.terminationStatus === "disputed";
   const isClosed = ["completed", "closed"].includes(statusKey);
   const role = getCurrentUserRole();
-  const blockState = getBlockMenuState(caseData);
-  const hasFutureInteractionAction = blockState.blocked || blockState.canBlock;
   const isWithdrawal = isWithdrawalCase(caseData);
   const isWithdrawn = isWithdrawnViewer(caseData);
   let disabled = isDisputed || isClosed;
@@ -4228,16 +4186,16 @@ function updateDisputeAction(caseData) {
     !!attorneyActionState?.showRelist;
   const hasMenuActions =
     role === "paralegal"
-      ? canWithdraw || canDispute || hasFutureInteractionAction
+      ? canWithdraw || canDispute
       : role === "attorney"
-        ? hasAttorneyWithdrawalAction || canDispute || hasFutureInteractionAction
+        ? hasAttorneyWithdrawalAction || canDispute
         : canDispute;
 
   hidden = !hasMenuActions;
   disabled = !hasMenuActions;
 
   const flagLabel =
-    role === "paralegal" || (role === "attorney" && (isWithdrawal || hasFutureInteractionAction || isClosed))
+    role === "paralegal" || (role === "attorney" && (isWithdrawal || isClosed))
       ? "Case actions"
       : "Flag dispute";
   caseDisputeButton.setAttribute("aria-label", flagLabel);
@@ -4554,36 +4512,6 @@ async function handleRequestWithdrawal() {
   }
 }
 
-async function handleBlockFutureInteraction() {
-  if (state.blockingFutureInteraction) return;
-  const caseId = state.activeCaseId;
-  const caseData = state.activeCase || {};
-  const blockStatus = caseData?.blockStatus || null;
-  if (!caseId) return;
-  if (!blockStatus?.canBlock) return;
-
-  const confirmed = window.confirm(getCaseBlockConfirmMessage());
-  if (!confirmed) return;
-
-  state.blockingFutureInteraction = true;
-  const statusNode = resolveCaseActionStatusNode();
-  if (statusNode) showMsg(statusNode, "Blocking future interaction...");
-
-  try {
-    await fetchCSRF().catch(() => "");
-    await fetchJSON("/api/blocks", {
-      method: "POST",
-      body: { caseId },
-    });
-    if (statusNode) showMsg(statusNode, "Future interaction blocked. This user was not notified.");
-    await loadCase(caseId, { suppressStatus: true });
-  } catch (err) {
-    if (statusNode) showMsg(statusNode, err.message || "Unable to block future interaction.");
-  } finally {
-    state.blockingFutureInteraction = false;
-  }
-}
-
 async function reopenWithdrawalMenu(caseData, actionState) {
   if (!caseData) return;
   const action = await openAttorneyFlagMenu(caseData, actionState);
@@ -4744,15 +4672,11 @@ async function handleFlagAction() {
       await handleDisputeCase();
       return;
     }
-    if (action === "block") {
-      await handleBlockFutureInteraction();
-    }
     return;
   }
   if (role === "attorney") {
     const actionState = getAttorneyWithdrawalActionState(caseData);
-    const blockState = getBlockMenuState(caseData);
-    if (actionState.eligible || blockState.blocked || blockState.canBlock) {
+    if (actionState.eligible) {
       const action = await openAttorneyFlagMenu(caseData, actionState);
       if (action === "partial") {
         await handlePartialPayout({ returnToMenu: true, menuCaseData: caseData, menuActionState: actionState });
@@ -4769,9 +4693,6 @@ async function handleFlagAction() {
       if (action === "dispute") {
         await handleDisputeCase();
         return;
-      }
-      if (action === "block") {
-        await handleBlockFutureInteraction();
       }
       return;
     }

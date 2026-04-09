@@ -8,6 +8,7 @@ process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_stub";
 const User = require("../models/User");
 const Case = require("../models/Case");
 const CaseFile = require("../models/CaseFile");
+const AuditLog = require("../models/AuditLog");
 const casesRouter = require("../routes/cases");
 const { buildCaseFileKeyQuery } = require("../utils/dataEncryption");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
@@ -345,5 +346,50 @@ describe("Permissions / ACL", () => {
 
     const record = await CaseFile.findOne(buildCaseFileKeyQuery({ caseId: caseDoc._id, storageKey: key })).lean();
     expect(record).toBeTruthy();
+  });
+
+  test("Status history does not duplicate withdrawn entries", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "alex.withdrawn.history@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const pausedAt = new Date("2026-02-25T20:07:52.000Z");
+    const caseDoc = await Case.create({
+      title: "Withdrawn history regression",
+      details: "Avoid duplicate withdrawn timeline entries.",
+      status: "paused",
+      pausedReason: "paralegal_withdrew",
+      pausedAt,
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      totalAmount: 100000,
+      currency: "usd",
+      tasks: [{ title: "Review file", completed: true }],
+    });
+
+    await AuditLog.create({
+      actor: attorney._id,
+      actorRole: "attorney",
+      action: "case.withdrawal.requested",
+      case: caseDoc._id,
+      createdAt: pausedAt,
+      details: { caseId: String(caseDoc._id) },
+    });
+
+    const res = await request(app)
+      .get(`/api/cases/${caseDoc._id}/status-history`)
+      .set("Cookie", authCookieFor(attorney));
+
+    expect(res.status).toBe(200);
+    const withdrawnEntries = Array.isArray(res.body?.items)
+      ? res.body.items.filter((item) => item?.label === "Withdrawn")
+      : [];
+    expect(withdrawnEntries).toHaveLength(1);
   });
 });
