@@ -85,6 +85,7 @@ async function submitAttorneySignup(page, { barNumber, barState, goodStanding = 
   if (goodStanding) {
     await safeClick(page, "#attorneyGoodStanding");
   }
+  await safeClick(page, "#attorneyPricingAck");
   await safeClick(page, "#submitBtn");
   await page.waitForSelector("#msg.show");
   return page.$eval("#msg", (el) => el.textContent.trim());
@@ -143,6 +144,45 @@ async function run() {
       });
       if (!msg.includes("Enter a valid bar number")) {
         throw new Error(`Expected invalid bar message, got: ${msg}`);
+      }
+      await closeContext(context);
+    }
+
+    // Test: Pricing acknowledgement is required on attorney signup.
+    // Input values: valid attorney fields without checking pricing acknowledgement.
+    // Expected result: inline pricing validation is shown and submit is blocked.
+    {
+      const context = await createContext();
+      const page = await context.newPage();
+      configurePage(page);
+      await page.setViewport({ width: 1280, height: 720 });
+      await gotoSignup(page, baseUrl);
+      await safeClick(page, "#btnA");
+      await fillStepOne(page, {
+        firstName: "Test",
+        lastName: "Attorney",
+        email: "pricingack@example.com",
+        password: "Password123!",
+      });
+      await page.type("#bar", "CA12345");
+      await page.select("#barState", "CA");
+      await safeClick(page, "#attorneyGoodStanding");
+      await safeClick(page, "#submitBtn");
+      await page.waitForSelector("#msg.show");
+      const msg = await page.$eval("#msg", (el) => el.textContent.trim());
+      const inlinePricingError = await page.$eval("#attorneyPricingError", (el) => ({
+        text: el.textContent.trim(),
+        shown: el.classList.contains("show"),
+      }));
+      const pricingInvalid = await page.$eval("#attorneyPricingAck", (el) => el.getAttribute("aria-invalid"));
+      if (!msg.includes("$400 minimum case requirement")) {
+        throw new Error(`Expected pricing acknowledgement message, got: ${msg}`);
+      }
+      if (!inlinePricingError.shown || !inlinePricingError.text.includes("$400 minimum")) {
+        throw new Error(`Expected inline pricing validation, got: ${JSON.stringify(inlinePricingError)}`);
+      }
+      if (pricingInvalid !== "true") {
+        throw new Error(`Expected attorney pricing checkbox to be invalid, got: ${pricingInvalid}`);
       }
       await closeContext(context);
     }

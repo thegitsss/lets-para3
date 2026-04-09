@@ -8,6 +8,7 @@ const Case = require("../models/Case");
 const User = require("../models/User");
 const AuditLog = require("../models/AuditLog");
 const { notifyUser } = require("../utils/notifyUser");
+const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
 
 const ADMIN_REVIEW_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -396,6 +397,50 @@ router.post(
     } catch (err) {
       console.warn("[disputes] notify dispute opened failed", err?.message || err);
     }
+
+    await publishEventSafe({
+      eventType: "dispute.opened",
+      eventFamily: "platform_case",
+      idempotencyKey: `case:${c._id}:dispute:${last?.disputeId || String(last?._id || "")}:opened`,
+      correlationId: `case:${c._id}`,
+      actor: {
+        actorType: req.user?.role === "admin" ? "admin" : "user",
+        userId: req.user?.id || req.user?._id || null,
+        role: req.user?.role || "",
+        email: req.user?.email || "",
+        label: req.user?.email || "User",
+      },
+      subject: {
+        entityType: "case",
+        entityId: String(c._id),
+      },
+      related: {
+        caseId: c._id,
+        userId: req.user?.id || req.user?._id || null,
+      },
+      source: {
+        surface: req.user?.role === "admin" ? "admin" : req.user?.role || "system",
+        route: `/api/disputes/${c._id}`,
+        service: "disputes",
+        producer: "route",
+      },
+      facts: {
+        summary: `A dispute was opened for ${c.title || "this case"}.`,
+        disputeId: last?.disputeId || String(last?._id || ""),
+        caseTitle: c.title || "",
+        after: {
+          disputeId: last?.disputeId || String(last?._id || ""),
+          caseTitle: c.title || "",
+          message: last?.message || "",
+        },
+      },
+      signals: {
+        confidence: "high",
+        priority: "urgent",
+        moneyRisk: true,
+        founderVisible: true,
+      },
+    });
 
     res.status(201).json({
       ok: true,

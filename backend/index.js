@@ -124,7 +124,17 @@ app.use("/api", (req, res, next) => {
 // 4) Routers
 const waitlistRouter = require("./routes/waitlist");
 const authRouter = require("./routes/auth");
+const aiAdminRouter = require("./routes/aiAdmin");
+const adminKnowledgeRouter = require("./routes/adminKnowledge");
+const adminMarketingRouter = require("./routes/adminMarketing");
+const adminSupportRouter = require("./routes/adminSupport");
+const adminSalesRouter = require("./routes/adminSales");
+const adminApprovalsRouter = require("./routes/adminApprovals");
+const adminEngineeringRouter = require("./routes/adminEngineering");
+const autonomousActionsRouter = require("./routes/autonomousActions");
 const adminRouter = require("./routes/admin");
+const incidentAdminRouter = require("./routes/incidentAdmin");
+const incidentsRouter = require("./routes/incidents");
 const casesRouter = require("./routes/cases");
 const caseDraftsRouter = require("./routes/caseDrafts");
 const messagesRouter = require("./routes/messages");
@@ -146,13 +156,36 @@ const publicRouter = require("./routes/public");
 const accountRouter = require("./routes/account");
 const stripeRouter = require("./routes/stripe");
 const notificationRouter = require("./routes/notifications");
+const supportRouter = require("./routes/support");
+const { isCcoAutonomyHarnessEnabled } = require("./utils/ccoAutonomyHarnessAccess");
+const { isControlRoomE2eHarnessEnabled } = require("./utils/controlRoomE2eHarnessAccess");
 const blocksRouter = require("./routes/blocks");
 const { startPurgeWorker } = require("./services/caseLifecycle");
 const { startAgentScheduler } = require("./scheduler/agentScheduler");
+const { startIncidentScheduler } = require("./scheduler/incidentScheduler");
 
 app.use(express.json({ limit: "1mb" }));
 app.use("/api/waitlist", waitlistRouter);
 app.use("/api/auth", authRouter);
+app.use("/api/incidents", incidentsRouter);
+if (isControlRoomE2eHarnessEnabled(process.env)) {
+  const controlRoomE2eHarnessRouter = require("./routes/controlRoomE2eHarness");
+  app.use("/api/admin/ai-control-room/dev/e2e", controlRoomE2eHarnessRouter);
+}
+app.use("/api/admin/ai", aiAdminRouter);
+app.use("/api/admin/ai-control-room", aiAdminRouter);
+app.use("/api/admin/knowledge", adminKnowledgeRouter);
+app.use("/api/admin/marketing", adminMarketingRouter);
+app.use("/api/admin/support", adminSupportRouter);
+if (isCcoAutonomyHarnessEnabled(process.env)) {
+  const ccoAutonomyHarnessRouter = require("./routes/ccoAutonomyHarness");
+  app.use("/api/admin/support/dev/cco-autonomy", ccoAutonomyHarnessRouter);
+}
+app.use("/api/admin/sales", adminSalesRouter);
+app.use("/api/admin/approvals", adminApprovalsRouter);
+app.use("/api/admin/engineering", adminEngineeringRouter);
+app.use("/api/admin/autonomous-actions", autonomousActionsRouter);
+app.use("/api/admin/incidents", incidentAdminRouter);
 app.use("/api/admin", adminRouter);
 app.use("/api/cases/:caseId/tasks", caseTasksRouter);
 app.use("/api/cases", casesRouter);
@@ -172,6 +205,7 @@ app.use("/api/users", usersRouter);
 app.use("/api/account", accountRouter);
 app.use("/api/stripe", stripeRouter);
 app.use("/api/notifications", notificationRouter);
+app.use("/api/support", supportRouter);
 app.use("/api/blocks", blocksRouter);
 app.use("/api/verify", verificationRouter);
 app.use("/api/public", publicRouter);
@@ -255,3 +289,4 @@ app.listen(PORT, () => {
 
 startPurgeWorker();
 startAgentScheduler();
+startIncidentScheduler();

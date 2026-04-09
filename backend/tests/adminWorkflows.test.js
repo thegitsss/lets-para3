@@ -91,7 +91,7 @@ describe("Admin workflows", () => {
       password: "Password123!",
     });
     expect(pendingLogin.status).toBe(403);
-    expect(pendingLogin.body.msg).toMatch(/pending admin approval/i);
+    expect(pendingLogin.body.msg).toMatch(/under review/i);
 
     const approveRes = await request(app)
       .post(`/api/admin/users/${attorney._id}/approve`)
@@ -100,10 +100,21 @@ describe("Admin workflows", () => {
     expect(approveRes.status).toBe(200);
     expect(approveRes.body.ok).toBe(true);
     expect(approveRes.body.user.status).toBe("approved");
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    const [approvalEmailTo, approvalEmailSubject, approvalEmailHtml] = sendEmail.mock.calls[0];
+    expect(approvalEmailTo).toBe(attorney.email);
+    expect(approvalEmailSubject).toBe("Welcome to Let’s-ParaConnect");
+    expect(approvalEmailHtml).toContain("Welcome to Let&rsquo;s-ParaConnect");
+    expect(approvalEmailHtml).toContain("Congratulations! We are pleased to inform you that you have been accepted to Let&rsquo;s-ParaConnect.");
+    expect(approvalEmailHtml).toContain("What You Can Use LPC For:");
+    expect(approvalEmailHtml).toContain("Next Steps:");
+    expect(approvalEmailHtml).toContain("Go to Your Dashboard");
+    expect(approvalEmailHtml).not.toContain("Attorney launch begins today");
 
     const updated = await User.findById(attorney._id);
     expect(updated.status).toBe("approved");
     expect(updated.approvedAt).toBeTruthy();
+    expect(updated.emailVerified).toBe(true);
 
     const approvedLogin = await request(app).post("/api/auth/login").send({
       email: attorney.email,
@@ -111,6 +122,7 @@ describe("Admin workflows", () => {
     });
     expect(approvedLogin.status).toBe(200);
     expect(approvedLogin.body.success).toBe(true);
+    expect(approvedLogin.body.user.isFirstLogin).toBe(true);
   });
 
   test("Admin denies attorney registration and denial email is sent", async () => {
@@ -160,6 +172,47 @@ describe("Admin workflows", () => {
     });
     expect(deniedLogin.status).toBe(403);
     expect(deniedLogin.body.msg).toMatch(/not approved/i);
+  });
+
+  test("Admin email change keeps the current login email active until the new email is verified", async () => {
+    const admin = await User.create({
+      firstName: "Admin",
+      lastName: "Owner",
+      email: "owner5@lets-paraconnect.com",
+      password: "Password123!",
+      role: "admin",
+      status: "approved",
+      state: "CA",
+    });
+
+    const attorney = await User.create({
+      firstName: "Riley",
+      lastName: "West",
+      email: "riley.west@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      emailVerified: true,
+      state: "CA",
+    });
+
+    const res = await request(app)
+      .patch(`/api/admin/users/${attorney._id}/email`)
+      .set("Cookie", authCookieFor(admin))
+      .send({ email: "riley.new@example.com" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.user.email).toBe("riley.west@example.com");
+    expect(res.body.user.pendingEmail).toBe("riley.new@example.com");
+
+    const updated = await User.findById(attorney._id);
+    expect(updated.email).toBe("riley.west@example.com");
+    expect(updated.pendingEmail).toBe("riley.new@example.com");
+    expect(updated.emailVerified).toBe(true);
+
+    expect(sendEmail).toHaveBeenCalled();
+    expect(sendEmail.mock.calls[0][0]).toBe("riley.new@example.com");
   });
 
   test("Non-admin cannot approve attorney registrations", async () => {

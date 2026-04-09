@@ -17,10 +17,18 @@ const validAttorneyPayload = {
   barNumber: "CA-12345",
   barState: "CA",
   lawFirm: "Johnson Law",
+  attorneyPricingAccepted: true,
   termsAccepted: true,
   state: "CA",
   timezone: "America/Los_Angeles",
 };
+
+function extractTokenFromEmailCall(call = []) {
+  const [, , body = "", opts = {}] = call;
+  const haystack = [body, opts?.text || ""].filter(Boolean).join("\n");
+  const match = haystack.match(/token=([^&\s]+)/i);
+  return match ? decodeURIComponent(match[1]) : "";
+}
 
 afterAll(async () => {
   await closeDatabase();
@@ -110,8 +118,117 @@ describe("Auth workflows", () => {
       password: "WrongPassword",
     });
 
-    expect(res.status).toBe(400);
-    expect(res.body.msg).toMatch(/Invalid credentials/i);
+    expect(res.status).toBe(401);
+    expect(res.body.msg).toMatch(/incorrect password/i);
+  });
+
+  test("Login returns a truthful error when no account exists", async () => {
+    const res = await request(app).post("/api/auth/login").send({
+      email: "missing.user@example.com",
+      password: "Password123!",
+    });
+
+    expect(res.status).toBe(404);
+    expect(res.body.msg).toMatch(/no account found/i);
+  });
+
+  test("Existing unverified user does not get a no-user error", async () => {
+    await User.create({
+      firstName: "Robin",
+      lastName: "Cole",
+      email: "robin.cole@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "pending",
+      emailVerified: false,
+      state: "CA",
+    });
+
+    const res = await request(app).post("/api/auth/login").send({
+      email: "robin.cole@example.com",
+      password: "Password123!",
+    });
+
+    expect(res.status).toBe(403);
+    expect(res.body.msg).toMatch(/under review/i);
+    expect(res.body.msg).not.toMatch(/no account found/i);
+  });
+
+  test("Approved user with stale emailVerified flag is repaired on login", async () => {
+    const user = await User.create({
+      firstName: "Dana",
+      lastName: "Price",
+      email: "dana.price@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      emailVerified: false,
+      state: "CA",
+    });
+
+    const res = await request(app).post("/api/auth/login").send({
+      email: "dana.price@example.com",
+      password: "Password123!",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const updated = await User.findById(user._id);
+    expect(updated.emailVerified).toBe(true);
+    expect(updated.approvedAt).toBeTruthy();
+  });
+
+  test("Pending email change does not replace the live login email until verified", async () => {
+    const user = await User.create({
+      firstName: "Blair",
+      lastName: "Hart",
+      email: "blair.hart@example.com",
+      pendingEmail: "blair.new@example.com",
+      pendingEmailRequestedAt: new Date(),
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      emailVerified: true,
+      state: "CA",
+    });
+
+    const beforeVerify = await request(app).post("/api/auth/login").send({
+      email: "blair.hart@example.com",
+      password: "Password123!",
+    });
+    expect(beforeVerify.status).toBe(200);
+
+    const pendingLogin = await request(app).post("/api/auth/login").send({
+      email: "blair.new@example.com",
+      password: "Password123!",
+    });
+    expect(pendingLogin.status).toBe(404);
+
+    const resend = await request(app).post("/api/auth/resend-verification").send({
+      email: "blair.new@example.com",
+    });
+    expect(resend.status).toBe(200);
+    expect(sendEmail).toHaveBeenCalled();
+    expect(sendEmail.mock.calls[0][0]).toBe("blair.new@example.com");
+
+    const token = extractTokenFromEmailCall(sendEmail.mock.calls[0]);
+    expect(token).toBeTruthy();
+
+    const verify = await request(app).post("/api/auth/verify-email").send({ token });
+    expect(verify.status).toBe(200);
+    expect(verify.body.ok).toBe(true);
+
+    const updated = await User.findById(user._id);
+    expect(updated.email).toBe("blair.new@example.com");
+    expect(updated.pendingEmail).toBeNull();
+    expect(updated.emailVerified).toBe(true);
+
+    const afterVerify = await request(app).post("/api/auth/login").send({
+      email: "blair.new@example.com",
+      password: "Password123!",
+    });
+    expect(afterVerify.status).toBe(200);
   });
 
   test("Password reset emails are sent", async () => {

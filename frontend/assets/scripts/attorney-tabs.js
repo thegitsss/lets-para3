@@ -124,6 +124,7 @@ const state = {
     loading: false,
     error: "",
   },
+  draftSelection: new Set(),
   archivedSelection: new Set(),
   archivedStatusFilter: "all",
   casesPage: {
@@ -707,13 +708,27 @@ async function markNotificationsRead(options = {}) {
 
 function isAttorneyProfileComplete(user = {}) {
   if (!user || typeof user !== "object") return false;
+  if (user.onboarding && typeof user.onboarding === "object" && user.onboarding.attorneyProfileCompleted === true) {
+    return true;
+  }
   const practiceAreas = Array.isArray(user.practiceAreas)
     ? user.practiceAreas.filter((item) => String(item || "").trim())
     : [];
+  const publications = Array.isArray(user.publications)
+    ? user.publications.filter((item) => String(item || "").trim())
+    : [];
   const description = String(user.practiceDescription || user.bio || "").trim();
-  const hasPractice = practiceAreas.length > 0;
-  const hasSummary = Boolean(description) || Boolean(user.lawFirm) || Boolean(user.linkedInURL);
-  return hasPractice && hasSummary;
+  const lawFirm = String(user.lawFirm || "").trim();
+  const linkedInURL = String(user.linkedInURL || "").trim();
+  const firmWebsite = String(user.firmWebsite || "").trim();
+  return Boolean(
+    practiceAreas.length ||
+      publications.length ||
+      description ||
+      lawFirm ||
+      linkedInURL ||
+      firmWebsite
+  );
 }
 
 function getAttorneyOnboardingProgress() {
@@ -733,23 +748,23 @@ function getNextOnboardingStep(progress = getAttorneyOnboardingProgress()) {
 function getOnboardingAttentionCopy(step) {
   if (step === "profile") {
     return {
-      title: "Complete Step 1: Finish your profile",
-      text: "Step 1 of 3 is still pending. Add your profile details to continue onboarding.",
-      cta: "Open Step 1",
+      title: "Finish your profile",
+      text: "Add your profile details so everything is ready before you post your first case.",
+      cta: "Open profile",
     };
   }
   if (step === "payment") {
     return {
-      title: "Complete Step 2: Add payment method",
-      text: "Step 2 of 3 is still pending. Complete payment method setup in Stripe.",
-      cta: "Open Step 2",
+      title: "Add a payment method",
+      text: "Add your payment method now so you can fund a case when you're ready.",
+      cta: "Open billing",
     };
   }
   if (step === "case") {
     return {
-      title: "Complete Step 3: Post your first case",
-      text: "Step 3 of 3 is still pending. Create your first case to finish onboarding.",
-      cta: "Open Step 3",
+      title: "Post your first case",
+      text: "Create your first case to start receiving paralegal interest and move work forward.",
+      cta: "Create case",
     };
   }
   return { title: "", text: "", cta: "Open step" };
@@ -918,8 +933,8 @@ function updateOnboardingAttentionCard(progress = getAttorneyOnboardingProgress(
     const copy = getOnboardingAttentionCopy(step);
     if (titleEl) titleEl.textContent = copy.title;
     if (textEl) {
-      textEl.textContent = "";
-      textEl.hidden = true;
+      textEl.hidden = false;
+      textEl.textContent = copy.text;
     }
     card.dataset.step = step;
     card.hidden = false;
@@ -2459,6 +2474,17 @@ function getUniqueCaseRecords(records = []) {
   return Array.from(unique.values());
 }
 
+function getCaseEntryById(caseId) {
+  const key = String(caseId || "");
+  if (!key) return null;
+  return (
+    state.caseLookup.get(key) ||
+    state.cases.find((item) => String(parseCaseId(item)) === key) ||
+    state.casesArchived.find((item) => String(parseCaseId(item)) === key) ||
+    null
+  );
+}
+
 function normalizeAmountToCents(value) {
   if (typeof value === "number" && Number.isFinite(value)) {
     if (value < 1 && value > -1 && value !== Math.trunc(value)) {
@@ -3263,6 +3289,7 @@ async function initCasesPage() {
 
   wrapper.addEventListener("click", onCasesTableClick);
   wrapper.addEventListener("click", onCasesPaginationClick);
+  wrapper.addEventListener("change", onDraftSelectionChange);
   wrapper.addEventListener("change", onArchivedSelectionChange);
   document.addEventListener("click", (evt) => {
     if (openCaseMenu && !openCaseMenu.contains(evt.target)) {
@@ -3284,6 +3311,9 @@ async function initCasesPage() {
 
   document.querySelectorAll("[data-archived-bulk]").forEach((btn) => {
     btn.addEventListener("click", onArchivedBulkAction);
+  });
+  document.querySelectorAll("[data-draft-bulk]").forEach((btn) => {
+    btn.addEventListener("click", onDraftBulkAction);
   });
 
   const archivedStatusFilter = document.querySelector("[data-archived-status-filter]");
@@ -3385,9 +3415,13 @@ async function loadArchivedCases(force = false) {
 }
 
 function renderCasesView() {
+  if (state.casesViewFilter !== "draft" && state.draftSelection.size) {
+    state.draftSelection.clear();
+  }
   if (state.casesViewFilter !== "archived" && state.archivedSelection.size) {
     state.archivedSelection.clear();
   }
+  pruneDraftSelection();
   pruneArchivedSelection();
   state.localDrafts = readLocalDrafts();
   const totals = computeCaseCounts();
@@ -3412,7 +3446,7 @@ function renderCasesView() {
     if (!pageItems.length) {
       const searchActive = state.casesSearchTerm && key === state.casesViewFilter;
       const message = searchActive ? "No cases match your search." : "No cases in this category.";
-      const span = key === "archived" ? 8 : 7;
+      const span = 7;
       body.innerHTML = `<tr><td colspan="${span}" class="empty-row">${message}</td></tr>`;
       updateCasesPagination(key, 0);
       return;
@@ -3420,7 +3454,6 @@ function renderCasesView() {
     body.innerHTML = pageItems.map((item) => renderCaseRow(item, key)).join("");
     updateCasesPagination(key, totalCount);
   });
-  syncArchivedBulkUI();
   maybeHighlightArchivedCase();
 }
 
@@ -3652,6 +3685,7 @@ function normalizeApplicantData(applicant = {}) {
       }
     : null;
   return {
+    applicationId: applicant?.applicationId || "",
     paralegalId,
     name,
     avatar,
@@ -3786,6 +3820,14 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
           caseId
         )}" data-paralegal-id="${sanitize(applicant.paralegalId)}">Remove applicant</button>`
       : "";
+  const blockMarkup =
+    caseId && applicant.paralegalId
+      ? `<button type="button" class="applicant-side-btn danger" data-block-applicant data-case-id="${sanitize(
+          caseId
+        )}" data-paralegal-id="${sanitize(applicant.paralegalId)}" data-paralegal-name="${sanitize(
+          applicant.name || "Applicant"
+        )}">Block applicant</button>`
+      : "";
   const confidentialityDoc = preEngagement?.confidentialityDocument || null;
   const signedDoc = preEngagement?.paralegalConfidentialityDocument || null;
   const preEngagementMarkup = preEngagement
@@ -3868,6 +3910,7 @@ function buildApplicantDetail(applicant, { caseId } = {}) {
             ${linkedInMarkup}
             ${hireMarkup}
             ${removeMarkup}
+            ${blockMarkup}
           </div>
           ${
             hireMarkup
@@ -3931,6 +3974,7 @@ function renderCaseRow(item, filterKey = "active") {
   const amountDisplay = formatCaseAmount(item);
   const canViewWorkspace = isWorkspaceEligibleCase(item);
   const canOpenDetail = canOpenCaseDetail(item);
+  const previewOnly = shouldOpenCasePreviewOnly(item, { filterKey });
   const caseId = item.id || item.caseId || item._id || "";
   const returnContext = getApplicantReturnContext();
   const shouldOpenDrawer =
@@ -3954,14 +3998,6 @@ function renderCaseRow(item, filterKey = "active") {
   const moderationBadge =
     moderationStatus === "flagged" || moderationStatus === "resolution_requested"
       ? `<span class="status pending">Flagged</span>`
-      : "";
-  const selectionCell =
-    filterKey === "archived"
-      ? item.archived
-        ? `<td class="case-select"><input type="checkbox" data-archived-select value="${sanitize(caseId)}" ${
-            state.archivedSelection.has(String(caseId)) ? "checked" : ""
-          } aria-label="Select case ${sanitize(item.title || "Untitled Case")}" /></td>`
-        : `<td class="case-select"></td>`
       : "";
   const applicantsToggle =
     filterKey === "inquiries"
@@ -4006,10 +4042,11 @@ function renderCaseRow(item, filterKey = "active") {
       : "";
   return `
     <tr data-case-id="${sanitize(caseId)}">
-      ${selectionCell}
       <td class="case-title-cell">${
         item.localDraft
           ? `<a href="create-case.html?draftId=${encodeURIComponent(caseId)}#description">${sanitize(item.title || "Untitled Case")}</a>`
+          : previewOnly
+          ? `<button type="button" class="case-title-trigger" data-case-action="details" data-case-id="${sanitize(caseId)}">${sanitize(item.title || "Untitled Case")}</button>`
           : canOpenDetail
           ? `<a href="case-detail.html?caseId=${encodeURIComponent(caseId)}">${sanitize(item.title || "Untitled Case")}</a>`
           : `<span>${sanitize(item.title || "Untitled Case")}</span>`
@@ -4032,7 +4069,9 @@ function renderCaseMenu(item) {
   const isFinal = isFinalCase(item);
   const canViewWorkspace = isWorkspaceEligibleCase(item);
   const canOpenDetail = canOpenCaseDetail(item);
+  const previewOnly = shouldOpenCasePreviewOnly(item);
   const hasAssigned = hasAssignedParalegal(item);
+  const canDelete = canDeleteCase(item);
   const statusKey = normalizeCaseStatus(item.status);
   if (statusKey === "in progress") {
     return "";
@@ -4057,7 +4096,7 @@ function renderCaseMenu(item) {
       <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="${menuId}" data-case-menu-trigger>⋯</button>
       <div class="case-menu" id="${menuId}" role="menu" style="width: 180px; min-width: 180px;">
         <button type="button" class="menu-item" data-case-action="resume-draft" data-case-id="${baseCaseId}">Resume Draft</button>
-        <button type="button" class="menu-item danger" data-case-action="discard-draft" data-case-id="${baseCaseId}">Discard Draft</button>
+        <button type="button" class="menu-item danger" data-case-action="discard-draft" data-case-id="${baseCaseId}">Delete Case</button>
       </div>
     </div>
     `;
@@ -4068,7 +4107,7 @@ function renderCaseMenu(item) {
       `<button type="button" class="menu-item" data-case-action="edit-case" data-case-id="${baseCaseId}">Edit Case</button>`
     );
   }
-  if (!item.archived) {
+  if (previewOnly || !item.archived) {
     parts.push(
       `<button type="button" class="menu-item" data-case-action="details" data-case-id="${baseCaseId}">View Details</button>`
     );
@@ -4091,12 +4130,12 @@ function renderCaseMenu(item) {
   parts.push(
     `<button type="button" class="menu-item" data-case-action="status-history" data-case-id="${baseCaseId}">View Status History</button>`
   );
-  if (canOpenDetail && !canViewWorkspace) {
+  if (!previewOnly && canOpenDetail && !canViewWorkspace) {
     parts.push(
       `<button type="button" class="menu-item" data-case-action="open-case-detail" data-case-id="${baseCaseId}">Open Case</button>`
     );
   }
-  if (canViewWorkspace) {
+  if (!previewOnly && canViewWorkspace) {
     parts.push(
       `<button type="button" class="menu-item" data-case-action="workspace" data-case-id="${baseCaseId}">Open Workspace</button>`,
       `<button type="button" class="menu-item" data-case-action="messages" data-case-id="${baseCaseId}">Open Messages</button>`
@@ -4119,7 +4158,7 @@ function renderCaseMenu(item) {
   }
   if (item.archived) {
     parts.push(
-      `<button type="button" class="menu-item" data-case-action="download-archive" data-case-id="${baseCaseId}">Download Archive</button>`
+      `<button type="button" class="menu-item" data-case-action="download-archive" data-case-id="${baseCaseId}">Download Case</button>`
     );
     if (!isFinal) {
       parts.push(
@@ -4131,9 +4170,11 @@ function renderCaseMenu(item) {
       `<button type="button" class="menu-item danger" data-case-action="archive" data-case-id="${baseCaseId}">Archive Case</button>`
     );
   }
-  parts.push(
-    `<button type="button" class="menu-item danger" data-case-action="delete-case" data-case-id="${baseCaseId}">Delete Case</button>`
-  );
+  if (canDelete) {
+    parts.push(
+      `<button type="button" class="menu-item danger" data-case-action="delete-case" data-case-id="${baseCaseId}">Delete Case</button>`
+    );
+  }
   return `
     <div class="case-actions" data-case-id="${baseCaseId}">
       <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="${menuId}" data-case-menu-trigger>⋯</button>
@@ -4381,7 +4422,12 @@ async function reviewApplicantPreEngagement(caseId, paralegalId, action, button)
 function pruneArchivedSelection() {
   if (!state.archivedSelection) state.archivedSelection = new Set();
   if (!state.archivedSelection.size) return;
-  const valid = new Set(getArchivedBucketCases().map((c) => String(c.id)));
+  const valid = new Set(
+    getArchivedBucketCases()
+      .filter((item) => canDeleteCase(item))
+      .map((item) => String(parseCaseId(item)))
+      .filter(Boolean)
+  );
   state.archivedSelection.forEach((id) => {
     if (!valid.has(id)) state.archivedSelection.delete(id);
   });
@@ -4431,9 +4477,53 @@ async function removeLocalDraft(draftId) {
   state.localDrafts = readLocalDrafts().filter((item) => String(item.id) !== String(draftId));
 }
 
+function pruneDraftSelection() {
+  if (!state.draftSelection) state.draftSelection = new Set();
+  if (!state.draftSelection.size) return;
+  const valid = new Set(readLocalDrafts().map((item) => String(parseCaseId(item))).filter(Boolean));
+  state.draftSelection.forEach((id) => {
+    if (!valid.has(id)) state.draftSelection.delete(id);
+  });
+}
+
+function syncDraftBulkUI() {
+  const bar = document.querySelector("[data-draft-bulk-bar]");
+  if (!bar) return;
+  pruneDraftSelection();
+  const isDraftView = state.casesViewFilter === "draft";
+  bar.hidden = !isDraftView;
+  const selectAll = bar.querySelector("[data-draft-select-all]");
+  const bulkButtons = bar.querySelectorAll("[data-draft-bulk]");
+  const checkboxes = Array.from(document.querySelectorAll('[data-table-body="draft"] [data-draft-select]'));
+
+  if (!isDraftView) {
+    if (selectAll) {
+      selectAll.checked = false;
+      selectAll.indeterminate = false;
+    }
+    bulkButtons.forEach((btn) => (btn.disabled = true));
+    return;
+  }
+
+  checkboxes.forEach((cb) => {
+    cb.checked = state.draftSelection.has(cb.value);
+  });
+
+  const selectedCount = state.draftSelection.size;
+  bulkButtons.forEach((btn) => (btn.disabled = selectedCount === 0));
+
+  if (selectAll) {
+    const totalVisible = checkboxes.length;
+    const selectedVisible = checkboxes.filter((cb) => cb.checked).length;
+    selectAll.checked = totalVisible > 0 && selectedVisible === totalVisible;
+    selectAll.indeterminate = selectedVisible > 0 && selectedVisible < totalVisible;
+  }
+}
+
 function syncArchivedBulkUI() {
   const bar = document.querySelector("[data-archived-bulk-bar]");
   if (!bar) return;
+  pruneArchivedSelection();
   const isArchivedView = state.casesViewFilter === "archived";
   bar.hidden = !isArchivedView;
   const selectAll = bar.querySelector("[data-archived-select-all]");
@@ -4454,7 +4544,18 @@ function syncArchivedBulkUI() {
   });
 
   const selectedCount = state.archivedSelection.size;
-  bulkButtons.forEach((btn) => (btn.disabled = selectedCount === 0));
+  const selectedIds = Array.from(state.archivedSelection);
+  const deleteEnabled =
+    selectedCount > 0 && selectedIds.every((id) => canDeleteCase(getCaseEntryById(id)));
+  bulkButtons.forEach((btn) => {
+    if (btn.dataset.archivedBulk === "delete") {
+      btn.hidden = checkboxes.length === 0;
+      btn.disabled = !deleteEnabled;
+      return;
+    }
+    btn.hidden = false;
+    btn.disabled = selectedCount === 0;
+  });
 
   if (selectAll) {
     const totalVisible = checkboxes.length;
@@ -5301,7 +5402,12 @@ function maybeOpenCasePreviewFromQuery() {
 }
 
 function onCasesTableClick(event) {
-  if (event.target.closest("[data-archived-select]") || event.target.closest("[data-archived-select-all]")) {
+  if (
+    event.target.closest("[data-draft-select]") ||
+    event.target.closest("[data-draft-select-all]") ||
+    event.target.closest("[data-archived-select]") ||
+    event.target.closest("[data-archived-select-all]")
+  ) {
     return;
   }
   const applicantsToggle = event.target.closest("[data-applicants-toggle]");
@@ -5372,6 +5478,17 @@ function onCasesTableClick(event) {
     void removeApplicantFromCase(caseId, paralegalId, drawerEl);
     return;
   }
+  const blockBtn = event.target.closest("[data-block-applicant]");
+  if (blockBtn) {
+    event.preventDefault();
+    const caseId = blockBtn.dataset.caseId || "";
+    const paralegalId = blockBtn.dataset.paralegalId || "";
+    const paralegalName = blockBtn.dataset.paralegalName || "Applicant";
+    if (!caseId || !paralegalId) return;
+    const drawerEl = blockBtn.closest("[data-applicants-drawer]");
+    void blockApplicantFromCase(caseId, paralegalId, paralegalName, drawerEl);
+    return;
+  }
   const preEngagementActionBtn = event.target.closest("[data-preengagement-review-action]");
   if (preEngagementActionBtn) {
     event.preventDefault();
@@ -5431,6 +5548,53 @@ function onArchivedSelectionChange(event) {
   syncArchivedBulkUI();
 }
 
+function onDraftSelectionChange(event) {
+  const toggleAll = event.target.closest("[data-draft-select-all]");
+  if (toggleAll) {
+    const checked = toggleAll.checked;
+    document.querySelectorAll('[data-table-body="draft"] [data-draft-select]').forEach((box) => {
+      box.checked = checked;
+      const id = box.value;
+      if (!id) return;
+      if (checked) state.draftSelection.add(String(id));
+      else state.draftSelection.delete(String(id));
+    });
+    syncDraftBulkUI();
+    return;
+  }
+
+  const checkbox = event.target.closest("[data-draft-select]");
+  if (!checkbox) return;
+  const caseId = checkbox.value;
+  if (!caseId) return;
+  if (checkbox.checked) state.draftSelection.add(String(caseId));
+  else state.draftSelection.delete(String(caseId));
+  syncDraftBulkUI();
+}
+
+async function onDraftBulkAction(event) {
+  const btn = event.target.closest("[data-draft-bulk]");
+  if (!btn) return;
+  const action = btn.dataset.draftBulk;
+  const ids = Array.from(state.draftSelection);
+  if (!ids.length) return;
+  try {
+    if (action === "delete") {
+      const confirmed = window.confirm(`Delete ${ids.length} draft${ids.length === 1 ? "" : "s"}? This cannot be undone.`);
+      if (!confirmed) return;
+      for (const id of ids) {
+        await removeLocalDraft(id);
+      }
+      notifyCases("Drafts deleted.", "success");
+    }
+    state.draftSelection.clear();
+    renderCasesView();
+  } catch (err) {
+    console.error(err);
+    notifyCases(err.message || "Bulk action failed.", "error");
+  }
+}
+
 async function onArchivedBulkAction(event) {
   const btn = event.target.closest("[data-archived-bulk]");
   if (!btn) return;
@@ -5444,9 +5608,17 @@ async function onArchivedBulkAction(event) {
       });
       notifyCases("Download started for selected cases.", "success");
     } else if (action === "delete") {
-      const confirmed = window.confirm(`Delete ${ids.length} case${ids.length === 1 ? "" : "s"}? This cannot be undone.`);
+      const deletableIds = ids.filter((id) => canDeleteCase(getCaseEntryById(id)));
+      if (deletableIds.length !== ids.length) {
+        syncArchivedBulkUI();
+        notifyCases("Some selected cases can no longer be deleted.", "error");
+        return;
+      }
+      const confirmed = window.confirm(
+        `Delete ${deletableIds.length} case${deletableIds.length === 1 ? "" : "s"}? This cannot be undone.`
+      );
       if (!confirmed) return;
-      for (const id of ids) {
+      for (const id of deletableIds) {
         await deleteArchivedCase(id, { skipConfirm: true, silent: true });
       }
       notifyCases("Cases deleted.", "success");
@@ -5545,9 +5717,18 @@ async function handleCaseAction(action, caseId) {
     } else if (action === "details") {
       await openCasePreview(caseId);
     } else if (action === "open-case-detail") {
+      const entry = state.caseLookup.get(String(caseId));
+      if (shouldOpenCasePreviewOnly(entry)) {
+        await openCasePreview(caseId);
+        return;
+      }
       window.location.href = `case-detail.html?caseId=${encodeURIComponent(caseId)}`;
     } else if (action === "workspace") {
       const entry = state.caseLookup.get(String(caseId));
+      if (shouldOpenCasePreviewOnly(entry)) {
+        await openCasePreview(caseId);
+        return;
+      }
       if (!isWorkspaceEligibleCase(entry)) {
         notifyCases("Workspace unlocks after a paralegal is hired and the case is funded.", "info");
         return;
@@ -5609,6 +5790,11 @@ async function handleCaseAction(action, caseId) {
       renderCasesView();
       notifyCases("Case restored.");
     } else if (action === "delete-case") {
+      const entry = getCaseEntryById(caseId);
+      if (!canDeleteCase(entry)) {
+        notifyCases("This case can no longer be deleted.", "info");
+        return;
+      }
       await deleteArchivedCase(caseId);
       renderCasesView();
     }
@@ -6819,6 +7005,18 @@ function hasAssignedParalegal(caseItem) {
   return !!(caseItem?.paralegal || caseItem?.paralegalId);
 }
 
+function canDeleteCase(caseItem) {
+  if (!caseItem) return false;
+  const statusKey = normalizeCaseStatus(caseItem?.status);
+  const isArchivedFinalCase =
+    caseItem.archived === true && (caseItem.paymentReleased === true || ["completed", "closed"].includes(statusKey));
+  if (hasAssignedParalegal(caseItem) && !isArchivedFinalCase) return false;
+  const escrowStatus = String(caseItem?.escrowStatus || "").toLowerCase();
+  const escrowFunded = escrowStatus === "funded" || caseItem.paymentReleased === true;
+  if (escrowFunded && !isArchivedFinalCase) return false;
+  return true;
+}
+
 function isTerminalCase(caseItem) {
   if (!caseItem) return false;
   if (caseItem.paymentReleased === true) return true;
@@ -6838,6 +7036,12 @@ function isArchivedBucketCase(caseItem) {
     return true;
   }
   return isTerminalCase(caseItem);
+}
+
+function shouldOpenCasePreviewOnly(caseItem, { filterKey = state.casesViewFilter || "" } = {}) {
+  if (!caseItem || caseItem.localDraft) return false;
+  if (filterKey === "archived") return true;
+  return isArchivedBucketCase(caseItem) || caseItem.archived === true;
 }
 
 function getArchivedBucketCases({ cases = state.cases, archivedCases = state.casesArchived } = {}) {
@@ -6990,6 +7194,33 @@ async function removeApplicantFromCase(caseId, paralegalId, drawerEl) {
     renderCasesView();
   } catch (err) {
     notifyCases(err?.message || "Unable to remove applicant.", "error");
+  }
+}
+
+async function blockApplicantFromCase(caseId, paralegalId, paralegalName, drawerEl) {
+  const confirmed = window.confirm(
+    `Block ${paralegalName || "this applicant"} from future interaction? They will no longer be able to apply, be invited, be hired, or message you on Let's ParaConnect. They will not be notified.`
+  );
+  if (!confirmed) return;
+  try {
+    await secureFetch("/api/blocks", {
+      method: "POST",
+      body: { caseId, paralegalId },
+    });
+    notifyCases("Applicant blocked from future interaction.", "success");
+    if (drawerEl) {
+      await loadApplicantsForDrawer(caseId, drawerEl);
+    }
+    await loadCasesWithFiles(true);
+    await loadArchivedCases(true);
+    const cachedApplicants = applicantDrawerCache.get(caseId) || [];
+    const visibleCount = cachedApplicants.filter(
+      (entry) => !["accepted", "rejected"].includes(entry.status)
+    ).length;
+    updateCaseApplicantCount(caseId, visibleCount);
+    renderCasesView();
+  } catch (err) {
+    notifyCases(err?.message || "Unable to block applicant.", "error");
   }
 }
 

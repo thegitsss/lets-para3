@@ -1,0 +1,17 @@
+[Unit]
+Description=LPC ops monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=__PROJECT_ROOT__/backend
+Environment=MONGO_URI=__MONGO_URI__
+Environment=OPS_HEALTHCHECK_URL=__OPS_HEALTHCHECK_URL__
+Environment=OWNER_ALERT_EMAILS=__OWNER_ALERT_EMAILS__
+Environment=BACKUP_STATUS_FILE=__BACKUP_STATUS_FILE__
+Environment=OPS_MONITOR_STATE_FILE=__OPS_MONITOR_STATE_FILE__
+ExecStart=/usr/bin/env node __PROJECT_ROOT__/backend/scripts/ops-monitor.js
+
+[Install]
+WantedBy=multi-user.target

@@ -136,9 +136,29 @@ document.addEventListener("DOMContentLoaded", () => {
     navPreferences: "preferencesSection",
     navDelete: "deleteSection"
   };
+  const sectionToNav = Object.entries(navItems).reduce((acc, [navId, sectionId]) => {
+    acc[sectionId] = navId;
+    return acc;
+  }, {});
   const topLevelSections = Object.values(navItems)
     .map((id) => document.getElementById(id))
     .filter(Boolean);
+  const hashSectionMap = {
+    "#securitysection": "securitySection",
+    "#security": "securitySection",
+    "#profilesection": "profileSection",
+    "#profile": "profileSection",
+    "#preferencessection": "preferencesSection",
+    "#preferences": "preferencesSection",
+    "#deletesection": "deleteSection",
+    "#delete": "deleteSection",
+  };
+  const syncActiveNav = (sectionId) => {
+    const activeNavId = sectionToNav[sectionId] || "navProfile";
+    document.querySelectorAll(".settings-item").forEach((el) => {
+      el.classList.toggle("active", el.id === activeNavId);
+    });
+  };
   const setActiveSection = (sectionId) => {
     topLevelSections.forEach((sec) => {
       sec.classList.remove("active");
@@ -156,7 +176,15 @@ document.addEventListener("DOMContentLoaded", () => {
       section.style.removeProperty("display");
       section.style.display = "block";
     }
+    syncActiveNav(sectionId);
     scheduleProfileScrollIndicatorUpdate();
+  };
+
+  const applySectionFromHash = (hashValue = window.location.hash) => {
+    const requestedSection = hashSectionMap[String(hashValue || "").trim().toLowerCase()] || "";
+    if (!requestedSection) return false;
+    setActiveSection(requestedSection);
+    return true;
   };
 
   Object.keys(navItems).forEach(navId => {
@@ -166,9 +194,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!btn) return;
 
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".settings-item").forEach(el => el.classList.remove("active"));
-      btn.classList.add("active");
       setActiveSection(sectionId);
+      const nextHash = `#${sectionId}`;
+      if (window.location.hash !== nextHash) {
+        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${nextHash}`);
+      }
     });
   });
 
@@ -182,10 +212,16 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const initialNav = document.querySelector(".settings-item.active");
-  const initialSectionId = initialNav && navItems[initialNav.id]
-    ? navItems[initialNav.id]
-    : navItems.navProfile;
+  const requestedHashSection = hashSectionMap[String(window.location.hash || "").trim().toLowerCase()] || "";
+  const initialSectionId = requestedHashSection || (
+    initialNav && navItems[initialNav.id]
+      ? navItems[initialNav.id]
+      : navItems.navProfile
+  );
   setActiveSection(initialSectionId);
+  window.addEventListener("hashchange", () => {
+    applySectionFromHash();
+  });
   bindProfileScrollIndicator();
   const stepToRun = String(requestedOnboardingStep || "").toLowerCase();
   if (stepToRun) {
@@ -457,13 +493,24 @@ document.addEventListener("DOMContentLoaded", () => {
     prefBtn.addEventListener("click", async () => {
       const email = emailToggle ? emailToggle.checked : false;
       const theme = themeSelect ? themeSelect.value : "mountain";
+      const fontSize = fontSizeSelect ? fontSizeSelect.value : "md";
+      const hideProfile = hideProfileToggle ? !!hideProfileToggle.checked : undefined;
       const state = statePreferenceSelect ? statePreferenceSelect.value : "";
+      const payload = {
+        email,
+        theme,
+        fontSize,
+        state,
+      };
+      if (typeof hideProfile === "boolean") {
+        payload.hideProfile = hideProfile;
+      }
 
       const res = await fetch("/api/account/preferences", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, theme, state })
+        body: JSON.stringify(payload)
       });
 
       const data = await res.json().catch(() => ({}));
@@ -476,10 +523,19 @@ document.addEventListener("DOMContentLoaded", () => {
       if (theme && typeof window.applyThemePreference === "function") {
         window.applyThemePreference(theme);
       }
+      if (fontSize && typeof window.applyFontSizePreference === "function") {
+        window.applyFontSizePreference(fontSize);
+      }
       if (currentUser) {
+        currentUser.notificationPrefs = {
+          ...(currentUser.notificationPrefs || {}),
+          email
+        };
         currentUser.preferences = {
           ...(currentUser.preferences || {}),
-          theme
+          theme,
+          fontSize,
+          ...(typeof hideProfile === "boolean" ? { hideProfile } : {})
         };
         currentUser.location = state || "";
         currentUser.state = state || "";
@@ -743,6 +799,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function loadBlockedUsers() {
     const container = document.getElementById("blockedUsersList");
+    const summaryCount = document.getElementById("blockedUsersSummaryCount");
     if (!container) return;
 
     try {
@@ -750,8 +807,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json();
 
       if (!Array.isArray(data) || !data.length) {
+        if (summaryCount) summaryCount.textContent = "No blocked users";
         container.innerHTML = "<p class='muted'>No blocked users.</p>";
         return;
+      }
+
+      if (summaryCount) {
+        const count = data.length;
+        summaryCount.textContent = `${count} blocked user${count === 1 ? "" : "s"}`;
       }
 
       container.innerHTML = data
@@ -789,6 +852,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     } catch (err) {
       console.error("Failed to load blocked users", err);
+      if (summaryCount) summaryCount.textContent = "Unavailable";
       container.innerHTML = "<p class='muted'>Unable to load blocked users.</p>";
     }
   }
@@ -1501,6 +1565,16 @@ function bindDocumentFileChooser(triggerId, input, onAfterChoose = null) {
   });
 }
 
+function openProfileDocument(url) {
+  const targetUrl = String(url || "").trim();
+  if (!targetUrl) return;
+  try {
+    window.open(targetUrl, "_blank", "noopener,noreferrer");
+  } catch {
+    window.location.href = targetUrl;
+  }
+}
+
 async function uploadParalegalPdfDocument({
   input,
   endpoint,
@@ -1764,6 +1838,7 @@ function normalizeOnboarding(raw = {}) {
     paralegalWelcomeDismissed: Boolean(raw?.paralegalWelcomeDismissed),
     paralegalTourCompleted: Boolean(raw?.paralegalTourCompleted),
     paralegalProfileTourCompleted: Boolean(raw?.paralegalProfileTourCompleted),
+    attorneyProfileCompleted: Boolean(raw?.attorneyProfileCompleted),
   };
 }
 
@@ -1896,14 +1971,14 @@ async function initParalegalProfileTour(user = {}) {
       id: "previewProfileBtn",
       sectionId: "profileSection",
       title: "View profile",
-      text: "Preview the profile attorneys will see. We are in pre-launch, so attorneys are not onboarded yet. You will be emailed when onboarding begins.",
+      text: "Preview the profile attorneys will see when your profile is available on the platform.",
       autoScroll: "smooth",
     },
     {
       id: "connectStripeBtn",
       sectionId: "securitySection",
       title: "Payouts Setup",
-      text: "Set up payouts here. Connect Stripe so you can receive payments once platform payouts are active.",
+      text: "Set up payouts here. Connect Stripe so you can receive payments.",
       autoScroll: "smooth",
     },
     {
@@ -3717,13 +3792,42 @@ function hydrateParalegalVisibilityPref(user = {}) {
   updateParalegalVisibilityLock(user);
 }
 
+function normalizeHttpUrlInput(value, { fieldLabel = "URL", requiredHost = "" } = {}) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const withProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+  let parsed;
+  try {
+    parsed = new URL(withProtocol);
+  } catch {
+    throw new Error(`Enter a valid ${fieldLabel}.`);
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error(`Enter a valid ${fieldLabel}.`);
+  }
+  if (requiredHost) {
+    const host = parsed.hostname.toLowerCase();
+    if (!host || (host !== requiredHost && !host.endsWith(`.${requiredHost}`))) {
+      throw new Error(`Enter a valid ${fieldLabel}.`);
+    }
+  }
+  return parsed.toString();
+}
+
 function collectAttorneyPayload() {
   const first = document.getElementById("attorneyFirstName")?.value.trim() || "";
   const last = document.getElementById("attorneyLastName")?.value.trim() || "";
   const email = document.getElementById("attorneyEmail")?.value.trim() || "";
-  const linkedIn = document.getElementById("attorneyLinkedIn")?.value.trim() || "";
+  const linkedInInput = document.getElementById("attorneyLinkedIn");
+  const linkedIn = normalizeHttpUrlInput(linkedInInput?.value, {
+    fieldLabel: "LinkedIn URL",
+    requiredHost: "linkedin.com",
+  });
   const lawFirm = document.getElementById("attorneyFirmName")?.value.trim() || "";
-  const firmWebsite = document.getElementById("attorneyFirmWebsite")?.value.trim() || "";
+  const firmWebsiteInput = document.getElementById("attorneyFirmWebsite");
+  const firmWebsite = normalizeHttpUrlInput(firmWebsiteInput?.value, {
+    fieldLabel: "firm website",
+  });
   const practiceDescription = document.getElementById("attorneyPracticeDescription")?.value.trim() || "";
   const emailToggle = document.getElementById("attorneyEmailNotifications");
   const practiceAreas = collectAttorneyPracticeAreas();
@@ -3746,6 +3850,8 @@ function collectAttorneyPayload() {
       email: emailToggle ? emailToggle.checked : settingsState.notificationPrefs.email !== false
     }
   };
+  if (linkedInInput) linkedInInput.value = linkedIn;
+  if (firmWebsiteInput) firmWebsiteInput.value = firmWebsite;
   settingsState.practiceDescription = practiceDescription;
   if (firmWebsite) {
     payload.firmWebsite = firmWebsite;
@@ -3849,7 +3955,7 @@ async function handleAttorneyProfileSave() {
     }
   } catch (err) {
     console.error("Failed to save attorney profile", err);
-    showToast("Unable to save profile right now.", "err");
+    showToast(err?.message || "Unable to save profile right now.", "err");
   } finally {
     if (saveBtn) {
       saveBtn.disabled = false;
@@ -4476,7 +4582,7 @@ function ensureAttorneyBillingCTA() {
     billingBtn.type = "button";
     billingBtn.id = "attorneyBillingSetupBtn";
     billingBtn.className = "btn btn-outline";
-    billingBtn.textContent = "Go to Billing & Add Card";
+    billingBtn.textContent = "Open Billing";
     block.appendChild(billingBtn);
   }
   billingBtn.onclick = () => {
@@ -4501,9 +4607,9 @@ function runAttorneyOnboardingStep(step, options = {}) {
     if (!silent && !getAttorneyOnboardingModalSeen("payment")) {
       bindAttorneyOnboardingModal();
       showAttorneyOnboardingModal(
-        "Step 2 of 3: Set up payments for Stripe.",
+        "Step 2 of 3: Add a payment method so you can fund matters when you're ready.",
         "payment",
-        "Set Up Payments"
+        "Add Payment Method"
       );
       return;
     }
@@ -4805,7 +4911,7 @@ function loadCertificate(user) {
       <div class="paralegal-doc-actions">
         <div class="file-input-row">
           <button type="button" id="certificateChooseBtn" class="file-trigger">${hasCertificate ? "Certificate on file" : "Choose File"}</button>
-          <button id="removeCertificateBtn" class="file-trigger remove-action-btn" type="button" ${hasCertificate ? "" : "disabled"}>Remove</button>
+          <button id="removeCertificateBtn" class="file-trigger remove-action-btn" type="button" ${hasCertificate ? "" : "hidden"}>Remove</button>
           <span id="certificateFileName" class="file-name"></span>
         </div>
         <input id="certificateInput" type="file" accept="application/pdf" class="file-input-hidden">
@@ -4848,7 +4954,7 @@ function loadCertificate(user) {
           const chooseBtn = document.getElementById("certificateChooseBtn");
           if (chooseBtn) chooseBtn.textContent = "Certificate on file";
           const removeBtn = document.getElementById("removeCertificateBtn");
-          if (removeBtn) removeBtn.disabled = false;
+          if (removeBtn) removeBtn.hidden = false;
         },
         onFinally: () => {
           if (status && status.textContent === "Uploading…") {
@@ -4876,7 +4982,7 @@ function loadCertificate(user) {
     const chooseBtn = document.getElementById("certificateChooseBtn");
     if (chooseBtn) chooseBtn.textContent = "Choose File";
     const removeBtn = document.getElementById("removeCertificateBtn");
-    if (removeBtn) removeBtn.disabled = true;
+    if (removeBtn) removeBtn.hidden = true;
   });
 }
 
@@ -4884,7 +4990,8 @@ function loadResume(user) {
   const section = document.getElementById("settingsResume");
   if (!section) return;
   settingsState.removeResume = false;
-  const hasResume = Boolean(user.resumeURL || settingsState.pendingResumeKey);
+  const getResumeUrl = () => String(settingsState.pendingResumeKey || user.resumeURL || "").trim();
+  const hasResume = Boolean(getResumeUrl());
   section.innerHTML = `
     <div class="paralegal-doc-row">
       <div class="paralegal-doc-meta">
@@ -4894,8 +5001,8 @@ function loadResume(user) {
       </div>
       <div class="paralegal-doc-actions">
         <div class="file-input-row">
-          <button type="button" id="resumeChooseBtn" class="file-trigger">${hasResume ? "Résumé on file" : "Choose File"}</button>
-          <button id="removeResumeBtn" class="file-trigger remove-action-btn" type="button" ${hasResume ? "" : "disabled"}>Remove</button>
+          <button type="button" id="resumeChooseBtn" class="file-trigger">${hasResume ? "View Resume" : "Choose File"}</button>
+          <button id="removeResumeBtn" class="file-trigger remove-action-btn" type="button" ${hasResume ? "" : "hidden"}>Remove</button>
           <span id="resumeFileName" class="file-name"></span>
         </div>
         <input id="resumeInput" type="file" accept="application/pdf" class="file-input-hidden">
@@ -4905,7 +5012,18 @@ function loadResume(user) {
 
   const resumeInput = document.getElementById("resumeInput");
   const resumeFileName = document.getElementById("resumeFileName");
-  bindDocumentFileChooser("resumeChooseBtn", resumeInput);
+  const resumeChooseBtn = document.getElementById("resumeChooseBtn");
+  resumeChooseBtn?.addEventListener("click", () => {
+    const currentResumeUrl = getResumeUrl();
+    if (currentResumeUrl) {
+      openProfileDocument(currentResumeUrl);
+      return;
+    }
+    if (!resumeInput) return;
+    const restoreScroll = preserveProfileSettingsScrollPosition();
+    resumeInput.click();
+    setTimeout(() => restoreScroll(), 0);
+  });
   if (resumeInput) {
     resumeInput.addEventListener("change", async (event) => {
       const file = event.target.files?.[0] || null;
@@ -4936,9 +5054,9 @@ function loadResume(user) {
           if (resumeFileName) resumeFileName.textContent = file?.name || "";
           if (status) status.textContent = "";
           const chooseBtn = document.getElementById("resumeChooseBtn");
-          if (chooseBtn) chooseBtn.textContent = "Résumé on file";
+          if (chooseBtn) chooseBtn.textContent = "View Resume";
           const removeBtn = document.getElementById("removeResumeBtn");
-          if (removeBtn) removeBtn.disabled = false;
+          if (removeBtn) removeBtn.hidden = false;
           updateRequiredFieldMarkers();
         },
         onFinally: () => {
@@ -4967,7 +5085,7 @@ function loadResume(user) {
     const chooseBtn = document.getElementById("resumeChooseBtn");
     if (chooseBtn) chooseBtn.textContent = "Choose File";
     const removeBtn = document.getElementById("removeResumeBtn");
-    if (removeBtn) removeBtn.disabled = true;
+    if (removeBtn) removeBtn.hidden = true;
     updateRequiredFieldMarkers();
   });
 
@@ -4989,7 +5107,7 @@ function loadWritingSample(user) {
       <div class="paralegal-doc-actions">
         <div class="file-input-row">
           <button type="button" id="writingSampleChooseBtn" class="file-trigger">${hasSample ? "Writing sample on file" : "Choose File"}</button>
-          <button id="removeWritingSampleBtn" class="file-trigger remove-action-btn" type="button" ${hasSample ? "" : "disabled"}>Remove</button>
+          <button id="removeWritingSampleBtn" class="file-trigger remove-action-btn" type="button" ${hasSample ? "" : "hidden"}>Remove</button>
           <span id="writingSampleFileName" class="file-name"></span>
         </div>
         <input id="writingSampleInput" type="file" accept="application/pdf" class="file-input-hidden">
@@ -5032,7 +5150,7 @@ function loadWritingSample(user) {
           const chooseBtn = document.getElementById("writingSampleChooseBtn");
           if (chooseBtn) chooseBtn.textContent = "Writing sample on file";
           const removeBtn = document.getElementById("removeWritingSampleBtn");
-          if (removeBtn) removeBtn.disabled = false;
+          if (removeBtn) removeBtn.hidden = false;
         },
         onFinally: () => {
           if (status && status.textContent === "Uploading…") {
@@ -5060,7 +5178,7 @@ function loadWritingSample(user) {
     const chooseBtn = document.getElementById("writingSampleChooseBtn");
     if (chooseBtn) chooseBtn.textContent = "Choose File";
     const removeBtn = document.getElementById("removeWritingSampleBtn");
-    if (removeBtn) removeBtn.disabled = true;
+    if (removeBtn) removeBtn.hidden = true;
   });
 }
 

@@ -19,6 +19,9 @@ const { sendWelcomePacket, sendProfilePhotoRejectedEmail } = sendEmail;
 const { notifyUser } = require("../utils/notifyUser");
 const { getAppSettings, normalizeTaxRate, serializeAppSettings } = require("../utils/appSettings");
 const { triageSupportIssue } = require("../ai/supportAgent");
+const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
+const { ensureApprovedUserAuthReady } = require("../utils/authReady");
+const { normalizeEmail, sendVerificationEmail } = require("../utils/emailVerification");
 
 // -----------------------------------------
 // CSRF (enabled in production or when ENABLE_CSRF=true)
@@ -36,7 +39,10 @@ const APP_BASE_URL = (process.env.APP_BASE_URL || "").replace(/\/$/, "");
 const EMAIL_BASE_URL = (process.env.EMAIL_BASE_URL || "").replace(/\/$/, "");
 const ASSET_BASE_URL = EMAIL_BASE_URL || "https://www.lets-paraconnect.com";
 const LOGIN_URL = `${ASSET_BASE_URL}/login.html`;
+const ATTORNEY_DASHBOARD_URL = `${ASSET_BASE_URL}/dashboard-attorney.html`;
 const APPROVAL_EMAIL_SUBJECT =
+"Welcome to Let’s-ParaConnect";
+const ATTORNEY_APPROVAL_EMAIL_SUBJECT =
 "Welcome to Let’s-ParaConnect";
 const DENIAL_EMAIL_SUBJECT =
 "Your application to join Let's-ParaConnect has been reviewed and was unfortunately not approved.";
@@ -231,6 +237,7 @@ function pickUserSafe(u) {
 // fields safe to return to admin tools
 const {
 _id, firstName, lastName, email, role, status, bio, about, availability, emailVerified,
+pendingEmail, pendingEmailRequestedAt,
 lastLoginAt, lockedUntil, failedLogins, audit, createdAt, updatedAt,
 specialties, jurisdictions, skills, yearsExperience, languages,
 avatarURL, timezone, location, state, kycStatus, stripeCustomerId, stripeAccountId,
@@ -249,6 +256,8 @@ bio,
 about,
 availability,
 emailVerified,
+pendingEmail,
+pendingEmailRequestedAt,
 lastLoginAt, lockedUntil, failedLogins, audit, createdAt, updatedAt,
 specialties, jurisdictions, skills, yearsExperience, languages,
 avatarURL, timezone, location, state, kycStatus, stripeCustomerId, stripeAccountId,
@@ -374,7 +383,7 @@ function buildApprovalEmailHtml(user, opts = {}) {
             <td align="center" style="padding:24px 32px 16px;">
               <table cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td bgcolor="#ffbd59" style="border-radius:999px;">
+                  <td bgcolor="#0a84ff" style="border-radius:999px;">
                     <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
                       Login
                     </a>
@@ -407,13 +416,123 @@ function buildApprovalEmailHtml(user, opts = {}) {
                 Need help?
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#545454;line-height:1.4;margin-top:8px;">
-                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#545454;text-decoration:none;">help@lets-paraconnect.com</a>
+                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#545454;text-decoration:none;">help@lets-paraconnect.com</a> or reply to this email.
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#7a7a7a;line-height:1.4;margin-top:14px;">
                 ${unsubscribeLine}. Required account and case notices may still be sent.
               </div>
             </td>
           </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  `;
+}
+
+function buildAttorneyApprovalEmailHtml(user, opts = {}) {
+  const dashboardUrl = ATTORNEY_DASHBOARD_URL;
+  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
+  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
+  const contactUrl = `${ASSET_BASE_URL}/contact.html`;
+  const privacyUrl = `${ASSET_BASE_URL}/privacy.html`;
+  const linkedinUrl = "https://www.linkedin.com/company/lets-paraconnect/";
+  const facebookUrl = "https://www.facebook.com/LetsParaConnect/";
+  const instagramUrl = "https://www.instagram.com/letsparaconnect/";
+  const token = buildUnsubscribeToken(user);
+  const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
+  const friendlyName = user?.firstName || formatFullName(user) || "there";
+  const unsubscribeLine = unsubscribeUrl
+    ? `<a href="${unsubscribeUrl}" style="color:#7a7a7a;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
+    : "Unsubscribe from non-essential emails";
+
+  return `
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td align="center" style="padding:24px 24px 8px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding-right:12px;">
+                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
+                  </td>
+                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
+                    Let's-ParaConnect
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 24px 20px;">
+              <img src="${heroUrl}" alt="Welcome to Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 32px 0;">
+              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:34px;letter-spacing:0.02em;color:#6e6e6e;">
+                Welcome to Let&rsquo;s-ParaConnect
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:16px 40px 0;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.01em;color:#1f1f1f;line-height:1.7;text-align:left;">
+                <p style="margin:0 0 18px;">Dear ${friendlyName},</p>
+                <p style="margin:0 0 18px;">Congratulations! We are pleased to inform you that you have been accepted to Let&rsquo;s-ParaConnect.</p>
+                <p style="margin:0 0 18px;">LPC is a platform designed for attorneys and paralegals to connect in a streamlined, efficient, and secure environment. Through LPC, you can easily find, collaborate with, and manage skilled professionals to support your legal work&mdash;whether for case preparation, document drafting, research, or administrative assistance.</p>
+                <p style="margin:0 0 10px;"><strong>What You Can Use LPC For:</strong></p>
+                <ul style="margin:0 0 18px 20px;padding:0;">
+                  <li style="margin:0 0 10px;">Connecting with vetted paralegals</li>
+                  <li style="margin:0 0 10px;">Delegating legal research, drafting, and case support tasks</li>
+                  <li style="margin:0 0 10px;">Managing workflows and improving operational efficiency</li>
+                  <li style="margin:0;">Scaling your practice with flexible, on-demand support</li>
+                </ul>
+                <p style="margin:0 0 10px;"><strong>Next Steps:</strong></p>
+                <ul style="margin:0 0 18px 20px;padding:0;">
+                  <li style="margin:0 0 10px;">Log in to your account using the credentials you provided during sign-up.</li>
+                  <li style="margin:0 0 10px;">Complete your profile.</li>
+                  <li style="margin:0 0 10px;">Explore available paralegal professionals.</li>
+                  <li style="margin:0;">Post your first task or project.</li>
+                </ul>
+                <p style="margin:0 0 18px;">The goal is to help you save time, increase productivity, and focus on delivering the highest quality legal services to your clients.</p>
+                <p style="margin:0 0 18px;">If you have any questions or need assistance getting started, please don&rsquo;t hesitate to contact us.</p>
+                <p style="margin:0 0 18px;">Welcome aboard&mdash;we&rsquo;re excited to have you as part of the platform.</p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:24px 32px 16px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td bgcolor="#0a84ff" style="border-radius:999px;">
+                    <a href="${dashboardUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 30px;font-family:Georgia, 'Times New Roman', serif;font-size:20px;color:#ffffff;text-decoration:none;">
+                      Go to Your Dashboard
+                    </a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:18px 40px 28px;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:16px;letter-spacing:0.01em;color:#1f1f1f;line-height:1.7;text-align:left;">
+                Warm regards,<br>
+                The Lets-ParaConnect Team
+              </div>
+            </td>
+          </tr>
+          ${buildLaunchEmailFooter({
+            unsubscribeLine,
+            contactUrl,
+            privacyUrl,
+            linkedinUrl,
+            facebookUrl,
+            instagramUrl,
+            backgroundColor: "#f5f7fb",
+          })}
         </table>
       </td>
     </tr>
@@ -483,7 +602,7 @@ function buildDenialEmailHtml(user, opts = {}) {
                 Need help?
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#545454;line-height:1.4;margin-top:8px;">
-                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#545454;text-decoration:none;">help@lets-paraconnect.com</a>
+                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#545454;text-decoration:none;">help@lets-paraconnect.com</a> or reply to this email.
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:12px;color:#7a7a7a;line-height:1.4;margin-top:14px;">
                 ${unsubscribeLine}. Required account and case notices may still be sent.
@@ -554,7 +673,7 @@ function buildCompleteProfileEmailHtml(user, opts = {}) {
             <td align="center" style="padding:24px 32px 16px;">
               <table cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td bgcolor="#ffbd59" style="border-radius:999px;">
+                  <td bgcolor="#0a84ff" style="border-radius:999px;">
                     <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
                       Login
                     </a>
@@ -610,18 +729,19 @@ function buildLaunchEmailFooter({
   linkedinUrl,
   facebookUrl,
   instagramUrl,
-  linkedinIconUrl,
-  facebookIconUrl,
-  instagramIconUrl,
+  linkedinIconUrl = `${ASSET_BASE_URL}/assets/email/linkedin-icon.svg`,
+  facebookIconUrl = `${ASSET_BASE_URL}/assets/email/facebook-icon.svg`,
+  instagramIconUrl = `${ASSET_BASE_URL}/assets/email/instagram-icon.svg`,
+  backgroundColor = "#ffffff",
 } = {}) {
   return `
           <tr>
-            <td style="padding:26px 32px;background:#ffffff;">
+            <td style="padding:26px 32px;background:${backgroundColor};">
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:20px;color:#1f1f1f;letter-spacing:-0.01em;">
                 Need help?
               </div>
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;color:#545454;line-height:1.4;margin-top:8px;">
-                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#545454;text-decoration:none;">help@lets-paraconnect.com</a>
+                Email us at <a href="mailto:help@lets-paraconnect.com" style="color:#545454;text-decoration:none;">help@lets-paraconnect.com</a> or reply to this email.
               </div>
               <table cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;">
                 <tr>
@@ -667,9 +787,6 @@ function buildAttorneyLaunchEmailHtml(user, opts = {}) {
   const linkedinUrl = "https://www.linkedin.com/company/lets-paraconnect/";
   const facebookUrl = "https://www.facebook.com/LetsParaConnect/";
   const instagramUrl = "https://www.instagram.com/letsparaconnect/";
-  const linkedinIconUrl = opts.linkedinIconUrl || "cid:lpc-linkedin-icon";
-  const facebookIconUrl = opts.facebookIconUrl || "cid:lpc-facebook-icon";
-  const instagramIconUrl = opts.instagramIconUrl || "cid:lpc-instagram-icon";
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
   const friendlyName = user?.firstName || "there";
@@ -720,7 +837,7 @@ function buildAttorneyLaunchEmailHtml(user, opts = {}) {
             <td align="center" style="padding:24px 32px 16px;">
               <table cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td bgcolor="#c9a227" style="border-radius:999px;">
+                  <td bgcolor="#0a84ff" style="border-radius:999px;">
                     <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 30px;font-family:Georgia, 'Times New Roman', serif;font-size:20px;color:#ffffff;text-decoration:none;">
                       Log In
                     </a>
@@ -752,9 +869,6 @@ function buildAttorneyLaunchEmailHtml(user, opts = {}) {
             linkedinUrl,
             facebookUrl,
             instagramUrl,
-            linkedinIconUrl,
-            facebookIconUrl,
-            instagramIconUrl,
           })}
         </table>
       </td>
@@ -772,9 +886,6 @@ function buildAttorneyLaunchSetupEmailHtml(user, opts = {}) {
   const linkedinUrl = "https://www.linkedin.com/company/lets-paraconnect/";
   const facebookUrl = "https://www.facebook.com/LetsParaConnect/";
   const instagramUrl = "https://www.instagram.com/letsparaconnect/";
-  const linkedinIconUrl = opts.linkedinIconUrl || "cid:lpc-linkedin-icon";
-  const facebookIconUrl = opts.facebookIconUrl || "cid:lpc-facebook-icon";
-  const instagramIconUrl = opts.instagramIconUrl || "cid:lpc-instagram-icon";
   const token = buildUnsubscribeToken(user);
   const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
   const friendlyName = user?.firstName || "there";
@@ -825,7 +936,7 @@ function buildAttorneyLaunchSetupEmailHtml(user, opts = {}) {
             <td align="center" style="padding:24px 32px 16px;">
               <table cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td bgcolor="#c9a227" style="border-radius:999px;">
+                  <td bgcolor="#0a84ff" style="border-radius:999px;">
                     <a href="${loginUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 30px;font-family:Georgia, 'Times New Roman', serif;font-size:20px;color:#ffffff;text-decoration:none;">
                       Log In
                     </a>
@@ -857,9 +968,6 @@ function buildAttorneyLaunchSetupEmailHtml(user, opts = {}) {
             linkedinUrl,
             facebookUrl,
             instagramUrl,
-            linkedinIconUrl,
-            facebookIconUrl,
-            instagramIconUrl,
           })}
         </table>
       </td>
@@ -870,33 +978,18 @@ function buildAttorneyLaunchSetupEmailHtml(user, opts = {}) {
 
 async function dispatchDecisionEmail(user, status) {
 if (!user?.email) return;
-const friendlyName = formatFullName(user) || "there";
+const role = String(user?.role || "").toLowerCase();
 if (status === "approved") {
-const inlineLogoPath = path.join(__dirname, "../../frontend/Cleanfav.png");
-const html = buildApprovalEmailHtml(user, { logoUrl: "cid:cleanfav-logo" });
-await sendEmail(user.email, APPROVAL_EMAIL_SUBJECT, html, {
-  attachments: [
-    {
-      filename: "Cleanfav.png",
-      path: inlineLogoPath,
-      cid: "cleanfav-logo",
-    },
-  ],
-});
+const subject = role === "attorney" ? ATTORNEY_APPROVAL_EMAIL_SUBJECT : APPROVAL_EMAIL_SUBJECT;
+const html = role === "attorney"
+  ? buildAttorneyApprovalEmailHtml(user)
+  : buildApprovalEmailHtml(user);
+await sendEmail(user.email, subject, html);
 return;
 }
 if (status === "denied") {
-const inlineLogoPath = path.join(__dirname, "../../frontend/Cleanfav.png");
-const html = buildDenialEmailHtml(user, { logoUrl: "cid:cleanfav-logo" });
-await sendEmail(user.email, DENIAL_EMAIL_SUBJECT, html, {
-  attachments: [
-    {
-      filename: "Cleanfav.png",
-      path: inlineLogoPath,
-      cid: "cleanfav-logo",
-    },
-  ],
-});
+const html = buildDenialEmailHtml(user);
+await sendEmail(user.email, DENIAL_EMAIL_SUBJECT, html);
 }
 }
 
@@ -916,10 +1009,11 @@ error.statusCode = 400;
 throw error;
 }
 const wasApproved = user.status === "approved";
+  const previousStatus = String(user.status || "");
   const cleanNote = sanitizeNote(note);
   user.status = normalized;
-  if (normalized === "approved" && !user.approvedAt) {
-    user.approvedAt = new Date();
+  if (normalized === "approved") {
+    ensureApprovedUserAuthReady(user);
   }
   if (!wasApproved && normalized === "approved" && String(user.role || "").toLowerCase() === "paralegal") {
     user.preferences = {
@@ -947,6 +1041,50 @@ meta: { status: normalized, note: cleanNote },
 } catch (err) {
 console.warn("[admin] Failed to log audit event", err?.message || err);
 }
+
+await publishEventSafe({
+eventType: "user.approval.decided",
+eventFamily: "platform_user",
+idempotencyKey: `user:${user._id}:approval:${normalized}:${user.audit.length}`,
+correlationId: `user:${user._id}`,
+actor: {
+actorType: "admin",
+userId: req.user?.id || req.user?._id || null,
+role: req.user?.role || "admin",
+email: req.user?.email || "",
+label: req.user?.email || "Admin",
+},
+subject: {
+entityType: "user",
+entityId: String(user._id),
+},
+related: {
+userId: user._id,
+},
+source: {
+surface: "admin",
+route: `/api/admin/users/${user._id}/${normalized === "approved" ? "approve" : "deny"}`,
+service: "admin",
+producer: "route",
+},
+facts: {
+summary: `${user.email || "User"} was marked ${normalized}.`,
+reason: cleanNote,
+before: {
+status: previousStatus,
+},
+after: {
+status: normalized,
+email: user.email || "",
+role: user.role || "",
+approvedAt: user.approvedAt || null,
+},
+},
+signals: {
+confidence: "high",
+priority: "normal",
+},
+});
 
 await sendDecisionEmailSafe(user, normalized);
 return user;
@@ -2011,18 +2149,26 @@ if (!isEmail(nextEmail)) return res.status(400).json({ msg: "Invalid email addre
 if (isTypoEmailDomain(nextEmail)) {
   return res.status(400).json({ msg: "Email must not end with .con" });
 }
-if (nextEmail !== user.email) {
-  const exists = await User.countDocuments({ email: nextEmail, _id: { $ne: user._id } });
+if (nextEmail !== normalizeEmail(user.email) && nextEmail !== normalizeEmail(user.pendingEmail)) {
+  const exists = await User.countDocuments({
+    _id: { $ne: user._id },
+    $or: [{ email: nextEmail }, { pendingEmail: nextEmail }],
+  });
   if (exists) return res.status(409).json({ msg: "Email already in use" });
   const previousEmail = user.email || "";
-  user.email = nextEmail;
-  user.emailVerified = false;
+  user.pendingEmail = nextEmail;
+  user.pendingEmailRequestedAt = new Date();
   await user.save();
+  try {
+    await sendVerificationEmail({ user, email: user.pendingEmail });
+  } catch (err) {
+    console.warn("[admin] pending email verification send failed", err?.message || err);
+  }
   try {
     await AuditLog.logFromReq(req, "admin.user.email_changed", {
       targetType: "user",
       targetId: user._id,
-      meta: { from: previousEmail, to: nextEmail },
+      meta: { from: previousEmail, pendingTo: nextEmail },
     });
   } catch (err) {
     console.warn("[admin] Failed to log email change", err?.message || err);
@@ -2074,7 +2220,9 @@ if (userId && isObjId(userId)) {
   user = await User.findOne({ email: String(email).toLowerCase().trim() });
 }
 if (!user) return res.status(404).send("User not found.");
-const html = buildApprovalEmailHtml(user);
+const html = String(user?.role || "").toLowerCase() === "attorney"
+  ? buildAttorneyApprovalEmailHtml(user)
+  : buildApprovalEmailHtml(user);
 res.set("Content-Type", "text/html").send(html);
 }));
 
@@ -2095,33 +2243,7 @@ if (!ids.length) {
 const users = await User.find({ _id: { $in: ids } })
   .select("firstName lastName email role status profileImage avatarURL profilePhotoStatus")
   .lean();
-const inlineLogoPath = path.join(__dirname, "../../frontend/Cleanfav.png");
-const linkedinIconPath = path.join(__dirname, "../../frontend/assets/email/linkedin-icon.svg");
-const facebookIconPath = path.join(__dirname, "../../frontend/assets/email/facebook-icon.svg");
-const instagramIconPath = path.join(__dirname, "../../frontend/assets/email/instagram-icon.svg");
 const emailOpts = {
-  attachments: [
-    {
-      filename: "Cleanfav.png",
-      path: inlineLogoPath,
-      cid: "cleanfav-logo",
-    },
-    {
-      filename: "linkedin-icon.svg",
-      path: linkedinIconPath,
-      cid: "lpc-linkedin-icon",
-    },
-    {
-      filename: "facebook-icon.svg",
-      path: facebookIconPath,
-      cid: "lpc-facebook-icon",
-    },
-    {
-      filename: "instagram-icon.svg",
-      path: instagramIconPath,
-      cid: "lpc-instagram-icon",
-    },
-  ],
   throwOnError: true,
 };
 
@@ -2148,30 +2270,25 @@ for (const user of users) {
   let subject = "";
   let html = "";
   if (normalizedType === "acceptance") {
-    subject = APPROVAL_EMAIL_SUBJECT;
-    html = buildApprovalEmailHtml(user, { logoUrl: "cid:cleanfav-logo" });
+    if (String(user?.role || "").toLowerCase() === "attorney") {
+      subject = ATTORNEY_APPROVAL_EMAIL_SUBJECT;
+      html = buildAttorneyApprovalEmailHtml(user);
+    } else {
+      subject = APPROVAL_EMAIL_SUBJECT;
+      html = buildApprovalEmailHtml(user);
+    }
   } else if (normalizedType === "denial") {
     subject = DENIAL_EMAIL_SUBJECT;
-    html = buildDenialEmailHtml(user, { logoUrl: "cid:cleanfav-logo" });
+    html = buildDenialEmailHtml(user);
   } else if (normalizedType === "complete_profile") {
     subject = "Complete your profile on Let’s-ParaConnect";
-    html = buildCompleteProfileEmailHtml(user, { logoUrl: "cid:cleanfav-logo" });
+    html = buildCompleteProfileEmailHtml(user);
   } else if (normalizedType === "attorney_launch") {
     subject = ATTORNEY_LAUNCH_EMAIL_SUBJECT;
-    html = buildAttorneyLaunchEmailHtml(user, {
-      logoUrl: "cid:cleanfav-logo",
-      linkedinIconUrl: "cid:lpc-linkedin-icon",
-      facebookIconUrl: "cid:lpc-facebook-icon",
-      instagramIconUrl: "cid:lpc-instagram-icon",
-    });
+    html = buildAttorneyLaunchEmailHtml(user);
   } else if (normalizedType === "attorney_launch_setup") {
     subject = ATTORNEY_LAUNCH_EMAIL_SUBJECT;
-    html = buildAttorneyLaunchSetupEmailHtml(user, {
-      logoUrl: "cid:cleanfav-logo",
-      linkedinIconUrl: "cid:lpc-linkedin-icon",
-      facebookIconUrl: "cid:lpc-facebook-icon",
-      instagramIconUrl: "cid:lpc-instagram-icon",
-    });
+    html = buildAttorneyLaunchSetupEmailHtml(user);
   }
   try {
     await sendEmail(email, subject, html, emailOpts);

@@ -1441,26 +1441,47 @@
       margin-top: 2rem;
     }
 
+    .applied-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-left: auto;
+    }
+
     .applied-header h2 {
       font-family: var(--font-serif);
       font-size: 1.6rem;
       font-weight: 300;
     }
 
-    .applied-toggle-btn {
-      border: 1px solid var(--line);
+    .applied-filter-btn {
+      border: none;
       background: transparent;
       color: var(--ink);
       border-radius: 999px;
-      padding: 0.35rem 1rem;
-      font-size: 0.85rem;
+      width: 2.25rem;
+      height: 2.25rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
-      transition: border-color 0.2s ease, color 0.2s ease;
+      font-family: var(--font-sans);
+      font-weight: 200;
+      transition: color 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+      opacity: 0.72;
     }
 
-    .applied-toggle-btn:hover {
-      border-color: var(--accent);
+    .applied-filter-btn:hover,
+    .applied-filter-btn[aria-expanded="true"] {
       color: var(--accent);
+      background: rgba(182, 164, 122, 0.06);
+      opacity: 1;
+    }
+
+    .applied-filter-btn svg {
+      width: 1.15rem;
+      height: 1.15rem;
+      display: block;
     }
 
     .applied-pagination {
@@ -1502,7 +1523,19 @@
       flex-wrap: wrap;
       gap: 0.75rem;
       align-items: center;
+      margin: 0;
+    }
+
+    .applied-controls-panel {
       margin: 1rem 0 1.5rem;
+      padding: 1rem;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+    }
+
+    .applied-controls-panel[hidden] {
+      display: none;
     }
 
     .applied-controls input,
@@ -1511,7 +1544,9 @@
       border-radius: 8px;
       padding: 0.5rem 0.75rem;
       font-family: var(--font-sans);
+      font-weight: 200;
       font-size: 0.9rem;
+      line-height: 1.35;
       background: var(--panel);
       color: var(--ink);
     }
@@ -1522,9 +1557,9 @@
     }
 
     .applied-count {
-      margin-left: auto;
       font-size: 0.85rem;
       color: var(--muted);
+      white-space: nowrap;
     }
 
     .availability-hidden {
@@ -1549,6 +1584,12 @@
       .applied-header {
         flex-direction: column;
         align-items: flex-start;
+      }
+
+      .applied-toolbar {
+        width: 100%;
+        justify-content: space-between;
+        margin-left: 0;
       }
 
       .applied-controls {
@@ -2302,6 +2343,14 @@
       font-size: 0.95rem;
     }
 
+    .cases-page-header {
+      margin-bottom: 0;
+    }
+
+    .cases-page-header #browseJobsBtn {
+      margin-top: 2rem;
+    }
+
     .cases-actions {
       display: flex;
       justify-content: flex-end;
@@ -2412,15 +2461,22 @@
     .card-more-actions summary {
       list-style: none;
       cursor: pointer;
-      border: 1px solid var(--line);
+      border: none;
       border-radius: 999px;
-      background: #fff;
-      color: var(--muted);
-      font-size: 0.8rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      padding: 0.38rem 0.78rem;
+      background: transparent;
+      color: var(--ink);
+      width: 2.25rem;
+      height: 2.25rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-sans);
+      font-size: 0.82rem;
+      font-weight: 200;
+      letter-spacing: 0;
+      padding: 0;
+      opacity: 0.42;
+      transition: color 0.2s ease, background 0.2s ease, opacity 0.2s ease;
       user-select: none;
     }
 
@@ -2430,21 +2486,29 @@
 
     .card-more-actions[open] summary {
       color: var(--accent);
-      border-color: rgba(166, 142, 95, 0.4);
+      background: rgba(182, 164, 122, 0.04);
+      opacity: 0.88;
+    }
+
+    .card-more-actions summary:hover {
+      color: var(--accent);
+      background: rgba(182, 164, 122, 0.04);
+      opacity: 0.88;
     }
 
     .card-more-actions-menu {
       position: absolute;
       right: 0;
-      top: calc(100% + 8px);
-      min-width: 220px;
-      padding: 0.35rem;
-      border: 1px solid var(--line);
-      border-radius: 16px;
+      top: calc(100% + 2px);
+      width: max-content;
+      min-width: 0;
+      padding: 0.2rem;
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 12px;
       background: #fff;
-      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
       display: grid;
-      gap: 0.2rem;
+      gap: 0;
       z-index: 20;
     }
 
@@ -2455,11 +2519,13 @@
       border: none;
       background: transparent;
       text-align: left;
-      padding: 0.72rem 0.85rem;
-      border-radius: 12px;
-      font: inherit;
-      font-size: 0.9rem;
-      color: var(--ink);
+      white-space: nowrap;
+      padding: 0.46rem 0.62rem;
+      border-radius: 10px;
+      font-family: var(--font-sans);
+      font-size: 0.82rem;
+      font-weight: 200;
+      color: var(--muted);
     }
 
     .card-more-actions-menu button {
@@ -3166,7 +3232,7 @@
         <div class="welcome-notice-body">
           <div class="welcome-notice-title">Welcome to Let's-ParaConnect - we're excited to have you.</div>
           <p>We're currently onboarding qualified paralegals as we prepare the platform for attorneys.</p>
-          <p>Opportunities will begin appearing as attorney onboarding expands. In the meantime, feel free to complete your profile and upload credentials - we'll notify you as jobs become available.</p>
+          <p>Opportunities will begin appearing as attorney onboarding expands. In the meantime, feel free to complete your profile and upload credentials.</p>
         </div>
         <button class="welcome-notice-btn" id="dismissWelcomeNotice" type="button">Got it</button>
       </div>
@@ -3236,15 +3302,13 @@
     </div>
 
     <div id="paralegalCasesView" class="dashboard-view" hidden>
-      <header class="page-header">
+      <header class="page-header cases-page-header">
         <div>
           <h1>Cases and Applications</h1>
           <p>Track your applications and manage active cases.</p>
         </div>
-      </header>
-      <div class="cases-actions">
         <button type="button" class="completed-page-btn" id="browseJobsBtn">Browse cases</button>
-      </div>
+      </header>
       <div class="cases-hairline" aria-hidden="true"></div>
 
       <div class="cases-apps-grid">
@@ -3279,19 +3343,40 @@
               <h2>My Applications</h2>
               <div class="case-subinfo">Search and filter your recent applications.</div>
             </div>
+            <div class="applied-toolbar">
+              <span class="applied-count" id="appliedCount"></span>
+              <button
+                type="button"
+                class="applied-filter-btn"
+                id="appliedFilterToggle"
+                aria-expanded="false"
+                aria-controls="appliedControlsPanel"
+                aria-label="Show application filters"
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 7h14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                  <circle cx="9" cy="7" r="1.4" fill="currentColor"/>
+                  <path d="M5 12h14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                  <circle cx="15" cy="12" r="1.4" fill="currentColor"/>
+                  <path d="M5 17h14" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                  <circle cx="11" cy="17" r="1.4" fill="currentColor"/>
+                </svg>
+              </button>
+            </div>
           </div>
-          <div class="applied-controls">
-            <input type="search" id="appliedSearch" placeholder="Search by job title or practice area" />
-            <select id="appliedPracticeFilter">
-              <option value="all">All practice areas</option>
-            </select>
-            <select id="appliedDateFilter">
-              <option value="3">Last 3 days</option>
-              <option value="7">Last week</option>
-              <option value="30">Last month</option>
-              <option value="all">All time</option>
-            </select>
-            <span class="applied-count" id="appliedCount"></span>
+          <div class="applied-controls-panel" id="appliedControlsPanel" hidden>
+            <div class="applied-controls">
+              <input type="search" id="appliedSearch" placeholder="Search by job title or practice area" />
+              <select id="appliedPracticeFilter">
+                <option value="all">All practice areas</option>
+              </select>
+              <select id="appliedDateFilter">
+                <option value="3">Last 3 days</option>
+                <option value="7">Last week</option>
+                <option value="30">Last month</option>
+                <option value="all">All time</option>
+              </select>
+            </div>
           </div>
 
           <section class="case-list" id="appliedJobsList">
@@ -3570,7 +3655,7 @@
         if (blockStatus.blocked) {
           return `
             <details class="card-more-actions">
-              <summary>More</summary>
+              <summary aria-label="More actions">...</summary>
               <div class="card-more-actions-menu">
                 <span aria-disabled="true">Blocked - manage in Settings</span>
               </div>
@@ -3580,9 +3665,9 @@
         if (!blockStatus.canBlock) return "";
         return `
           <details class="card-more-actions">
-            <summary>More</summary>
+            <summary aria-label="More actions">...</summary>
             <div class="card-more-actions-menu">
-              <button type="button" data-block-future-interaction data-case-id="${escapeHTML(caseId)}">Block future interaction</button>
+              <button type="button" data-block-future-interaction data-case-id="${escapeHTML(caseId)}">Block attorney</button>
             </div>
           </details>
         `;
@@ -3748,12 +3833,12 @@
               <article class="file-card${highlightClass}" data-case-id="${escapeHTML(caseId)}">
                 <div class="file-line">
                   <span class="file-name">${escapeHTML(title)}</span>
+                  ${blockAction}
                 </div>
                 <div class="file-meta">${meta}</div>
                 <div class="file-actions">
                   ${disputeAction}
                   ${receiptAction}
-                  ${blockAction}
                 </div>
               </article>
           `;
@@ -4057,8 +4142,7 @@
               if (!res.ok) {
                 throw new Error(payload?.error || "Unable to block future interaction.");
               }
-              blockBtn.closest(".card-more-actions")?.removeAttribute("open");
-              notifyCase("Future interaction blocked. This user was not notified.", "success");
+              notifyCase("Attorney blocked from future interaction.", "success");
               await refreshCasesView({ preserveCompletedPage: true });
             } catch (error) {
               blockBtn.disabled = false;

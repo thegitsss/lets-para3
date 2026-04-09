@@ -3,6 +3,7 @@
 <head>
 
   <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/admin-ai-control-room.css" />
 <script>
   (function () {
     const root = document.documentElement;
@@ -93,15 +94,12 @@ body.is-loading .panel::after{
 content:"";
 position:absolute;
 inset:0;
-background:linear-gradient(90deg,#e9edf3 0%,#f5f7fb 50%,#e9edf3 100%);
-background-size:200% 100%;
-animation:skeletonShimmer 1.4s ease infinite;
+background:#eef2f7;
 border-radius:inherit;
 }
 body.is-loading .metric>*,
 body.is-loading .chart-card>*,
 body.is-loading .panel>*{visibility:hidden;}
-@keyframes skeletonShimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
 
 /* Sidebar */
 .sidebar{
@@ -130,7 +128,7 @@ font-weight:300;
 text-align:center;
 margin-bottom:36px;
 }
-nav{display:flex;flex-direction:column;gap:14px;}
+nav{display:flex;flex-direction:column;gap:8px;}
 nav a{
 text-decoration:none;
 color:var(--ink);
@@ -157,6 +155,16 @@ cursor:pointer;
   z-index:2;
 }
 .sidebar-link:hover,.sidebar-link:focus{background:rgba(0,0,0,0.04);outline:none;}
+.nav-section-label{
+display:block;
+margin:1rem 0 .35rem;
+padding:0 .95rem;
+font-size:.72rem;
+font-weight:500;
+letter-spacing:.08em;
+text-transform:uppercase;
+color:var(--muted);
+}
 .sidebar-footer{
 margin-top:auto;
 font-size:.7rem;
@@ -387,7 +395,7 @@ background:#fff;
 .metric.blue{background:#e2f3ff;} .metric.blue p{color:#4a90e2;}
 .metric.purple{background:#f1e8ff;} .metric.purple p{color:#9b59b6;}
 .metric.teal{background:#e2fff7;} .metric.teal p{color:#16a085;}
-.metric.violet{background:linear-gradient(135deg,#7e49ff,#b47cff);color:#fff;}
+.metric.violet{background:#8f69d8;color:#fff;}
 .metric.violet p{color:#fff;}
 .dashboard-grid{display:grid;grid-template-columns:2fr 1fr;gap:2rem;align-items:start;}
 .chart-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:1.5rem;}
@@ -420,11 +428,115 @@ background:#fff;
 .card.highlight h3,.card.highlight p{color:#fff;}
 .card.clickable{cursor:pointer;transition:transform .2s ease,box-shadow .2s ease;}
 .card.clickable:hover{transform:translateY(-2px);box-shadow:0 16px 30px rgba(15,23,42,0.12);}
-.card.clickable:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.card.clickable:focus-visible{outline:1px solid rgba(26,26,26,.16);outline-offset:2px;}
 .quick-stats {display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1rem;text-align:center;margin-bottom:2rem;}
 .quick-stats div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:.8rem;}
 .quick-stats strong{display:block;color:var(--accent);font-size:1.2rem;}
 .panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;}
+.approval-queue-header{
+align-items:flex-start;
+gap:1rem;
+flex-wrap:wrap;
+}
+.approval-queue-toolbar{
+display:flex;
+flex-wrap:wrap;
+align-items:center;
+justify-content:flex-end;
+gap:.45rem;
+margin:0;
+}
+.approval-queue-toggle{
+display:flex;
+align-items:center;
+gap:.45rem;
+font-size:.82rem;
+color:var(--ink);
+white-space:nowrap;
+}
+.approval-queue-toggle input{
+width:16px;
+height:16px;
+}
+.approval-queue-toolbar label{
+display:flex;
+align-items:center;
+gap:.35rem;
+font-size:.82rem;
+color:var(--muted);
+white-space:nowrap;
+}
+.approval-card-badges,.approval-detail-badges{
+display:flex;
+flex-wrap:wrap;
+gap:8px;
+align-items:center;
+}
+.approval-card-meta{
+margin-top:.35rem;
+}
+.approval-card-outcome{
+margin-top:.35rem;
+color:var(--muted);
+}
+.approval-queue-toolbar select{
+padding:.35rem .55rem;
+border:1px solid var(--line);
+border-radius:8px;
+background:#fff;
+font-family:var(--font-sans);
+font-size:.82rem;
+max-width:170px;
+}
+.approval-queue-toolbar .workspace-form-actions{
+display:flex;
+align-items:center;
+gap:.45rem;
+margin:0;
+}
+.admin-support-chat-host{
+position:fixed;
+top:18px;
+right:22px;
+z-index:2050;
+display:flex;
+align-items:center;
+justify-content:center;
+}
+.admin-support-chat-host .notification-icon{
+position:relative;
+display:flex;
+align-items:center;
+justify-content:center;
+width:46px;
+height:46px;
+border:0;
+border-radius:999px;
+background:rgba(255,255,255,.9);
+box-shadow:0 12px 30px rgba(15,23,42,.12);
+cursor:pointer;
+color:var(--ink);
+transition:transform .2s ease, box-shadow .2s ease, background .2s ease;
+}
+.admin-support-chat-host .notification-icon:hover,
+.admin-support-chat-host .notification-icon:focus-visible{
+transform:translateY(-1px);
+box-shadow:0 16px 34px rgba(15,23,42,.16);
+outline:none;
+}
+.admin-support-chat-host .notification-icon svg{
+width:20px;
+height:20px;
+}
+#section-approvals-workspace .workspace-grid--approvals-main{
+display:grid;
+grid-template-columns:minmax(320px,.92fr) minmax(0,1.08fr);
+gap:1.5rem;
+align-items:start;
+}
+#approvalWorkspaceStatus{
+margin:-.3rem 0 .75rem;
+}
 .view-all{font-size:.9rem;color:var(--accent);text-decoration:none;}
 .tickets{width:100%;border-collapse:collapse;}
 .tickets th,.tickets td{padding:.75rem;border-bottom:1px solid var(--line);}
@@ -498,6 +610,514 @@ font-weight:300;
 .muted{color:var(--muted);font-size:.9rem;}
 .search{width:260px;padding:.5rem .75rem;border:1px solid var(--line);border-radius:6px;}
 .grid-four{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:1.5rem;}
+#section-marketing-drafts .workspace-grid--marketing-top{grid-template-columns:minmax(0,1fr);}
+#section-marketing-drafts .founder-layer-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(320px,.9fr);gap:1.5rem;margin-bottom:1.5rem;}
+#section-marketing-drafts .founder-status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin:1rem 0 1.25rem;}
+#section-marketing-drafts .founder-ready-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;}
+#section-marketing-drafts .founder-action-grid{display:grid;gap:.85rem;}
+#section-marketing-drafts .founder-action-item,
+#section-marketing-drafts .founder-ready-card{
+border:1px solid var(--line);
+border-radius:10px;
+padding:1rem 1.1rem;
+background:rgba(255,255,255,0.88);
+}
+#section-marketing-drafts .founder-action-item p,
+#section-marketing-drafts .founder-ready-card p{margin-top:.45rem;}
+#section-marketing-drafts .founder-action-item .workspace-form-actions,
+#section-marketing-drafts .founder-ready-card .workspace-form-actions{margin-top:.8rem;}
+#section-marketing-drafts .founder-log-grid{display:grid;gap:1rem;}
+#section-marketing-drafts .founder-log-grid .ai-room-focus-block ul{margin-top:.5rem;}
+#section-ai-control-room{gap:1.35rem;}
+#section-ai-control-room.visible{display:grid;}
+#section-ai-control-room .ai-room-header{align-items:flex-start;margin-bottom:0;}
+#section-ai-control-room .ai-room-header p{margin-bottom:0;}
+#section-ai-control-room .ai-room-header-controls{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;justify-content:flex-end;}
+#section-ai-control-room .ai-room-header-badge,
+#section-ai-control-room .ai-room-header-stamp{background:rgba(255,255,255,.88);}
+#section-ai-control-room .ai-room-summary-strip{margin-bottom:0;}
+#section-ai-control-room .ai-room-section-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;}
+#section-ai-control-room .ai-room-section-heading h2{font-family:var(--font-serif);font-size:1.9rem;font-weight:300;line-height:1;margin:0;}
+#section-ai-control-room .ai-room-card-grid{
+grid-template-columns:repeat(3,minmax(0,1fr));
+align-items:stretch;
+grid-auto-rows:1fr;
+margin-bottom:0;
+}
+#section-ai-control-room .ai-room-card{
+grid-column:auto;
+min-height:286px;
+padding:1.05rem;
+border-radius:20px;
+box-shadow:0 12px 24px rgba(15,23,42,.05);
+transition:transform .2s ease, box-shadow .2s ease;
+}
+#section-ai-control-room .ai-room-card:hover{
+transform:translateY(-2px);
+box-shadow:0 18px 34px rgba(15,23,42,.08);
+}
+#section-ai-control-room .ai-room-card-top{margin-bottom:.8rem;}
+#section-ai-control-room .ai-room-card-role{display:grid;gap:.16rem;}
+#section-ai-control-room .ai-room-card-title{
+font-family:var(--font-serif);
+font-size:2rem;
+font-weight:300;
+line-height:.95;
+margin:0;
+}
+#section-ai-control-room .ai-room-card-department{
+font-size:.82rem;
+letter-spacing:.14em;
+text-transform:uppercase;
+color:rgba(26,26,26,.56);
+}
+#section-ai-control-room .ai-room-card-metrics{
+display:grid;
+grid-template-columns:repeat(2,minmax(0,1fr));
+gap:.7rem;
+margin-bottom:.8rem;
+}
+#section-ai-control-room .ai-room-card-metric{
+border:1px solid rgba(182,164,122,.26);
+border-radius:14px;
+padding:.82rem .85rem;
+background:rgba(255,255,255,.66);
+display:flex;
+flex-direction:column;
+justify-content:center;
+min-height:78px;
+}
+#section-ai-control-room .ai-room-card-metric-value{
+display:block;
+font-family:var(--font-serif);
+font-size:1.7rem;
+font-weight:300;
+line-height:1;
+margin-bottom:.22rem;
+}
+#section-ai-control-room .ai-room-card-metric-label{
+display:block;
+font-size:.76rem;
+letter-spacing:.08em;
+text-transform:uppercase;
+color:rgba(26,26,26,.58);
+}
+#section-ai-control-room .ai-room-card-footer{
+margin-top:auto;
+display:flex;
+align-items:center;
+justify-content:flex-end;
+gap:.75rem;
+padding-top:.8rem;
+}
+#section-ai-control-room .ai-room-card-action.btn.secondary{
+border-radius:999px;
+padding:.58rem .95rem;
+white-space:nowrap;
+}
+#section-ai-control-room .ai-room-card-action[disabled]{
+opacity:.52;
+cursor:not-allowed;
+}
+#section-ai-control-room .ai-room-card-state-strip{
+display:grid;
+grid-template-columns:repeat(3,minmax(0,1fr));
+gap:.55rem;
+margin-bottom:.8rem;
+}
+#section-ai-control-room .ai-room-card-state-pill{
+border:1px solid rgba(26,26,26,.08);
+border-radius:12px;
+padding:.48rem .58rem;
+background:rgba(255,255,255,.58);
+display:grid;
+gap:.12rem;
+font-size:.68rem;
+letter-spacing:.1em;
+text-transform:uppercase;
+color:rgba(26,26,26,.58);
+}
+#section-ai-control-room .ai-room-card-state-pill strong{
+font-family:var(--font-serif);
+font-size:1rem;
+font-weight:400;
+line-height:1;
+color:rgba(26,26,26,.86);
+}
+#section-ai-control-room .ai-room-card-decision{
+border:1px solid rgba(26,26,26,.08);
+border-radius:16px;
+padding:.82rem .85rem;
+background:rgba(255,255,255,.5);
+display:grid;
+gap:.38rem;
+margin-bottom:.65rem;
+}
+#section-ai-control-room .ai-room-card-decision.is-empty{
+background:rgba(255,255,255,.42);
+}
+#section-ai-control-room .ai-room-card-decision-label{
+font-size:.72rem;
+letter-spacing:.14em;
+text-transform:uppercase;
+color:rgba(26,26,26,.52);
+}
+#section-ai-control-room .ai-room-card-decision-title{
+margin:0;
+font-size:1rem;
+font-weight:500;
+line-height:1.3;
+}
+#section-ai-control-room .ai-room-card-decision-body{
+margin:0;
+font-size:.84rem;
+line-height:1.45;
+color:rgba(26,26,26,.68);
+}
+#section-ai-control-room .ai-room-card-actions-row{
+display:flex;
+align-items:center;
+gap:.5rem;
+flex-wrap:wrap;
+padding-top:.2rem;
+}
+#section-ai-control-room .ai-room-card--healthy-state{
+background:linear-gradient(180deg,rgba(237,250,244,.98),rgba(251,255,252,.98));
+border-color:rgba(36,130,91,.18);
+}
+#section-ai-control-room .ai-room-card--review-state{
+background:linear-gradient(180deg,rgba(255,247,232,.98),rgba(255,252,246,.98));
+border-color:rgba(181,134,45,.22);
+}
+#section-ai-control-room .ai-room-card--blocked-state{
+background:linear-gradient(180deg,rgba(255,239,236,.98),rgba(255,249,247,.98));
+border-color:rgba(191,80,45,.22);
+box-shadow:0 14px 28px rgba(185,77,32,.08);
+}
+#section-ai-control-room .ai-room-card--warning{
+background:linear-gradient(180deg,rgba(255,241,231,.99),rgba(255,250,245,.99));
+border-color:rgba(217,119,6,.26);
+box-shadow:0 16px 30px rgba(217,119,6,.1);
+}
+#section-ai-control-room .ai-room-card--neutral-state{
+background:linear-gradient(180deg,rgba(248,248,247,.98),rgba(255,255,255,.98));
+border-color:rgba(26,26,26,.08);
+}
+#section-ai-control-room .ai-room-card--healthy-state .ai-room-card-metric,
+#section-ai-control-room .ai-room-card--healthy-state .ai-room-card-state-pill,
+#section-ai-control-room .ai-room-card--healthy-state .ai-room-card-decision{
+background:rgba(255,255,255,.56);
+border-color:rgba(36,130,91,.14);
+}
+#section-ai-control-room .ai-room-card--review-state .ai-room-card-metric,
+#section-ai-control-room .ai-room-card--review-state .ai-room-card-state-pill,
+#section-ai-control-room .ai-room-card--review-state .ai-room-card-decision{
+background:rgba(255,255,255,.5);
+border-color:rgba(181,134,45,.15);
+}
+#section-ai-control-room .ai-room-card--blocked-state .ai-room-card-metric,
+#section-ai-control-room .ai-room-card--blocked-state .ai-room-card-state-pill,
+#section-ai-control-room .ai-room-card--blocked-state .ai-room-card-decision{
+background:rgba(255,255,255,.54);
+border-color:rgba(191,80,45,.14);
+}
+#section-ai-control-room .ai-room-card--warning .ai-room-card-metric,
+#section-ai-control-room .ai-room-card--warning .ai-room-card-state-pill,
+#section-ai-control-room .ai-room-card--warning .ai-room-card-decision{
+background:rgba(255,255,255,.54);
+border-color:rgba(217,119,6,.16);
+}
+#section-ai-control-room .ai-room-founder-columns{
+opacity:.7;
+}
+#section-ai-control-room .ai-room-founder-columns .ai-room-founder-section{
+gap:.65rem;
+}
+#section-ai-control-room .ai-room-founder-columns .ai-room-founder-feed-item{
+background:rgba(255,255,255,.04);
+border-color:rgba(255,255,255,.08);
+}
+#section-ai-control-room .ai-room-focus-panel{
+margin-bottom:.85rem;
+}
+#section-ai-control-room .ai-room-secondary-console{
+margin-top:0;
+padding:1rem 1.1rem 1.15rem;
+border-radius:20px;
+border:1px solid rgba(26,26,26,.08);
+background:rgba(248,249,251,.78);
+box-shadow:none;
+}
+#section-ai-control-room .ai-room-secondary-console[hidden]{
+display:none;
+}
+#section-ai-control-room .ai-room-secondary-console-summary{
+display:flex;
+align-items:center;
+justify-content:space-between;
+gap:1rem;
+cursor:pointer;
+list-style:none;
+}
+#section-ai-control-room .ai-room-secondary-console-summary::-webkit-details-marker{
+display:none;
+}
+#section-ai-control-room .ai-room-secondary-console-summary h2{
+margin:.2rem 0 0;
+font-family:var(--font-serif);
+font-size:1.35rem;
+font-weight:300;
+line-height:1;
+}
+#section-ai-control-room .ai-room-secondary-console-note{
+font-size:.78rem;
+letter-spacing:.12em;
+text-transform:uppercase;
+color:rgba(26,26,26,.48);
+}
+#section-ai-control-room #aiRoomFounderConsoleBody{
+margin-top:1rem;
+}
+#section-ai-control-room .ai-room-founder-intro-grid{
+display:grid;
+grid-template-columns:repeat(2,minmax(0,1fr));
+gap:1rem;
+}
+#section-ai-control-room .ai-room-founder-section{
+display:grid;
+gap:.9rem;
+}
+#section-ai-control-room .ai-room-founder-section--priority{
+margin:1rem 0;
+}
+#section-ai-control-room .ai-room-founder-section-top{
+display:flex;
+align-items:flex-end;
+justify-content:space-between;
+gap:1rem;
+}
+#section-ai-control-room .ai-room-founder-section-top h3{
+margin:0;
+color:rgba(26,26,26,.88);
+font-family:var(--font-serif);
+font-size:1.35rem;
+font-weight:300;
+}
+#section-ai-control-room .ai-room-founder-queue-progress{
+margin:.18rem 0 0;
+font-size:.86rem;
+line-height:1.4;
+color:rgba(26,26,26,.58);
+}
+#section-ai-control-room .ai-room-founder-columns{
+display:grid;
+grid-template-columns:repeat(3,minmax(0,1fr));
+gap:1rem;
+}
+#section-ai-control-room .ai-room-founder-decision-list,
+#section-ai-control-room .ai-room-founder-feed-list{
+display:grid;
+gap:.85rem;
+}
+#section-ai-control-room .ai-room-founder-decision-card,
+#section-ai-control-room .ai-room-founder-feed-item{
+border:1px solid rgba(26,26,26,.08);
+border-radius:18px;
+padding:.8rem .9rem;
+background:rgba(255,255,255,.78);
+display:grid;
+gap:.35rem;
+}
+#section-ai-control-room .ai-room-founder-decision-card{
+will-change:transform,opacity;
+}
+#section-ai-control-room .ai-room-founder-decision-top,
+#section-ai-control-room .ai-room-founder-feed-top{
+display:flex;
+align-items:flex-start;
+justify-content:flex-start;
+gap:.6rem;
+}
+#section-ai-control-room .ai-room-founder-decision-list{
+position:relative;
+}
+#section-ai-control-room .ai-room-founder-role{
+margin:0 0 .1rem;
+font-size:.72rem;
+letter-spacing:.14em;
+text-transform:uppercase;
+color:rgba(26,26,26,.5);
+}
+#section-ai-control-room .ai-room-founder-decision-card h3{
+margin:0;
+font-size:1.08rem;
+font-weight:500;
+line-height:1.3;
+color:rgba(26,26,26,.9);
+}
+#section-ai-control-room .ai-room-founder-decision-body,
+#section-ai-control-room .ai-room-founder-decision-preview,
+#section-ai-control-room .ai-room-founder-decision-action-preview,
+#section-ai-control-room .ai-room-founder-decision-meta,
+#section-ai-control-room .ai-room-founder-feed-item p,
+#section-ai-control-room .ai-room-founder-feed-meta{
+margin:0;
+font-size:.88rem;
+line-height:1.55;
+color:rgba(26,26,26,.72);
+}
+#section-ai-control-room .ai-room-founder-decision-preview,
+#section-ai-control-room .ai-room-founder-feed-meta{
+color:rgba(26,26,26,.56);
+}
+#section-ai-control-room .ai-room-founder-decision-action-preview{
+color:rgba(26,26,26,.82);
+}
+#section-ai-control-room .ai-room-founder-decision-actions,
+#section-ai-control-room .ai-room-founder-feed-actions{
+display:flex;
+flex-wrap:wrap;
+gap:.5rem;
+padding-top:.05rem;
+align-items:flex-start;
+}
+#section-ai-control-room .ai-room-founder-decision-body--compact{
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis;
+}
+#section-ai-control-room .ai-room-founder-decision-disclosure{
+margin:0;
+}
+#section-ai-control-room .ai-room-founder-decision-disclosure summary{
+list-style:none;
+}
+#section-ai-control-room .ai-room-founder-decision-disclosure summary::-webkit-details-marker{
+display:none;
+}
+#section-ai-control-room .ai-room-founder-decision-disclosure summary.btn{
+display:inline-flex;
+align-items:center;
+justify-content:center;
+cursor:pointer;
+}
+#section-ai-control-room .ai-room-founder-decision-disclosure[open] summary.btn{
+background:rgba(26,26,26,.05);
+border-color:rgba(26,26,26,.12);
+}
+#section-ai-control-room .ai-room-founder-decision-details{
+display:grid;
+gap:.4rem;
+padding-top:.45rem;
+}
+#section-ai-control-room .ai-room-founder-decision-detail-actions{
+display:flex;
+flex-wrap:wrap;
+gap:.45rem;
+}
+html.theme-dark #section-ai-control-room .ai-room-card,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card,
+body.theme-dark #section-ai-control-room .ai-room-card,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card{
+background:rgba(21,27,41,.98);
+border-color:rgba(255,255,255,.08);
+box-shadow:0 16px 30px rgba(0,0,0,.24);
+}
+html.theme-dark #section-ai-control-room .ai-room-card-department,
+html.theme-dark #section-ai-control-room .ai-room-card-desc,
+html.theme-dark #section-ai-control-room .ai-room-card-action-line,
+html.theme-dark #section-ai-control-room .ai-room-card-note,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-department,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-desc,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-action-line,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-note,
+body.theme-dark #section-ai-control-room .ai-room-card-department,
+body.theme-dark #section-ai-control-room .ai-room-card-desc,
+body.theme-dark #section-ai-control-room .ai-room-card-action-line,
+body.theme-dark #section-ai-control-room .ai-room-card-note,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-department,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-desc,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-action-line,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-note{
+color:rgba(244,246,251,.72);
+}
+html.theme-dark #section-ai-control-room .ai-room-card-metric,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-metric,
+body.theme-dark #section-ai-control-room .ai-room-card-metric,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-metric{
+background:rgba(247,240,226,.12);
+border-color:rgba(247,240,226,.18);
+}
+html.theme-dark #section-ai-control-room .ai-room-card-state-pill,
+html.theme-dark #section-ai-control-room .ai-room-card-state-pill strong,
+html.theme-dark #section-ai-control-room .ai-room-card-decision-label,
+html.theme-dark #section-ai-control-room .ai-room-card-decision-title,
+html.theme-dark #section-ai-control-room .ai-room-card-decision-body,
+html.theme-dark #section-ai-control-room .ai-room-card-decision-preview,
+html.theme-dark #section-ai-control-room .ai-room-card-decision-meta,
+html.theme-dark #section-ai-control-room .ai-room-card-detail-line,
+html.theme-dark #section-ai-control-room .ai-room-card-detail-line span,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-state-pill,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-state-pill strong,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-label,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-title,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-body,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-preview,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-meta,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-detail-line,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-detail-line span,
+body.theme-dark #section-ai-control-room .ai-room-card-state-pill,
+body.theme-dark #section-ai-control-room .ai-room-card-state-pill strong,
+body.theme-dark #section-ai-control-room .ai-room-card-decision-label,
+body.theme-dark #section-ai-control-room .ai-room-card-decision-title,
+body.theme-dark #section-ai-control-room .ai-room-card-decision-body,
+body.theme-dark #section-ai-control-room .ai-room-card-decision-preview,
+body.theme-dark #section-ai-control-room .ai-room-card-decision-meta,
+body.theme-dark #section-ai-control-room .ai-room-card-detail-line,
+body.theme-dark #section-ai-control-room .ai-room-card-detail-line span,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-state-pill,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-state-pill strong,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-label,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-title,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-body,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-preview,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-decision-meta,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-detail-line,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-detail-line span{
+color:rgba(244,246,251,.78);
+}
+html.theme-dark #section-ai-control-room .ai-room-card-state-pill,
+html.theme-dark #section-ai-control-room .ai-room-card-decision,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-state-pill,
+html.theme-mountain-dark #section-ai-control-room .ai-room-card-decision,
+body.theme-dark #section-ai-control-room .ai-room-card-state-pill,
+body.theme-dark #section-ai-control-room .ai-room-card-decision,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-state-pill,
+body.theme-mountain-dark #section-ai-control-room .ai-room-card-decision{
+background:rgba(247,240,226,.08);
+border-color:rgba(247,240,226,.16);
+}
+@media (max-width:1100px){
+#section-marketing-drafts .founder-layer-grid{grid-template-columns:minmax(0,1fr);}
+#section-ai-control-room .ai-room-card-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+#section-ai-control-room #aiRoomFounderConsoleBody .ai-room-focus-body{grid-template-columns:minmax(0,1fr);}
+#section-ai-control-room .ai-room-founder-columns,
+#section-ai-control-room .ai-room-founder-intro-grid{grid-template-columns:minmax(0,1fr);}
+#section-approvals-workspace .workspace-grid--approvals-main{grid-template-columns:minmax(0,1fr);}
+}
+@media (max-width:820px){
+#section-ai-control-room .ai-room-header{flex-direction:column;align-items:flex-start;}
+#section-ai-control-room .ai-room-header-controls{justify-content:flex-start;}
+#section-ai-control-room .ai-room-summary-strip,
+#section-ai-control-room .ai-room-card-grid{grid-template-columns:minmax(0,1fr);}
+#section-ai-control-room .ai-room-card-state-strip{grid-template-columns:minmax(0,1fr);}
+#section-ai-control-room .ai-room-card-footer{flex-direction:column;align-items:flex-start;}
+#section-ai-control-room .ai-room-card-note{max-width:none;}
+.admin-support-chat-host{
+top:72px;
+right:14px;
+}
+}
 .ledger-table{width:100%;border-collapse:collapse;}
 .ledger-table th,.ledger-table td{padding:.75rem;border-bottom:1px solid var(--line);text-align:left;}
 .receipts-header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
@@ -516,7 +1136,7 @@ font-weight:300;
 .dispute-actions .btn{white-space:nowrap;}
 .dispute-tabs{display:flex;flex-wrap:wrap;gap:8px;}
 .dispute-tabs .tab-btn{border:1px solid var(--line);background:#fff;color:var(--ink);padding:6px 12px;border-radius:999px;font-size:.85rem;cursor:pointer;transition:all .2s ease;}
-.dispute-tabs .tab-btn.active{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 1px rgba(166,142,95,.2);}
+.dispute-tabs .tab-btn.active{border-color:rgba(26,26,26,.16);color:var(--ink);box-shadow:none;}
 .dispute-notes{display:flex;flex-direction:column;gap:8px;}
 .dispute-notes textarea{width:100%;min-width:180px;min-height:70px;padding:8px;border:1px solid var(--line);border-radius:8px;font-family:var(--font-sans);font-size:.9rem;resize:vertical;}
 .dispute-row-toggle{border:none;background:transparent;color:var(--accent);cursor:pointer;font-size:.85rem;padding:0;text-decoration:underline;}
@@ -531,6 +1151,99 @@ font-weight:300;
 font-size:1.1rem;
 margin-bottom:.25rem;
 }
+#section-approvals-workspace #approvalItemList{
+overflow-y:auto;
+overscroll-behavior:contain;
+padding-right:.25rem;
+}
+#section-overview .overview-action-panel{
+margin:1.25rem 0 1.5rem;
+}
+#section-overview .overview-action-note{
+margin-top:.35rem;
+}
+#section-overview .overview-action-table-wrap{
+margin-top:1rem;
+overflow-x:auto;
+}
+#section-overview .overview-action-table{
+width:100%;
+border-collapse:collapse;
+}
+#section-overview .overview-action-table th,
+#section-overview .overview-action-table td{
+padding:.9rem .85rem;
+border-top:1px solid rgba(0,0,0,0.08);
+vertical-align:top;
+text-align:left;
+}
+#section-overview .overview-action-table th{
+font-size:.72rem;
+letter-spacing:.08em;
+text-transform:uppercase;
+color:var(--muted);
+font-weight:500;
+}
+#section-overview .overview-action-row{
+cursor:pointer;
+transition:background .2s ease;
+}
+#section-overview .overview-action-row:hover,
+#section-overview .overview-action-row:focus,
+#section-overview .overview-action-row:focus-within{
+background:rgba(0,0,0,0.03);
+}
+#section-overview .overview-action-priority{
+display:inline-flex;
+align-items:center;
+justify-content:center;
+min-width:64px;
+padding:.28rem .6rem;
+border-radius:999px;
+font-size:.74rem;
+font-weight:500;
+}
+#section-overview .overview-action-priority--now{
+background:rgba(166,86,40,0.14);
+color:#8d4c24;
+}
+#section-overview .overview-action-priority--next{
+background:rgba(182,164,122,0.2);
+color:#6e5d38;
+}
+#section-overview .overview-action-priority--clear{
+background:rgba(34,139,34,0.12);
+color:#2f6d2f;
+}
+#section-overview .overview-action-title{
+display:block;
+font-size:1rem;
+font-weight:500;
+color:var(--ink);
+}
+#section-overview .overview-action-meta{
+display:block;
+margin-top:.25rem;
+color:var(--muted);
+font-size:.88rem;
+}
+#section-overview .overview-action-reason{
+color:var(--ink);
+font-size:.92rem;
+}
+#section-overview .overview-action-empty{
+color:var(--muted);
+text-align:center;
+}
+#section-overview .overview-action-warning{
+background:rgba(166,86,40,0.1);
+color:#8d4c24;
+font-size:.92rem;
+}
+.overview-target-flash{
+box-shadow:0 0 0 3px rgba(182,164,122,0.28);
+transition:box-shadow .35s ease;
+}
 
 /* Panels */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:1.5rem;margin-bottom:2rem;}
@@ -541,7 +1254,7 @@ padding:1.25rem 1.5rem;
 background:#fff;
 transition:all .25s ease;
 }
-.panel:hover{border-color:var(--accent);}
+.panel:hover{border-color:rgba(26,26,26,.12);}
 .panel h2{
 font-family:var(--font-serif);
 font-weight:300;
@@ -571,7 +1284,7 @@ th{color:var(--muted);font-weight:200;}
 .btn.primary{background:var(--accent);color:#fff;}
 .btn.primary:hover{background:#a38e5f;}
 .btn.secondary{background:#fff;border:1px solid var(--line);color:var(--ink);}
-.btn.secondary:hover{border-color:var(--accent);color:var(--accent);}
+.btn.secondary:hover{border-color:rgba(26,26,26,.16);color:var(--ink);}
 .weather{display:flex;align-items:center;justify-content:space-between;}
 .weather h3{font-family:var(--font-serif);font-weight:300;}
 .toast{
@@ -626,6 +1339,26 @@ border:1px dashed var(--line);
 #pendingUserModal .details-content{max-width:900px;}
 #pendingUserModal .details-table td:first-child{width:200px;font-weight:300;}
 #pendingUserModal .details-table td:last-child{white-space:pre-line;}
+
+@media (max-width:900px){
+#section-overview .overview-action-table thead{
+display:none;
+}
+#section-overview .overview-action-table,
+#section-overview .overview-action-table tbody,
+#section-overview .overview-action-table tr,
+#section-overview .overview-action-table td{
+display:block;
+width:100%;
+}
+#section-overview .overview-action-table tr{
+border-top:1px solid rgba(0,0,0,0.08);
+}
+#section-overview .overview-action-table td{
+border-top:none;
+padding:.5rem .25rem;
+}
+}
 
 @media (max-width: 1024px){
 body{flex-direction:column;}
@@ -782,7 +1515,7 @@ left:14px;
 }
 nav{
 flex-direction:column;
-gap:12px;
+gap:8px;
 }
 nav a{
 width:100%;
@@ -804,11 +1537,16 @@ font-size:.95rem;
 <nav>
 <a href="#" class="active" data-section="overview">Overview</a>
 <a href="#" data-section="user-management">User Management</a>
-<a href="#" data-section="photo-reviews">Photo Reviews</a>
-<a href="#" data-section="escrow">Stripe</a>
-<a href="#" data-section="disputes">Disputes</a>
-<a href="#" data-section="revenue">Revenue</a>
-<a href="#" data-section="posts">Posts</a>
+<a href="#" data-section="ai-control-room">AI Control Room</a>
+<a href="#" data-section="engineering">Engineering</a>
+<a href="#" data-section="approvals-workspace">Approvals</a>
+<a href="#" data-section="knowledge-studio">Knowledge Studio</a>
+<a href="#" data-section="marketing-drafts">Marketing</a>
+<a href="#" data-section="support-ops">Support Ops</a>
+<a href="#" data-section="sales-workspace">Sales</a>
+<a href="#" data-section="finance">Finance</a>
+<a href="#" data-section="posts">Attorney Posts</a>
+<span class="nav-section-label">Utilities</span>
 <a href="#" data-section="activity-logs">Activity Logs</a>
 <a href="#" data-section="settings">Settings</a>
 </nav>
@@ -817,6 +1555,7 @@ font-size:.95rem;
 <div class="sidebar-footer">© Let’s-ParaConnect 2026</div>
 </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+  <div id="adminSupportChatHost" class="admin-support-chat-host" data-notification-center="true" aria-label="Open support chat"></div>
 
 <main id="main" tabindex="-1" class="main">
 
@@ -831,11 +1570,38 @@ font-size:.95rem;
   <span id="healthBannerText">System status: Checking…</span>
 </div>
 
+<div class="panel overview-action-panel">
+<div class="panel-header">
+<div>
+<h2>Start Here</h2>
+<p class="small overview-action-note">Work this list from top to bottom. Click any row to open the exact admin workspace you should handle next.</p>
+</div>
+</div>
+<div id="overviewActionStatus" class="small" style="margin-top:.35rem;color:var(--muted);">Loading overview actions…</div>
+<div class="overview-action-table-wrap">
+<table class="overview-action-table" aria-describedby="overviewActionStatus">
+<thead>
+<tr>
+<th scope="col">Priority</th>
+<th scope="col">What You Need To Do</th>
+<th scope="col">Why</th>
+<th scope="col">Open</th>
+</tr>
+</thead>
+<tbody id="overviewActionRows">
+<tr>
+<td colspan="4" class="overview-action-empty">Loading overview actions…</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
 <div class="metrics">
 <div class="metric"><h3>Total Users</h3><p id="totalUsers">0</p></div>
 <div class="metric"><h3>Funds in Stripe</h3><p id="escrowTotal">—</p></div>
 <div class="metric"><h3>Active Cases</h3><p id="activeCases">0</p></div>
-<div class="metric"><h3>Pending Approvals</h3><p id="pendingUsers">0</p></div>
+<div class="metric" id="pendingApprovalsMetric" role="button" tabindex="0" aria-label="Open pending user signup approvals"><h3>Pending Approvals</h3><p id="pendingUsers">0</p></div>
 </div>
 
 <div class="grid-four" style="margin-bottom:1.5rem;">
@@ -849,61 +1615,940 @@ font-size:.95rem;
 <p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="incomeTotal">—</p>
 <p class="small" id="incomeCount">0 income records</p>
 </div>
-<div class="card" id="disputeCard" role="button" tabindex="0" aria-label="Open disputes">
+<div class="card" id="disputeCard" role="button" tabindex="0" aria-label="Open finance">
 <h3>Disputes</h3>
 <p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="disputeCount">0</p>
 <p class="small">Open disputes</p>
 </div>
 </div>
 
-<div class="grid">
+<div class="grid-four">
+<div class="card clickable" data-overview-link="ai-control-room" role="button" tabindex="0">
+<h3>AI Control Room</h3>
+<p class="small">Top-level summary across the main admin areas.</p>
+</div>
+<div class="card clickable" data-overview-link="approvals-workspace" role="button" tabindex="0">
+<h3>Approvals</h3>
+<p class="small">Main place to approve or reject items that need a decision.</p>
+</div>
+<div class="card clickable" data-overview-link="finance" role="button" tabindex="0">
+<h3>Finance</h3>
+<p class="small">Payments, disputes, receipts, and reporting.</p>
+</div>
+<div class="card clickable" data-overview-link="posts" role="button" tabindex="0">
+<h3>Attorney Posts</h3>
+<p class="small">Marketplace moderation for attorney-created posts.</p>
+</div>
+</div>
+</section>
 
-<!-- Escrow -->
-<div class="panel" id="escrowPanel">
-<div class="panel-header">
-<h2 role="button" tabindex="0" aria-expanded="true" data-panel-toggle="escrowPanel">Payment Overview <span>▾</span></h2>
+<!-- AI CONTROL ROOM -->
+<section id="section-ai-control-room" class="section">
+<header class="ai-room-header">
+<div>
+<p class="ai-room-eyebrow">Admin Summary</p>
+<h1>AI Control Room</h1>
+<p>Live summary across marketing, engineering, finance, support, sales, and admissions.</p>
 </div>
-<div class="panel-content">
-<canvas id="escrowChart" height="90"></canvas>
-<table>
-<thead><tr><th>Case</th><th>Attorney</th><th>Paralegal</th><th>In Stripe</th><th>Status</th></tr></thead>
-<tbody id="escrowBody">
-<tr><td colspan="5" style="text-align:center;color:var(--muted)">No payment data yet</td></tr>
-</tbody>
-</table>
-<button class="btn secondary" onclick="pauseReportActivity(0)">Pause & Report Activity</button>
+<div class="ai-room-header-meta">
+<div class="ai-room-header-controls">
+<span id="aiRoomRefreshBadge" class="ai-room-header-badge">Live data</span>
+<span id="aiRoomTimestamp" class="ai-room-header-stamp">Not loaded yet</span>
+<button type="button" class="btn secondary" id="aiRoomRefreshButton">Refresh</button>
+</div>
+</div>
+</header>
+
+<div class="ai-room-summary-strip">
+<article class="ai-room-summary-tile ai-room-summary-tile--urgent" id="aiSummaryUrgent">
+<span class="ai-room-summary-label">Needs Your Decision</span>
+<strong class="ai-room-summary-value">0</strong>
+<p class="ai-room-summary-note">Admin decisions waiting across the live areas.</p>
+</article>
+<article class="ai-room-summary-tile" id="aiSummaryReview">
+<span class="ai-room-summary-label">Auto-Handled Today</span>
+<strong class="ai-room-summary-value">0</strong>
+<p class="ai-room-summary-note">Actions already handled automatically with audit visibility.</p>
+</article>
+<article class="ai-room-summary-tile" id="aiSummaryBlocked">
+<span class="ai-room-summary-label">Blocked Waiting on You</span>
+<strong class="ai-room-summary-value">0</strong>
+<p class="ai-room-summary-note">Work that cannot move forward until you make a decision.</p>
+</article>
+<article class="ai-room-summary-tile" id="aiSummaryRisk">
+<span class="ai-room-summary-label">High Risk</span>
+<strong class="ai-room-summary-value">0</strong>
+<p class="ai-room-summary-note">Open disputes, money-sensitive issues, and incident risk signals.</p>
+</article>
+<article class="ai-room-summary-tile ai-room-summary-tile--quiet" id="aiSummaryHealth">
+<span class="ai-room-summary-label">System Health</span>
+<strong class="ai-room-summary-value">Checking</strong>
+<p class="ai-room-summary-note">System health and control room freshness.</p>
+</article>
+</div>
+
+<div class="ai-room-section-heading">
+<div>
+<p class="ai-room-section-label">Executive Views</p>
+<h2>Live Lane Summary</h2>
 </div>
 </div>
 
-<!-- Revenue -->
-<div class="panel" id="revenuePanel">
-<h2 onclick="togglePanel('revenuePanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('revenuePanel');}" role="button" tabindex="0" aria-expanded="true">Revenue Reports <span>▾</span></h2>
-<div class="panel-content"><canvas id="revChart" height="90"></canvas></div>
+<div class="ai-room-card-grid" id="aiRoomCardGrid"></div>
+
+<div class="panel ai-room-focus-panel">
+<div class="panel-header ai-room-focus-header">
+<div>
+<p class="ai-room-section-label">Lane Detail</p>
+<h2 id="aiRoomFocusTitle">Selected Lane</h2>
+</div>
+<div class="ai-room-focus-meta">
+<span id="aiRoomFocusStatus" class="ai-room-badge ai-room-badge--active">Active</span>
+</div>
+</div>
+<div id="aiRoomFocusBody"></div>
 </div>
 
-<!-- Recent Posts -->
-<div class="panel" id="postsPanel">
-<h2 onclick="togglePanel('postsPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('postsPanel');}" role="button" tabindex="0" aria-expanded="true">Recent Job Posts <span>▾</span></h2>
-<div class="panel-content">
-<table>
-<thead><tr><th>Title</th><th>Posted By</th><th>Date</th></tr></thead>
-<tbody id="postsBody">
-<tr><td colspan="3" style="text-align:center;color:var(--muted)">No posts available</td></tr>
-</tbody>
-</table>
+</section>
+
+<section id="section-engineering" class="section">
+<header class="ai-room-header">
+<div>
+<p class="ai-room-eyebrow">Admin Engineering</p>
+<h1>Engineering</h1>
+<p>Review incidents, see diagnosis and execution plans, and decide the next manual step.</p>
 </div>
+<div class="ai-room-header-meta">
+<span id="engineeringRefreshBadge" class="ai-room-header-badge">Waiting for live data</span>
+<span id="engineeringTimestamp" class="ai-room-header-stamp">Not loaded yet</span>
+</div>
+</header>
+
+<div class="ai-room-summary-strip">
+<article class="ai-room-summary-tile" id="engineeringSummaryActive">
+<span class="ai-room-summary-label">Active</span>
+<strong class="ai-room-summary-value">0</strong>
+<p class="ai-room-summary-note">Open engineering items currently in view.</p>
+</article>
+<article class="ai-room-summary-tile ai-room-summary-tile--urgent" id="engineeringSummaryBlocked">
+<span class="ai-room-summary-label">Blocked</span>
+<strong class="ai-room-summary-value">0</strong>
+<p class="ai-room-summary-note">Items blocked by uncertainty, failed verification, or missing human intervention.</p>
+</article>
+<article class="ai-room-summary-tile" id="engineeringSummaryApproval">
+<span class="ai-room-summary-label">Awaiting Approval</span>
+<strong class="ai-room-summary-value">0</strong>
+<p class="ai-room-summary-note">Items waiting on an approval or release decision.</p>
+</article>
+<article class="ai-room-summary-tile ai-room-summary-tile--quiet" id="engineeringSummaryReady">
+<span class="ai-room-summary-label">Ready for Test</span>
+<strong class="ai-room-summary-value">0</strong>
+<p class="ai-room-summary-note">Items closest to validated resolution without implying deployment authority.</p>
+</article>
 </div>
 
-<!-- Audit Logs -->
-<div class="panel" id="logsPanel">
-<h2 onclick="togglePanel('logsPanel')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();togglePanel('logsPanel');}" role="button" tabindex="0" aria-expanded="true">Admin Activity / Audit Logs <span>▾</span></h2>
-<div class="panel-content">
-<ul id="logsList" style="list-style:none;padding:0;margin:0;">
-<li style="color:var(--muted)">No activity yet</li>
+<div class="workspace-grid workspace-grid--engineering-top">
+<div class="panel workspace-panel workspace-panel--form">
+<p class="workspace-step-label">Guardrails</p>
+<h2>Manual engineering review</h2>
+<p class="small" id="engineeringRecommendation">Engineering recommendations will appear here when the queue loads.</p>
+<div class="ai-room-focus-block" style="margin-top:1rem;">
+<h3>Operating posture</h3>
+<p id="engineeringGuardrailText">No auto-deploy. Engineering stays manual, even when a diagnosis or execution plan exists.</p>
+<ul>
+<li>Diagnosis summaries explain what likely happened.</li>
+<li>Execution plans outline implementation, testing, and review.</li>
+<li>Deployment and user-facing resolution still require human confirmation.</li>
 </ul>
 </div>
 </div>
 
+<div class="panel workspace-panel workspace-panel--detail">
+<p class="workspace-step-label">Quick Actions</p>
+<h2>Next useful actions</h2>
+<p class="small">Shortcuts based on the current engineering queue.</p>
+<div id="engineeringQuickActionList" class="ai-room-list">
+<div class="ai-room-empty">Quick actions will appear here when the engineering queue loads.</div>
+</div>
+</div>
+</div>
+
+<div class="workspace-grid workspace-grid--engineering-main">
+<div class="panel workspace-panel workspace-panel--queue">
+<p class="workspace-step-label">Issue List</p>
+<div class="panel-header">
+<div>
+<h2>Engineering Issues</h2>
+<p class="small" id="engineeringWorkspaceStatus">Engineering queue not loaded yet.</p>
+</div>
+</div>
+<div id="engineeringQueueList" class="ai-room-list">
+<div class="ai-room-empty">No engineering items are visible yet.</div>
+</div>
+</div>
+
+<div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
+<p class="workspace-step-label">Selected Item</p>
+<div id="engineeringDetail" class="ai-room-focus-blocks-left">
+<div class="ai-room-empty">Select an engineering item to inspect its incident, support, and CTO context.</div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="section-approvals-workspace" class="section">
+<header>
+<h1>Approvals Workspace</h1>
+<p>One place to review items that need approval across knowledge, marketing, support, and sales.</p>
+</header>
+
+<div class="grid-four" style="margin-bottom:1.5rem;">
+<div class="card">
+<h3>Total Items</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="approvalTotalCount">0</p>
+<p class="small">Visible review items</p>
+</div>
+<div class="card">
+<h3>Pending</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="approvalPendingCount">0</p>
+<p class="small">Waiting on your decision</p>
+</div>
+<div class="card">
+<h3>Knowledge + Marketing</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="approvalKnowledgeMarketingCount">0</p>
+<p class="small">Knowledge and marketing items</p>
+</div>
+<div class="card">
+<h3>Support + Sales</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="approvalSupportSalesCount">0</p>
+<p class="small">Support and sales items</p>
+</div>
+</div>
+
+<div class="workspace-grid workspace-grid--approvals-main">
+<div class="panel workspace-panel workspace-panel--queue">
+<div class="panel-header approval-queue-header">
+<div>
+<h2>Review Queue</h2>
+<p class="small" id="approvalQueueCountLabel">0 items need review</p>
+</div>
+<form id="approvalFilterForm" class="approval-queue-toolbar">
+<label>Pillar
+<select id="approvalFilterPillar">
+<option value="">All areas</option>
+<option value="knowledge">Knowledge</option>
+<option value="marketing">Marketing</option>
+<option value="support">Support</option>
+<option value="sales">Sales</option>
+</select>
+</label>
+<label>Type
+<select id="approvalFilterType">
+<option value="">All types</option>
+<option value="knowledge_revision">Knowledge revision</option>
+<option value="marketing_draft_packet">Marketing draft</option>
+<option value="faq_candidate">FAQ candidate</option>
+<option value="sales_draft_packet">Sales draft</option>
+</select>
+</label>
+<label>Status
+<select id="approvalFilterStatus">
+<option value="">All statuses</option>
+<option value="pending" selected>Pending</option>
+<option value="approved">Approved</option>
+<option value="rejected">Rejected</option>
+</select>
+</label>
+<label class="approval-queue-toggle" for="approvalHideTests">
+<input type="checkbox" id="approvalHideTests" checked />
+<span>Hide test items</span>
+</label>
+<div class="workspace-form-actions">
+<button class="btn secondary" type="submit" id="approvalRefreshBtn">Refresh</button>
+</div>
+</form>
+</div>
+<div id="approvalItemList" class="ai-room-list">
+<div class="ai-room-empty">No approval items loaded yet.</div>
+</div>
+</div>
+
+<div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
+<div class="panel-header">
+<div>
+<h2>Current Item</h2>
+</div>
+</div>
+<div id="approvalItemDetail" class="ai-room-focus-blocks-left">
+<div class="ai-room-empty">Select a review item to inspect its detail.</div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="section-knowledge-studio" class="section">
+<header>
+<h1>Knowledge Studio</h1>
+<p>Approved reference material for platform facts, messaging, admissions language, and common responses.</p>
+</header>
+
+<div class="grid-four" style="margin-bottom:1.5rem;">
+<div class="card">
+<h3>Sources</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="knowledgeSourceCount">0</p>
+<p class="small">Source files synced</p>
+</div>
+<div class="card">
+<h3>Collections</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="knowledgeCollectionCount">0</p>
+<p class="small">Knowledge groups</p>
+</div>
+<div class="card">
+<h3>Knowledge Items</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="knowledgeItemCount">0</p>
+<p class="small">Saved knowledge records</p>
+</div>
+<div class="card">
+<h3>Pending Review</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="knowledgePendingCount">0</p>
+<p class="small">Updates waiting on your decision</p>
+</div>
+</div>
+
+<div class="workspace-grid workspace-grid--knowledge-top">
+<div class="panel workspace-panel workspace-panel--queue">
+<div class="panel-header">
+<div>
+<h2>Source Registry</h2>
+<p class="small">Source material currently used by the admin tools.</p>
+</div>
+<button class="btn secondary" type="button" id="knowledgeSyncBtn">Sync Sources</button>
+</div>
+<div id="knowledgeSyncStatus" class="small" style="margin-bottom:1rem;color:var(--muted);">Not synced in this session.</div>
+<div id="knowledgeSourceList" class="ai-room-list">
+<div class="ai-room-empty">No knowledge sources loaded yet.</div>
+</div>
+</div>
+
+<div class="panel workspace-panel workspace-panel--queue">
+<div class="panel-header">
+<div>
+<h2>Approval Queue</h2>
+<p class="small">Knowledge updates waiting on your decision.</p>
+</div>
+</div>
+<div id="knowledgeApprovalList" class="ai-room-list">
+<div class="ai-room-empty">No knowledge approvals are pending.</div>
+</div>
+</div>
+</div>
+
+<div class="workspace-stack">
+<div class="panel workspace-panel workspace-panel--queue">
+<div class="panel-header">
+<div>
+<h2>Approved Knowledge</h2>
+<p class="small">Approved knowledge records and summaries.</p>
+</div>
+</div>
+<div id="knowledgeItemList" class="ai-room-list">
+<div class="ai-room-empty">No knowledge items loaded yet.</div>
+</div>
+</div>
+</div>
+
+<div class="workspace-stack">
+<div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
+<div class="panel-header">
+<div>
+<h2>Item Detail</h2>
+<p class="small">Open a knowledge record to review the current approved version and its sources.</p>
+</div>
+</div>
+<div id="knowledgeDetailPanel" class="knowledge-detail-panel">
+<div class="ai-room-empty">Select a knowledge record to review its current approved detail.</div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="section-marketing-drafts" class="section">
+<header>
+<h1>Marketing Draft Queue</h1>
+<p>Create post drafts, review them, and manage posting settings for LinkedIn and Facebook.</p>
+</header>
+
+<div class="workspace-grid founder-layer-grid">
+<div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
+<p class="workspace-step-label">Daily Summary</p>
+<div class="panel-header">
+<div>
+<h2>Daily Log</h2>
+<p class="small">What changed, what matters today, and what likely needs your attention next.</p>
+</div>
+<div class="workspace-form-actions">
+<button class="btn secondary" type="button" id="marketingFounderRefreshBtn">Refresh Daily Summary</button>
+</div>
+</div>
+<div class="founder-status-grid">
+<div class="card">
+<h3>Pending Review</h3>
+<p style="font-size:1.2rem;font-weight:300;color:var(--accent);" id="marketingFounderPendingReviewCount">0</p>
+<p class="small">Waiting on your decision</p>
+</div>
+<div class="card">
+<h3>Ready To Post</h3>
+<p style="font-size:1.2rem;font-weight:300;color:var(--accent);" id="marketingFounderReadyToPostCount">0</p>
+<p class="small">Manual posting only</p>
+</div>
+<div class="card">
+<h3>Blocked</h3>
+<p style="font-size:1.2rem;font-weight:300;color:var(--accent);" id="marketingFounderBlockedCount">0</p>
+<p class="small">Currently blocked</p>
+</div>
+<div class="card">
+<h3>Generated</h3>
+<p style="font-size:1rem;font-weight:300;color:var(--accent);" id="marketingFounderGeneratedAt">—</p>
+<p class="small">America/New_York</p>
+</div>
+</div>
+<div id="marketingFounderDailyLog" class="founder-log-grid">
+<div class="ai-room-empty">Daily summary not loaded yet.</div>
+</div>
+<div id="marketingFounderStatus" class="small" style="margin-top:1rem;color:var(--muted);">Daily summary not loaded yet.</div>
+</div>
+
+<div class="panel workspace-panel workspace-panel--detail">
+<p class="workspace-step-label">Quick Actions</p>
+<div class="panel-header">
+<div>
+<h2>Quick Actions</h2>
+<p class="small">The next useful actions, without opening the full list.</p>
+</div>
+</div>
+<div id="marketingFounderQuickActions" class="founder-action-grid">
+<div class="ai-room-empty">Quick actions will appear here when the daily summary loads.</div>
+</div>
+</div>
+</div>
+
+<div class="workspace-stack" style="margin-bottom:1.5rem;">
+<div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
+<p class="workspace-step-label">Today</p>
+<div class="panel-header">
+<div>
+<h2>Today’s Ready Posts</h2>
+<p class="small">Posts that are ready to review or ready to post today.</p>
+</div>
+<div class="workspace-form-actions">
+<button class="btn secondary" type="button" id="marketingFounderOpenQueueBtn">Open Full Marketing List</button>
+</div>
+</div>
+<div id="marketingFounderReadyPosts" class="founder-ready-grid">
+<div class="ai-room-empty">No review-ready post is available yet for today.</div>
+</div>
+</div>
+</div>
+
+<div class="grid-four" style="margin-bottom:1.5rem;">
+<div class="card">
+<h3>Briefs</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="marketingBriefCount">0</p>
+<p class="small">Saved brief drafts</p>
+</div>
+<div class="card">
+<h3>Drafts</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="marketingPacketCount">0</p>
+<p class="small">Generated drafts</p>
+</div>
+<div class="card">
+<h3>Pending Review</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="marketingPendingCount">0</p>
+<p class="small">Waiting on your decision</p>
+</div>
+<div class="card">
+<h3>Approved</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="marketingApprovedCount">0</p>
+<p class="small">Approved</p>
+</div>
+</div>
+
+<div class="workspace-grid workspace-grid--marketing-top" style="margin-bottom:1.5rem;">
+<div class="panel workspace-panel workspace-panel--form">
+<p class="workspace-step-label">1. Posting Settings</p>
+<div class="panel-header">
+<div>
+<h2>Posting Settings</h2>
+<p class="small">Set how often draft post batches are created and whether LinkedIn or Facebook are enabled.</p>
+</div>
+</div>
+<div class="grid-four" style="margin-bottom:1rem;">
+<div class="card">
+<h3>Cadence</h3>
+<p style="font-size:1.2rem;font-weight:300;color:var(--accent);" id="marketingPublishingCadence">Manual only</p>
+<p class="small" id="marketingPublishingEnabled">Disabled</p>
+</div>
+<div class="card">
+<h3>Next Due</h3>
+<p style="font-size:1.2rem;font-weight:300;color:var(--accent);" id="marketingPublishingNextDue">—</p>
+<p class="small">Next scheduled check</p>
+</div>
+<div class="card">
+<h3>Open Cycles</h3>
+<p style="font-size:1.2rem;font-weight:300;color:var(--accent);" id="marketingPublishingOpenCycles">0</p>
+<p class="small">Open batches</p>
+</div>
+<div class="card">
+<h3>Channel Readiness</h3>
+<p style="font-size:1.2rem;font-weight:300;color:var(--accent);" id="marketingPublishingReadiness">Not configured</p>
+<p class="small">Connection and posting status</p>
+</div>
+</div>
+<form id="marketingPublishingSettingsForm" class="pending-controls workspace-form-grid workspace-form-grid--roomy workspace-form-grid--lpc">
+<label>Cadence
+<select id="marketingPublishingCadenceMode" required>
+<option value="manual_only">Manual only</option>
+<option value="daily">Daily</option>
+<option value="every_2_days">Every 2 days</option>
+<option value="every_3_days">Every 3 days</option>
+</select>
+</label>
+<label>Timezone
+<input id="marketingPublishingTimezone" type="text" maxlength="120" placeholder="America/New_York" />
+</label>
+<label>Preferred Hour
+<input id="marketingPublishingPreferredHour" type="number" min="0" max="23" step="1" />
+</label>
+<label>Max Open Cycles
+<input id="marketingPublishingMaxOpenCycles" type="number" min="1" max="5" step="1" />
+</label>
+<label class="checkbox-inline"><input id="marketingPublishingIsEnabled" type="checkbox" /> Enable schedule</label>
+<label class="checkbox-inline"><input id="marketingPublishingLinkedIn" type="checkbox" /> LinkedIn company</label>
+<label class="checkbox-inline"><input id="marketingPublishingFacebook" type="checkbox" /> Facebook Page</label>
+<label style="grid-column:1 / -1;">Pause Reason
+<input id="marketingPublishingPauseReason" type="text" maxlength="500" placeholder="Optional reason to pause scheduled cycles" />
+</label>
+<div class="workspace-form-actions">
+<button class="btn secondary" type="button" id="marketingPublishingRefreshBtn">Refresh Publishing Loop</button>
+<button class="btn secondary" type="button" id="marketingPublishingRunScheduledBtn">Run Due Slot Check</button>
+<button class="btn secondary" type="button" id="marketingPublishingManualCycleBtn">Trigger Manual Cycle</button>
+<button class="btn" type="submit" id="marketingPublishingSaveBtn">Save Settings</button>
+</div>
+</form>
+<div class="ai-room-focus-block" style="margin-top:1rem;">
+<h3>LinkedIn Guidance</h3>
+<p class="small" id="marketingPublishingCadenceSummary" style="margin-top:0.5rem;color:var(--muted);">No LinkedIn guidance loaded yet.</p>
+<ul id="marketingPublishingCadenceRecommendations" style="margin-top:0.5rem;">
+<li>Refresh the publishing loop to inspect the current explanation, positioning, and momentum mix.</li>
+</ul>
+</div>
+<div class="ai-room-focus-block" style="margin-top:1rem;">
+<h3>LinkedIn Connection</h3>
+<p class="small">Connect the LinkedIn company account used for posting. The fields below are optional hints.</p>
+<form id="marketingLinkedInConnectionForm" class="pending-controls workspace-form-grid workspace-form-grid--roomy workspace-form-grid--lpc" style="margin-top:0.75rem;">
+<label>Organization Name Hint
+<input id="marketingLinkedInOrgName" type="text" maxlength="240" placeholder="Optional company/org name hint" />
+</label>
+<label>Organization ID Hint
+<input id="marketingLinkedInOrgId" type="text" maxlength="120" placeholder="Optional if discovery is ambiguous" />
+</label>
+<label style="grid-column:1 / -1;">Organization URN Hint
+<input id="marketingLinkedInOrgUrn" type="text" maxlength="240" placeholder="Optional if discovery is ambiguous" />
+</label>
+<label>API Version
+<input id="marketingLinkedInApiVersion" type="text" maxlength="40" placeholder="202503" />
+</label>
+<div class="workspace-form-actions">
+<button class="btn secondary" type="button" id="marketingLinkedInRefreshBtn">Refresh LinkedIn Status</button>
+<button class="btn secondary" type="button" id="marketingLinkedInValidateBtn">Check Connection</button>
+<button class="btn secondary" type="button" id="marketingLinkedInConnectBtn">Connect Account</button>
+<button class="btn" type="submit" id="marketingLinkedInSaveBtn">Save Details</button>
+</div>
+</form>
+<div class="small" id="marketingLinkedInValidationMeta" style="margin-top:0.5rem;color:var(--muted);">No LinkedIn validation has been recorded yet.</div>
+<div id="marketingLinkedInConnectionFacts" class="small" style="margin-top:0.5rem;color:var(--muted);">OAuth will populate LinkedIn organization identity, scope, and token timing after a real connection succeeds.</div>
+<div id="marketingLinkedInConnectionStatus" class="small" style="margin-top:0.75rem;color:var(--muted);">LinkedIn connection status not loaded yet.</div>
+</div>
+<div id="marketingPublishingStatus" class="small" style="margin-top:1rem;color:var(--muted);">Publishing loop settings not loaded yet.</div>
+</div>
+
+<div class="panel workspace-panel workspace-panel--queue">
+<p class="workspace-step-label">2. Post Batches</p>
+<div class="panel-header">
+<div>
+<h2>Post Batches</h2>
+<p class="small">Each batch groups the LinkedIn and Facebook drafts created for the same posting window.</p>
+</div>
+</div>
+<div id="marketingCycleList" class="ai-room-list">
+<div class="ai-room-empty">No publishing cycles loaded yet.</div>
+</div>
+</div>
+</div>
+
+<div class="workspace-stack" style="margin-bottom:1.5rem;">
+<div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
+<p class="workspace-step-label">3. Batch Detail</p>
+<div class="panel-header">
+<div>
+<h2>Batch Detail</h2>
+<p class="small">Review draft status, posting blockers, and channel setup for the selected batch.</p>
+</div>
+</div>
+<div id="marketingCycleDetail" class="ai-room-focus-blocks-left">
+<div class="ai-room-empty">Select a cycle after it is created.</div>
+</div>
+</div>
+</div>
+
+<div class="workspace-stack" style="margin-bottom:1.5rem;">
+<div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
+<p class="workspace-step-label">4. Research Notes</p>
+<div class="panel-header">
+<div>
+<h2>Marketing Research Notes</h2>
+<p class="small">Saved context, useful facts, and planning notes used to generate drafts.</p>
+</div>
+<div class="workspace-form-actions">
+<button class="btn secondary" type="button" id="marketingJrCmoRefreshBtn">Refresh Notes</button>
+</div>
+</div>
+<div id="marketingJrCmoLibrary" class="ai-room-focus-blocks-left">
+<div class="ai-room-empty">Jr. CMO library not loaded yet.</div>
+</div>
+<div id="marketingJrCmoStatus" class="small" style="margin-top:1rem;color:var(--muted);">Jr. CMO library not loaded yet.</div>
+</div>
+</div>
+
+<div class="workspace-grid workspace-grid--marketing-top" id="marketingFullQueueAnchor">
+<div class="panel workspace-panel workspace-panel--form">
+<p class="workspace-step-label">5. Create Brief</p>
+<div class="panel-header">
+<div>
+<h2>Create Brief</h2>
+<p class="small">Create a brief and generate a draft from it right away.</p>
+</div>
+</div>
+<form id="marketingBriefForm" class="pending-controls workspace-form-grid workspace-form-grid--roomy workspace-form-grid--lpc">
+<label>Workflow
+<select id="marketingWorkflowType" required>
+<option value="founder_linkedin_post">Founder LinkedIn Post</option>
+<option value="platform_update_announcement">Platform Update Post</option>
+</select>
+</label>
+<label>Target Audience
+<input id="marketingTargetAudience" type="text" maxlength="240" placeholder="e.g. founding attorneys, approved paralegals" />
+</label>
+<label style="grid-column:1 / -1;">Title
+<input id="marketingTitle" type="text" maxlength="240" required placeholder="Short internal title" />
+</label>
+<label style="grid-column:1 / -1;">Objective
+<input id="marketingObjective" type="text" maxlength="1000" placeholder="What this draft should accomplish" />
+</label>
+<label style="grid-column:1 / -1;">Brief Summary
+<textarea id="marketingBriefSummary" rows="4" maxlength="8000" placeholder="What you want to say and why"></textarea>
+</label>
+<label style="grid-column:1 / -1;">Update Facts
+<textarea id="marketingUpdateFacts" rows="4" maxlength="4000" placeholder="One fact per line"></textarea>
+</label>
+<label style="grid-column:1 / -1;">CTA Preference
+<input id="marketingCtaPreference" type="text" maxlength="500" placeholder="Optional CTA preference" />
+</label>
+<div class="workspace-form-actions">
+<button class="btn secondary" type="button" id="marketingRefreshBtn">Refresh Queue</button>
+<button class="btn" type="submit" id="marketingGenerateBtn">Create Brief + Draft</button>
+</div>
+</form>
+<div id="marketingFormStatus" class="small" style="margin-top:1rem;color:var(--muted);">No draft created yet.</div>
+</div>
+
+<div class="panel workspace-panel workspace-panel--queue">
+<p class="workspace-step-label">6. Draft List</p>
+<div class="panel-header">
+<div>
+<h2>Draft Queue</h2>
+<p class="small">Most recent draft posts.</p>
+</div>
+</div>
+<div id="marketingPacketList" class="ai-room-list">
+<div class="ai-room-empty">No marketing drafts loaded yet.</div>
+</div>
+</div>
+</div>
+
+<div class="workspace-stack">
+<div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
+<p class="workspace-step-label">7. Draft Detail</p>
+<div class="panel-header">
+<div>
+<h2>Draft Detail</h2>
+<p class="small">See the draft text, supporting notes, and posting status for the selected item.</p>
+</div>
+</div>
+<div id="marketingPacketDetail" class="ai-room-focus-blocks-left">
+<div class="ai-room-empty">Select a packet after it is generated.</div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="section-support-ops" class="section">
+<header>
+<h1>Support Ops</h1>
+<p>Review support tickets, understand the context, and reply to users.</p>
+</header>
+
+<div class="grid-four" style="margin-bottom:1.5rem;">
+<div class="card">
+<h3>Open Tickets</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="supportOpenCount">0</p>
+<p class="small">Active support work items</p>
+</div>
+<div class="card">
+<h3>Blockers</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="supportBlockerCount">0</p>
+<p class="small">High-priority support items</p>
+</div>
+<div class="card">
+<h3>Waiting on User</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="supportWaitingCount">0</p>
+<p class="small">Team replied and waiting</p>
+</div>
+<div class="card">
+<h3>Resolved</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="supportResolvedCount">0</p>
+<p class="small">Closed out recently</p>
+</div>
+</div>
+
+<div class="workspace-grid workspace-grid--support-top">
+<div class="panel workspace-panel workspace-panel--queue">
+<div class="panel-header">
+<div>
+<h2>Support Ticket Queue</h2>
+<p class="small">Support conversations with user context and message history.</p>
+</div>
+<button class="btn secondary" type="button" id="supportRefreshBtn">Refresh Queue</button>
+</div>
+<div class="support-ops-filter-bar">
+<div class="support-filter-pills">
+<button class="support-filter-pill is-active" type="button" data-support-filter-status="open" aria-pressed="true">Open</button>
+<button class="support-filter-pill" type="button" data-support-filter-status="in_review" aria-pressed="false">In Review</button>
+<button class="support-filter-pill" type="button" data-support-filter-status="waiting_on_user" aria-pressed="false">Waiting on User</button>
+<button class="support-filter-pill" type="button" data-support-filter-status="resolved" aria-pressed="false">Resolved</button>
+<button class="support-filter-pill" type="button" data-support-filter-status="all" aria-pressed="false">All</button>
+</div>
+<div class="support-ops-filter-controls">
+<label class="support-filter-select">Urgency
+<select id="supportUrgencyFilter">
+<option value="all">All</option>
+<option value="high">High</option>
+<option value="medium">Medium</option>
+<option value="low">Low</option>
+</select>
+</label>
+<label class="support-filter-select">Role
+<select id="supportRoleFilter">
+<option value="all">All</option>
+<option value="attorney">Attorney</option>
+<option value="paralegal">Paralegal</option>
+<option value="admin">Admin</option>
+</select>
+</label>
+<label class="support-filter-select">Window
+<select id="supportDateFilter">
+<option value="all">All time</option>
+<option value="7">Last 7 days</option>
+<option value="30">Last 30 days</option>
+</select>
+</label>
+<label class="support-filter-select">Sort
+<select id="supportSortFilter">
+<option value="newest">Newest first</option>
+<option value="updated">Recently updated</option>
+<option value="oldest">Oldest first</option>
+</select>
+</label>
+</div>
+</div>
+<div id="supportOpsStatus" class="small support-ops-status-line" style="margin-bottom:1rem;color:var(--muted);">Support queue not loaded yet.</div>
+<div id="supportTicketList" class="ai-room-list">
+<div class="ai-room-empty">No support tickets loaded yet.</div>
+</div>
+</div>
+</div>
+
+<div class="workspace-stack">
+<div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
+<div class="panel-header">
+<div>
+<h2>Ticket Detail</h2>
+<p class="small">Review the issue, see the context, add notes, and reply to the user.</p>
+</div>
+</div>
+<div id="supportTicketDetail" class="ai-room-focus-blocks-left">
+<div class="ai-room-empty">Select a support ticket to inspect the conversation and respond.</div>
+</div>
+</div>
+</div>
+
+<div class="workspace-grid workspace-grid--support-bottom">
+<div class="panel workspace-panel workspace-panel--queue">
+<div class="panel-header">
+<div>
+<h2>FAQ Candidate Review</h2>
+<p class="small">Suggested help answers based on repeated resolved issues.</p>
+</div>
+<button class="btn secondary" type="button" id="supportGenerateFaqBtn">Generate FAQ Candidates</button>
+</div>
+<div id="supportFaqCandidateList" class="ai-room-list">
+<div class="ai-room-empty">No FAQ candidates are pending review.</div>
+</div>
+</div>
+
+<div class="panel workspace-panel workspace-panel--queue">
+<div class="panel-header">
+<div>
+<h2>Support Insights</h2>
+<p class="small">Repeated friction or confusion themes surfaced from ticket patterns.</p>
+</div>
+<button class="btn secondary" type="button" id="supportRefreshInsightsBtn">Refresh Insights</button>
+</div>
+<div id="supportInsightList" class="ai-room-list">
+<div class="ai-room-empty">No support insights are visible yet.</div>
+</div>
+</div>
+</div>
+</section>
+
+<section id="section-sales-workspace" class="section">
+<header>
+<h1>Sales Workspace</h1>
+<p>Create sales notes and message drafts, review account history, and approve outgoing content.</p>
+</header>
+
+<div class="grid-four" style="margin-bottom:1.5rem;">
+<div class="card">
+<h3>Accounts</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="salesAccountCount">0</p>
+<p class="small">Active account records</p>
+</div>
+<div class="card">
+<h3>Interactions</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="salesInteractionCount">0</p>
+<p class="small">Recorded signals and notes</p>
+</div>
+<div class="card">
+<h3>Draft Packets</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="salesPacketCount">0</p>
+<p class="small">Saved drafts</p>
+</div>
+<div class="card">
+<h3>Pending Review</h3>
+<p style="font-size:1.6rem;font-weight:300;color:var(--accent);" id="salesPendingCount">0</p>
+<p class="small">Waiting on your decision</p>
+</div>
+</div>
+
+<div class="workspace-grid workspace-grid--sales-top">
+<div class="panel workspace-panel workspace-panel--form">
+<p class="workspace-step-label">1. Create or import account</p>
+<div class="panel-header">
+<div>
+<h2>Create Account</h2>
+<p class="small">Create a sales record or import public contact signals without sending anything.</p>
+</div>
+<button class="btn secondary" type="button" id="salesImportSignalsBtn">Import Public Contact Signals</button>
+</div>
+<form id="salesAccountForm" class="pending-controls workspace-form-grid workspace-form-grid--roomy">
+<label>Name
+<input id="salesAccountName" type="text" maxlength="240" placeholder="Account or contact name" required />
+</label>
+<label>Primary Email
+<input id="salesPrimaryEmail" type="email" maxlength="320" placeholder="Optional email" />
+</label>
+<label>Audience Type
+<select id="salesAudienceType">
+<option value="general">General</option>
+<option value="attorney">Attorney</option>
+<option value="paralegal">Paralegal</option>
+<option value="firm">Firm</option>
+</select>
+</label>
+<label>Role / Label
+<input id="salesRoleLabel" type="text" maxlength="120" placeholder="e.g. managing attorney" />
+</label>
+<label style="grid-column:1 / -1;">Company / Firm
+<input id="salesCompanyName" type="text" maxlength="240" placeholder="Optional firm or company" />
+</label>
+<label style="grid-column:1 / -1;">Account Summary
+<textarea id="salesAccountSummary" rows="4" maxlength="4000" placeholder="Internal summary only. Keep it factual and restrained."></textarea>
+</label>
+<div class="workspace-form-actions">
+<button class="btn secondary" type="button" id="salesRefreshBtn">Refresh Sales</button>
+<button class="btn" type="submit" id="salesCreateAccountBtn">Create Account</button>
+</div>
+</form>
+<div id="salesFormStatus" class="small" style="margin-top:1rem;color:var(--muted);">No sales action run in this session.</div>
+</div>
+
+<div class="panel workspace-panel workspace-panel--queue">
+<p class="workspace-step-label">2. Review accounts and snapshots</p>
+<div class="panel-header">
+<div>
+<h2>Account Snapshot List</h2>
+<p class="small">Saved accounts with notes and available draft actions.</p>
+</div>
+</div>
+<div id="salesAccountList" class="ai-room-list">
+<div class="ai-room-empty">No sales accounts loaded yet.</div>
+</div>
+</div>
+</div>
+
+<div class="workspace-stack">
+<div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
+<p class="workspace-step-label">3. Inspect account detail</p>
+<div class="panel-header">
+<div>
+<h2>Account Detail</h2>
+<p class="small">Review notes, add interactions, and create drafts.</p>
+</div>
+</div>
+<div id="salesAccountDetail" class="ai-room-focus-blocks-left">
+<div class="ai-room-empty">Select a sales account to inspect its record.</div>
+</div>
+</div>
+</div>
+
+<div class="workspace-stack">
+<div class="panel workspace-panel workspace-panel--queue">
+<p class="workspace-step-label">4. Review outreach queue</p>
+<div class="panel-header">
+<div>
+<h2>Outreach Draft Queue</h2>
+<p class="small">Drafts waiting to be reviewed before they are used.</p>
+</div>
+</div>
+<div id="salesPacketList" class="ai-room-list">
+<div class="ai-room-empty">No sales draft packets loaded yet.</div>
+</div>
+</div>
+</div>
+
+<div class="workspace-stack">
+<div class="panel workspace-panel workspace-panel--detail workspace-panel--detail-wide">
+<p class="workspace-step-label">Packet detail</p>
+<div class="panel-header">
+<div>
+<h2>Packet Detail</h2>
+<p class="small">Review the draft, open questions, watchouts, and next recommended step.</p>
+</div>
+</div>
+<div id="salesPacketDetail" class="ai-room-focus-blocks-left">
+<div class="ai-room-empty">Select a sales packet to inspect its detail.</div>
+</div>
+</div>
 </div>
 </section>
 
@@ -913,7 +2558,7 @@ font-size:.95rem;
 <div class="header-top">
 <h1>User Management</h1>
 </div>
-<p>Analyze user registrations, activity, and sales performance over time.</p>
+<p>Admissions, approved-user maintenance, photo review, and targeted admin outreach.</p>
 </header>
 
 <div class="user-approvals-grid">
@@ -1099,11 +2744,12 @@ font-size:.95rem;
 </div>
 </section>
 
-<!-- PHOTO REVIEWS -->
+<!-- PHOTO REVIEWS (shown with User Management) -->
 <section id="section-photo-reviews" class="section">
 <header>
-<h1>Profile Photo Reviews</h1>
-<p>Approve or reject paralegal headshots to keep the marketplace polished.</p>
+<p class="workspace-step-label">Admissions detail</p>
+<h2>Profile Photo Reviews</h2>
+<p>Approve or reject profile photos without leaving the broader user-ops workflow.</p>
 </header>
 
 <div class="panel" id="photoReviewsPanel">
@@ -1141,36 +2787,20 @@ font-size:.95rem;
 </div>
 </section>
 
-<!-- ESCROW -->
+<!-- FINANCE: PAYMENTS OPS -->
 <section id="section-escrow" class="section">
 <header>
-<h1>Funds Dashboard</h1>
-<p>Monitor all Stripe activities — deposits, withdrawals, charges, and tickets.</p>
+<h1>Finance</h1>
+<p>Payments operations, disputes, receipts, and accounting in one place.</p>
 </header>
 
 <!-- Top Chart Row -->
-<div class="grid-two escrow-chart-row">
+<div class="grid-two escrow-chart-row" style="margin-bottom:2rem;">
 <div class="panel">
 <h2>Monthly Funds Report</h2>
 <canvas id="escrowReportChart" height="90"></canvas>
 </div>
 
-<div class="panel">
-<h2>Daily Logins (Last 10 Days)</h2>
-<canvas id="dailyLoginChart" height="90"></canvas>
-</div>
-</div>
-
-<!-- Quick Stats -->
-<div class="quick-stats">
-<div><strong>3</strong><span>Active Users</span></div>
-<div><strong>0</strong><span>Email Unverified</span></div>
-<div><strong>1</strong><span>Pending Withdrawals</span></div>
-<div><strong>1</strong><span>Pending Deposits</span></div>
-<div><strong>0</strong><span>Rejected Deposits</span></div>
-</div>
-
-<div class="grid-two escrow-action-row">
 <div class="panel">
 <h2>Reconcile Case Payment</h2>
 <p class="small">Force-sync Stripe payment status for a case.</p>
@@ -1179,78 +2809,15 @@ font-size:.95rem;
 <button class="btn primary" type="button" id="reconcileCaseBtn">Reconcile</button>
 <p class="small" id="reconcileStatus"></p>
 </div>
-
-<!-- Tickets -->
-<div class="panel">
-<h2>Recent Tickets</h2>
-<p class="small">Funds support requests and dispute tickets.</p>
-<button class="btn secondary" type="button" id="recentTicketsBtn">View Recent Tickets</button>
-</div>
-</div>
-
-<!-- Hidden Detail Modal -->
-<div id="recentTicketsModal" class="details-modal hidden" role="dialog" aria-modal="true" aria-labelledby="recentTicketsTitle">
-<div class="details-content">
-<div class="details-header">
-<h2 id="recentTicketsTitle">Recent Tickets</h2>
-<button class="btn secondary" data-recent-tickets-close>Close ✕</button>
-</div>
-<table class="tickets">
-<thead>
-<tr><th>Subject</th><th>Status</th></tr>
-</thead>
-<tbody>
-<tr><td>Ticket#125950 - dfsaf</td><td><span class="status open">Open</span></td></tr>
-<tr><td>Ticket#754912 - dfsaf</td><td><span class="status open">Open</span></td></tr>
-<tr><td>Ticket#94883578 - fsdfsd</td><td><span class="status open">Open</span></td></tr>
-<tr><td>Ticket#40031718 - In molestiae delenit</td><td><span class="status open">Open</span></td></tr>
-<tr><td>Ticket#70632904 - dfg</td><td><span class="status open">Open</span></td></tr>
-</tbody>
-</table>
-</div>
-</div>
-
-<!-- Hidden Detail Modal -->
-<div id="escrowDetails" class="details-modal hidden">
-<div class="details-content">
-<div class="details-header">
-<h2>Payment Details</h2>
-<button class="btn secondary" data-escrow-close>Close ✕</button>
-</div>
-<div class="breadcrumb">
-<a href="#" onclick="closeEscrowDetails()">🏠 Home</a> → Funds Details
-</div>
-
-<div class="detail-panel">
-<h3>Web Application</h3>
-<button class="btn primary" style="float:right;">See Milestones →</button>
-<table class="details-table">
-<tr><td><strong>Payment ID</strong></td><td>CBS50QN7F8JEM</td></tr>
-<tr><td><strong>Title</strong></td><td>Website Development</td></tr>
-<tr><td><strong>Attorney</strong></td><td>John Doe</td></tr>
-<tr><td><strong>Paralegal</strong></td><td>Jane Smith</td></tr>
-<tr><td><strong>Attorney Email</strong></td><td>attorney@email.com</td></tr>
-<tr><td><strong>Charge Payer</strong></td><td><span class="highlight-text">Buyer(50%) - Seller(50%)</span></td></tr>
-<tr><td><strong>Status</strong></td><td>Active</td></tr>
-<tr><td><strong>Amount</strong></td><td>—</td></tr>
-<tr><td><strong>Charge</strong></td><td>—</td></tr>
-<tr><td><strong>Created Milestone</strong></td><td>—</td></tr>
-<tr><td><strong>Milestone Funded</strong></td><td>—</td></tr>
-<tr><td><strong>Milestone Unfunded</strong></td><td>—</td></tr>
-<tr><td><strong>Rest Amount</strong></td><td>—</td></tr>
-<tr><td><strong>Disputed By</strong></td><td>test12</td></tr>
-<tr><td><strong>Dispute Reason</strong></td><td>Delayed delivery</td></tr>
-</table>
-</div>
-</div>
 </div>
 </section>
 
-<!-- DISPUTES -->
+<!-- FINANCE: DISPUTES -->
 <section id="section-disputes" class="section">
 <header>
-<h1>Disputes</h1>
-<p>Review disputed cases and resolve payouts or refunds.</p>
+<p class="workspace-step-label">Money risk</p>
+<h2>Disputes</h2>
+<p>Review disputed cases and resolve refunds or payouts from the same finance workspace.</p>
 </header>
 
 <div class="panel">
@@ -1291,11 +2858,12 @@ font-size:.95rem;
 </div>
 </section>
 
-<!-- REVENUE -->
+<!-- FINANCE: ACCOUNTING -->
 <section id="section-revenue" class="section">
 <header>
-<h1>Revenue & Accounting</h1>
-<p>Monitor revenue flow, platform fees, and tax summaries — everything you need for stress-free bookkeeping.</p>
+<p class="workspace-step-label">Accounting</p>
+<h2>Revenue & Accounting</h2>
+<p>Reporting, ledger detail, receipts, tax estimates, and payout scheduling.</p>
 </header>
 
 <!-- Overview Row -->
@@ -1381,13 +2949,13 @@ font-size:.95rem;
 <!-- POSTS -->
 <section id="section-posts" class="section">
 <header>
-<h1>Manage Job Posts</h1>
-<p>Oversee attorney job listings. Edit or remove posts that don’t meet Let’s-ParaConnect standards.</p>
+<h1>Attorney Posts</h1>
+<p>Moderate attorney-created marketplace posts. Review, request edits, archive, suspend, or remove them.</p>
 </header>
 
 <!-- Analytics Summary -->
 <div class="grid-four">
-<div class="card"><h3>Total Posts</h3><p>1,248</p></div>
+<div class="card"><h3>Total Attorney Posts</h3><p>1,248</p></div>
 <div class="card highlight"><h3>Active</h3><p>—</p></div>
 <div class="card"><h3>Archived</h3><p>—</p></div>
 <div class="card clickable" data-posts-flagged-card role="button" tabindex="0"><h3>Flagged</h3><p>—</p></div>
@@ -1411,7 +2979,7 @@ font-size:.95rem;
 <!-- Table of Posts -->
 <div class="panel" style="margin-top:2rem;">
 <div class="panel-header">
-<h2>Latest Job Listings</h2>
+<h2>Latest Attorney Posts</h2>
   <input type="text" id="postSearch" class="search" placeholder="Search by keyword or author…" aria-label="Search job posts">
 </div>
 <table class="posts-table">
@@ -1427,7 +2995,6 @@ font-size:.95rem;
 <td>Nov 10 2026</td>
 <td><span class="status pending">Pending</span></td>
 <td>
-<button class="btn secondary" onclick="editPost(this)">Edit</button>
 <button class="btn danger" onclick="deletePost(this)">Delete</button>
 </td>
 </tr>
@@ -1439,7 +3006,6 @@ font-size:.95rem;
 <td>Nov 09 2026</td>
 <td><span class="status approved">Approved</span></td>
 <td>
-<button class="btn secondary" onclick="editPost(this)">Edit</button>
 <button class="btn danger" onclick="deletePost(this)">Delete</button>
 </td>
 </tr>
@@ -1462,35 +3028,6 @@ font-size:.95rem;
 <li><strong>Discovery Review Needed</strong> – contains vague requirements</li>
 <li><strong>Case Communication Post</strong> – unprofessional language detected</li>
 </ul>
-</div>
-</div>
-
-<!-- Modal for Editing -->
-<div id="editPostModal" class="details-modal hidden">
-<div class="details-content">
-<div class="details-header">
-<h2>Edit Job Post</h2>
-<button type="button" class="btn secondary" data-edit-post-close>Close ✕</button>
-</div>
-<form id="editPostForm">
-<label>Title</label><input type="text" id="editTitle" class="input-field">
-<label>Description</label><textarea id="editDescription" class="input-field" rows="5"></textarea>
-<label>Category</label>
-<select id="editCategory" class="input-field">
-<option>Corporate</option>
-<option>Litigation</option>
-<option>Family</option>
-<option>Real Estate</option>
-<option>Criminal</option>
-</select>
-<label>Status</label>
-<select id="editStatus" class="input-field">
-<option>Pending</option>
-<option>Approved</option>
-<option>Flagged</option>
-</select>
-<button type="button" class="btn primary" onclick="savePostEdits()">Save Changes</button>
-</form>
 </div>
 </div>
 
@@ -1624,7 +3161,7 @@ font-size:.95rem;
 <!-- SETTINGS -->
 <section id="section-settings" class="section">
 <h2>Settings</h2>
-<p>Manage site preferences, API keys, and notifications.</p>
+<p>Manage platform-wide admin controls separately from your own dashboard preferences.</p>
 <div class="settings-grid">
   <div class="panel">
     <h3>Platform Controls</h3>
@@ -1658,14 +3195,14 @@ font-size:.95rem;
       <span id="settingsUpdatedAt" class="muted"></span>
     </div>
   </div>
-  <div class="panel">
-    <h3>Theme</h3>
+    <div class="panel">
+      <h3>My Preferences</h3>
     <label for="settingAdminTheme">Admin dashboard theme</label>
     <select id="settingAdminTheme" class="input-field">
       <option value="light">Light</option>
       <option value="mountain">Mountain Light</option>
     </select>
-    <p class="settings-help">Controls your admin dashboard appearance only.</p>
+    <p class="settings-help">Personal admin preference only. This does not change platform-wide settings.</p>
   </div>
 </div>
 <div class="settings-actions">
@@ -1718,12 +3255,35 @@ const sidebarNav=document.getElementById("sidebarNav");
 const sidebarBackdrop=document.getElementById("sidebarBackdrop");
 const ACTIVE_SECTION_KEY="adminActiveSection";
 const SCROLL_POS_KEY="adminScrollY";
+const VALID_SECTION_NAMES=new Set(Array.from(navLinks).map(link=>link.dataset.section).filter(Boolean));
+const SECTION_ALIASES={
+"photo-reviews":"user-management",
+escrow:"finance",
+disputes:"finance",
+revenue:"finance",
+};
+const SECTION_GROUPS={
+overview:["section-overview"],
+"ai-control-room":["section-ai-control-room"],
+engineering:["section-engineering"],
+"approvals-workspace":["section-approvals-workspace"],
+"knowledge-studio":["section-knowledge-studio"],
+"marketing-drafts":["section-marketing-drafts"],
+"support-ops":["section-support-ops"],
+"sales-workspace":["section-sales-workspace"],
+"user-management":["section-user-management","section-photo-reviews"],
+finance:["section-escrow","section-disputes","section-revenue"],
+posts:["section-posts"],
+"activity-logs":["section-activity-logs"],
+settings:["section-settings"],
+};
 const healthBanner=document.getElementById("healthBanner");
 const healthBannerText=document.getElementById("healthBannerText");
 const refreshCharts=()=>{
 if(!window.dashboardCharts?.length) return;
 window.dashboardCharts.forEach(chart=>chart.resize());
 };
+const normalizeSectionName=(sectionName)=>SECTION_ALIASES[String(sectionName||"").trim()]||String(sectionName||"").trim();
 
 const refreshHealth=async()=>{
 if(!healthBanner||!healthBannerText) return;
@@ -1775,28 +3335,56 @@ window.addEventListener("resize",()=>{
 if(window.innerWidth>1024) closeSidebar();
 });
 
-function activateSection(sectionName){
-if(!sectionName) return;
-try{sessionStorage.setItem(ACTIVE_SECTION_KEY,sectionName);}catch{}
+function activateSection(sectionName,options={}){
+const normalizedSection=normalizeSectionName(sectionName);
+if(!normalizedSection||!VALID_SECTION_NAMES.has(normalizedSection)) return;
+const syncHash=options.syncHash!==false;
+try{sessionStorage.setItem(ACTIVE_SECTION_KEY,normalizedSection);}catch{}
+if(syncHash&&window.location.hash!==`#${normalizedSection}`){
+history.replaceState(null,"",`#${normalizedSection}`);
+}
 navLinks.forEach(link=>{
-const match=link.dataset.section===sectionName;
+const match=link.dataset.section===normalizedSection;
 link.classList.toggle("active",match);
 });
+const visibleSectionIds=new Set(SECTION_GROUPS[normalizedSection]||[`section-${normalizedSection}`]);
 sections.forEach(section=>{
-section.classList.toggle("visible",section.id===`section-${sectionName}`);
+section.classList.toggle("visible",visibleSectionIds.has(section.id));
 });
 const mainContent=document.querySelector(".main");
 if(mainContent) mainContent.scrollTo({top:0,left:0,behavior:"auto"});
-if(sectionName==="user-management"){
+if(normalizedSection==="user-management"){
 loadPendingUsers?.();
 loadApprovedUsers?.();
 loadDeletedUsers?.();
 loadMassEmailUsers?.();
-}
-if(sectionName==="photo-reviews"){
 window.loadProfilePhotoReviews?.();
 }
-if(sectionName==="disputes"){
+if(normalizedSection==="overview"){
+window.loadOverviewActionBoard?.(true);
+}
+if(normalizedSection==="knowledge-studio"){
+window.loadKnowledgeStudio?.(true);
+}
+if(normalizedSection==="engineering"){
+window.loadEngineeringWorkspace?.(true);
+}
+if(normalizedSection==="approvals-workspace"){
+window.loadApprovalsWorkspace?.(true);
+}
+if(normalizedSection==="marketing-drafts"){
+window.loadMarketingFounderDailyLog?.(true);
+window.loadMarketingDraftQueue?.(true);
+window.loadMarketingPublishingLoop?.(true);
+window.loadMarketingJrCmoLibrary?.(true);
+}
+if(normalizedSection==="support-ops"){
+window.loadSupportOps?.(true);
+}
+if(normalizedSection==="sales-workspace"){
+window.loadSalesWorkspace?.(true);
+}
+if(normalizedSection==="finance"){
 window.loadDisputes?.();
 }
 requestAnimationFrame(refreshCharts);
@@ -1811,8 +3399,19 @@ if(target) activateSection(target);
 });
 });
 
-const savedSection=sessionStorage.getItem(ACTIVE_SECTION_KEY);
-if(savedSection) activateSection(savedSection);
+const savedSection=normalizeSectionName(sessionStorage.getItem(ACTIVE_SECTION_KEY));
+const hashSection=normalizeSectionName(window.location.hash.replace(/^#/,"").trim());
+if(hashSection&&VALID_SECTION_NAMES.has(hashSection)){
+activateSection(hashSection,{syncHash:false});
+}else if(savedSection){
+activateSection(savedSection);
+}
+window.addEventListener("hashchange",()=>{
+const nextSection=normalizeSectionName(window.location.hash.replace(/^#/,"").trim());
+if(nextSection&&VALID_SECTION_NAMES.has(nextSection)){
+activateSection(nextSection,{syncHash:false});
+}
+});
 const savedScroll=Number(sessionStorage.getItem(SCROLL_POS_KEY));
 if(Number.isFinite(savedScroll)){
 requestAnimationFrame(()=>window.scrollTo(0,savedScroll));
@@ -1824,7 +3423,27 @@ pendingMetricCard.addEventListener("click",()=>{
 activateSection("user-management");
 setTimeout(()=>document.getElementById("pendingUsersPanel")?.scrollIntoView({behavior:"smooth",block:"start"}),60);
 });
+pendingMetricCard.addEventListener("keydown",(event)=>{
+if(event.key==="Enter"||event.key===" "){
+event.preventDefault();
+activateSection("user-management");
+setTimeout(()=>document.getElementById("pendingUsersPanel")?.scrollIntoView({behavior:"smooth",block:"start"}),60);
 }
+});
+}
+document.querySelectorAll("[data-overview-link]").forEach((card)=>{
+card.addEventListener("click",()=>{
+const target=card.getAttribute("data-overview-link");
+if(target) activateSection(target);
+});
+card.addEventListener("keydown",(event)=>{
+if(event.key==="Enter"||event.key===" "){
+event.preventDefault();
+const target=card.getAttribute("data-overview-link");
+if(target) activateSection(target);
+}
+});
+});
 
 const clearLoadingState=()=>{
 if(document.body.classList.contains("is-loading")){
@@ -2070,95 +3689,6 @@ fill:true
 },
 options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
 });
-
-pushChart(document.getElementById("dailyLoginChart"), {
-type:"line",
-data:{
-labels:["Feb 27","Mar 01","Mar 02","Mar 04","Mar 05","Mar 10","Mar 15","Mar 16","Mar 18"],
-datasets:[{
-label:"Logins",
-data:[1,5,6,0,2,4,1,6,3],
-borderColor:"#1abc9c",
-backgroundColor:"rgba(26,188,156,0.15)",
-tension:0.4,
-fill:true
-}]
-},
-options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
-});
-
-/* -------- Escrow Details Modal Logic -------- */
-const escrowModal = document.getElementById("escrowDetails");
-const escrowCloseBtn = escrowModal?.querySelector("[data-escrow-close]");
-const recentTicketsModal = document.getElementById("recentTicketsModal");
-const recentTicketsBtn = document.getElementById("recentTicketsBtn");
-const recentTicketsCloseBtn = recentTicketsModal?.querySelector("[data-recent-tickets-close]");
-function openEscrowDetails(){
-  if (!escrowModal || !escrowModal.classList.contains("hidden")) return;
-  requestAnimationFrame(() => {
-    escrowModal.classList.remove("hidden");
-    escrowModal.setAttribute("aria-hidden","false");
-  });
-}
-function closeEscrowDetails(){
-  if (!escrowModal) return;
-  escrowModal.classList.add("hidden");
-  escrowModal.setAttribute("aria-hidden","true");
-  const content = escrowModal.querySelector(".details-content");
-  if (content) content.scrollTop = 0;
-}
-if (escrowCloseBtn) {
-  escrowCloseBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    closeEscrowDetails();
-  });
-}
-if (escrowModal) {
-  escrowModal.addEventListener("click", (e) => {
-    if (e.target === escrowModal) closeEscrowDetails();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !escrowModal.classList.contains("hidden")) {
-      closeEscrowDetails();
-    }
-  });
-}
-function openRecentTicketsModal(){
-  if (!recentTicketsModal || !recentTicketsModal.classList.contains("hidden")) return;
-  requestAnimationFrame(() => {
-    recentTicketsModal.classList.remove("hidden");
-    recentTicketsModal.setAttribute("aria-hidden","false");
-  });
-}
-function closeRecentTicketsModal(){
-  if (!recentTicketsModal) return;
-  recentTicketsModal.classList.add("hidden");
-  recentTicketsModal.setAttribute("aria-hidden","true");
-  const content = recentTicketsModal.querySelector(".details-content");
-  if (content) content.scrollTop = 0;
-}
-if (recentTicketsBtn) {
-  recentTicketsBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    openRecentTicketsModal();
-  });
-}
-if (recentTicketsCloseBtn) {
-  recentTicketsCloseBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    closeRecentTicketsModal();
-  });
-}
-if (recentTicketsModal) {
-  recentTicketsModal.addEventListener("click", (e) => {
-    if (e.target === recentTicketsModal) closeRecentTicketsModal();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !recentTicketsModal.classList.contains("hidden")) {
-      closeRecentTicketsModal();
-    }
-  });
-}
 
 /* -------- Revenue Charts -------- */
 pushChart(document.getElementById("revMainChart"),{
@@ -2525,7 +4055,6 @@ menu.appendChild(item);
 };
 
 addItem("View Details","",()=>openPostDetails(record));
-addItem("Edit","",()=>editPost({ closest: () => wrapper.closest("tr") }));
 addItem("Delete","danger",()=>deletePost(record));
 if(record.isFlagged){
 addItem("Resolve Flag","",()=>resolveFlag(record));
@@ -2787,18 +4316,6 @@ updateDeadlineChart([]);
 }
 }
 
-/* -------- Post Moderation Logic -------- */
-function editPost(btn){
-document.getElementById("editPostModal").classList.remove("hidden");
-const row=btn.closest("tr");
-document.getElementById("editTitle").value=row.children[0].innerText;
-document.getElementById("editCategory").value=row.children[2].innerText;
-document.getElementById("editStatus").value=row.children[5].innerText;
-}
-function closeEditModal(){
-document.getElementById("editPostModal").classList.add("hidden");
-}
-
 function resolveDeleteTarget(target){
 if(!target)return null;
 if(target.id)return target;
@@ -2959,26 +4476,14 @@ async function suspendAuthor(record){
 openSuspendModal(record);
 }
 
-const editPostModal=document.getElementById("editPostModal");
-const editPostCloseBtn=editPostModal?.querySelector("[data-edit-post-close]");
-editPostCloseBtn?.addEventListener("click",(event)=>{
-event.preventDefault();
-closeEditModal();
-});
 postDetailsCloseBtn?.addEventListener("click",(event)=>{
 event.preventDefault();
 closePostDetails();
-});
-editPostModal?.addEventListener("click",(event)=>{
-if(event.target===editPostModal) closeEditModal();
 });
 postDetailsModal?.addEventListener("click",(event)=>{
 if(event.target===postDetailsModal) closePostDetails();
 });
 document.addEventListener("keydown",(event)=>{
-if(event.key==="Escape"&&editPostModal&&!editPostModal.classList.contains("hidden")){
-closeEditModal();
-}
 if(event.key==="Escape"&&postDetailsModal&&!postDetailsModal.classList.contains("hidden")){
 closePostDetails();
 }
@@ -3168,10 +4673,6 @@ if(event.key==="Escape"&&authorPostsModal&&!authorPostsModal.classList.contains(
 closeAuthorPosts();
 }
 });
-function savePostEdits(){
-alert("Post updated successfully!");
-closeEditModal();
-}
 const postsTableState=(() => {
 let rows=[];
 const state={search:"",mode:"all"};
@@ -3247,20 +4748,8 @@ Promise.all([loadAdminPosts(), loadFinanceCards()]).finally(() => {
 document.body.classList.remove("is-loading");
 document.body.classList.add("is-ready");
 });
-/* -------- Pause & Report -------- */
-function pauseReportActivity(id){
-const r=prompt(`Enter reason for pausing Case #${id||'Unknown'}:`); 
-if(r)alert("Flag submitted to Admin. You will be contacted within 1 business day.\n\nReason: "+r);
-}
-
 window.togglePanel = togglePanel;
-window.pauseReportActivity = pauseReportActivity;
-window.editPost = editPost;
-window.closeEditModal = closeEditModal;
-window.savePostEdits = savePostEdits;
 window.deletePost = deletePost;
-window.openEscrowDetails = openEscrowDetails;
-window.closeEscrowDetails = closeEscrowDetails;
 const pendingTableBody = document.getElementById('pendingUsersBody');
 const pendingMetric = document.getElementById('pendingUsers');
 const pendingCountLabel = document.getElementById('pendingUsersCountLabel');
@@ -4776,6 +6265,7 @@ tasks.push(window.loadSidebarWeather());
 tasks.push(
 loadFinanceCards(),
 loadAdminPosts(),
+window.loadOverviewActionBoard?.(true),
 loadPendingUsers(),
 loadProfilePhotoReviews(),
 loadApprovedUsers(),
@@ -4811,5 +6301,6 @@ window.loadDeletedUsers = loadDeletedUsers;
 window.loadMassEmailUsers = loadMassEmailUsers;
 </script>
 <script type="module" src="assets/scripts/admin-dashboard.js"></script>
+<script type="module" src="assets/scripts/utils/support-drawer.js"></script>
 </body>
 </html>

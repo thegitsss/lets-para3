@@ -12,6 +12,8 @@ const sendEmail = require("../utils/email");
 const { logAction } = require("../utils/audit");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
 const { applyPublicParalegalFilter } = require("../utils/paralegalProfile");
+const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
+const { looksLikeSupportSubmission } = require("../services/lpcEvents/supportRoutingService");
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 // ----------------------------------------
@@ -236,6 +238,80 @@ router.post(
         });
       } catch (e) {
         // swallow
+      }
+
+      await publishEventSafe({
+        eventType: "public.contact.submitted",
+        eventFamily: "public_signal",
+        actor: {
+          actorType: "user",
+          role: "visitor",
+          email,
+          label: name,
+        },
+        subject: {
+          entityType: "public_contact",
+          entityId: email.toLowerCase(),
+        },
+        source: {
+          surface: "public",
+          route: "/api/public/contact",
+          service: "public",
+          producer: "route",
+        },
+        facts: {
+          summary: `Public contact submission received from ${email}.`,
+          after: {
+            name,
+            email,
+            role,
+            subject,
+          },
+        },
+        signals: {
+          confidence: "high",
+          priority: "normal",
+          publicFacing: true,
+        },
+      });
+
+      if (looksLikeSupportSubmission({ subject, message })) {
+        await publishEventSafe({
+          eventType: "support.submission.created",
+          eventFamily: "support",
+          actor: {
+            actorType: "user",
+            role: "visitor",
+            email,
+            label: name,
+          },
+          subject: {
+            entityType: "support_submission",
+            entityId: `${email.toLowerCase()}:${sanitizeSubject(subject).toLowerCase()}`,
+          },
+          source: {
+            surface: "public",
+            route: "/api/public/contact",
+            service: "support",
+            producer: "route",
+          },
+          facts: {
+            summary: `Support-style public submission received from ${email}.`,
+            after: {
+              name,
+              email,
+              role: role || "visitor",
+              subject,
+              message,
+              sourceLabel: "Public contact form",
+            },
+          },
+          signals: {
+            confidence: "medium",
+            priority: "normal",
+            publicFacing: true,
+          },
+        });
       }
 
       return res.json({ ok: true });

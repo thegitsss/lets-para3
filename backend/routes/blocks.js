@@ -77,10 +77,10 @@ router.get("/", async (req, res) => {
   }
 });
 
-// POST /api/blocks { caseId, reason? }
+// POST /api/blocks { caseId, paralegalId?, reason? }
 router.post("/", async (req, res) => {
   try {
-    const { caseId, reason } = req.body || {};
+    const { caseId, paralegalId, reason } = req.body || {};
     const requesterRole = String(req.user.role || "").toLowerCase();
     if (!isBlockableRole(requesterRole)) {
       return res.status(403).json({ error: "Blocking is only available to attorneys and paralegals." });
@@ -91,7 +91,7 @@ router.post("/", async (req, res) => {
 
     const caseDoc = await Case.findById(caseId)
       .select(
-        "attorney attorneyId paralegal paralegalId withdrawnParalegalId status pausedReason disputes disputeSettlement payoutFinalizedAt payoutFinalizedType partialPayoutAmount paymentReleased"
+        "attorney attorneyId paralegal paralegalId withdrawnParalegalId status pausedReason disputes disputeSettlement payoutFinalizedAt payoutFinalizedType partialPayoutAmount paymentReleased applicants"
       )
       .populate("withdrawnParalegalId", "firstName lastName role")
       .populate("paralegal", "firstName lastName role")
@@ -112,26 +112,48 @@ router.post("/", async (req, res) => {
       return res.status(403).json({ error: "You do not have access to block users for this case." });
     }
 
-    const target = await User.findById(counterparty.counterpartyId).select("role firstName lastName");
-    if (!target) return res.status(404).json({ error: "User not found." });
+    let targetId = counterparty.counterpartyId;
+    let targetRole = counterparty.counterpartyRole;
+    let sourceType = "";
+    let sourceDisputeId = "";
 
-    const status = await getCaseInteractionBlockStatus(caseDoc, req.user);
-    if (status.blocked) {
-      return res.json({ ok: true, blocked: true, message: BLOCKED_MESSAGE, block: status });
+    if (requesterRole === "attorney" && isObjId(paralegalId)) {
+      const caseParalegalId = normalizeId(caseDoc.paralegal || caseDoc.paralegalId);
+      const isAssignedParalegal = caseParalegalId && String(caseParalegalId) === String(paralegalId);
+      const applicants = Array.isArray(caseDoc.applicants) ? caseDoc.applicants : [];
+      const isApplicant = applicants.some((entry) => normalizeId(entry?.paralegalId) === String(paralegalId));
+      if (!isApplicant || isAssignedParalegal) {
+        return res.status(403).json({ error: "Only active applicants can be blocked from the Applicants view." });
+      }
+      targetId = String(paralegalId);
+      targetRole = "paralegal";
+      sourceType = "application_screening";
+    } else {
+      const status = await getCaseInteractionBlockStatus(caseDoc, req.user);
+      if (status.blocked) {
+        return res.json({ ok: true, blocked: true, message: BLOCKED_MESSAGE, block: status });
+      }
+      if (!status.canBlock) {
+        return res.status(403).json({ error: status.reason || BLOCK_NOT_ELIGIBLE_MESSAGE });
+      }
+      targetId = status.counterpartyId || targetId;
+      targetRole = status.counterpartyRole || targetRole;
+      sourceType = status.sourceType || "";
+      sourceDisputeId = status.sourceDisputeId || "";
     }
-    if (!status.canBlock) {
-      return res.status(403).json({ error: status.reason || BLOCK_NOT_ELIGIBLE_MESSAGE });
-    }
+
+    const target = await User.findById(targetId).select("role firstName lastName");
+    if (!target) return res.status(404).json({ error: "User not found." });
 
     // Private safety action: do not notify the blocked user by email, notification, or chat.
     const result = await createOrActivateBlock({
       blockerId: req.user.id,
       blockedId: target._id,
       blockerRole: requesterRole,
-      blockedRole: target.role,
+      blockedRole: target.role || targetRole,
       sourceCaseId: caseDoc._id,
-      sourceDisputeId: status.sourceDisputeId || "",
-      sourceType: status.sourceType || "legacy",
+      sourceDisputeId,
+      sourceType: sourceType || "legacy",
       reason: normalizeReason(reason),
     });
 

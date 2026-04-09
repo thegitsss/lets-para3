@@ -2456,7 +2456,24 @@
       font-weight: 200;
     }
 
+    .view-cases td .case-title-trigger{
+      appearance:none;
+      border:0;
+      background:transparent;
+      padding:0;
+      margin:0;
+      color:var(--ink);
+      font:inherit;
+      font-weight:200;
+      text-align:left;
+      cursor:pointer;
+    }
+
     .view-cases td a:hover {
+      color: var(--accent);
+    }
+
+    .view-cases td .case-title-trigger:hover {
       color: var(--accent);
     }
 
@@ -4982,7 +4999,7 @@
             <button class="filter-tab active" data-case-filter="active">Active (<span data-case-count="active">0</span>)</button>
             <button class="filter-tab" data-case-filter="draft">Draft (<span data-case-count="draft">0</span>)</button>
             <button class="filter-tab" data-case-filter="archived">Archived (<span data-case-count="archived">0</span>)</button>
-            <button class="filter-tab" data-case-filter="inquiries">Inquiries (<span data-case-count="inquiries">0</span>)</button>
+            <button class="filter-tab" data-case-filter="inquiries">Applicants (<span data-case-count="inquiries">0</span>)</button>
             <div class="filter-search">
               <input type="search" placeholder="Search cases..." data-cases-search aria-label="Search cases" />
             </div>
@@ -5038,14 +5055,8 @@
             </div>
 
             <div class="case-table hidden" data-case-table="archived">
-              <div class="archived-bulk-bar" data-archived-bulk-bar hidden>
-                <label class="archived-select-all">
-                  <input type="checkbox" data-archived-select-all />
-                  <span>Select all</span>
-                </label>
+              <div class="archived-bulk-bar">
                 <div class="archived-bulk-actions">
-                  <button type="button" class="pill-btn primary" data-archived-bulk="download" disabled>Download selected</button>
-                  <button type="button" class="pill-btn danger" data-archived-bulk="delete" disabled>Delete selected</button>
                   <select class="archived-status-filter" data-archived-status-filter>
                     <option value="all">All statuses</option>
                     <option value="completed">Completed</option>
@@ -5057,7 +5068,6 @@
               <table>
                 <thead>
                   <tr>
-                    <th style="width:42px;">Select</th>
                     <th class="case-title-col">Title</th>
                     <th class="case-paralegal-col">Paralegal Assigned</th>
                     <th class="case-field-col">Field</th>
@@ -5068,7 +5078,7 @@
                   </tr>
                 </thead>
                 <tbody data-table-body="archived">
-                  <tr><td colspan="8" class="empty-row">Loading archived cases…</td></tr>
+                  <tr><td colspan="7" class="empty-row">Loading archived cases…</td></tr>
                 </tbody>
               </table>
               <div class="case-pagination" data-case-pagination="archived">
@@ -5092,7 +5102,7 @@
                   </tr>
                 </thead>
                 <tbody data-table-body="inquiries">
-                  <tr><td colspan="7" class="empty-row">Loading inquiries…</td></tr>
+                  <tr><td colspan="7" class="empty-row">Loading applicants…</td></tr>
                 </tbody>
               </table>
               <div class="case-pagination" data-case-pagination="inquiries">
@@ -5306,7 +5316,7 @@
       <div class="tour-hero" role="presentation"></div>
       <div class="tour-content">
         <div class="tour-title" id="attorneyCaseOnboardingTitle">Let’s Post Your First Case</div>
-        <p class="tour-text" id="attorneyCaseOnboardingText">Step 3 of 3: Click “+ New Case” to create a matter for paralegals to apply to.</p>
+        <p class="tour-text" id="attorneyCaseOnboardingText">Click “+ New Case” to post your first matter and start receiving paralegal interest.</p>
         <div class="tour-actions">
           <button type="button" class="tour-btn ghost" data-case-onboarding-skip>Skip onboarding</button>
           <button type="button" class="tour-btn primary" data-case-onboarding-continue>Continue</button>

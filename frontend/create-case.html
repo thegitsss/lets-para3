@@ -1468,7 +1468,7 @@ body.theme-dark .select-field select{
 </div>
 
   <div class="field">
-  <label for="comp">Compensation<span class="fee-info" tabindex="0" data-tooltip="You may edit the amount until a paralegal applies or you send the first invitation. After that, the amount is locked.">?</span></label>
+  <label for="comp">Compensation<span class="fee-info" tabindex="0" data-tooltip="Your card will not be charged until you select and hire a paralegal. Payment is securely processed through Stripe and released only after you mark the matter complete.">?</span></label>
   <div class="comp-wrapper">
     <span class="dollar-sign">$</span>
     <input id="comp" type="text" inputmode="numeric" placeholder="3,500+" />
@@ -1571,7 +1571,7 @@ body.theme-dark .select-field select{
           </div>
           <aside class="compliance-note" aria-label="Professional guidelines">
             <h3>Professional Guidelines</h3>
-            <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed securely through Stripe and are released upon attorney approval within the workspace after all tasks are checked.</p>
+            <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed securely through Stripe and are released only upon attorney approval within the workspace or resolution of a platform review or dispute.</p>
           </aside>
           <div class="summary-wide"></div>
         </div>
@@ -2769,7 +2769,7 @@ body.theme-dark .select-field select{
       const guidelinesHtml = `
         <aside class="compliance-note" aria-label="Professional guidelines">
           <h3>Professional Guidelines</h3>
-          <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed securely through Stripe and are released upon attorney approval within the workspace after all tasks are checked.</p>
+          <p>All paralegal work must be supervised by the hiring attorney. The hiring attorney remains responsible for the final work product. Let&rsquo;s-ParaConnect does not provide legal services or legal advice. Payments are processed securely through Stripe and are released only upon attorney approval within the workspace or resolution of a platform review or dispute.</p>
         </aside>
       `;
       reviewSummary.innerHTML = `
@@ -3538,5 +3538,6 @@ body.theme-dark .select-field select{
   })();
   </script>
   <script src="assets/scripts/create-case-nav.js"></script>
+  <script type="module" src="assets/scripts/utils/support-drawer.js"></script>
 </body>
 </html>

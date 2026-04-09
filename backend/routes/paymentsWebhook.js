@@ -17,6 +17,7 @@ const AuditLog = require("../models/AuditLog"); // match filename
 const WebhookEvent = require("../models/WebhookEvent");
 const { notifyUser } = require("../utils/notifyUser");
 const { currentStripeMode, pickStripeMode, stripeModeFromLivemode } = require("../utils/stripeMode");
+const { sendOwnerAlert } = require("../utils/opsAlerting");
 
 // ----------------------------------------
 // Durable dedupe (db-backed) with retry-safe status tracking
@@ -71,6 +72,13 @@ async function markWebhookEventFailed(eventId, err) {
       { eventId },
       { $set: { status: "failed", lastError: String(err?.message || err || "Unknown error") } }
     );
+    if (String(process.env.STRIPE_WEBHOOK_ALERTS_ENABLED || "true").toLowerCase() !== "false") {
+      await sendOwnerAlert("LPC attention needed: payment status update issue", [
+        "A payment status update did not finish cleanly and should be reviewed.",
+        `Reference: ${eventId}`,
+        `Details: ${String(err?.message || err || "Unknown error")}`,
+      ]).catch(() => {});
+    }
   } catch (updateErr) {
     console.warn("[stripe] webhook failed update failed", updateErr?.message || updateErr);
   }

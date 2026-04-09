@@ -21,6 +21,8 @@ const {
   applyPublicParalegalFilter,
   hasRequiredParalegalFieldsForPublic,
 } = require("../utils/paralegalProfile");
+const { ensureApprovedUserAuthReady } = require("../utils/authReady");
+const { normalizeEmail, sendVerificationEmail } = require("../utils/emailVerification");
 const {
   ACTIVE_BLOCK_FILTER,
   BLOCKED_MESSAGE,
@@ -155,7 +157,7 @@ const parseParalegalFilters = (query = {}) => {
 
 const SAFE_PUBLIC_SELECT =
   "_id firstName lastName avatarURL profileImage profileImageOriginal pendingProfileImage pendingProfileImageOriginal profilePhotoStatus location specialties practiceAreas skills bestFor experience yearsExperience linkedInURL firmWebsite certificateURL writingSampleURL education resumeURL publications notificationPrefs preferences lawFirm bio about availability availabilityDetails approvedAt createdAt languages writingSamples status stateExperience";
-const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email phoneNumber onboarding pendingHire`;
+const SAFE_SELF_SELECT = `${SAFE_PUBLIC_SELECT} email pendingEmail pendingEmailRequestedAt phoneNumber onboarding pendingHire`;
 const FILE_PUBLIC_BASE =
   (process.env.CDN_BASE_URL || process.env.S3_PUBLIC_BASE_URL || "").replace(/\/+$/, "") ||
   (process.env.S3_BUCKET && process.env.S3_REGION
@@ -239,6 +241,8 @@ function serializePublicUser(user, { includeEmail = false, includeStatus = false
   };
   if (includeEmail) {
     payload.email = src.email || "";
+    payload.pendingEmail = src.pendingEmail || "";
+    payload.pendingEmailRequestedAt = src.pendingEmailRequestedAt || null;
     payload.phoneNumber = src.phoneNumber || "";
   }
   if (includeStatus) {
@@ -259,7 +263,36 @@ function serializeOnboarding(onboarding = {}) {
     paralegalTourCompleted: Boolean(onboarding?.paralegalTourCompleted),
     paralegalProfileTourCompleted: Boolean(onboarding?.paralegalProfileTourCompleted),
     attorneyTourCompleted: Boolean(onboarding?.attorneyTourCompleted),
+    attorneyProfileCompleted: Boolean(onboarding?.attorneyProfileCompleted),
   };
+}
+
+function hasAttorneyProfileDetails(user = {}) {
+  const practiceAreas = Array.isArray(user.practiceAreas)
+    ? user.practiceAreas.filter((item) => String(item || "").trim())
+    : [];
+  const publications = Array.isArray(user.publications)
+    ? user.publications.filter((item) => String(item || "").trim())
+    : [];
+  return Boolean(
+    practiceAreas.length ||
+      publications.length ||
+      String(user.practiceDescription || user.bio || "").trim() ||
+      String(user.lawFirm || "").trim() ||
+      String(user.linkedInURL || "").trim() ||
+      String(user.firmWebsite || "").trim()
+  );
+}
+
+function resolveAttorneyProfileCompleted(user = {}) {
+  if (user?.onboarding?.attorneyProfileCompleted) return true;
+  if (hasAttorneyProfileDetails(user)) return true;
+  const createdAt = user?.createdAt ? new Date(user.createdAt) : null;
+  const updatedAt = user?.updatedAt ? new Date(user.updatedAt) : null;
+  if (createdAt instanceof Date && updatedAt instanceof Date && !Number.isNaN(createdAt.valueOf()) && !Number.isNaN(updatedAt.valueOf())) {
+    return updatedAt.valueOf() > createdAt.valueOf();
+  }
+  return false;
 }
 
 function serializePendingHire(pendingHire = {}) {
@@ -408,6 +441,9 @@ router.get(
     const payload = serializePublicUser(me, { includeEmail: true, includeStatus: true, includePhotoMeta: true });
     payload.role = me.role;
     payload.onboarding = serializeOnboarding(me.onboarding || {});
+    if (String(me.role || "").toLowerCase() === "attorney" && !payload.onboarding.attorneyProfileCompleted) {
+      payload.onboarding.attorneyProfileCompleted = resolveAttorneyProfileCompleted(me);
+    }
     payload.pendingHire = serializePendingHire(me.pendingHire || {});
     return res.json(payload);
   })
@@ -437,6 +473,7 @@ router.patch(
       "paralegalTourCompleted",
       "paralegalProfileTourCompleted",
       "attorneyTourCompleted",
+      "attorneyProfileCompleted",
     ];
     allowed.forEach((key) => {
       if (typeof body[key] === "boolean") {
@@ -682,13 +719,22 @@ router.patch(
     if (typeof lastName === "string" && lastName.trim()) {
       me.lastName = normStr(lastName, { len: 150 }).trim();
     }
+    let pendingEmailChanged = false;
     if (typeof nextEmail === "string" && nextEmail.trim()) {
-      const normalizedEmail = normStr(nextEmail, { len: 320 }).trim().toLowerCase();
-      if (normalizedEmail && normalizedEmail !== me.email) {
-        const exists = await User.countDocuments({ email: normalizedEmail, _id: { $ne: me._id } });
+      const normalizedEmail = normalizeEmail(normStr(nextEmail, { len: 320 }));
+      if (
+        normalizedEmail &&
+        normalizedEmail !== normalizeEmail(me.email) &&
+        normalizedEmail !== normalizeEmail(me.pendingEmail)
+      ) {
+        const exists = await User.countDocuments({
+          _id: { $ne: me._id },
+          $or: [{ email: normalizedEmail }, { pendingEmail: normalizedEmail }],
+        });
         if (exists) return res.status(409).json({ error: "Email already in use" });
-        me.email = normalizedEmail;
-        me.emailVerified = false;
+        me.pendingEmail = normalizedEmail;
+        me.pendingEmailRequestedAt = new Date();
+        pendingEmailChanged = true;
       }
     }
     const phoneVal = typeof phoneNumber === "string" ? phoneNumber : typeof phone === "string" ? phone : null;
@@ -862,7 +908,22 @@ router.patch(
       me.notificationPrefs = currentPrefs;
     }
 
+    if (me.role === "attorney") {
+      me.onboarding = {
+        ...(me.onboarding?.toObject ? me.onboarding.toObject() : me.onboarding || {}),
+        attorneyProfileCompleted: true,
+      };
+    }
+
     await me.save();
+
+    if (pendingEmailChanged && me.pendingEmail) {
+      try {
+        await sendVerificationEmail({ user: me, email: me.pendingEmail });
+      } catch (err) {
+        console.warn("[users] pending email verification send failed", err?.message || err);
+      }
+    }
     try {
       await logAction(req, "user.me.update", { targetType: "user", targetId: me._id });
     } catch {}
@@ -1283,6 +1344,7 @@ router.patch(
 
     const wasApproved = user.status === "approved";
     user.status = "approved";
+    ensureApprovedUserAuthReady(user);
     if (!wasApproved && String(user.role || "").toLowerCase() === "paralegal") {
       user.preferences = {
         ...(typeof user.preferences?.toObject === "function"

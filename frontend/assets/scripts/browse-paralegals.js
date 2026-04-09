@@ -196,12 +196,14 @@ function bindFilterEvents() {
   elements.prevPage?.addEventListener("click", () => {
     if (state.page > 1) {
       state.page -= 1;
+      window.scrollTo({ top: 0, behavior: "smooth" });
       loadParalegals();
     }
   });
   elements.nextPage?.addEventListener("click", () => {
     if (state.page < state.pages) {
       state.page += 1;
+      window.scrollTo({ top: 0, behavior: "smooth" });
       loadParalegals();
     }
   });

@@ -1,5 +1,6 @@
 // Shared notification center for headers
 import { secureFetch, getStoredSession } from "../auth.js";
+import { closeSupportDrawer, scanSupportLaunchers } from "./support-drawer.js";
 
 const NOTIFICATION_STYLE_ID = "lpc-notification-styles";
 const MAX_VISIBLE_NOTIFICATION_CARDS = 3;
@@ -508,6 +509,7 @@ export function scanNotificationCenters() {
       preload(center);
     }
   });
+  scanSupportLaunchers();
   bindGlobalDismiss();
 }
 
@@ -687,6 +689,7 @@ function togglePanel(center) {
     center.panel.dataset.pendingShow = "";
     return;
   }
+  closeSupportDrawer({ restoreFocus: false });
   if (!center.loaded) {
     renderEmpty(center, "Loading...");
     center.panel.dataset.pendingShow = "";
@@ -966,6 +969,9 @@ function bindMinimalToggleHandler() {
       toggle.parentElement?.querySelector("[data-notification-panel]");
     if (!panel) return;
     const willShow = !panel.classList.contains("show");
+    if (willShow) {
+      closeSupportDrawer({ restoreFocus: false });
+    }
     document.querySelectorAll("[data-notification-panel]").forEach((node) => {
       if (node !== panel) {
         node.classList.remove("show");

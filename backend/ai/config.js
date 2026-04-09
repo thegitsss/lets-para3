@@ -29,6 +29,17 @@ if (!initError && process.env.OPENAI_API_KEY) {
   }
 }
 
+if (openAIClient) {
+  logger.info("OpenAI client initialized successfully.", {
+    enabled: true,
+    hasApiKey: Boolean(process.env.OPENAI_API_KEY),
+  });
+} else if (process.env.OPENAI_API_KEY) {
+  logger.error("OpenAI client initialization failed at startup.", initError || "Unknown OpenAI initialization error.");
+} else {
+  logger.warn("OpenAI client disabled at startup because OPENAI_API_KEY is missing.");
+}
+
 function isAiEnabled() {
   return Boolean(openAIClient);
 }
@@ -55,21 +66,26 @@ function safeJsonParse(value) {
   }
 }
 
-async function createJsonChatCompletion({ systemPrompt, userPrompt, model, temperature = 0.2 }) {
+async function createJsonChatCompletion({ systemPrompt, userPrompt, model, temperature = 0.2, messages }) {
   if (!openAIClient) {
     const err = new Error("AI is not enabled");
     err.code = "AI_DISABLED";
     throw err;
   }
 
+  const requestMessages =
+    Array.isArray(messages) && messages.length
+      ? messages
+      : [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ];
+
   const response = await openAIClient.chat.completions.create({
     model: model || AI_MODELS.support,
     temperature,
     response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
+    messages: requestMessages,
   });
 
   const content = response?.choices?.[0]?.message?.content || "";

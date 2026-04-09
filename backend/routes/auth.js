@@ -16,6 +16,12 @@ const AuditLog = require("../models/AuditLog"); // audit trail hooks
 const sendEmail = require("../utils/email");
 const { getAppSettings } = require("../utils/appSettings");
 const { publishNotificationEvent } = require("../utils/notificationEvents");
+const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
+const { ensureApprovedUserAuthReady, isApprovedUser } = require("../utils/authReady");
+const {
+  normalizeEmail,
+  applyVerifiedEmail,
+} = require("../utils/emailVerification");
 
 const IS_PROD = process.env.NODE_ENV === "production" || process.env.PROD === "true";
 const TWO_FACTOR_ENABLED = String(process.env.ENABLE_TWO_FACTOR || "").toLowerCase() === "true";
@@ -44,6 +50,10 @@ function buildAuthCookieOptions(req, { maxAge } = {}) {
     ...(typeof maxAge === "number" ? { maxAge } : {}),
   };
 }
+
+const NO_ACCOUNT_MSG = "No account found for that email.";
+const EMAIL_NOT_VERIFIED_MSG = "Please verify your email before logging in.";
+const WRONG_PASSWORD_MSG = "Incorrect password.";
 const MAX_RESUME_FILE_BYTES = 10 * 1024 * 1024;
 const MAX_CERT_FILE_BYTES = 10 * 1024 * 1024;
 const VALID_US_STATES = new Set([
@@ -216,7 +226,7 @@ function buildResetPasswordEmailHtml(user, resetUrl, opts = {}) {
             <td align="center" style="padding:24px 32px 16px;">
               <table cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td bgcolor="#ffbd59" style="border-radius:999px;">
+                  <td bgcolor="#0a84ff" style="border-radius:999px;">
                     <a href="${resetUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 32px;font-family:Georgia, 'Times New Roman', serif;font-size:22px;color:#ffffff;text-decoration:none;">
                       Reset password
                     </a>
@@ -378,7 +388,7 @@ const BOT_FORBIDDEN_CHARS = /[{}[\]|\\^<>]/;
 const PARA_WELCOME_TITLE = "Welcome to Let's-ParaConnect - we're excited to have you.";
 const PARA_WELCOME_BODY =
   "We're currently onboarding qualified paralegals as we prepare the platform for attorneys. " +
-  "Opportunities will begin appearing as attorney onboarding expands. In the meantime, feel free to complete your profile and upload credentials — we’ll notify you as jobs become available.";
+  "Opportunities will begin appearing as attorney onboarding expands. In the meantime, feel free to complete your profile and upload credentials.";
 
 async function ensureParalegalWelcomeNotification(user) {
   if (!user) return;
@@ -512,6 +522,7 @@ router.post(
       captchaToken,
       recaptchaToken,
       termsAccepted,
+      attorneyPricingAccepted,
       phoneNumber,
       barState,
       state,
@@ -601,6 +612,10 @@ router.post(
       if (normalizedLinkedInURL && !isHttpUrl(normalizedLinkedInURL)) {
         return res.status(400).json({ msg: "LinkedIn URL must start with http:// or https://" });
       }
+      const pricingAccepted = String(attorneyPricingAccepted || "").toLowerCase() === "true";
+      if (!pricingAccepted) {
+        return res.status(400).json({ msg: "Attorneys must acknowledge the $400 minimum case requirement." });
+      }
     }
 
     const resumeFile = req.files?.resume?.[0] || req.files?.resumeFile?.[0] || null;
@@ -666,6 +681,8 @@ router.post(
       linkedInURL: normalizedLinkedInURL,
       lawFirm: roleLc === "attorney" ? (String(lawFirm || "").trim() || null) : null,
       termsAccepted: true,
+      attorneyPricingAccepted:
+        roleLc === "attorney" ? String(attorneyPricingAccepted || "").toLowerCase() === "true" : false,
       phoneNumber: phoneNumber ? String(phoneNumber).trim() || null : null,
       state: normalizedState,
       timezone: safeTimezone || undefined,
@@ -710,24 +727,10 @@ router.post(
 
     await user.save();
 
-    // Email: registration received + email verification link (optional but nice)
+    // Email: registration received
     try {
-      const verifyToken = signOneTime(
-        { purpose: "verify-email", uid: user._id.toString() },
-        { minutes: 60, secretEnv: "JWT_SECRET" }
-      );
-      const verifyUrl = `${process.env.APP_BASE_URL || ""}/verify-email?token=${verifyToken}`;
-      const inlineLogoPath = path.join(__dirname, "../../frontend/Cleanfav.png");
-      const html = buildApplicationSubmissionEmailHtml(user, { logoUrl: "cid:cleanfav-logo" });
-      await sendEmail(user.email, "Registration received", html, {
-        attachments: [
-          {
-            filename: "Cleanfav.png",
-            path: inlineLogoPath,
-            cid: "cleanfav-logo",
-          },
-        ],
-      });
+      const html = buildApplicationSubmissionEmailHtml(user);
+      await sendEmail(user.email, "Registration received", html);
     } catch (_) {}
 
     await AuditLog.logFromReq(req, "auth.register", {
@@ -755,6 +758,45 @@ router.post(
       console.warn("[auth] admin signup email failed", err?.message || err);
     }
 
+    await publishEventSafe({
+      eventType: "user.signup.created",
+      eventFamily: "platform_user",
+      idempotencyKey: `user:${user._id}:signup:created`,
+      correlationId: `user:${user._id}`,
+      actor: {
+        actorType: "user",
+        userId: user._id,
+        role: user.role || "",
+        email: user.email || "",
+        label: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email || "User",
+      },
+      subject: {
+        entityType: "user",
+        entityId: String(user._id),
+      },
+      related: {
+        userId: user._id,
+      },
+      source: {
+        surface: "public",
+        route: "/api/auth/register",
+        service: "auth",
+        producer: "route",
+      },
+      facts: {
+        summary: `${user.email || "User"} signed up and entered the pending admissions queue.`,
+        after: {
+          email: user.email || "",
+          role: user.role || "",
+          status: user.status || "",
+        },
+      },
+      signals: {
+        confidence: "high",
+        priority: "normal",
+      },
+    });
+
     res.json({ msg: "Registered successfully. Await admin approval." });
   })
 );
@@ -776,7 +818,7 @@ router.post(
     const user = await User.findOne({ email: String(email).toLowerCase() }).select("+password");
     if (!user) {
       await AuditLog.logFromReq(req, "auth.login.fail", { targetType: "user", meta: { email } });
-      return res.status(400).json({ msg: "Invalid credentials" });
+      return res.status(404).json({ msg: NO_ACCOUNT_MSG, error: NO_ACCOUNT_MSG });
     }
 
     if (isDeactivatedUser(user)) {
@@ -789,23 +831,32 @@ router.post(
     }
 
     const status = user.status || "pending";
-    const approvedFlag = status === "approved";
+    const approvedFlag = isApprovedUser(user);
     if (!approvedFlag) {
       const msg =
         status === "pending"
-          ? "Your application is still pending admin approval."
+          ? "Your account is still under review. We'll email you as soon as it's approved."
           : "Your application was not approved. Please contact support if you have questions.";
       return res.status(403).json({ msg });
+    }
+
+    let userChanged = false;
+    if (user.emailVerified !== true) {
+      userChanged = ensureApprovedUserAuthReady(user) || userChanged;
+      if (user.emailVerified !== true) {
+        return res.status(403).json({ msg: EMAIL_NOT_VERIFIED_MSG, error: EMAIL_NOT_VERIFIED_MSG });
+      }
     }
 
     const ok = await user.comparePassword(String(password));
     if (!ok) {
       await AuditLog.logFromReq(req, "auth.login.fail", { targetType: "user", targetId: user._id });
-      return res.status(400).json({ msg: "Invalid credentials" });
+      return res.status(401).json({ msg: WRONG_PASSWORD_MSG, error: WRONG_PASSWORD_MSG });
     }
 
     if (user._passwordNeedsRehash) {
       user.password = String(password);
+      userChanged = true;
     }
 
     if (user.twoFactorEnabled && !TWO_FACTOR_ENABLED) {
@@ -814,6 +865,10 @@ router.post(
       user.twoFactorTempCode = null;
       user.twoFactorExpiresAt = null;
       user.twoFactorBackupCodes = [];
+      userChanged = true;
+    }
+
+    if (userChanged) {
       await user.save();
     }
 
@@ -901,6 +956,15 @@ router.post(
       return res.status(403).json({ error: DISABLED_ACCOUNT_MSG, msg: DISABLED_ACCOUNT_MSG });
     }
 
+    if (!isApprovedUser(user)) {
+      user.twoFactorTempCode = null;
+      user.twoFactorExpiresAt = null;
+      await user.save();
+      return res.status(403).json({ error: "Account pending approval" });
+    }
+
+    ensureApprovedUserAuthReady(user);
+
     if (!user.twoFactorTempCode || !user.twoFactorExpiresAt || user.twoFactorExpiresAt < new Date()) {
       return res.status(400).json({ error: "Code expired." });
     }
@@ -908,14 +972,6 @@ router.post(
     const match = await bcrypt.compare(String(code), user.twoFactorTempCode);
     if (!match) {
       return res.status(400).json({ error: "Incorrect code." });
-    }
-
-    const approvedFlag = String(user.status || "").toLowerCase() === "approved";
-    if (!approvedFlag) {
-      user.twoFactorTempCode = null;
-      user.twoFactorExpiresAt = null;
-      await user.save();
-      return res.status(403).json({ error: "Account pending approval" });
     }
 
     const lastLoginAt = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
@@ -977,6 +1033,11 @@ router.post(
     if (isDeactivatedUser(user)) {
       return res.status(403).json({ error: DISABLED_ACCOUNT_MSG, msg: DISABLED_ACCOUNT_MSG });
     }
+    if (!isApprovedUser(user)) {
+      return res.status(403).json({ error: "Account pending approval" });
+    }
+
+    ensureApprovedUserAuthReady(user);
 
     if (!Array.isArray(user.twoFactorBackupCodes) || user.twoFactorBackupCodes.length === 0) {
       return res.status(400).json({ error: "No backup codes available." });
@@ -1057,6 +1118,8 @@ router.get(
           id: u._id,
           role: u.role,
           email: u.email,
+          pendingEmail: u.pendingEmail || "",
+          pendingEmailRequestedAt: u.pendingEmailRequestedAt || null,
         firstName: u.firstName,
         lastName: u.lastName,
         avatarURL: u.avatarURL || null,
@@ -1106,17 +1169,20 @@ router.post(
     const { email } = req.body || {};
     if (!isEmail(email)) return res.status(400).json({ msg: "Invalid email" });
 
-    const user = await User.findOne({ email: String(email).toLowerCase() });
+    const normalizedEmail = normalizeEmail(email);
+    const user = await User.findOne({
+      $or: [{ email: normalizedEmail }, { pendingEmail: normalizedEmail }],
+    });
     if (!user) return res.json({ ok: true }); // don't reveal existence
-    if (user.emailVerified) return res.json({ ok: true });
+    const isCurrentEmail = normalizeEmail(user.email) === normalizedEmail;
+    const isPendingEmail = normalizeEmail(user.pendingEmail) === normalizedEmail;
+    if (isCurrentEmail && user.emailVerified && !isPendingEmail) return res.json({ ok: true });
 
     try {
-      const verifyToken = signOneTime(
-        { purpose: "verify-email", uid: user._id.toString() },
-        { minutes: 60, secretEnv: "JWT_SECRET" }
-      );
-      const verifyUrl = `${process.env.APP_BASE_URL || ""}/verify-email?token=${verifyToken}`;
-      await sendEmail(user.email, "Verify your email", `Click to verify: ${verifyUrl}`);
+      await sendVerificationEmail({
+        user,
+        email: isPendingEmail ? user.pendingEmail : user.email,
+      });
     } catch (_) {}
 
     await AuditLog.logFromReq(req, "auth.verify.resend", {
@@ -1135,12 +1201,24 @@ router.post(
     if (!token) return res.status(400).json({ msg: "Missing token" });
     try {
       const payload = jwt.verify(token, process.env.JWT_SECRET);
-      if (payload.purpose !== "verify-email" || !isObjId(payload.uid)) {
+      if (payload.purpose !== "verify-email" || !isObjId(payload.uid) || !isEmail(payload.email || "")) {
         return res.status(400).json({ msg: "Invalid token" });
       }
       const user = await User.findById(payload.uid);
       if (!user) return res.status(404).json({ msg: "User not found" });
-      user.markEmailVerified?.();
+      const verifiedEmail = normalizeEmail(payload.email);
+      if (!applyVerifiedEmail(user, verifiedEmail)) {
+        return res.status(400).json({ msg: "Invalid or expired token" });
+      }
+      if (normalizeEmail(user.email) === verifiedEmail) {
+        const collision = await User.exists({
+          _id: { $ne: user._id },
+          email: verifiedEmail,
+        });
+        if (collision) {
+          return res.status(409).json({ msg: "Email already in use" });
+        }
+      }
       await user.save();
 
       await AuditLog.logFromReq(req, "auth.verify.success", {
@@ -1176,19 +1254,9 @@ router.post(
     const baseUrl = (process.env.APP_BASE_URL || "").replace(/\/+$/, "");
     const resetUrl = `${baseUrl}/reset-password.html?token=${resetToken}`;
     try {
-      const inlineLogoPath = path.join(__dirname, "../../frontend/Cleanfav.png");
-      const html = buildResetPasswordEmailHtml(user, resetUrl, { logoUrl: "cid:cleanfav-logo" });
+      const html = buildResetPasswordEmailHtml(user, resetUrl);
       const text = `Reset your password using this link: ${resetUrl}\nThis link expires in 48 hours.`;
-      await sendEmail(user.email, "Reset your password", html, {
-        text,
-        attachments: [
-          {
-            filename: "Cleanfav.png",
-            path: inlineLogoPath,
-            cid: "cleanfav-logo",
-          },
-        ],
-      });
+      await sendEmail(user.email, "Reset your password", html, { text });
     } catch (_) {}
 
     await AuditLog.logFromReq(req, "auth.password.reset.request", {

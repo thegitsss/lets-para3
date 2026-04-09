@@ -138,6 +138,24 @@
       margin-top: 2px;
       flex: 0 0 auto;
     }
+    .terms-label.validation-error {
+      color: #9f1239;
+    }
+    .terms-label.validation-error input {
+      outline: 1px solid #dc2626;
+      outline-offset: 2px;
+    }
+    .inline-validation {
+      display: none;
+      margin-top: 6px;
+      margin-left: 28px;
+      font-size: 0.84rem;
+      color: #b42318;
+      line-height: 1.35;
+    }
+    .inline-validation.show {
+      display: block;
+    }
     .role-note.pricing-note {
       margin: 12px 0 18px;
       padding: 10px 12px;
@@ -566,10 +584,11 @@
               </label>
             </div>
             <div id="attorneyPricingWrap" style="display:none;margin-top:10px;">
-              <label class="terms-label" style="display:flex;align-items:flex-start;gap:8px;font-size:0.9rem;font-weight:200;color:var(--muted);">
-                <input id="attorneyPricingAck" type="checkbox" />
+              <label id="attorneyPricingLabel" class="terms-label" style="display:flex;align-items:flex-start;gap:8px;font-size:0.9rem;font-weight:200;color:var(--muted);">
+                <input id="attorneyPricingAck" type="checkbox" required aria-describedby="attorneyPricingError" aria-invalid="false" />
                 <span>I acknowledge that all matters posted on Let’s-ParaConnect require a $400 minimum.</span>
               </label>
+              <p id="attorneyPricingError" class="inline-validation" role="alert">You must acknowledge the $400 minimum before creating your account.</p>
             </div>
 
             <div class="turnstile-wrap" aria-hidden="true">
@@ -628,6 +647,9 @@
     const admissionNotice = document.getElementById('paralegalAdmissionNotice');
     const attorneyPricingNotice = document.getElementById('attorneyPricingNotice');
     const attorneyPricingWrap = document.getElementById('attorneyPricingWrap');
+    const attorneyPricingLabel = document.getElementById('attorneyPricingLabel');
+    const attorneyPricingAck = document.getElementById('attorneyPricingAck');
+    const attorneyPricingError = document.getElementById('attorneyPricingError');
     const togglePw = document.getElementById('togglePw');
     const pw = document.getElementById('password');
     const pwConfirm = document.getElementById('passwordConfirm');
@@ -653,6 +675,17 @@
       if (!submitBtn) return;
       submitBtn.disabled = submitLocked;
     };
+
+    function setAttorneyPricingValidation(showError) {
+      if (!attorneyPricingAck) return;
+      attorneyPricingAck.setAttribute('aria-invalid', showError ? 'true' : 'false');
+      attorneyPricingLabel?.classList.toggle('validation-error', Boolean(showError));
+      attorneyPricingError?.classList.toggle('show', Boolean(showError));
+    }
+
+    function clearAttorneyPricingValidation() {
+      setAttorneyPricingValidation(false);
+    }
 
     function goToStep(step) {
       currentStep = step;
@@ -859,6 +892,7 @@
         attorneyPricingAck.disabled = !showPricing;
         if (!showPricing) attorneyPricingAck.checked = false;
       }
+      clearAttorneyPricingValidation();
       if (r === 'paralegal') attachResumeHandler();
     }
     function resetSignupForm(nextRole) {
@@ -884,6 +918,7 @@
         window.turnstile.reset();
       }
       say('');
+      clearAttorneyPricingValidation();
       setRole(nextRole);
       goToStep(1);
       updateSubmitState();
@@ -924,6 +959,11 @@
     });
 
     stateSelect?.addEventListener('change', updateSubmitState);
+    attorneyPricingAck?.addEventListener('change', () => {
+      if (attorneyPricingAck.checked) {
+        clearAttorneyPricingValidation();
+      }
+    });
 
     function say(text, cls = '') {
       if (!msg) return;
@@ -1097,6 +1137,7 @@
         attorneyBarState = (document.getElementById('barState')?.value || '').trim();
         attorneyLawFirm = (document.getElementById('lawFirm')?.value || '').trim();
         const goodStandingConfirmed = document.getElementById('attorneyGoodStanding')?.checked;
+        const pricingAcknowledged = document.getElementById('attorneyPricingAck')?.checked;
         if (!attorneyBar) { say('State Bar Number is required for attorneys.', 'err'); return; }
         if (!isValidBarNumber(attorneyBar, attorneyBarState)) {
           say('Enter a valid bar number.', 'err');
@@ -1107,6 +1148,13 @@
           say('Please confirm you are licensed and in good standing.', 'err');
           return;
         }
+        if (!pricingAcknowledged) {
+          setAttorneyPricingValidation(true);
+          say('Please acknowledge the $400 minimum case requirement.', 'err');
+          document.getElementById('attorneyPricingAck')?.focus();
+          return;
+        }
+        clearAttorneyPricingValidation();
         if (attorneyLinkedIn && !isValidLinkedInUrl(attorneyLinkedIn)) {
           say('Enter a valid LinkedIn URL (e.g., https://www.linkedin.com/in/username).', 'err');
           return;
@@ -1160,6 +1208,7 @@
           if (attorneyBarState) formData.append('barState', attorneyBarState);
           if (attorneyLinkedIn) formData.append('linkedInURL', attorneyLinkedIn);
           if (attorneyLawFirm) formData.append('lawFirm', attorneyLawFirm);
+          formData.append('attorneyPricingAccepted', String(Boolean(document.getElementById('attorneyPricingAck')?.checked)));
         } else {
           const resumeFile = document.getElementById('resumeUpload')?.files?.[0];
           if (resumeFile) formData.append('resume', resumeFile, resumeFile.name || 'resume.pdf');
@@ -1191,7 +1240,7 @@
 
         localStorage.setItem('lastEmail', email);
         sessionStorage.setItem('signupToast', 'Your application has been submitted for approval.');
-        sayPersistent('Application submitted. Await approval.', 'ok');
+        sayPersistent("Application submitted. We'll email you once it's approved.", 'ok');
         shouldRestoreButton = false;
         submitLocked = true;
         if (submitBtn) {

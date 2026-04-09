@@ -156,6 +156,8 @@ const recentActivityState = {
 };
 
 const appliedFilters = {
+  toggle: document.getElementById('appliedFilterToggle'),
+  panel: document.getElementById('appliedControlsPanel'),
   search: document.getElementById('appliedSearch'),
   status: document.getElementById('appliedStatusFilter'),
   practice: document.getElementById('appliedPracticeFilter'),
@@ -196,6 +198,7 @@ let stripeGateBound = false;
 let pendingApprovalReady = false;
 let appliedAppsCache = [];
 let appliedFiltersBound = false;
+let appliedFilterToggleBound = false;
 let activeApplication = null;
 let applicationPreEngagementDraft = null;
 let applicationPreEngagementExpandedKey = '';
@@ -2621,9 +2624,38 @@ async function loadAppliedJobs({ preservePage = false } = {}) {
 
 function bindAppliedFilters() {
   if (appliedFiltersBound) return;
-  const { search, status, practice, dateRange } = appliedFilters;
+  const { toggle, panel, search, status, practice, dateRange } = appliedFilters;
   if (!search || !practice || !dateRange) return;
   appliedFiltersBound = true;
+
+  if (toggle && panel && !appliedFilterToggleBound) {
+    appliedFilterToggleBound = true;
+
+    const setOpen = (open) => {
+      panel.hidden = !open;
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      toggle.setAttribute('aria-label', open ? 'Hide application filters' : 'Show application filters');
+    };
+
+    toggle.addEventListener('click', () => {
+      const open = toggle.getAttribute('aria-expanded') !== 'true';
+      setOpen(open);
+    });
+
+    document.addEventListener('click', (event) => {
+      if (panel.hidden) return;
+      if (panel.contains(event.target) || toggle.contains(event.target)) return;
+      setOpen(false);
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !panel.hidden) {
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+  }
+
   search.addEventListener('input', () => applyAppliedFilters({ resetPage: true }));
   if (status) {
     status.addEventListener('change', () => applyAppliedFilters({ resetPage: true }));

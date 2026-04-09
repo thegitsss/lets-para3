@@ -1,0 +1,38 @@
+{
+  "checkedAt": "2026-04-01T21:35:59.676Z",
+  "ok": true,
+  "fingerprint": "",
+  "checks": [
+    {
+      "ok": true,
+      "code": "health_ok",
+      "message": "Health check passed.",
+      "details": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "db": "connected"
+        }
+      }
+    },
+    {
+      "ok": true,
+      "code": "backup_ok",
+      "message": "Backup freshness check passed.",
+      "details": {
+        "status": "ok",
+        "startedAt": "2026-04-01T21:34:01.378Z",
+        "completedAt": "2026-04-01T21:34:04.259Z",
+        "backupDir": "/Users/samanthasider/Desktop/lets-para3/backend/backups",
+        "outPath": "/Users/samanthasider/Desktop/lets-para3/backend/backups/backup_20260401_213401.archive.gz",
+        "sizeBytes": 393755,
+        "retentionDays": 14
+      }
+    },
+    {
+      "ok": true,
+      "code": "stripe_webhooks_ok",
+      "message": "No recent failed Stripe webhook events detected."
+    }
+  ]
+}

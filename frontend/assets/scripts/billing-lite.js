@@ -251,6 +251,7 @@ async function loadPaymentMethodStatus() {
 function renderPaymentMethodSummary(payload = {}) {
   if (!paymentSummaryEl) return;
   const pm = payload.paymentMethod;
+  window.__lpcBillingPaymentMethod = pm || null;
   if (pm) {
     const brand = (pm.brand || pm.type || "Card").toString().toUpperCase();
     const last4 = pm.last4 || "••••";

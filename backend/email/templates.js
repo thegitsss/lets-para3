@@ -86,7 +86,7 @@ const templates = {
         ${amountLine}
         ${breakdown}
       </div>
-      <p style="margin:0;">You will see the deposit in your bank per Stripe&rsquo;s normal timeline.</p>`
+      <p style="margin:0;">You will see the deposit in your bank account according to your bank&rsquo;s normal processing time.</p>`
     );
     return { subject: "Your payout is complete", html };
   },
@@ -170,7 +170,7 @@ const templates = {
     return { subject: "Your case posting was removed", html };
   },
   systemAnnouncement: (payload = {}) => {
-    const title = payload.title || "System announcement";
+    const title = payload.title || "Platform update";
     const body = payload.message || "There is a new update available.";
     const html = frameEmail(title, `<p>${body}</p>`);
     return { subject: title, html };

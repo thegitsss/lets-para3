@@ -9,7 +9,7 @@ export function render(el) {
     <section class="pending-view">
       <div class="card">
         <h1>Account Pending Approval</h1>
-        <p>Your account is pending approval. You will receive an email once an administrator approves your access.</p>
+        <p>Your account is still under review. We’ll email you as soon as it’s approved.</p>
         <button class="btn" data-act="logout">Log out</button>
       </div>
     </section>

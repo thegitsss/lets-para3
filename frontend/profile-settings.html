@@ -1024,6 +1024,10 @@
       padding-bottom: 12px;
     }
 
+    body.paralegal-flat #securitySection .blocked-users-card {
+      margin-top: 0;
+    }
+
     @media (max-width: 960px) {
       #securitySection .security-grid {
         grid-template-columns: 1fr;
@@ -1197,8 +1201,94 @@
     }
 
     .blocked-user-name {
-      font-weight: 600;
+      font-family: var(--font-sans);
+      font-size: 0.95rem;
+      font-weight: 300;
+      letter-spacing: 0.01em;
+      color: var(--ink);
       min-width: 0;
+    }
+
+    #securitySection .blocked-users-card {
+      padding: 0;
+      border: none;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .blocked-users-disclosure {
+      flex: 1;
+      border: none;
+      background: transparent;
+      overflow: visible;
+    }
+
+    .blocked-users-disclosure summary {
+      list-style: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 4px 0;
+      font-family: var(--font-sans);
+      font-size: 0.92rem;
+      font-weight: 300;
+      color: var(--ink);
+      user-select: none;
+    }
+
+    .blocked-users-disclosure summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .blocked-users-summary-leading {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .blocked-users-summary-inline-help {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.55);
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-serif);
+      font-size: 0.8rem;
+      font-weight: 300;
+      line-height: 1;
+    }
+
+    .blocked-users-summary-meta {
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 200;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .blocked-users-summary-caret {
+      color: var(--muted);
+      font-size: 0.72rem;
+      transition: transform 0.2s ease;
+    }
+
+    .blocked-users-disclosure[open] .blocked-users-summary-caret {
+      transform: rotate(180deg);
+    }
+
+    .blocked-users-panel {
+      padding: 8px 0 0;
+      display: grid;
+      gap: 10px;
     }
 
     .muted {
@@ -1635,6 +1725,11 @@ label {
     .language-row .language-level:focus {
       border-color: var(--accent);
       box-shadow: 0 0 0 2px rgba(182, 164, 122, 0.25);
+    }
+
+    .language-row .language-level option {
+      color: #132033;
+      background: #ffffff;
     }
 
     #paralegalSettings .language-row .remove-language {
@@ -3252,6 +3347,39 @@ input[type="number"],
       color: var(--ink);
     }
 
+    body.theme-dark #paralegalSettings .language-row .language-level,
+    html.theme-dark #paralegalSettings .language-row .language-level,
+    body.theme-mountain-dark #paralegalSettings .language-row .language-level,
+    html.theme-mountain-dark #paralegalSettings .language-row .language-level {
+      background:
+        linear-gradient(135deg, rgba(182, 164, 122, 0.18), rgba(0, 0, 0, 0)) padding-box,
+        linear-gradient(135deg, rgba(182, 164, 122, 0.38), rgba(255, 255, 255, 0.08)) border-box;
+      background-color: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(201, 173, 118, 0.35);
+      color: #f8fafc;
+      box-shadow: 0 10px 24px rgba(3, 7, 18, 0.22);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath fill='%23f3e3b2' d='M7 9L0 0h14z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      background-size: 12px;
+    }
+
+    body.theme-dark #paralegalSettings .language-row .language-level:focus,
+    html.theme-dark #paralegalSettings .language-row .language-level:focus,
+    body.theme-mountain-dark #paralegalSettings .language-row .language-level:focus,
+    html.theme-mountain-dark #paralegalSettings .language-row .language-level:focus {
+      border: 1px solid rgba(243, 227, 178, 0.55);
+      box-shadow: 0 0 0 3px rgba(182, 164, 122, 0.22);
+    }
+
+    body.theme-dark #paralegalSettings .language-row .language-level option,
+    html.theme-dark #paralegalSettings .language-row .language-level option,
+    body.theme-mountain-dark #paralegalSettings .language-row .language-level option,
+    html.theme-mountain-dark #paralegalSettings .language-row .language-level option {
+      background: #111827;
+      color: #f8fafc;
+    }
+
     #paralegalSettings #stateExperienceInput {
       border: 1px solid var(--line);
       background: var(--panel);
@@ -3687,6 +3815,8 @@ input[type="number"],
       transform: translateX(-50%) translateY(20px);
       background: var(--ink);
       color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: 0 14px 32px rgba(15, 23, 42, 0.28);
       padding: 12px 24px;
       border-radius: 999px;
       opacity: 0;
@@ -3701,11 +3831,42 @@ input[type="number"],
     }
 
     .toast[data-toast-type="ok"] {
-      background: #1d976c;
+      background: #166534;
+      color: #f8fffb;
     }
 
     .toast[data-toast-type="err"] {
-      background: var(--danger);
+      background: #b42318;
+      color: #fff7f6;
+    }
+
+    .toast[data-toast-type="info"] {
+      background: #1f2937;
+      color: #f9fafb;
+    }
+
+    html.theme-dark .toast,
+    body.theme-dark .toast,
+    html.theme-mountain-dark .toast,
+    body.theme-mountain-dark .toast {
+      border-color: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45);
+    }
+
+    html.theme-dark .toast[data-toast-type="ok"],
+    body.theme-dark .toast[data-toast-type="ok"],
+    html.theme-mountain-dark .toast[data-toast-type="ok"],
+    body.theme-mountain-dark .toast[data-toast-type="ok"] {
+      background: #14532d;
+      color: #f7fee7;
+    }
+
+    html.theme-dark .toast[data-toast-type="info"],
+    body.theme-dark .toast[data-toast-type="info"],
+    html.theme-mountain-dark .toast[data-toast-type="info"],
+    body.theme-mountain-dark .toast[data-toast-type="info"] {
+      background: #111827;
+      color: #f9fafb;
     }
 
     .modal {
@@ -4928,17 +5089,26 @@ input[type="number"],
             <button id="savePasswordBtn" class="btn btn-primary">Save Password</button>
           </div>
 
-          <div class="settings-block security-card">
-            <div class="settings-title-with-help">
-              <h3>Blocked Users</h3>
-              <details class="settings-help-tooltip">
-                <summary aria-label="Blocked users help">?</summary>
-                <div class="settings-help-tooltip-panel" role="note">
-                  Manage active blocks here. Removing a block only restores future interaction. It does not reopen old matters, messages, or prior workflows. This user will not be notified.
-                </div>
-              </details>
-            </div>
-            <div id="blockedUsersList">Loading…</div>
+          <div class="settings-block security-card blocked-users-card">
+            <details class="blocked-users-disclosure">
+              <summary>
+                <span class="blocked-users-summary-leading">
+                  <span>Blocked</span>
+                  <span
+                    class="blocked-users-summary-inline-help"
+                    aria-label="Blocked users help"
+                    title="Manage active blocks here. Removing a block only restores future interaction. It does not reopen old matters, messages, or prior workflows."
+                  >?</span>
+                </span>
+                <span class="blocked-users-summary-meta">
+                  <span id="blockedUsersSummaryCount">Loading…</span>
+                  <span class="blocked-users-summary-caret" aria-hidden="true">▾</span>
+                </span>
+              </summary>
+              <div class="blocked-users-panel">
+                <div id="blockedUsersList">Loading…</div>
+              </div>
+            </details>
           </div>
         </div>
 

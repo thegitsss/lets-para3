@@ -8,6 +8,7 @@
 export let CSRF_TOKEN = "";
 
 const USER_KEY = "lpc_user";
+const SUPPORT_SESSION_USER_KEY = "lpc_support_session_user";
 const LEGACY_TOKEN_KEYS = ["LPC_JWT", "lpc_jwt"];
 let redirectingToLogin = false;
 
@@ -70,6 +71,11 @@ export function persistSession({ user } = {}) {
 export function clearSession() {
   try {
     localStorage.removeItem(USER_KEY);
+  } catch {
+    /* noop */
+  }
+  try {
+    sessionStorage.removeItem(SUPPORT_SESSION_USER_KEY);
   } catch {
     /* noop */
   }

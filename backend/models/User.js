@@ -160,6 +160,7 @@ const onboardingSchema = new Schema(
     paralegalTourCompleted: { type: Boolean, default: false },
     paralegalProfileTourCompleted: { type: Boolean, default: false },
     attorneyTourCompleted: { type: Boolean, default: false },
+    attorneyProfileCompleted: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -192,6 +193,14 @@ const userSchema = new Schema(
       index: true,
       maxlength: 320,
     },
+    pendingEmail: {
+      type: String,
+      default: null,
+      lowercase: true,
+      trim: true,
+      maxlength: 320,
+    },
+    pendingEmailRequestedAt: { type: Date, default: null },
     password: { type: String, required: true, select: false }, // never returned by default
     emailVerified: { type: Boolean, default: false },
     phoneNumber: { type: String, default: null },
@@ -254,6 +263,7 @@ const userSchema = new Schema(
 
     // Security / housekeeping
     termsAccepted: { type: Boolean, default: false },
+    attorneyPricingAccepted: { type: Boolean, default: false },
     lastLoginAt: { type: Date },
     failedLogins: { type: Number, default: 0 },
     lockedUntil: { type: Date },

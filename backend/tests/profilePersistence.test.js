@@ -93,10 +93,12 @@ describe("Profile persistence + cross-device state", () => {
     expect(secondSession.body.lastName).toBe("Stone");
     expect(secondSession.body.lawFirm).toBe("Stone & Co");
     expect(secondSession.body.practiceAreas).toContain("Litigation");
+    expect(secondSession.body.onboarding?.attorneyProfileCompleted).toBe(true);
 
     const fromDb = await User.findById(attorney._id).lean();
     expect(fromDb.lastName).toBe("Stone");
     expect(fromDb.lawFirm).toBe("Stone & Co");
+    expect(fromDb.onboarding?.attorneyProfileCompleted).toBe(true);
   });
 
   test("Paralegal profile persists after logout/login", async () => {
