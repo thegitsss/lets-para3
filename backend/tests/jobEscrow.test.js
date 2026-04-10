@@ -50,6 +50,7 @@ jest.mock("../services/caseLifecycle", () => ({
 }));
 
 const stripe = require("../utils/stripe");
+const caseLifecycle = require("../services/caseLifecycle");
 const casesRouter = require("../routes/cases");
 const paymentsRouter = require("../routes/payments");
 
@@ -94,6 +95,7 @@ beforeEach(async () => {
   stripe.customers.retrieve.mockResolvedValue({
     invoice_settings: { default_payment_method: "pm_test_default" },
   });
+  caseLifecycle.buildReceiptPdfBuffer.mockClear();
 });
 
 describe("Job posting + escrow", () => {
@@ -265,6 +267,13 @@ describe("Job posting + escrow", () => {
 
     expect(intentRes.status).toBe(200);
     expect(intentRes.body.clientSecret).toBe("cs_test_123");
+    expect(stripe.paymentIntents.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 48800,
+        currency: "usd",
+      }),
+      expect.any(Object)
+    );
 
     const confirmRes = await request(app)
       .post(`/api/payments/confirm/${caseDoc._id}`)
@@ -282,6 +291,10 @@ describe("Job posting + escrow", () => {
 
     const refreshed = await Case.findById(caseDoc._id).lean();
     expect(refreshed.escrowStatus).toBe("funded");
+    expect(refreshed.feeAttorneyPct).toBe(22);
+    expect(refreshed.feeAttorneyAmount).toBe(8800);
+    expect(refreshed.feeParalegalPct).toBe(18);
+    expect(refreshed.feeParalegalAmount).toBe(7200);
 
     const receiptRes = await request(app)
       .get(`/api/payments/receipt/attorney/${caseDoc._id}`)
@@ -292,6 +305,67 @@ describe("Job posting + escrow", () => {
     expect(receiptRes.headers["content-type"]).toMatch(/application\/pdf/);
     expect(Buffer.isBuffer(receiptRes.body)).toBe(true);
     expect(receiptRes.body.length).toBeGreaterThan(5);
+    expect(caseLifecycle.buildReceiptPdfBuffer).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        lineItems: expect.arrayContaining([
+          expect.objectContaining({ label: "Case fee", value: "$400.00" }),
+          expect.objectContaining({ label: "Platform fee (22%)", value: "$88.00" }),
+        ]),
+        totalAmount: "$488.00",
+      })
+    );
+  });
+
+  test("Attorney receipt recomputes platform fee when historical snapshot is zero", async () => {
+    const attorney = await User.create({
+      firstName: "Ava",
+      lastName: "Stone",
+      email: "samanthasider+attorney@gmail.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const caseDoc = await Case.create({
+      title: "Historical receipt test",
+      practiceArea: "immigration",
+      details: "Historical funding record with a bad fee snapshot.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      totalAmount: 40000,
+      lockedTotalAmount: 40000,
+      feeAttorneyPct: 22,
+      feeAttorneyAmount: 0,
+      paymentIntentId: "pi_historical_123",
+      escrowIntentId: "pi_historical_123",
+      currency: "usd",
+    });
+
+    stripe.paymentIntents.retrieve.mockResolvedValue({
+      id: "pi_historical_123",
+      status: "succeeded",
+      amount: 48800,
+      currency: "usd",
+      charges: { data: [{ payment_method_details: { card: { brand: "visa", last4: "4242" } } }] },
+    });
+
+    const cookie = authCookieFor(attorney);
+    const receiptRes = await request(app)
+      .get(`/api/payments/receipt/attorney/${caseDoc._id}`)
+      .set("Cookie", cookie)
+      .buffer(true);
+
+    expect(receiptRes.status).toBe(200);
+    expect(caseLifecycle.buildReceiptPdfBuffer).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        lineItems: expect.arrayContaining([
+          expect.objectContaining({ label: "Case fee", value: "$400.00" }),
+          expect.objectContaining({ label: "Platform fee (22%)", value: "$88.00" }),
+        ]),
+        totalAmount: "$488.00",
+      })
+    );
   });
 
   test("Budget update fails when below $400", async () => {

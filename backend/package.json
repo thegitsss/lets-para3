@@ -32,6 +32,7 @@
     "test:e2e:error-handling": "node scripts/e2e-error-handling.js",
     "test:e2e:payouts": "node scripts/e2e-payouts.js",
     "test:e2e:withdrawal": "node scripts/e2e-withdrawal-flow.js",
+    "backfill:attorney-fees": "node scripts/backfill-attorney-fees.js",
     "test:playwright:control-room": "playwright test -c playwright.control-room.config.js",
     "test:playwright:control-room:headed": "playwright test -c playwright.control-room.config.js --headed",
     "test:playwright:support": "playwright test -c playwright.support.config.js",

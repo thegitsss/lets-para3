@@ -300,20 +300,47 @@ function resolveParalegalFeePct(doc = {}) {
     : PLATFORM_FEE_PARALEGAL_PERCENT;
 }
 
+function calculateAttorneyFee(baseAmount, pct = PLATFORM_FEE_ATTORNEY_PERCENT) {
+  return Math.max(0, Math.round(cents(baseAmount) * ((Number(pct) || 0) / 100)));
+}
+
+function calculateParalegalFee(baseAmount, pct = PLATFORM_FEE_PARALEGAL_PERCENT) {
+  return Math.max(0, Math.round(cents(baseAmount) * ((Number(pct) || 0) / 100)));
+}
+
 function computePlatformFee(doc = {}) {
-  const snap = cents(doc.feeAttorneyAmount);
-  if (snap > 0) return snap;
   const pct = resolveAttorneyFeePct(doc);
   const base = doc.lockedTotalAmount ?? doc.totalAmount;
-  return Math.max(0, Math.round(cents(base) * (pct / 100)));
+  const snap = cents(doc.feeAttorneyAmount);
+  if (snap > 0 || cents(base) <= 0) return snap;
+  return calculateAttorneyFee(base, pct);
 }
 
 function computeParalegalFee(doc = {}) {
-  const snap = cents(doc.feeParalegalAmount);
-  if (snap > 0) return snap;
   const pct = resolveParalegalFeePct(doc);
   const base = doc.lockedTotalAmount ?? doc.totalAmount;
-  return Math.max(0, Math.round(cents(base) * (pct / 100)));
+  const snap = cents(doc.feeParalegalAmount);
+  if (snap > 0 || cents(base) <= 0) return snap;
+  return calculateParalegalFee(base, pct);
+}
+
+function syncPlatformFeeSnapshots(doc = {}, { baseAmount } = {}) {
+  const base = cents(
+    typeof baseAmount !== "undefined" ? baseAmount : doc.lockedTotalAmount ?? doc.totalAmount
+  );
+  const attorneyPct = resolveAttorneyFeePct(doc);
+  const paralegalPct = resolveParalegalFeePct(doc);
+  doc.feeAttorneyPct = attorneyPct;
+  doc.feeParalegalPct = paralegalPct;
+  doc.feeAttorneyAmount = calculateAttorneyFee(base, attorneyPct);
+  doc.feeParalegalAmount = calculateParalegalFee(base, paralegalPct);
+  return {
+    baseAmount: base,
+    attorneyPct,
+    paralegalPct,
+    attorneyFee: doc.feeAttorneyAmount,
+    paralegalFee: doc.feeParalegalAmount,
+  };
 }
 
 function resolveDisputeSettlement(doc = {}) {
@@ -328,12 +355,16 @@ function resolveDisputeSettlement(doc = {}) {
   const feeParalegalPct = Number.isFinite(settlement.feeParalegalPct)
     ? settlement.feeParalegalPct
     : resolveParalegalFeePct(doc);
-  const feeAttorneyAmount = Number.isFinite(settlement.feeAttorneyAmount)
-    ? cents(settlement.feeAttorneyAmount)
-    : Math.max(0, Math.round(grossAmount * (feeAttorneyPct / 100)));
-  const feeParalegalAmount = Number.isFinite(settlement.feeParalegalAmount)
-    ? cents(settlement.feeParalegalAmount)
-    : Math.max(0, Math.round(grossAmount * (feeParalegalPct / 100)));
+  const feeAttorneySnapshot = cents(settlement.feeAttorneyAmount);
+  const feeParalegalSnapshot = cents(settlement.feeParalegalAmount);
+  const feeAttorneyAmount =
+    feeAttorneySnapshot > 0 || grossAmount <= 0
+      ? feeAttorneySnapshot
+      : calculateAttorneyFee(grossAmount, feeAttorneyPct);
+  const feeParalegalAmount =
+    feeParalegalSnapshot > 0 || grossAmount <= 0
+      ? feeParalegalSnapshot
+      : calculateParalegalFee(grossAmount, feeParalegalPct);
   const payoutAmount = Number.isFinite(settlement.payoutAmount)
     ? cents(settlement.payoutAmount)
     : Math.max(0, grossAmount - feeParalegalAmount);
@@ -559,6 +590,7 @@ async function applyPaymentIntentSnapshot(caseDoc, paymentIntent, { notifyOnSucc
     caseDoc.lockedTotalAmount = caseDoc.totalAmount;
   }
   caseDoc.paymentStatus = piStatus || caseDoc.paymentStatus || "pending";
+  syncPlatformFeeSnapshots(caseDoc);
 
   if (piStatus === "succeeded" && transferable) {
     caseDoc.escrowStatus = "funded";
@@ -1914,10 +1946,7 @@ router.post(
       c.stripeMode,
       currentStripeMode()
     );
-    if (!Number.isFinite(c.feeAttorneyPct)) c.feeAttorneyPct = attorneyPct;
-    if (!Number.isFinite(c.feeAttorneyAmount)) c.feeAttorneyAmount = attorneyFee;
-    if (!Number.isFinite(c.feeParalegalPct)) c.feeParalegalPct = paralegalPct;
-    if (!Number.isFinite(c.feeParalegalAmount)) c.feeParalegalAmount = paralegalFee;
+    syncPlatformFeeSnapshots(c, { baseAmount });
     await c.save();
 
     await AuditLog.logFromReq(req, "payment.intent.create", {
@@ -2110,12 +2139,7 @@ router.post(
     if (pi.status !== "succeeded") return res.status(400).json({ error: "Stripe not captured yet" });
 
     const base = c.lockedTotalAmount ?? c.totalAmount;
-    const attorneyFee = Math.max(0, Math.round((base * resolveAttorneyFeePct(c)) / 100));
-    const paralegalFee = Math.max(0, Math.round((base * resolveParalegalFeePct(c)) / 100));
-    if (!Number.isFinite(c.feeAttorneyPct)) c.feeAttorneyPct = resolveAttorneyFeePct(c);
-    if (!Number.isFinite(c.feeAttorneyAmount)) c.feeAttorneyAmount = attorneyFee;
-    if (!Number.isFinite(c.feeParalegalPct)) c.feeParalegalPct = resolveParalegalFeePct(c);
-    if (!Number.isFinite(c.feeParalegalAmount)) c.feeParalegalAmount = paralegalFee;
+    const { attorneyFee, paralegalFee } = syncPlatformFeeSnapshots(c, { baseAmount: base });
     const payout = Math.max(0, base - paralegalFee);
 
     c.paymentReleased = true;
@@ -2202,12 +2226,7 @@ router.post(
     }
 
     const base = c.lockedTotalAmount ?? c.totalAmount;
-    const feeP = Math.max(0, Math.round((base * resolveParalegalFeePct(c)) / 100));
-    const feeA = Math.max(0, Math.round((base * resolveAttorneyFeePct(c)) / 100));
-    if (!Number.isFinite(c.feeAttorneyPct)) c.feeAttorneyPct = resolveAttorneyFeePct(c);
-    if (!Number.isFinite(c.feeAttorneyAmount)) c.feeAttorneyAmount = feeA;
-    if (!Number.isFinite(c.feeParalegalPct)) c.feeParalegalPct = resolveParalegalFeePct(c);
-    if (!Number.isFinite(c.feeParalegalAmount)) c.feeParalegalAmount = feeP;
+    const { attorneyFee: feeA, paralegalFee: feeP } = syncPlatformFeeSnapshots(c, { baseAmount: base });
     const payout = Math.max(0, base - feeP);
 
     let transfer;
@@ -3282,9 +3301,7 @@ router.get(
         fullName(doc.withdrawnParalegalId || {}) || doc.paralegalNameSnapshot || "Paralegal";
 
       const baseAmount = Number(doc.lockedTotalAmount ?? doc.totalAmount ?? 0);
-      const attorneyFee = Number.isFinite(Number(doc.feeAttorneyAmount))
-        ? Number(doc.feeAttorneyAmount)
-        : computePlatformFee(doc);
+      const attorneyFee = computePlatformFee(doc);
       const fundingReceiptId = doc.paymentIntentId || doc.escrowIntentId || "";
       if (fundingReceiptId) {
         rows.push(

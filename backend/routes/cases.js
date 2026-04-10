@@ -488,18 +488,26 @@ function resolveParalegalFeePct(doc = {}) {
     : PLATFORM_FEE_PARALEGAL_PERCENT;
 }
 
+function calculateAttorneyFeeAmount(baseAmount, pct = PLATFORM_FEE_ATTORNEY_PERCENT) {
+  return Math.max(0, Math.round(Number(baseAmount || 0) * ((Number(pct) || 0) / 100)));
+}
+
+function calculateParalegalFeeAmount(baseAmount, pct = PLATFORM_FEE_PARALEGAL_PERCENT) {
+  return Math.max(0, Math.round(Number(baseAmount || 0) * ((Number(pct) || 0) / 100)));
+}
+
 function computeAttorneyFeeAmount(baseAmount, doc = {}) {
-  if (Number.isFinite(doc.feeAttorneyAmount) && doc.feeAttorneyAmount >= 0) {
+  if (Number.isFinite(doc.feeAttorneyAmount) && doc.feeAttorneyAmount > 0) {
     return doc.feeAttorneyAmount;
   }
-  return Math.max(0, Math.round(baseAmount * (resolveAttorneyFeePct(doc) / 100)));
+  return calculateAttorneyFeeAmount(baseAmount, resolveAttorneyFeePct(doc));
 }
 
 function computeParalegalFeeAmount(baseAmount, doc = {}) {
-  if (Number.isFinite(doc.feeParalegalAmount) && doc.feeParalegalAmount >= 0) {
+  if (Number.isFinite(doc.feeParalegalAmount) && doc.feeParalegalAmount > 0) {
     return doc.feeParalegalAmount;
   }
-  return Math.max(0, Math.round(baseAmount * (resolveParalegalFeePct(doc) / 100)));
+  return calculateParalegalFeeAmount(baseAmount, resolveParalegalFeePct(doc));
 }
 
 function resolveDisputeSettlement(doc = {}) {
@@ -514,12 +522,14 @@ function resolveDisputeSettlement(doc = {}) {
   const feeParalegalPct = Number.isFinite(settlement.feeParalegalPct)
     ? settlement.feeParalegalPct
     : resolveParalegalFeePct(doc);
-  const feeAttorneyAmount = Number.isFinite(settlement.feeAttorneyAmount)
-    ? settlement.feeAttorneyAmount
-    : Math.max(0, Math.round(grossAmount * (feeAttorneyPct / 100)));
-  const feeParalegalAmount = Number.isFinite(settlement.feeParalegalAmount)
-    ? settlement.feeParalegalAmount
-    : Math.max(0, Math.round(grossAmount * (feeParalegalPct / 100)));
+  const feeAttorneyAmount =
+    Number.isFinite(settlement.feeAttorneyAmount) && settlement.feeAttorneyAmount > 0
+      ? settlement.feeAttorneyAmount
+      : calculateAttorneyFeeAmount(grossAmount, feeAttorneyPct);
+  const feeParalegalAmount =
+    Number.isFinite(settlement.feeParalegalAmount) && settlement.feeParalegalAmount > 0
+      ? settlement.feeParalegalAmount
+      : calculateParalegalFeeAmount(grossAmount, feeParalegalPct);
   const payoutAmount = Number.isFinite(settlement.payoutAmount)
     ? settlement.payoutAmount
     : Math.max(0, grossAmount - feeParalegalAmount);
@@ -1636,8 +1646,8 @@ async function ensureFundsReleased(req, caseDoc) {
   caseDoc.paidOutAt = completedAt;
   caseDoc.completedAt = caseDoc.completedAt || completedAt;
   caseDoc.briefSummary = `${caseDoc.title} – ${paralegalName} – completed ${completedAt.toISOString().split("T")[0]}`;
-  if (!Number.isFinite(caseDoc.feeAttorneyPct)) caseDoc.feeAttorneyPct = resolveAttorneyFeePct(caseDoc);
-  if (!Number.isFinite(caseDoc.feeAttorneyAmount)) caseDoc.feeAttorneyAmount = attorneyFee;
+  caseDoc.feeAttorneyPct = resolveAttorneyFeePct(caseDoc);
+  caseDoc.feeAttorneyAmount = attorneyFee;
   caseDoc.feeParalegalPct = paralegalFeePct;
   caseDoc.feeParalegalAmount = paralegalFee;
 

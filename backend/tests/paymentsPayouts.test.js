@@ -34,6 +34,8 @@ jest.mock("../services/caseLifecycle", () => ({
 }));
 
 const casesRouter = require("../routes/cases");
+const paymentsRouter = require("../routes/payments");
+const caseLifecycle = require("../services/caseLifecycle");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
 const app = (() => {
@@ -41,6 +43,7 @@ const app = (() => {
   instance.use(cookieParser());
   instance.use(express.json({ limit: "1mb" }));
   instance.use("/api/cases", casesRouter);
+  instance.use("/api/payments", paymentsRouter);
   instance.use((err, _req, res, _next) => {
     console.error(err);
     res.status(500).json({ msg: "Server error", error: err?.message || "Unknown error" });
@@ -73,6 +76,7 @@ beforeEach(async () => {
   mockStripe.transfers.create.mockReset();
   mockStripe.isTransferablePaymentIntent.mockReset();
   mockStripe.sanitizeStripeError.mockClear();
+  caseLifecycle.buildReceiptPdfBuffer.mockClear();
 });
 
 describe("Payments + payouts", () => {
@@ -165,6 +169,89 @@ describe("Payments + payouts", () => {
     const refreshed = await Case.findById(caseDoc._id).lean();
     expect(refreshed.paymentReleased).toBe(true);
     expect(refreshed.payoutTransferId).toBe("tr_test_123");
+    expect(refreshed.feeParalegalPct).toBe(18);
+    expect(refreshed.feeParalegalAmount).toBe(18000);
+
+    const receiptRes = await request(app)
+      .get(`/api/payments/receipt/paralegal/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(paralegal))
+      .buffer(true);
+
+    expect(receiptRes.status).toBe(200);
+    expect(receiptRes.headers["content-type"]).toMatch(/application\/pdf/);
+    expect(caseLifecycle.buildReceiptPdfBuffer).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        lineItems: expect.arrayContaining([
+          expect.objectContaining({ label: "Gross amount", value: "$1,000.00" }),
+          expect.objectContaining({ label: "Platform fee (18%)", value: "$180.00" }),
+        ]),
+        totalAmount: "$820.00",
+      })
+    );
+  });
+
+  test("Paralegal receipt recomputes 18 percent fee when historical snapshot is zero", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "attorney+receipt@gmail.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "paralegal+receipt@gmail.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+
+    const caseDoc = await Case.create({
+      title: "Historical payout receipt test",
+      practiceArea: "immigration",
+      details: "Historical payout record with a bad paralegal fee snapshot.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      paymentReleased: true,
+      payoutTransferId: "tr_historical_123",
+      paidOutAt: new Date("2026-04-10T12:00:00.000Z"),
+      lockedTotalAmount: 100000,
+      totalAmount: 100000,
+      feeParalegalPct: 18,
+      feeParalegalAmount: 0,
+      currency: "usd",
+    });
+
+    await Payout.create({
+      caseId: caseDoc._id,
+      paralegalId: paralegal._id,
+      amountPaid: 82000,
+      transferId: "tr_historical_123",
+      stripeMode: "test",
+    });
+
+    const receiptRes = await request(app)
+      .get(`/api/payments/receipt/paralegal/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(paralegal))
+      .buffer(true);
+
+    expect(receiptRes.status).toBe(200);
+    expect(caseLifecycle.buildReceiptPdfBuffer).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        lineItems: expect.arrayContaining([
+          expect.objectContaining({ label: "Gross amount", value: "$1,000.00" }),
+          expect.objectContaining({ label: "Platform fee (18%)", value: "$180.00" }),
+        ]),
+        totalAmount: "$820.00",
+      })
+    );
   });
 
   test("Failed payout is handled and returns an error", async () => {
