@@ -37,6 +37,8 @@ const STRIPE_PAYOUT_BYPASS_EMAILS = new Set([
   "game4funwithme1+1@gmail.com",
   "game4funwithme1@gmail.com",
 ]);
+const MIN_CASE_AMOUNT_CENTS = 40000;
+const MIN_CASE_AMOUNT_MESSAGE = "Amount must be at least $400.";
 
 function buildFundingFingerprint({ caseId, amount, currency = "usd", mode = "escrow" }) {
   return [mode, String(caseId || ""), String(amount || 0), String(currency || "usd").toLowerCase()].join(":");
@@ -1750,7 +1752,7 @@ router.get(
 /**
  * PATCH /api/payments/:caseId/budget
  * Body: { amountUsd, currency }
- * Attorney-owner or admin only. Validates cents >= $0.50.
+ * Attorney-owner or admin only. Validates case budget >= $400.
  */
 router.patch(
   "/:caseId/budget",
@@ -1788,8 +1790,8 @@ router.patch(
     }
 
     const cents = Math.round(Number(amountUsd || 0) * 100);
-    if (!Number.isFinite(cents) || cents < 1) {
-      return res.status(400).json({ msg: "Amount must be greater than $0." });
+    if (!Number.isFinite(cents) || cents < MIN_CASE_AMOUNT_CENTS) {
+      return res.status(400).json({ msg: MIN_CASE_AMOUNT_MESSAGE });
     }
 
     const before = c.totalAmount;
