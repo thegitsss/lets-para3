@@ -601,6 +601,7 @@ body.support-drawer-open .support-drawer {
   left: 30px;
   right: 78px;
   top: 24px;
+  z-index: 2;
   overflow: hidden;
   pointer-events: none;
   color: rgba(92, 112, 148, 0.84);
@@ -661,7 +662,7 @@ body.support-drawer-open .support-drawer {
   position: absolute;
   right: 18px;
   bottom: 18px;
-  z-index: 2;
+  z-index: 3;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -712,17 +713,41 @@ body.theme-mountain-dark .support-composer {
   border-color: rgba(255, 255, 255, 0.08);
 }
 
+html.theme-dark .support-drawer-title,
 body.theme-dark .support-drawer-title,
+html.theme-dark .support-message-bubble,
 body.theme-dark .support-message-bubble,
+html.theme-dark .support-message-action,
+body.theme-dark .support-message-action,
+html.theme-dark .support-suggested-reply,
+body.theme-dark .support-suggested-reply,
+html.theme-dark .support-quick-prompt,
+body.theme-dark .support-quick-prompt,
+html.theme-dark .support-drawer-menu-trigger,
 body.theme-dark .support-drawer-menu-trigger,
+html.theme-dark .support-drawer-menu-item,
 body.theme-dark .support-drawer-menu-item,
+html.theme-dark .support-drawer-close,
 body.theme-dark .support-drawer-close,
+html.theme-dark .support-composer textarea,
 body.theme-dark .support-composer textarea,
+html.theme-mountain-dark .support-drawer-title,
 body.theme-mountain-dark .support-drawer-title,
+html.theme-mountain-dark .support-message-bubble,
 body.theme-mountain-dark .support-message-bubble,
+html.theme-mountain-dark .support-message-action,
+body.theme-mountain-dark .support-message-action,
+html.theme-mountain-dark .support-suggested-reply,
+body.theme-mountain-dark .support-suggested-reply,
+html.theme-mountain-dark .support-quick-prompt,
+body.theme-mountain-dark .support-quick-prompt,
+html.theme-mountain-dark .support-drawer-menu-trigger,
 body.theme-mountain-dark .support-drawer-menu-trigger,
+html.theme-mountain-dark .support-drawer-menu-item,
 body.theme-mountain-dark .support-drawer-menu-item,
+html.theme-mountain-dark .support-drawer-close,
 body.theme-mountain-dark .support-drawer-close,
+html.theme-mountain-dark .support-composer textarea,
 body.theme-mountain-dark .support-composer textarea {
   color: #f8fbff;
 }
@@ -823,14 +848,21 @@ body.theme-mountain-dark .support-message--team .support-message-bubble {
   color: #f8fbff;
 }
 
+html.theme-dark .support-inline-link,
 body.theme-dark .support-inline-link,
+html.theme-mountain-dark .support-inline-link,
 body.theme-mountain-dark .support-inline-link {
+  color: #f8fbff;
   border-bottom-color: rgba(214, 194, 149, 0.65);
   box-shadow: inset 0 -1px 0 rgba(214, 194, 149, 0.2);
 }
 
+html.theme-dark .support-inline-link:hover,
+html.theme-dark .support-inline-link:focus-visible,
 body.theme-dark .support-inline-link:hover,
 body.theme-dark .support-inline-link:focus-visible,
+html.theme-mountain-dark .support-inline-link:hover,
+html.theme-mountain-dark .support-inline-link:focus-visible,
 body.theme-mountain-dark .support-inline-link:hover,
 body.theme-mountain-dark .support-inline-link:focus-visible {
   color: #f8fbff;
@@ -1011,5 +1043,59 @@ body.theme-mountain-dark .support-drawer-status.is-info {
   html.theme-mountain-dark .support-send:focus-visible {
     background: transparent;
     box-shadow: none;
+  }
+}
+
+html.theme-dark .support-drawer .support-composer-prompt,
+body.theme-dark .support-drawer .support-composer-prompt,
+html.theme-dark .support-drawer .support-composer-prompt-text,
+body.theme-dark .support-drawer .support-composer-prompt-text,
+html.theme-mountain-dark .support-drawer .support-composer-prompt,
+body.theme-mountain-dark .support-drawer .support-composer-prompt,
+html.theme-mountain-dark .support-drawer .support-composer-prompt-text,
+body.theme-mountain-dark .support-drawer .support-composer-prompt-text {
+  color: rgba(248, 251, 255, 0.84) !important;
+  -webkit-text-fill-color: rgba(248, 251, 255, 0.84);
+}
+
+@media (max-width: 680px) {
+  html.theme-dark .support-drawer .support-composer-shell,
+  body.theme-dark .support-drawer .support-composer-shell,
+  html.theme-mountain-dark .support-drawer .support-composer-shell,
+  body.theme-mountain-dark .support-drawer .support-composer-shell {
+    padding: 18px 18px 16px;
+    border-radius: 24px;
+    background: rgba(31, 41, 55, 0.96);
+    background-image: none;
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+    overflow: hidden;
+  }
+
+  html.theme-dark .support-drawer .support-composer textarea,
+  body.theme-dark .support-drawer .support-composer textarea,
+  html.theme-mountain-dark .support-drawer .support-composer textarea,
+  body.theme-mountain-dark .support-drawer .support-composer textarea {
+    padding-left: 8px;
+    padding-right: 56px;
+  }
+
+  html.theme-dark .support-drawer .support-composer-prompt,
+  body.theme-dark .support-drawer .support-composer-prompt,
+  html.theme-mountain-dark .support-drawer .support-composer-prompt,
+  body.theme-mountain-dark .support-drawer .support-composer-prompt {
+    left: 26px;
+    right: 60px;
+    top: 18px;
+  }
+
+  html.theme-dark .support-drawer .support-send,
+  body.theme-dark .support-drawer .support-send,
+  html.theme-mountain-dark .support-drawer .support-send,
+  body.theme-mountain-dark .support-drawer .support-send {
+    right: 14px;
+    bottom: 14px;
+    width: 42px;
+    height: 42px;
   }
 }
