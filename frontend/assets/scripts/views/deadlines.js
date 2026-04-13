@@ -55,7 +55,7 @@ function ensureStylesOnce() {
   .actions{display:flex; gap:8px}
   .x{border:none;background:none;color:#6b7280;cursor:pointer;font-size:14px;line-height:1;padding:6px 8px}
   .x:hover{color:#111827}
-  .skel{height:54px;background:linear-gradient(90deg,#eee 25%,#f5f5f5 37%,#eee 63%);background-size:400% 100%;animation:sk 1.4s ease infinite;border-radius:10px}
+  .skel{height:54px;background:#eeeeee;background-size:auto;animation:sk 1.4s ease infinite;border-radius:10px}
   @keyframes sk{0%{background-position:100% 0}100%{background-position:-100% 0}}
   .overdue{color:#b91c1c}
   .soon{color:#92400e}

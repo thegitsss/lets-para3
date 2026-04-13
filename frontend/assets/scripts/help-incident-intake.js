@@ -10,7 +10,7 @@
         border:1px solid var(--line, #e8edf3);
         border-radius:var(--radius, 14px);
         padding:24px;
-        background:linear-gradient(180deg, rgba(246,249,252,0.92), #ffffff);
+        background:rgba(255,255,255,0.96);
         margin-bottom:32px;
       }
       .incident-intake-head{

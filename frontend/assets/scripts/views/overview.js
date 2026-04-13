@@ -236,7 +236,7 @@ function ensureStyles() {
     .btn.ghost{background:#fff}
     .empty{color:#6b7280;font-size:.95rem}
     .error{padding:16px;border:1px solid #fecaca;background:#fef2f2;border-radius:12px;color:#b91c1c}
-    .shimmer{background:linear-gradient(90deg,#f3f4f6 25%,#e5e7eb 37%,#f3f4f6 63%);background-size:400% 100%;animation:shimmer 1.4s ease infinite;border-radius:10px;height:18px}
+    .shimmer{background:#e5e7eb;background-size:auto;animation:shimmer 1.4s ease infinite;border-radius:10px;height:18px}
     @keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
   `;
   document.head.appendChild(style);

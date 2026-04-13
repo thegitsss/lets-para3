@@ -84,7 +84,7 @@ function ensureStylesOnce() {
   .cal-modal-form .wide{grid-column:1/-1}
   .cal-modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
   .cal-modal-actions .btn.primary{background:#111827;color:#fff;border-color:#111827}
-  .skel{background:linear-gradient(90deg,#eee 25%,#f5f5f5 37%,#eee 63%);background-size:400% 100%;animation:sk 1.4s ease infinite}
+  .skel{background:#eeeeee;background-size:auto;animation:sk 1.4s ease infinite}
   @keyframes sk{0%{background-position:100% 0}100%{background-position:-100% 0}}
   .toast{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);background:#111827;color:#fff;border-radius:8px;padding:10px 14px;font-size:14px;box-shadow:0 10px 20px rgba(0,0,0,.15);z-index:9999}
   `;

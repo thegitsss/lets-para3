@@ -990,7 +990,7 @@
 
 .engineering-recommended-action {
   border-color: rgba(26, 26, 26, 0.08);
-  background: linear-gradient(180deg, rgba(255, 252, 246, 0.96) 0%, rgba(250, 246, 239, 0.9) 100%);
+  background: rgba(250, 246, 239, 0.94);
 }
 
 .engineering-recommended-action h3 {
@@ -1251,7 +1251,7 @@
   padding: 1.05rem;
   border: 1px solid rgba(26, 26, 26, 0.08);
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 244, 236, 0.96));
+  background: rgba(248, 244, 236, 0.96);
 }
 
 .support-issue-lifecycle-grid {

@@ -233,7 +233,7 @@ function ensureStyles() {
     .apply-confirm-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
     .apply-confirm-link{background:#111827;color:#fff;border-radius:999px;padding:0.55rem 1.2rem;text-decoration:none;font-weight:250;font-size:.95rem}
     .apply-confirm-close{border:1px solid #d1d5db;background:#fff;border-radius:999px;padding:0.55rem 1.2rem;font-weight:250;font-size:.95rem;cursor:pointer}
-    .shimmer{background:linear-gradient(90deg,#f3f4f6 25%,#e5e7eb 37%,#f3f4f6 63%);background-size:400% 100%;animation:shimmer 1.4s ease infinite;border-radius:10px;height:18px}
+    .shimmer{background:#e5e7eb;background-size:auto;animation:shimmer 1.4s ease infinite;border-radius:10px;height:18px}
     @keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
   `;
   document.head.appendChild(style);

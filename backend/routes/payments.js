@@ -904,6 +904,14 @@ function buildAttorneyReceiptPayload(caseDoc, paymentMethodLabel) {
   };
 }
 
+function shouldRefreshAttorneyReceiptCache(caseDoc) {
+  return cents(caseDoc?.feeAttorneyAmount) <= 0 && computePlatformFee(caseDoc) > 0;
+}
+
+function shouldRefreshParalegalReceiptCache(caseDoc) {
+  return cents(caseDoc?.feeParalegalAmount) <= 0 && computeParalegalFee(caseDoc) > 0;
+}
+
 function buildParalegalReceiptPayload(caseDoc, payoutDoc) {
   const settlement = resolveDisputeSettlement(caseDoc);
   const hasWithdrawalPayout =
@@ -3105,7 +3113,7 @@ router.get(
     const payload = buildAttorneyReceiptPayload(doc, paymentMethodLabel);
     const key = getReceiptKey(doc._id, "attorney");
     const filename = safeReceiptFilename(doc.title, "receipt");
-    const streamed = await tryStreamReceipt(res, key, filename);
+    const streamed = shouldRefreshAttorneyReceiptCache(doc) ? false : await tryStreamReceipt(res, key, filename);
     if (streamed) return;
     const pdfBuffer = await buildReceiptPdfBuffer(payload);
     res.setHeader("Content-Type", "application/pdf");
@@ -3125,7 +3133,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const doc = await Case.findById(req.params.caseId)
       .select(
-        "title lockedTotalAmount totalAmount feeAttorneyAmount feeAttorneyPct payoutTransferId paidOutAt completedAt updatedAt paralegal paralegalId paralegalNameSnapshot attorney attorneyId attorneyNameSnapshot withdrawnParalegalId pausedReason payoutFinalizedAt payoutFinalizedType partialPayoutAmount paymentReleased"
+        "title lockedTotalAmount totalAmount feeAttorneyAmount feeAttorneyPct feeParalegalAmount feeParalegalPct payoutTransferId paidOutAt completedAt updatedAt paralegal paralegalId paralegalNameSnapshot attorney attorneyId attorneyNameSnapshot withdrawnParalegalId pausedReason payoutFinalizedAt payoutFinalizedType partialPayoutAmount paymentReleased"
       )
       .populate("paralegal", "firstName lastName email role")
       .populate("attorney", "firstName lastName email role")
@@ -3177,7 +3185,7 @@ router.get(
     const payload = buildParalegalReceiptPayload(doc, payoutDoc);
     const key = getReceiptKey(doc._id, "paralegal");
     const filename = safeReceiptFilename(doc.title, "payout-receipt");
-    const streamed = await tryStreamReceipt(res, key, filename);
+    const streamed = shouldRefreshParalegalReceiptCache(doc) ? false : await tryStreamReceipt(res, key, filename);
     if (streamed) return;
     const pdfBuffer = await buildReceiptPdfBuffer(payload);
     res.setHeader("Content-Type", "application/pdf");

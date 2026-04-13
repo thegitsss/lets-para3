@@ -491,7 +491,7 @@ function ensureStyles() {
     .avatar-fallback{display:flex;align-items:center;justify-content:center;font-weight:600;color:#4b5563;background:#f3f4f6}
     .applicant-actions{display:flex;align-items:center}
     .apply-footnote{font-size:.85rem;color:#6b7280;margin:0}
-    .shimmer{background:linear-gradient(90deg,#f3f4f6 25%,#e5e7eb 37%,#f3f4f6 63%);background-size:400% 100%;animation:shimmer 1.4s ease infinite;border-radius:10px;height:18px}
+    .shimmer{background:#e5e7eb;background-size:auto;animation:shimmer 1.4s ease infinite;border-radius:10px;height:18px}
     @keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
     .case-modal-overlay{position:fixed;inset:0;background:rgba(17,24,39,.45);display:flex;align-items:center;justify-content:center;z-index:999}
     .case-modal{background:#fff;border-radius:16px;padding:24px;max-width:420px;box-shadow:0 20px 45px rgba(0,0,0,.22)}

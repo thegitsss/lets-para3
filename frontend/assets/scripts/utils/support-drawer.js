@@ -86,17 +86,16 @@ function getRoleAwareQuickPrompts(role = "") {
 }
 
 function getDrawerSubtitle(role = "") {
-  const normalizedRole = String(role || "").trim().toLowerCase();
-  if (normalizedRole === "attorney") {
-    return "Ask a question or describe what's happening. You'll get help right here.";
-  }
-  if (normalizedRole === "paralegal") {
-    return "Ask a question or describe what's happening. You'll get help right here.";
-  }
-  if (normalizedRole === "admin") {
-    return "Ask a question or describe what's happening. You'll get help right here.";
-  }
-  return "Ask a question or describe what's happening. You'll get help right here.";
+  const session = getSupportSession();
+  const firstName = String(
+    session?.user?.firstName ||
+      session?.user?.name ||
+      ""
+  )
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)[0];
+  return `Welcome back, ${firstName || "there"}`;
 }
 
 const state = {
@@ -131,6 +130,7 @@ const state = {
   composerPromptIndex: 0,
   composerPromptTimer: null,
   composerPromptTransitionTimer: null,
+  composerPromptPaused: false,
   escalatingMessageId: "",
   pollTimer: null,
   eventSource: null,
@@ -410,6 +410,7 @@ function createDrawerMarkup() {
           ${buildSendIcon()}
         </button>
       </div>
+      <p class="support-composer-hint">AI may make mistakes. Verify important information.</p>
     </form>
   `;
 
@@ -459,6 +460,15 @@ function createDrawerMarkup() {
     syncComposerState();
     syncComposerPrompt();
     renderThread();
+  });
+  state.textarea?.addEventListener("focus", () => {
+    state.composerPromptPaused = true;
+    stopComposerPromptRotation();
+    syncComposerPrompt();
+  });
+  state.textarea?.addEventListener("blur", () => {
+    state.composerPromptPaused = false;
+    syncComposerPrompt();
   });
   state.textarea?.addEventListener("keydown", async (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -606,7 +616,7 @@ function syncComposerPrompt() {
   }
   const shouldShow = shouldShowComposerPrompt();
   state.composerPrompt.classList.toggle("is-hidden", !shouldShow);
-  if (!shouldShow) {
+  if (!shouldShow || state.composerPromptPaused) {
     stopComposerPromptRotation();
     return;
   }
@@ -1021,10 +1031,10 @@ function renderPrompts() {
   if (!shouldShowQuickPrompts()) return;
 
   const supportState = state.conversation?.supportState || {};
-  if (supportState.welcomePrompt || supportState.proactivePrompt?.text) {
+  if (supportState.proactivePrompt?.text) {
     const copy = document.createElement("div");
     copy.className = "support-proactive-copy";
-    copy.textContent = [supportState.welcomePrompt, supportState.proactivePrompt?.text].filter(Boolean).join(" ");
+    copy.textContent = supportState.proactivePrompt.text || "";
     if (copy.textContent) {
       state.prompts.appendChild(copy);
     }

@@ -1181,7 +1181,7 @@ function ensureWithdrawalNoticeModalStyles() {
     .decision-title{font-weight:500;color:var(--app-text)}
     .decision-text{font-size:.9rem;color:var(--app-muted)}
     .decision-card.decision-deny{
-      background:linear-gradient(135deg, var(--app-accent-soft), rgba(255,255,255,0));
+      background:var(--app-accent-soft);
       border-color:rgba(182,164,122,.35);
     }
     html.theme-dark .decision-card.decision-deny,
@@ -2002,7 +2002,7 @@ function ensureFlagMenuStyles() {
     .case-flag-overlay{
       position:fixed;
       inset:0;
-      background:radial-gradient(circle at top, rgba(15,23,42,.35), rgba(15,23,42,.65));
+      background:rgba(15,23,42,.56);
       display:flex;
       align-items:center;
       justify-content:center;
@@ -2031,7 +2031,7 @@ function ensureFlagMenuStyles() {
       position:absolute;
       inset:0;
       border-radius:inherit;
-      background:linear-gradient(135deg, rgba(197,168,117,.08), transparent 55%);
+      background:rgba(197,168,117,.08);
       pointer-events:none;
     }
     .case-flag-title{
@@ -2114,7 +2114,7 @@ function ensureFlagMenuStyles() {
     html.theme-dark .case-flag-modal::before,
     body.theme-mountain-dark .case-flag-modal::before,
     html.theme-mountain-dark .case-flag-modal::before{
-      background:linear-gradient(135deg, rgba(182,164,122,.12), transparent 55%);
+      background:rgba(182,164,122,.12);
     }
     body.theme-dark .case-flag-actions .case-action-btn,
     html.theme-dark .case-flag-actions .case-action-btn,
