@@ -236,6 +236,14 @@ function buildResetPasswordEmailHtml(user, resetUrl, opts = {}) {
             </td>
           </tr>
           <tr>
+            <td align="center" style="padding:0 32px 20px;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.04em;color:#545454;line-height:1.7;word-break:break-word;">
+                If the button does not work, copy and paste this URL into your browser:<br>
+                <a href="${resetUrl}" target="_blank" rel="noopener" style="color:#1f1f1f;text-decoration:underline;word-break:break-all;">${resetUrl}</a>
+              </div>
+            </td>
+          </tr>
+          <tr>
             <td align="center" style="padding:8px 32px 16px;">
               <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
