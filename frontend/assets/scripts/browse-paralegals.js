@@ -27,6 +27,7 @@ const elements = {
   status: document.getElementById("resultsStatus"),
   experience: document.getElementById("experience"),
   availability: document.getElementById("availability"),
+  sortBy: document.getElementById("sortBy"),
   stateInput: document.getElementById("stateInput"),
   stateList: document.getElementById("stateList"),
   specialtyInput: document.getElementById("specialtyInput"),
@@ -57,6 +58,7 @@ const state = {
     experience: "",
     availability: "",
     location: "",
+    sort: "recent",
     specialties: selectedSpecialties,
   },
   viewer: null,
@@ -186,8 +188,12 @@ function bindFilterEvents() {
   elements.availability?.addEventListener("change", () => {
     state.filters.availability = elements.availability.value;
   });
+  elements.sortBy?.addEventListener("change", () => {
+    state.filters.sort = normalizeSortValue(elements.sortBy.value);
+    resetPageAndFetch();
+  });
   elements.stateInput?.addEventListener("change", () => {
-  state.filters.location = (elements.stateInput.value || "").trim();
+    state.filters.location = (elements.stateInput.value || "").trim();
   });
   elements.stateInput?.addEventListener("blur", () => {
     state.filters.location = (elements.stateInput.value || "").trim();
@@ -255,6 +261,7 @@ function syncFiltersFromInputs() {
   state.filters.experience = elements.experience?.value || "";
   state.filters.availability = elements.availability?.value || "";
   state.filters.location = elements.stateInput?.value?.trim() || "";
+  state.filters.sort = normalizeSortValue(elements.sortBy?.value);
 }
 
 
@@ -395,6 +402,7 @@ async function loadParalegals() {
   const params = new URLSearchParams();
   params.set("page", state.page);
   params.set("limit", state.limit);
+  params.set("sort", normalizeSortValue(state.filters.sort));
 
   const minYears = parseExperience(state.filters.experience);
   if (minYears) params.set("minYears", String(minYears));
@@ -724,6 +732,12 @@ async function sendInquiry() {
 function parseExperience(value = "") {
   const match = value.match(/\d+/);
   return match ? parseInt(match[0], 10) : null;
+}
+
+function normalizeSortValue(value = "") {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "experience" || normalized === "alpha") return normalized;
+  return "recent";
 }
 
 function handleContactClick(paralegalId) {
