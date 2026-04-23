@@ -37,11 +37,13 @@
 
     :root {
       --bg: #ffffff;
-      --sidebar-bg: #ffffff;
+      --sidebar-bg: #f5f5f5e6;
       --accent: #b6a47a;
-      --ink: #1a2230;
-      --muted: #5c6b7a;
-      --line: #e8edf3;
+      --ink: #1a1a1a;
+      --muted: #8a8a8a;
+      --line: rgba(0, 0, 0, 0.08);
+      --panel: #fcfcfc;
+      --sidebar-text: #1a1a1a;
       --radius: 14px;
       --font-serif: 'Cormorant Garamond', serif;
       --font-sans: 'Sarabun', sans-serif;
@@ -55,7 +57,8 @@
       font-family: var(--font-sans);
       font-weight: 200;
       display: flex;
-      min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
     }
     body.theme-light,
     body.theme-mountain {
@@ -63,7 +66,7 @@
     }
     body.theme-light .sidebar,
     body.theme-mountain .sidebar {
-      background: #ffffff;
+      background: var(--sidebar-bg);
     }
     body.theme-light .callout,
     body.theme-mountain .callout {
@@ -75,8 +78,38 @@
       background: var(--sidebar-bg);
       display: flex;
       flex-direction: column;
-      border-right: 1px solid rgba(0,0,0,0.08);
+      border-right: 1px solid var(--line);
       padding: 24px 16px;
+      color: var(--sidebar-text);
+      position: relative;
+      flex-shrink: 0;
+      overflow: hidden;
+      transition: width 0.25s ease, padding 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+    }
+
+    .sidebar::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: transparent;
+      pointer-events: none;
+      transition: background 0.3s ease;
+    }
+
+    body.theme-mountain .sidebar,
+    body.theme-mountain-dark .sidebar {
+      background: var(--bg) url('hero-mountain.jpg') center/cover no-repeat;
+    }
+
+    body.theme-mountain .sidebar::before,
+    body.theme-mountain-dark .sidebar::before {
+      background: rgba(0, 0, 0, 0.45);
+    }
+
+    body.theme-mountain .sidebar > *,
+    body.theme-mountain-dark .sidebar > * {
+      position: relative;
+      z-index: 1;
     }
 
     .logo {
@@ -102,24 +135,45 @@
       padding: 10px 14px;
       border-radius: var(--radius);
       transition: background 0.3s ease;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     nav a.active,
     nav a:hover {
       background: rgba(0, 0, 0, 0.04);
     }
+
+    body.theme-dark nav a.active,
+    body.theme-dark nav a:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    body.theme-mountain nav a.active,
+    body.theme-mountain nav a:hover,
+    body.theme-mountain-dark nav a.active,
+    body.theme-mountain-dark nav a:hover {
+      background: rgba(255, 255, 255, 0.18);
+    }
+
+    body.theme-mountain nav a,
+    body.theme-mountain-dark nav a {
+      color: #fff;
+    }
     .sidebar-link{
       margin-top:1.5rem;
       width:100%;
-      border:1px solid rgba(0,0,0,0.08);
+      border:1px solid var(--line);
       border-radius:var(--radius);
       padding:0.6rem 1rem;
       background:transparent;
-      color:var(--ink);
-      font-size:0.9rem;
-      font-family:var(--font-sans);
+      font-family:var(--font-serif);
+      font-weight:300;
+      font-size:1.1rem;
       cursor:pointer;
       transition:background .2s ease,color .2s ease;
+      color:var(--sidebar-text);
     }
     .sidebar-link:hover,
     .sidebar-link:focus{
@@ -127,8 +181,27 @@
       color:var(--accent);
       outline:none;
     }
-    .sidebar-footer{
+
+    body.theme-dark .sidebar-link:hover,
+    body.theme-dark .sidebar-link:focus,
+    body.theme-mountain .sidebar-link:hover,
+    body.theme-mountain .sidebar-link:focus,
+    body.theme-mountain-dark .sidebar-link:hover,
+    body.theme-mountain-dark .sidebar-link:focus{
+      color:#fff;
+    }
+
+    body.theme-mountain .sidebar-link,
+    body.theme-mountain-dark .sidebar-link{
+      color:#fff;
+    }
+    .sidebar-bottom{
       margin-top:auto;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .sidebar-footer{
       font-size:0.7rem;
       color:var(--muted);
       text-align:center;
@@ -138,23 +211,120 @@
       display: none;
       align-items: center;
       justify-content: center;
-      width: 42px;
-      height: 42px;
-      border-radius: 12px;
-      border: none;
-      background: transparent;
+      width: 28px;
+      height: 56px;
+      border-radius: 0 16px 16px 0;
+      border: 1px solid rgba(26, 26, 26, 0.08);
+      border-left: none;
+      background: linear-gradient(90deg, rgba(182, 164, 122, 0.08) 0%, rgba(255, 255, 255, 0.92) 34%, rgba(255, 255, 255, 0.96) 100%);
+      backdrop-filter: blur(10px);
       padding: 0;
       cursor: pointer;
-      position: fixed;
-      top: 14px;
-      left: 14px;
+      position: relative;
       z-index: 2100;
+      flex: 0 0 auto;
+      box-shadow: none;
+      transition: transform 0.18s ease, background 0.2s ease, border-color 0.2s ease;
     }
 
-    .sidebar-toggle-icon {
-      width: 28px;
-      height: 28px;
-      display: block;
+    .sidebar-toggle::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 1px;
+      background: rgba(182, 164, 122, 0.24);
+    }
+
+    .sidebar-toggle:hover,
+    .sidebar-toggle:focus-visible {
+      background: linear-gradient(90deg, rgba(182, 164, 122, 0.12) 0%, rgba(255, 255, 255, 0.96) 34%, rgba(255, 255, 255, 0.98) 100%);
+      border-color: rgba(182, 164, 122, 0.4);
+      outline: none;
+    }
+
+    .sidebar-toggle[aria-expanded="true"] {
+      background: linear-gradient(90deg, rgba(182, 164, 122, 0.16) 0%, rgba(255, 255, 255, 0.92) 34%, rgba(255, 255, 255, 0.96) 100%);
+      border-color: rgba(182, 164, 122, 0.45);
+    }
+
+    .sidebar-toggle-glyph {
+      position: relative;
+      width: 14px;
+      height: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .sidebar-toggle-bar {
+      position: absolute;
+      left: 0;
+      width: 14px;
+      height: 1px;
+      border-radius: 999px;
+      background: rgba(26, 26, 26, 0.56);
+      transform-origin: center;
+      transition:
+        transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.28s ease,
+        width 0.28s ease,
+        background 0.2s ease;
+    }
+
+    .sidebar-toggle-bar--top {
+      transform: translateY(-4px);
+    }
+
+    .sidebar-toggle-bar--middle {
+      width: 10px;
+    }
+
+    .sidebar-toggle-bar--bottom {
+      transform: translateY(4px);
+    }
+
+    .sidebar-toggle:hover .sidebar-toggle-glyph,
+    .sidebar-toggle:focus-visible .sidebar-toggle-glyph {
+      transform: scale(1.03);
+    }
+
+    .sidebar-toggle:hover .sidebar-toggle-bar--top,
+    .sidebar-toggle:hover .sidebar-toggle-bar--bottom,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--top,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--bottom {
+      width: 12px;
+      background: rgba(26, 26, 26, 0.72);
+    }
+
+    .sidebar-toggle:hover .sidebar-toggle-bar--middle,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--middle {
+      width: 14px;
+      background: rgba(26, 26, 26, 0.7);
+    }
+
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-glyph {
+      transform: rotate(180deg) scale(1.01);
+    }
+
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar {
+      width: 14px;
+      background: rgba(26, 26, 26, 0.7);
+    }
+
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--top {
+      transform: rotate(45deg);
+    }
+
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--middle {
+      opacity: 0;
+      transform: scaleX(0.35);
+    }
+
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--bottom {
+      transform: rotate(-45deg);
     }
 
     .sidebar-backdrop {
@@ -167,9 +337,27 @@
 
     main {
       flex: 1;
-      padding: 60px 40px;
+      padding: 60px 40px 80px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      min-height: 100vh;
+      scrollbar-gutter: stable;
+    }
+
+    main > * {
+      width: 100%;
       max-width: 900px;
-      margin: 0 auto 80px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      gap: 12px;
+      min-height: 56px;
+      margin-bottom: 1.25rem;
     }
 
     h1, h2 {
@@ -204,6 +392,11 @@
       border-bottom: none;
       padding-bottom: 0;
       margin-bottom: 0;
+    }
+    section[data-incident-intake-root] {
+      border-bottom: none;
+      padding-bottom: 0;
+      margin-bottom: 24px;
     }
     #attorney-help {
       border-bottom: none;
@@ -317,12 +510,58 @@
 
     .sidebar-toggle {
       display: inline-flex;
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      border-left: 1px solid rgba(26, 26, 26, 0.08);
+      background: rgba(255, 255, 255, 0.82);
+    }
+
+    .sidebar-toggle::before {
+      display: none;
+    }
+
+    .sidebar-toggle-glyph {
+      width: 18px;
+      height: 12px;
+    }
+
+    .sidebar-toggle-bar {
+      width: 18px;
+    }
+
+    .sidebar-toggle-bar--top {
+      transform: translateY(-5px);
+    }
+
+    .sidebar-toggle-bar--middle {
+      width: 12px;
+    }
+
+    .sidebar-toggle-bar--bottom {
+      transform: translateY(5px);
+    }
+
+    .sidebar-toggle:hover .sidebar-toggle-bar--top,
+    .sidebar-toggle:hover .sidebar-toggle-bar--bottom,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--top,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--bottom {
+      width: 16px;
+    }
+
+    .sidebar-toggle:hover .sidebar-toggle-bar--middle,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--middle {
+      width: 18px;
+    }
+
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--top,
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--bottom {
+      width: 18px;
     }
 
     main {
-      padding: 96px 20px 60px;
-      max-width: 100%;
-      margin: 0;
+      padding: 28px 20px 60px;
+      min-height: 100vh;
     }
   }
 
@@ -362,23 +601,30 @@
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
-  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
-    <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
-  </button>
   <aside class="sidebar" id="sidebarNav">
     <div class="logo">Dashboard</div>
     <nav id="helpNav" aria-label="Primary">
       <a href="dashboard-attorney.html">Home</a>
-      <a href="dashboard-attorney.html#cases">Cases</a>
+      <a href="dashboard-attorney.html#cases">Matters</a>
       <a href="dashboard-attorney.html#billing">Funds &amp; Payments</a>
       <a href="help.html" class="active">Help</a>
-      <a href="contact.html">Contact Support</a>
     </nav>
-    <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-    <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s‑ParaConnect 2026</a></div>
+    <div class="sidebar-bottom">
+      <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
+      <div class="sidebar-footer">© Let’s‑ParaConnect 2026</div>
+    </div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <main id="main" tabindex="-1" aria-labelledby="help-title">
+    <div class="topbar">
+      <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Show menu" aria-controls="sidebarNav" aria-expanded="false">
+        <span class="sidebar-toggle-glyph" aria-hidden="true">
+          <span class="sidebar-toggle-bar sidebar-toggle-bar--top"></span>
+          <span class="sidebar-toggle-bar sidebar-toggle-bar--middle"></span>
+          <span class="sidebar-toggle-bar sidebar-toggle-bar--bottom"></span>
+        </span>
+      </button>
+    </div>
     <h1 id="help-title">Help for Attorneys</h1>
     <p class="muted">Guidance for posting matters, hiring paralegals, and managing payments.</p>
     <p class="muted">Need a person? <a href="contact.html">Contact Support</a>.</p>
@@ -389,34 +635,30 @@
       data-hide-ready-status="true"
       data-hide-primary-labels="true"
       data-hide-optional-context-fields="true"
-      data-hide-submit-note="true"
       aria-label="Structured incident intake"
     ></section>
 
     <section id="attorney-help">
-      <h2>Help for Attorneys</h2>
-      <p class="lead">Post matters, hire paralegals, and manage delivery, messaging, and payments.</p>
-
       <h3>Account &amp; access</h3>
       <p>Forgot your password? <a href="forgot-password.html">Reset it here</a> and check spam or junk if the email doesn’t arrive. If two-factor auth is enabled, watch for autofilled or expired codes. Update your email, profile, or security settings anytime in <a href="profile-settings.html">Settings</a>. If you can’t access your account, contact support.</p>
       <p>Self-serve account deactivation is available in Settings and removes your account from active platform participation, but it is not full erasure. Attorneys cannot deactivate while involved in an active matter or while escrow, payout, dispute, or other financial obligations remain unresolved.</p>
 
       <h3>Posting a matter</h3>
-      <p>To begin, create a new case by providing a clear description of the work required, including the scope of the assignment, expected timeline, required tasks and deliverables. You may review applications from paralegals who express interest in the matter.</p>
-      <p>All active and completed matters can be accessed at any time through <a href="dashboard-attorney.html#cases">Cases &amp; Files</a>, where each assignment is organized within its own workspace.</p>
+      <p>To begin, create a new matter by providing a clear description of the work required, including the scope of the assignment, expected timeline, required tasks and deliverables. You may review applications from paralegals who express interest in the matter.</p>
+      <p>All active and completed matters can be accessed at any time through <a href="dashboard-attorney.html#cases">Matters</a>, where each assignment is organized within its own workspace.</p>
 
       <h3>Hiring &amp; managing work</h3>
-      <p>After hiring a paralegal, the case workspace becomes the central location for communication, file sharing, and progress updates. Attorneys may upload documents, review drafts, and provide guidance as the assignment progresses.</p>
+      <p>After hiring a paralegal, the matter workspace becomes the central location for communication, file sharing, and progress updates. Attorneys may upload documents, review drafts, and provide guidance as the assignment progresses.</p>
       <p>When reviewing deliverables, attorneys should evaluate the work against the agreed scope and request any necessary revisions before confirming completion.</p>
 
       <h3>Workflow</h3>
-      <p>Post a case or single-scope assignment with a clear description of the work needed, the timeline, and required tasks the paralegal must complete. Once applications begin coming in, review the paralegals who apply and select the one you want to hire. After hiring, use the case workspace to communicate, share files, and review drafts or completed documents. When the final work meets your expectations, confirm completion to release payment and close the matter.</p>
+      <p>Post a matter or single-scope assignment with a clear description of the work needed, the timeline, and required tasks the paralegal must complete. Once applications begin coming in, review the paralegals who apply and select the one you want to hire. After hiring, use the matter workspace to communicate, share files, and review drafts or completed documents. When the final work meets your expectations, confirm completion to release payment and close the matter.</p>
 
       <h3>Funding, release, and disputes</h3>
-      <p>During case creation, attorneys set the case amount required to hire a paralegal. When selecting a paralegal to hire, the total cost of the matter, including any applicable platform fees, will be displayed for confirmation before funding.</p>
-      <p>Once the matter is funded through Stripe, the case workspace opens for both the attorney and the assigned paralegal to begin work. Within the workspace, attorneys may communicate with the paralegal, upload reference documents, and review progress as the assignment is completed. Only the attorney may mark tasks as completed and confirm when the matter is finished.</p>
+      <p>During matter creation, attorneys set the matter amount required to hire a paralegal. When selecting a paralegal to hire, the total cost of the matter, including any applicable platform fees, will be displayed for confirmation before funding.</p>
+      <p>Once the matter is funded through Stripe, the matter workspace opens for both the attorney and the assigned paralegal to begin work. Within the workspace, attorneys may communicate with the paralegal, upload reference documents, and review progress as the assignment is completed. Only the attorney may mark tasks as completed and confirm when the matter is finished.</p>
       <p>When the final deliverable meets the agreed scope of work, the attorney can confirm completion to release the funded payment to the paralegal.</p>
-      <p>If the work does not meet the agreed scope, the attorney may open a dispute before releasing funds by selecting the flag icon within the case workspace. Opening a dispute temporarily pauses the workspace and payment release while the matter is reviewed. The attorney may then provide additional context explaining the concern so that the issue can be evaluated and resolved appropriately.</p>
+      <p>If the work does not meet the agreed scope, the attorney may open a dispute before releasing funds by selecting the flag icon within the matter workspace. Opening a dispute temporarily pauses the workspace and payment release while the matter is reviewed. The attorney may then provide additional context explaining the concern so that the issue can be evaluated and resolved appropriately.</p>
     </section>
 
     <section id="help-links">
@@ -434,11 +676,17 @@
     const sidebarBackdrop = document.getElementById('sidebarBackdrop');
     const closeSidebar = () => {
       document.body.classList.remove('nav-open');
-      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'false');
+      if (sidebarToggle) {
+        sidebarToggle.setAttribute('aria-expanded', 'false');
+        sidebarToggle.setAttribute('aria-label', 'Show menu');
+      }
     };
     const openSidebar = () => {
       document.body.classList.add('nav-open');
-      if (sidebarToggle) sidebarToggle.setAttribute('aria-expanded', 'true');
+      if (sidebarToggle) {
+        sidebarToggle.setAttribute('aria-expanded', 'true');
+        sidebarToggle.setAttribute('aria-label', 'Hide menu');
+      }
     };
     if (logoutBtn) {
       logoutBtn.addEventListener('click', async (event) => {
@@ -455,20 +703,19 @@
       const navItems = {
         attorney: [
           { href: 'dashboard-attorney.html', label: 'Home' },
-          { href: 'dashboard-attorney.html#cases', label: 'Cases' },
+          { href: 'dashboard-attorney.html#cases', label: 'Matters' },
           { href: 'dashboard-attorney.html#billing', label: 'Funds & Payments' },
           { href: 'help.html', label: 'Help', active: true },
-          { href: 'contact.html', label: 'Contact Support' },
         ],
         paralegal: [
-          { href: 'contact.html', label: 'Contact Us' },
+          { href: 'contact.html', label: 'Contact Support' },
           { href: 'dashboard-paralegal.html', label: 'Home' },
           { href: 'dashboard-paralegal.html#cases', label: 'Cases and Applications' },
           { href: 'profile-settings.html', label: 'Profile Settings' },
           { href: 'paralegalhelp.html', label: 'Help', active: true },
         ],
         admin: [
-          { href: 'contact.html', label: 'Contact Us' },
+          { href: 'contact.html', label: 'Contact Support' },
           { href: 'admin-dashboard.html', label: 'Admin Dashboard' },
           { href: 'help.html', label: 'Help', active: true },
         ],
@@ -503,12 +750,13 @@
     }
     if (sidebarNav) {
       sidebarNav.addEventListener('click', (event) => {
-        if (event.target && event.target.tagName === 'A') closeSidebar();
+        if (event.target.closest('a') || event.target.closest('button')) closeSidebar();
       });
     }
     window.addEventListener('resize', () => {
-      if (window.innerWidth > 960) closeSidebar();
+      if (window.innerWidth > 1024) closeSidebar();
     });
+    closeSidebar();
   </script>
 </body>
 </html>

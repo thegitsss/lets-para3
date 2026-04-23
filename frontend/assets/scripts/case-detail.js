@@ -4013,7 +4013,8 @@ function renderCaseOverview(data) {
       } else if (normalized === "paused") {
         messagePanelBanner.textContent = "Case is paused. Workspace is locked.";
       } else {
-        messagePanelBanner.textContent = opened ? `Opened on ${opened}` : "Case updates will appear here.";
+        messagePanelBanner.textContent = opened ? `Opened on ${opened}` : "";
+        messagePanelBanner.hidden = !opened;
       }
     }
   }

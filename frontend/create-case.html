@@ -24,7 +24,7 @@
   <meta name="theme-color" content="#0B2A4A">
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Create Case – Let’s-ParaConnect</title>
+  <title>Create Matter – Let’s-ParaConnect</title>
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="icon" href="/favicon.ico" />
   <link rel="shortcut icon" href="/favicon.ico" />
@@ -196,20 +196,104 @@
       display: none;
       align-items: center;
       justify-content: center;
-      width: 42px;
-      height: 42px;
-      border-radius: 12px;
-      border: none;
-      background: transparent;
+      width: 28px;
+      height: 56px;
+      border-radius: 0 16px 16px 0;
+      border: 1px solid rgba(26, 26, 26, 0.08);
+      border-left: none;
+      background: linear-gradient(90deg, rgba(182, 164, 122, 0.08) 0%, rgba(255, 255, 255, 0.92) 34%, rgba(255, 255, 255, 0.96) 100%);
+      backdrop-filter: blur(10px);
       padding: 0;
       cursor: pointer;
       position: relative;
       z-index: 2100;
+      flex: 0 0 auto;
+      box-shadow: none;
+      transition: transform 0.18s ease, background 0.2s ease, border-color 0.2s ease;
     }
-    .sidebar-toggle-icon {
-      width: 28px;
-      height: 28px;
-      display: block;
+    .sidebar-toggle::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 1px;
+      background: rgba(182, 164, 122, 0.24);
+    }
+    .sidebar-toggle:hover,
+    .sidebar-toggle:focus-visible {
+      background: linear-gradient(90deg, rgba(182, 164, 122, 0.12) 0%, rgba(255, 255, 255, 0.96) 34%, rgba(255, 255, 255, 0.98) 100%);
+      border-color: rgba(182, 164, 122, 0.4);
+      outline: none;
+    }
+    .sidebar-toggle[aria-expanded="true"] {
+      background: linear-gradient(90deg, rgba(182, 164, 122, 0.16) 0%, rgba(255, 255, 255, 0.92) 34%, rgba(255, 255, 255, 0.96) 100%);
+      border-color: rgba(182, 164, 122, 0.45);
+    }
+    .sidebar-toggle-glyph {
+      position: relative;
+      width: 14px;
+      height: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .sidebar-toggle-bar {
+      position: absolute;
+      left: 0;
+      width: 14px;
+      height: 1px;
+      border-radius: 999px;
+      background: rgba(26, 26, 26, 0.56);
+      transform-origin: center;
+      transition:
+        transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.28s ease,
+        width 0.28s ease,
+        background 0.2s ease;
+    }
+    .sidebar-toggle-bar--top {
+      transform: translateY(-4px);
+    }
+    .sidebar-toggle-bar--middle {
+      width: 10px;
+    }
+    .sidebar-toggle-bar--bottom {
+      transform: translateY(4px);
+    }
+    .sidebar-toggle:hover .sidebar-toggle-glyph,
+    .sidebar-toggle:focus-visible .sidebar-toggle-glyph {
+      transform: scale(1.03);
+    }
+    .sidebar-toggle:hover .sidebar-toggle-bar--top,
+    .sidebar-toggle:hover .sidebar-toggle-bar--bottom,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--top,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--bottom {
+      width: 12px;
+      background: rgba(26, 26, 26, 0.72);
+    }
+    .sidebar-toggle:hover .sidebar-toggle-bar--middle,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--middle {
+      width: 14px;
+      background: rgba(26, 26, 26, 0.7);
+    }
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-glyph {
+      transform: rotate(180deg) scale(1.01);
+    }
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar {
+      width: 14px;
+      background: rgba(26, 26, 26, 0.7);
+    }
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--top {
+      transform: rotate(45deg);
+    }
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--middle {
+      opacity: 0;
+      transform: scaleX(0.35);
+    }
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--bottom {
+      transform: rotate(-45deg);
     }
     .sidebar-backdrop {
       display: none;
@@ -272,8 +356,9 @@
 
     /* Main */
     .main{flex:1;padding:40px;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;}
-    .topbar{display:flex;justify-content:flex-end;align-items:flex-start;margin-bottom:0.2rem;gap:1.5rem;position:relative;min-height:0;}
-    #createCaseTopbar{display:flex;align-items:center;justify-content:flex-end;gap:12px;}
+    .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.2rem;gap:1.5rem;position:relative;min-height:56px;}
+    #createCaseTopbar{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+    .topbar-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex:1;}
     .user-profile{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:none;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color 0.2s ease,box-shadow .2s ease;cursor:pointer;position:relative;}
     .user-profile img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:none;object-fit:cover;}
     .user-profile strong{display:block;font-family:var(--font-serif);font-weight:500;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1092,14 +1177,48 @@ body.theme-dark .select-field select{
       }
       .sidebar-toggle {
         display: inline-flex;
-        position: fixed;
-        top: 14px;
-        left: 14px;
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        border-left: 1px solid rgba(26, 26, 26, 0.08);
+        background: rgba(255, 255, 255, 0.82);
+      }
+      .sidebar-toggle::before {
+        display: none;
+      }
+      .sidebar-toggle-glyph {
+        width: 18px;
+        height: 12px;
+      }
+      .sidebar-toggle-bar {
+        width: 18px;
+      }
+      .sidebar-toggle-bar--top {
+        transform: translateY(-5px);
+      }
+      .sidebar-toggle-bar--middle {
+        width: 12px;
+      }
+      .sidebar-toggle-bar--bottom {
+        transform: translateY(5px);
+      }
+      .sidebar-toggle:hover .sidebar-toggle-bar--top,
+      .sidebar-toggle:hover .sidebar-toggle-bar--bottom,
+      .sidebar-toggle:focus-visible .sidebar-toggle-bar--top,
+      .sidebar-toggle:focus-visible .sidebar-toggle-bar--bottom {
+        width: 16px;
+      }
+      .sidebar-toggle:hover .sidebar-toggle-bar--middle,
+      .sidebar-toggle:focus-visible .sidebar-toggle-bar--middle {
+        width: 18px;
+      }
+      .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--top,
+      .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--bottom {
+        width: 18px;
       }
       .topbar {
         margin-bottom: 1.25rem;
-        min-height: 56px;
-        justify-content: flex-end;
+        justify-content: space-between;
         gap: 12px;
       }
       .logo {
@@ -1276,21 +1395,18 @@ body.theme-dark .select-field select{
     })();
   </script>
   <a class="skip-link" href="#main">Skip to main content</a>
-  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
-    <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
-  </button>
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebarNav">
     <div class="logo">Dashboard</div>
     <nav>
       <a href="dashboard-attorney.html">Home</a>
-      <a href="dashboard-attorney.html#cases">Cases &amp; Files</a>
-      <a href="dashboard-attorney.html#billing">Payments</a>
+      <a href="dashboard-attorney.html#cases">Matters</a>
+      <a href="dashboard-attorney.html#billing">Funds &amp; Payments</a>
       <a href="help.html">Help</a>
     </nav>
     <div class="sidebar-bottom">
       <button type="button" class="sidebar-link" id="logoutBtn">Log Out</button>
-      <div class="sidebar-footer"><a href="index.html" style="color:inherit;text-decoration:none;">© Let’s-ParaConnect 2026</a></div>
+      <div class="sidebar-footer">© Let’s‑ParaConnect 2026</div>
     </div>
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
@@ -1298,6 +1414,14 @@ body.theme-dark .select-field select{
   <!-- Main -->
   <main id="main" tabindex="-1" class="main">
     <div class="topbar" id="createCaseTopbar">
+      <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Show menu" aria-controls="sidebarNav" aria-expanded="false">
+        <span class="sidebar-toggle-glyph" aria-hidden="true">
+          <span class="sidebar-toggle-bar sidebar-toggle-bar--top"></span>
+          <span class="sidebar-toggle-bar sidebar-toggle-bar--middle"></span>
+          <span class="sidebar-toggle-bar sidebar-toggle-bar--bottom"></span>
+        </span>
+      </button>
+      <div class="topbar-actions">
       <div class="notification-wrapper" data-notification-center>
         <button class="notification-icon" id="createCaseNotifBtn" type="button" aria-label="View notifications" data-notification-toggle>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1326,16 +1450,17 @@ body.theme-dark .select-field select{
           <button type="button" class="logout-btn" data-logout>Log Out</button>
         </div>
       </div>
+      </div>
     </div>
 
     <section class="step-panel" data-step="details" id="create-step-details">
       <header>
-        <h1>Create a New Case</h1>
+        <h1>Create a New Matter</h1>
       </header>
 
       <div class="steps">
         <a href="#details" class="step active" data-step-link="details">
-          <div class="circle">1</div><span>Case details</span>
+          <div class="circle">1</div><span>Matter details</span>
         </a>
         <a href="#description" class="step" data-step-link="description">
           <div class="circle">2</div><span>Description</span>
@@ -1347,7 +1472,7 @@ body.theme-dark .select-field select{
 
       <form>
         <div class="field">
-          <label for="caseTitleInput">Case Title</label>
+          <label for="caseTitleInput">Matter Title</label>
           <input id="caseTitleInput" type="text" placeholder="e.g., Draft asset purchase agreement" />
         </div>
       <div class="field">
@@ -1499,12 +1624,12 @@ body.theme-dark .select-field select{
 
     <section class="step-panel" data-step="description" id="create-step-description" hidden>
       <header>
-        <h1>Create a New Case</h1>
+        <h1>Create a New Matter</h1>
       </header>
 
       <div class="steps">
         <a href="#details" class="step" data-step-link="details">
-          <div class="circle">1</div><span>Case details</span>
+          <div class="circle">1</div><span>Matter details</span>
         </a>
         <a href="#description" class="step active" data-step-link="description">
           <div class="circle">2</div><span>Description</span>
@@ -1518,7 +1643,7 @@ body.theme-dark .select-field select{
         <form>
           <div class="case-title-preview" id="caseTitlePreview">
             <span class="label">Matter Title</span>
-            <span class="value" id="caseTitlePreviewText">Untitled Case</span>
+            <span class="value" id="caseTitlePreviewText">Untitled Matter</span>
           </div>
           <div class="field">
             <label for="caseDescription">Matter Description</label>
@@ -1549,12 +1674,12 @@ body.theme-dark .select-field select{
     </section>
     <section class="step-panel" data-step="review" id="create-step-review" hidden>
       <header>
-        <h1>Review &amp; Post Your Case</h1>
+        <h1>Review &amp; Post Your Matter</h1>
       </header>
 
       <div class="steps">
         <a href="#details" class="step" data-step-link="details">
-          <div class="circle">1</div><span>Case details</span>
+          <div class="circle">1</div><span>Matter details</span>
         </a>
         <a href="#description" class="step" data-step-link="description">
           <div class="circle">2</div><span>Description</span>
@@ -1567,7 +1692,7 @@ body.theme-dark .select-field select{
       <section class="summary" id="reviewSummary">
         <div class="summary-layout">
           <div class="summary-content">
-            <p>Gathering your case details…</p>
+            <p>Gathering your matter details…</p>
           </div>
           <aside class="compliance-note" aria-label="Professional guidelines">
             <h3>Professional Guidelines</h3>
@@ -1581,7 +1706,7 @@ body.theme-dark .select-field select{
         <button type="button" class="btn secondary" data-step-switch="description">Back</button>
         <button type="button" class="btn secondary" data-nav="cancel" data-target="dashboard-attorney.html#cases:draft" data-save-draft="true">Save &amp; Exit</button>
         <button type="button" class="btn secondary" id="previewBtn">Preview Listing</button>
-        <button type="button" class="btn primary" id="postBtn">Post Case</button>
+        <button type="button" class="btn primary" id="postBtn">Post Matter</button>
       </div>
     </section>
   </main>
@@ -2062,13 +2187,19 @@ body.theme-dark .select-field select{
       const sidebarToggle = document.getElementById("sidebarToggle");
       const sidebarNav = document.getElementById("sidebarNav");
       const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+      const syncSidebarToggle = () => {
+        if (!sidebarToggle) return;
+        const isOpen = document.body.classList.contains("nav-open");
+        sidebarToggle.setAttribute("aria-expanded", String(isOpen));
+        sidebarToggle.setAttribute("aria-label", isOpen ? "Hide menu" : "Show menu");
+      };
       const closeSidebar = () => {
         document.body.classList.remove("nav-open");
-        if (sidebarToggle) sidebarToggle.setAttribute("aria-expanded", "false");
+        syncSidebarToggle();
       };
       const openSidebar = () => {
         document.body.classList.add("nav-open");
-        if (sidebarToggle) sidebarToggle.setAttribute("aria-expanded", "true");
+        syncSidebarToggle();
       };
       if (sidebarToggle) {
         sidebarToggle.addEventListener("click", () => {
@@ -2089,6 +2220,7 @@ body.theme-dark .select-field select{
       window.addEventListener("resize", () => {
         if (window.innerWidth > 1024) closeSidebar();
       });
+      syncSidebarToggle();
     });
   </script>
 
@@ -2183,7 +2315,7 @@ body.theme-dark .select-field select{
       {
         field: fields.title,
         check: (value) => value.trim().length >= 3,
-        message: "Add a descriptive case title.",
+        message: "Add a descriptive matter title.",
       },
       {
         field: fields.specialty,
@@ -2198,7 +2330,7 @@ body.theme-dark .select-field select{
       {
         field: fields.comp,
         check: (value) => parseCompAmount(value) > 0,
-        message: "Enter a valid compensation amount greater than $0.",
+        message: "Enter a valid compensation amount greater than $400.",
       },
     ];
 
@@ -2242,7 +2374,7 @@ body.theme-dark .select-field select{
     function updateTitlePreview(value = "") {
       if (!titlePreview) return;
       const safe = value.trim();
-      titlePreview.textContent = safe || "Untitled Case";
+      titlePreview.textContent = safe || "Untitled Matter";
     }
 
     function updateDescriptionCount() {
@@ -2740,7 +2872,7 @@ body.theme-dark .select-field select{
             .map((task) => `<li>${escapeHTML(task.title)}</li>`)
             .join("")}</ul>`
         : `<p><strong>Tasks:</strong> Not provided</p>`;
-      const safeTitle = escapeHTML(data.title || "(Untitled Case)");
+      const safeTitle = escapeHTML(data.title || "(Untitled Matter)");
       const safeField = escapeHTML(data.field || "Practice area pending");
       const safeState = escapeHTML(data.state || "Location pending");
       const safeComp = escapeHTML(data.comp || "—");
@@ -2802,7 +2934,7 @@ body.theme-dark .select-field select{
       if (!previewModal) return;
       const data = latestCaseData || collectCaseData();
       if (!data.title || !data.description) {
-        showToastBanner("Add a case title and description before previewing.", "error");
+        showToastBanner("Add a matter title and description before previewing.", "error");
         return;
       }
       const tasks = Array.isArray(data.tasks) ? data.tasks : [];
@@ -2865,9 +2997,9 @@ body.theme-dark .select-field select{
       draftCache.tasks = [];
     }
 
-    function showToast(message, href, isError = false, linkLabel = "View Case") {
+    function showToast(message, href, isError = false, linkLabel = "View Matter") {
       if (!toastEl) return;
-      const linkHtml = href ? ` <a href="${href}">${escapeHTML(linkLabel || "View Case")}</a>` : "";
+      const linkHtml = href ? ` <a href="${href}">${escapeHTML(linkLabel || "View Matter")}</a>` : "";
       toastEl.innerHTML = `${isError ? "⚠️" : "✅"} ${message}${linkHtml}`;
       toastEl.classList.toggle("error", Boolean(isError));
       toastEl.classList.add("show");
@@ -3247,7 +3379,7 @@ body.theme-dark .select-field select{
       }
       const data = latestCaseData || collectCaseData();
       if (!data.title || !data.description) {
-        showToastBanner("Add a case title and description before posting.", "error");
+        showToastBanner("Add a matter title and description before posting.", "error");
         return;
       }
       if (postBtn) postBtn.disabled = true;
@@ -3256,7 +3388,7 @@ body.theme-dark .select-field select{
           const paymentMethodReady = await hasDefaultPaymentMethod();
           if (!paymentMethodReady) {
             showToast(
-              "Connect Stripe and add a payment method before posting a case.",
+              "Connect Stripe and add a payment method before posting a matter.",
               "dashboard-attorney.html#billing",
               true,
               "Open Billing"
@@ -3287,7 +3419,7 @@ body.theme-dark .select-field select{
         window.location.href = "dashboard-attorney.html#cases";
       } catch (err) {
         console.error(err);
-        showToast(err?.message || "Unable to post this case right now.", null, true);
+        showToast(err?.message || "Unable to post this matter right now.", null, true);
         if (postBtn) postBtn.disabled = false;
       }
     }
@@ -3308,7 +3440,7 @@ body.theme-dark .select-field select{
     postBtn?.addEventListener("click", handlePost);
 
     function applyEditingCopy() {
-      document.title = "Edit Case – Let’s-ParaConnect";
+      document.title = "Edit Matter – Let’s-ParaConnect";
       const detailsHeader = document.querySelector('#create-step-details header h1');
       const detailsSub = document.querySelector('#create-step-details header p');
       const descHeader = document.querySelector('#create-step-description header h1');
@@ -3318,13 +3450,13 @@ body.theme-dark .select-field select{
       const labelDetails = document.querySelectorAll('[data-step-link="details"] span');
       const labelDesc = document.querySelectorAll('[data-step-link="description"] span');
       const labelReview = document.querySelectorAll('[data-step-link="review"] span');
-      detailsHeader && (detailsHeader.textContent = "Edit Case");
-      detailsSub && (detailsSub.textContent = "Step 1: Update your case basics.");
-      descHeader && (descHeader.textContent = "Edit Case");
-      descSub && (descSub.textContent = "Step 2: Update the case description.");
+      detailsHeader && (detailsHeader.textContent = "Edit Matter");
+      detailsSub && (detailsSub.textContent = "Step 1: Update your matter basics.");
+      descHeader && (descHeader.textContent = "Edit Matter");
+      descSub && (descSub.textContent = "Step 2: Update the matter description.");
       reviewHeader && (reviewHeader.textContent = "Review & Save Changes");
       reviewSub && (reviewSub.textContent = "Step 3: Confirm updates before saving.");
-      labelDetails.forEach((el) => (el.textContent = "Case details"));
+      labelDetails.forEach((el) => (el.textContent = "Matter details"));
       labelDesc.forEach((el) => (el.textContent = "Description"));
       labelReview.forEach((el) => (el.textContent = "Review & Save"));
       if (postBtn) postBtn.textContent = "Save Changes";

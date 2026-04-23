@@ -1990,7 +1990,7 @@ async function initParalegalProfileTour(user = {}) {
     },
     {
       id: "dashboardReturnLink",
-      title: "Return to Dashboard",
+      title: "RETURN TO DASHBOARD",
       text: "Use this button anytime to go back to your dashboard.",
     },
   ];
@@ -2406,7 +2406,7 @@ const BEST_FOR_SUGGESTIONS = [
   "Ongoing litigation support",
   "Family law matters",
   "Document drafting and research",
-  "Case management support"
+  "Matter management support"
 ];
 
 const EXPERIENCE_TITLE = "Paralegal";

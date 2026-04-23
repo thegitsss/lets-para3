@@ -107,6 +107,22 @@
       padding: 24px 16px;
       color: var(--sidebar-text);
       position: relative;
+      flex-shrink: 0;
+      overflow: hidden;
+      transition: width 0.25s ease, padding 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+    }
+
+    body.nav-collapsed .sidebar {
+      width: 0;
+      padding-left: 0;
+      padding-right: 0;
+      border-right-color: transparent;
+      box-shadow: none;
+    }
+
+    body.nav-collapsed .sidebar > * {
+      opacity: 0;
+      pointer-events: none;
     }
 
     .logo {
@@ -176,21 +192,125 @@
       display: none;
       align-items: center;
       justify-content: center;
-      width: 42px;
-      height: 42px;
-      border-radius: 12px;
-      border: none;
-      background: transparent;
+      width: 28px;
+      height: 56px;
+      border-radius: 0 16px 16px 0;
+      border: 1px solid rgba(26, 26, 26, 0.08);
+      border-left: none;
+      background: linear-gradient(90deg, rgba(182, 164, 122, 0.08) 0%, rgba(255, 255, 255, 0.92) 34%, rgba(255, 255, 255, 0.96) 100%);
+      backdrop-filter: blur(10px);
       padding: 0;
       cursor: pointer;
       position: relative;
       z-index: 2100;
+      align-self: flex-start;
+      margin-left: -40px;
+      margin-right: 0.85rem;
+      margin-top: -10px;
+      box-shadow: none;
+      transition: transform 0.18s ease, background 0.2s ease, border-color 0.2s ease;
     }
 
-    .sidebar-toggle-icon {
-      width: 28px;
-      height: 28px;
-      display: block;
+    .sidebar-toggle::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      bottom: 8px;
+      width: 1px;
+      background: rgba(182, 164, 122, 0.24);
+    }
+
+    .sidebar-toggle:hover,
+    .sidebar-toggle:focus-visible {
+      background: linear-gradient(90deg, rgba(182, 164, 122, 0.12) 0%, rgba(255, 255, 255, 0.96) 34%, rgba(255, 255, 255, 0.98) 100%);
+      border-color: rgba(182, 164, 122, 0.4);
+      box-shadow: none;
+      outline: none;
+    }
+
+    .sidebar-toggle[aria-expanded="true"] {
+      background: linear-gradient(90deg, rgba(182, 164, 122, 0.16) 0%, rgba(255, 255, 255, 0.92) 34%, rgba(255, 255, 255, 0.96) 100%);
+      border-color: rgba(182, 164, 122, 0.45);
+      box-shadow: none;
+    }
+
+    .sidebar-toggle-glyph {
+      position: relative;
+      width: 14px;
+      height: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .sidebar-toggle-bar {
+      position: absolute;
+      left: 0;
+      width: 14px;
+      height: 1px;
+      border-radius: 999px;
+      background: rgba(26, 26, 26, 0.56);
+      transform-origin: center;
+      transition:
+        transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.28s ease,
+        width 0.28s ease,
+        background 0.2s ease;
+    }
+
+    .sidebar-toggle-bar--top {
+      transform: translateY(-4px);
+    }
+
+    .sidebar-toggle-bar--middle {
+      width: 9px;
+    }
+
+    .sidebar-toggle-bar--bottom {
+      transform: translateY(4px);
+    }
+
+    .sidebar-toggle:hover .sidebar-toggle-glyph,
+    .sidebar-toggle:focus-visible .sidebar-toggle-glyph {
+      transform: scale(1.04);
+    }
+
+    .sidebar-toggle:hover .sidebar-toggle-bar--top,
+    .sidebar-toggle:hover .sidebar-toggle-bar--bottom,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--top,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--bottom {
+      width: 12px;
+    }
+
+    .sidebar-toggle:hover .sidebar-toggle-bar--middle,
+    .sidebar-toggle:focus-visible .sidebar-toggle-bar--middle {
+      width: 14px;
+    }
+
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-glyph {
+      transform: rotate(180deg);
+    }
+
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar {
+      background: rgba(26, 26, 26, 0.62);
+    }
+
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--top {
+      width: 14px;
+      transform: translateY(0) rotate(45deg);
+    }
+
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--middle {
+      width: 4px;
+      opacity: 0;
+      transform: scaleX(0.2);
+    }
+
+    .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--bottom {
+      width: 14px;
+      transform: translateY(0) rotate(-45deg);
     }
 
     .sidebar-backdrop {
@@ -220,12 +340,18 @@
 
     .topbar {
       display: flex;
-      justify-content: flex-end;
+      justify-content: flex-start;
       align-items: center;
       margin-bottom: 2rem;
       gap: 1.5rem;
       min-height: 72px;
     }
+
+    .topbar-header-slot {
+      margin-left: auto;
+      min-width: 0;
+    }
+
     .topbar .lpc-shared-header {
       margin-bottom: 0;
     }
@@ -889,6 +1015,10 @@
       color: var(--ink);
       letter-spacing: -0.01em;
     }
+    .message-box .status-subtext {
+      color: var(--muted);
+      margin-bottom: 0;
+    }
     .status-value .is-muted {
       color: var(--muted);
       font-weight: 400;
@@ -993,12 +1123,48 @@
       text-overflow: ellipsis;
     }
 
+    .matter-title-link {
+      display: inline-flex;
+      align-items: center;
+      max-width: fit-content;
+      color: inherit;
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: color 0.18s ease, border-color 0.18s ease;
+      cursor: pointer;
+    }
+
+    .matter-title-link:hover,
+    .matter-title-link:focus-visible {
+      color: #27496f;
+      border-bottom-color: rgba(39, 73, 111, 0.35);
+      outline: none;
+    }
+
     .matter-meta {
       font-size: 0.85em;
       color: var(--muted);
       display: flex;
       flex-wrap: wrap;
       gap: 0.25rem;
+    }
+
+    .matter-meta-separator {
+      color: rgba(138, 138, 138, 0.7);
+    }
+
+    .matter-inline-link {
+      color: #27496f;
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: color 0.18s ease, border-color 0.18s ease;
+    }
+
+    .matter-inline-link:hover,
+    .matter-inline-link:focus-visible {
+      color: #1d3856;
+      border-bottom-color: rgba(39, 73, 111, 0.35);
+      outline: none;
     }
 
     .matter-message {
@@ -1643,6 +1809,7 @@
       background: var(--panel);
       color: var(--ink);
       letter-spacing: 0.02em;
+      cursor: pointer;
       transition: background 0.2s ease, color 0.2s ease, border 0.2s ease, transform 0.15s ease;
       min-width: 130px;
     }
@@ -2164,6 +2331,13 @@
       cursor: pointer;
       font-size: 0.9rem;
       transition: background 0.2s;
+    }
+
+    .view-cases .add-btn .btn-plus,
+    button[data-quick-link="create-case"] .btn-plus {
+      display: inline-block;
+      position: relative;
+      top: -0.08em;
     }
 
     .view-cases .add-btn:hover {
@@ -4200,6 +4374,21 @@
       font-size:0.8rem;
     }
 
+    .view-billing .escrow-table .escrow-link {
+      color: #27496f;
+      text-decoration: none;
+      font-weight: 400;
+      border-bottom: 1px solid rgba(39, 73, 111, 0.22);
+      transition: color 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+    }
+
+    .view-billing .escrow-table .escrow-link:hover,
+    .view-billing .escrow-table .escrow-link:focus-visible {
+      color: #1d3856;
+      border-bottom-color: rgba(39, 73, 111, 0.48);
+      outline: none;
+    }
+
     .view-billing .finance-alerts .finance-alert.calm {
       border-style:dashed;
       border-color:var(--line);
@@ -4502,15 +4691,64 @@
 
       .sidebar-toggle {
         display: inline-flex;
-        position: fixed;
-        top: 14px;
-        left: 14px;
+        flex: 0 0 auto;
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        border-left: 1px solid rgba(26, 26, 26, 0.08);
+        background: rgba(255, 255, 255, 0.82);
+        box-shadow: none;
+        margin-left: 0;
+        margin-right: 0;
+        margin-top: 0;
+      }
+
+      .sidebar-toggle::before {
+        display: none;
+      }
+
+      .sidebar-toggle-glyph {
+        width: 18px;
+        height: 12px;
+      }
+
+      .sidebar-toggle-bar {
+        width: 18px;
+      }
+
+      .sidebar-toggle-bar--top {
+        transform: translateY(-5px);
+      }
+
+      .sidebar-toggle-bar--middle {
+        width: 12px;
+      }
+
+      .sidebar-toggle-bar--bottom {
+        transform: translateY(5px);
+      }
+
+      .sidebar-toggle:hover .sidebar-toggle-bar--top,
+      .sidebar-toggle:hover .sidebar-toggle-bar--bottom,
+      .sidebar-toggle:focus-visible .sidebar-toggle-bar--top,
+      .sidebar-toggle:focus-visible .sidebar-toggle-bar--bottom {
+        width: 16px;
+      }
+
+      .sidebar-toggle:hover .sidebar-toggle-bar--middle,
+      .sidebar-toggle:focus-visible .sidebar-toggle-bar--middle {
+        width: 18px;
+      }
+
+      .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--top,
+      .sidebar-toggle[aria-expanded="true"] .sidebar-toggle-bar--bottom {
+        width: 18px;
       }
 
       .topbar {
         margin-bottom: 1.25rem;
         min-height: 56px;
-        justify-content: flex-end;
+        justify-content: flex-start;
         gap: 12px;
       }
 
@@ -4795,14 +5033,11 @@
     })();
   </script>
   <a class="skip-link" href="#main">Skip to main content</a>
-  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
-    <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
-  </button>
   <aside class="sidebar" id="sidebarNav">
     <div class="logo">Dashboard</div>
     <nav>
       <a href="#home" class="active" data-view-target="home">Home</a>
-      <a href="#cases" data-view-target="cases">Cases</a>
+      <a href="#cases" data-view-target="cases">Matters</a>
       <a href="#billing" data-view-target="billing">Funds &amp; Payments</a>
       <a href="help.html">Help</a>
     </nav>
@@ -4813,12 +5048,21 @@
   </aside>
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <main id="main" tabindex="-1" class="main">
-    <div class="topbar" data-attorney-header>
-      <div class="header-skeleton" aria-hidden="true">
-        <div class="skeleton-circle"></div>
-        <div class="skeleton-stack">
-          <div class="skeleton-line short"></div>
-          <div class="skeleton-line medium"></div>
+    <div class="topbar">
+      <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
+        <span class="sidebar-toggle-glyph" aria-hidden="true">
+          <span class="sidebar-toggle-bar sidebar-toggle-bar--top"></span>
+          <span class="sidebar-toggle-bar sidebar-toggle-bar--middle"></span>
+          <span class="sidebar-toggle-bar sidebar-toggle-bar--bottom"></span>
+        </span>
+      </button>
+      <div class="topbar-header-slot" data-attorney-header>
+        <div class="header-skeleton" aria-hidden="true">
+          <div class="skeleton-circle"></div>
+          <div class="skeleton-stack">
+            <div class="skeleton-line short"></div>
+            <div class="skeleton-line medium"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -4827,10 +5071,9 @@
       <header class="command-header">
         <div class="command-title">
           <h1><span id="welcomeGreeting">Welcome</span>, <span id="user-name-heading"></span></h1>
-          <p id="activeCasesHeading" data-static="true">Your matters at a glance</p>
         </div>
         <div class="command-actions btn-group" role="group" aria-label="Quick actions">
-          <button type="button" data-quick-link="create-case">+ New Case</button>
+          <button type="button" data-quick-link="create-case"><span class="btn-plus">+</span> New Matter</button>
           <button type="button" class="secondary" data-quick-link="browse-paralegals">Browse Paralegals</button>
         </div>
       </header>
@@ -4918,7 +5161,7 @@
             <section class="status-rail-shell" aria-label="Status rail">
               <div class="status-rail">
                 <div class="status-item">
-                  <a class="status-label status-link" href="#cases" data-view-target="cases">Cases</a>
+                  <a class="status-label status-link" href="#cases" data-view-target="cases">Matters</a>
                   <div class="status-value" data-today="casesCreated">0</div>
                 </div>
                 <div class="status-item">
@@ -4927,7 +5170,8 @@
                 </div>
                 <div class="status-item message-box" id="messageBox" role="button" tabindex="0">
                   <div class="status-label">Unread Messages</div>
-                  <div class="status-value"><span id="messageCount">0</span></div>
+                  <div class="status-value" hidden><span id="messageCount">0</span></div>
+                  <div class="info-line status-subtext" id="messageLabel">Caught up</div>
                 </div>
                 <div class="status-item">
                   <a class="status-label status-link" href="#cases:archived">Total Completed Matters</a>
@@ -4982,7 +5226,7 @@
       <div class="cases-shell">
         <header class="cases-header">
           <div>
-            <h1>Cases</h1>
+            <h1>Matters</h1>
             <p>Manage and monitor your matters below.</p>
           </div>
           <button type="button" class="cases-onboarding-skip" id="caseOnboardingSkipBtn" hidden>Skip onboarding</button>
@@ -4990,7 +5234,7 @@
         <section id="casesViewSection">
           <div class="page-header">
             <div class="actions">
-              <button class="add-btn" type="button" data-case-quick="create">＋ New Case</button>
+              <button class="add-btn" type="button" data-case-quick="create"><span class="btn-plus">+</span> New Matter</button>
               <button class="add-btn" type="button" data-quick-link="browse-paralegals">Browse Paralegals</button>
             </div>
           </div>
@@ -5001,7 +5245,7 @@
             <button class="filter-tab" data-case-filter="archived">Archived (<span data-case-count="archived">0</span>)</button>
             <button class="filter-tab" data-case-filter="inquiries">Applicants (<span data-case-count="inquiries">0</span>)</button>
             <div class="filter-search">
-              <input type="search" placeholder="Search cases..." data-cases-search aria-label="Search cases" />
+              <input type="search" placeholder="Search matters..." data-cases-search aria-label="Search matters" />
             </div>
           </div>
 
@@ -5020,7 +5264,7 @@
                   </tr>
                 </thead>
                 <tbody data-table-body="active">
-                  <tr><td colspan="7" class="empty-row">Loading cases…</td></tr>
+                  <tr><td colspan="7" class="empty-row">Loading matters…</td></tr>
                 </tbody>
               </table>
               <div class="case-pagination" data-case-pagination="active">
@@ -5044,7 +5288,7 @@
                 </tr>
               </thead>
                 <tbody data-table-body="draft">
-                  <tr><td colspan="7" class="empty-row">Loading draft cases…</td></tr>
+                  <tr><td colspan="7" class="empty-row">Loading draft matters…</td></tr>
                 </tbody>
               </table>
               <div class="case-pagination" data-case-pagination="draft">
@@ -5078,7 +5322,7 @@
                   </tr>
                 </thead>
                 <tbody data-table-body="archived">
-                  <tr><td colspan="7" class="empty-row">Loading archived cases…</td></tr>
+                  <tr><td colspan="7" class="empty-row">Loading archived matters…</td></tr>
                 </tbody>
               </table>
               <div class="case-pagination" data-case-pagination="archived">
@@ -5118,8 +5362,8 @@
 
       <div id="caseNoteModal" class="note-modal hidden" role="dialog" aria-modal="true">
         <div class="note-modal-card">
-          <h3 style="font-family:var(--font-serif);font-weight:300;">Edit Case Note</h3>
-          <textarea id="caseNoteTextarea" placeholder="Add internal notes for this case."></textarea>
+          <h3 style="font-family:var(--font-serif);font-weight:300;">Edit Matter Note</h3>
+          <textarea id="caseNoteTextarea" placeholder="Add internal notes for this matter."></textarea>
           <div class="note-modal-actions">
             <button type="button" class="btn secondary" data-note-cancel>Cancel</button>
             <button type="button" class="btn primary" data-note-save>Save Note</button>
@@ -5166,7 +5410,7 @@
       <header class="page-header">
         <div>
           <h1>Billing &amp; Payments</h1>
-          <p>Manage invoices, receipts, and Stripe releases without leaving your dashboard.</p>
+          <p>Manage invoices, receipts, and Stripe releases.</p>
         </div>
         <div class="actions">
           <button type="button" class="primary-btn" id="openPortalBtn">Open Stripe Billing Portal</button>
@@ -5196,7 +5440,7 @@
         <div class="panel-header">
           <div>
             <h2 id="escrow-heading">Active Funds</h2>
-            <p>Payments pending for ongoing cases.</p>
+            <p>Payments pending for ongoing matters.</p>
           </div>
         </div>
         <div class="table-wrapper">
@@ -5211,11 +5455,11 @@
             </colgroup>
             <thead>
               <tr>
-                <th data-escrow-sort-th="case"><button type="button" class="sort-btn" data-escrow-sort-key="case">Case <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                <th data-escrow-sort-th="case"><button type="button" class="sort-btn" data-escrow-sort-key="case">Matter <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
                 <th data-escrow-sort-th="paralegal"><button type="button" class="sort-btn" data-escrow-sort-key="paralegal">Paralegal <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
                 <th data-escrow-sort-th="amount"><button type="button" class="sort-btn" data-escrow-sort-key="amount">Amount <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
                 <th data-escrow-sort-th="funded"><button type="button" class="sort-btn" data-escrow-sort-key="funded">Funded <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
-                <th data-escrow-sort-th="case_status"><button type="button" class="sort-btn" data-escrow-sort-key="case_status">Case Status <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
+                <th data-escrow-sort-th="case_status"><button type="button" class="sort-btn" data-escrow-sort-key="case_status">Matter Status <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
                 <th data-escrow-sort-th="payment_status"><button type="button" class="sort-btn" data-escrow-sort-key="payment_status">Payment Status <span class="sort-indicator" aria-hidden="true">↕</span></button></th>
               </tr>
             </thead>
@@ -5235,7 +5479,6 @@
         <div class="panel-header">
           <div>
             <h2 id="history-heading">Completed Assignments</h2>
-            <p>Receipts for every completed job. Click any record to jump back into its case file.</p>
           </div>
         </div>
         <div id="historyList" class="history-list">
@@ -5247,7 +5490,7 @@
     <div id="casePreviewModal" class="note-modal hidden" role="dialog" aria-modal="true" aria-labelledby="casePreviewTitle">
       <div class="note-modal-card case-preview-card">
         <header class="case-preview-header">
-          <h3 id="casePreviewTitle">Case Preview</h3>
+          <h3 id="casePreviewTitle">Matter Preview</h3>
           <div class="case-preview-actions">
             <button type="button" class="case-preview-close" aria-label="Close case preview" data-case-preview-close>&times;</button>
           </div>
@@ -5289,8 +5532,8 @@
       <button type="button" class="tour-close" id="casePostedCloseBtn" aria-label="Close">×</button>
       <div class="tour-hero" role="presentation"></div>
       <div class="tour-content">
-        <div class="tour-title" id="casePostedTitle">Case Posted</div>
-        <p class="tour-text" id="casePostedText">Your case is now live and open to applications.</p>
+        <div class="tour-title" id="casePostedTitle">Matter Posted</div>
+        <p class="tour-text" id="casePostedText">Your matter is now live and open to applications.</p>
         <div class="tour-actions">
           <button type="button" class="tour-btn primary" id="casePostedConfirmBtn">Close</button>
         </div>
@@ -5315,8 +5558,8 @@
       <button type="button" class="tour-close" data-case-onboarding-close aria-label="Close">×</button>
       <div class="tour-hero" role="presentation"></div>
       <div class="tour-content">
-        <div class="tour-title" id="attorneyCaseOnboardingTitle">Let’s Post Your First Case</div>
-        <p class="tour-text" id="attorneyCaseOnboardingText">Click “+ New Case” to post your first matter and start receiving paralegal interest.</p>
+        <div class="tour-title" id="attorneyCaseOnboardingTitle">Let’s Post Your First Matter</div>
+        <p class="tour-text" id="attorneyCaseOnboardingText">Click “+ New Matter” to post your first matter and start receiving paralegal interest.</p>
         <div class="tour-actions">
           <button type="button" class="tour-btn ghost" data-case-onboarding-skip>Skip onboarding</button>
           <button type="button" class="tour-btn primary" data-case-onboarding-continue>Continue</button>
@@ -5402,18 +5645,32 @@
       const sidebarToggle = document.getElementById("sidebarToggle");
       const sidebarNav = document.getElementById("sidebarNav");
       const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+      const syncSidebarToggle = () => {
+        if (!sidebarToggle) return;
+        const isMobile = window.innerWidth <= 1024;
+        const isOpen = isMobile
+          ? document.body.classList.contains("nav-open")
+          : !document.body.classList.contains("nav-collapsed");
+        sidebarToggle.setAttribute("aria-expanded", String(isOpen));
+        sidebarToggle.setAttribute("aria-label", isOpen ? "Hide menu" : "Show menu");
+      };
       const closeSidebar = () => {
         document.body.classList.remove("nav-open");
-        if (sidebarToggle) sidebarToggle.setAttribute("aria-expanded", "false");
+        syncSidebarToggle();
       };
       const openSidebar = () => {
         document.body.classList.add("nav-open");
-        if (sidebarToggle) sidebarToggle.setAttribute("aria-expanded", "true");
+        syncSidebarToggle();
       };
       if (sidebarToggle) {
         sidebarToggle.addEventListener("click", () => {
-          if (document.body.classList.contains("nav-open")) closeSidebar();
-          else openSidebar();
+          if (window.innerWidth <= 1024) {
+            if (document.body.classList.contains("nav-open")) closeSidebar();
+            else openSidebar();
+            return;
+          }
+          document.body.classList.toggle("nav-collapsed");
+          syncSidebarToggle();
         });
       }
       if (sidebarBackdrop) {
@@ -5427,8 +5684,14 @@
         });
       }
       window.addEventListener("resize", () => {
-        if (window.innerWidth > 1024) closeSidebar();
+        if (window.innerWidth > 1024) {
+          document.body.classList.remove("nav-open");
+        } else {
+          document.body.classList.remove("nav-collapsed");
+        }
+        syncSidebarToggle();
       });
+      syncSidebarToggle();
     });
   </script>
   <script>

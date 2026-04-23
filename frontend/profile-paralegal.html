@@ -1118,6 +1118,25 @@
       outline-offset: 2px;
     }
 
+    .hero-cta-row #inviteToCaseBtn {
+      border-color: rgba(200, 221, 251, 0.9);
+      background: rgba(255, 255, 255, 0.5);
+      color: #27496f;
+      box-shadow: 0 10px 24px rgba(63, 95, 143, 0.08);
+      -webkit-backdrop-filter: saturate(160%) blur(8px);
+      backdrop-filter: saturate(160%) blur(8px);
+    }
+
+    .hero-cta-row #inviteToCaseBtn:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.58);
+      border-color: #c8ddfb;
+      color: #1f3f62;
+    }
+
+    .hero-cta-row #inviteToCaseBtn:focus-visible {
+      outline: 2px solid rgba(200, 221, 251, 0.9);
+    }
+
     .hero-doc-buttons {
       display: flex;
       gap: 8px;
@@ -1860,7 +1879,7 @@
             <div class="profile-header-actions">
               <div class="hero-cta-row">
                 <button type="button" class="cta-secondary hidden" id="messageBtn">Message</button>
-                <button type="button" class="cta-primary hidden" id="inviteToCaseBtn">Invite to Case</button>
+                <button type="button" class="cta-primary hidden" id="inviteToCaseBtn">Invite to Matter</button>
                 <button type="button" class="cta-ghost hidden" id="editProfileBtn">Edit Profile</button>
               </div>
             </div>
@@ -1907,10 +1926,10 @@
   <!-- Modal + toast + scripts stay intact -->
   <div class="modal-overlay" id="inviteModal" role="dialog" aria-modal="true">
     <div class="invite-modal">
-      <h3>Invite to Case</h3>
-      <p class="modal-subtitle">Choose the case to connect with this paralegal.</p>
+      <h3>Invite to Matter</h3>
+      <p class="modal-subtitle">Choose the matter to connect with this paralegal.</p>
       <label>
-        <span style="display:block;font-size:0.9rem;color:var(--muted);margin-bottom:6px;">Select a case</span>
+        <span style="display:block;font-size:0.9rem;color:var(--muted);margin-bottom:6px;">Select a matter</span>
         <select id="inviteCaseSelect"></select>
       </label>
       <div class="modal-actions">

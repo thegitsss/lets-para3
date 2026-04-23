@@ -2726,6 +2726,7 @@ font-size:.95rem;
 <select id="massEmailAudienceSelect" aria-label="Mass email audience">
 <option value="missing_photo">Approved paralegals missing a profile photo</option>
 <option value="has_photo">Approved paralegals with an uploaded profile photo</option>
+<option value="attorney_no_matter">Approved attorneys who have not posted a matter yet</option>
 </select>
 </div>
 <div class="mass-email-actions">
@@ -2734,6 +2735,7 @@ font-size:.95rem;
 <button class="btn primary" type="button" id="massEmailCompleteBtn">Send Complete Profile</button>
 <button class="btn primary" type="button" id="massEmailAttorneyLaunchSetupBtn">Send Launch + Setup</button>
 <button class="btn primary" type="button" id="massEmailAttorneyLaunchBtn">Send Attorney Launch</button>
+<button class="btn primary" type="button" id="massEmailAttorneyFirstMatterBtn">Send First Matter Reminder</button>
 </div>
 <div class="pending-controls mass-email-controls">
 <select id="massEmailPageSelect" aria-label="Mass email users page"></select>
@@ -4821,6 +4823,7 @@ const massEmailDenialBtn = document.getElementById('massEmailDenialBtn');
 const massEmailCompleteBtn = document.getElementById('massEmailCompleteBtn');
 const massEmailAttorneyLaunchSetupBtn = document.getElementById('massEmailAttorneyLaunchSetupBtn');
 const massEmailAttorneyLaunchBtn = document.getElementById('massEmailAttorneyLaunchBtn');
+const massEmailAttorneyFirstMatterBtn = document.getElementById('massEmailAttorneyFirstMatterBtn');
 const massEmailAudienceSelect = document.getElementById('massEmailAudienceSelect');
 const massEmailPageSelect = document.getElementById('massEmailPageSelect');
 
@@ -5467,11 +5470,22 @@ return !hasPhoto;
 const hasUploadedProfilePhoto = (user = {}) => Boolean(user.profileImage || user.avatarURL);
 
 const getMassEmailAudienceConfig = () => {
+const paralegalLoadParams = { status: 'approved', role: 'paralegal', limit: '200' };
+if (massEmailAudience === 'attorney_no_matter') {
+return {
+helpText: 'Approved attorneys who have not posted a matter yet.',
+statusText: 'No matter posted',
+filter: () => true,
+loadParams: { status: 'approved', role: 'attorney', audience: 'attorney_no_matter', limit: '200' },
+enabledTypes: ['attorney_first_matter'],
+};
+}
 if (massEmailAudience === 'has_photo') {
 return {
 helpText: 'Approved paralegals with an uploaded profile photo.',
 statusText: 'Photo uploaded',
 filter: hasUploadedProfilePhoto,
+loadParams: paralegalLoadParams,
 enabledTypes: ['attorney_launch'],
 };
 }
@@ -5479,6 +5493,7 @@ return {
 helpText: 'Approved paralegals missing a profile photo.',
 statusText: 'Missing photo',
 filter: isMissingProfilePhoto,
+loadParams: paralegalLoadParams,
 enabledTypes: ['acceptance', 'denial', 'complete_profile', 'attorney_launch_setup'],
 };
 };
@@ -5492,6 +5507,7 @@ denial: massEmailDenialBtn,
 complete_profile: massEmailCompleteBtn,
 attorney_launch_setup: massEmailAttorneyLaunchSetupBtn,
 attorney_launch: massEmailAttorneyLaunchBtn,
+attorney_first_matter: massEmailAttorneyFirstMatterBtn,
 };
 Object.entries(buttonMap).forEach(([type, button]) => {
 if (!button) return;
@@ -5571,7 +5587,13 @@ const loadMassEmailUsers = async () => {
 if (!massEmailUsersBody) return;
 massEmailUsersBody.innerHTML =
 '<tr><td colspan="4" class="pending-empty">Loading users…</td></tr>';
-const params = new URLSearchParams({ status: 'approved', role: 'paralegal', limit: '200' });
+massEmailAllUsers = [];
+massEmailUsers = [];
+massEmailPage = 1;
+massEmailSelected.clear();
+updateMassEmailCount();
+const { loadParams } = getMassEmailAudienceConfig();
+const params = new URLSearchParams(loadParams);
 try {
 const res = await secureFetch(`/api/admin/pending-users?${params.toString()}`, {
 headers: { Accept: 'application/json' },
@@ -5611,6 +5633,7 @@ denial: massEmailDenialBtn,
 complete_profile: massEmailCompleteBtn,
 attorney_launch_setup: massEmailAttorneyLaunchSetupBtn,
 attorney_launch: massEmailAttorneyLaunchBtn,
+attorney_first_matter: massEmailAttorneyFirstMatterBtn,
 };
 const button = buttons[type];
 const originalLabel = button?.textContent || '';
@@ -6249,13 +6272,15 @@ renderMassEmailUsers();
 });
 massEmailAudienceSelect?.addEventListener('change', () => {
 massEmailAudience = String(massEmailAudienceSelect.value || 'missing_photo');
-applyMassEmailAudience();
+syncMassEmailActionState();
+loadMassEmailUsers();
 });
 massEmailAcceptanceBtn?.addEventListener('click', () => sendMassEmail('acceptance'));
 massEmailDenialBtn?.addEventListener('click', () => sendMassEmail('denial'));
 massEmailCompleteBtn?.addEventListener('click', () => sendMassEmail('complete_profile'));
 massEmailAttorneyLaunchSetupBtn?.addEventListener('click', () => sendMassEmail('attorney_launch_setup'));
 massEmailAttorneyLaunchBtn?.addEventListener('click', () => sendMassEmail('attorney_launch'));
+massEmailAttorneyFirstMatterBtn?.addEventListener('click', () => sendMassEmail('attorney_first_matter'));
 syncMassEmailActionState();
 
 let softRefreshInFlight = false;

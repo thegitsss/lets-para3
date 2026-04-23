@@ -7206,7 +7206,7 @@ describe("Support assistant API", () => {
     expect(sendRes.body.assistantMessage.text).toMatch(/review queue/i);
   });
 
-  test("refuses non-admin questions in the admin dashboard chat scope", async () => {
+  test("allows non-dashboard questions in the admin dashboard chat scope to use the normal assistant", async () => {
     const admin = await createUser({
       role: "admin",
       email: "support-admin-dashboard-refusal@lets-paraconnect.test",
@@ -7229,17 +7229,16 @@ describe("Support assistant API", () => {
     expect(sendRes.status).toBe(201);
     expect(sendRes.body.assistantReply).toEqual(
       expect.objectContaining({
-        primaryAsk: "admin_dashboard_help",
-        provider: "admin_dashboard_support",
-        responseMode: "DIRECT_ANSWER",
+        primaryAsk: "product_guidance",
+        provider: "openai",
         navigation: expect.objectContaining({
-          ctaLabel: "Overview",
-          ctaHref: "admin-dashboard.html#overview",
+          ctaLabel: "Browse cases",
+          ctaHref: "browse-jobs.html",
         }),
       })
     );
-    expect(sendRes.body.assistantMessage.text).toMatch(/only handles admin dashboard questions/i);
-    expect(sendRes.body.assistantMessage.text).not.toMatch(/browse open cases|apply when a case is open/i);
+    expect(sendRes.body.assistantMessage.text).toMatch(/browse open cases|apply when a case is open/i);
+    expect(sendRes.body.assistantMessage.text).not.toMatch(/only handles admin dashboard questions/i);
   });
 
   test("attorney prompt sweep stays coherent across 50 prompts", async () => {

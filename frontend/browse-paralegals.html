@@ -205,14 +205,18 @@
       padding: 0.5rem 1rem;
       font-size: 0.95rem;
       border-radius: 999px;
-      border: 1px solid var(--gold);
+      border: 1px solid #c8ddfb;
       background: transparent;
-      color: var(--gold);
+      color: #3f5f8f;
       cursor: pointer;
       letter-spacing: 0.04em;
     }
 
-    .filter-actions button.primary { background: var(--gold); color: #fff; }
+    .filter-actions button.primary {
+      background: #eef6ff;
+      border-color: #c8ddfb;
+      color: #3f5f8f;
+    }
 
     .results {
       flex: 1;
@@ -541,11 +545,11 @@
 
     aside.filter #stateList li:hover,
     aside.filter #specialtyList li:hover {
-      background: rgba(180, 151, 90, 0.1);
+      background: #eef6ff;
     }
 
     aside.filter #specialtyList input[type="checkbox"] {
-      accent-color: var(--gold);
+      accent-color: #3f5f8f;
       cursor: pointer;
       transform: scale(1.1);
       width: 18px;
@@ -582,13 +586,13 @@
     aside.filter select:focus,
     aside.filter input[type="text"]:focus,
     #stateInput:focus {
-      border-color: var(--gold);
+      border-color: #c8ddfb;
     }
 
     aside.filter select:hover,
     aside.filter input[type="text"]:hover,
     #stateInput:hover {
-      border-color: var(--gold);
+      border-color: #c8ddfb;
     }
 
     .results-status.error {
@@ -653,13 +657,17 @@
 
     .card-meta {
       display: flex;
+      align-items: center;
       flex-wrap: wrap;
       gap: 0.5rem;
       margin-top: 0.45rem;
     }
 
     .card-meta span {
+      display: inline-flex;
+      align-items: center;
       font-size: 0.95rem;
+      line-height: 1.2;
       color: var(--muted);
       border: 1px solid var(--line);
       padding: 0.2rem 0.6rem;
@@ -939,7 +947,7 @@
       <nav aria-label="Primary"></nav>
       <a class="brand" href="index.html">Let<span class="accent-apostrophe">’</span>s-ParaConnect</a>
       <div class="header-actions">
-<a class="pill signup-pill" href="dashboard-attorney.html" id="returnDashboard">Return to Dashboard</a>
+<a class="pill signup-pill" href="dashboard-attorney.html" id="returnDashboard">RETURN TO DASHBOARD</a>
       </div>
     </div>
   </header>
@@ -951,42 +959,39 @@
       <aside class="filter" id="filterMenu">
         <h2>Filter</h2>
         <div class="filter-group">
-          <label for="experience">Experience</label>
-          <select id="experience">
-            <option value="">Any</option>
+          <select id="experience" aria-label="Experience">
+            <option value="">Experience</option>
             <option value="1+ years">1+ years</option>
             <option value="3+ years">3+ years</option>
             <option value="5+ years">5+ years</option>
+            <option value="10+ years">10+ years</option>
           </select>
         </div>
 
         <div class="filter-group">
-          <label for="specialtyInput">Specialty</label>
           <div class="dropdown-wrapper">
-            <input type="text" id="specialtyInput" placeholder="Click to select specialties" readonly />
+            <input type="text" id="specialtyInput" placeholder="Specialty" aria-label="Specialty" readonly />
             <ul id="specialtyList"></ul>
           </div>
         </div>
 
         <div class="filter-group">
-          <label for="stateInput">State</label>
           <div class="dropdown-wrapper">
-            <input type="text" id="stateInput" placeholder="Select State" autocomplete="off" />
+            <input type="text" id="stateInput" placeholder="State" aria-label="State" autocomplete="off" />
             <ul id="stateList"></ul>
           </div>
         </div>
 
         <div class="filter-group">
-          <label for="availability">Availability</label>
-          <select id="availability">
-            <option value="">Any</option>
+          <select id="availability" aria-label="Availability">
+            <option value="">Availability</option>
             <option value="Available Now">Available Now</option>
             <option value="Weekends">Weekends</option>
           </select>
         </div>
         <div class="filter-actions">
-          <button type="button" class="primary" id="applyFilters">Apply Filters</button>
-          <button type="button" id="clearFilters">Reset Filters</button>
+          <button type="button" class="primary" id="applyFilters">Apply</button>
+          <button type="button" id="clearFilters">Reset</button>
         </div>
       </aside>
 
@@ -994,7 +999,6 @@
         <div class="results-header">
           <div class="title-block">
             <h2>Available Paralegals</h2>
-            <p>Use the filters to focus on specialties, locations, and availability.</p>
           </div>
           <div class="results-controls">
             <label for="sortBy">Sort by</label>
@@ -1028,7 +1032,7 @@
       <h2 id="authBlockerTitle">Create an account to interact</h2>
       <p>Sign in to filter, open profiles, or send inquiries.</p>
       <div class="auth-blocker__actions">
-        <a class="btn primary" href="login.html">Log In</a>
+        <a class="btn primary" href="login.html">Sign In</a>
         <a class="btn secondary" href="signup.html">Create Account</a>
       </div>
     </div>
@@ -1037,9 +1041,9 @@
   <div class="modal-overlay" id="inquireModal">
     <div class="inquire-modal">
       <h3>Send Inquiry</h3>
-      <p id="selectedParalegalText">Select a case to send this paralegal.</p>
+      <p id="selectedParalegalText">Select a matter to send this paralegal.</p>
       <div class="job-list" id="jobList"></div>
-      <p class="invite-lock-note">Sending an invitation locks the case amount.</p>
+      <p class="invite-lock-note">Sending an invitation locks the matter amount.</p>
       <label class="modal-note">
         <textarea id="inquireMessage" placeholder="Add context or next steps" rows="3"></textarea>
       </label>

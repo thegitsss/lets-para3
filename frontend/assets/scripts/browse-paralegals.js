@@ -130,10 +130,10 @@ function syncAuthButtons() {
           ? "admin-dashboard.html"
           : "dashboard-attorney.html";
       elements.returnDashboard.href = dashboardHref;
-      elements.returnDashboard.textContent = "Return to Dashboard";
+      elements.returnDashboard.textContent = "RETURN TO DASHBOARD";
     } else {
       elements.returnDashboard.href = "login.html";
-      elements.returnDashboard.textContent = "Log In";
+      elements.returnDashboard.textContent = "Sign In";
     }
   }
   if (state.isLoggedIn) {

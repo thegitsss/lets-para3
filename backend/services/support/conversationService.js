@@ -1380,31 +1380,7 @@ function buildAdminDashboardSupportReply({ text = "" } = {}) {
     });
   }
 
-  return buildLlmAssistantPayload({
-    reply:
-      "This chat only handles admin dashboard questions. Ask about tabs, queues, settings, or where to do a task inside the admin dashboard.",
-    navigation: buildNavigationPayload({
-      ctaLabel: "Overview",
-      ctaHref: "admin-dashboard.html#overview",
-      ctaType: "deep_link",
-    }),
-    actions: [buildActionPayload({ label: "Open Overview", href: "admin-dashboard.html#overview" })].filter(Boolean),
-    suggestions: ["Overview", "Approvals", "Finance"],
-    provider: "admin_dashboard_support",
-    category: "unknown",
-    categoryLabel: "Admin Dashboard",
-    primaryAsk: "admin_dashboard_help",
-    activeTask: "ANSWER",
-    responseMode: "DIRECT_ANSWER",
-    confidence: "high",
-    urgency: "low",
-    grounded: true,
-    detailLevel: "concise",
-    supportFacts: {
-      userRole: "admin",
-      workspace: "admin_dashboard",
-    },
-  });
+  return null;
 }
 
 function buildSelfServiceActions({
@@ -6884,7 +6860,7 @@ async function createConversationMessage({
     },
   });
 
-  const assistantReply = isAdminDashboardSupportScope({
+  const adminDashboardReply = isAdminDashboardSupportScope({
     user,
     pageContext: context.pageContext,
     sourcePage: context.sourcePage,
@@ -6892,24 +6868,28 @@ async function createConversationMessage({
     ? buildAdminDashboardSupportReply({
         text: normalizedText,
       })
-    : await buildAssistantReply({
-        user,
-        text: normalizedText,
-        pageContext: context.pageContext,
-        assistantReplyOverride,
-        conversationContext: {
-          supportState: effectiveSupportState,
-          conversationId: normalizeId(conversation._id),
-          currentMessageId: normalizeId(userMessage._id),
-          ticketId: normalizeId(conversation.escalation?.ticketId),
-          lastAssistantMessage,
-          awaitingMessagingClarification:
-            conversation.metadata?.support?.awaitingMessagingClarification === true,
-          awaitingIntakeDetails: conversation.metadata?.support?.awaitingIntakeDetails === true,
-          frustration,
-          promptAction: normalizedPromptAction,
-        },
-      });
+    : null;
+
+  const assistantReply =
+    adminDashboardReply ||
+    (await buildAssistantReply({
+      user,
+      text: normalizedText,
+      pageContext: context.pageContext,
+      assistantReplyOverride,
+      conversationContext: {
+        supportState: effectiveSupportState,
+        conversationId: normalizeId(conversation._id),
+        currentMessageId: normalizeId(userMessage._id),
+        ticketId: normalizeId(conversation.escalation?.ticketId),
+        lastAssistantMessage,
+        awaitingMessagingClarification:
+          conversation.metadata?.support?.awaitingMessagingClarification === true,
+        awaitingIntakeDetails: conversation.metadata?.support?.awaitingIntakeDetails === true,
+        frustration,
+        promptAction: normalizedPromptAction,
+      },
+    }));
 
   const assistantMessage = await SupportMessage.create({
     conversationId: conversation._id,

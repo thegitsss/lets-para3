@@ -375,8 +375,8 @@ body.support-drawer-open .support-drawer {
 }
 
 .support-message--user .support-message-bubble {
-  background: rgba(182, 164, 122, 0.16);
-  border-color: rgba(182, 164, 122, 0.22);
+  background: rgba(10, 132, 255, 0.12);
+  border-color: rgba(10, 132, 255, 0.22);
 }
 
 .support-message--team .support-message-bubble {
@@ -600,7 +600,7 @@ body.support-drawer-open .support-drawer {
   position: absolute;
   left: 30px;
   right: 78px;
-  top: 24px;
+  top: 20px;
   z-index: 2;
   overflow: hidden;
   pointer-events: none;
@@ -837,8 +837,8 @@ body.theme-mountain-dark .support-quick-prompt--primary {
 
 body.theme-dark .support-message--user .support-message-bubble,
 body.theme-mountain-dark .support-message--user .support-message-bubble {
-  background: rgba(182, 164, 122, 0.18);
-  border-color: rgba(182, 164, 122, 0.28);
+  background: rgba(10, 132, 255, 0.18);
+  border-color: rgba(10, 132, 255, 0.28);
 }
 
 body.theme-dark .support-message--team .support-message-bubble,

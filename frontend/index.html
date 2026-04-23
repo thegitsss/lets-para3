@@ -234,11 +234,20 @@
       z-index: 60;
     }
     .kicker {
-      color: rgba(255, 255, 255, 0.9);
-      letter-spacing: .28em;
+      display: inline-block;
+      color: #ffffff;
+      letter-spacing: .24em;
       text-transform: uppercase;
-      font-size: 14px;
+      font-size: 16px;
+      font-weight: 500;
       margin-bottom: 14px;
+      text-shadow:
+        0 4px 14px rgba(0, 0, 0, 0.72),
+        0 0 12px rgba(255, 255, 255, 0.32),
+        0 0 28px rgba(255, 255, 255, 0.18);
+      filter:
+        drop-shadow(0 0 8px rgba(255, 255, 255, 0.28))
+        drop-shadow(0 5px 18px rgba(0, 0, 0, 0.65));
     }
     .headline {
   font-family: 'Cormorant Garamond', serif;
@@ -1117,7 +1126,7 @@
           <span class="card-icon" aria-hidden="true"><img src="android-chrome-512x512.png" alt="" /></span>
           <div class="hiw-card">
             <div class="hiw-default">
-              <h3>Payments through Stripe</h3>
+              <h3>Payments Through Stripe</h3>
               <p>Payments are processed through Stripe Connect. Attorneys authorize payment through Stripe, and Stripe processes payout to the paralegal’s connected account once the project is marked complete in the platform. Let’s‑ParaConnect does not take custody of funds outside of Stripe, does not act as a payment processor, and charges a platform fee for access to the platform’s communication, workflow, and payment-facilitation tools.</p>
               <a href="#" class="hiw-toggle" data-target="secure-escrow">Learn More →</a>
             </div>

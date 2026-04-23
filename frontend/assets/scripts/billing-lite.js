@@ -430,7 +430,7 @@ function resumePendingHire(pending) {
 }
 
 function renderHistoryCard(entry = {}) {
-  const caseName = escapeHtml(entry.caseName || entry.caseTitle || entry.title || "Case");
+  const caseName = escapeHtml(entry.caseName || entry.caseTitle || entry.title || "Matter");
   const paralegal = escapeHtml(entry.paralegalName || "Assigned Paralegal");
   const amount = formatCurrency(entry.jobAmount ?? entry.amount ?? entry.lockedTotalAmount ?? entry.totalAmount);
   const datePaid = formatDate(entry.releaseDate || entry.paidOutAt || entry.completedAt);

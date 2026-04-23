@@ -47,7 +47,9 @@ const ATTORNEY_APPROVAL_EMAIL_SUBJECT =
 const DENIAL_EMAIL_SUBJECT =
 "Your application to join Let's-ParaConnect has been reviewed and was unfortunately not approved.";
 const ATTORNEY_LAUNCH_EMAIL_SUBJECT = "Attorney Launch Begins Today";
+const ATTORNEY_FIRST_MATTER_EMAIL_SUBJECT = "Post Your First Matter on Let’s-ParaConnect";
 const PLATFORM_FEE_PARALEGAL_PERCENT = Number(process.env.PLATFORM_FEE_PARALEGAL_PERCENT || 18);
+const CREATE_CASE_URL = `${ASSET_BASE_URL}/create-case.html`;
 
 // -----------------------------------------
 // Helpers
@@ -308,6 +310,15 @@ return text ? text.slice(0, 1000) : undefined;
 
 function escapeRegex(value = "") {
 return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+async function getAttorneyIdsWithPostedMatters(attorneyIds = []) {
+  const normalizedIds = Array.isArray(attorneyIds)
+    ? attorneyIds.filter(isObjId).map((id) => new mongoose.Types.ObjectId(String(id)))
+    : [];
+  const filter = normalizedIds.length ? { attorneyId: { $in: normalizedIds } } : {};
+  const rows = await Job.distinct("attorneyId", filter);
+  return new Set(rows.filter((id) => isObjId(id)).map((id) => String(id)));
 }
 
 function buildUnsubscribeToken(user) {
@@ -959,6 +970,97 @@ function buildAttorneyLaunchSetupEmailHtml(user, opts = {}) {
               <div style="font-family:Arial, Helvetica, sans-serif;font-size:14px;letter-spacing:0.06em;color:#545454;line-height:1.6;">
                 If you have any questions, reply to this email and we&rsquo;ll help you get set up.
               </div>
+            </td>
+          </tr>
+          ${buildLaunchEmailFooter({
+            unsubscribeLine,
+            contactUrl,
+            privacyUrl,
+            linkedinUrl,
+            facebookUrl,
+            instagramUrl,
+          })}
+        </table>
+      </td>
+    </tr>
+  </table>
+  `;
+}
+
+function buildAttorneyFirstMatterEmailHtml(user, opts = {}) {
+  const createCaseUrl = CREATE_CASE_URL;
+  const logoUrl = opts.logoUrl || `${ASSET_BASE_URL}/Cleanfav.png`;
+  const heroUrl = `${ASSET_BASE_URL}/hero-mountain.jpg`;
+  const contactUrl = `${ASSET_BASE_URL}/contact.html`;
+  const privacyUrl = `${ASSET_BASE_URL}/privacy.html`;
+  const linkedinUrl = "https://www.linkedin.com/company/lets-paraconnect/";
+  const facebookUrl = "https://www.facebook.com/LetsParaConnect/";
+  const instagramUrl = "https://www.instagram.com/letsparaconnect/";
+  const token = buildUnsubscribeToken(user);
+  const unsubscribeUrl = token ? `${ASSET_BASE_URL}/public/unsubscribe?token=${encodeURIComponent(token)}` : "";
+  const friendlyName = user?.firstName || formatFullName(user) || "there";
+  const unsubscribeLine = unsubscribeUrl
+    ? `<a href="${unsubscribeUrl}" style="color:#7a7a7a;text-decoration:underline;">Unsubscribe from non-essential emails</a>`
+    : "Unsubscribe from non-essential emails";
+
+  return `
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f0f1f5" style="background-color:#f0f1f5;margin:0;padding:0;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;">
+          <tr>
+            <td align="center" style="padding:24px 24px 8px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding-right:12px;">
+                    <img src="${logoUrl}" alt="Let's-ParaConnect" width="42" height="42" style="display:block;border:0;width:42px;height:42px;">
+                  </td>
+                  <td style="font-family:Georgia, 'Times New Roman', serif;font-size:28px;letter-spacing:0.04em;color:#0e1b10;">
+                    Let's-ParaConnect
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 24px 20px;">
+              <img src="${heroUrl}" alt="Let's-ParaConnect" width="552" style="display:block;border:0;width:100%;max-width:552px;border-radius:18px;">
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:8px 32px 0;">
+              <div style="font-family:Georgia, 'Times New Roman', serif;font-size:30px;letter-spacing:0.04em;color:#6e6e6e;">
+                Post your first matter
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:16px 40px 0;">
+              <div style="font-family:Arial, Helvetica, sans-serif;font-size:15px;letter-spacing:0.04em;color:#1f1f1f;line-height:1.6;text-align:left;">
+                <p style="margin:0 0 18px;">Hi ${friendlyName},</p>
+                <p style="margin:0 0 18px;">Your Let&rsquo;s-ParaConnect account is ready. If you have not posted your first matter yet, this is a good time to get one live and start receiving interest from approved paralegals.</p>
+                <p style="margin:0 0 10px;"><strong>A simple first post can include:</strong></p>
+                <ul style="margin:0 0 18px 20px;padding:0;">
+                  <li style="margin:0 0 10px;">A clear scope of work and deadline</li>
+                  <li style="margin:0 0 10px;">The practice area and state involved</li>
+                  <li style="margin:0;">Compensation for the matter</li>
+                </ul>
+                <p style="margin:0 0 18px;">Once your matter is posted, approved paralegals can review it and apply directly through the platform.</p>
+                <p style="margin:0;">If you need help getting your first matter set up, reply to this email and we&rsquo;ll help.</p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:24px 32px 16px;">
+              <table cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td bgcolor="#0a84ff" style="border-radius:999px;">
+                    <a href="${createCaseUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:12px 30px;font-family:Georgia, 'Times New Roman', serif;font-size:20px;color:#ffffff;text-decoration:none;">
+                      Post Your First Matter
+                    </a>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           ${buildLaunchEmailFooter({
@@ -1933,6 +2035,7 @@ recentUsers,
 const listUsersHandler = asyncHandler(async (req, res) => {
 const { status = "pending", role, q } = req.query;
 const { skip, limit, page } = parsePagination(req, { defaultLimit: 25 });
+const audience = String(req.query.audience || "").trim().toLowerCase();
 
 const filter = {};
 const rawStatus = String(status || "").trim().toLowerCase();
@@ -1952,6 +2055,16 @@ filter.status = normalizedStatus;
 }
 }
 if (["attorney", "paralegal", "admin"].includes(role)) filter.role = role;
+if (audience === "attorney_no_matter") {
+filter.role = "attorney";
+filter.status = "approved";
+const postedAttorneyIds = await getAttorneyIdsWithPostedMatters();
+if (postedAttorneyIds.size) {
+  filter._id = {
+    $nin: Array.from(postedAttorneyIds).map((id) => new mongoose.Types.ObjectId(id)),
+  };
+}
+}
 if (q && q.trim()) {
 const rx = new RegExp(q.trim(), "i");
 filter.$or = [
@@ -2229,7 +2342,7 @@ res.set("Content-Type", "text/html").send(html);
 router.post("/bulk-email", csrfProtection, asyncHandler(async (req, res) => {
 const { type, userIds } = req.body || {};
 const normalizedType = String(type || "").trim().toLowerCase();
-if (!["acceptance", "denial", "complete_profile", "attorney_launch", "attorney_launch_setup"].includes(normalizedType)) {
+if (!["acceptance", "denial", "complete_profile", "attorney_launch", "attorney_launch_setup", "attorney_first_matter"].includes(normalizedType)) {
   return res.status(400).json({ msg: "Invalid email type" });
 }
 if (!Array.isArray(userIds) || !userIds.length) {
@@ -2250,6 +2363,9 @@ const emailOpts = {
 let sent = 0;
 let skipped = 0;
 const failures = [];
+const attorneyIdsWithPostedMatters = normalizedType === "attorney_first_matter"
+  ? await getAttorneyIdsWithPostedMatters(users.map((user) => user?._id).filter(Boolean))
+  : new Set();
 for (const user of users) {
   const email = user?.email;
   if (!email) {
@@ -2263,6 +2379,15 @@ for (const user of users) {
       ? userHasUploadedProfilePhoto(user)
       : !userHasUploadedProfilePhoto(user);
     if (!isApprovedParalegal || !photoRequirementMet) {
+      skipped += 1;
+      continue;
+    }
+  }
+  if (normalizedType === "attorney_first_matter") {
+    const isApprovedAttorney = String(user?.role || "").toLowerCase() === "attorney"
+      && String(user?.status || "").toLowerCase() === "approved";
+    const hasPostedMatter = attorneyIdsWithPostedMatters.has(String(user?._id || ""));
+    if (!isApprovedAttorney || hasPostedMatter) {
       skipped += 1;
       continue;
     }
@@ -2289,6 +2414,9 @@ for (const user of users) {
   } else if (normalizedType === "attorney_launch_setup") {
     subject = ATTORNEY_LAUNCH_EMAIL_SUBJECT;
     html = buildAttorneyLaunchSetupEmailHtml(user);
+  } else if (normalizedType === "attorney_first_matter") {
+    subject = ATTORNEY_FIRST_MATTER_EMAIL_SUBJECT;
+    html = buildAttorneyFirstMatterEmailHtml(user);
   }
   try {
     await sendEmail(email, subject, html, emailOpts);

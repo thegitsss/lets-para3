@@ -76,26 +76,15 @@
         min-height:120px;
         resize:vertical;
       }
+      .incident-intake-actions{
+        display:flex;
+        justify-content:flex-end;
+        margin-top:4px;
+      }
       .incident-grid{
         display:grid;
         gap:12px;
         grid-template-columns:repeat(2, minmax(0, 1fr));
-      }
-      .incident-checkbox{
-        display:flex;
-        align-items:flex-start;
-        gap:10px;
-        font-size:0.9rem;
-        color:var(--muted, #5c6b7a);
-      }
-      .incident-checkbox input{
-        margin-top:2px;
-      }
-      .incident-intake-actions{
-        display:flex;
-        flex-wrap:wrap;
-        gap:12px;
-        align-items:center;
       }
       .incident-submit{
         display:inline-flex;
@@ -115,10 +104,6 @@
       .incident-submit[disabled]{
         opacity:0.65;
         cursor:not-allowed;
-      }
-      .incident-note{
-        color:var(--muted, #5c6b7a);
-        font-size:0.9rem;
       }
       .incident-status{
         margin-top:14px;
@@ -159,6 +144,9 @@
         }
         .incident-intake-shell{
           padding:18px;
+        }
+        .incident-intake-actions .incident-submit{
+          width:100%;
         }
       }
     `;
@@ -277,24 +265,23 @@
       hideReadyStatus = false,
       hidePrimaryLabels = false,
       hideOptionalContextFields = false,
-      hideSubmitNote = false,
     } = options;
     return `
       <div class="incident-intake-shell">
-        <div class="incident-intake-head">
-          <div>
-            <h2>Report an issue</h2>
-          </div>
-          ${
-            hideContextPills
-              ? ""
-              : `<div class="incident-intake-pills">
-            <span class="incident-pill">Surface: ${surfaceLabel}</span>
-            <span class="incident-pill">Page: ${compactText(window.location.pathname, 40) || "/"}</span>
-          </div>`
-          }
-        </div>
         <form class="incident-intake-form" novalidate>
+          <div class="incident-intake-head">
+            <div>
+              <h2>Report an Issue</h2>
+              ${
+                hideContextPills
+                  ? ""
+                  : `<div class="incident-intake-pills">
+                <span class="incident-pill">Surface: ${surfaceLabel}</span>
+                <span class="incident-pill">Page: ${compactText(window.location.pathname, 40) || "/"}</span>
+              </div>`
+              }
+            </div>
+          </div>
           <div class="incident-field">
             ${hidePrimaryLabels ? "" : '<label for="incidentSummary">Short summary</label>'}
             <input id="incidentSummary" name="summary" type="text" maxlength="180" required placeholder="What is not working?" aria-label="Short summary" />
@@ -321,13 +308,8 @@
               <input id="incidentApplicationId" name="applicationId" type="text" maxlength="64" value="${escapeHtml(defaults.applicationId)}" placeholder="Optional" />
             </div>
           </div>`}
-          <label class="incident-checkbox">
-            <input id="incidentAttachDiagnostics" type="checkbox" checked />
-            <span>Include technical details to help us troubleshoot.</span>
-          </label>
           <div class="incident-intake-actions">
-            <button class="incident-submit" type="submit">Submit issue</button>
-            ${hideSubmitNote ? "" : '<span class="incident-note">This creates a structured incident record in the internal War Room.</span>'}
+            <button class="incident-submit" type="submit">Submit Issue</button>
           </div>
         </form>
         <div class="incident-status" data-tone="neutral" aria-live="polite"${hideReadyStatus ? ' hidden' : ""}>
@@ -397,7 +379,6 @@
       hideReadyStatus: container.dataset.hideReadyStatus === "true",
       hidePrimaryLabels: container.dataset.hidePrimaryLabels === "true",
       hideOptionalContextFields: container.dataset.hideOptionalContextFields === "true",
-      hideSubmitNote: container.dataset.hideSubmitNote === "true",
     };
     container.innerHTML = buildUnavailableMarkup(
       "Structured reporting",
@@ -438,9 +419,7 @@
         applicationId: compactText(formData.get("applicationId"), 64),
       };
 
-      if (container.querySelector("#incidentAttachDiagnostics")?.checked) {
-        payload.diagnostics = collectDiagnostics();
-      }
+      payload.diagnostics = collectDiagnostics();
 
       submitButton.disabled = true;
       submitButton.textContent = "Submitting…";
@@ -458,12 +437,10 @@
         const caseIdInput = container.querySelector("#incidentCaseId");
         const jobIdInput = container.querySelector("#incidentJobId");
         const applicationIdInput = container.querySelector("#incidentApplicationId");
-        const attachDiagnosticsInput = container.querySelector("#incidentAttachDiagnostics");
         if (featureKeyInput) featureKeyInput.value = defaults.featureKey;
         if (caseIdInput) caseIdInput.value = defaults.caseId;
         if (jobIdInput) jobIdInput.value = defaults.jobId;
         if (applicationIdInput) applicationIdInput.value = defaults.applicationId;
-        if (attachDiagnosticsInput) attachDiagnosticsInput.checked = true;
         setStatus(container, {
           tone: "success",
           title: "Report received",
@@ -481,7 +458,7 @@
         });
       } finally {
         submitButton.disabled = false;
-        submitButton.textContent = "Submit issue";
+        submitButton.textContent = "Submit Issue";
       }
     });
   }

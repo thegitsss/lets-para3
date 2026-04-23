@@ -387,7 +387,7 @@ function ensureHeaderStyles() {
   .lpc-shared-header .btn:hover{transform:translateY(-1px);background:#9c8a63}
   .lpc-shared-header .btn.btn-outline{background:transparent;border-color:rgba(0,0,0,0.08);color:#1a1a1a}
   .lpc-shared-header .btn.btn-outline:hover{border-color:#b6a47a;color:#b6a47a;background:rgba(182,164,122,0.06)}
-  .lpc-shared-header .user-chip{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:none;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color .2s ease, box-shadow .2s ease}
+  .lpc-shared-header .user-chip{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.6);border:none;cursor:pointer;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:border-color .2s ease, box-shadow .2s ease}
   .lpc-shared-header .user-chip img{width:44px;height:44px;border-radius:50%;border:2px solid #fff;box-shadow:none;object-fit:cover}
   .lpc-shared-header .user-chip strong{display:block;font-family:var(--font-serif);font-weight:500;letter-spacing:.02em;color:#1a1a1a;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .lpc-shared-header .user-chip span{font-size:.85rem;color:#6b6b6b;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1232,11 +1232,15 @@ async function initOverviewPage() {
 
   function updateMessageBubble(count = 0) {
     if (messageCountSpan) {
-      messageCountSpan.textContent = count === 0 ? "Caught up" : String(count);
-      messageCountSpan.classList.toggle("is-muted", count === 0);
+      messageCountSpan.textContent = String(count);
+      messageCountSpan.classList.remove("is-muted");
+      if (messageCountSpan.parentElement) {
+        messageCountSpan.parentElement.hidden = count === 0;
+      }
     }
     if (messageLabelSpan) {
-      messageLabelSpan.textContent = count === 1 ? "message waiting" : "messages waiting";
+      messageLabelSpan.textContent =
+        count === 0 ? "Caught up" : count === 1 ? "message waiting" : "messages waiting";
     }
     updateOverviewSignals({ unreadCount: count });
   }
@@ -2227,12 +2231,17 @@ function renderActiveEscrows(body, escrows = [], options = {}) {
   body.innerHTML = pageItems
     .map((record) => {
       const caseId = parseCaseId(record);
-      const title = sanitize(record.caseTitle || record.caseName || record.title || "Case");
-      const paralegal = sanitize(
+      const title = sanitize(record.caseTitle || record.caseName || record.title || "Matter");
+      const caseHref = caseId ? `case-detail.html?caseId=${encodeURIComponent(caseId)}` : "";
+      const paralegalName = sanitize(
         record.paralegalName ||
           (record.paralegal && [record.paralegal.firstName, record.paralegal.lastName].filter(Boolean).join(" ")) ||
           "Assigned Paralegal"
       );
+      const paralegalId = parseParalegalId(record);
+      const paralegalHref = paralegalId
+        ? buildParalegalProfileUrl(paralegalId, { returnTo: buildBillingReturnUrl() })
+        : "";
       const fundedDate = formatDisplayDate(record.fundedAt || record.createdAt || record.updatedAt);
       const caseStatus = sanitize(formatActiveEscrowCaseStatus(record));
       const status = sanitize(formatActiveEscrowPaymentStatus(record));
@@ -2247,8 +2256,16 @@ function renderActiveEscrows(body, escrows = [], options = {}) {
       );
       return `
         <tr data-case-id="${caseId || ""}">
-          <td>${title}</td>
-          <td>${paralegal}</td>
+          <td>${
+            caseHref
+              ? `<a class="escrow-link" href="${sanitize(caseHref)}">${title}</a>`
+              : title
+          }</td>
+          <td>${
+            paralegalHref
+              ? `<a class="escrow-link" href="${sanitize(paralegalHref)}">${paralegalName}</a>`
+              : paralegalName
+          }</td>
           <td>${amount}</td>
           <td>${fundedDate}</td>
           <td><span class="pill">${caseStatus}</span></td>
@@ -2464,6 +2481,18 @@ function parseCaseId(entry = {}) {
   return entry.caseId || entry.id || entry._id || entry.case || entry.caseID;
 }
 
+function parseParalegalId(entry = {}) {
+  if (entry.paralegalId) return entry.paralegalId;
+  if (entry.paralegal?._id) return entry.paralegal._id;
+  if (entry.paralegal?.id) return entry.paralegal.id;
+  if (typeof entry.paralegal === "string") return entry.paralegal;
+  return "";
+}
+
+function buildBillingReturnUrl() {
+  return "dashboard-attorney.html#billing";
+}
+
 function getUniqueCaseRecords(records = []) {
   const unique = new Map();
   records.forEach((item) => {
@@ -2541,7 +2570,7 @@ function renderReviewList(container) {
       const files = reviewFiles.map((file) => renderReviewItem(caseItem, file)).join("");
       return `
         <section class="case-review" data-case-id="${caseItem.id}">
-          <h2 class="case-title">${sanitize(caseItem.title || "Untitled Case")}</h2>
+          <h2 class="case-title">${sanitize(caseItem.title || "Untitled Matter")}</h2>
           ${files || `<p style="color:var(--muted);font-size:.9rem;">All documents are approved.</p>`}
         </section>
       `;
@@ -2803,7 +2832,7 @@ function setupCaseFilesUploadUI() {
       cases.forEach((caseItem) => {
         const option = document.createElement("option");
         option.value = String(caseItem.id);
-        option.textContent = caseItem.title || "Untitled Case";
+        option.textContent = caseItem.title || "Untitled Matter";
         caseSelect.appendChild(option);
       });
       caseSelect.disabled = false;
@@ -2863,7 +2892,7 @@ function renderModernCaseFilesList() {
   if (!listHost) return;
   const caseId = state.caseFiles.selectedCaseId;
   if (!caseId) {
-    listHost.innerHTML = `<p style="color:var(--muted);font-size:.95rem;">Select a case to view its files.</p>`;
+    listHost.innerHTML = `<p style="color:var(--muted);font-size:.95rem;">Select a matter to view its files.</p>`;
     return;
   }
   if (state.caseFiles.loading) {
@@ -2899,7 +2928,7 @@ function renderModernCaseFilesList() {
 async function handleCaseFileUpload() {
   const caseId = state.caseFiles.selectedCaseId;
   if (!caseId) {
-    notifyCases("Select a case before uploading.", "error");
+    notifyCases("Select a matter before uploading.", "error");
     return;
   }
   const input = document.getElementById("caseFileInput");
@@ -3022,7 +3051,7 @@ function renderCaseFilesList() {
 
       return `
         <div class="case-block">
-          <h2>${sanitize(caseItem.title || "Untitled Case")}</h2>
+          <h2>${sanitize(caseItem.title || "Untitled Matter")}</h2>
           ${rows}
         </div>
       `;
@@ -3142,7 +3171,7 @@ function openTaskModal(task) {
   if (notesEl) notesEl.textContent = task.notes || "No additional notes.";
   if (metaEl) {
     const due = task.due ? new Date(task.due).toLocaleString() : "No due date";
-    metaEl.innerHTML = `<strong>Case:</strong> ${sanitize(caseTitle)}<br/><strong>Due:</strong> ${due}`;
+    metaEl.innerHTML = `<strong>Matter:</strong> ${sanitize(caseTitle)}<br/><strong>Due:</strong> ${due}`;
   }
   if (toggleBtn) {
     toggleBtn.textContent = task.done ? "Mark Incomplete" : "Mark Complete";
@@ -3169,9 +3198,9 @@ function populateTaskCaseOptions() {
   if (!select) return;
   const combinedCases = [...state.cases, ...state.casesArchived];
   const options = [
-    `<option value="">Select a case (optional)</option>`,
+    `<option value="">Select a matter (optional)</option>`,
     ...combinedCases.map(
-      (caseItem) => `<option value="${caseItem.id}">${sanitize(caseItem.title || "Case")}</option>`
+      (caseItem) => `<option value="${caseItem.id}">${sanitize(caseItem.title || "Matter")}</option>`
     ),
   ];
   select.innerHTML = options.join("");
@@ -3359,11 +3388,11 @@ function showCasePostedPopup() {
   const title = String(payload?.title || "").trim();
   const titleEl = document.getElementById("casePostedTitle");
   const textEl = document.getElementById("casePostedText");
-  if (titleEl) titleEl.textContent = "Case Posted";
+  if (titleEl) titleEl.textContent = "Matter Posted";
   if (textEl) {
     textEl.textContent = title
       ? `“${title}” is now live and open to applications.`
-      : "Your case is now live and open to applications.";
+      : "Your matter is now live and open to applications.";
   }
 
   const close = () => {
@@ -4023,7 +4052,7 @@ function renderCaseRow(item, filterKey = "active") {
       <td colspan="8">
         <div class="applicant-drawer" data-applicants-drawer data-case-id="${sanitize(caseId)}">
           <div class="applicant-drawer-header">
-            <div class="applicant-drawer-title">Applicants for ${sanitize(item.title || "Case")}</div>
+            <div class="applicant-drawer-title">Applicants for ${sanitize(item.title || "Matter")}</div>
             <button type="button" class="applicant-drawer-close" data-applicants-close aria-label="Close applicants">Close</button>
           </div>
           <div class="applicant-drawer-body">
@@ -4044,12 +4073,12 @@ function renderCaseRow(item, filterKey = "active") {
     <tr data-case-id="${sanitize(caseId)}">
       <td class="case-title-cell">${
         item.localDraft
-          ? `<a href="create-case.html?draftId=${encodeURIComponent(caseId)}#description">${sanitize(item.title || "Untitled Case")}</a>`
+          ? `<a href="create-case.html?draftId=${encodeURIComponent(caseId)}#description">${sanitize(item.title || "Untitled Matter")}</a>`
           : previewOnly
-          ? `<button type="button" class="case-title-trigger" data-case-action="details" data-case-id="${sanitize(caseId)}">${sanitize(item.title || "Untitled Case")}</button>`
+          ? `<button type="button" class="case-title-trigger" data-case-action="details" data-case-id="${sanitize(caseId)}">${sanitize(item.title || "Untitled Matter")}</button>`
           : canOpenDetail
-          ? `<a href="case-detail.html?caseId=${encodeURIComponent(caseId)}">${sanitize(item.title || "Untitled Case")}</a>`
-          : `<span>${sanitize(item.title || "Untitled Case")}</span>`
+          ? `<a href="case-detail.html?caseId=${encodeURIComponent(caseId)}">${sanitize(item.title || "Untitled Matter")}</a>`
+          : `<span>${sanitize(item.title || "Untitled Matter")}</span>`
       }</td>
       <td class="case-paralegal-cell">${filterKey === "draft" ? '<span class="muted">—</span>' : sanitize(client)}</td>
       <td class="case-field-cell">${sanitize(practice)}</td>
@@ -4073,9 +4102,6 @@ function renderCaseMenu(item) {
   const hasAssigned = hasAssignedParalegal(item);
   const canDelete = canDeleteCase(item);
   const statusKey = normalizeCaseStatus(item.status);
-  if (statusKey === "in progress") {
-    return "";
-  }
   const hasInvites =
     (Array.isArray(item.invites) && item.invites.length > 0) ||
     !!(item.pendingParalegal || item.pendingParalegalId);
@@ -4096,7 +4122,7 @@ function renderCaseMenu(item) {
       <button class="menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="${menuId}" data-case-menu-trigger>⋯</button>
       <div class="case-menu" id="${menuId}" role="menu" style="width: 180px; min-width: 180px;">
         <button type="button" class="menu-item" data-case-action="resume-draft" data-case-id="${baseCaseId}">Resume Draft</button>
-        <button type="button" class="menu-item danger" data-case-action="discard-draft" data-case-id="${baseCaseId}">Delete Case</button>
+        <button type="button" class="menu-item danger" data-case-action="discard-draft" data-case-id="${baseCaseId}">Delete Matter</button>
       </div>
     </div>
     `;
@@ -4104,7 +4130,7 @@ function renderCaseMenu(item) {
   const parts = [];
   if (canEditCase) {
     parts.push(
-      `<button type="button" class="menu-item" data-case-action="edit-case" data-case-id="${baseCaseId}">Edit Case</button>`
+      `<button type="button" class="menu-item" data-case-action="edit-case" data-case-id="${baseCaseId}">Edit Matter</button>`
     );
   }
   if (previewOnly || !item.archived) {
@@ -4119,7 +4145,7 @@ function renderCaseMenu(item) {
       );
     } else {
       parts.push(
-        `<span class="menu-item" aria-disabled="true">Edit case to resolve flag</span>`
+        `<span class="menu-item" aria-disabled="true">Edit matter to resolve flag</span>`
       );
     }
   } else if (moderationStatus === "resolution_requested") {
@@ -4132,7 +4158,7 @@ function renderCaseMenu(item) {
   );
   if (!previewOnly && canOpenDetail && !canViewWorkspace) {
     parts.push(
-      `<button type="button" class="menu-item" data-case-action="open-case-detail" data-case-id="${baseCaseId}">Open Case</button>`
+      `<button type="button" class="menu-item" data-case-action="open-case-detail" data-case-id="${baseCaseId}">Open Matter</button>`
     );
   }
   if (!previewOnly && canViewWorkspace) {
@@ -4158,22 +4184,25 @@ function renderCaseMenu(item) {
   }
   if (item.archived) {
     parts.push(
-      `<button type="button" class="menu-item" data-case-action="download-archive" data-case-id="${baseCaseId}">Download Case</button>`
+      `<button type="button" class="menu-item" data-case-action="download-archive" data-case-id="${baseCaseId}">Download Matter</button>`
     );
     if (!isFinal) {
       parts.push(
-        `<button type="button" class="menu-item" data-case-action="restore" data-case-id="${baseCaseId}">Restore Case</button>`
+        `<button type="button" class="menu-item" data-case-action="restore" data-case-id="${baseCaseId}">Restore Matter</button>`
       );
     }
   } else if (!hasAssigned) {
     parts.push(
-      `<button type="button" class="menu-item danger" data-case-action="archive" data-case-id="${baseCaseId}">Archive Case</button>`
+      `<button type="button" class="menu-item danger" data-case-action="archive" data-case-id="${baseCaseId}">Archive Matter</button>`
     );
   }
   if (canDelete) {
     parts.push(
-      `<button type="button" class="menu-item danger" data-case-action="delete-case" data-case-id="${baseCaseId}">Delete Case</button>`
+      `<button type="button" class="menu-item danger" data-case-action="delete-case" data-case-id="${baseCaseId}">Delete Matter</button>`
     );
+  }
+  if (!parts.length) {
+    return "";
   }
   return `
     <div class="case-actions" data-case-id="${baseCaseId}">
@@ -4444,7 +4473,7 @@ async function loadCaseDrafts() {
     const items = Array.isArray(payload?.items) ? payload.items : [];
     state.localDrafts = items.map((item) => ({
       id: item.id,
-      title: item.title || "Untitled Case",
+      title: item.title || "Untitled Matter",
       practiceArea: item.practiceArea || "",
       details: item.description || "",
       state: item.state || "",
@@ -5317,13 +5346,13 @@ async function openCasePreview(caseId, options = {}) {
     } catch {}
   }
   if (!entry) {
-    if (casePreviewFields.title) casePreviewFields.title.textContent = "Case Details";
+    if (casePreviewFields.title) casePreviewFields.title.textContent = "Matter Details";
     if (casePreviewFields.field) casePreviewFields.field.textContent = "—";
     if (casePreviewFields.location) casePreviewFields.location.textContent = "—";
     if (casePreviewFields.comp) casePreviewFields.comp.textContent = "—";
     if (casePreviewFields.experience) casePreviewFields.experience.textContent = "—";
     if (casePreviewFields.description) {
-      casePreviewFields.description.textContent = "Unable to load case details right now.";
+      casePreviewFields.description.textContent = "Unable to load matter details right now.";
     }
     if (casePreviewFields.tasks) {
       casePreviewFields.tasks.innerHTML = `<p class="case-preview-empty">No tasks listed.</p>`;
@@ -5333,7 +5362,7 @@ async function openCasePreview(caseId, options = {}) {
       casePreviewFields.receipt.removeAttribute("href");
     }
     casePreviewModalRef.removeAttribute("aria-busy");
-    notifyCases("Unable to load case details.", "error");
+    notifyCases("Unable to load matter details.", "error");
     return;
   }
 
@@ -5351,7 +5380,7 @@ async function openCasePreview(caseId, options = {}) {
     .map((title) => String(title || "").trim())
     .filter(Boolean);
 
-  if (casePreviewFields.title) casePreviewFields.title.textContent = entry.title || "Case Preview";
+  if (casePreviewFields.title) casePreviewFields.title.textContent = entry.title || "Matter Preview";
   if (casePreviewFields.field) casePreviewFields.field.textContent = practiceArea || "—";
   if (casePreviewFields.location) casePreviewFields.location.textContent = location || "—";
   if (casePreviewFields.comp) casePreviewFields.comp.textContent = compensation || "—";
@@ -5621,7 +5650,7 @@ async function onArchivedBulkAction(event) {
       for (const id of deletableIds) {
         await deleteArchivedCase(id, { skipConfirm: true, silent: true });
       }
-      notifyCases("Cases deleted.", "success");
+      notifyCases("Matters deleted.", "success");
     }
     state.archivedSelection.clear();
     await loadArchivedCases(true);
@@ -5784,15 +5813,15 @@ async function handleCaseAction(action, caseId) {
     } else if (action === "archive") {
       await toggleCaseArchive(caseId, true);
       renderCasesView();
-      notifyCases("Case archived.");
+      notifyCases("Matter archived.");
     } else if (action === "restore") {
       await toggleCaseArchive(caseId, false);
       renderCasesView();
-      notifyCases("Case restored.");
+      notifyCases("Matter restored.");
     } else if (action === "delete-case") {
       const entry = getCaseEntryById(caseId);
       if (!canDeleteCase(entry)) {
-        notifyCases("This case can no longer be deleted.", "info");
+        notifyCases("This matter can no longer be deleted.", "info");
         return;
       }
       await deleteArchivedCase(caseId);
@@ -5806,7 +5835,7 @@ async function handleCaseAction(action, caseId) {
 
 async function downloadCaseDeliverables(caseId) {
   const entry = state.caseLookup.get(String(caseId));
-  if (!entry) throw new Error("Case not found");
+  if (!entry) throw new Error("Matter not found");
   if (Array.isArray(entry.downloadUrl) && entry.downloadUrl.length) {
     window.open(sanitizeDownloadPath(entry.downloadUrl[0]), "_blank");
     return;
@@ -5828,7 +5857,7 @@ async function toggleCaseArchive(caseId, archived) {
   const entry = state.caseLookup.get(String(caseId));
 
   if (archived && hasAssignedParalegal(entry)) {
-    throw new Error("Cases with a hired paralegal cannot be archived.");
+    throw new Error("Matters with a hired paralegal cannot be archived.");
   }
 
   // Ensure a valid status before unarchiving to avoid enum errors.
@@ -5919,7 +5948,7 @@ async function deleteArchivedCase(caseId, { skipConfirm = false, silent = false 
     throw new Error(payload.error || "Unable to delete case.");
   }
   removeCaseFromState(caseId);
-  if (!silent) notifyCases("Case deleted.", "success");
+  if (!silent) notifyCases("Matter deleted.", "success");
 }
 
 function removeCaseFromState(caseId) {
@@ -6102,7 +6131,7 @@ function renderMessageCases() {
   if (!container) return;
   const list = state.messages.cases;
   if (!list.length) {
-    container.innerHTML = `<div class="messages-placeholder" role="status">You have no active cases yet.</div>`;
+    container.innerHTML = `<div class="messages-placeholder" role="status">You have no active matters yet.</div>`;
     return;
   }
   const activeId = state.messages.activeCaseId;
@@ -6116,7 +6145,7 @@ function renderMessageCases() {
       const snippetText = snippet || "No recent messages.";
       return `
         <div class="case-item${id === activeId ? " active" : ""}" data-message-case="${id}">
-          <div>${sanitize(item.title || "Untitled Case")}</div>
+          <div>${sanitize(item.title || "Untitled Matter")}</div>
           <div class="case-label">
             <span>${sanitize(snippetText)}</span>
             ${badge}
@@ -6146,7 +6175,7 @@ async function selectMessageCase(caseId) {
     await markNotificationsRead({ caseId: String(caseId) });
   } catch (err) {
     console.warn(err);
-    notifyMessages(err.message || "Unable to load messages for that case.", "error");
+    notifyMessages(err.message || "Unable to load messages for that matter.", "error");
   }
 }
 
@@ -6218,7 +6247,7 @@ function renderMessageThreads(caseId) {
   const container = document.querySelector("[data-message-threads]");
   if (!container) return;
   if (!caseId) {
-    container.innerHTML = `<div class="messages-placeholder" role="status">Select a case to view conversations.</div>`;
+    container.innerHTML = `<div class="messages-placeholder" role="status">Select a matter to view conversations.</div>`;
     return;
   }
   const messages = state.messages.messagesByCase.get(String(caseId)) || [];
@@ -6305,7 +6334,7 @@ function renderChatMessages() {
   if (!body) return;
   const caseId = state.messages.activeCaseId;
   if (!caseId) {
-    body.innerHTML = `<p style="color:var(--muted);">Select a case to view messages.</p>`;
+    body.innerHTML = `<p style="color:var(--muted);">Select a matter to view messages.</p>`;
     setComposerLock(true);
     if (chatCountdownTimer) {
       clearInterval(chatCountdownTimer);
@@ -6345,7 +6374,7 @@ function renderChatMessages() {
   if (readOnly) {
     const countdownText = purgeAt ? formatAutoDelete(purgeAt) : "--:--";
     body.innerHTML =
-      `<p style="color:var(--muted);font-size:.85rem;margin-bottom:.6rem;">Case archived. Auto-delete in <span data-chat-countdown>${countdownText}</span>.</p>` +
+      `<p style="color:var(--muted);font-size:.85rem;margin-bottom:.6rem;">Matter archived. Auto-delete in <span data-chat-countdown>${countdownText}</span>.</p>` +
       body.innerHTML;
     const countdownNode = body.querySelector("[data-chat-countdown]");
     if (countdownNode && purgeAt) startChatCountdown(countdownNode, purgeAt);
@@ -6362,7 +6391,7 @@ function setComposerLock(readOnly) {
   if (chatInput) {
     const disable = readOnly || !state.messages.activeCaseId;
     chatInput.disabled = disable;
-    chatInput.placeholder = disable ? "Case archived. Messaging disabled." : "Type a message...";
+    chatInput.placeholder = disable ? "Matter archived. Messaging disabled." : "Type a message...";
     if (disable) chatInput.value = "";
   }
   if (sendBtn) {
@@ -6565,7 +6594,7 @@ function buildConversationTranscript(caseId) {
   const messages = state.messages.messagesByCase.get(String(caseId)) || [];
   if (!messages.length) throw new Error("No conversation available.");
   const caseEntry = state.caseLookup.get(String(caseId));
-  const header = `Conversation for ${caseEntry?.title || "Case"}\\n`;
+  const header = `Conversation for ${caseEntry?.title || "Matter"}\\n`;
   const lines = messages.map((msg) => {
     const label = msg.isSelf ? "You" : msg.senderName || "Paralegal";
     return `[${formatChatTimestamp(msg.createdAt)}] ${label}: ${msg.text}`;
@@ -6664,7 +6693,7 @@ function getDocumentInventory({ includeArchived = false } = {}) {
       docs.push({
         id: `${caseItem.id}-${fileId}`,
         caseId: caseItem.id,
-        caseTitle: caseItem.title || "Case",
+        caseTitle: caseItem.title || "Matter",
         file,
       });
     });
@@ -6684,7 +6713,7 @@ function renderDocumentGroups() {
 
   const groups = new Map();
   list.forEach((item) => {
-    const bucket = item.caseTitle || "Case";
+    const bucket = item.caseTitle || "Matter";
     if (!groups.has(bucket)) groups.set(bucket, []);
     groups.get(bucket).push(item);
   });
@@ -6791,7 +6820,7 @@ function renderDocumentPreview(doc) {
     return;
   }
   const file = doc.file || {};
-  const caseTitle = state.caseLookup.get(String(doc.caseId))?.title || doc.caseTitle || "Case";
+  const caseTitle = state.caseLookup.get(String(doc.caseId))?.title || doc.caseTitle || "Matter";
   if (title) title.textContent = file.filename || file.original || "Document";
   const uploaded = formatCaseDate(file.uploadedAt || file.createdAt || file.updatedAt);
   meta.innerHTML = `
@@ -6825,7 +6854,7 @@ async function handleDocumentUpload(event) {
   const active = state.documents.activeDocId ? findDocumentById(state.documents.activeDocId) : null;
   const targetCaseId = active?.caseId || state.cases[0]?.id;
   if (!targetCaseId) {
-    notifyDocuments("Select a case before uploading.", "error");
+    notifyDocuments("Select a matter before uploading.", "error");
     return;
   }
   try {
@@ -6937,7 +6966,7 @@ function renderArchiveList() {
     .map(
       (doc) => `
       <li>
-        <span>${sanitize(doc.file.filename || doc.file.original || "Document")} — ${sanitize(doc.caseTitle || "Case")}</span>
+        <span>${sanitize(doc.file.filename || doc.file.original || "Document")} — ${sanitize(doc.caseTitle || "Matter")}</span>
         <span style="color:var(--muted);">${formatCaseDate(doc.file.uploadedAt || doc.file.createdAt)}</span>
       </li>
     `
@@ -7639,7 +7668,7 @@ function updateMessagePreviewUI({
   const snippet =
     cleanedSnippet.length > 120 ? `${cleanedSnippet.slice(0, 120).trim()}…` : cleanedSnippet;
   if (messageSnippet) messageSnippet.textContent = snippet;
-  if (messagePreviewSender) messagePreviewSender.textContent = nextThread.title || "Case thread";
+  if (messagePreviewSender) messagePreviewSender.textContent = nextThread.title || "Matter thread";
   if (messagePreviewText) messagePreviewText.textContent = ` – ${snippet}`;
   const threadId = nextThread.id || null;
   const threadCaseId = nextThread.caseId || nextThread.case?.id || threadId || null;
@@ -7729,7 +7758,7 @@ function renderApplications(apps = [], hasPaymentMethod = true) {
       const caseId = group.caseId || "";
       const caseEntry = caseId ? state.caseLookup.get(String(caseId)) : null;
       const primaryApp = getPrimaryApplication(group.apps) || group.apps[0] || {};
-      const title = sanitize(caseEntry?.title || primaryApp.jobTitle || primaryApp.caseTitle || "Case");
+      const title = sanitize(caseEntry?.title || primaryApp.jobTitle || primaryApp.caseTitle || "Matter");
       const practiceRaw =
         caseEntry?.practiceArea ||
         caseEntry?.field ||
@@ -7774,7 +7803,7 @@ function renderApplications(apps = [], hasPaymentMethod = true) {
         if (caseEntry && isRelistHireLocked(caseEntry)) {
           reason = "Hiring locked until the payout is finalized.";
         } else if (caseEntry && !canHireForCase(caseEntry)) {
-          reason = "Case is not ready for hiring.";
+          reason = "Matter is not ready for hiring.";
         }
         hireDisabledAttr = ` disabled aria-disabled="true" title="${sanitize(reason)}"`;
       }
@@ -7847,7 +7876,7 @@ async function handleHireFromApplications({ caseId, paralegalId, paralegalName, 
   try {
     caseDetails = await getCaseForHire(caseId);
   } catch (err) {
-    notifyCases(err?.message || "Unable to load case details.", "error");
+    notifyCases(err?.message || "Unable to load matter details.", "error");
     return;
   }
   if (!canHireForCase(caseDetails)) {
@@ -7952,7 +7981,7 @@ async function getCaseForHire(caseId) {
   const res = await secureFetch(`/api/cases/${encodeURIComponent(caseId)}`, { headers: { Accept: "application/json" } });
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(payload?.error || "Unable to load case details.");
+    throw new Error(payload?.error || "Unable to load matter details.");
   }
   return payload;
 }
@@ -8129,7 +8158,7 @@ function openHireConfirmModal({
       `
     : `
         <div class="hire-confirm-row">
-          <span>Case amount</span>
+          <span>Matter amount</span>
           <strong>${sanitize(formatCurrency(amountCents))}</strong>
         </div>
         <div class="hire-confirm-row">
@@ -8152,7 +8181,7 @@ function openHireConfirmModal({
         </div>
       `;
   const copy = `You’re about to hire ${safeName}. Your payment will be processed through Stripe upon confirmation. You can review the <a class="hire-confirm-terms-link" href="terms.html#payments">payment terms here</a>.`;
-  const successCopy = reuseEscrow ? "Case ready. Work can begin." : "Case funded. Work can begin.";
+  const successCopy = reuseEscrow ? "Matter ready. Work can begin." : "Matter funded. Work can begin.";
   const overlay = document.createElement("div");
   overlay.className = "hire-confirm-overlay";
   overlay.innerHTML = `
@@ -8554,14 +8583,27 @@ function renderCaseCards(container, cases = [], threadsByCase = new Map()) {
 function buildMatterRowMarkup(caseItem, threadsByCase) {
   const caseId = String(caseItem.caseId || caseItem.id || "");
   const title = sanitize(caseItem.jobTitle || "Untitled Matter");
-  const paralegal = sanitize(caseItem.paralegalName || "Unassigned");
+  const paralegalName = caseItem.paralegalName || "Unassigned";
+  const paralegal = sanitize(paralegalName);
+  const paralegalId = parseParalegalId(caseItem);
+  const paralegalHref =
+    paralegalId && paralegalName !== "Unassigned"
+      ? buildParalegalProfileUrl(paralegalId, { returnTo: "dashboard-attorney.html#home" })
+      : "";
   const practice = sanitize(caseItem.practiceArea || "General");
   const rawStatus = normalizeCaseStatus(caseItem.status);
   const status = rawStatus
     ? rawStatus.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
     : "Open";
   const created = caseItem.createdAt ? new Date(caseItem.createdAt).toLocaleDateString() : "";
-  const metaParts = [practice, paralegal, status, created ? `Created ${created}` : ""].filter(Boolean);
+  const metaParts = [
+    `<span>${practice}</span>`,
+    paralegalHref
+      ? `<a class="matter-inline-link" href="${sanitize(paralegalHref)}">${paralegal}</a>`
+      : `<span>${paralegal}</span>`,
+    `<span>${sanitize(status)}</span>`,
+    created ? `<span>Created ${sanitize(created)}</span>` : "",
+  ].filter(Boolean);
   const thread = threadsByCase.get(caseId);
   const unread = Number(thread?.unread || 0);
   const rawMessageLabel =
@@ -8574,8 +8616,10 @@ function buildMatterRowMarkup(caseItem, threadsByCase) {
   return `
     <div class="matter-row" data-case-id="${caseId}">
       <div class="matter-main">
-        <div class="matter-title">${title}</div>
-        <div class="matter-meta">${metaParts.join(" • ")}</div>
+        <div class="matter-title">
+          <button type="button" class="matter-title-link" data-case-link="view" data-case-id="${caseId}">${title}</button>
+        </div>
+        <div class="matter-meta">${metaParts.join('<span class="matter-meta-separator" aria-hidden="true">•</span>')}</div>
         ${messageLabel ? `<button type="button" class="matter-message" data-case-link="view" data-case-id="${caseId}">${messageLabel}</button>` : ""}
       </div>
       <button type="button" class="matter-view" data-case-link="view" data-case-id="${caseId}">View →</button>
@@ -8587,7 +8631,7 @@ function bindMatterRowHandlers(container) {
   if (!container) return;
   container.querySelectorAll(".matter-row").forEach((row) => {
     row.addEventListener("click", (evt) => {
-      if (evt.target.closest("[data-case-link]")) return;
+      if (evt.target.closest("[data-case-link]") || evt.target.closest("a")) return;
       const caseId = row.getAttribute("data-case-id");
       if (caseId) {
         const entry = state.caseLookup.get(String(caseId));
