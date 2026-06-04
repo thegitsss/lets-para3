@@ -345,7 +345,7 @@ async function loadStripeStatus() {
   stripeConnected = isStripeConnected(data);
   if (banner) banner.classList.toggle("hidden", stripeConnected);
   if (message && !stripeConnected) {
-    message.textContent = "Secure payouts powered by Stripe. Payments activate shortly.";
+    message.textContent = "";
   }
   if (cta) {
     cta.disabled = !stripeConnected;

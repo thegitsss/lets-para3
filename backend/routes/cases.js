@@ -1417,6 +1417,41 @@ async function sendCaseUpdateEmail(recipient, caseDoc, summary) {
   }
 }
 
+async function sendAdminJobPostedEmails(attorney, caseDoc, amountCents) {
+  try {
+    const admins = await User.find({
+      role: "admin",
+      status: "approved",
+      email: { $exists: true, $ne: "" },
+    })
+      .select("email")
+      .lean();
+    if (!admins.length) return;
+
+    const attorneyName =
+      [attorney?.firstName, attorney?.lastName].filter(Boolean).join(" ").trim() ||
+      attorney?.email ||
+      "An attorney";
+    const baseUrl = String(
+      process.env.EMAIL_BASE_URL || process.env.APP_BASE_URL || "https://www.lets-paraconnect.com"
+    ).replace(/\/+$/, "");
+    const template = emailTemplates.adminJobPosted({
+      caseTitle: caseDoc?.title || "Untitled job",
+      attorneyName,
+      attorneyEmail: attorney?.email || "",
+      practiceArea: caseDoc?.practiceArea || "",
+      budget: formatCurrency(amountCents),
+      link: `${baseUrl}/admin-dashboard.html#posts`,
+    });
+
+    await Promise.allSettled(
+      admins.map((admin) => sendEmail(admin.email, template.subject, template.html))
+    );
+  } catch (err) {
+    console.warn("[cases] admin job-posted email failed", err?.message || err);
+  }
+}
+
 async function hasCaseNotification(userId, type, caseDoc, payload = {}) {
   if (!userId || !caseDoc?._id) return false;
   const query = {
@@ -2649,6 +2684,10 @@ router.post(
       await created.save();
     } catch (jobErr) {
       console.warn("[cases] Unable to mirror job posting", jobErr?.message || jobErr);
+    }
+
+    if (role === "attorney") {
+      await sendAdminJobPostedEmails(created.attorney || req.user, created, amountCents);
     }
 
     try {
@@ -4903,6 +4942,9 @@ router.post(
 
     const paralegal = await User.findById(paralegalId).select("firstName lastName email role");
     if (!paralegal) return res.status(404).json({ error: "Paralegal not found" });
+    if (String(paralegal.role || "").toLowerCase() !== "paralegal") {
+      return res.status(400).json({ error: "Pre-engagement items can only be requested from a paralegal." });
+    }
     if (await isBlockedBetween(attorneyOnCase, paralegal._id)) {
       return res.status(403).json({ error: BLOCKED_MESSAGE });
     }

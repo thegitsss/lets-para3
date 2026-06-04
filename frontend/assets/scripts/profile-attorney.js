@@ -71,6 +71,7 @@ async function init() {
   state.jobContextId = profileJobId;
 
   bindEditButton();
+  bindProfileSectionLinks();
 
   if (profileAttorneyId) {
     try {
@@ -368,6 +369,22 @@ function bindEditButton() {
     window.location.href = "profile-settings.html";
   });
   btn.dataset.bound = "true";
+}
+
+function bindProfileSectionLinks() {
+  const tabs = Array.from(document.querySelectorAll("[data-profile-section-link]"));
+  if (!tabs.length) return;
+  tabs.forEach((tab) => {
+    if (tab.dataset.bound === "true") return;
+    tab.dataset.bound = "true";
+    tab.addEventListener("click", () => {
+      const targetId = String(tab.dataset.profileSectionLink || "");
+      const target = targetId ? document.getElementById(targetId) : null;
+      if (!target) return;
+      tabs.forEach((item) => item.classList.toggle("active", item === tab));
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
 }
 
 function updateBackLink() {

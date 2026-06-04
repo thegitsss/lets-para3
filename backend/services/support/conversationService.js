@@ -4042,7 +4042,7 @@ function buildExplainReply(facts = {}, options = {}) {
   if (role === "attorney" && facts.explainIntent === "attorney_first_steps") {
     return {
       reply:
-        "Start from your dashboard by posting or reviewing your matters. Then choose the paralegal support you need and work together in the case workspace once the matter is active.",
+        "Start from your dashboard by posting or reviewing your matters. Then choose the paralegal support you need. If needed, you can request optional pre-engagement items like a confidentiality agreement or conflicts check before hiring, then work together in the case workspace once the matter is active.",
       navigation: null,
     };
   }
@@ -4050,7 +4050,7 @@ function buildExplainReply(facts = {}, options = {}) {
   if (role === "attorney" && facts.explainIntent === "attorney_workflow_simple") {
     return {
       reply:
-        "In simple terms, you manage matters from your dashboard, choose the paralegal support you need, and then work together inside the case workspace once the matter is active.",
+        "In simple terms, you manage matters from your dashboard, review applicants, optionally request pre-engagement items like a confidentiality agreement or conflicts check, and then work together inside the case workspace once the matter is active.",
       navigation: null,
     };
   }
@@ -4060,7 +4060,7 @@ function buildExplainReply(facts = {}, options = {}) {
       reply:
         role === "paralegal"
           ? "On LPC, you build your profile, browse open cases, apply when a matter is open to applicants, and then collaborate inside the case workspace once you're engaged. Payouts run through Stripe after payment is released."
-          : "On LPC, you manage matters from your dashboard, choose the paralegal support you need, and then collaborate inside the case workspace once a matter is active. Billing stays on the attorney side, and there is no subscription model.",
+          : "On LPC, you manage matters from your dashboard, review applicants, may request optional pre-engagement items like confidentiality agreements or conflicts checks, and then collaborate inside the case workspace once a matter is active. Billing stays on the attorney side, and there is no subscription model.",
       navigation: null,
     };
   }

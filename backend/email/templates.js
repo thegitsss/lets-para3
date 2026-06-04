@@ -2,6 +2,15 @@ const BRAND_FONT = "'Sarabun', 'Helvetica Neue', Arial, sans-serif";
 const GOLD = "#b4975a";
 const INK = "#1a1a1a";
 
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function frameEmail(title, body) {
   return `
 <div style="background:#f7f5f0;padding:32px 0;">
@@ -46,6 +55,28 @@ const templates = {
       `<p>The case <strong>${title}</strong> has been updated.</p><p>${summary}</p>`
     );
     return { subject: "Case update on LPC", html };
+  },
+  adminJobPosted: (payload = {}) => {
+    const title = escapeHtml(payload.caseTitle || "Untitled job");
+    const attorneyName = escapeHtml(payload.attorneyName || "An attorney");
+    const attorneyEmail = escapeHtml(payload.attorneyEmail || "");
+    const practiceArea = escapeHtml(payload.practiceArea || "Not specified");
+    const budget = escapeHtml(payload.budget || "Not specified");
+    const link = escapeHtml(payload.link || "admin-dashboard.html#posts");
+    const html = frameEmail(
+      "New attorney job posted",
+      `<p><strong>${attorneyName}</strong>${attorneyEmail ? ` (${attorneyEmail})` : ""} posted a new job.</p>
+       <div style="margin:16px 0 18px;padding:16px;border:1px solid rgba(0,0,0,0.06);border-radius:14px;background:#fbfaf7;">
+         <div style="font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8a8373;">Job</div>
+         <div style="font-size:16px;font-weight:600;color:${INK};margin-top:4px;">${title}</div>
+         <div style="margin-top:12px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8a8373;">Practice area</div>
+         <div style="font-size:15px;color:${INK};margin-top:4px;">${practiceArea}</div>
+         <div style="margin-top:12px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#8a8373;">Budget</div>
+         <div style="font-size:15px;color:${INK};margin-top:4px;">${budget}</div>
+       </div>
+       <p><a href="${link}" style="color:${GOLD};font-weight:600;">Review job posting in Admin</a></p>`
+    );
+    return { subject: `New attorney job posted: ${payload.caseTitle || "Untitled job"}`, html };
   },
   profileApproved: () => {
     const html = frameEmail(

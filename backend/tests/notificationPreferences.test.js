@@ -50,6 +50,34 @@ describe("Notification preferences", () => {
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
+  test("New message alerts on sends a message email", async () => {
+    const user = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "priya.message-alerts@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+      notificationPrefs: {
+        email: true,
+        emailMessages: true,
+      },
+    });
+
+    await notifyUser(user._id, "message", {
+      fromName: "Alex",
+      messageSnippet: "Can you review this?",
+    });
+
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(sendEmail).toHaveBeenCalledWith(
+      user.email,
+      "New message on LPC",
+      expect.any(String)
+    );
+  });
+
   test("Email off for case updates still creates in-app notification", async () => {
     // Description: User disables case emails but keeps in-app on.
     // Input values: emailCase=false, inAppCase=true, type="case_update".
@@ -76,6 +104,34 @@ describe("Notification preferences", () => {
     const notif = await Notification.findOne({ userId: user._id, type: "case_update" }).lean();
     expect(notif).toBeTruthy();
     expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  test("Matter updates on sends a case update email", async () => {
+    const user = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "priya.matter-updates@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+      notificationPrefs: {
+        email: true,
+        emailCase: true,
+      },
+    });
+
+    await notifyUser(user._id, "case_update", {
+      caseTitle: "Immigration support",
+      summary: "A matter task was updated.",
+    });
+
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(sendEmail).toHaveBeenCalledWith(
+      user.email,
+      "Case update",
+      expect.any(String)
+    );
   });
 
   test("Email and in-app off produces no notification", async () => {

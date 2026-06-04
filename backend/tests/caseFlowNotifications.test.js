@@ -208,7 +208,7 @@ describe("Case flow notifications", () => {
       .set("Cookie", authCookieFor(attorney))
       .field("confidentialityAgreementRequired", "false")
       .field("conflictsCheckRequired", "true")
-      .field("conflictsDetails", "Check ACME Corp, Beta LLC, and opposing counsel list.");
+      .field("conflictsDetails", "Check ACME Corp, Beta Inc., and opposing counsel list.");
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -313,6 +313,107 @@ describe("Case flow notifications", () => {
     expect(notif).toBeTruthy();
     expect(String(notif?.payload?.caseId || "")).toBe(String(caseDoc._id));
     expect(String(notif?.payload?.paralegalId || "")).toBe(String(paralegal._id));
+  });
+
+  test("Requested paralegal can submit a no-known-conflict response", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "conflicts-none-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Ng",
+      email: "conflicts-none-paralegal@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+
+    const caseDoc = await Case.create({
+      title: "No known conflict response",
+      practiceArea: "business law",
+      details: "Verify the no-known-conflict response path.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      status: "open",
+      totalAmount: 75000,
+      currency: "usd",
+      tasks: [{ title: "Prepare issue list", completed: false }],
+      preEngagement: {
+        status: "requested",
+        requestedParalegalId: paralegal._id,
+        confidentialityAgreementRequired: false,
+        conflictsCheckRequired: true,
+        conflictsDetails: "Review ACME Corp and related parties.",
+        requestedAt: new Date(),
+        requestedBy: attorney._id,
+      },
+    });
+
+    const res = await request(app)
+      .post(`/api/cases/${caseDoc._id}/pre-engagement/respond`)
+      .set("Cookie", authCookieFor(paralegal))
+      .send({
+        confidentialityAcknowledged: false,
+        conflictsResponseType: "none_known",
+        conflictsDisclosureText: "This text should not persist.",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.preEngagement?.status).toBe("submitted");
+    expect(res.body.preEngagement?.conflictsResponseType).toBe("none_known");
+    expect(res.body.preEngagement?.conflictsDisclosureText).toBe("");
+  });
+
+  test("Attorney cannot request a conflicts check from a non-paralegal user", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Stone",
+      email: "conflicts-role-attorney@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const otherAttorney = await User.create({
+      firstName: "Taylor",
+      lastName: "Stone",
+      email: "conflicts-role-target@example.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const caseDoc = await Case.create({
+      title: "Invalid conflicts target",
+      practiceArea: "business law",
+      details: "Reject a conflicts request sent to a non-paralegal.",
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      status: "open",
+      totalAmount: 75000,
+      currency: "usd",
+      tasks: [{ title: "Prepare issue list", completed: false }],
+    });
+
+    const res = await request(app)
+      .post(`/api/cases/${caseDoc._id}/pre-engagement/${otherAttorney._id}/request`)
+      .set("Cookie", authCookieFor(attorney))
+      .field("confidentialityAgreementRequired", "false")
+      .field("conflictsCheckRequired", "true")
+      .field("conflictsDetails", "Review ACME Corp.");
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/only be requested from a paralegal/i);
   });
 
   test("Accepted invitation notifies the attorney but does not create a self-notification for the paralegal", async () => {

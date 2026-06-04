@@ -72,6 +72,24 @@ function setAttorneyOnboardingModalSeen(step = "profile") {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  const blockedUsersHelpButton = document.querySelector(".blocked-users-summary-inline-help");
+  const blockedUsersHelpPanel = document.getElementById("blockedUsersHelpPanel");
+  const setBlockedUsersHelpOpen = (open) => {
+    if (!blockedUsersHelpButton || !blockedUsersHelpPanel) return;
+    blockedUsersHelpButton.setAttribute("aria-expanded", open ? "true" : "false");
+    blockedUsersHelpPanel.classList.toggle("hidden", !open);
+  };
+
+  blockedUsersHelpButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setBlockedUsersHelpOpen(blockedUsersHelpButton.getAttribute("aria-expanded") !== "true");
+  });
+  blockedUsersHelpPanel?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+
   const closeSettingsHelpTooltips = (exceptTooltip = null) => {
     document.querySelectorAll(".settings-help-tooltip[open]").forEach((tooltip) => {
       if (exceptTooltip && tooltip === exceptTooltip) return;
@@ -80,11 +98,26 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   document.addEventListener("click", (event) => {
+    if (
+      blockedUsersHelpButton &&
+      blockedUsersHelpPanel &&
+      event.target instanceof Element &&
+      !blockedUsersHelpButton.contains(event.target) &&
+      !blockedUsersHelpPanel.contains(event.target)
+    ) {
+      setBlockedUsersHelpOpen(false);
+    }
     const tooltip = event.target instanceof Element
       ? event.target.closest(".settings-help-tooltip")
       : null;
     if (tooltip) return;
     closeSettingsHelpTooltips();
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || blockedUsersHelpButton?.getAttribute("aria-expanded") !== "true") return;
+    setBlockedUsersHelpOpen(false);
+    blockedUsersHelpButton.focus();
   });
 
   document.querySelectorAll(".settings-help-tooltip summary").forEach((summary) => {
@@ -864,6 +897,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const cachedUser = getCachedUser();
   const cachedRole = String(cachedUser?.role || "").toLowerCase();
   const isParalegal = cachedRole === "paralegal";
+  const setStripeStatus = (message = "") => {
+    if (!stripeStatus) return;
+    stripeStatus.textContent = message;
+    stripeStatus.classList.toggle("hidden", !message);
+  };
 
   const updateStripeStatus = (data = {}) => {
     const connected = !!data.details_submitted && !!data.payouts_enabled;
@@ -874,11 +912,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const bankBits = [];
         if (bankName) bankBits.push(bankName);
         if (bankLast4) bankBits.push(`**** ${bankLast4}`);
-        stripeStatus.textContent = bankBits.length
+        setStripeStatus(bankBits.length
           ? `Stripe connected for payouts (${bankBits.join(" ")})`
-          : "Stripe connected for payouts.";
+          : "Stripe connected for payouts.");
       } else {
-        stripeStatus.textContent = "Secure payouts powered by Stripe. Payments activate shortly.";
+        setStripeStatus();
       }
     }
     if (connectStripeBtn) {
@@ -892,14 +930,14 @@ document.addEventListener("DOMContentLoaded", () => {
   async function refreshStripeStatus() {
     if (!isParalegal) return;
     if (!connectStripeBtn && !stripeStatus) return;
-    if (stripeStatus) stripeStatus.textContent = "Checking Stripe status…";
+    setStripeStatus("Checking Stripe status…");
     try {
       const res = await secureFetch("/api/payments/connect/status");
       if (!res.ok) throw new Error("Unable to fetch Stripe status");
       const data = await res.json();
       updateStripeStatus(data);
     } catch (err) {
-      if (stripeStatus) stripeStatus.textContent = "Stripe status unavailable.";
+      setStripeStatus("Stripe status unavailable.");
       if (connectStripeBtn) {
         connectStripeBtn.disabled = !isParalegal;
         connectStripeBtn.setAttribute("aria-disabled", !isParalegal ? "true" : "false");
@@ -928,7 +966,7 @@ document.addEventListener("DOMContentLoaded", () => {
       connectStripeBtn.setAttribute("aria-disabled", "true");
     }
   } else if (!isParalegal && stripeStatus) {
-    stripeStatus.textContent = "";
+    setStripeStatus();
   }
 });
 
@@ -4633,13 +4671,11 @@ function applyUnifiedRoleStyling(user = {}) {
   showForceVisible();
   const role = (user.role || "").trim().toLowerCase();
   const isParalegal = role === "paralegal";
-  const eyebrow = document.querySelector(".unified-header .eyebrow");
   const title = document.querySelector(".unified-header h1");
   const sidebarLogo = document.querySelector(".sidebar .logo");
 
-  if (eyebrow) eyebrow.textContent = "Account";
   if (title) {
-    title.textContent = role === "paralegal" ? "Account Settings" : "Account Settings";
+    title.textContent = "Account Settings";
   }
   if (sidebarLogo) {
     const defaultText = sidebarLogo.dataset.defaultText || sidebarLogo.textContent;
@@ -4648,9 +4684,6 @@ function applyUnifiedRoleStyling(user = {}) {
   }
   document.body.classList.toggle("paralegal-flat", isParalegal);
   document.body.classList.toggle("attorney-classic", role === "attorney");
-  if (eyebrow) {
-    eyebrow.style.display = role === "attorney" ? "none" : "";
-  }
 
   document.querySelectorAll("[data-paralegal-only]").forEach((el) => {
     if (el.dataset.forceVisible !== undefined) {
@@ -4770,12 +4803,8 @@ async function loadSettings() {
     const titleEl = document.getElementById("accountSettingsTitle");
     const subtitleEl = document.getElementById("accountSettingsSubtitle");
 
-    if (currentUser?.role === "paralegal") {
-      if (titleEl) titleEl.textContent = "Paralegal Account Settings";
-    }
-
+    if (titleEl) titleEl.textContent = "Account Settings";
     if (currentUser?.role === "attorney") {
-      if (titleEl) titleEl.textContent = "Account Settings";
       if (subtitleEl) subtitleEl.textContent = "";
     }
     enforceUnifiedRoleStyling(user);

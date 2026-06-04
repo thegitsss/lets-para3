@@ -199,6 +199,7 @@ const state = {
   openCases: [],
   inviteTarget: null,
   applicantContext: null,
+  blockedByProfileOwner: false,
 };
 let inviteCutoutLayer = null;
 let inviteCutoutAlignRaf = null;
@@ -899,6 +900,7 @@ async function loadProfile() {
             state.profileUser = { ...data, id: data.id || data._id || state.paralegalId };
             resolved = true;
           } else if (res.status !== 404) {
+            state.blockedByProfileOwner = res.status === 403 && data?.blockedByProfileOwner === true;
             const err = new Error(data?.error || "Unable to load this paralegal right now.");
             err.status = res.status;
             throw err;
@@ -919,6 +921,7 @@ async function loadProfile() {
           data = await res.json().catch(() => ({}));
           if (!res.ok) {
             publicProfileFailed = true;
+            state.blockedByProfileOwner = res.status === 403 && data?.blockedByProfileOwner === true;
             const message =
               res.status === 404
                 ? "Paralegal profile not found. Please use a valid profile link."
@@ -1816,6 +1819,14 @@ function toggleElement(el, shouldShow) {
 
 function updateInviteButtonState() {
   if (!elements.inviteBtn) return;
+  if (state.blockedByProfileOwner) {
+    toggleElement(elements.inviteBtn, false);
+    elements.inviteBtn.disabled = true;
+    if (elements.sendInviteBtn) elements.sendInviteBtn.disabled = true;
+    closeInviteModal();
+    scheduleInviteCutoutAlign();
+    return;
+  }
   const isAttorney = state.viewerRole === "attorney";
   const applicantCaseId = state.applicantContext?.caseId || "";
   if (isAttorney && applicantCaseId) {

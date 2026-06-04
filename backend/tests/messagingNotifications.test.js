@@ -183,6 +183,103 @@ describe("Messaging + notifications", () => {
     expect(listRes2.body.messages[0].readBy.map(String)).toContain(String(attorney._id));
   });
 
+  test("Workspace unread summary excludes the viewer's own messages", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Unread",
+      email: "samanthasider+attorney-unread@gmail.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Unread",
+      email: "samanthasider+paralegal-unread@gmail.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+
+    const caseDoc = await seedFundedCase({ attorney, paralegal });
+
+    await request(app)
+      .post(`/api/messages/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(attorney))
+      .send({ text: "My own update" });
+
+    await request(app)
+      .post(`/api/messages/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(paralegal))
+      .send({ text: "Update from the other participant" });
+
+    const summaryRes = await request(app)
+      .get("/api/messages/summary")
+      .set("Cookie", authCookieFor(attorney));
+
+    expect(summaryRes.status).toBe(200);
+    expect(summaryRes.body.items).toEqual([
+      expect.objectContaining({
+        caseId: String(caseDoc._id),
+        unread: 1,
+      }),
+    ]);
+  });
+
+  test("Alias-only case participants retain all workspace messaging access", async () => {
+    const attorney = await User.create({
+      firstName: "Alex",
+      lastName: "Alias",
+      email: "samanthasider+attorney-alias@gmail.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      state: "CA",
+    });
+
+    const paralegal = await User.create({
+      firstName: "Priya",
+      lastName: "Alias",
+      email: "samanthasider+paralegal-alias@gmail.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+    });
+
+    const caseDoc = await seedFundedCase({ attorney, paralegal });
+    await Case.updateOne(
+      { _id: caseDoc._id },
+      { $unset: { attorney: 1, paralegal: 1 } }
+    );
+
+    const sendRes = await request(app)
+      .post(`/api/messages/${caseDoc._id}`)
+      .set("Cookie", authCookieFor(paralegal))
+      .send({ text: "Alias participant update" });
+    expect(sendRes.status).toBe(201);
+
+    const summaryRes = await request(app)
+      .get("/api/messages/summary")
+      .set("Cookie", authCookieFor(attorney));
+    expect(summaryRes.status).toBe(200);
+    expect(summaryRes.body.items).toEqual([
+      expect.objectContaining({
+        caseId: String(caseDoc._id),
+        unread: 1,
+      }),
+    ]);
+
+    const readRes = await request(app)
+      .post(`/api/messages/${caseDoc._id}/read`)
+      .set("Cookie", authCookieFor(attorney))
+      .send({});
+    expect(readRes.status).toBe(200);
+  });
+
   test("Messaging is blocked when escrow is not funded", async () => {
     // Description: Paralegal attempts to send message on unfunded case.
     // Input values: escrowStatus="pending", escrowIntentId missing.

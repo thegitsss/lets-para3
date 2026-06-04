@@ -53,6 +53,7 @@ const User = require("../models/User");
 const Case = require("../models/Case");
 const Payout = require("../models/Payout");
 const casesRouter = require("../routes/cases");
+const paymentsRouter = require("../routes/payments");
 
 function authCookieFor(user) {
   const payload = {
@@ -70,6 +71,7 @@ async function startServer() {
   app.use(cookieParser());
   app.use(express.json({ limit: "1mb" }));
   app.use("/api/cases", casesRouter);
+  app.use("/api/payments", paymentsRouter);
 
   const server = http.createServer(app);
   await new Promise((resolve) => server.listen(0, resolve));
@@ -122,9 +124,11 @@ async function main() {
       lockedTotalAmount: 100000,
       totalAmount: 100000,
       currency: "usd",
+      tasks: [{ title: "Finalize and deliver", completed: true }],
     });
 
     const cookie = authCookieFor(attorney);
+    const paralegalCookie = authCookieFor(paralegal);
 
     // Test: Payout transfer created to connected account.
     let res = await fetch(`${baseUrl}/api/cases/${caseDoc._id}/complete`, {
@@ -144,6 +148,18 @@ async function main() {
     const payoutDoc = await Payout.findOne({ caseId: caseDoc._id }).lean();
     if (!payoutDoc || payoutDoc.amountPaid !== 82000) {
       throw new Error(`Payout amount incorrect: ${payoutDoc?.amountPaid}`);
+    }
+
+    // Test: Paralegal can download payout receipt.
+    res = await fetch(`${baseUrl}/api/payments/receipt/paralegal/${caseDoc._id}`, {
+      headers: { Cookie: paralegalCookie },
+    });
+    if (res.status !== 200) {
+      throw new Error(`Expected paralegal receipt 200, got ${res.status}`);
+    }
+    const receiptContentType = res.headers.get("content-type") || "";
+    if (!receiptContentType.includes("application/pdf")) {
+      throw new Error(`Expected paralegal PDF receipt, got ${receiptContentType}`);
     }
 
     // Test: Error handling for failed payouts.
@@ -166,6 +182,7 @@ async function main() {
       lockedTotalAmount: 100000,
       totalAmount: 100000,
       currency: "usd",
+      tasks: [{ title: "Finalize and deliver", completed: true }],
     });
 
     res = await fetch(`${baseUrl}/api/cases/${caseFail._id}/complete`, {

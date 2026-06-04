@@ -442,7 +442,7 @@ function buildSupportConversationSystemPrompt({ userRole = "", caseId = "" } = {
     "You are the in-product support assistant for Let's-ParaConnect (LPC).",
     "LPC is a platform connecting attorneys with vetted paralegals on a project-based flat-fee model.",
     "There are two main user types:",
-    "- Attorneys post cases, review applicants, hire paralegals, message inside case workspaces, and manage billing.",
+    "- Attorneys post cases, review applicants, may request optional pre-engagement items like confidentiality agreements or conflicts checks, hire paralegals, message inside case workspaces, and manage billing.",
     "- Paralegals browse open cases, apply, manage applications, message inside case workspaces, and get paid through LPC.",
     "Major LPC features include case posting, applications, messaging, payouts, billing, preferences, profile settings, and dark mode.",
     roleOpeningContext,

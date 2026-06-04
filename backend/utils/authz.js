@@ -42,7 +42,7 @@ function requireSelfOrAdmin(paramKey = "userId") {
 /**
  * requireCaseAccess("caseId", opts?)
  *
- * Default policy: allow if user is admin OR case.attorney OR case.paralegal.
+ * Default policy: allow if user is admin OR matches a case attorney/paralegal field.
  *
  * Options:
  *  - hideExistence (bool, default true):
@@ -83,8 +83,8 @@ function requireCaseAccess(paramKey = "caseId", opts = {}) {
       }
 
       // Build a minimal projection; add applicants only if needed
-      // Always include attorney/paralegal to evaluate access quickly.
-      let select = "_id attorney paralegal status readOnly paralegalAccessRevokedAt";
+      // Always include participant fields to evaluate access quickly.
+      let select = "_id attorney attorneyId paralegal paralegalId status readOnly paralegalAccessRevokedAt";
       if (checkApplicants) select += " applicants";
       if (project) {
         // Allow caller to ask for more fields (e.g., "status title")
@@ -106,8 +106,8 @@ function requireCaseAccess(paramKey = "caseId", opts = {}) {
 
       const uid = toId(req.user.id);
       const isAdmin = req.user.role === "admin";
-      const isAttorney = sameId(c.attorney, uid);
-      const isParalegal = sameId(c.paralegal, uid);
+      const isAttorney = sameId(c.attorney, uid) || sameId(c.attorneyId, uid);
+      const isParalegal = sameId(c.paralegal, uid) || sameId(c.paralegalId, uid);
       const paralegalRevoked = isParalegal && !isAdmin && !!c.paralegalAccessRevokedAt;
 
       if (paralegalRevoked) {

@@ -27,6 +27,7 @@ const {
   ACTIVE_BLOCK_FILTER,
   BLOCKED_MESSAGE,
   deactivateBlock,
+  findActiveBlockBetween,
   getBlockedUserIds,
   isBlockedBetween,
 } = require("../utils/blocks");
@@ -1196,8 +1197,13 @@ paralegalRouter.get(
       return res.status(404).json({ error: "Paralegal not found" });
     }
     if (String(req.user.role || "").toLowerCase() === "attorney") {
-      const blocked = await isBlockedBetween(req.user.id, profile._id);
-      if (blocked) return res.status(403).json({ error: BLOCKED_MESSAGE });
+      const block = await findActiveBlockBetween(req.user.id, profile._id);
+      if (block) {
+        return res.status(403).json({
+          error: BLOCKED_MESSAGE,
+          blockedByProfileOwner: String(block.blockerId) === String(profile._id),
+        });
+      }
     }
     if (profile.role !== "paralegal" && String(profile._id) !== String(req.user.id) && req.user.role !== "admin") {
       return res.status(404).json({ error: "Paralegal not found" });

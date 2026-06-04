@@ -11,6 +11,7 @@ const Block = require("../models/Block");
 const Notification = require("../models/Notification");
 const blocksRouter = require("../routes/blocks");
 const messagesRouter = require("../routes/messages");
+const usersRouter = require("../routes/users");
 const { BLOCKED_MESSAGE } = require("../utils/blocks");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
@@ -20,6 +21,7 @@ const app = (() => {
   instance.use(express.json({ limit: "1mb" }));
   instance.use("/api/blocks", blocksRouter);
   instance.use("/api/messages", messagesRouter);
+  instance.use("/api/paralegals", usersRouter.paralegalRouter);
   instance.use((err, _req, res, _next) => {
     console.error(err);
     res.status(500).json({ msg: "Server error", error: err?.message || "Unknown error" });
@@ -38,7 +40,7 @@ function authCookieFor(user) {
   return `token=${token}`;
 }
 
-async function createApprovedUser({ email, role, firstName = "Test", lastName = "User" }) {
+async function createApprovedUser({ email, role, firstName = "Test", lastName = "User", ...overrides }) {
   return User.create({
     firstName,
     lastName,
@@ -47,6 +49,7 @@ async function createApprovedUser({ email, role, firstName = "Test", lastName = 
     role,
     status: "approved",
     state: "CA",
+    ...overrides,
   });
 }
 
@@ -110,6 +113,12 @@ describe("Finalized block rules", () => {
       email: "samanthasider+block-paralegal-withdraw@gmail.com",
       role: "paralegal",
       firstName: "Parker",
+      bio: "Experienced family law paralegal.",
+      skills: ["Case management"],
+      practiceAreas: ["family law"],
+      resumeURL: "paralegal-resumes/parker.pdf",
+      profileImage: "https://example.com/parker.jpg",
+      profilePhotoStatus: "approved",
     });
 
     const withdrawnCase = await Case.create({
@@ -145,6 +154,16 @@ describe("Finalized block rules", () => {
     expect(storedBlock).toBeTruthy();
     expect(storedBlock.active).toBe(true);
     expect(storedBlock.sourceType).toBe("withdrawal_zero_payout");
+
+    const profileRes = await request(app)
+      .get(`/api/paralegals/${paralegal._id}`)
+      .set("Cookie", authCookieFor(attorney));
+
+    expect(profileRes.status).toBe(403);
+    expect(profileRes.body).toMatchObject({
+      error: BLOCKED_MESSAGE,
+      blockedByProfileOwner: false,
+    });
 
     const laterCase = await Case.create({
       title: "Later matter",
@@ -215,6 +234,16 @@ describe("Finalized block rules", () => {
     expect(storedBlock).toBeTruthy();
     expect(storedBlock.active).toBe(true);
     expect(storedBlock.sourceType).toBe("closed_case");
+
+    const profileRes = await request(app)
+      .get(`/api/paralegals/${paralegal._id}`)
+      .set("Cookie", authCookieFor(attorney));
+
+    expect(profileRes.status).toBe(403);
+    expect(profileRes.body).toMatchObject({
+      error: BLOCKED_MESSAGE,
+      blockedByProfileOwner: true,
+    });
   });
 
   test("unblocking deactivates the pairwise restriction without creating notifications", async () => {

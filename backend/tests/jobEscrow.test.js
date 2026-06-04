@@ -8,6 +8,8 @@ const Case = require("../models/Case");
 
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 
+jest.mock("../utils/email", () => jest.fn(async () => ({ ok: true })));
+
 jest.mock("../utils/stripe", () => {
   const paymentIntents = {
     create: jest.fn(),
@@ -51,6 +53,7 @@ jest.mock("../services/caseLifecycle", () => ({
 
 const stripe = require("../utils/stripe");
 const caseLifecycle = require("../services/caseLifecycle");
+const sendEmail = require("../utils/email");
 const casesRouter = require("../routes/cases");
 const paymentsRouter = require("../routes/payments");
 
@@ -96,6 +99,7 @@ beforeEach(async () => {
     invoice_settings: { default_payment_method: "pm_test_default" },
   });
   caseLifecycle.buildReceiptPdfBuffer.mockClear();
+  sendEmail.mockClear();
 });
 
 describe("Job posting + escrow", () => {
@@ -113,6 +117,15 @@ describe("Job posting + escrow", () => {
       status: "approved",
       state: "CA",
       stripeCustomerId: "cus_attorney_test_1",
+    });
+    const admin = await User.create({
+      firstName: "Admin",
+      lastName: "Reviewer",
+      email: "admin@example.com",
+      password: "Password123!",
+      role: "admin",
+      status: "approved",
+      state: "CA",
     });
 
     const cookie = authCookieFor(attorney);
@@ -133,6 +146,11 @@ describe("Job posting + escrow", () => {
     const created = await Case.findOne({ title: "Immigration support" }).lean();
     expect(created).toBeTruthy();
     expect(created.totalAmount).toBe(40000);
+    expect(sendEmail).toHaveBeenCalledWith(
+      admin.email,
+      "New attorney job posted: Immigration support",
+      expect.stringContaining("Review job posting in Admin")
+    );
   });
 
   test("Posting fails on invalid values", async () => {

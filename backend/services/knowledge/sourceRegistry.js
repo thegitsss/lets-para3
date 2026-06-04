@@ -244,6 +244,45 @@ const SOURCE_REGISTRY = Object.freeze([
         ],
       },
       {
+        key: "platform_conflicts_check_pre_engagement",
+        collectionKey: "platform_truth",
+        title: "Optional Conflicts Checks and Pre-Engagement Items",
+        domain: "platform_truth",
+        recordType: "fact_card",
+        audienceScopes: ["support_safe", "sales_safe", "marketing_safe", "public_approved"],
+        freshnessDays: 120,
+        tags: ["attorney", "workflow", "conflicts", "pre-engagement", "confidentiality"],
+        content: {
+          summary:
+            "Use this when explaining whether LPC includes conflicts checks or pre-engagement requirements before an attorney hires a paralegal.",
+          statement:
+            "Yes. LPC supports optional pre-engagement items before hiring, including a confidentiality agreement and a conflicts check requested by the attorney for a selected paralegal.",
+          supportingPoints: [
+            "These tools are optional and are not automatically required on every matter.",
+            "If used, the requested paralegal completes the items inside LPC before hiring and funding move forward.",
+            "Attorneys remain responsible for supervising the engagement and handling any professional obligations that apply to the matter.",
+          ],
+        },
+        citations: [
+          {
+            sourceKey: "attorney_faq",
+            label: "frontend/attorney-faq.html",
+            filePath: "frontend/attorney-faq.html",
+            locator: "Question 9",
+            excerpt:
+              "Before hiring, an attorney may optionally request pre-engagement items for a selected paralegal through LPC. These can include a confidentiality agreement and a conflicts check",
+          },
+          {
+            sourceKey: "attorney_faq",
+            label: "frontend/attorney-faq.html",
+            filePath: "frontend/attorney-faq.html",
+            locator: "Question 9",
+            excerpt:
+              "These pre-engagement items are optional tools within the platform. They are not automatically required on every matter",
+          },
+        ],
+      },
+      {
         key: "platform_guardrail_what_lpc_is_not",
         collectionKey: "platform_truth",
         title: "What LPC Is Not",

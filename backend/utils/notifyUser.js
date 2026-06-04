@@ -404,7 +404,6 @@ function shouldSendEmailForType(user, type, payload = {}) {
   if (type === "profile_photo_rejected") return false;
   if (type === "application_denied") return false;
   if (type === "payout_released") return false;
-  if (type === "case_update") return false;
   if (prefs.email === false) return false;
   if (type === "message") {
     if (payload?.suppressEmail) return false;

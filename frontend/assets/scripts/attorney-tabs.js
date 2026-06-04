@@ -1959,11 +1959,12 @@ function showDashboardView(target, { skipHash = false, caseFilter = null } = {})
   if (!dashboardViewState.viewMap.has(target)) target = "home";
   const normalizedFilter = (caseFilter || "").toLowerCase();
   const wantsFilter = normalizedFilter && CASE_VIEW_FILTERS.includes(normalizedFilter);
+  const targetCaseFilter = target === "cases" ? (wantsFilter ? normalizedFilter : "active") : "";
   if (dashboardViewState.currentView === target) {
-    if (target === "cases" && wantsFilter && state.casesViewFilter !== normalizedFilter) {
+    if (target === "cases" && state.casesViewFilter !== targetCaseFilter) {
       void ensureCasesViewReady().then(() => {
-        if (state.casesViewFilter !== normalizedFilter) {
-          setCaseFilter(normalizedFilter);
+        if (state.casesViewFilter !== targetCaseFilter) {
+          setCaseFilter(targetCaseFilter, { syncHash: false });
         }
       });
     }
@@ -1994,12 +1995,12 @@ function showDashboardView(target, { skipHash = false, caseFilter = null } = {})
   }
 
   if (target === "cases") {
-    if (wantsFilter && !dashboardViewState.casesInitialized) {
-      setCaseFilter(normalizedFilter, { render: false });
+    if (!dashboardViewState.casesInitialized) {
+      setCaseFilter(targetCaseFilter, { render: false, syncHash: false });
     }
     void ensureCasesViewReady().then(() => {
-      if (wantsFilter && state.casesViewFilter !== normalizedFilter) {
-        setCaseFilter(normalizedFilter);
+      if (state.casesViewFilter !== targetCaseFilter) {
+        setCaseFilter(targetCaseFilter, { syncHash: false });
       }
       maybeOpenCasePreviewFromQuery();
       maybeOpenApplicantFromQuery();
@@ -2073,7 +2074,7 @@ function bindCaseViewTabs() {
   dashboardViewState.caseTabsBound = true;
 }
 
-function setCaseFilter(filterKey, { render = true } = {}) {
+function setCaseFilter(filterKey, { render = true, syncHash = true } = {}) {
   const key = (filterKey || "").toLowerCase();
   if (!CASE_VIEW_FILTERS.includes(key)) return;
   const tabs = document.querySelectorAll("[data-case-filter]");
@@ -2091,6 +2092,12 @@ function setCaseFilter(filterKey, { render = true } = {}) {
   tables.forEach((table) => {
     table.classList.toggle("hidden", table.dataset.caseTable !== key);
   });
+  if (syncHash && dashboardViewState.currentView === "cases") {
+    const nextHash = `#cases:${key}`;
+    if (window.location.hash !== nextHash) {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${nextHash}`);
+    }
+  }
   if (render) {
     renderCasesView();
   }

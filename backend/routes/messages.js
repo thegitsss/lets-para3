@@ -45,7 +45,14 @@ function sanitizeText(s) {
 function buildCaseAccessFilter(user) {
   if (!user) return {};
   if (user.role === "admin") return {};
-  return { $or: [{ attorney: user.id }, { paralegal: user.id }] };
+  return {
+    $or: [
+      { attorney: user.id },
+      { attorneyId: user.id },
+      { paralegal: user.id },
+      { paralegalId: user.id },
+    ],
+  };
 }
 
 const FUNDED_WORKSPACE_FILTER = {
@@ -320,12 +327,21 @@ router.get(
     const userDoc = await User.findById(req.user.id).select("messageLastViewedAt");
     const lastMap = userDoc?.messageLastViewedAt || new Map();
     const items = [];
+    const requesterObjectId = new mongoose.Types.ObjectId(req.user.id);
     for (const doc of caseDocs) {
       const key = String(doc._id);
       const lastViewed =
         typeof lastMap.get === "function" ? lastMap.get(key) : lastMap?.[key];
-      const query = { caseId: doc._id, deleted: { $ne: true } };
-      if (lastViewed) query.createdAt = { $gt: new Date(lastViewed) };
+      const query = {
+        caseId: doc._id,
+        deleted: { $ne: true },
+        senderId: { $ne: requesterObjectId },
+      };
+      if (lastViewed) {
+        query.createdAt = { $gt: new Date(lastViewed) };
+      } else {
+        query.$and = buildUnreadClause(requesterObjectId).$and;
+      }
       const unread = await Message.countDocuments(query);
       items.push({
         caseId: key,

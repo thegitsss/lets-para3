@@ -10,7 +10,12 @@ const User = require("../models/User");
 const verifyToken = require("../utils/verifyToken");
 const sendEmail = require("../utils/email");
 const { logAction } = require("../utils/audit");
-const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
+const {
+  BLOCKED_MESSAGE,
+  findActiveBlockBetween,
+  getBlockedUserIds,
+  isBlockedBetween,
+} = require("../utils/blocks");
 const { applyPublicParalegalFilter } = require("../utils/paralegalProfile");
 const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
 const { looksLikeSupportSubmission } = require("../services/lpcEvents/supportRoutingService");
@@ -494,8 +499,13 @@ router.get(
       return res.status(404).json({ error: "Paralegal not found" });
     }
     if (String(req.user?.role || "").toLowerCase() === "attorney") {
-      const blocked = await isBlockedBetween(req.user.id, doc._id);
-      if (blocked) return res.status(403).json({ error: BLOCKED_MESSAGE });
+      const block = await findActiveBlockBetween(req.user.id, doc._id);
+      if (block) {
+        return res.status(403).json({
+          error: BLOCKED_MESSAGE,
+          blockedByProfileOwner: String(block.blockerId) === String(doc._id),
+        });
+      }
     }
     res.json(serializeParalegal(doc));
   })
