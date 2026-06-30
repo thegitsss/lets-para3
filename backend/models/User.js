@@ -11,7 +11,7 @@ const uniqueStrings = (arr = []) =>
 /** ----------------------------------------
  * Enums
  * -----------------------------------------*/
-const ROLE_ENUM = ["attorney", "paralegal", "admin"];
+const ROLE_ENUM = ["attorney", "paralegal", "admin", "director"];
 const STATUS_ENUM = ["pending", "approved", "denied", "rejected"];
 const KYC_STATUS = ["unverified", "pending_review", "verified", "rejected"];
 

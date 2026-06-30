@@ -10,6 +10,7 @@ const clearLocalSession = () => {
 const resolveDashboardTarget = (role) => {
   const normalizedRole = String(role || "").toLowerCase();
   if (normalizedRole === "admin") return "admin-dashboard.html";
+  if (normalizedRole === "director") return "director-portal.html";
   if (normalizedRole === "paralegal") return "dashboard-paralegal.html";
   return "dashboard-attorney.html";
 };
@@ -196,13 +197,7 @@ const initLogin = () => {
       shouldRestoreButton = false;
       localStorage.setItem("lpc_user", JSON.stringify(data.user || {}));
 
-      if (data.user.role === "admin") {
-        window.location.href = "admin-dashboard.html";
-      } else if (data.user.role === "paralegal") {
-        window.location.href = "dashboard-paralegal.html";
-      } else {
-        window.location.href = "dashboard-attorney.html";
-      }
+      window.location.href = resolveDashboardTarget(data.user.role);
     } catch (err) {
       console.error(err);
       clearLocalSession();
@@ -283,13 +278,7 @@ const initLogin = () => {
           return;
         }
         localStorage.setItem("lpc_user", JSON.stringify(payload.user || {}));
-        if (payload.user?.role === "admin") {
-          window.location.href = "admin-dashboard.html";
-        } else if (payload.user?.role === "paralegal") {
-          window.location.href = "dashboard-paralegal.html";
-        } else {
-          window.location.href = "dashboard-attorney.html";
-        }
+        window.location.href = resolveDashboardTarget(payload.user?.role);
       } catch (err) {
         if (err?.name === "AbortError") {
           if (toastHelper) {

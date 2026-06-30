@@ -13,6 +13,7 @@
     "dev:debug": "nodemon --inspect=0.0.0.0:9229 index.js",
     "incident:runner": "node --unhandled-rejections=strict scripts/incident-runner.js",
     "seed:admin": "node scripts/seedAdmin.js",
+    "seed:director": "node scripts/seedDirector.js",
     "backup:db": "node scripts/backup-db.js",
     "ops:monitor": "node scripts/ops-monitor.js",
     "health": "node -e \"console.log('ok')\"",

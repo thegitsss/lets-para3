@@ -364,6 +364,8 @@
     const target =
       norm === "admin"
         ? "admin-dashboard.html"
+        : norm === "director"
+        ? "director-portal.html"
         : norm === "paralegal"
         ? "dashboard-paralegal.html"
         : "dashboard-attorney.html";
@@ -618,6 +620,8 @@
       window.location.href = "dashboard-paralegal.html";
     } else if (role === "admin") {
       window.location.href = "admin-dashboard.html";
+    } else if (role === "director") {
+      window.location.href = "director-portal.html";
     } else {
       window.location.href = "login.html";
     }

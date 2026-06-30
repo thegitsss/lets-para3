@@ -99,7 +99,32 @@ module.exports = async function sendEmail(to, subject, html, opts = {}) {
     return { disabled: true };
   }
 
-  await verifyOnce();
+  const customSmtp = opts.smtp || null;
+  const activeTransporter = customSmtp
+    ? nodemailer.createTransport({
+        host: customSmtp.host || process.env.SMTP_HOST,
+        port: Number(customSmtp.port || process.env.SMTP_PORT || 587),
+        secure:
+          typeof customSmtp.secure === "boolean"
+            ? customSmtp.secure
+            : String(customSmtp.secure || process.env.SMTP_SECURE || "").toLowerCase() === "true" ||
+              Number(customSmtp.port || process.env.SMTP_PORT || 587) === 465,
+        auth:
+          customSmtp.user && customSmtp.pass
+            ? {
+                user: customSmtp.user,
+                pass: customSmtp.pass,
+              }
+            : undefined,
+        socketTimeout: 20_000,
+        greetingTimeout: 10_000,
+        connectionTimeout: 10_000,
+      })
+    : transporter;
+
+  if (!customSmtp) {
+    await verifyOnce();
+  }
 
   const from = defaultFrom();
   const safeSubject = sanitizeSubject(subject);
@@ -136,7 +161,7 @@ module.exports = async function sendEmail(to, subject, html, opts = {}) {
 
   // Build message
   const message = {
-    from,
+    from: opts.from || from,
     to,
     subject: safeSubject,
     html: wrapHtml(html || ""),
@@ -153,7 +178,7 @@ module.exports = async function sendEmail(to, subject, html, opts = {}) {
   };
 
   try {
-    const info = await transporter.sendMail(message);
+    const info = await activeTransporter.sendMail(message);
     if (process.env.NODE_ENV !== "test") {
       console.log(`✅ Email sent to ${to} (id: ${info.messageId || "n/a"})`);
     }

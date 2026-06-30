@@ -11,6 +11,7 @@ const { runTimedTriggers } = require("../services/lpcEvents/timedTriggerService"
 const { prepareFounderDailyLogIfDue } = require("../services/marketing/founderDailyLogService");
 const { cleanupJrCmoLibrary, refreshJrCmoLibrary } = require("../services/marketing/jrCmoResearchService");
 const { runScheduledCycleCreation } = require("../services/marketing/publishingCycleService");
+const { processAutomaticDirectorFollowUps } = require("../services/director/directorPortalService");
 const { createLogger } = require("../utils/logger");
 
 const logger = createLogger("scheduler:agents");
@@ -40,10 +41,15 @@ function startAgentScheduler() {
       const marketingPublishing = await runScheduledCycleCreation({
         actor: { actorType: "system", label: "Marketing Publishing Scheduler" },
       });
+      const directorFollowUps = await processAutomaticDirectorFollowUps({
+        now: new Date(),
+        limit: 25,
+      });
       const founderDailyPrep = await prepareFounderDailyLogIfDue({
         now: new Date(),
         schedulerState: {
           marketingPublishing,
+          directorFollowUps,
           generatedFromScheduler: true,
         },
       });
@@ -59,6 +65,7 @@ function startAgentScheduler() {
           factCount: Array.isArray(jrCmoResearch.facts) ? jrCmoResearch.facts.length : 0,
         },
         jrCmoCleanup,
+        directorFollowUps,
         marketingPublishing,
         founderDailyPrep: founderDailyPrep?.prepared
           ? {

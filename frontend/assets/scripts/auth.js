@@ -321,6 +321,8 @@ export async function loadUserHeaderInfo() {
         role.textContent = "Paralegal";
       } else if (resolvedRole === "admin") {
         role.textContent = "Admin";
+      } else if (resolvedRole === "director") {
+        role.textContent = "Director";
       } else if (resolvedRole) {
         role.textContent = "Attorney";
       } else {

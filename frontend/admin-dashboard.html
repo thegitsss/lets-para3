@@ -1546,6 +1546,7 @@ font-size:.95rem;
 <a href="#" data-section="marketing-drafts">Marketing</a>
 <a href="#" data-section="support-ops">Support Ops</a>
 <a href="#" data-section="sales-workspace">Sales</a>
+<a href="admin-directors.html">Director Oversight</a>
 <a href="#" data-section="finance">Finance</a>
 <a href="#" data-section="posts">Attorney Posts</a>
 <span class="nav-section-label">Utilities</span>
@@ -3408,6 +3409,7 @@ window.activateAdminSection = activateSection;
 
 navLinks.forEach(link=>{
 link.addEventListener("click",e=>{
+if(!link.dataset.section) return;
 e.preventDefault();
 const target=link.dataset.section;
 if(target) activateSection(target);

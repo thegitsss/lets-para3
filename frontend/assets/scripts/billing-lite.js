@@ -1,4 +1,4 @@
-import { secureFetch } from "./auth.js";
+import { getStoredSession, secureFetch } from "./auth.js";
 import { createElements, mountPaymentElement, confirmSetup } from "./payments.js";
 
 const ATTORNEY_ONBOARDING_STEP_KEY = "lpc_attorney_onboarding_step";
@@ -49,6 +49,8 @@ function setAttorneyOnboardingStep(step) {
 function initBillingLite() {
   const surface = document.querySelector("[data-billing-surface]");
   if (!surface || billingLiteInitialized) return;
+  const role = String(getStoredSession()?.role || "").toLowerCase();
+  if (role && role !== "attorney" && role !== "admin") return;
 
   billingLiteInitialized = true;
   historyList = document.getElementById("historyList");

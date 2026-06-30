@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Director Portal | Let's-ParaConnect</title>
+  <link rel="stylesheet" href="assets/styles/fonts.css" />
+  <link rel="stylesheet" href="assets/styles/styles.css" />
+  <style>
+    :root {
+      --font-sans: 'Sarabun', sans-serif;
+      --font-serif: 'Cormorant Garamond', serif;
+      --director-ink: #120f13;
+      --director-muted: #89838c;
+      --director-line: rgba(40, 26, 44, 0.08);
+      --director-bg: #f4f5f7;
+      --director-panel: #ffffff;
+      --director-card-alpha: 1;
+      --director-card-bg: rgba(255, 255, 255, var(--director-card-alpha));
+      --director-card-line: rgba(255, 255, 255, 0.42);
+      --director-card-ink: #120f13;
+      --director-card-muted: #89838c;
+      --director-chart-grid: rgba(255, 255, 255, 0.2);
+      --director-chart-bar: rgba(91, 142, 233, 0.16);
+      --director-graph-primary: #7aaef4;
+      --director-graph-secondary: #d98999;
+      --director-graph-tertiary: #7772c8;
+      --director-dot-idle: rgba(227, 229, 233, 0.88);
+      --director-soft-track: rgba(255, 255, 255, 0.28);
+      --director-control-bg: rgba(255, 255, 255, 0.9);
+      --director-control-line: rgba(18, 15, 19, 0.08);
+      --director-hover-bg: rgba(255, 255, 255, 0.38);
+      --director-background-image: none;
+      --director-background-overlay: linear-gradient(135deg, rgba(255, 255, 255, 0.84), rgba(244, 245, 247, 0.78));
+      --director-photo-overlay: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(18, 15, 19, 0.08));
+      --director-accent: #b6a47a;
+      --director-blue: #5b8ee9;
+      --director-green: #68c68a;
+      --director-rose: #d85d74;
+      --director-purple: #7672c8;
+      --director-warn: #9b5d14;
+      --director-shadow: none;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      background-image:
+        var(--director-background-overlay),
+        radial-gradient(circle at 16% 8%, rgba(182, 164, 122, 0.13), transparent 34%),
+        linear-gradient(135deg, #ffffff 0%, var(--director-bg) 52%, #eef1f5 100%);
+      background-size: cover, auto, auto;
+      background-position: center, center, center;
+      background-attachment: fixed, fixed, fixed;
+      color: var(--director-ink);
+      font-family: var(--font-sans);
+      font-weight: 200;
+    }
+    body.has-director-photo-bg {
+      background-image:
+        var(--director-photo-overlay),
+        var(--director-background-image);
+      background-size: cover, cover;
+      background-position: center, center;
+      background-attachment: fixed, fixed;
+    }
+    body.director-mode-dark {
+      color: #f8fafc;
+    }
+    body.director-mode-dark .director-account,
+    body.director-mode-dark .sync-meta,
+    body.director-mode-dark .director-status {
+      color: rgba(248, 250, 252, 0.72);
+    }
+    body.director-mode-dark .director-icon-btn,
+    body.director-mode-dark .settings-close,
+    body.director-mode-dark .appearance-upload {
+      background: rgba(15, 23, 42, 0.5);
+      border-color: rgba(248, 250, 252, 0.18);
+      color: #f8fafc;
+    }
+    body.director-mode-dark .settings-dialog {
+      background: rgba(15, 23, 42, 0.86);
+      border-color: rgba(248, 250, 252, 0.18);
+      color: #f8fafc;
+    }
+    body.director-mode-dark .appearance-field,
+    body.director-mode-dark .appearance-help {
+      color: rgba(248, 250, 252, 0.72);
+    }
+    body.director-mode-dark .appearance-field > span:first-child,
+    body.director-mode-dark .appearance-value {
+      color: #f8fafc;
+    }
+    body.director-mode-dark .appearance-divider {
+      background: rgba(248, 250, 252, 0.16);
+    }
+    body.director-mode-dark .appearance-mode-btn {
+      background: rgba(15, 23, 42, 0.52);
+      border-color: rgba(248, 250, 252, 0.18);
+      color: #f8fafc;
+    }
+    body.director-mode-dark .appearance-mode-btn.active {
+      background: var(--director-blue);
+      border-color: var(--director-blue);
+    }
+    button, input, select, table {
+      font-family: var(--font-sans);
+      font-weight: 200;
+    }
+    .director-shell {
+      height: 100vh;
+      height: 100dvh;
+      display: block;
+      width: 100%;
+      overflow-x: hidden;
+      min-width: 0;
+    }
+    .director-logo {
+      font-family: var(--font-serif);
+      font-size: 1.35rem;
+      line-height: 1.1;
+      letter-spacing: 0;
+      font-weight: 300;
+      margin: 0;
+    }
+    .director-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.2rem 0.2rem 0.15rem;
+    }
+    .director-account {
+      display: flex;
+      align-items: center;
+      gap: 0.72rem;
+      color: var(--director-muted);
+      font-size: 0.86rem;
+      min-width: 0;
+    }
+    .director-account span {
+      max-width: min(46vw, 420px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .director-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex: 0 0 auto;
+    }
+    .director-icon-btn {
+      width: 42px;
+      height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(18, 15, 19, 0.08);
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.76);
+      color: var(--director-ink);
+      cursor: pointer;
+      backdrop-filter: blur(14px) saturate(130%);
+      -webkit-backdrop-filter: blur(14px) saturate(130%);
+      transition: transform 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+    }
+    .director-icon-btn:hover,
+    .director-icon-btn:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(91, 142, 233, 0.35);
+      color: var(--director-blue);
+      outline: none;
+    }
+    .director-icon-btn svg {
+      width: 19px;
+      height: 19px;
+      stroke-width: 1.8;
+    }
+    .director-appearance {
+      display: grid;
+      gap: 1rem;
+    }
+    .appearance-field {
+      display: grid;
+      gap: 0.5rem;
+      color: var(--director-muted);
+      font-size: 0.82rem;
+    }
+    .appearance-field > span:first-child {
+      color: var(--director-ink);
+      font-size: 0.92rem;
+      font-weight: 400;
+    }
+    .appearance-range-row {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .appearance-field input[type="range"] {
+      flex: 1;
+      accent-color: var(--director-blue);
+    }
+    .appearance-mode {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.4rem;
+    }
+    .appearance-mode-btn {
+      min-height: 38px;
+      border: 1px solid var(--director-line);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.72);
+      color: var(--director-ink);
+      cursor: pointer;
+      font: inherit;
+    }
+    .appearance-mode-btn.active {
+      background: var(--director-blue);
+      border-color: var(--director-blue);
+      color: #ffffff;
+    }
+    .appearance-value {
+      min-width: 4ch;
+      color: var(--director-ink);
+      text-align: right;
+    }
+    .appearance-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+    .appearance-upload {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      border: 1px solid var(--director-line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--director-ink);
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .appearance-help {
+      color: var(--director-muted);
+      font-size: 0.76rem;
+      line-height: 1.35;
+    }
+    .appearance-divider {
+      height: 1px;
+      background: var(--director-line);
+    }
+    .appearance-upload input {
+      display: none;
+    }
+    .director-main {
+      width: 100%;
+      min-width: 0;
+      padding: 1rem;
+      display: grid;
+      gap: 0.75rem;
+      align-content: start;
+      overflow-x: hidden;
+      overflow-y: auto;
+      height: 100vh;
+      height: 100dvh;
+      max-width: 100vw;
+    }
+    .settings-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(18, 15, 19, 0.18);
+      opacity: 1;
+      transition: opacity 0.18s ease;
+    }
+    .settings-overlay[hidden] {
+      display: none;
+    }
+    .settings-dialog {
+      width: min(340px, calc(100vw - 2rem));
+      border: 1px solid rgba(255, 255, 255, 0.72);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.84);
+      backdrop-filter: blur(22px) saturate(135%);
+      -webkit-backdrop-filter: blur(22px) saturate(135%);
+      padding: 1.15rem;
+    }
+    .settings-head {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+    .settings-head h2 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 1.45rem;
+      font-weight: 300;
+    }
+    .settings-close {
+      position: absolute;
+      right: 0;
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--director-line);
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.7);
+      color: var(--director-ink);
+      cursor: pointer;
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+    .director-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      flex-wrap: wrap;
+      padding: 0.2rem 0.2rem 0;
+    }
+    .director-header h1 {
+      font-family: var(--font-serif);
+      margin: 0;
+      font-size: 2.1rem;
+      font-weight: 300;
+      letter-spacing: 0;
+    }
+    .director-header p {
+      margin: 0.25rem 0 0;
+      color: var(--director-muted);
+    }
+    .director-board {
+      display: grid;
+      grid-template-columns: minmax(180px, 25%) minmax(0, 1fr) minmax(180px, 25%);
+      grid-template-areas:
+        "emails open completed"
+        "conversion performance performance"
+        "unsub performance performance";
+      gap: 0.28rem;
+      min-width: 0;
+    }
+    .director-panel,
+    .director-card,
+    .metric-card {
+      background: var(--director-panel);
+      background: var(--director-card-bg);
+      border: 1px solid var(--director-card-line);
+      border-radius: 24px;
+      box-shadow: var(--director-shadow);
+      backdrop-filter: blur(22px) saturate(150%) brightness(1.06);
+      -webkit-backdrop-filter: blur(22px) saturate(150%) brightness(1.06);
+      color: var(--director-card-ink);
+    }
+    .director-panel { padding: 1rem; }
+    .metric-card {
+      min-width: 0;
+      min-height: 168px;
+      padding: 1.35rem;
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      align-content: space-between;
+      color: var(--director-card-ink);
+    }
+    .metric-card h2,
+    .director-performance h2 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+    .metric-card > *,
+    .director-performance > * {
+      min-width: 0;
+    }
+    .metric-body {
+      display: grid;
+      grid-template-columns: minmax(82px, 92px) minmax(0, 1fr);
+      gap: 0.75rem;
+      align-items: end;
+      min-width: 0;
+    }
+    .metric-delta {
+      color: var(--director-green);
+      font-size: 0.9rem;
+      margin-bottom: 0.45rem;
+    }
+    .metric-delta.down { color: var(--director-rose); }
+    .metric-value {
+      display: block;
+      font-size: 1.75rem;
+      line-height: 1;
+      font-weight: 500;
+    }
+    .metric-note {
+      color: var(--director-card-muted);
+      font-size: 0.82rem;
+      margin-top: 0.35rem;
+    }
+    .emails-card { grid-area: emails; }
+    .open-card { grid-area: open; }
+    .completed-card { grid-area: completed; }
+    .conversion-card { grid-area: conversion; }
+    .unsub-card { grid-area: unsub; }
+    .director-performance {
+      grid-area: performance;
+      min-height: 386px;
+      padding: 1.35rem;
+      background: var(--director-card-bg);
+      border: 1px solid var(--director-card-line);
+      border-radius: 24px;
+      box-shadow: var(--director-shadow);
+      backdrop-filter: blur(22px) saturate(150%) brightness(1.06);
+      -webkit-backdrop-filter: blur(22px) saturate(150%) brightness(1.06);
+      color: var(--director-card-ink);
+    }
+    .arc-chart {
+      min-height: 84px;
+      border-radius: 999px 999px 0 0;
+      background:
+        radial-gradient(circle at center bottom, #fff 0 52%, transparent 53%),
+        conic-gradient(from 245deg, transparent 0 16%, #8bb7f4 16% 59%, #eef0f4 59% 76%, transparent 76% 100%);
+      position: relative;
+    }
+    .arc-chart::after {
+      content: "sent";
+      position: absolute;
+      right: 18%;
+      bottom: 12px;
+      color: var(--director-purple);
+      font-size: 0.82rem;
+    }
+    .mini-bars,
+    .mini-columns {
+      height: 82px;
+      display: flex;
+      align-items: end;
+      gap: 0.45rem;
+      padding-bottom: 0.25rem;
+    }
+    .mini-bars span,
+    .mini-columns span {
+      display: block;
+      flex: 1;
+      border-radius: 8px 8px 0 0;
+      background: linear-gradient(to top, rgba(182, 164, 122, 0.2), rgba(182, 164, 122, 0.72));
+      min-height: 16px;
+    }
+    .mini-bars span:nth-child(1) { height: 38%; opacity: 0.35; }
+    .mini-bars span:nth-child(2) { height: 58%; opacity: 0.45; }
+    .mini-bars span:nth-child(3) { height: 82%; background: linear-gradient(to top, #d9f6cc, #96d875); }
+    .mini-bars span:nth-child(4) { height: 48%; opacity: 0.35; }
+    .mini-bars span:nth-child(5) { height: 72%; opacity: 0.28; }
+    .mini-bars span:nth-child(6) { height: 54%; opacity: 0.3; }
+    .dot-grid {
+      display: grid;
+      grid-template-columns: repeat(15, minmax(3px, 6px));
+      gap: clamp(2px, 0.35vw, 4px);
+      align-content: end;
+      justify-content: end;
+      min-height: 88px;
+      max-width: 100%;
+    }
+    .dot-grid span {
+      width: min(6px, 100%);
+      height: min(6px, 1.4vw);
+      min-height: 3px;
+      border-radius: 2px;
+      background: var(--director-dot-idle);
+    }
+    .dot-grid span:nth-child(-n + 40) { background: rgba(104, 198, 138, 0.55); }
+    .completed-progress {
+      align-self: end;
+    }
+    .completed-progress-track {
+      height: 6px;
+      border-radius: 999px;
+      background: var(--director-soft-track);
+      overflow: hidden;
+      margin-top: 0.8rem;
+    }
+    .completed-progress-fill {
+      display: block;
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--director-blue), var(--director-green));
+      transition: width 0.25s ease;
+    }
+    .tiny-line {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+    }
+    .tiny-line::before,
+    .tiny-line::after {
+      content: "";
+      height: 2px;
+      background: var(--director-soft-track);
+      flex: 1;
+    }
+    .tiny-line span {
+      width: 34px;
+      height: 36px;
+      border-left: 2px solid var(--director-blue);
+      border-right: 2px solid var(--director-blue);
+      background: linear-gradient(to top, rgba(91, 142, 233, 0.15), transparent);
+    }
+    .performance-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+    .performance-head p {
+      margin: 0.2rem 0 0;
+      color: var(--director-card-muted);
+      font-size: 0.92rem;
+    }
+    .chart-legend {
+      display: flex;
+      gap: 1rem;
+      color: var(--director-card-ink);
+      font-size: 0.88rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .chart-legend span::before {
+      content: "";
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      margin-right: 0.4rem;
+      background: var(--director-rose);
+    }
+    .chart-legend span:nth-child(2)::before { background: var(--director-purple); }
+    .chart-legend span:nth-child(3)::before { background: var(--director-blue); }
+    .performance-chart {
+      height: 246px;
+      position: relative;
+      min-width: 0;
+      overflow: hidden;
+      border-radius: 0;
+      background:
+        repeating-linear-gradient(to right, transparent 0 22px, var(--director-chart-bar) 22px 24px),
+        repeating-linear-gradient(to bottom, transparent 0 47px, var(--director-chart-grid) 47px 48px);
+    }
+    .performance-chart svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .director-actions {
+      display: flex;
+      gap: 0.7rem;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+    .director-actions label {
+      display: grid;
+      gap: 0.3rem;
+      color: var(--director-card-muted);
+      font-size: 0.85rem;
+    }
+    .director-actions select {
+      min-height: 40px;
+      border: 1px solid var(--director-control-line);
+      border-radius: 14px;
+      padding: 0 0.85rem;
+      background: var(--director-control-bg);
+      color: var(--director-card-ink);
+    }
+    .director-btn {
+      border: 1px solid var(--director-control-line);
+      background: var(--director-control-bg);
+      color: var(--director-card-ink);
+      border-radius: 14px;
+      min-height: 40px;
+      padding: 0 1rem;
+      cursor: pointer;
+      font-size: 0.95rem;
+      box-shadow: none;
+    }
+    .director-actions .director-btn:first-of-type {
+      background: var(--director-accent);
+      border-color: var(--director-accent);
+    }
+    .director-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .director-status {
+      color: var(--director-card-muted);
+      font-size: 0.9rem;
+      min-height: 1.3rem;
+      margin-top: 0.75rem;
+      opacity: 1;
+      transition: opacity 0.25s ease;
+    }
+    .director-status.success { color: var(--director-green); }
+    .director-status.error { color: var(--director-rose); }
+    .director-status.fade-out { opacity: 0; }
+    .sync-meta {
+      color: var(--director-card-muted);
+      font-size: 0.82rem;
+      margin-top: 0.25rem;
+    }
+    .director-empty-state {
+      display: none;
+      border: 1px solid var(--director-card-line);
+      border-radius: 18px;
+      padding: 1rem;
+      margin-top: 0.85rem;
+      color: var(--director-card-muted);
+      background: rgba(255, 255, 255, calc(var(--director-card-alpha) * 0.44));
+    }
+    .director-empty-state.visible {
+      display: block;
+    }
+    .director-empty-state strong {
+      display: block;
+      color: var(--director-card-ink);
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+    }
+    .attention-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.9rem;
+    }
+    .attention-item {
+      border: 1px solid var(--director-card-line);
+      border-radius: 18px;
+      padding: 0.85rem;
+      background: rgba(255, 255, 255, calc(var(--director-card-alpha) * 0.48));
+      color: var(--director-card-ink);
+      min-width: 0;
+    }
+    .attention-item span {
+      display: block;
+      color: var(--director-card-muted);
+      font-size: 0.76rem;
+      margin-bottom: 0.3rem;
+    }
+    .attention-item strong {
+      display: block;
+      font-size: 1.25rem;
+      line-height: 1;
+      font-weight: 500;
+    }
+    .director-table-wrap {
+      overflow-x: auto;
+      overflow-y: visible;
+      border-radius: 0;
+      background: var(--director-card-bg);
+      border: 1px solid var(--director-card-line);
+      border-left: 0;
+      border-right: 0;
+      box-shadow: none;
+      color: var(--director-card-ink);
+      backdrop-filter: blur(22px) saturate(150%) brightness(1.06);
+      -webkit-backdrop-filter: blur(22px) saturate(150%) brightness(1.06);
+    }
+    table.director-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 860px;
+      background: transparent;
+    }
+    .director-table th,
+    .director-table td {
+      text-align: left;
+      padding: 0.82rem 0.9rem;
+      border-bottom: 1px solid var(--director-card-line);
+      vertical-align: top;
+      font-size: 0.9rem;
+      color: var(--director-card-ink);
+    }
+    .director-table th {
+      color: var(--director-card-muted);
+      font-size: 0.76rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: rgba(255, 255, 255, calc(var(--director-card-alpha) * 0.72));
+      backdrop-filter: blur(18px) saturate(140%);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .director-table tbody tr:hover { background: var(--director-hover-bg); }
+    .records-empty td {
+      padding: 2.1rem 1rem;
+      text-align: center;
+      color: var(--director-card-muted);
+    }
+    .records-empty strong {
+      display: block;
+      color: var(--director-card-ink);
+      font-size: 1rem;
+      margin-bottom: 0.28rem;
+      font-weight: 500;
+    }
+    .records-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.55rem;
+      padding: 0.95rem 0 0;
+      color: var(--director-card-muted);
+      font-size: 0.9rem;
+    }
+    .records-pagination[hidden] {
+      display: none;
+    }
+    .records-page-btn {
+      width: 38px;
+      height: 38px;
+      border: 1px solid var(--director-control-line);
+      background:
+        linear-gradient(180deg, var(--director-control-bg), var(--director-control-bg));
+      color: var(--director-card-ink);
+      border-radius: 14px;
+      font-size: 1.05rem;
+      font-family: var(--font-serif);
+      font-weight: 300;
+      cursor: pointer;
+      line-height: 1;
+      box-shadow: none;
+      transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+    .records-page-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      border-color: rgba(91, 142, 233, 0.35);
+      color: var(--director-purple);
+      box-shadow: none;
+    }
+    .records-page-btn:disabled {
+      opacity: 0.38;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    #recordsPageInfo {
+      color: var(--director-card-muted);
+      font-size: 0.82rem;
+      min-width: 116px;
+      text-align: center;
+      padding: 0.52rem 0.82rem;
+      border: 1px solid var(--director-control-line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, var(--director-card-alpha));
+      box-shadow: none;
+      backdrop-filter: blur(18px) saturate(140%);
+      -webkit-backdrop-filter: blur(18px) saturate(140%);
+    }
+    .director-badge {
+      display: inline-flex;
+      border: 1px solid var(--director-line);
+      border-radius: 999px;
+      padding: 0.22rem 0.62rem;
+      color: var(--director-muted);
+      white-space: nowrap;
+      background: #f8f8f8;
+    }
+    .director-badge.attention {
+      border-color: #d7a15c;
+      color: var(--director-warn);
+      background: #fff7e8;
+    }
+    .director-badge.registered {
+      border-color: rgba(91, 142, 233, 0.28);
+      color: var(--director-blue);
+      background: #eef3ff;
+    }
+    .director-badge.matter,
+    .director-badge.commission {
+      border-color: rgba(104, 198, 138, 0.35);
+      color: #2f7d58;
+      background: #edf8f2;
+    }
+    @media (max-width: 1100px) {
+      .director-board {
+        grid-template-columns: 1fr 1fr;
+        grid-template-areas:
+          "emails open"
+          "conversion unsub"
+          "completed completed"
+          "performance performance";
+      }
+    }
+    @media (max-width: 900px) {
+      .director-main {
+        overflow-x: clip;
+        padding: 0.85rem;
+      }
+      .director-topbar {
+        align-items: flex-start;
+      }
+      .director-account {
+        align-items: flex-end;
+        flex-direction: column-reverse;
+      }
+      .director-board {
+        gap: 0.5rem;
+      }
+      .metric-card,
+      .director-performance,
+      .director-panel {
+        border-radius: 8px;
+      }
+      .settings-dialog {
+        width: min(420px, calc(100vw - 1.5rem));
+      }
+    }
+    @media (max-width: 640px) {
+      .director-main {
+        padding: 0.65rem;
+        gap: 0.65rem;
+      }
+      .director-topbar {
+        align-items: stretch;
+        display: grid;
+        gap: 0.45rem;
+      }
+      .director-account {
+        align-items: center;
+        flex-direction: row;
+        justify-content: space-between;
+      }
+      .director-account span {
+        max-width: calc(100vw - 7rem);
+        font-size: 0.78rem;
+      }
+      .director-toolbar {
+        gap: 0.35rem;
+      }
+      .director-icon-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+      }
+      .director-board {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "emails"
+          "open"
+          "completed"
+          "conversion"
+          "unsub"
+          "performance";
+        gap: 0.55rem;
+      }
+      .metric-card {
+        min-height: 132px;
+        padding: 1rem;
+      }
+      .metric-card h2,
+      .director-performance h2 {
+        font-size: 0.95rem;
+      }
+      .metric-value {
+        font-size: 1.55rem;
+      }
+      .metric-delta,
+      .metric-note {
+        font-size: 0.78rem;
+      }
+      .arc-chart,
+      .dot-grid,
+      .mini-bars {
+        min-height: 62px;
+        height: 62px;
+      }
+      .dot-grid {
+        grid-template-columns: repeat(12, minmax(3px, 5px));
+        justify-content: start;
+      }
+      .completed-progress {
+        width: 100%;
+      }
+      .director-performance {
+        min-height: 300px;
+        padding: 1rem;
+      }
+      .performance-head { display: grid; }
+      .chart-legend {
+        gap: 0.65rem;
+        font-size: 0.78rem;
+      }
+      .performance-chart {
+        height: 190px;
+      }
+      .metric-body { grid-template-columns: 1fr; }
+      .director-panel {
+        padding: 0.85rem;
+      }
+      .director-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+        align-items: stretch;
+      }
+      .director-actions label,
+      .director-actions select,
+      .director-actions .director-btn {
+        width: 100%;
+      }
+      #importTodayBtn {
+        order: 1;
+        background: var(--director-accent);
+        border-color: var(--director-accent);
+        color: #ffffff;
+      }
+      #openZohoBtn {
+        order: 2;
+        background: transparent;
+        border-color: var(--director-control-line);
+        color: var(--director-card-ink);
+      }
+      .director-status {
+        font-size: 0.78rem;
+      }
+      .sync-meta {
+        font-size: 0.74rem;
+      }
+      .attention-strip {
+        grid-template-columns: 1fr;
+        gap: 0.45rem;
+      }
+      .attention-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.72rem 0.8rem;
+        border-radius: 14px;
+      }
+      .attention-item span {
+        margin-bottom: 0;
+      }
+      .director-table-wrap {
+        margin-left: -0.65rem;
+        margin-right: -0.65rem;
+        max-width: calc(100vw);
+        border-radius: 0;
+        overflow-x: hidden;
+      }
+      table.director-table {
+        min-width: 0;
+        display: block;
+      }
+      .director-table thead {
+        display: none;
+      }
+      .director-table tbody,
+      .director-table tr,
+      .director-table td {
+        display: block;
+        width: 100%;
+      }
+      .director-table tr {
+        border-bottom: 1px solid var(--director-card-line);
+        padding: 0.72rem 0.65rem;
+      }
+      .director-table tr:hover {
+        background: transparent;
+      }
+      .director-table th,
+      .director-table td {
+        padding: 0.28rem 0;
+        font-size: 0.8rem;
+        border-bottom: 0;
+      }
+      .director-table td {
+        display: grid;
+        grid-template-columns: 7.5rem minmax(0, 1fr);
+        gap: 0.7rem;
+        align-items: start;
+      }
+      .director-table td::before {
+        content: attr(data-label);
+        color: var(--director-card-muted);
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .records-empty td {
+        display: block;
+        padding: 1.5rem 1rem;
+      }
+      .records-empty td::before {
+        content: "";
+        display: none;
+      }
+      .records-pagination {
+        gap: 0.45rem;
+        padding-top: 0.75rem;
+      }
+      .records-page-btn {
+        width: 34px;
+        height: 34px;
+      }
+      #recordsPageInfo {
+        min-width: 98px;
+        font-size: 0.76rem;
+        padding: 0.45rem 0.62rem;
+      }
+      .settings-overlay {
+        padding: 0.75rem;
+        align-items: center;
+      }
+      .settings-dialog {
+        width: 100%;
+        max-height: calc(100vh - 1.5rem);
+        max-height: calc(100dvh - 1.5rem);
+        overflow-y: auto;
+        border-radius: 8px;
+        padding: 1rem;
+      }
+      .appearance-actions {
+        grid-template-columns: 1fr;
+      }
+    }
+    @media (max-width: 390px) {
+      .director-main {
+        padding: 0.5rem;
+      }
+      .metric-card,
+      .director-performance,
+      .director-panel {
+        border-radius: 8px;
+      }
+      .metric-card {
+        min-height: 122px;
+      }
+      .director-table-wrap {
+        margin-left: -0.5rem;
+        margin-right: -0.5rem;
+      }
+    }
+    @media (orientation: landscape) and (max-height: 520px) and (max-width: 960px) {
+      body,
+      .director-shell,
+      .director-main {
+        height: 100dvh;
+      }
+      .director-main {
+        padding: 0.5rem;
+        padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+        gap: 0.5rem;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .director-topbar {
+        align-items: center;
+      }
+      .director-account {
+        flex-direction: row;
+        align-items: center;
+      }
+      .director-account span {
+        max-width: min(42vw, 340px);
+        font-size: 0.76rem;
+      }
+      .director-icon-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+      }
+      .director-board {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-areas:
+          "emails open"
+          "completed conversion"
+          "unsub performance"
+          "unsub performance";
+        gap: 0.45rem;
+      }
+      .metric-card {
+        min-height: 104px;
+        padding: 0.78rem;
+        border-radius: 14px;
+      }
+      .metric-card h2,
+      .director-performance h2 {
+        font-size: 0.84rem;
+      }
+      .metric-body {
+        grid-template-columns: minmax(68px, 78px) minmax(0, 1fr);
+        gap: 0.5rem;
+      }
+      .metric-value {
+        font-size: 1.28rem;
+      }
+      .metric-delta,
+      .metric-note,
+      .chart-legend,
+      .director-status {
+        font-size: 0.7rem;
+      }
+      .arc-chart,
+      .dot-grid,
+      .mini-bars {
+        min-height: 48px;
+        height: 48px;
+      }
+      .dot-grid {
+        grid-template-columns: repeat(10, minmax(3px, 5px));
+        gap: 2px;
+      }
+      .tiny-line {
+        height: 44px;
+      }
+      .director-performance {
+        min-height: 220px;
+        padding: 0.78rem;
+        border-radius: 14px;
+      }
+      .performance-head {
+        margin-bottom: 0.45rem;
+      }
+      .chart-legend {
+        gap: 0.45rem;
+        margin-bottom: 0.45rem;
+      }
+      .performance-chart {
+        height: 140px;
+      }
+      .director-panel {
+        padding: 0.65rem;
+        border-radius: 14px;
+      }
+      .director-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+      }
+      .attention-strip {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.45rem;
+      }
+      .attention-item {
+        padding: 0.65rem;
+        border-radius: 14px;
+      }
+      .attention-item strong {
+        font-size: 1rem;
+      }
+      .director-actions label,
+      .director-actions select,
+      .director-actions .director-btn {
+        flex: 1 1 180px;
+      }
+      .director-actions select,
+      .director-btn {
+        min-height: 34px;
+        font-size: 0.78rem;
+      }
+      .director-table-wrap {
+        max-height: 46dvh;
+        overflow: auto;
+      }
+      table.director-table {
+        min-width: 720px;
+      }
+      .director-table th,
+      .director-table td {
+        padding: 0.52rem 0.62rem;
+        font-size: 0.74rem;
+      }
+      .records-pagination {
+        padding-top: 0.5rem;
+      }
+      .records-page-btn {
+        width: 32px;
+        height: 32px;
+      }
+      #recordsPageInfo {
+        padding: 0.38rem 0.55rem;
+        font-size: 0.7rem;
+      }
+      .settings-overlay {
+        align-items: center;
+        padding: 0.5rem;
+      }
+      .settings-dialog {
+        width: min(420px, calc(100vw - 1rem));
+        max-height: calc(100dvh - 1rem);
+        overflow-y: auto;
+        border-radius: 8px;
+        padding: 0.85rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="director-shell">
+    <main class="director-main">
+      <header class="director-topbar">
+        <div class="director-logo" aria-label="Let's-ParaConnect Director Portal"></div>
+        <div class="director-account">
+          <span id="directorIdentity"></span>
+          <div class="director-toolbar" aria-label="Director portal controls">
+            <button type="button" class="director-icon-btn" id="settingsBtn" aria-label="Open dashboard settings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"></path>
+                <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.04.04a2 2 0 0 1-2.83 2.83l-.04-.04a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 0 1-4 0v-.06a1.7 1.7 0 0 0-1.04-1.56 1.7 1.7 0 0 0-1.87.34l-.04.04a2 2 0 1 1-2.83-2.83l.04-.04A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 0 1 0-4h.06A1.7 1.7 0 0 0 4.6 8.92a1.7 1.7 0 0 0-.34-1.87l-.04-.04a2 2 0 1 1 2.83-2.83l.04.04a1.7 1.7 0 0 0 1.87.34A1.7 1.7 0 0 0 10 3.06V3a2 2 0 0 1 4 0v.06a1.7 1.7 0 0 0 1.04 1.56 1.7 1.7 0 0 0 1.87-.34l.04-.04a2 2 0 0 1 2.83 2.83l-.04.04a1.7 1.7 0 0 0-.34 1.87A1.7 1.7 0 0 0 20.94 10H21a2 2 0 0 1 0 4h-.06A1.7 1.7 0 0 0 19.4 15Z"></path>
+              </svg>
+            </button>
+            <button type="button" class="director-icon-btn" id="logoutBtn" aria-label="Log out">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <path d="M16 17l5-5-5-5"></path>
+                <path d="M21 12H9"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </header>
+      <section class="director-board" aria-label="Outreach analytics">
+        <article class="metric-card emails-card">
+          <h2>Emails Sent</h2>
+          <div class="metric-body">
+            <div>
+              <div class="metric-delta">▲ Imported</div>
+              <strong class="metric-value" id="metricEmailsSent">0</strong>
+              <div class="metric-note" aria-hidden="true"></div>
+            </div>
+            <div class="arc-chart" aria-hidden="true"></div>
+          </div>
+        </article>
+
+        <article class="metric-card open-card">
+          <h2>Registered</h2>
+          <div class="metric-body">
+            <div>
+              <div class="metric-delta">▲ Attorneys</div>
+              <strong class="metric-value" id="metricRegisteredCount">0</strong>
+              <div class="metric-note" aria-hidden="true"></div>
+            </div>
+            <div class="dot-grid" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </article>
+
+        <article class="metric-card completed-card">
+          <h2>Completed Matters</h2>
+          <div class="metric-body">
+            <div>
+              <div class="metric-delta">▲ Completed</div>
+              <strong class="metric-value" id="metricCompletedMatters">0</strong>
+              <div class="metric-note"><span id="metricCompletedCap">0/50</span> completed matters</div>
+            </div>
+            <div class="completed-progress">
+              <div class="completed-progress-track"><span class="completed-progress-fill" id="completedMatterBar"></span></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="metric-card conversion-card">
+          <h2>Conversion Rate</h2>
+          <div class="metric-body">
+            <div>
+              <div class="metric-delta">▲ Registered</div>
+              <strong class="metric-value" id="metricConversionRate">0%</strong>
+              <div class="metric-note">Registrations</div>
+            </div>
+            <div class="mini-bars" aria-hidden="true">
+              <span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </article>
+
+        <article class="metric-card unsub-card">
+          <h2>Follow-Ups Sent</h2>
+          <div class="metric-body">
+            <div>
+              <div class="metric-delta">▲ Automatic</div>
+              <strong class="metric-value" id="metricFollowUpsSent">0</strong>
+              <div class="metric-note" aria-hidden="true"></div>
+            </div>
+            <div class="tiny-line" aria-hidden="true"><span></span></div>
+          </div>
+        </article>
+
+        <article class="director-performance">
+          <div class="performance-head">
+            <div>
+              <h2>Outreach Performance</h2>
+            </div>
+          </div>
+          <div class="chart-legend">
+            <span>Registered</span>
+            <span>Follow-Ups</span>
+            <span>Completed Matters</span>
+          </div>
+          <div class="performance-chart" aria-label="Outreach performance chart">
+            <svg viewBox="0 0 900 246" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M0 220 L55 190 L110 196 L165 176 L220 184 L275 132 L330 116 L385 108 L440 72 L495 98 L550 92 L605 38 L660 52 L715 76 L770 70 L825 78 L900 34" fill="none" stroke="var(--director-graph-primary)" stroke-width="3"/>
+              <path d="M0 218 L55 188 L110 178 L165 168 L220 160 L275 126 L330 112 L385 104 L440 82 L495 106 L550 96 L605 50 L660 58 L715 88 L770 86 L825 74 L900 48" fill="none" stroke="var(--director-graph-secondary)" stroke-width="2"/>
+              <path d="M0 226 L55 206 L110 198 L165 184 L220 174 L275 148 L330 138 L385 132 L440 116 L495 134 L550 124 L605 92 L660 104 L715 126 L770 120 L825 110 L900 82" fill="none" stroke="var(--director-graph-tertiary)" stroke-width="2"/>
+            </svg>
+          </div>
+        </article>
+      </section>
+
+      <section class="director-panel">
+        <div class="director-actions">
+          <label aria-label="Stage Filter">
+            <select id="stageFilter">
+              <option value="">All stages</option>
+              <option value="outreach_sent">Outreach Sent</option>
+              <option value="attorney_registered">Attorney Registered</option>
+              <option value="follow_up_sent">Follow-Up Auto Sent</option>
+              <option value="follow_up_failed">Follow-Up Failed</option>
+              <option value="matter_posted">Matter Posted</option>
+              <option value="matter_completed">Matter Completed</option>
+              <option value="commission_complete">Commission Complete</option>
+              <option value="founder_attention">Founder Attention</option>
+            </select>
+          </label>
+          <label aria-label="Time Range">
+            <select id="rangeFilter">
+              <option value="1">Today</option>
+              <option value="7" selected>7 days</option>
+              <option value="30">30 days</option>
+            </select>
+          </label>
+          <button type="button" class="director-btn secondary" id="openZohoBtn">Open Zoho</button>
+          <button type="button" class="director-btn" id="importTodayBtn">Import Today</button>
+        </div>
+        <p class="director-status" id="directorStatus"></p>
+        <p class="sync-meta" id="lastSyncedAt"></p>
+        <p class="sync-meta" id="lastImportAt"></p>
+        <div class="director-empty-state" id="directorEmptyState">
+          <strong>Ready for outreach</strong>
+          Import today after sending outreach from Zoho.
+        </div>
+        <div class="attention-strip" aria-label="Needs attention">
+          <div class="attention-item">
+            <span>Replies for Samantha</span>
+            <strong id="attentionReplies">0</strong>
+          </div>
+          <div class="attention-item">
+            <span>Follow-ups auto sent</span>
+            <strong id="attentionFollowUps">0</strong>
+          </div>
+          <div class="attention-item">
+            <span>Follow-up failed</span>
+            <strong id="attentionFailedFollowUps">0</strong>
+          </div>
+          <div class="attention-item">
+            <span>Commission progress</span>
+            <strong id="attentionCommission">0</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="director-grid" aria-label="Outreach summary" hidden>
+        <article class="director-card"><span>Total Records</span><strong id="countTotal">0</strong></article>
+        <article class="director-card"><span>Follow-Up Auto Sent</span><strong id="countFollowUp">0</strong></article>
+        <article class="director-card"><span>Founder Attention</span><strong id="countAttention">0</strong></article>
+        <article class="director-card"><span>Commission Earned</span><strong id="countCommission">$0.00</strong></article>
+      </section>
+
+      <section>
+        <div class="director-table-wrap">
+          <table class="director-table">
+            <thead>
+              <tr>
+                <th>Attorney</th>
+                <th>Email</th>
+                <th>State</th>
+                <th>Stage</th>
+                <th>Outreach</th>
+                <th>Follow-Up</th>
+                <th>Registered</th>
+                <th>Matter</th>
+                <th>Commission</th>
+              </tr>
+            </thead>
+            <tbody id="recordsBody">
+              <tr><td colspan="9"></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="records-pagination" id="recordsPagination" hidden>
+          <button type="button" class="records-page-btn" id="recordsPrevBtn" aria-label="Previous records page">‹</button>
+          <span id="recordsPageInfo">1-10 of 10</span>
+          <button type="button" class="records-page-btn" id="recordsNextBtn" aria-label="Next records page">›</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <div class="settings-overlay" id="settingsOverlay" hidden>
+    <div class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="settings-head">
+        <h2 id="settingsTitle">Appearance</h2>
+        <button type="button" class="settings-close" id="settingsCloseBtn" aria-label="Close settings">×</button>
+      </div>
+      <section class="director-appearance" aria-label="Director dashboard appearance">
+        <div class="appearance-field">
+          <span>Theme</span>
+          <span class="appearance-mode" role="group" aria-label="Dashboard color mode">
+            <button type="button" class="appearance-mode-btn active" id="appearanceLightBtn" data-appearance-mode="light">Light</button>
+            <button type="button" class="appearance-mode-btn" id="appearanceDarkBtn" data-appearance-mode="dark">Dark</button>
+          </span>
+        </div>
+        <div class="appearance-divider" aria-hidden="true"></div>
+        <label class="appearance-field" for="cardTranslucencyRange">
+          <span>Card Opacity</span>
+          <span class="appearance-range-row">
+            <input type="range" id="cardTranslucencyRange" min="0" max="100" step="1" value="0" />
+            <span class="appearance-value" id="cardTranslucencyValue">0%</span>
+          </span>
+        </label>
+        <div class="appearance-divider" aria-hidden="true"></div>
+        <div class="appearance-field">
+          <span>Background Image</span>
+          <label class="appearance-upload">
+            Upload Background Image
+            <input type="file" id="dashboardBackgroundInput" accept="image/*" />
+          </label>
+        </div>
+        <div class="appearance-actions">
+          <button type="button" class="director-btn secondary" id="resetAppearanceBtn">Reset Settings</button>
+          <button type="button" class="director-btn" id="doneAppearanceBtn">Done</button>
+        </div>
+      </section>
+    </div>
+  </div>
+  <script type="module" src="assets/scripts/director-portal.js"></script>
+</body>
+</html>

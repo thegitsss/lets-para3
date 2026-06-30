@@ -135,6 +135,7 @@ const authRouter = require("./routes/auth");
 const aiAdminRouter = require("./routes/aiAdmin");
 const adminKnowledgeRouter = require("./routes/adminKnowledge");
 const adminMarketingRouter = require("./routes/adminMarketing");
+const adminDirectorsRouter = require("./routes/adminDirectors");
 const adminSupportRouter = require("./routes/adminSupport");
 const adminSalesRouter = require("./routes/adminSales");
 const adminApprovalsRouter = require("./routes/adminApprovals");
@@ -165,11 +166,13 @@ const accountRouter = require("./routes/account");
 const stripeRouter = require("./routes/stripe");
 const notificationRouter = require("./routes/notifications");
 const supportRouter = require("./routes/support");
+const directorPortalRouter = require("./routes/directorPortal");
 const { isCcoAutonomyHarnessEnabled } = require("./utils/ccoAutonomyHarnessAccess");
 const { isControlRoomE2eHarnessEnabled } = require("./utils/controlRoomE2eHarnessAccess");
 const blocksRouter = require("./routes/blocks");
 const { startPurgeWorker } = require("./services/caseLifecycle");
 const { startAgentScheduler } = require("./scheduler/agentScheduler");
+const { startDirectorFollowUpScheduler } = require("./scheduler/directorFollowUpScheduler");
 const { startIncidentScheduler } = require("./scheduler/incidentScheduler");
 
 app.use(express.json({ limit: "1mb" }));
@@ -184,12 +187,14 @@ app.use("/api/admin/ai", aiAdminRouter);
 app.use("/api/admin/ai-control-room", aiAdminRouter);
 app.use("/api/admin/knowledge", adminKnowledgeRouter);
 app.use("/api/admin/marketing", adminMarketingRouter);
+app.use("/api/admin/directors", adminDirectorsRouter);
 app.use("/api/admin/support", adminSupportRouter);
 if (isCcoAutonomyHarnessEnabled(process.env)) {
   const ccoAutonomyHarnessRouter = require("./routes/ccoAutonomyHarness");
   app.use("/api/admin/support/dev/cco-autonomy", ccoAutonomyHarnessRouter);
 }
 app.use("/api/admin/sales", adminSalesRouter);
+app.use("/api/director", directorPortalRouter);
 app.use("/api/admin/approvals", adminApprovalsRouter);
 app.use("/api/admin/engineering", adminEngineeringRouter);
 app.use("/api/admin/autonomous-actions", autonomousActionsRouter);
@@ -297,4 +302,5 @@ app.listen(PORT, () => {
 
 startPurgeWorker();
 startAgentScheduler();
+startDirectorFollowUpScheduler();
 startIncidentScheduler();
