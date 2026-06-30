@@ -400,38 +400,99 @@ async function notifyFounderOfReply({ record, item } = {}) {
   });
 }
 
-async function importDirectorSentMail({ user = {}, state = "", fromDate = startOfToday(), toDate = new Date() } = {}) {
-  const profile = await ensureDirectorProfile(user);
-  const messages = await fetchZohoMessages({ profile, folderKind: "sent", fromDate, toDate });
-  const items = messages.flatMap((message) => mapSentMessage(message, profile)).filter(Boolean);
-  const records = [];
-  for (const item of items) {
-    const record = await upsertRecordFromImport({ profile, item, state });
-    if (record) records.push(record);
-  }
-  await refreshDirectorRecords({ directorUserId: profile.userId });
-  return {
-    imported: records.length,
-    scanned: messages.length,
-    profile: serializeProfile(profile),
-  };
+async function updateDirectorZohoSyncStatus(profile, payload = {}) {
+  if (!profile?._id) return null;
+  return DirectorProfile.findByIdAndUpdate(
+    profile._id,
+    {
+      $set: {
+        zohoLastSyncAt: payload.syncedAt || new Date(),
+        zohoLastSyncStatus: payload.status || "success",
+        zohoLastSyncSummary: String(payload.summary || "").slice(0, 1000),
+        zohoLastSyncError: String(payload.error || "").slice(0, 1000),
+      },
+    },
+    { new: true }
+  );
 }
 
-async function importDirectorInboxReplies({ user = {}, fromDate = startOfToday(), toDate = new Date() } = {}) {
+async function importDirectorSentMail({
+  user = {},
+  state = "",
+  fromDate = startOfToday(),
+  toDate = new Date(),
+  recordSyncStatus = true,
+} = {}) {
   const profile = await ensureDirectorProfile(user);
-  const messages = await fetchZohoMessages({ profile, folderKind: "inbox", fromDate, toDate });
-  const items = messages.map((message) => mapInboxMessage(message, profile)).filter(Boolean);
-  const records = [];
-  for (const item of items) {
-    const record = await upsertRecordFromImport({ profile, item });
-    if (record) records.push(record);
+  try {
+    const messages = await fetchZohoMessages({ profile, folderKind: "sent", fromDate, toDate });
+    const items = messages.flatMap((message) => mapSentMessage(message, profile)).filter(Boolean);
+    const records = [];
+    for (const item of items) {
+      const record = await upsertRecordFromImport({ profile, item, state });
+      if (record) records.push(record);
+    }
+    await refreshDirectorRecords({ directorUserId: profile.userId });
+    if (recordSyncStatus) {
+      await updateDirectorZohoSyncStatus(profile, {
+        status: "success",
+        summary: `Sent mail scanned: ${messages.length}. Outreach records imported: ${records.length}.`,
+      });
+    }
+    return {
+      imported: records.length,
+      scanned: messages.length,
+      profile: serializeProfile(profile),
+    };
+  } catch (err) {
+    if (recordSyncStatus) {
+      await updateDirectorZohoSyncStatus(profile, {
+        status: "failed",
+        summary: "Sent mail import failed.",
+        error: err?.message || String(err),
+      }).catch(() => {});
+    }
+    throw err;
   }
-  await refreshDirectorRecords({ directorUserId: profile.userId });
-  return {
-    imported: records.length,
-    scanned: messages.length,
-    profile: serializeProfile(profile),
-  };
+}
+
+async function importDirectorInboxReplies({
+  user = {},
+  fromDate = startOfToday(),
+  toDate = new Date(),
+  recordSyncStatus = true,
+} = {}) {
+  const profile = await ensureDirectorProfile(user);
+  try {
+    const messages = await fetchZohoMessages({ profile, folderKind: "inbox", fromDate, toDate });
+    const items = messages.map((message) => mapInboxMessage(message, profile)).filter(Boolean);
+    const records = [];
+    for (const item of items) {
+      const record = await upsertRecordFromImport({ profile, item });
+      if (record) records.push(record);
+    }
+    await refreshDirectorRecords({ directorUserId: profile.userId });
+    if (recordSyncStatus) {
+      await updateDirectorZohoSyncStatus(profile, {
+        status: "success",
+        summary: `Inbox scanned: ${messages.length}. Replies imported: ${records.length}.`,
+      });
+    }
+    return {
+      imported: records.length,
+      scanned: messages.length,
+      profile: serializeProfile(profile),
+    };
+  } catch (err) {
+    if (recordSyncStatus) {
+      await updateDirectorZohoSyncStatus(profile, {
+        status: "failed",
+        summary: "Inbox import failed.",
+        error: err?.message || String(err),
+      }).catch(() => {});
+    }
+    throw err;
+  }
 }
 
 async function autoImportDirectorMail({
@@ -470,14 +531,19 @@ async function autoImportDirectorMail({
 
   for (const director of directors) {
     const user = { ...director, id: director._id };
+    const profile = await ensureDirectorProfile(user);
     try {
-      const sent = await importDirectorSentMail({ user, fromDate: startDate, toDate });
-      const replies = await importDirectorInboxReplies({ user, fromDate: startDate, toDate });
+      const sent = await importDirectorSentMail({ user, fromDate: startDate, toDate, recordSyncStatus: false });
+      const replies = await importDirectorInboxReplies({ user, fromDate: startDate, toDate, recordSyncStatus: false });
       result.sentImported += sent.imported || 0;
       result.sentScanned += sent.scanned || 0;
       result.repliesImported += replies.imported || 0;
       result.repliesScanned += replies.scanned || 0;
       result.refreshed += 1;
+      await updateDirectorZohoSyncStatus(profile, {
+        status: "success",
+        summary: `Auto-sync scanned ${sent.scanned || 0} sent and ${replies.scanned || 0} inbox messages. Imported ${sent.imported || 0} outreach records and ${replies.imported || 0} replies.`,
+      });
     } catch (err) {
       result.failed += 1;
       result.failures.push({
@@ -485,6 +551,11 @@ async function autoImportDirectorMail({
         directorEmail: director.email || "",
         reason: err?.message || String(err),
       });
+      await updateDirectorZohoSyncStatus(profile, {
+        status: "failed",
+        summary: "Auto-sync failed.",
+        error: err?.message || String(err),
+      }).catch(() => {});
     }
   }
 

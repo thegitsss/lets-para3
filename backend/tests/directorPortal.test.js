@@ -247,6 +247,15 @@ describe("Director portal", () => {
       })
     );
     expect(record.lastReplyAt).toBeTruthy();
+
+    const profile = await DirectorProfile.findOne({ userId: director._id }).lean();
+    expect(profile).toEqual(
+      expect.objectContaining({
+        zohoLastSyncStatus: "success",
+      })
+    );
+    expect(profile.zohoLastSyncAt).toBeTruthy();
+    expect(profile.zohoLastSyncSummary).toContain("Auto-sync scanned");
   });
 
   test("prevents duplicate attorney assignment across directors", async () => {

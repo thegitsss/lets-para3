@@ -24,6 +24,26 @@ function date(value) {
   return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+function dateTime(value) {
+  if (!value) return "Never";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Never";
+  return parsed.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function syncLabel(status) {
+  const normalized = String(status || "never").toLowerCase();
+  if (normalized === "success") return "Healthy";
+  if (normalized === "partial") return "Partial";
+  if (normalized === "failed") return "Needs Attention";
+  return "Not Synced";
+}
+
 async function readJsonOrThrow(res, fallback) {
   const payload = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(payload?.error || fallback);
@@ -50,6 +70,17 @@ function renderDirectors(directors = []) {
           <div>
             <h2>${escapeHTML(director.displayName || director.email || "Director")}</h2>
             <p>${escapeHTML(director.zohoEmail || director.email || "")}</p>
+          </div>
+          <div class="sync-line">
+            <span class="sync-pill ${escapeHTML(director.zohoLastSyncStatus || "never")}">${escapeHTML(syncLabel(director.zohoLastSyncStatus))}</span>
+            <span>Last Zoho sync: ${escapeHTML(dateTime(director.zohoLastSyncAt))}</span>
+            ${
+              director.zohoLastSyncError
+                ? `<small>${escapeHTML(director.zohoLastSyncError)}</small>`
+                : director.zohoLastSyncSummary
+                ? `<small>${escapeHTML(director.zohoLastSyncSummary)}</small>`
+                : ""
+            }
           </div>
           <dl>
             <div><dt>Records</dt><dd>${Number(totals.totalRecords || 0).toLocaleString()}</dd></div>

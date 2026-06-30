@@ -156,6 +156,45 @@
       display: grid;
       gap: 0.8rem;
     }
+    .sync-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.45rem;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+    .sync-line small {
+      flex-basis: 100%;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .sync-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 1.5rem;
+      border-radius: 999px;
+      padding: 0.12rem 0.5rem;
+      border: 1px solid rgba(129, 123, 132, 0.22);
+      background: rgba(129, 123, 132, 0.08);
+      color: var(--muted);
+      font-size: 0.75rem;
+    }
+    .sync-pill.success {
+      color: var(--green);
+      border-color: rgba(60, 138, 98, 0.25);
+      background: rgba(60, 138, 98, 0.08);
+    }
+    .sync-pill.partial {
+      color: var(--blue);
+      border-color: rgba(91, 142, 233, 0.25);
+      background: rgba(91, 142, 233, 0.09);
+    }
+    .sync-pill.failed {
+      color: var(--danger);
+      border-color: rgba(185, 77, 98, 0.28);
+      background: rgba(185, 77, 98, 0.08);
+    }
     dl {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));

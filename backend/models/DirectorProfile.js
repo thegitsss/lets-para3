@@ -15,6 +15,10 @@ const directorProfileSchema = new Schema(
     outreachSubject: { type: String, trim: true, default: "for matters that need an extra hand next", maxlength: 200 },
     outreachTemplateText: { type: String, default: "", maxlength: 20000 },
     outreachTemplateHtml: { type: String, default: "", maxlength: 150000 },
+    zohoLastSyncAt: { type: Date, default: null },
+    zohoLastSyncStatus: { type: String, enum: ["never", "success", "partial", "failed"], default: "never" },
+    zohoLastSyncSummary: { type: String, trim: true, default: "", maxlength: 1000 },
+    zohoLastSyncError: { type: String, trim: true, default: "", maxlength: 1000 },
     notes: { type: String, trim: true, default: "", maxlength: 4000 },
   },
   {

@@ -51,6 +51,10 @@ function serializeDirector(profile = {}, user = null, records = []) {
     activeState: profile.activeState || "",
     commissionCapMatterCount: profile.commissionCapMatterCount || 50,
     commissionSharePctOfAttorneyFee: profile.commissionSharePctOfAttorneyFee || 50,
+    zohoLastSyncAt: serializeDate(profile.zohoLastSyncAt),
+    zohoLastSyncStatus: profile.zohoLastSyncStatus || "never",
+    zohoLastSyncSummary: profile.zohoLastSyncSummary || "",
+    zohoLastSyncError: profile.zohoLastSyncError || "",
     totals,
   };
 }
@@ -96,6 +100,10 @@ async function listDirectorOversight({ limit = 500 } = {}) {
         activeState: "",
         commissionCapMatterCount: 50,
         commissionSharePctOfAttorneyFee: 50,
+        zohoLastSyncAt: null,
+        zohoLastSyncStatus: "never",
+        zohoLastSyncSummary: "",
+        zohoLastSyncError: "",
       });
     }
   });
