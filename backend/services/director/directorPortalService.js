@@ -434,6 +434,63 @@ async function importDirectorInboxReplies({ user = {}, fromDate = startOfToday()
   };
 }
 
+async function autoImportDirectorMail({
+  directorUserId = null,
+  fromDate = null,
+  toDate = new Date(),
+  lookbackHours = 24,
+  limit = 25,
+} = {}) {
+  const normalizedLimit = Math.min(100, Math.max(1, Number(limit) || 25));
+  const startDate =
+    fromDate ||
+    new Date(new Date(toDate).getTime() - Math.max(1, Number(lookbackHours) || 24) * 60 * 60 * 1000);
+  const userFilter = {
+    role: "director",
+    status: "approved",
+  };
+  if (directorUserId) userFilter._id = directorUserId;
+
+  const directors = await User.find(userFilter)
+    .select("_id email firstName lastName role status")
+    .sort({ createdAt: 1 })
+    .limit(normalizedLimit)
+    .lean();
+
+  const result = {
+    scannedDirectors: directors.length,
+    sentImported: 0,
+    sentScanned: 0,
+    repliesImported: 0,
+    repliesScanned: 0,
+    refreshed: 0,
+    failed: 0,
+    failures: [],
+  };
+
+  for (const director of directors) {
+    const user = { ...director, id: director._id };
+    try {
+      const sent = await importDirectorSentMail({ user, fromDate: startDate, toDate });
+      const replies = await importDirectorInboxReplies({ user, fromDate: startDate, toDate });
+      result.sentImported += sent.imported || 0;
+      result.sentScanned += sent.scanned || 0;
+      result.repliesImported += replies.imported || 0;
+      result.repliesScanned += replies.scanned || 0;
+      result.refreshed += 1;
+    } catch (err) {
+      result.failed += 1;
+      result.failures.push({
+        directorUserId: String(director._id),
+        directorEmail: director.email || "",
+        reason: err?.message || String(err),
+      });
+    }
+  }
+
+  return result;
+}
+
 async function refreshDirectorRecords({ directorUserId = null } = {}) {
   const filter = directorUserId ? { directorUserId } : {};
   const records = await DirectorOutreachRecord.find(filter);
@@ -831,6 +888,7 @@ async function getDirectorAnalytics({ user = {}, days = 14 } = {}) {
 }
 
 module.exports = {
+  autoImportDirectorMail,
   ensureDirectorProfile,
   getDirectorAnalytics,
   getDirectorOverview,

@@ -173,6 +173,7 @@ const blocksRouter = require("./routes/blocks");
 const { startPurgeWorker } = require("./services/caseLifecycle");
 const { startAgentScheduler } = require("./scheduler/agentScheduler");
 const { startDirectorFollowUpScheduler } = require("./scheduler/directorFollowUpScheduler");
+const { startDirectorMailImportScheduler } = require("./scheduler/directorMailImportScheduler");
 const { startIncidentScheduler } = require("./scheduler/incidentScheduler");
 
 app.use(express.json({ limit: "1mb" }));
@@ -302,5 +303,6 @@ app.listen(PORT, () => {
 
 startPurgeWorker();
 startAgentScheduler();
+startDirectorMailImportScheduler();
 startDirectorFollowUpScheduler();
 startIncidentScheduler();

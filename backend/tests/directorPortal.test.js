@@ -20,7 +20,10 @@ const PlatformIncome = require("../models/PlatformIncome");
 const User = require("../models/User");
 const adminDirectorsRouter = require("../routes/adminDirectors");
 const directorRouter = require("../routes/directorPortal");
-const { processAutomaticDirectorFollowUps } = require("../services/director/directorPortalService");
+const {
+  autoImportDirectorMail,
+  processAutomaticDirectorFollowUps,
+} = require("../services/director/directorPortalService");
 const mailImportService = require("../services/director/mailImportService");
 const sendEmail = require("../utils/email");
 const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
@@ -185,6 +188,65 @@ describe("Director portal", () => {
         stage: "outreach_sent",
       })
     );
+  });
+
+  test("auto-imports director sent mail and replies without a portal click", async () => {
+    const director = await createDirector();
+    mailImportService.fetchZohoMessages.mockImplementation(async ({ folderKind }) => {
+      if (folderKind === "sent") {
+        return [
+          {
+            subject: "for matters that need an extra hand next",
+            toAddress: "\"Jordan Ellis\" <jordan@example-law.com>",
+            sentDate: "2026-06-28T14:00:00.000Z",
+            messageId: "zoho-sent-1",
+          },
+        ];
+      }
+      if (folderKind === "inbox") {
+        return [
+          {
+            subject: "Re: for matters that need an extra hand next",
+            fromAddress: "\"Jordan Ellis\" <jordan@example-law.com>",
+            receivedDate: "2026-06-29T15:00:00.000Z",
+            messageId: "zoho-reply-1",
+            snippet: "I have a question about the platform.",
+          },
+        ];
+      }
+      return [];
+    });
+
+    const result = await autoImportDirectorMail({
+      directorUserId: director._id,
+      fromDate: new Date("2026-06-28T00:00:00.000Z"),
+      toDate: new Date("2026-06-30T00:00:00.000Z"),
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        scannedDirectors: 1,
+        sentImported: 1,
+        repliesImported: 1,
+        failed: 0,
+      })
+    );
+    expect(mailImportService.fetchZohoMessages).toHaveBeenCalledWith(
+      expect.objectContaining({ folderKind: "sent" })
+    );
+    expect(mailImportService.fetchZohoMessages).toHaveBeenCalledWith(
+      expect.objectContaining({ folderKind: "inbox" })
+    );
+
+    const record = await DirectorOutreachRecord.findOne({ attorneyEmail: "jordan@example-law.com" }).lean();
+    expect(record).toEqual(
+      expect.objectContaining({
+        directorEmail: "skyler@lets-paraconnect.com",
+        attorneyName: "Jordan Ellis",
+        stage: "founder_attention",
+      })
+    );
+    expect(record.lastReplyAt).toBeTruthy();
   });
 
   test("prevents duplicate attorney assignment across directors", async () => {
