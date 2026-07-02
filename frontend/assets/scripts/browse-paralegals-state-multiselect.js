@@ -97,7 +97,7 @@ if (stateInput && stateList) {
 
       const checkbox = row.querySelector("input[type='checkbox']");
       if (!checkbox) return;
-      checkbox.checked = event.target === checkbox ? checkbox.checked : !checkbox.checked;
+      checkbox.checked = !checkbox.checked;
       checkbox.dispatchEvent(new Event("change", { bubbles: true }));
     },
     true
