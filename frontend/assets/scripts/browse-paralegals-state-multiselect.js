@@ -11,6 +11,9 @@ const selectedStates = new Set();
 const stateInput = document.getElementById("stateInput");
 const stateList = document.getElementById("stateList");
 const specialtyList = document.getElementById("specialtyList");
+let autoApplyTimer = null;
+let restoreScrollY = null;
+let restoreDropdownAfterFetch = false;
 
 function slugify(value = "") {
   return String(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -51,9 +54,35 @@ function closeStateList() {
   stateList?.classList.remove("show");
 }
 
-function applySelectedStates() {
-  const applyFilters = document.getElementById("applyFilters");
-  applyFilters?.click();
+function scheduleAutoApply() {
+  window.clearTimeout(autoApplyTimer);
+  autoApplyTimer = window.setTimeout(() => {
+    restoreScrollY = window.scrollY;
+    restoreDropdownAfterFetch = stateList?.classList.contains("show") || document.activeElement === stateInput;
+    const sortBy = document.getElementById("sortBy");
+    if (sortBy) {
+      sortBy.dispatchEvent(new Event("change", { bubbles: true }));
+      return;
+    }
+    document.getElementById("applyFilters")?.click();
+  }, 150);
+}
+
+function restoreScrollAndDropdownSoon() {
+  if (restoreScrollY !== null) {
+    const y = restoreScrollY;
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: y, left: 0, behavior: "auto" });
+    });
+    window.setTimeout(() => window.scrollTo({ top: y, left: 0, behavior: "auto" }), 80);
+  }
+  if (restoreDropdownAfterFetch) {
+    window.requestAnimationFrame(openStateList);
+  }
+  window.setTimeout(() => {
+    restoreScrollY = null;
+    restoreDropdownAfterFetch = false;
+  }, 200);
 }
 
 if (stateInput && stateList) {
@@ -105,6 +134,7 @@ if (stateInput && stateList) {
     else selectedStates.delete(value);
     updateStateInput();
     renderStateList("");
+    scheduleAutoApply();
   });
 
   document.addEventListener("click", (event) => {
@@ -133,10 +163,10 @@ if (stateInput && stateList) {
     const url = new URL(rawUrl, window.location.origin);
     url.searchParams.set("location", selectedStateQuery);
 
-    if (typeof input === "string") {
-      return originalFetch(`${url.pathname}${url.search}`, init);
-    }
+    const nextInput = typeof input === "string"
+      ? `${url.pathname}${url.search}`
+      : new Request(url.href, input);
 
-    return originalFetch(new Request(url.href, input), init);
+    return originalFetch(nextInput, init).finally(restoreScrollAndDropdownSoon);
   };
 }
