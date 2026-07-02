@@ -51,12 +51,7 @@ function closeStateList() {
   stateList?.classList.remove("show");
 }
 
-function triggerFilteredFetch() {
-  const sortBy = document.getElementById("sortBy");
-  if (sortBy) {
-    sortBy.dispatchEvent(new Event("change", { bubbles: true }));
-    return;
-  }
+function applySelectedStates() {
   const applyFilters = document.getElementById("applyFilters");
   applyFilters?.click();
 }
@@ -110,13 +105,22 @@ if (stateInput && stateList) {
     else selectedStates.delete(value);
     updateStateInput();
     renderStateList("");
-    triggerFilteredFetch();
   });
 
   document.addEventListener("click", (event) => {
     const wrapper = stateInput.closest(".dropdown-wrapper");
     if (!wrapper?.contains(event.target)) closeStateList();
   });
+
+  document.getElementById("applyFilters")?.addEventListener("click", () => {
+    updateStateInput();
+  }, true);
+
+  document.getElementById("clearFilters")?.addEventListener("click", () => {
+    selectedStates.clear();
+    updateStateInput();
+    renderStateList("");
+  }, true);
 
   const originalFetch = window.fetch.bind(window);
   window.fetch = (input, init) => {
