@@ -111,8 +111,14 @@ function buildStateTokens(value = "") {
 }
 
 function buildStateFilter(value = "") {
-  const regexes = buildStateTokens(value).map((token) => new RegExp(`^${escapeRegex(token)}$`, "i"));
-  const looseRegexes = buildStateTokens(value).map((token) => new RegExp(escapeRegex(token), "i"));
+  const values = String(value || "")
+    .split(/[|,]/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+  const tokens = values.flatMap(buildStateTokens);
+  const uniqueTokens = [...new Set(tokens)];
+  const regexes = uniqueTokens.map((token) => new RegExp(`^${escapeRegex(token)}$`, "i"));
+  const looseRegexes = uniqueTokens.map((token) => new RegExp(escapeRegex(token), "i"));
   return {
     $or: [
       { state: { $in: regexes } },
