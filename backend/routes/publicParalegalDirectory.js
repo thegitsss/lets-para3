@@ -11,6 +11,62 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const escapeRegex = (str = "") => String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const US_STATE_ABBR = {
+  Alabama: "AL",
+  Alaska: "AK",
+  Arizona: "AZ",
+  Arkansas: "AR",
+  California: "CA",
+  Colorado: "CO",
+  Connecticut: "CT",
+  Delaware: "DE",
+  Florida: "FL",
+  Georgia: "GA",
+  Hawaii: "HI",
+  Idaho: "ID",
+  Illinois: "IL",
+  Indiana: "IN",
+  Iowa: "IA",
+  Kansas: "KS",
+  Kentucky: "KY",
+  Louisiana: "LA",
+  Maine: "ME",
+  Maryland: "MD",
+  Massachusetts: "MA",
+  Michigan: "MI",
+  Minnesota: "MN",
+  Mississippi: "MS",
+  Missouri: "MO",
+  Montana: "MT",
+  Nebraska: "NE",
+  Nevada: "NV",
+  "New Hampshire": "NH",
+  "New Jersey": "NJ",
+  "New Mexico": "NM",
+  "New York": "NY",
+  "North Carolina": "NC",
+  "North Dakota": "ND",
+  Ohio: "OH",
+  Oklahoma: "OK",
+  Oregon: "OR",
+  Pennsylvania: "PA",
+  "Rhode Island": "RI",
+  "South Carolina": "SC",
+  "South Dakota": "SD",
+  Tennessee: "TN",
+  Texas: "TX",
+  Utah: "UT",
+  Vermont: "VT",
+  Virginia: "VA",
+  Washington: "WA",
+  "West Virginia": "WV",
+  Wisconsin: "WI",
+  Wyoming: "WY",
+};
+const US_STATE_NAME_BY_ABBR = Object.fromEntries(
+  Object.entries(US_STATE_ABBR).map(([name, abbr]) => [abbr, name])
+);
+
 const PUBLIC_PAR_FIELDS =
   "_id firstName lastName avatarURL profileImage location state specialties practiceAreas bestFor yearsExperience linkedInURL education bio about availability approvedAt createdAt";
 
@@ -38,6 +94,32 @@ function serializeParalegal(userDoc) {
     availability: src.availability || "",
     approvedAt: src.approvedAt || null,
     createdAt: src.createdAt || null,
+  };
+}
+
+function buildStateTokens(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return [];
+  const normalizedRaw = raw.replace(/\s+/g, " ");
+  const upper = normalizedRaw.toUpperCase();
+  const title = normalizedRaw
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+  const stateName = US_STATE_NAME_BY_ABBR[upper] || title;
+  const abbr = US_STATE_ABBR[stateName] || upper;
+  return [...new Set([normalizedRaw, stateName, abbr].filter(Boolean))];
+}
+
+function buildStateFilter(value = "") {
+  const regexes = buildStateTokens(value).map((token) => new RegExp(`^${escapeRegex(token)}$`, "i"));
+  const looseRegexes = buildStateTokens(value).map((token) => new RegExp(escapeRegex(token), "i"));
+  return {
+    $or: [
+      { state: { $in: regexes } },
+      { location: { $in: looseRegexes } },
+      { jurisdictions: { $in: regexes } },
+      { stateExperience: { $in: regexes } },
+    ],
   };
 }
 
@@ -88,6 +170,8 @@ router.get(
         { practiceAreas: rx },
         { location: rx },
         { state: rx },
+        { jurisdictions: rx },
+        { stateExperience: rx },
       ];
     }
 
@@ -96,8 +180,7 @@ router.get(
     }
 
     if (location) {
-      const rx = new RegExp(escapeRegex(location), "i");
-      filter.$and = [...(filter.$and || []), { $or: [{ location: rx }, { state: rx }] }];
+      filter.$and = [...(filter.$and || []), buildStateFilter(location)];
     }
 
     if (practiceRaw) {
