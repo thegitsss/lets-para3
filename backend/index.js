@@ -162,6 +162,7 @@ const checklistRouter = require("./routes/checklist");
 const eventsRouter = require("./routes/events");
 const verificationRouter = require("./routes/verification");
 const publicRouter = require("./routes/public");
+const publicParalegalDirectoryRouter = require("./routes/publicParalegalDirectory");
 const accountRouter = require("./routes/account");
 const stripeRouter = require("./routes/stripe");
 const notificationRouter = require("./routes/notifications");
@@ -222,6 +223,8 @@ app.use("/api/notifications", notificationRouter);
 app.use("/api/support", supportRouter);
 app.use("/api/blocks", blocksRouter);
 app.use("/api/verify", verificationRouter);
+app.use("/api/public/paralegals", publicParalegalDirectoryRouter);
+app.use("/public/paralegals", publicParalegalDirectoryRouter);
 app.use("/api/public", publicRouter);
 app.use("/public", publicRouter);
 if (usersRouter?.paralegalRouter) {
