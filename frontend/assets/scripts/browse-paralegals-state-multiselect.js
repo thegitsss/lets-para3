@@ -67,9 +67,9 @@ if (stateInput && stateList) {
 
   stateInput.addEventListener("click", (event) => {
     event.preventDefault();
-    if (stateList.classList.contains("show")) closeStateList();
-    else openStateList();
-  });
+    event.stopImmediatePropagation();
+    openStateList();
+  }, true);
 
   stateInput.addEventListener("focus", () => {
     window.requestAnimationFrame(openStateList);
