@@ -261,6 +261,15 @@ function wireLogoutDelegation() {
   );
 }
 
+function loadPageEnhancements() {
+  const path = String(window.location?.pathname || "").toLowerCase();
+  if (path.endsWith("/browse-paralegals.html") || path.endsWith("browse-paralegals.html")) {
+    import("./browse-paralegals-state-multiselect.js").catch((err) => {
+      console.warn("Unable to load browse paralegal state multi-select", err);
+    });
+  }
+}
+
 // Boot-time: add 'loaded' class, fetch CSRF, and toggle role-based UI (best-effort)
 window.addEventListener("DOMContentLoaded", async () => {
   document.body.classList.add("loaded");
@@ -290,6 +299,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  loadPageEnhancements();
   wireLogoutButton();
   wireLogoutDelegation();
 });
