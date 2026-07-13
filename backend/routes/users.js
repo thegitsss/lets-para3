@@ -1341,6 +1341,7 @@ paralegalRouter.post(
 router.patch(
   "/:userId/approve",
   requireRole("admin"),
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { userId } = req.params;
     if (!isObjId(userId)) return res.status(400).json({ error: "Invalid user id" });
@@ -1382,6 +1383,7 @@ router.patch(
 router.patch(
   "/:userId/reject",
   requireRole("admin"),
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { userId } = req.params;
     if (!isObjId(userId)) return res.status(400).json({ error: "Invalid user id" });

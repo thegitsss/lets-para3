@@ -129,6 +129,13 @@ app.use("/api", (req, res, next) => {
   next();
 });
 
+app.use("/api", (_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
+});
+
 // 4) Routers
 const waitlistRouter = require("./routes/waitlist");
 const authRouter = require("./routes/auth");

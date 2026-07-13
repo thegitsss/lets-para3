@@ -5,6 +5,7 @@ const router = express.Router();
 
 const auth = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
+const { csrfProtection } = require("../utils/csrf");
 const CaseDraft = require("../models/CaseDraft");
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -112,6 +113,7 @@ router.get(
 
 router.post(
   "/",
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const payload = normalizeDraftPayload(req.body || {});
     if (!assertMinComp(res, payload.compAmount)) return;
@@ -122,6 +124,7 @@ router.post(
 
 router.put(
   "/:draftId",
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { draftId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(draftId)) {
@@ -143,6 +146,7 @@ router.put(
 
 router.delete(
   "/:draftId",
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { draftId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(draftId)) {

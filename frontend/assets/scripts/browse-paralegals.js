@@ -1,7 +1,7 @@
 import { secureFetch, logout } from "./auth.js";
 
 const states = [
-  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","Florida","Georgia",
+  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware","District of Columbia","Florida","Georgia",
   "Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts",
   "Michigan","Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey",
   "New Mexico","New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island",
@@ -21,15 +21,16 @@ const specialties = [
 ];
 
 const selectedSpecialties = new Set();
+const selectedStates = new Set();
 
 const elements = {
   results: document.getElementById("paralegalResults"),
   status: document.getElementById("resultsStatus"),
   experience: document.getElementById("experience"),
-  availability: document.getElementById("availability"),
   sortBy: document.getElementById("sortBy"),
   stateInput: document.getElementById("stateInput"),
   stateList: document.getElementById("stateList"),
+  selectedStateChips: document.getElementById("selectedStateChips"),
   specialtyInput: document.getElementById("specialtyInput"),
   specialtyList: document.getElementById("specialtyList"),
   prevPage: document.getElementById("prevPage"),
@@ -56,10 +57,10 @@ const state = {
   pages: 1,
   filters: {
     experience: "",
-    availability: "",
     location: "",
     sort: "recent",
     specialties: selectedSpecialties,
+    states: selectedStates,
   },
   viewer: null,
   viewerRole: "",
@@ -69,6 +70,7 @@ const state = {
 
 let availableCases = [];
 let activeParalegal = null;
+let filterFetchTimer = null;
 const toast = window.toastUtils;
 const AUTH_LOCK_CLASS = "auth-locked";
 const AUTH_BLOCKER_READY_CLASS = "auth-blocker-ready";
@@ -78,6 +80,16 @@ function normalizeId(val) {
   if (typeof val === "string") return val;
   if (typeof val === "object") return String(val.id || val._id || val.paralegalId || "");
   return "";
+}
+
+function escapeHTML(value = "") {
+  return String(value).replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[char]));
 }
 
 document.addEventListener("DOMContentLoaded", init);
@@ -184,21 +196,12 @@ function requireSignIn(event) {
 function bindFilterEvents() {
   elements.experience?.addEventListener("change", () => {
     state.filters.experience = elements.experience.value;
-  });
-  elements.availability?.addEventListener("change", () => {
-    state.filters.availability = elements.availability.value;
+    resetPageAndFetch();
   });
   elements.sortBy?.addEventListener("change", () => {
     state.filters.sort = normalizeSortValue(elements.sortBy.value);
     resetPageAndFetch();
   });
-  elements.stateInput?.addEventListener("change", () => {
-    state.filters.location = (elements.stateInput.value || "").trim();
-  });
-  elements.stateInput?.addEventListener("blur", () => {
-    state.filters.location = (elements.stateInput.value || "").trim();
-  });
-
   elements.prevPage?.addEventListener("click", () => {
     if (state.page > 1) {
       state.page -= 1;
@@ -237,11 +240,17 @@ function bindFilterButtons() {
   });
   elements.clearFilters?.addEventListener("click", () => {
     if (elements.experience) elements.experience.value = "";
-    if (elements.availability) elements.availability.value = "";
     if (elements.stateInput) elements.stateInput.value = "";
     state.filters.experience = "";
-    state.filters.availability = "";
     state.filters.location = "";
+    selectedStates.clear();
+    renderSelectedStateChips();
+    if (elements.stateList) {
+      elements.stateList.querySelectorAll("input[type='checkbox']").forEach((cb) => {
+        cb.checked = false;
+      });
+      elements.stateList.classList.remove("show");
+    }
     selectedSpecialties.clear();
     updateSpecialtyInput();
     if (elements.specialtyList) {
@@ -250,7 +259,6 @@ function bindFilterButtons() {
       });
       elements.specialtyList.classList.remove("show");
     }
-    elements.stateList?.classList.remove("show");
     elements.filterMenu?.classList.remove("active");
     syncFiltersFromInputs();
     resetPageAndFetch();
@@ -259,8 +267,7 @@ function bindFilterButtons() {
 
 function syncFiltersFromInputs() {
   state.filters.experience = elements.experience?.value || "";
-  state.filters.availability = elements.availability?.value || "";
-  state.filters.location = elements.stateInput?.value?.trim() || "";
+  state.filters.location = [...selectedStates].join("|");
   state.filters.sort = normalizeSortValue(elements.sortBy?.value);
 }
 
@@ -296,30 +303,100 @@ function initStateDropdown() {
   if (!elements.stateInput || !elements.stateList) return;
   const stateWrapper = elements.stateInput.closest(".dropdown-wrapper");
   const specialtyWrapper = elements.specialtyInput?.closest(".dropdown-wrapper") || null;
-  const render = (query = "") => {
-    const matches = states.filter((s) => s.toLowerCase().startsWith(query.toLowerCase()));
-    elements.stateList.innerHTML = matches.map((s) => `<li>${s}</li>`).join("");
-    elements.stateList.classList.toggle("show", matches.length > 0);
-  };
-  elements.stateInput.addEventListener("input", () => render(elements.stateInput.value));
-  elements.stateInput.addEventListener("focus", () => {
+  const closeList = () => elements.stateList.classList.remove("show");
+  const openList = () => {
+    renderList(elements.stateInput.value);
     elements.specialtyList?.classList.remove("show");
-    render(elements.stateInput.value);
+    elements.stateList.classList.add("show");
+  };
+  const renderList = (query = "") => {
+    const normalizedQuery = String(query || "").trim().toLowerCase();
+    const matches = states.filter((stateName) => stateName.toLowerCase().includes(normalizedQuery));
+    elements.stateList.innerHTML = matches.length
+      ? matches
+      .map((stateName) => {
+        const slug = stateName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        return `
+        <li>
+          <input type="checkbox" id="state-${slug}" value="${escapeHTML(stateName)}" ${selectedStates.has(stateName) ? "checked" : ""}>
+          <label for="state-${slug}">${escapeHTML(stateName)}</label>
+        </li>`;
+      })
+      .join("")
+      : '<li class="empty-option">No states match</li>';
+  };
+  elements.stateInput.addEventListener("click", (event) => {
+    event.preventDefault();
+    openList();
+  });
+  elements.stateInput.addEventListener("focus", openList);
+  elements.stateInput.addEventListener("input", () => {
+    renderList(elements.stateInput.value);
+    elements.stateList.classList.add("show");
+  });
+  elements.stateInput.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeList();
+      elements.stateInput.blur();
+      return;
+    }
+    if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown") {
+      event.preventDefault();
+      openList();
+    }
   });
   elements.stateList.addEventListener("click", (event) => {
-    if (event.target.tagName === "LI") {
-      elements.stateInput.value = event.target.textContent;
-      elements.stateList.classList.remove("show");
-      state.filters.location = event.target.textContent;
+    const row = event.target.closest("li");
+    if (!row) return;
+    const checkbox = row.querySelector("input[type='checkbox']");
+    if (!checkbox) return;
+    if (event.target === checkbox || event.target.tagName === "LABEL") return;
+    checkbox.checked = !checkbox.checked;
+    checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  elements.stateList.addEventListener("change", (event) => {
+    const value = event.target.value;
+    if (!value) return;
+    if (event.target.checked) selectedStates.add(value);
+    else selectedStates.delete(value);
+    renderSelectedStateChips();
+    state.filters.location = [...selectedStates].join("|");
+    scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
+  });
+  elements.selectedStateChips?.addEventListener("click", (event) => {
+    const removeButton = event.target.closest("[data-remove-state]");
+    const clearButton = event.target.closest("[data-clear-all-states]");
+    if (removeButton) {
+      selectedStates.delete(removeButton.dataset.removeState || "");
+      renderSelectedStateChips();
+      syncStateCheckboxes();
+      state.filters.location = [...selectedStates].join("|");
+      scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
+      return;
+    }
+    if (clearButton) {
+      selectedStates.clear();
+      renderSelectedStateChips();
+      syncStateCheckboxes();
+      state.filters.location = "";
+      scheduleResetPageAndFetch({ preserveScroll: true, quiet: true });
     }
   });
   document.addEventListener("click", (event) => {
     if (!stateWrapper?.contains(event.target)) {
-      elements.stateList.classList.remove("show");
+      closeList();
     }
     if (!specialtyWrapper?.contains(event.target)) {
       elements.specialtyList?.classList.remove("show");
     }
+  });
+  renderSelectedStateChips();
+}
+
+function syncStateCheckboxes() {
+  if (!elements.stateList) return;
+  elements.stateList.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
+    checkbox.checked = selectedStates.has(checkbox.value);
   });
 }
 
@@ -386,19 +463,56 @@ function initSpecialtyDropdown() {
   updateSpecialtyInput();
 }
 
+function renderSelectedStateChips() {
+  if (!elements.selectedStateChips) return;
+  const selected = [...selectedStates];
+  elements.selectedStateChips.classList.toggle("has-items", selected.length > 0);
+  elements.selectedStateChips.innerHTML = selected
+    .map(
+      (stateName) => `
+        <span class="filter-chip">
+          ${escapeHTML(stateName)}
+          <button type="button" aria-label="Remove ${escapeHTML(stateName)}" data-remove-state="${escapeHTML(stateName)}">&times;</button>
+        </span>`
+    )
+    .join("");
+  if (selected.length > 1) {
+    elements.selectedStateChips.insertAdjacentHTML(
+      "beforeend",
+      '<span class="filter-chip clear-chip"><button type="button" data-clear-all-states>Clear all</button></span>'
+    );
+  }
+}
+
 function updateSpecialtyInput() {
   if (!elements.specialtyInput) return;
   elements.specialtyInput.value = [...selectedSpecialties].join(", ");
 }
 
-function resetPageAndFetch() {
+function resetPageAndFetch(options = {}) {
+  if (filterFetchTimer) {
+    clearTimeout(filterFetchTimer);
+    filterFetchTimer = null;
+  }
   state.page = 1;
-  loadParalegals();
+  loadParalegals(options);
 }
 
-async function loadParalegals() {
+function scheduleResetPageAndFetch(options = {}) {
+  if (filterFetchTimer) clearTimeout(filterFetchTimer);
+  filterFetchTimer = setTimeout(() => {
+    filterFetchTimer = null;
+    state.page = 1;
+    loadParalegals(options);
+  }, 150);
+}
+
+async function loadParalegals(options = {}) {
   if (!elements.results || !elements.status) return;
-  setResultsStatus("Loading paralegals…");
+  const preserveScroll = Boolean(options.preserveScroll);
+  const quiet = Boolean(options.quiet);
+  const scrollY = preserveScroll ? window.scrollY : null;
+  if (!quiet) setResultsStatus("Loading paralegals…");
   const params = new URLSearchParams();
   params.set("page", state.page);
   params.set("limit", state.limit);
@@ -406,8 +520,7 @@ async function loadParalegals() {
 
   const minYears = parseExperience(state.filters.experience);
   if (minYears) params.set("minYears", String(minYears));
-  if (state.filters.availability) params.set("availability", state.filters.availability);
-  if (state.filters.location) params.set("location", state.filters.location);
+  if (selectedStates.size) params.set("location", [...selectedStates].join("|"));
   if (selectedSpecialties.size) {
     params.set("practice", [...selectedSpecialties].join("|"));
   }
@@ -423,6 +536,9 @@ async function loadParalegals() {
     }
     renderParalegals(Array.isArray(data.items) ? data.items : []);
     updatePagination({ total: data.total, pages: data.pages, page: data.page });
+    if (preserveScroll && Number.isFinite(scrollY)) {
+      requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: "auto" }));
+    }
   } catch (error) {
     console.error(error);
     renderParalegals([]);

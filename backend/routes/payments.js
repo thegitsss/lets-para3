@@ -1797,6 +1797,7 @@ router.get(
 router.patch(
   "/:caseId/budget",
   requireRole("attorney", "admin"),
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const isAdmin = req.user.role === "admin";
     const { caseId } = req.params;
@@ -2103,6 +2104,7 @@ router.post(
 router.post(
   "/release/:caseId",
   requireRole("attorney", "admin"),
+  csrfProtection,
   asyncHandler(async (req, res) => {
     if (req.user.role !== "admin") {
       return res.status(403).json({ error: "Funds are released only via case completion." });
@@ -2178,6 +2180,7 @@ router.post(
 router.post(
   "/payout/:caseId",
   requireRole("admin"),
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const c = await Case.findById(req.params.caseId).populate(
       "paralegal",
@@ -2317,6 +2320,7 @@ router.post(
 router.post(
   "/dispute/settle/:caseId",
   requireRole("admin"),
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
     const { action, disputeId, grossAmountCents, payoutAmountCents } = req.body || {};
@@ -2916,6 +2920,7 @@ router.post(
 router.post(
   "/refund/:caseId",
   requireRole("admin"),
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const c = await Case.findById(req.params.caseId).select(
       "status paymentReleased escrowIntentId terminationStatus disputes"

@@ -6389,10 +6389,9 @@ async function uploadProfilePhotoFile(file, originalFile, editedExisting = false
     formData.append("editExisting", "1");
   }
 
-  const res = await fetch("/api/uploads/profile-photo", {
+  const res = await secureFetch("/api/uploads/profile-photo", {
     method: "POST",
     body: formData,
-    credentials: "include"
   });
 
   const payload = await res.json().catch(() => ({}));

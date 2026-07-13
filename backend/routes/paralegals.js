@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
+const { csrfProtection } = require("../utils/csrf");
 const Paralegal = require("../models/User");
 
 function normalizeStatus(value) {
@@ -14,7 +15,7 @@ function normalizeDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-router.post("/update-availability", verifyToken, requireApproved, requireRole("paralegal"), async (req, res) => {
+router.post("/update-availability", verifyToken, requireApproved, requireRole("paralegal"), csrfProtection, async (req, res) => {
   try {
     const userId = req.user.id;
     const { status, nextAvailable } = req.body || {};

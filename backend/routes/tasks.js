@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const ensureCaseParticipant = require("../middleware/ensureCaseParticipant");
+const { csrfProtection } = require("../utils/csrf");
 const Task = require("../models/Task");
 
 const IN_PROGRESS_STATUS = "in progress";
@@ -41,6 +42,7 @@ router.param("caseId", ensureCaseParticipant("caseId"));
 
 router.post(
   "/:caseId/tasks",
+  csrfProtection,
   async (req, res, next) => {
     try {
       if (!assertTasksUnlocked(req, res)) return;
@@ -83,6 +85,7 @@ router.get(
 
 router.patch(
   "/:caseId/tasks/:taskId",
+  csrfProtection,
   async (req, res, next) => {
     try {
       if (!assertTasksUnlocked(req, res)) return;

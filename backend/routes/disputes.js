@@ -9,6 +9,7 @@ const User = require("../models/User");
 const AuditLog = require("../models/AuditLog");
 const { notifyUser } = require("../utils/notifyUser");
 const { publishEventSafe } = require("../services/lpcEvents/publishEventService");
+const { csrfProtection } = require("../utils/csrf");
 
 const ADMIN_REVIEW_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -292,6 +293,7 @@ router.get(
  */
 router.post(
   "/:caseId",
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { caseId } = req.params;
     const { message, amount, amountCents } = req.body || {};
@@ -456,6 +458,7 @@ router.post(
  */
 router.post(
   "/:caseId/:disputeId/comment",
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { caseId, disputeId } = req.params;
     const { text } = req.body || {};
@@ -500,6 +503,7 @@ router.post(
 router.patch(
   "/:caseId/:disputeId",
   requireRole("admin"),
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { caseId, disputeId } = req.params;
     const { status } = req.body || {};
@@ -547,6 +551,7 @@ router.patch(
 router.patch(
   "/:caseId/:disputeId/admin-notes",
   requireRole("admin"),
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { caseId, disputeId } = req.params;
     if (!isObjId(caseId)) return res.status(400).json({ error: "Invalid caseId" });
@@ -593,6 +598,7 @@ router.patch(
 router.post(
   "/resolve/:disputeId",
   requireRole("admin"),
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { disputeId } = req.params;
     if (!disputeId) return res.status(400).json({ error: "disputeId required" });

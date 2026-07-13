@@ -640,9 +640,8 @@ async function uploadResume(file) {
   const formData = new FormData();
   formData.append("file", file, file.name || "resume.pdf");
   try {
-    const res = await fetch("/api/uploads/paralegal-resume", {
+    const res = await secureFetch("/api/uploads/paralegal-resume", {
       method: "POST",
-      credentials: "include",
       body: formData,
     });
     const data = await res.json().catch(() => ({}));
@@ -650,15 +649,7 @@ async function uploadResume(file) {
       throw new Error(data?.error || data?.msg || "Unable to upload résumé");
     }
     const key = data.key || data.url;
-    const patchRes = await fetch("/api/users/me", {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ resumeURL: key }),
-    });
-    if (!patchRes.ok) {
-      throw new Error("Could not save résumé to profile.");
-    }
+    await persistDocumentField("resumeURL", key);
     const resumeValue = key;
     const snapshot = state.profileUser || { id: state.paralegalId };
     state.profileUser = { ...snapshot, resumeURL: resumeValue };

@@ -203,7 +203,41 @@
     }
     .appearance-field input[type="range"] {
       flex: 1;
-      accent-color: var(--director-blue);
+      appearance: none;
+      height: 22px;
+      background: transparent;
+      accent-color: transparent;
+      cursor: pointer;
+    }
+    .appearance-field input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+    }
+    .appearance-field input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      margin-top: -7px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.42);
+      border: 1px solid rgba(18, 15, 19, 0.14);
+      box-shadow: 0 4px 14px rgba(18, 15, 19, 0.08);
+    }
+    .appearance-field input[type="range"]::-moz-range-track {
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+    }
+    .appearance-field input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.42);
+      border: 1px solid rgba(18, 15, 19, 0.14);
+      box-shadow: 0 4px 14px rgba(18, 15, 19, 0.08);
     }
     .appearance-mode {
       display: grid;

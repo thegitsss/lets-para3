@@ -1575,6 +1575,7 @@ res.json({ ok: true, disabled: true });
 
 router.post(
 "/enable/:id",
+csrfProtection,
 asyncHandler(async (req, res) => {
 const { id } = req.params;
 if (!isObjId(id)) return res.status(400).json({ error: "Invalid user id" });
@@ -2542,7 +2543,7 @@ cases: items.map(sanitizeCaseForAdmin),
 * Body: { paralegalId }
 * Manually assign a paralegal to a case (sets status to 'assigned' if applicable).
 */
-router.patch("/assign/:caseId", asyncHandler(async (req, res) => {
+router.patch("/assign/:caseId", csrfProtection, asyncHandler(async (req, res) => {
 const { caseId } = req.params;
 const { paralegalId } = req.body || {};
 if (!isObjId(caseId)) return res.status(400).json({ msg: "Invalid case id" });
@@ -2585,7 +2586,7 @@ res.json({ ok: true, msg: "Paralegal assigned", case: sanitizeCaseForAdmin(popul
 * Body: { status }
 * Update a case status as admin (uses Case transition guardrails if available).
 */
-router.patch("/cases/:id/status", asyncHandler(async (req, res) => {
+router.patch("/cases/:id/status", csrfProtection, asyncHandler(async (req, res) => {
 const { id } = req.params;
 const { status } = req.body || {};
 if (!isObjId(id)) return res.status(400).json({ msg: "Invalid case id" });

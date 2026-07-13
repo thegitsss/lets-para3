@@ -635,6 +635,7 @@ router.post(
 router.post(
   "/:caseId/summary",
   requireCaseAccess("caseId"),
+  csrfProtection,
   asyncHandler(async (_req, res) => {
     res.json({ summary: "Summary endpoint placeholder." });
   })

@@ -68,6 +68,7 @@ router.get(
 
 router.post(
   "/preferences",
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const { email, theme, state, fontSize, hideProfile } = req.body || {};
     const user = await User.findById(req.user.id)

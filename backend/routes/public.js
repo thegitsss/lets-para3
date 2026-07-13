@@ -122,9 +122,112 @@ function sanitizeSubject(s = "") {
 const isObjId = (id) => mongoose.Types.ObjectId.isValid(id);
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const escapeRegex = (str = "") => String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const US_STATE_NAME_TO_CODE = {
+  alabama: "AL",
+  alaska: "AK",
+  arizona: "AZ",
+  arkansas: "AR",
+  california: "CA",
+  colorado: "CO",
+  connecticut: "CT",
+  delaware: "DE",
+  "district of columbia": "DC",
+  florida: "FL",
+  georgia: "GA",
+  hawaii: "HI",
+  idaho: "ID",
+  illinois: "IL",
+  indiana: "IN",
+  iowa: "IA",
+  kansas: "KS",
+  kentucky: "KY",
+  louisiana: "LA",
+  maine: "ME",
+  maryland: "MD",
+  massachusetts: "MA",
+  michigan: "MI",
+  minnesota: "MN",
+  mississippi: "MS",
+  missouri: "MO",
+  montana: "MT",
+  nebraska: "NE",
+  nevada: "NV",
+  "new hampshire": "NH",
+  "new jersey": "NJ",
+  "new mexico": "NM",
+  "new york": "NY",
+  "north carolina": "NC",
+  "north dakota": "ND",
+  ohio: "OH",
+  oklahoma: "OK",
+  oregon: "OR",
+  pennsylvania: "PA",
+  "rhode island": "RI",
+  "south carolina": "SC",
+  "south dakota": "SD",
+  tennessee: "TN",
+  texas: "TX",
+  utah: "UT",
+  vermont: "VT",
+  virginia: "VA",
+  washington: "WA",
+  "west virginia": "WV",
+  wisconsin: "WI",
+  wyoming: "WY",
+};
+const US_STATE_CODE_TO_NAME = Object.fromEntries(
+  Object.entries(US_STATE_NAME_TO_CODE).map(([name, code]) => [code, name])
+);
 
 const PUBLIC_PAR_FIELDS =
-  "_id firstName lastName avatarURL profileImage location state specialties practiceAreas bestFor yearsExperience linkedInURL education bio about availability approvedAt createdAt";
+  "_id firstName lastName avatarURL profileImage location state stateExperience specialties practiceAreas bestFor yearsExperience linkedInURL education bio about availability approvedAt createdAt";
+
+function getStateSearchTerms(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return [];
+  const normalizedName = raw.toLowerCase().replace(/\s+/g, " ");
+  const upperCode = raw.toUpperCase();
+  const terms = new Set([raw]);
+  if (US_STATE_NAME_TO_CODE[normalizedName]) terms.add(US_STATE_NAME_TO_CODE[normalizedName]);
+  if (US_STATE_CODE_TO_NAME[upperCode]) terms.add(US_STATE_CODE_TO_NAME[upperCode]);
+  return [...terms];
+}
+
+function buildLocationFilter(value = "") {
+  const terms = String(value || "")
+    .split(/[|,]/)
+    .flatMap((token) => getStateSearchTerms(token))
+    .filter(Boolean);
+  if (!terms.length) return null;
+  const uniqueTerms = [...new Set(terms)];
+  const patterns = uniqueTerms.map((term) => new RegExp(escapeRegex(term), "i"));
+  return {
+    $or: [
+      { location: { $in: patterns } },
+      { state: { $in: patterns } },
+      { stateExperience: { $in: patterns } },
+      { jurisdictions: { $in: patterns } },
+    ],
+  };
+}
+
+function buildAvailableParalegalFilter() {
+  return [
+    {
+      $or: [
+        { "availabilityDetails.status": { $exists: false } },
+        { "availabilityDetails.status": { $ne: "unavailable" } },
+      ],
+    },
+    {
+      $or: [
+        { availability: { $exists: false } },
+        { availability: "" },
+        { availability: { $not: /^unavailable/i } },
+      ],
+    },
+  ];
+}
 
 function serializeParalegal(userDoc) {
   if (!userDoc) return null;
@@ -396,7 +499,6 @@ router.get(
         : typeof req.query.search === "string"
         ? req.query.search.trim()
         : "";
-    const availability = typeof req.query.availability === "string" ? req.query.availability.trim() : "";
     const location = typeof req.query.location === "string" ? req.query.location.trim() : "";
     const practiceRaw = typeof req.query.practice === "string" ? req.query.practice.trim() : "";
     const minYears = parseInt(req.query.minYears, 10);
@@ -404,6 +506,7 @@ router.get(
 
     const filter = { role: "paralegal", status: "approved" };
     filter["preferences.hideProfile"] = { $ne: true };
+    filter.$and = [...buildAvailableParalegalFilter()];
     applyPublicParalegalFilter(filter);
     if (String(req.user?.role || "").toLowerCase() === "attorney") {
       const blockedIds = await getBlockedUserIds(req.user.id);
@@ -424,11 +527,11 @@ router.get(
         { state: rx },
       ];
     }
-    if (availability) {
-      filter.availability = new RegExp(escapeRegex(availability), "i");
-    }
     if (location) {
-      filter.location = new RegExp(escapeRegex(location), "i");
+      const locationFilter = buildLocationFilter(location);
+      if (locationFilter) {
+        filter.$and = [...(filter.$and || []), locationFilter];
+      }
     }
     if (practiceRaw) {
       const tokens = practiceRaw

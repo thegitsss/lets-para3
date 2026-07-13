@@ -475,7 +475,7 @@ router.post(
 );
 
 // Temporary stub for legacy attachment probes
-router.post("/attach", (_req, res) => {
+router.post("/attach", csrfProtection, (_req, res) => {
   res.json({ ok: true });
 });
 
@@ -584,6 +584,7 @@ function caseFileMiddleware(req, res, next) {
 router.post(
   "/paralegal-certificate",
   requireRole("paralegal"),
+  csrfProtection,
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
@@ -628,6 +629,7 @@ router.post(
 router.post(
   "/paralegal-writing-sample",
   requireRole("paralegal"),
+  csrfProtection,
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
@@ -672,6 +674,7 @@ router.post(
 router.post(
   "/paralegal-resume",
   requireRole("paralegal"),
+  csrfProtection,
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
     if (!BUCKET) return res.status(500).json({ msg: "Server misconfigured (bucket)" });
@@ -724,6 +727,7 @@ router.post(
 router.post(
   "/profile-photo",
   requireRole("paralegal", "attorney"),
+  csrfProtection,
   profilePhotoUpload.fields([
     { name: "file", maxCount: 1 },
     { name: "original", maxCount: 1 },
@@ -930,6 +934,7 @@ router.get(
 router.post(
   "/case/:caseId",
   ensureCaseParticipant(),
+  csrfProtection,
   caseFileMiddleware,
   asyncHandler(async (req, res) => {
     const { caseDoc, isAdmin } = await loadCaseForUser(req, req.params.caseId);

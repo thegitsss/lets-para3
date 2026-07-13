@@ -1185,8 +1185,10 @@ async function initOverviewPage() {
     onboardingAttentionCard?.querySelectorAll("[data-onboarding-check-step]") || []
   );
   const caseOnboardingSkipBtn = document.getElementById("caseOnboardingSkipBtn");
+  const attentionList = document.getElementById("attorneyNeedsAttentionList");
   setupOnboardingChecklist();
   updateOnboardingAttentionCard();
+  renderNeedsAttentionQueue();
   updateCaseOnboardingSkipButton();
 
   const handleOnboardingStepOpen = (stepValue) => {
@@ -1211,6 +1213,15 @@ async function initOverviewPage() {
   });
   onboardingAttentionSkip?.addEventListener("click", handleSkipOnboarding);
   caseOnboardingSkipBtn?.addEventListener("click", handleSkipOnboarding);
+  attentionList?.addEventListener("click", (event) => {
+    const action = event.target?.closest?.("[data-attention-action]");
+    if (!action) return;
+    const actionKey = String(action.dataset.attentionAction || "").toLowerCase();
+    if (actionKey === "messages") {
+      event.preventDefault();
+      goToMessages(state.latestThreadCaseId);
+    }
+  });
 
   const toastHelper = window.toastUtils;
   const stagedToast = toastHelper?.consume();
@@ -7567,6 +7578,149 @@ function updateOverviewSignals(partial = {}) {
       el.textContent = String(queueMap[key]);
     }
   });
+  renderNeedsAttentionQueue();
+}
+
+function pluralizeCount(count, singular, plural = `${singular}s`) {
+  const safeCount = Number(count || 0);
+  return `${safeCount} ${safeCount === 1 ? singular : plural}`;
+}
+
+function buildNeedsAttentionItems() {
+  const items = [];
+  const progress = getAttorneyOnboardingProgress();
+  const hasAnyMatter =
+    Number(overviewSignals.casesCreatedCount || 0) > 0 ||
+    (Array.isArray(state.casesArchived) && state.casesArchived.length > 0);
+
+  if (state.billing.hasPaymentMethod === false) {
+    items.push({
+      key: "payment",
+      title: "Add a payment method",
+      meta: "A payment method is required before hiring and funding a paralegal.",
+      actionLabel: "Open billing",
+      href: "#billing",
+      viewTarget: "billing",
+    });
+  }
+
+  if (overviewSignals.applicationsCount > 0) {
+    items.push({
+      key: "applications",
+      title: `${pluralizeCount(overviewSignals.applicationsCount, "application")} ready for review`,
+      meta: "Review interested paralegals while the matter is fresh.",
+      actionLabel: "Review applicants",
+      href: "#cases:inquiries",
+      viewTarget: "cases",
+    });
+  }
+
+  if (overviewSignals.unfundedCount > 0) {
+    items.push({
+      key: "funding",
+      title: `${pluralizeCount(overviewSignals.unfundedCount, "matter")} awaiting funding`,
+      meta: "Funding must be resolved before work can reliably move forward.",
+      actionLabel: "Open payments",
+      href: "#billing",
+      viewTarget: "billing",
+    });
+  }
+
+  if (overviewSignals.unreadCount > 0) {
+    items.push({
+      key: "messages",
+      title: `${pluralizeCount(overviewSignals.unreadCount, "message")} waiting`,
+      meta: "Open the latest matter conversation and respond from the workspace.",
+      actionLabel: "Open messages",
+      action: "messages",
+    });
+  }
+
+  if (overviewSignals.pendingReviewCount > 0) {
+    items.push({
+      key: "files",
+      title: `${pluralizeCount(overviewSignals.pendingReviewCount, "matter")} with files to review`,
+      meta: "Review submitted documents so completion and payment can stay on track.",
+      actionLabel: "Open matters",
+      href: "#cases",
+      viewTarget: "cases",
+    });
+  }
+
+  if (overviewSignals.overdueCount > 0) {
+    items.push({
+      key: "overdue",
+      title: `${pluralizeCount(overviewSignals.overdueCount, "overdue task")}`,
+      meta: "Resolve overdue checklist items before they slow down active work.",
+      actionLabel: "Open matters",
+      href: "#cases",
+      viewTarget: "cases",
+    });
+  }
+
+  if (!progress.profileDone) {
+    items.push({
+      key: "profile",
+      title: "Finish your attorney profile",
+      meta: "A complete profile gives paralegals better context before accepting work.",
+      actionLabel: "Open profile",
+      href: "profile-settings.html?onboardingStep=profile&profilePrompt=1",
+    });
+  }
+
+  if (!hasAnyMatter && progress.profileDone && state.billing.hasPaymentMethod === true) {
+    items.push({
+      key: "first-matter",
+      title: "Post your first matter",
+      meta: "Create a scoped matter so approved paralegals can apply or be invited.",
+      actionLabel: "Create matter",
+      href: "create-case.html",
+    });
+  }
+
+  return items;
+}
+
+function renderNeedsAttentionQueue() {
+  const shell = document.getElementById("attorneyNeedsAttention");
+  const list = document.getElementById("attorneyNeedsAttentionList");
+  if (!shell || !list) return;
+  const items = buildNeedsAttentionItems();
+  shell.hidden = false;
+  shell.setAttribute("aria-hidden", "false");
+
+  if (!items.length) {
+    list.innerHTML = `
+      <div class="queue-item">
+        <div>
+          <div class="queue-title">All clear</div>
+          <div class="queue-meta">No urgent applications, messages, payment blockers, file reviews, or overdue tasks need action right now.</div>
+        </div>
+        <a class="queue-action" href="create-case.html">New matter</a>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = items
+    .map((item) => {
+      const title = sanitize(item.title || "Review item");
+      const meta = sanitize(item.meta || "");
+      const label = sanitize(item.actionLabel || "Open");
+      const href = item.href ? sanitize(item.href) : "#";
+      const actionAttr = item.action ? ` data-attention-action="${sanitize(item.action)}"` : "";
+      const viewAttr = item.viewTarget ? ` data-view-target="${sanitize(item.viewTarget)}"` : "";
+      return `
+        <div class="queue-item" data-attention-item="${sanitize(item.key || "")}">
+          <div>
+            <div class="queue-title">${title}</div>
+            <div class="queue-meta">${meta}</div>
+          </div>
+          <a class="queue-action" href="${href}"${viewAttr}${actionAttr}>${label}</a>
+        </div>
+      `;
+    })
+    .join("");
 }
 
 async function refreshApplicationsOverview({ force = false } = {}) {

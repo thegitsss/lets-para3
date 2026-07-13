@@ -4,6 +4,7 @@ const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
 const intakeService = require("../services/incidents/intakeService");
 const { getReporterAccessToken } = require("../utils/incidentAccess");
+const { csrfProtection } = require("../utils/csrf");
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -12,6 +13,7 @@ router.post(
   verifyToken,
   requireApproved,
   requireRole("attorney", "paralegal"),
+  csrfProtection,
   asyncHandler(async (req, res) => {
     const result = await intakeService.createIncidentFromHelpReport({
       user: req.user,

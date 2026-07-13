@@ -3957,10 +3957,19 @@ function refreshTaskCheckboxStates(caseData) {
   });
 }
 
+function buildCaseSummaryText(data) {
+  const details = String(data?.details || "")
+    .split(/\n\s*Screening questions:/i)[0]
+    .replace(/\s+/g, " ")
+    .trim();
+  if (details) return details;
+  return String(data?.briefSummary || "").replace(/\s+/g, " ").trim();
+}
+
 function renderCaseOverview(data) {
   const title = data?.title || "Case";
   const status = formatCaseStatus(data?.status, data);
-  const summaryText = data?.briefSummary || data?.details || "";
+  const summaryText = buildCaseSummaryText(data);
 
   const remainingCents = resolveRemainingAmount(data);
   const escrowAmountRaw = Number.isFinite(remainingCents)
