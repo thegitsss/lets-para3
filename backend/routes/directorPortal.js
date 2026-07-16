@@ -10,6 +10,7 @@ const {
   listDirectorRecords,
   sendDirectorOutreach,
   updateDirectorProfile,
+  updateDirectorRecordState,
 } = require("../services/director/directorPortalService");
 
 const noop = (_req, _res, next) => next();
@@ -68,6 +69,19 @@ router.patch(
     }
     const profile = await updateDirectorProfile(req.user, req.body || {});
     res.json({ ok: true, profile });
+  })
+);
+
+router.patch(
+  "/records/:recordId/state",
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const record = await updateDirectorRecordState({
+      user: req.user,
+      recordId: req.params.recordId,
+      state: req.body?.state,
+    });
+    res.json({ ok: true, record });
   })
 );
 

@@ -17,6 +17,7 @@ const settingsOverlay = document.getElementById("settingsOverlay");
 const settingsCloseBtn = document.getElementById("settingsCloseBtn");
 const openZohoBtn = document.getElementById("openZohoBtn");
 const appearanceModeBtns = Array.from(document.querySelectorAll("[data-appearance-mode]"));
+const recordsSortButtons = Array.from(document.querySelectorAll("[data-sort-key]"));
 const DEMO_MODE = new URLSearchParams(window.location.search).get("demo") === "1";
 const RECORDS_PER_PAGE = 10;
 const APPEARANCE_KEY = `lpc_director_dashboard_appearance:${directorSession.user?._id || directorSession.user?.id || directorSession.user?.email || "director"}`;
@@ -24,11 +25,64 @@ const LAST_IMPORT_KEY = `lpc_director_last_import:${directorSession.user?._id ||
 const ZOHO_MAIL_URL = "https://mail.zoho.com/";
 const ZOHO_MAIL_APP_URL = "zohomail://";
 const AUTO_REFRESH_MS = 5 * 60 * 1000;
+const US_STATE_CODES = Object.freeze([
+  "AL",
+  "AK",
+  "AZ",
+  "AR",
+  "CA",
+  "CO",
+  "CT",
+  "DE",
+  "FL",
+  "GA",
+  "HI",
+  "ID",
+  "IL",
+  "IN",
+  "IA",
+  "KS",
+  "KY",
+  "LA",
+  "ME",
+  "MD",
+  "MA",
+  "MI",
+  "MN",
+  "MS",
+  "MO",
+  "MT",
+  "NE",
+  "NV",
+  "NH",
+  "NJ",
+  "NM",
+  "NY",
+  "NC",
+  "ND",
+  "OH",
+  "OK",
+  "OR",
+  "PA",
+  "RI",
+  "SC",
+  "SD",
+  "TN",
+  "TX",
+  "UT",
+  "VT",
+  "VA",
+  "WA",
+  "WV",
+  "WI",
+  "WY",
+]);
 let currentRecords = [];
 let currentPage = 1;
 let statusTimer = null;
 let autoRefreshTimer = null;
 let portalLoadInFlight = false;
+let recordsSort = { key: "", direction: "asc" };
 
 function getSelectedRangeDays() {
   const value = Number(rangeFilter?.value || 7);
@@ -496,6 +550,26 @@ function applyAdaptiveCardPalette({ alpha, backgroundLuminance, colorMode = "lig
   root.style.setProperty("--director-hover-bg", useLightCardText ? "rgba(248, 250, 252, 0.12)" : "rgba(255, 255, 255, 0.38)");
 }
 
+function applyGlassCardTreatment({ translucency, colorMode = "light" }) {
+  const root = document.documentElement;
+  const glassAmount = normalizeTranslucency(translucency) / 100;
+  const blur = 22 * (1 - glassAmount);
+  const saturation = 150 - glassAmount * 50;
+  const brightness = 1.06 - glassAmount * 0.06;
+  const isDark = normalizeColorMode(colorMode) === "dark";
+
+  root.style.setProperty("--director-card-blur", `${blur.toFixed(1)}px`);
+  root.style.setProperty("--director-card-saturation", `${saturation.toFixed(0)}%`);
+  root.style.setProperty("--director-card-brightness", brightness.toFixed(2));
+  root.style.setProperty(
+    "--director-card-line",
+    isDark
+      ? `rgba(248, 250, 252, ${0.16 - glassAmount * 0.06})`
+      : `rgba(255, 255, 255, ${0.42 - glassAmount * 0.22})`
+  );
+  root.style.setProperty("--director-shadow", "none");
+}
+
 function deriveUiLuminanceFromPixels(pixels) {
   const values = [];
   let total = 0;
@@ -515,22 +589,33 @@ function deriveUiLuminanceFromPixels(pixels) {
 function applyAppearance({ translucency = 0, backgroundImage = "", backgroundLuminance = null, colorMode = "light" } = {}) {
   const normalizedTranslucency = normalizeTranslucency(translucency);
   const normalizedMode = normalizeColorMode(colorMode);
-  const alpha = 1 - normalizedTranslucency * 0.0098;
+  const glassAmount = normalizedTranslucency / 100;
+  const alpha = Math.max(0, 1 - normalizedTranslucency * 0.01);
+  const lightOverlayStart = 0.84 * (1 - glassAmount);
+  const lightOverlayEnd = 0.78 * (1 - glassAmount);
+  const darkOverlayStart = 0.9 * (1 - glassAmount);
+  const darkOverlayEnd = 0.82 * (1 - glassAmount);
+  const lightPhotoStart = 0.1 * (1 - glassAmount);
+  const lightPhotoEnd = 0.08 * (1 - glassAmount);
+  const darkPhotoStart = 0.45 * (1 - glassAmount);
+  const darkPhotoEnd = 0.35 * (1 - glassAmount);
+
   document.documentElement.style.setProperty("--director-card-alpha", String(alpha));
   document.documentElement.style.setProperty(
     "--director-background-overlay",
     normalizedMode === "dark"
-      ? "linear-gradient(135deg, rgba(15, 18, 24, 0.9), rgba(28, 32, 40, 0.82))"
-      : "linear-gradient(135deg, rgba(255, 255, 255, 0.84), rgba(244, 245, 247, 0.78))"
+      ? `linear-gradient(135deg, rgba(15, 18, 24, ${darkOverlayStart.toFixed(2)}), rgba(28, 32, 40, ${darkOverlayEnd.toFixed(2)}))`
+      : `linear-gradient(135deg, rgba(255, 255, 255, ${lightOverlayStart.toFixed(2)}), rgba(244, 245, 247, ${lightOverlayEnd.toFixed(2)}))`
   );
   document.documentElement.style.setProperty(
     "--director-photo-overlay",
     normalizedMode === "dark"
-      ? "linear-gradient(135deg, rgba(10, 12, 16, 0.45), rgba(10, 12, 16, 0.35))"
-      : "linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(18, 15, 19, 0.08))"
+      ? `linear-gradient(135deg, rgba(10, 12, 16, ${darkPhotoStart.toFixed(2)}), rgba(10, 12, 16, ${darkPhotoEnd.toFixed(2)}))`
+      : `linear-gradient(135deg, rgba(255, 255, 255, ${lightPhotoStart.toFixed(2)}), rgba(18, 15, 19, ${lightPhotoEnd.toFixed(2)}))`
   );
   document.body?.classList.toggle("director-mode-dark", normalizedMode === "dark");
   applyAdaptiveCardPalette({ alpha, backgroundLuminance, colorMode: normalizedMode });
+  applyGlassCardTreatment({ translucency: normalizedTranslucency, colorMode: normalizedMode });
   const applyPhotoClass = () => {
     if (!document.body) return;
     document.body.classList.toggle("has-director-photo-bg", !!backgroundImage);
@@ -677,6 +762,123 @@ function formatDateTime(value) {
 
 function formatMoney(cents) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((Number(cents) || 0) / 100);
+}
+
+function getRecordSortValue(record = {}, key = "") {
+  switch (key) {
+    case "outreach":
+      return { type: "date", value: record.firstOutreachSentAt };
+    case "followUp":
+      return { type: "date", value: record.followUpSentAt };
+    case "registered":
+      return { type: "date", value: record.registeredAt };
+    case "matter":
+      return { type: "date", value: record.firstMatterPostedAt || record.firstMatterCompletedAt };
+    case "commission":
+      return { type: "number", value: Number(record.commissionEarnedCents || 0) };
+    case "state":
+      return { type: "text", value: record.state };
+    case "attorney":
+      return { type: "text", value: record.attorneyName };
+    case "email":
+      return { type: "text", value: record.attorneyEmail };
+    case "stage":
+      return { type: "text", value: record.stageLabel || record.stage };
+    default:
+      return { type: "text", value: "" };
+  }
+}
+
+function normalizeSortValue({ type, value } = {}) {
+  if (type === "date") {
+    const time = new Date(value).getTime();
+    return Number.isFinite(time) ? time : null;
+  }
+  if (type === "number") {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+  }
+  const text = String(value || "").trim().toLowerCase();
+  return text || null;
+}
+
+function compareRecordValues(aRecord = {}, bRecord = {}, key = "", direction = "asc") {
+  const aMeta = getRecordSortValue(aRecord, key);
+  const bMeta = getRecordSortValue(bRecord, key);
+  const aValue = normalizeSortValue(aMeta);
+  const bValue = normalizeSortValue(bMeta);
+  const aMissing = aValue === null;
+  const bMissing = bValue === null;
+  if (aMissing && bMissing) return 0;
+  if (aMissing) return 1;
+  if (bMissing) return -1;
+
+  let result = 0;
+  if (aMeta.type === "text") {
+    result = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: "base" });
+  } else {
+    result = aValue - bValue;
+  }
+  return direction === "desc" ? result * -1 : result;
+}
+
+function getSortedRecords(records = []) {
+  if (!recordsSort.key) return records;
+  return [...records].sort((a, b) => compareRecordValues(a, b, recordsSort.key, recordsSort.direction));
+}
+
+function updateSortHeaders() {
+  recordsSortButtons.forEach((button) => {
+    const active = button.dataset.sortKey === recordsSort.key;
+    const direction = active ? recordsSort.direction : "";
+    button.dataset.sortActive = active ? "true" : "false";
+    button.dataset.sortIcon = direction === "desc" ? "↓" : "↑";
+    button.setAttribute(
+      "aria-label",
+      `${button.textContent.trim()} sort ${active && direction === "asc" ? "descending" : "ascending"}`
+    );
+    button.closest("th")?.setAttribute(
+      "aria-sort",
+      !active ? "none" : direction === "desc" ? "descending" : "ascending"
+    );
+  });
+}
+
+function renderStateSelect(record = {}) {
+  const recordId = String(record.id || "");
+  const currentState = String(record.state || "").toUpperCase();
+  const options = [
+    `<option value="">State</option>`,
+    ...US_STATE_CODES.map((state) => (
+      `<option value="${state}"${currentState === state ? " selected" : ""}>${state}</option>`
+    )),
+  ].join("");
+  return `<select class="record-state-select" data-record-state-id="${escapeHTML(recordId)}" aria-label="Set attorney state">${options}</select>`;
+}
+
+async function updateRecordState(select) {
+  const recordId = select?.dataset?.recordStateId || "";
+  const state = String(select?.value || "").toUpperCase();
+  if (!recordId || !state) return;
+  const previousRecord = currentRecords.find((record) => String(record.id || "") === recordId);
+  const previousState = previousRecord?.state || "";
+  select.disabled = true;
+  try {
+    const res = await secureFetch(`/api/director/records/${encodeURIComponent(recordId)}/state`, {
+      method: "PATCH",
+      body: { state },
+      headers: { Accept: "application/json" },
+    });
+    const payload = await readJsonOrThrow(res, "Unable to update attorney state.");
+    currentRecords = currentRecords.map((record) => (String(record.id || "") === recordId ? payload.record || record : record));
+    setStatus(`State set to ${state}.`, { tone: "success", transient: true });
+    renderCurrentRecordsPage();
+  } catch (err) {
+    if (previousRecord) previousRecord.state = previousState;
+    select.value = previousState;
+    select.disabled = false;
+    setStatus(err?.message || "Unable to update attorney state.", { tone: "error" });
+  }
 }
 
 function escapeHTML(value) {
@@ -849,6 +1051,7 @@ function renderRecords(records = [], { preservePage = false } = {}) {
 
 function renderCurrentRecordsPage() {
   if (!recordsBody) return;
+  updateSortHeaders();
   if (!currentRecords.length) {
     const filterLabel = stageFilter?.selectedOptions?.[0]?.textContent || "this view";
     recordsBody.innerHTML = `
@@ -865,7 +1068,7 @@ function renderCurrentRecordsPage() {
   const totalPages = Math.max(1, Math.ceil(currentRecords.length / RECORDS_PER_PAGE));
   currentPage = Math.min(Math.max(1, currentPage), totalPages);
   const start = (currentPage - 1) * RECORDS_PER_PAGE;
-  const pageRecords = currentRecords.slice(start, start + RECORDS_PER_PAGE);
+  const pageRecords = getSortedRecords(currentRecords).slice(start, start + RECORDS_PER_PAGE);
 
   recordsBody.innerHTML = pageRecords
     .map((record) => {
@@ -886,15 +1089,15 @@ function renderCurrentRecordsPage() {
           : "";
       return `
         <tr>
+          <td data-label="Outreach">${escapeHTML(formatDate(record.firstOutreachSentAt))}</td>
+          <td data-label="State">${renderStateSelect(record)}</td>
           <td data-label="Attorney">${escapeHTML(record.attorneyName || "—")}</td>
           <td data-label="Email">${escapeHTML(record.attorneyEmail || "—")}</td>
-          <td data-label="State">${escapeHTML(record.state || "—")}</td>
           <td data-label="Stage"><span class="director-badge${stageClass}">${escapeHTML(record.stageLabel || record.stage || "—")}</span></td>
-          <td data-label="Outreach">${escapeHTML(formatDate(record.firstOutreachSentAt))}</td>
           <td data-label="Follow-Up">${escapeHTML(formatDate(record.followUpSentAt))}</td>
           <td data-label="Registered">${escapeHTML(formatDate(record.registeredAt))}</td>
           <td data-label="Matter">${escapeHTML(formatDate(record.firstMatterPostedAt || record.firstMatterCompletedAt))}</td>
-          <td data-label="Commission">${escapeHTML(formatMoney(record.commissionEarnedCents || 0))}</td>
+          <td data-label="Commission">${escapeHTML(Number(record.commissionEarnedCents || 0) > 0 ? formatMoney(record.commissionEarnedCents) : "—")}</td>
         </tr>
       `;
     })
@@ -1094,6 +1297,23 @@ appearanceModeBtns.forEach((button) => {
   button.addEventListener("click", () => {
     updateAppearance({ colorMode: button.dataset.appearanceMode || "light" });
   });
+});
+recordsSortButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const key = button.dataset.sortKey || "";
+    if (!key) return;
+    recordsSort = {
+      key,
+      direction: recordsSort.key === key && recordsSort.direction === "asc" ? "desc" : "asc",
+    };
+    currentPage = 1;
+    renderCurrentRecordsPage();
+  });
+});
+recordsBody?.addEventListener("change", (event) => {
+  const select = event.target?.closest?.("[data-record-state-id]");
+  if (!select) return;
+  updateRecordState(select);
 });
 document.getElementById("recordsPrevBtn")?.addEventListener("click", () => {
   currentPage -= 1;

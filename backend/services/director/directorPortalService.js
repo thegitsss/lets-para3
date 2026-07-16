@@ -822,6 +822,39 @@ async function listDirectorRecords({ user = {}, state = "", stage = "", rangeDay
   return records.map(serializeRecord);
 }
 
+async function updateDirectorRecordState({ user = {}, recordId = "", state = "" } = {}) {
+  if (String(user.role || "").toLowerCase() !== "director") {
+    const error = new Error("Only director accounts can update outreach record state.");
+    error.statusCode = 403;
+    throw error;
+  }
+  if (!mongoose.Types.ObjectId.isValid(recordId)) {
+    const error = new Error("Invalid outreach record.");
+    error.statusCode = 400;
+    throw error;
+  }
+  const normalizedState = normalizeState(state);
+  if (!normalizedState) {
+    const error = new Error("Choose a valid attorney state.");
+    error.statusCode = 400;
+    throw error;
+  }
+  const record = await DirectorOutreachRecord.findOneAndUpdate(
+    {
+      _id: new mongoose.Types.ObjectId(recordId),
+      directorUserId: new mongoose.Types.ObjectId(user.id || user._id),
+    },
+    { $set: { state: normalizedState, updatedAt: new Date() } },
+    { new: true }
+  ).lean();
+  if (!record) {
+    const error = new Error("Outreach record not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+  return serializeRecord(record);
+}
+
 async function getDirectorOverview({ user = {}, rangeDays = 7 } = {}) {
   const profile = String(user.role || "").toLowerCase() === "director" ? await ensureDirectorProfile(user) : null;
   const filter = profile ? { directorUserId: profile.userId } : {};
@@ -973,4 +1006,5 @@ module.exports = {
   sendDirectorOutreach,
   serializeProfile,
   updateDirectorProfile,
+  updateDirectorRecordState,
 };

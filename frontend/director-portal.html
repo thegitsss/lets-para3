@@ -18,6 +18,9 @@
       --director-card-alpha: 1;
       --director-card-bg: rgba(255, 255, 255, var(--director-card-alpha));
       --director-card-line: rgba(255, 255, 255, 0.42);
+      --director-card-blur: 22px;
+      --director-card-saturation: 150%;
+      --director-card-brightness: 1.06;
       --director-card-ink: #120f13;
       --director-card-muted: #89838c;
       --director-chart-grid: rgba(255, 255, 255, 0.2);
@@ -393,8 +396,8 @@
       border: 1px solid var(--director-card-line);
       border-radius: 24px;
       box-shadow: var(--director-shadow);
-      backdrop-filter: blur(22px) saturate(150%) brightness(1.06);
-      -webkit-backdrop-filter: blur(22px) saturate(150%) brightness(1.06);
+      backdrop-filter: blur(var(--director-card-blur)) saturate(var(--director-card-saturation)) brightness(var(--director-card-brightness));
+      -webkit-backdrop-filter: blur(var(--director-card-blur)) saturate(var(--director-card-saturation)) brightness(var(--director-card-brightness));
       color: var(--director-card-ink);
     }
     .director-panel { padding: 1rem; }
@@ -456,8 +459,8 @@
       border: 1px solid var(--director-card-line);
       border-radius: 24px;
       box-shadow: var(--director-shadow);
-      backdrop-filter: blur(22px) saturate(150%) brightness(1.06);
-      -webkit-backdrop-filter: blur(22px) saturate(150%) brightness(1.06);
+      backdrop-filter: blur(var(--director-card-blur)) saturate(var(--director-card-saturation)) brightness(var(--director-card-brightness));
+      -webkit-backdrop-filter: blur(var(--director-card-blur)) saturate(var(--director-card-saturation)) brightness(var(--director-card-brightness));
       color: var(--director-card-ink);
     }
     .arc-chart {
@@ -742,6 +745,65 @@
       top: 0;
       z-index: 1;
     }
+    .director-sort-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      width: 100%;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      font: inherit;
+      letter-spacing: inherit;
+      text-align: left;
+      text-transform: inherit;
+    }
+    .director-sort-btn::after {
+      content: "↕";
+      color: currentColor;
+      font-size: 0.72rem;
+      opacity: 0.44;
+    }
+    .director-sort-btn[data-sort-active="true"]::after {
+      content: attr(data-sort-icon);
+      opacity: 0.92;
+    }
+    .director-sort-btn:focus-visible {
+      outline: 2px solid currentColor;
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+    .record-state-select {
+      width: 4.45rem;
+      min-height: 1.7rem;
+      border: 1px solid var(--director-control-line);
+      border-radius: 999px;
+      background: var(--director-control-bg);
+      color: var(--director-card-ink);
+      font-size: 0.74rem;
+      font-weight: 400;
+      padding: 0.18rem 0.38rem;
+    }
+    .record-state-select:disabled {
+      cursor: wait;
+      opacity: 0.62;
+    }
+    body.director-mode-dark .record-state-select {
+      border-color: rgba(248, 250, 252, 0.24);
+      background: rgba(15, 23, 42, 0.42);
+      color: #f8fafc;
+    }
+    body.director-mode-dark .director-table-wrap {
+      background: rgba(248, 250, 252, 0.08);
+      border-color: rgba(248, 250, 252, 0.18);
+    }
+    body.director-mode-dark .director-table th {
+      color: rgba(248, 250, 252, 0.9);
+      background: rgba(248, 250, 252, 0.14);
+      border-bottom-color: rgba(248, 250, 252, 0.22);
+    }
     .director-table tbody tr:hover { background: var(--director-hover-bg); }
     .records-empty td {
       padding: 2.1rem 1rem;
@@ -832,6 +894,27 @@
       border-color: rgba(104, 198, 138, 0.35);
       color: #2f7d58;
       background: #edf8f2;
+    }
+    body.director-mode-dark .director-badge {
+      border-color: rgba(248, 250, 252, 0.24);
+      color: rgba(248, 250, 252, 0.86);
+      background: rgba(15, 23, 42, 0.5);
+    }
+    body.director-mode-dark .director-badge.attention {
+      border-color: rgba(251, 191, 36, 0.5);
+      color: #fbbf24;
+      background: rgba(120, 53, 15, 0.52);
+    }
+    body.director-mode-dark .director-badge.registered {
+      border-color: rgba(147, 197, 253, 0.52);
+      color: #bfdbfe;
+      background: rgba(30, 64, 175, 0.48);
+    }
+    body.director-mode-dark .director-badge.matter,
+    body.director-mode-dark .director-badge.commission {
+      border-color: rgba(134, 239, 172, 0.48);
+      color: #bbf7d0;
+      background: rgba(20, 83, 45, 0.48);
     }
     @media (max-width: 1100px) {
       .director-board {
@@ -1428,15 +1511,15 @@
           <table class="director-table">
             <thead>
               <tr>
-                <th>Attorney</th>
-                <th>Email</th>
-                <th>State</th>
-                <th>Stage</th>
-                <th>Outreach</th>
-                <th>Follow-Up</th>
-                <th>Registered</th>
-                <th>Matter</th>
-                <th>Commission</th>
+                <th aria-sort="none"><button type="button" class="director-sort-btn" data-sort-key="outreach">Outreach</button></th>
+                <th aria-sort="none"><button type="button" class="director-sort-btn" data-sort-key="state">State</button></th>
+                <th aria-sort="none"><button type="button" class="director-sort-btn" data-sort-key="attorney">Attorney</button></th>
+                <th aria-sort="none"><button type="button" class="director-sort-btn" data-sort-key="email">Email</button></th>
+                <th aria-sort="none"><button type="button" class="director-sort-btn" data-sort-key="stage">Stage</button></th>
+                <th aria-sort="none"><button type="button" class="director-sort-btn" data-sort-key="followUp">Follow-Up</button></th>
+                <th aria-sort="none"><button type="button" class="director-sort-btn" data-sort-key="registered">Registered</button></th>
+                <th aria-sort="none"><button type="button" class="director-sort-btn" data-sort-key="matter">Matter</button></th>
+                <th aria-sort="none"><button type="button" class="director-sort-btn" data-sort-key="commission">Commission</button></th>
               </tr>
             </thead>
             <tbody id="recordsBody">

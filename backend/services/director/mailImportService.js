@@ -5,6 +5,11 @@ const {
   DIRECTOR_OUTREACH_SUBJECT,
 } = require("./constants");
 
+const DIRECTOR_OUTREACH_SUBJECT_ALIASES = [
+  DIRECTOR_OUTREACH_SUBJECT,
+  "for matters that need an extra hand",
+];
+
 const DEFAULT_ZOHO_BASE_URL = "https://mail.zoho.com/api";
 const DEFAULT_ZOHO_ACCOUNTS_BASE_URL = "https://accounts.zoho.com";
 const ACCESS_TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
@@ -25,15 +30,24 @@ function normalizeSubject(value = "") {
     .toLowerCase();
 }
 
+function decodeHtmlEntities(value = "") {
+  return String(value || "")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
 function parseAddress(value = "") {
   if (!value) return { name: "", email: "" };
   if (typeof value === "object") {
     return {
-      name: String(value.name || value.displayName || value.address || "").replace(/["<>]/g, "").trim(),
+      name: decodeHtmlEntities(value.name || value.displayName || value.address || "").replace(/["<>]/g, "").trim(),
       email: normalizeEmail(value.address || value.email || value.mail || value.value || ""),
     };
   }
-  const text = String(value || "").trim();
+  const text = decodeHtmlEntities(value).trim();
   const email = normalizeEmail(text);
   const name = text
     .replace(/<[^>]+>/g, "")
@@ -243,21 +257,40 @@ function extractMessageList(payload = {}) {
   return [];
 }
 
-function getMessageTimestamp(message = {}) {
-  const value =
-    message.sentDateInGMT ||
-    message.receivedTime ||
-    message.receivedDate ||
-    message.sentDate ||
-    message.date ||
-    message.time ||
-    "";
+function filterMessagesByDate(messages = [], fromDate, toDate) {
+  const fromTime = fromDate ? new Date(fromDate).getTime() : null;
+  const toTime = toDate ? new Date(toDate).getTime() : null;
+  return messages.filter((message) => {
+    const messageTime = getMessageTimestamp(message).getTime();
+    if (!Number.isFinite(messageTime)) return true;
+    if (Number.isFinite(fromTime) && messageTime < fromTime) return false;
+    if (Number.isFinite(toTime) && messageTime > toTime) return false;
+    return true;
+  });
+}
+
+function parseZohoDateValue(value) {
+  if (!value) return null;
   const numeric = Number(value);
   if (Number.isFinite(numeric) && numeric > 0) {
     return new Date(numeric > 10_000_000_000 ? numeric : numeric * 1000);
   }
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getMessageTimestamp(message = {}) {
+  const values = [
+    message.sentDateInGMT ||
+      message.sentDate ||
+      message.date ||
+      message.time,
+    message.receivedDate ||
+      message.receivedTime,
+  ];
+  const dates = values.map(parseZohoDateValue).filter(Boolean);
+  const latestAcceptableTime = Date.now() + 5 * 60 * 1000;
+  return dates.find((date) => date.getTime() <= latestAcceptableTime) || dates[0] || new Date();
 }
 
 function extractMessageId(message = {}) {
@@ -271,13 +304,17 @@ function extractMessageId(message = {}) {
   ).trim();
 }
 
+function isDirectorOutreachSubject(subject = "") {
+  const normalized = normalizeSubject(subject);
+  return DIRECTOR_OUTREACH_SUBJECT_ALIASES.some((alias) => normalizeSubject(alias) === normalized);
+}
+
 function mapSentMessage(message = {}, profile = {}) {
   const subject = String(message.subject || "").trim();
   const normalized = normalizeSubject(subject);
-  const outreachSubject = normalizeSubject(DIRECTOR_OUTREACH_SUBJECT);
   const followUpSubject = normalizeSubject(DIRECTOR_FOLLOW_UP_SUBJECT);
   let eventType = "";
-  if (normalized === outreachSubject) eventType = "outreach_sent";
+  if (isDirectorOutreachSubject(subject)) eventType = "outreach_sent";
   if (normalized === followUpSubject) eventType = "follow_up_sent";
   if (!eventType) return [];
 
@@ -302,8 +339,7 @@ function mapSentMessage(message = {}, profile = {}) {
 function mapInboxMessage(message = {}, profile = {}) {
   const subject = String(message.subject || "").trim();
   const normalized = normalizeSubject(subject);
-  const allowed = [normalizeSubject(DIRECTOR_OUTREACH_SUBJECT), normalizeSubject(DIRECTOR_FOLLOW_UP_SUBJECT)];
-  if (!allowed.includes(normalized)) return null;
+  if (!isDirectorOutreachSubject(subject) && normalized !== normalizeSubject(DIRECTOR_FOLLOW_UP_SUBJECT)) return null;
   const from = parseAddress(message.fromAddress || message.fromEmailAddress || message.from || message.sender);
   if (!from.email) return null;
   return {
@@ -328,15 +364,14 @@ async function fetchZohoMessages({ profile, folderKind = "sent", fromDate, toDat
   const folderId = await resolveFolderId(config, accountId, folderKind);
   const payload = await zohoGet(
     config,
-    `/accounts/${encodeURIComponent(accountId)}/folders/${encodeURIComponent(folderId)}/messages/view`,
+    `/accounts/${encodeURIComponent(accountId)}/messages/view`,
     {
+      folderId,
       limit: 200,
       includeto: true,
-      fromDate: fromDate ? new Date(fromDate).getTime() : undefined,
-      toDate: toDate ? new Date(toDate).getTime() : undefined,
     }
   );
-  return extractMessageList(payload);
+  return filterMessagesByDate(extractMessageList(payload), fromDate, toDate);
 }
 
 module.exports = {
