@@ -20,6 +20,7 @@ const { publishEventSafe } = require("../services/lpcEvents/publishEventService"
 const { ensureApprovedUserAuthReady, isApprovedUser } = require("../utils/authReady");
 const {
   normalizeEmail,
+  sendVerificationEmail,
   applyVerifiedEmail,
 } = require("../utils/emailVerification");
 

@@ -4,7 +4,7 @@ const { connect, clearDatabase, closeDatabase } = require("./helpers/db");
 const { buildTestApp } = require("./helpers/testApp");
 const sendEmail = require("../utils/email");
 
-jest.mock("../utils/email", () => jest.fn());
+jest.mock("../utils/email", () => jest.fn(async () => ({ ok: true })));
 
 const app = buildTestApp();
 
@@ -26,7 +26,7 @@ const validAttorneyPayload = {
 function extractTokenFromEmailCall(call = []) {
   const [, , body = "", opts = {}] = call;
   const haystack = [body, opts?.text || ""].filter(Boolean).join("\n");
-  const match = haystack.match(/token=([^&\s]+)/i);
+  const match = haystack.match(/token=([^&\s"'<>]+)/i);
   return match ? decodeURIComponent(match[1]) : "";
 }
 
@@ -252,5 +252,47 @@ describe("Auth workflows", () => {
     const [to, subject] = sendEmail.mock.calls[0];
     expect(to).toBe("taylor.ray@example.com");
     expect(subject).toMatch(/Reset your password/i);
+  });
+
+  test("Password reset token changes the password used for login", async () => {
+    await User.create({
+      firstName: "Morgan",
+      lastName: "Lane",
+      email: "morgan.lane@example.com",
+      password: "OldPassword123!",
+      role: "attorney",
+      status: "approved",
+      emailVerified: true,
+      state: "CA",
+    });
+
+    const requestReset = await request(app).post("/api/auth/request-password-reset").send({
+      email: "morgan.lane@example.com",
+    });
+    expect(requestReset.status).toBe(200);
+    expect(requestReset.body.ok).toBe(true);
+
+    const token = extractTokenFromEmailCall(sendEmail.mock.calls[0]);
+    expect(token).toBeTruthy();
+
+    const reset = await request(app).post("/api/auth/reset-password").send({
+      token,
+      newPassword: "NewPassword123!",
+    });
+    expect(reset.status).toBe(200);
+    expect(reset.body.ok).toBe(true);
+
+    const oldLogin = await request(app).post("/api/auth/login").send({
+      email: "morgan.lane@example.com",
+      password: "OldPassword123!",
+    });
+    expect(oldLogin.status).toBe(401);
+
+    const newLogin = await request(app).post("/api/auth/login").send({
+      email: "morgan.lane@example.com",
+      password: "NewPassword123!",
+    });
+    expect(newLogin.status).toBe(200);
+    expect(newLogin.body.success).toBe(true);
   });
 });
