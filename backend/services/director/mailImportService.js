@@ -7,6 +7,7 @@ const {
 
 const DIRECTOR_OUTREACH_SUBJECT_ALIASES = [
   DIRECTOR_OUTREACH_SUBJECT,
+  "On-demand paralegal support for your firm",
   "for matters that need an extra hand",
 ];
 
