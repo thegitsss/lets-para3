@@ -3,9 +3,9 @@ const { createLogger } = require("../utils/logger");
 const logger = createLogger("ai:config");
 
 const AI_MODELS = {
-  support: process.env.OPENAI_SUPPORT_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
-  marketing: process.env.OPENAI_MARKETING_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
-  sales: process.env.OPENAI_SALES_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini",
+  support: process.env.OPENAI_SUPPORT_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-terra",
+  marketing: process.env.OPENAI_MARKETING_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-terra",
+  sales: process.env.OPENAI_SALES_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-terra",
 };
 
 let OpenAI = null;

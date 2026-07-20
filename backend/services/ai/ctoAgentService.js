@@ -7,7 +7,7 @@ const CtoAgentRun = require("../../models/CtoAgentRun");
 const { createJsonChatCompletion } = require("../../ai/config");
 
 const REPO_ROOT = path.resolve(__dirname, "../../..");
-const CTO_MODEL = process.env.OPENAI_CTO_MODEL || process.env.OPENAI_MODEL || "gpt-4o-mini";
+const CTO_MODEL = process.env.OPENAI_CTO_MODEL || process.env.OPENAI_MODEL || "gpt-5.6-terra";
 
 const CATEGORY_ALIASES = Object.freeze({
   login: "login",

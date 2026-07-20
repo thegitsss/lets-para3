@@ -95,7 +95,17 @@ function getDrawerSubtitle(role = "") {
     .trim()
     .split(/\s+/)
     .filter(Boolean)[0];
-  return `Welcome back, ${firstName || "there"}`;
+  return `Hi ${firstName || "there"}, how can I help you with Let's-ParaConnect? The more details you provide, the better.`;
+}
+
+function isInitialAssistantGreeting(message = {}, index = 0) {
+  if (index !== 0 || getMessageVariant(message) !== "assistant") return false;
+  const text = String(message?.text || "").trim();
+  return (
+    /^Welcome back,\s+[^.]+\.?$/i.test(text) ||
+    /^Hi\s+[^,]+,\s+how can I help you with Let's-ParaConnect\?\s+The more details you provide,\s+the better\.?$/i.test(text) ||
+    /^Hi\s+[—-]\s+I can help with account questions,\s+payouts,\s+case activity,\s+and platform issues\.?$/i.test(text)
+  );
 }
 
 const state = {
@@ -319,9 +329,10 @@ function ensureStylesheet() {
 
 function buildLauncherIcon() {
   return `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="m21 3-8.5 18-2.2-6.3L3 12.5 21 3Z"></path>
-      <path d="M10.3 14.7 21 3"></path>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path>
+      <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-2.9 2.7-2.9 4"></path>
+      <path d="M12 17h.01"></path>
     </svg>
   `;
 }
@@ -354,6 +365,16 @@ function buildMenuIcon() {
   `;
 }
 
+function buildAssistantMarkIcon() {
+  return `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 3l1.65 5.35L19 10l-5.35 1.65L12 17l-1.65-5.35L5 10l5.35-1.65L12 3Z"></path>
+      <path d="M19 15l.72 2.28L22 18l-2.28.72L19 21l-.72-2.28L16 18l2.28-.72L19 15Z"></path>
+      <path d="M4.5 4l.48 1.52L6.5 6l-1.52.48L4.5 8l-.48-1.52L2.5 6l1.52-.48L4.5 4Z"></path>
+    </svg>
+  `;
+}
+
 function createDrawerMarkup() {
   const backdrop = document.createElement("div");
   backdrop.className = "support-drawer-backdrop";
@@ -371,7 +392,10 @@ function createDrawerMarkup() {
   drawer.innerHTML = `
     <header class="support-drawer-header">
       <div class="support-drawer-heading">
-        <h2 class="support-drawer-title" id="supportDrawerTitle">Support</h2>
+        <div class="support-drawer-title-row">
+          <span class="support-drawer-mark">${buildAssistantMarkIcon()}</span>
+          <h2 class="support-drawer-title" id="supportDrawerTitle">Assistant</h2>
+        </div>
         <p class="support-drawer-subtitle" data-support-subtitle></p>
       </div>
       <div class="support-drawer-actions">
@@ -380,7 +404,7 @@ function createDrawerMarkup() {
             class="support-drawer-menu-trigger"
             type="button"
             data-support-menu-trigger
-            aria-label="Open support options"
+            aria-label="Open assistant options"
             aria-expanded="false"
             aria-haspopup="menu"
           >
@@ -392,7 +416,7 @@ function createDrawerMarkup() {
             </button>
           </div>
         </div>
-        <button class="support-drawer-close" type="button" data-support-close aria-label="Close support">
+        <button class="support-drawer-close" type="button" data-support-close aria-label="Close assistant">
           ${buildCloseIcon()}
         </button>
       </div>
@@ -405,7 +429,7 @@ function createDrawerMarkup() {
         <div class="support-composer-prompt is-hidden" data-support-composer-prompt aria-hidden="true">
           <span class="support-composer-prompt-text" data-support-composer-prompt-text></span>
         </div>
-        <textarea id="supportComposerInput" data-support-textarea rows="1" aria-label="Describe your issue"></textarea>
+        <textarea id="supportComposerInput" data-support-textarea rows="1" aria-label="Ask Assistant a question"></textarea>
         <button class="support-send" type="submit" data-support-submit aria-label="Send message">
           ${buildSendIcon()}
         </button>
@@ -1009,7 +1033,10 @@ function renderThread() {
   }
 
   state.messages
-    .filter((message) => message?.metadata?.kind !== "support_escalation")
+    .filter((message, index) => {
+      if (message?.metadata?.kind === "support_escalation") return false;
+      return !isInitialAssistantGreeting(message, index);
+    })
     .forEach((message) => {
     state.thread.appendChild(createMessageElement(message));
     });
@@ -1026,7 +1053,9 @@ function renderPrompts() {
   if (!state.prompts) return;
   state.prompts.innerHTML = "";
   if (state.subtitle) {
-    state.subtitle.textContent = getDrawerSubtitle(getSupportRole());
+    const subtitle = getDrawerSubtitle(getSupportRole());
+    state.subtitle.textContent = subtitle;
+    state.subtitle.hidden = false;
   }
   if (!shouldShowQuickPrompts()) return;
 
@@ -1570,7 +1599,8 @@ function createLauncher() {
   const button = document.createElement("button");
   button.type = "button";
   button.className = "notification-icon support-launcher";
-  button.setAttribute("aria-label", "Open support");
+  button.setAttribute("aria-label", "Open AI help chat");
+  button.title = "AI help chat";
   button.setAttribute("aria-controls", SUPPORT_DRAWER_ID);
   button.setAttribute("aria-expanded", "false");
   button.innerHTML = buildLauncherIcon();

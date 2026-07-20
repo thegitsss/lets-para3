@@ -1436,6 +1436,22 @@ function buildSelfServiceActions({
       }),
     ].filter(Boolean);
   }
+  if (
+    category === "case_posting" &&
+    primaryAsk === "help_with_case" &&
+    String(supportFacts.userRole || "").toLowerCase() === "attorney"
+  ) {
+    return [
+      buildActionPayload({
+        label: "Open matters",
+        href: "dashboard-attorney.html#cases",
+      }),
+      buildActionPayload({
+        label: "Browse paralegals",
+        href: "browse-paralegals.html",
+      }),
+    ].filter(Boolean);
+  }
   if (category === "payment" && primaryAsk === "case_payment" && supportFacts.caseState?.caseId) {
     return [
       buildActionPayload({
@@ -3684,6 +3700,12 @@ function buildCaseReply(facts = {}) {
   const { caseState = {}, workspaceState = {} } = facts;
 
   if (!caseState.caseId) {
+    if (String(facts.userRole || "").toLowerCase() === "attorney") {
+      return "I can help with an LPC matter from a few angles: open matters, applicants or invites, messages, files, tasks, funding, or completion. Open your matters to pick the case, or tell me what part is stuck and I'll narrow it down.";
+    }
+    if (String(facts.userRole || "").toLowerCase() === "paralegal") {
+      return "I can help with a case workspace, application, messages, files, tasks, or payout status. Tell me which case or what part is stuck and I'll narrow it down.";
+    }
     return "Tell me which case you're asking about.";
   }
   if (!caseState.found) {
@@ -5972,9 +5994,69 @@ async function getLatestAssistantMessageForConversation(conversationId) {
     .lean();
 }
 
-function buildSupportFallbackPayload() {
+function isCaseHelpPrompt(text = "") {
+  return /\b(help with (?:a|my|this) case|help with (?:a|my|this) matter|case help|matter help)\b/i.test(
+    String(text || "")
+  );
+}
+
+function getRoleAwareFallbackReply(user = {}, text = "") {
+  const role = String(user?.role || "").trim().toLowerCase();
+  if (role === "attorney" && isCaseHelpPrompt(text)) {
+    return {
+      text:
+        "I can help with an LPC matter from a few angles: open matters, applicants or invites, messages, files, tasks, funding, or completion. Open your matters to pick the case, or tell me what part is stuck and I'll narrow it down.",
+      suggestedReplies: ["Open matters", "Applicants or invites", "Messages or files"],
+      actions: [
+        buildActionPayload({ label: "Open matters", href: "dashboard-attorney.html#cases" }),
+        buildActionPayload({ label: "Browse paralegals", href: "browse-paralegals.html" }),
+      ].filter(Boolean),
+    };
+  }
+  if (role === "paralegal" && isCaseHelpPrompt(text)) {
+    return {
+      text:
+        "I can help with a case workspace, application, messages, files, tasks, or payout status. Tell me which case or what part is stuck and I'll narrow it down.",
+      suggestedReplies: ["Case workspace", "Messages or files", "Payout status"],
+      actions: [buildActionPayload({ label: "Open assigned matters", href: "dashboard-paralegal.html#cases" })].filter(Boolean),
+    };
+  }
+  if (role === "attorney") {
+    return {
+      text:
+        "I can help with LPC attorney questions about posting matters, hiring paralegals, billing, messages, case workspaces, or account settings. What are you trying to do?",
+      suggestedReplies: ["Post a matter", "Billing", "Messages"],
+      actions: [],
+    };
+  }
+  if (role === "paralegal") {
+    return {
+      text:
+        "I can help with LPC paralegal questions about your profile, applications, messages, case workspaces, payouts, or account settings. What are you trying to do?",
+      suggestedReplies: ["Profile", "Applications", "Payouts"],
+      actions: [],
+    };
+  }
+  if (role === "admin") {
+    return {
+      text:
+        "I can help with LPC admin questions about approvals, support operations, control-room visibility, user review, or platform workflows. What are you trying to do?",
+      suggestedReplies: ["Approvals", "Support ops", "Control room"],
+      actions: [],
+    };
+  }
   return {
-    text: "I'm having trouble right now, please try again.",
+    text:
+      "I can help with LPC questions about accounts, cases, messages, payments, or platform workflows. What are you trying to do?",
+    suggestedReplies: [],
+    actions: [],
+  };
+}
+
+function buildSupportFallbackPayload({ user = {}, text = "" } = {}) {
+  const fallback = getRoleAwareFallbackReply(user, text);
+  return {
+    text: fallback.text,
     payload: {
       category: "general_support",
       categoryLabel: "Support",
@@ -5986,8 +6068,8 @@ function buildSupportFallbackPayload() {
       escalationReason: "",
       routing: null,
       navigation: null,
-      actions: [],
-      suggestedReplies: [],
+      actions: fallback.actions || [],
+      suggestedReplies: fallback.suggestedReplies,
       grounded: true,
       supportFacts: null,
       primaryAsk: "general_support",
@@ -6026,7 +6108,7 @@ function buildSupportFallbackPayload() {
       detailLevel: "concise",
       aiEnabled: false,
     },
-    internalSummary: "OpenAI support reply failed.",
+    internalSummary: "OpenAI support reply failed; returned role-aware LPC fallback.",
   };
 }
 
@@ -6384,7 +6466,7 @@ async function buildAssistantReply({
     pageContext,
   });
   if (!llmReply?.reply) {
-    return buildSupportFallbackPayload();
+    return buildSupportFallbackPayload({ user: supportUser, text });
   }
 
   return buildLlmAssistantPayload({

@@ -51,6 +51,17 @@ function authCookieFor(user) {
   return `token=${token}`;
 }
 
+function daysAgo(days, hour = 12) {
+  const date = new Date();
+  date.setUTCHours(hour, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() - Number(days || 0));
+  return date;
+}
+
+function isoDate(value) {
+  return new Date(value).toISOString().slice(0, 10);
+}
+
 async function createDirector() {
   return User.create({
     firstName: "Skyler",
@@ -185,6 +196,35 @@ describe("Director portal", () => {
         directorEmail: "skyler@lets-paraconnect.com",
         attorneyName: "Jordan Ellis",
         state: "",
+        stage: "outreach_sent",
+      })
+    );
+  });
+
+  test("imports sent Zoho outreach using the current director subject line", async () => {
+    const director = await createDirector();
+    mailImportService.fetchZohoMessages.mockResolvedValue([
+      {
+        subject: "On-demand paralegal support for your firm",
+        toAddress: "\"Morgan Lee\" <morgan@example-law.com>",
+        sentDate: "2026-06-28T15:00:00.000Z",
+        messageId: "zoho-current-subject-1",
+      },
+    ]);
+
+    const res = await request(app)
+      .post("/api/director/import-today")
+      .set("Cookie", authCookieFor(director))
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.imported).toBe(1);
+
+    const record = await DirectorOutreachRecord.findOne({ attorneyEmail: "morgan@example-law.com" }).lean();
+    expect(record).toEqual(
+      expect.objectContaining({
+        directorEmail: "skyler@lets-paraconnect.com",
+        attorneyName: "Morgan Lee",
         stage: "outreach_sent",
       })
     );
@@ -381,6 +421,12 @@ describe("Director portal", () => {
 
   test("returns analytics series from outreach records and matched platform outcomes", async () => {
     const director = await createDirector();
+    const firstOutreachSentAt = daysAgo(6);
+    const registeredAt = daysAgo(5);
+    const followUpSentAt = daysAgo(4);
+    const lastReplyAt = daysAgo(3);
+    const firstMatterPostedAt = daysAgo(2);
+    const firstMatterCompletedAt = daysAgo(1);
     const attorney = await User.create({
       firstName: "Jordan",
       lastName: "Ellis",
@@ -389,7 +435,7 @@ describe("Director portal", () => {
       role: "attorney",
       status: "approved",
       emailVerified: true,
-      createdAt: new Date("2026-06-06T12:00:00.000Z"),
+      createdAt: registeredAt,
       state: "TX",
     });
     const paralegal = await User.create({
@@ -406,9 +452,9 @@ describe("Director portal", () => {
       directorEmail: director.email,
       attorneyEmail: attorney.email,
       attorneyName: "Jordan Ellis",
-      firstOutreachSentAt: new Date("2026-06-05T12:00:00.000Z"),
-      followUpSentAt: new Date("2026-06-10T12:00:00.000Z"),
-      lastReplyAt: new Date("2026-06-11T12:00:00.000Z"),
+      firstOutreachSentAt,
+      followUpSentAt,
+      lastReplyAt,
       stage: "outreach_sent",
     });
     const caseDoc = await Case.create({
@@ -419,8 +465,8 @@ describe("Director portal", () => {
       title: "Analytics matter",
       details: "Review documents.",
       status: "completed",
-      createdAt: new Date("2026-06-12T12:00:00.000Z"),
-      completedAt: new Date("2026-06-15T12:00:00.000Z"),
+      createdAt: firstMatterPostedAt,
+      completedAt: firstMatterCompletedAt,
       totalAmount: 100000,
       lockedTotalAmount: 100000,
       feeAttorneyPct: 22,
@@ -452,10 +498,10 @@ describe("Director portal", () => {
       })
     );
     const byDate = new Map(res.body.series.map((bucket) => [bucket.date, bucket]));
-    expect(byDate.get("2026-06-05").emailsSent).toBe(1);
-    expect(byDate.get("2026-06-06").registrations).toBe(1);
-    expect(byDate.get("2026-06-12").mattersPosted).toBe(1);
-    expect(byDate.get("2026-06-15").mattersCompleted).toBe(1);
+    expect(byDate.get(isoDate(firstOutreachSentAt)).emailsSent).toBe(1);
+    expect(byDate.get(isoDate(registeredAt)).registrations).toBe(1);
+    expect(byDate.get(isoDate(firstMatterPostedAt)).mattersPosted).toBe(1);
+    expect(byDate.get(isoDate(firstMatterCompletedAt)).mattersCompleted).toBe(1);
   });
 
   test("filters overview and records by selected day range", async () => {
@@ -517,6 +563,7 @@ describe("Director portal", () => {
       role: "attorney",
       status: "approved",
       emailVerified: true,
+      createdAt: new Date("2026-06-29T12:00:00.000Z"),
     });
     await DirectorOutreachRecord.create({
       directorUserId: director._id,
@@ -568,6 +615,7 @@ describe("Director portal", () => {
       role: "attorney",
       status: "approved",
       emailVerified: true,
+      createdAt: new Date("2026-06-29T12:00:00.000Z"),
     });
     await DirectorOutreachRecord.create({
       directorUserId: director._id,

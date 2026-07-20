@@ -1855,9 +1855,46 @@ jest.mock("../ai/supportAgent", () => {
         }
       }
 
+      const fallbackByRole = {
+        attorney: {
+          reply:
+            "I can help with LPC attorney questions about posting matters, hiring paralegals, billing, messages, case workspaces, or account settings. What are you trying to do?",
+          suggestions: ["Post a matter", "Billing", "Messages"],
+        },
+        paralegal: {
+          reply:
+            "I can help with LPC paralegal questions about your profile, applications, messages, case workspaces, payouts, or account settings. What are you trying to do?",
+          suggestions: ["Profile", "Applications", "Payouts"],
+        },
+        admin: {
+          reply:
+            "I can help with LPC admin questions about approvals, support operations, control-room visibility, user review, or platform workflows. What are you trying to do?",
+          suggestions: ["Approvals", "Support ops", "Control room"],
+        },
+      };
+      if (context.role === "attorney" && /\bhelp with (?:a|my|this) case\b/i.test(messageText || "")) {
+        return buildReply({
+          reply:
+            "I can help with an LPC matter from a few angles: open matters, applicants or invites, messages, files, tasks, funding, or completion. Open your matters to pick the case, or tell me what part is stuck and I'll narrow it down.",
+          suggestions: ["Open matters", "Applicants or invites", "Messages or files"],
+          actions: [
+            linkAction("Open matters", "dashboard-attorney.html#cases"),
+            linkAction("Browse paralegals", "browse-paralegals.html"),
+          ],
+          navigation: null,
+          category: "case_posting",
+          primaryAsk: "help_with_case",
+          activeTask: "ANSWER",
+        });
+      }
+      const fallback = fallbackByRole[context.role] || {
+        reply:
+          "I can help with LPC questions about accounts, cases, messages, payments, or platform workflows. What are you trying to do?",
+        suggestions: [],
+      };
       return buildReply({
-        reply: "How can I help today?",
-        suggestions: ["Applications", "Messages", "Profile settings"],
+        reply: fallback.reply,
+        suggestions: fallback.suggestions,
         navigation: null,
         category: "general_support",
         primaryAsk: "general_support",
@@ -7241,6 +7278,186 @@ describe("Support assistant API", () => {
     expect(sendRes.body.assistantMessage.text).not.toMatch(/only handles admin dashboard questions/i);
   });
 
+  test("answers attorney case-help quick prompt with useful matter guidance", async () => {
+    const attorney = await createUser({
+      role: "attorney",
+      email: "support-attorney-case-help-quick-prompt@lets-paraconnect.test",
+      firstName: "Casey",
+      lastName: "Attorney",
+    });
+
+    const conversationRes = await createConversation(attorney, {
+      sourcePage: "/dashboard-attorney.html",
+      viewName: "dashboard-attorney",
+    });
+    const sendRes = await sendSupportMessage(attorney, conversationRes.body.conversation.id, {
+      text: "I need help with a case",
+      pageContext: {
+        pathname: "/dashboard-attorney.html",
+        viewName: "dashboard-attorney",
+      },
+    });
+
+    expect(sendRes.status).toBe(201);
+    const text = String(sendRes.body.assistantMessage?.text || "");
+    expect(text).toMatch(/open matters/i);
+    expect(text).toMatch(/applicants|invites/i);
+    expect(text).toMatch(/messages|files|tasks|funding|completion/i);
+    expect(text).not.toMatch(/I can help with LPC attorney questions about posting matters/i);
+    expect(sendRes.body.assistantReply).toEqual(
+      expect.objectContaining({
+        primaryAsk: "help_with_case",
+        navigation: null,
+        suggestedReplies: expect.any(Array),
+      })
+    );
+    expect(sendRes.body.assistantReply.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: "Open matters",
+          href: "dashboard-attorney.html#cases",
+        }),
+        expect.objectContaining({
+          label: "Browse paralegals",
+          href: "browse-paralegals.html",
+        }),
+      ])
+    );
+  });
+
+  test("keeps 10 attorney paralegal and admin prompts personalized and LPC bounded", async () => {
+    const attorney = await createUser({
+      role: "attorney",
+      email: "support-role-personalization-attorney@lets-paraconnect.test",
+      firstName: "Avery",
+      lastName: "Attorney",
+    });
+    const paralegal = await createUser({
+      role: "paralegal",
+      email: "support-role-personalization-paralegal@lets-paraconnect.test",
+      firstName: "Parker",
+      lastName: "Paralegal",
+    });
+    const admin = await createUser({
+      role: "admin",
+      email: "support-role-personalization-admin@lets-paraconnect.test",
+      firstName: "Samantha",
+      lastName: "Founder",
+    });
+
+    const promptCases = [
+      {
+        label: "attorney first step",
+        user: attorney,
+        prompt: "What do attorneys usually do first on LPC?",
+        pageContext: { pathname: "/dashboard-attorney.html", viewName: "dashboard-attorney" },
+        expectText: /posting or reviewing your matters/i,
+        rejectText: /apply when a case is open|payouts can be enabled/i,
+      },
+      {
+        label: "attorney billing",
+        user: attorney,
+        prompt: "Where is my payment method?",
+        conversationQuery: { viewName: "billing" },
+        pageContext: { pathname: "/dashboard-attorney.html", viewName: "billing" },
+        expectText: /here/i,
+        expectNavigation: { ctaLabel: "Billing & Payments", ctaHref: "dashboard-attorney.html#billing" },
+        rejectText: /browse open cases|profile so attorneys/i,
+      },
+      {
+        label: "attorney multi-topic",
+        user: attorney,
+        prompt: "Can I change to dark mode and where are my invoices?",
+        pageContext: { pathname: "/dashboard-attorney.html", viewName: "dashboard-attorney" },
+        expectText: /theme settings and billing/i,
+        rejectText: /applications|payouts/i,
+      },
+      {
+        label: "attorney random bounded",
+        user: attorney,
+        prompt: "Write me a pasta recipe.",
+        pageContext: { pathname: "/dashboard-attorney.html", viewName: "dashboard-attorney" },
+        expectText: /LPC attorney questions/i,
+        rejectText: /boil|sauce|recipe/i,
+      },
+      {
+        label: "paralegal first step",
+        user: paralegal,
+        prompt: "What should I do first on LPC?",
+        pageContext: { pathname: "/dashboard-paralegal.html", viewName: "dashboard-paralegal" },
+        expectText: /completing your profile/i,
+        rejectText: /posting or reviewing your matters|billing/i,
+      },
+      {
+        label: "paralegal profile and stripe",
+        user: paralegal,
+        prompt: "How do I create my profile and do I need Stripe yet?",
+        pageContext: { pathname: "/dashboard-paralegal.html", viewName: "dashboard-paralegal" },
+        expectText: /headline, experience, practice areas, and availability/i,
+        rejectText: /post.*matter|hire.*paralegal/i,
+      },
+      {
+        label: "paralegal browse cases",
+        user: paralegal,
+        prompt: "Where can I find cases to apply to?",
+        pageContext: { pathname: "/dashboard-paralegal.html", viewName: "dashboard-paralegal" },
+        expectText: /here/i,
+        expectNavigation: { ctaLabel: "Browse cases", ctaHref: "browse-jobs.html" },
+        rejectText: /billing.*payments/i,
+      },
+      {
+        label: "paralegal random bounded",
+        user: paralegal,
+        prompt: "What is the capital of France?",
+        pageContext: { pathname: "/dashboard-paralegal.html", viewName: "dashboard-paralegal" },
+        expectText: /LPC paralegal questions/i,
+        rejectText: /Paris/i,
+      },
+      {
+        label: "admin approvals",
+        user: admin,
+        prompt: "Where is the review queue?",
+        conversationQuery: { sourcePage: "/admin-dashboard.html", viewName: "admin-dashboard" },
+        pageContext: { pathname: "/admin-dashboard.html", viewName: "admin-dashboard" },
+        expectText: /Approvals/i,
+        expectNavigation: { ctaLabel: "Approvals", ctaHref: "admin-dashboard.html#approvals-workspace" },
+        expectProvider: "admin_dashboard_support",
+        rejectText: /profile settings|browse open cases/i,
+      },
+      {
+        label: "admin random bounded",
+        user: admin,
+        prompt: "Tell me a joke about the moon.",
+        pageContext: { pathname: "/admin-dashboard.html", viewName: "admin-dashboard" },
+        expectText: /LPC admin questions/i,
+        rejectText: /moon|joke/i,
+      },
+    ];
+
+    expect(promptCases).toHaveLength(10);
+
+    for (const promptCase of promptCases) {
+      const conversationRes = await createConversation(promptCase.user, promptCase.conversationQuery || {});
+      expect(conversationRes.status).toBe(200);
+      const sendRes = await sendSupportMessage(promptCase.user, conversationRes.body.conversation.id, {
+        text: promptCase.prompt,
+        pageContext: promptCase.pageContext,
+      });
+
+      expect(sendRes.status).toBe(201);
+      const text = String(sendRes.body.assistantMessage?.text || "");
+      const reply = sendRes.body.assistantReply || {};
+      expect(text).toMatch(promptCase.expectText);
+      expect(text).not.toMatch(promptCase.rejectText);
+      if (promptCase.expectNavigation) {
+        expect(reply.navigation).toEqual(expect.objectContaining(promptCase.expectNavigation));
+      }
+      if (promptCase.expectProvider) {
+        expect(reply.provider).toBe(promptCase.expectProvider);
+      }
+    }
+  });
+
   test("attorney prompt sweep stays coherent across 50 prompts", async () => {
     const attorney = await createUser({
       role: "attorney",
@@ -7799,7 +8016,7 @@ describe("Support assistant API", () => {
           break;
         case "generic_intake":
           expect(reply.needsEscalation).toBe(false);
-          expect(text).toBe("How can I help today?");
+          expect(text).toMatch(/How can I help today\?|LPC attorney questions/i);
           break;
         case "browse_paralegals":
           expect(reply.navigation).toEqual(

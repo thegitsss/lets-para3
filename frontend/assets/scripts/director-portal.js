@@ -1223,7 +1223,7 @@ async function importToday() {
     await loadPortal();
     setStatus(`Imported ${payload.imported || 0}`, { tone: "success", transient: true });
   } catch (err) {
-    setStatus("Import unavailable. Try again later.", { tone: "error" });
+    setStatus(err?.message || "Import unavailable. Try again later.", { tone: "error" });
   }
 }
 

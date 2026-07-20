@@ -9,6 +9,7 @@ const DIRECTOR_OUTREACH_SUBJECT_ALIASES = [
   DIRECTOR_OUTREACH_SUBJECT,
   "On-demand paralegal support for your firm",
   "for matters that need an extra hand",
+  "On-demand paralegal support for your firm",
 ];
 
 const DEFAULT_ZOHO_BASE_URL = "https://mail.zoho.com/api";
@@ -305,9 +306,17 @@ function extractMessageId(message = {}) {
   ).trim();
 }
 
-function isDirectorOutreachSubject(subject = "") {
+function getDirectorOutreachSubjectAliases(profile = {}) {
+  return [
+    profile.outreachSubject,
+    process.env.DIRECTOR_OUTREACH_SUBJECT,
+    ...DIRECTOR_OUTREACH_SUBJECT_ALIASES,
+  ].filter(Boolean);
+}
+
+function isDirectorOutreachSubject(subject = "", profile = {}) {
   const normalized = normalizeSubject(subject);
-  return DIRECTOR_OUTREACH_SUBJECT_ALIASES.some((alias) => normalizeSubject(alias) === normalized);
+  return getDirectorOutreachSubjectAliases(profile).some((alias) => normalizeSubject(alias) === normalized);
 }
 
 function mapSentMessage(message = {}, profile = {}) {
@@ -315,7 +324,7 @@ function mapSentMessage(message = {}, profile = {}) {
   const normalized = normalizeSubject(subject);
   const followUpSubject = normalizeSubject(DIRECTOR_FOLLOW_UP_SUBJECT);
   let eventType = "";
-  if (isDirectorOutreachSubject(subject)) eventType = "outreach_sent";
+  if (isDirectorOutreachSubject(subject, profile)) eventType = "outreach_sent";
   if (normalized === followUpSubject) eventType = "follow_up_sent";
   if (!eventType) return [];
 
@@ -340,7 +349,7 @@ function mapSentMessage(message = {}, profile = {}) {
 function mapInboxMessage(message = {}, profile = {}) {
   const subject = String(message.subject || "").trim();
   const normalized = normalizeSubject(subject);
-  if (!isDirectorOutreachSubject(subject) && normalized !== normalizeSubject(DIRECTOR_FOLLOW_UP_SUBJECT)) return null;
+  if (!isDirectorOutreachSubject(subject, profile) && normalized !== normalizeSubject(DIRECTOR_FOLLOW_UP_SUBJECT)) return null;
   const from = parseAddress(message.fromAddress || message.fromEmailAddress || message.from || message.sender);
   if (!from.email) return null;
   return {
