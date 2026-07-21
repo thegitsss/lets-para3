@@ -28,6 +28,12 @@ function startOfToday() {
   return date;
 }
 
+function startOfRecentImportWindow(hours = 36) {
+  const date = new Date();
+  date.setTime(date.getTime() - Math.max(1, Number(hours) || 36) * 60 * 60 * 1000);
+  return date;
+}
+
 function startOfUtcDay(value = new Date()) {
   const date = new Date(value);
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -419,7 +425,7 @@ async function updateDirectorZohoSyncStatus(profile, payload = {}) {
 async function importDirectorSentMail({
   user = {},
   state = "",
-  fromDate = startOfToday(),
+  fromDate = startOfRecentImportWindow(),
   toDate = new Date(),
   recordSyncStatus = true,
 } = {}) {

@@ -230,6 +230,25 @@ describe("Director portal", () => {
     );
   });
 
+  test("uses a recent lookback window for manual sent-mail imports", async () => {
+    const director = await createDirector();
+    mailImportService.fetchZohoMessages.mockResolvedValue([]);
+    const before = Date.now();
+
+    const res = await request(app)
+      .post("/api/director/import-today")
+      .set("Cookie", authCookieFor(director))
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(mailImportService.fetchZohoMessages).toHaveBeenCalledTimes(1);
+    const call = mailImportService.fetchZohoMessages.mock.calls[0][0];
+    const lookbackHours = (before - new Date(call.fromDate).getTime()) / (60 * 60 * 1000);
+    expect(lookbackHours).toBeGreaterThanOrEqual(35.9);
+    expect(lookbackHours).toBeLessThanOrEqual(36.1);
+    expect(new Date(call.toDate).getTime()).toBeGreaterThanOrEqual(before);
+  });
+
   test("auto-imports director sent mail and replies without a portal click", async () => {
     const director = await createDirector();
     mailImportService.fetchZohoMessages.mockImplementation(async ({ folderKind }) => {
