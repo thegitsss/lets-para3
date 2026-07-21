@@ -166,6 +166,16 @@ async function upsertRecordFromImport({ profile, item, state = "" } = {}) {
   if (existingOtherDirectorRecord) return null;
 
   const eventType = item.eventType;
+  if (eventType === "reply_received") {
+    const existingDirectorRecord = await DirectorOutreachRecord.findOne({
+      directorUserId: profile.userId,
+      attorneyEmail,
+      stage: { $ne: "suppressed" },
+    })
+      .select("_id")
+      .lean();
+    if (!existingDirectorRecord) return null;
+  }
   const assignedState = normalizeState(state);
   const update = {
     $setOnInsert: {

@@ -317,6 +317,73 @@ describe("Director portal", () => {
     expect(profile.zohoLastSyncSummary).toContain("Auto-sync scanned");
   });
 
+  test("does not treat internal LPC inbox messages as attorney replies", async () => {
+    const director = await createDirector();
+    await DirectorOutreachRecord.create({
+      directorUserId: director._id,
+      directorEmail: director.email,
+      attorneyEmail: "samantha@lets-paraconnect.com",
+      attorneyName: "Samantha",
+      firstOutreachSentAt: new Date("2026-07-20T20:00:00.000Z"),
+      stage: "outreach_sent",
+    });
+    mailImportService.fetchZohoMessages.mockResolvedValue([
+      {
+        subject: "for matters that need an extra hand",
+        fromAddress: "samantha@lets-paraconnect.com",
+        receivedDate: "2026-07-21T01:05:20.000Z",
+        messageId: "zoho-internal-samantha",
+        snippet: "Internal test message.",
+      },
+      {
+        subject: "for matters that need an extra hand",
+        fromAddress: "skyler@lets-paraconnect.com",
+        receivedDate: "2026-07-21T00:28:53.000Z",
+        messageId: "zoho-internal-skyler",
+        snippet: "Internal test message.",
+      },
+    ]);
+
+    const res = await request(app)
+      .post("/api/director/import-replies")
+      .set("Cookie", authCookieFor(director))
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.imported).toBe(0);
+    expect(sendEmail).not.toHaveBeenCalled();
+
+    const eventCount = await DirectorOutreachEvent.countDocuments({ eventType: "reply_received" });
+    expect(eventCount).toBe(0);
+    const record = await DirectorOutreachRecord.findOne({ attorneyEmail: "samantha@lets-paraconnect.com" }).lean();
+    expect(record.stage).toBe("outreach_sent");
+    expect(record.lastReplyAt).toBeFalsy();
+  });
+
+  test("does not create a new outreach record from an inbox-only reply match", async () => {
+    const director = await createDirector();
+    mailImportService.fetchZohoMessages.mockResolvedValue([
+      {
+        subject: "for matters that need an extra hand",
+        fromAddress: "\"Unmatched Attorney\" <unmatched@example-law.com>",
+        receivedDate: "2026-07-21T15:00:00.000Z",
+        messageId: "zoho-unmatched-reply",
+        snippet: "This should not create an outreach record by itself.",
+      },
+    ]);
+
+    const res = await request(app)
+      .post("/api/director/import-replies")
+      .set("Cookie", authCookieFor(director))
+      .send({});
+
+    expect(res.status).toBe(200);
+    expect(res.body.imported).toBe(0);
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(await DirectorOutreachRecord.countDocuments({ attorneyEmail: "unmatched@example-law.com" })).toBe(0);
+    expect(await DirectorOutreachEvent.countDocuments({ providerMessageId: "zoho-unmatched-reply" })).toBe(0);
+  });
+
   test("prevents duplicate attorney assignment across directors", async () => {
     const firstDirector = await createDirector();
     const secondDirector = await User.create({

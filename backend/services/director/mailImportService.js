@@ -17,6 +17,7 @@ const DEFAULT_ZOHO_ACCOUNTS_BASE_URL = "https://accounts.zoho.com";
 const ACCESS_TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 const DEFAULT_ACCESS_TOKEN_TTL_MS = 55 * 60 * 1000;
 const zohoAccessTokenCache = new Map();
+const INTERNAL_REPLY_DOMAINS = new Set(["lets-paraconnect.com"]);
 
 function normalizeEmail(value = "") {
   const text = String(value || "").trim().toLowerCase();
@@ -57,6 +58,15 @@ function parseAddress(value = "") {
     .replace(/["<>]/g, "")
     .trim();
   return { name, email };
+}
+
+function getEmailDomain(email = "") {
+  return String(email || "").trim().toLowerCase().split("@")[1] || "";
+}
+
+function isInternalReplySender(email = "") {
+  const domain = getEmailDomain(email);
+  return domain && INTERNAL_REPLY_DOMAINS.has(domain);
 }
 
 function flattenAddressList(value) {
@@ -352,6 +362,7 @@ function mapInboxMessage(message = {}, profile = {}) {
   if (!isDirectorOutreachSubject(subject, profile) && normalized !== normalizeSubject(DIRECTOR_FOLLOW_UP_SUBJECT)) return null;
   const from = parseAddress(message.fromAddress || message.fromEmailAddress || message.from || message.sender);
   if (!from.email) return null;
+  if (isInternalReplySender(from.email)) return null;
   return {
     eventType: "reply_received",
     attorneyEmail: from.email,
