@@ -4,6 +4,12 @@ const directorSession = requireAuth("director");
 
 const stageFilter = document.getElementById("stageFilter");
 const rangeFilter = document.getElementById("rangeFilter");
+const selectedStateSelect = document.getElementById("selectedStateSelect");
+const clearSelectedRowsBtn = document.getElementById("clearSelectedRowsBtn");
+const bulkStateBar = document.getElementById("bulkStateBar");
+const selectedRowsCount = document.getElementById("selectedRowsCount");
+const selectPageRowsCheckbox = document.getElementById("selectPageRowsCheckbox");
+const recordSearchInput = document.getElementById("recordSearchInput");
 const statusEl = document.getElementById("directorStatus");
 const recordsBody = document.getElementById("recordsBody");
 const identityEl = document.getElementById("directorIdentity");
@@ -77,16 +83,110 @@ const US_STATE_CODES = Object.freeze([
   "WI",
   "WY",
 ]);
+const US_STATE_NAMES = Object.freeze({
+  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
+  CO: "Colorado", CT: "Connecticut", DE: "Delaware", FL: "Florida", GA: "Georgia",
+  HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa", KS: "Kansas",
+  KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland", MA: "Massachusetts",
+  MI: "Michigan", MN: "Minnesota", MS: "Mississippi", MO: "Missouri", MT: "Montana",
+  NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey", NM: "New Mexico",
+  NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma",
+  OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina",
+  SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont",
+  VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
+});
 let currentRecords = [];
 let currentPage = 1;
 let statusTimer = null;
 let autoRefreshTimer = null;
 let portalLoadInFlight = false;
 let recordsSort = { key: "", direction: "asc" };
+let recordSearchQuery = "";
+const selectedRecordIds = new Set();
 
 function getSelectedRangeDays() {
   const value = Number(rangeFilter?.value || 7);
   return [1, 7, 30].includes(value) ? value : 7;
+}
+
+function populateSelectedStateOptions() {
+  if (!selectedStateSelect) return;
+  selectedStateSelect.innerHTML = [
+    `<option value="">Choose state…</option>`,
+    ...US_STATE_CODES.map((state) => `<option value="${state}">${state} — ${US_STATE_NAMES[state]}</option>`),
+  ].join("");
+}
+
+function syncSelectionControls() {
+  const selectedCount = selectedRecordIds.size;
+  if (bulkStateBar) bulkStateBar.hidden = selectedCount === 0;
+  if (selectedRowsCount) selectedRowsCount.textContent = `${selectedCount} attorney${selectedCount === 1 ? "" : "s"} selected`;
+  if (selectedStateSelect && !selectedStateSelect.disabled) selectedStateSelect.value = "";
+  syncPageSelectCheckbox();
+}
+
+function clearSelectedRows() {
+  selectedRecordIds.clear();
+  syncSelectionControls();
+  renderCurrentRecordsPage();
+}
+
+function pruneSelectedRows() {
+  const availableIds = new Set(currentRecords.map((record) => String(record.id || "")).filter(Boolean));
+  Array.from(selectedRecordIds).forEach((id) => {
+    if (!availableIds.has(id)) selectedRecordIds.delete(id);
+  });
+  syncSelectionControls();
+}
+
+function setRowSelected(recordId, selected) {
+  const id = String(recordId || "");
+  if (!id) return;
+  if (selected) selectedRecordIds.add(id);
+  else selectedRecordIds.delete(id);
+  const row = recordsBody?.querySelector?.(`[data-record-row-id="${CSS.escape(id)}"]`);
+  row?.classList.toggle("is-selected", selectedRecordIds.has(id));
+  row?.setAttribute("aria-selected", selectedRecordIds.has(id) ? "true" : "false");
+  const checkbox = row?.querySelector?.("[data-record-select-id]");
+  if (checkbox) checkbox.checked = selectedRecordIds.has(id);
+  syncSelectionControls();
+}
+
+function getCurrentPageRecords() {
+  const visibleRecords = getFilteredRecords();
+  const totalPages = Math.max(1, Math.ceil(visibleRecords.length / RECORDS_PER_PAGE));
+  currentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const start = (currentPage - 1) * RECORDS_PER_PAGE;
+  return getSortedRecords(visibleRecords).slice(start, start + RECORDS_PER_PAGE);
+}
+
+function getFilteredRecords() {
+  if (!recordSearchQuery) return currentRecords;
+  return currentRecords.filter((record) => (
+    `${record.attorneyName || ""} ${record.attorneyEmail || ""}`.toLowerCase().includes(recordSearchQuery)
+  ));
+}
+
+function getCurrentPageRecordIds() {
+  return getCurrentPageRecords().map((record) => String(record.id || "")).filter(Boolean);
+}
+
+function syncPageSelectCheckbox() {
+  if (!selectPageRowsCheckbox) return;
+  const pageIds = getCurrentPageRecordIds();
+  const selectedOnPage = pageIds.filter((id) => selectedRecordIds.has(id)).length;
+  selectPageRowsCheckbox.disabled = pageIds.length === 0;
+  selectPageRowsCheckbox.checked = pageIds.length > 0 && selectedOnPage === pageIds.length;
+  selectPageRowsCheckbox.indeterminate = selectedOnPage > 0 && selectedOnPage < pageIds.length;
+}
+
+function setPageRowsSelected(selected) {
+  getCurrentPageRecordIds().forEach((id) => {
+    if (selected) selectedRecordIds.add(id);
+    else selectedRecordIds.delete(id);
+  });
+  syncSelectionControls();
+  renderCurrentRecordsPage();
 }
 
 function recordMatchesRange(record = {}, days = 7) {
@@ -478,12 +578,7 @@ function renderLastImportAt(value = readLastImportAt()) {
     el.textContent = "";
     return;
   }
-  el.textContent = `Last import: ${date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })}`;
+  renderRelativeMeta(el, date, "Imported");
 }
 
 function readAppearance() {
@@ -747,21 +842,53 @@ function formatDate(value) {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function formatDateTime(value) {
-  if (!value) return "";
+function formatExactDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return `Last synced: ${date.toLocaleString(undefined, {
+  return date.toLocaleString(undefined, {
     month: "short",
     day: "numeric",
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
-  })}`;
+  });
+}
+
+function formatRelativeTime(value) {
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return "";
+  const elapsedSeconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
+  if (elapsedSeconds < 60) return "just now";
+  if (elapsedSeconds < 3600) return `${Math.floor(elapsedSeconds / 60)}m ago`;
+  if (elapsedSeconds < 86400) return `${Math.floor(elapsedSeconds / 3600)}h ago`;
+  if (elapsedSeconds < 604800) return `${Math.floor(elapsedSeconds / 86400)}d ago`;
+  return formatExactDateTime(value);
+}
+
+function renderRelativeMeta(element, value, label) {
+  if (!element || !value) {
+    if (element) {
+      element.textContent = "";
+      element.removeAttribute("title");
+    }
+    return;
+  }
+  const exact = formatExactDateTime(value);
+  if (!exact) return;
+  element.textContent = `${label} ${formatRelativeTime(value)}`;
+  element.title = `${label}: ${exact}`;
 }
 
 function formatMoney(cents) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((Number(cents) || 0) / 100);
+}
+
+function payoutStatusLabel(record = {}) {
+  const hasCommission = Number(record.commissionEarnedCents || 0) > 0;
+  if (!hasCommission) return "—";
+  const paid = String(record.commissionPayoutStatus || "unpaid").toLowerCase() === "paid";
+  if (!paid) return "Payable";
+  return record.commissionPaidAt ? `Paid ${formatDate(record.commissionPaidAt)}` : "Paid";
 }
 
 function getRecordSortValue(record = {}, key = "") {
@@ -848,12 +975,12 @@ function renderStateSelect(record = {}) {
   const recordId = String(record.id || "");
   const currentState = String(record.state || "").toUpperCase();
   const options = [
-    `<option value="">State</option>`,
+    `<option value="">Choose state…</option>`,
     ...US_STATE_CODES.map((state) => (
-      `<option value="${state}"${currentState === state ? " selected" : ""}>${state}</option>`
+      `<option value="${state}"${currentState === state ? " selected" : ""}>${state} — ${US_STATE_NAMES[state]}</option>`
     )),
   ].join("");
-  return `<select class="record-state-select" data-record-state-id="${escapeHTML(recordId)}" aria-label="Set attorney state">${options}</select>`;
+  return `<select class="record-state-select" data-record-state-id="${escapeHTML(recordId)}" aria-label="State for ${escapeHTML(record.attorneyName || record.attorneyEmail || "attorney")}">${options}</select>`;
 }
 
 async function updateRecordState(select) {
@@ -878,6 +1005,48 @@ async function updateRecordState(select) {
     select.value = previousState;
     select.disabled = false;
     setStatus(err?.message || "Unable to update attorney state.", { tone: "error" });
+  }
+}
+
+async function applyStateToSelectedRows() {
+  const state = String(selectedStateSelect?.value || "").toUpperCase();
+  if (!state || !US_STATE_CODES.includes(state)) {
+    setStatus("Choose a state for the selected rows.", { tone: "error", transient: true });
+    return;
+  }
+  const recordIds = Array.from(selectedRecordIds);
+  if (!recordIds.length) {
+    setStatus("Select at least one row first.", { tone: "error", transient: true });
+    return;
+  }
+
+  if (clearSelectedRowsBtn) clearSelectedRowsBtn.disabled = true;
+  if (selectPageRowsCheckbox) selectPageRowsCheckbox.disabled = true;
+  if (selectedStateSelect) selectedStateSelect.disabled = true;
+  setStatus(`Applying ${state} to ${recordIds.length} selected row${recordIds.length === 1 ? "" : "s"}...`);
+
+  let updated = 0;
+  try {
+    for (const recordId of recordIds) {
+      const res = await secureFetch(`/api/director/records/${encodeURIComponent(recordId)}/state`, {
+        method: "PATCH",
+        body: { state },
+        headers: { Accept: "application/json" },
+      });
+      const payload = await readJsonOrThrow(res, "Unable to update attorney state.");
+      currentRecords = currentRecords.map((record) => (String(record.id || "") === recordId ? payload.record || record : record));
+      updated += 1;
+    }
+    selectedRecordIds.clear();
+    setStatus(`Set ${updated} attorney${updated === 1 ? "" : "s"} to ${US_STATE_NAMES[state]} (${state}).`, { tone: "success", transient: true });
+    await loadPortal({ silent: true, preservePage: true });
+  } catch (err) {
+    setStatus(err?.message || "Unable to apply selected state.", { tone: "error" });
+    renderCurrentRecordsPage();
+  } finally {
+    if (selectedStateSelect) selectedStateSelect.disabled = false;
+    if (clearSelectedRowsBtn) clearSelectedRowsBtn.disabled = false;
+    syncSelectionControls();
   }
 }
 
@@ -910,19 +1079,33 @@ function renderOverview(payload = {}) {
   const rangeLabel = rangeDays === 1 ? "today" : rangeDays === 7 ? "last 7 days" : "last 30 days";
 
   document.getElementById("countTotal").textContent = String(total);
-  document.getElementById("countFollowUp").textContent = String(counts.follow_up_sent || 0);
-  document.getElementById("countAttention").textContent = String(counts.founder_attention || 0);
-  document.getElementById("countCommission").textContent = formatMoney(counts.commissionEarnedCents || 0);
-  document.getElementById("lastSyncedAt").textContent = formatDateTime(payload.lastSyncedAt);
+  const countFollowUpEl = document.getElementById("countFollowUp");
+  if (countFollowUpEl) countFollowUpEl.textContent = String(counts.follow_up_sent || 0);
+  const countAttentionEl = document.getElementById("countAttention");
+  if (countAttentionEl) countAttentionEl.textContent = String(counts.founder_attention || 0);
+  const commissionEarnedCents = Number(counts.commissionEarnedCents || 0);
+  document.getElementById("countCommission").textContent = commissionEarnedCents > 0 ? formatMoney(commissionEarnedCents) : "—";
+  renderRelativeMeta(document.getElementById("lastSyncedAt"), payload.lastSyncedAt, "Synced");
   renderLastImportAt();
   const emptyState = document.getElementById("directorEmptyState");
   if (emptyState) emptyState.classList.toggle("visible", total === 0);
 
   const attention = payload.attention || {};
-  document.getElementById("attentionReplies").textContent = String(attention.founderReplies || counts.founder_attention || 0);
-  document.getElementById("attentionFollowUps").textContent = String(attention.followUpsAutoSent || counts.follow_up_sent || 0);
-  document.getElementById("attentionFailedFollowUps").textContent = String(attention.followUpsFailed || counts.follow_up_failed || 0);
-  document.getElementById("attentionCommission").textContent = String(attention.commissionableRecords || 0);
+  const attentionRepliesEl = document.getElementById("attentionReplies");
+  if (attentionRepliesEl) attentionRepliesEl.textContent = String(attention.founderReplies || counts.founder_attention || 0);
+  const attentionFollowUpsEl = document.getElementById("attentionFollowUps");
+  if (attentionFollowUpsEl) attentionFollowUpsEl.textContent = String(attention.followUpsAutoSent || counts.follow_up_sent || 0);
+  const failedFollowUpsEl = document.getElementById("attentionFailedFollowUps");
+  if (failedFollowUpsEl) failedFollowUpsEl.textContent = String(attention.followUpsFailed || counts.follow_up_failed || 0);
+  const attentionStrip = document.getElementById("attentionStrip");
+  const commissionItem = document.getElementById("attentionCommissionItem");
+  const attentionCommissionEl = document.getElementById("attentionCommission");
+  if (commissionItem && attentionCommissionEl) {
+    const hasEarnedCommission = commissionEarnedCents > 0;
+    if (attentionStrip) attentionStrip.hidden = !hasEarnedCommission;
+    commissionItem.hidden = !hasEarnedCommission;
+    attentionCommissionEl.textContent = commissionEarnedCents > 0 ? formatMoney(commissionEarnedCents) : "—";
+  }
 
   const emailsSentEl = document.getElementById("metricEmailsSent");
   const conversionEl = document.getElementById("metricConversionRate");
@@ -1046,32 +1229,35 @@ function renderRecords(records = [], { preservePage = false } = {}) {
   const previousPage = currentPage;
   currentRecords = Array.isArray(records) ? records : [];
   currentPage = preservePage ? previousPage : 1;
+  pruneSelectedRows();
   renderCurrentRecordsPage();
 }
 
 function renderCurrentRecordsPage() {
   if (!recordsBody) return;
   updateSortHeaders();
-  if (!currentRecords.length) {
+  const visibleRecords = getFilteredRecords();
+  if (!visibleRecords.length) {
     const filterLabel = stageFilter?.selectedOptions?.[0]?.textContent || "this view";
+    const emptyMessage = recordSearchQuery
+      ? `No attorneys match “${recordSearchInput?.value?.trim() || recordSearchQuery}”.`
+      : filterLabel === "All stages" ? "Import today to add records." : `No records match ${filterLabel}.`;
     recordsBody.innerHTML = `
       <tr class="records-empty">
-        <td colspan="9">
+        <td colspan="11">
           <strong>No attorneys found</strong>
-          ${escapeHTML(filterLabel === "All stages" ? "Import today to add records." : `No records match ${filterLabel}.`)}
+          ${escapeHTML(emptyMessage)}
         </td>
       </tr>
     `;
     renderPagination();
     return;
   }
-  const totalPages = Math.max(1, Math.ceil(currentRecords.length / RECORDS_PER_PAGE));
-  currentPage = Math.min(Math.max(1, currentPage), totalPages);
-  const start = (currentPage - 1) * RECORDS_PER_PAGE;
-  const pageRecords = getSortedRecords(currentRecords).slice(start, start + RECORDS_PER_PAGE);
+  const pageRecords = getCurrentPageRecords();
 
   recordsBody.innerHTML = pageRecords
     .map((record) => {
+      const recordId = String(record.id || "");
       const stage = String(record.stage || "");
       const stageClass =
         stage === "founder_attention"
@@ -1088,20 +1274,25 @@ function renderCurrentRecordsPage() {
           ? " commission"
           : "";
       return `
-        <tr>
+        <tr data-record-row-id="${escapeHTML(recordId)}" tabindex="0" aria-selected="${selectedRecordIds.has(recordId) ? "true" : "false"}" class="${selectedRecordIds.has(recordId) ? "is-selected" : ""}">
+          <td class="director-select-cell" data-label="Select">
+            <input type="checkbox" class="director-row-checkbox" data-record-select-id="${escapeHTML(recordId)}" aria-label="Select ${escapeHTML(record.attorneyName || record.attorneyEmail || "row")}"${selectedRecordIds.has(recordId) ? " checked" : ""}>
+          </td>
           <td data-label="Outreach">${escapeHTML(formatDate(record.firstOutreachSentAt))}</td>
           <td data-label="State">${renderStateSelect(record)}</td>
           <td data-label="Attorney">${escapeHTML(record.attorneyName || "—")}</td>
           <td data-label="Email">${escapeHTML(record.attorneyEmail || "—")}</td>
           <td data-label="Stage"><span class="director-badge${stageClass}">${escapeHTML(record.stageLabel || record.stage || "—")}</span></td>
-          <td data-label="Follow-Up">${escapeHTML(formatDate(record.followUpSentAt))}</td>
-          <td data-label="Registered">${escapeHTML(formatDate(record.registeredAt))}</td>
-          <td data-label="Matter">${escapeHTML(formatDate(record.firstMatterPostedAt || record.firstMatterCompletedAt))}</td>
-          <td data-label="Commission">${escapeHTML(Number(record.commissionEarnedCents || 0) > 0 ? formatMoney(record.commissionEarnedCents) : "—")}</td>
+          <td data-label="Follow-Up" data-responsive-priority="low">${escapeHTML(formatDate(record.followUpSentAt))}</td>
+          <td data-label="Registered" data-responsive-priority="medium">${escapeHTML(formatDate(record.registeredAt))}</td>
+          <td data-label="Matter" data-responsive-priority="low">${escapeHTML(formatDate(record.firstMatterPostedAt || record.firstMatterCompletedAt))}</td>
+          <td data-label="Commission" data-responsive-priority="medium">${escapeHTML(Number(record.commissionEarnedCents || 0) > 0 ? formatMoney(record.commissionEarnedCents) : "—")}</td>
+          <td data-label="Payout" data-responsive-priority="low">${escapeHTML(payoutStatusLabel(record))}</td>
         </tr>
       `;
     })
     .join("");
+  syncSelectionControls();
   renderPagination();
 }
 
@@ -1112,7 +1303,7 @@ function renderPagination() {
   const nextBtn = document.getElementById("recordsNextBtn");
   if (!pagination || !pageInfo || !prevBtn || !nextBtn) return;
 
-  const total = currentRecords.length;
+  const total = getFilteredRecords().length;
   const totalPages = Math.max(1, Math.ceil(total / RECORDS_PER_PAGE));
   const shouldShow = total > RECORDS_PER_PAGE;
   pagination.hidden = !shouldShow;
@@ -1311,9 +1502,29 @@ recordsSortButtons.forEach((button) => {
   });
 });
 recordsBody?.addEventListener("change", (event) => {
+  const checkbox = event.target?.closest?.("[data-record-select-id]");
+  if (checkbox) {
+    setRowSelected(checkbox.dataset.recordSelectId || "", checkbox.checked);
+    return;
+  }
   const select = event.target?.closest?.("[data-record-state-id]");
   if (!select) return;
   updateRecordState(select);
+});
+recordsBody?.addEventListener("click", (event) => {
+  if (event.target?.closest?.("a, button, input, select, label, summary, details")) return;
+  const row = event.target?.closest?.("[data-record-row-id]");
+  if (!row) return;
+  const recordId = row.dataset.recordRowId || "";
+  setRowSelected(recordId, !selectedRecordIds.has(recordId));
+});
+recordsBody?.addEventListener("keydown", (event) => {
+  if (!["Enter", " "].includes(event.key) || event.target?.closest?.("a, button, input, select, label, summary, details")) return;
+  const row = event.target?.closest?.("[data-record-row-id]");
+  if (!row) return;
+  event.preventDefault();
+  const recordId = row.dataset.recordRowId || "";
+  setRowSelected(recordId, !selectedRecordIds.has(recordId));
 });
 document.getElementById("recordsPrevBtn")?.addEventListener("click", () => {
   currentPage -= 1;
@@ -1325,6 +1536,17 @@ document.getElementById("recordsNextBtn")?.addEventListener("click", () => {
 });
 stageFilter?.addEventListener("change", () => loadPortal().catch(() => {}));
 rangeFilter?.addEventListener("change", () => loadPortal().catch(() => {}));
+recordSearchInput?.addEventListener("input", () => {
+  recordSearchQuery = String(recordSearchInput.value || "").trim().toLowerCase();
+  currentPage = 1;
+  renderCurrentRecordsPage();
+});
+selectPageRowsCheckbox?.addEventListener("change", () => setPageRowsSelected(selectPageRowsCheckbox.checked));
+clearSelectedRowsBtn?.addEventListener("click", clearSelectedRows);
+selectedStateSelect?.addEventListener("change", () => {
+  if (!selectedStateSelect.value) return;
+  applyStateToSelectedRows().catch(() => {});
+});
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
     loadPortal({ silent: true, preservePage: true }).catch(() => {});
@@ -1333,6 +1555,8 @@ document.addEventListener("visibilitychange", () => {
 
 applyAppearance(readAppearance());
 ensureAppearanceLuminance();
+populateSelectedStateOptions();
+syncSelectionControls();
 loadPortal()
   .then(() => {
     scheduleAutoRefresh();

@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 
 const Case = require("../../models/Case");
+const AuditLog = require("../../models/AuditLog");
 const DirectorOutreachEvent = require("../../models/DirectorOutreachEvent");
 const DirectorOutreachRecord = require("../../models/DirectorOutreachRecord");
 const DirectorProfile = require("../../models/DirectorProfile");
@@ -29,12 +30,14 @@ function serializeDirector(profile = {}, user = null, records = []) {
       acc.totalRecords += 1;
       acc[record.stage] = (acc[record.stage] || 0) + 1;
       acc.commissionEarnedCents += cents(record.commissionEarnedCents);
+      if (record.commissionPayoutStatus !== "paid") acc.commissionUnpaidCents += cents(record.commissionEarnedCents);
       acc.commissionableMatterCount += Number(record.commissionableMatterCount || 0);
       return acc;
     },
     {
       totalRecords: 0,
       commissionEarnedCents: 0,
+      commissionUnpaidCents: 0,
       commissionableMatterCount: 0,
       founder_attention: 0,
       follow_up_failed: 0,
@@ -77,9 +80,17 @@ function serializeRecord(record = {}) {
     firstMatterCompletedAt: serializeDate(record.firstMatterCompletedAt),
     commissionableMatterCount: Number(record.commissionableMatterCount || 0),
     commissionEarnedCents: cents(record.commissionEarnedCents),
+    commissionPayoutStatus: record.commissionPayoutStatus || "unpaid",
+    commissionPaidAt: serializeDate(record.commissionPaidAt),
+    commissionPaidByAdminId: record.commissionPaidByAdminId ? String(record.commissionPaidByAdminId) : "",
+    commissionPayoutNote: record.commissionPayoutNote || "",
     lastFollowUpError: record.metadata?.lastFollowUpError || "",
     updatedAt: serializeDate(record.updatedAt),
   };
+}
+
+function isCommissionableRecord(record = {}) {
+  return cents(record.commissionEarnedCents) > 0 || Number(record.commissionableMatterCount || 0) > 0;
 }
 
 async function listDirectorOversight({ limit = 500 } = {}) {
@@ -142,9 +153,45 @@ async function listDirectorOversight({ limit = 500 } = {}) {
     records: records.map(serializeRecord),
     replies: records.filter((record) => record.stage === "founder_attention" || record.lastReplyAt).map(serializeRecord),
     failedFollowUps: records.filter((record) => record.stage === "follow_up_failed").map(serializeRecord),
+    commissionPayables: records.filter(isCommissionableRecord).map(serializeRecord),
     duplicates,
     stageLabels: DIRECTOR_STAGE_LABELS,
   };
+}
+
+async function updateDirectorCommissionPayout({ recordId, paid, note = "", req } = {}) {
+  if (!mongoose.isValidObjectId(recordId)) return null;
+  const record = await DirectorOutreachRecord.findById(recordId);
+  if (!record) return null;
+
+  const commissionCents = cents(record.commissionEarnedCents);
+  if (commissionCents <= 0) {
+    const err = new Error("Only records with earned commission can be marked paid.");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const markPaid = Boolean(paid);
+  record.commissionPayoutStatus = markPaid ? "paid" : "unpaid";
+  record.commissionPaidAt = markPaid ? new Date() : null;
+  record.commissionPaidByAdminId = markPaid ? req?.user?.id || req?.user?._id || null : null;
+  record.commissionPayoutNote = String(note || "").trim().slice(0, 500);
+  await record.save();
+
+  await AuditLog.logFromReq(req, markPaid ? "director.commission.mark_paid" : "director.commission.mark_unpaid", {
+    targetType: "other",
+    targetId: String(record._id),
+    meta: {
+      directorUserId: String(record.directorUserId || ""),
+      directorEmail: record.directorEmail || "",
+      attorneyEmail: record.attorneyEmail || "",
+      commissionEarnedCents: commissionCents,
+      commissionableMatterCount: Number(record.commissionableMatterCount || 0),
+      note: record.commissionPayoutNote || "",
+    },
+  });
+
+  return serializeRecord(record);
 }
 
 async function getDirectorRecordAudit(recordId) {
@@ -216,6 +263,9 @@ async function buildDirectorRecordsCsv() {
     "Matter Posted",
     "Matter Completed",
     "Commission",
+    "Payout Status",
+    "Paid At",
+    "Payout Note",
   ];
   const rows = records.map((record) => [
     record.directorEmail,
@@ -230,6 +280,9 @@ async function buildDirectorRecordsCsv() {
     record.firstMatterPostedAt,
     record.firstMatterCompletedAt,
     (record.commissionEarnedCents / 100).toFixed(2),
+    record.commissionPayoutStatus,
+    record.commissionPaidAt,
+    record.commissionPayoutNote,
   ]);
   return [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
 }
@@ -238,4 +291,5 @@ module.exports = {
   buildDirectorRecordsCsv,
   getDirectorRecordAudit,
   listDirectorOversight,
+  updateDirectorCommissionPayout,
 };

@@ -6,7 +6,9 @@ const {
   buildDirectorRecordsCsv,
   getDirectorRecordAudit,
   listDirectorOversight,
+  updateDirectorCommissionPayout,
 } = require("../services/director/directorAdminService");
+const { csrfProtection } = require("../utils/csrf");
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
@@ -36,6 +38,21 @@ router.get(
     const audit = await getDirectorRecordAudit(req.params.id);
     if (!audit) return res.status(404).json({ error: "Director outreach record not found." });
     res.json({ ok: true, ...audit });
+  })
+);
+
+router.patch(
+  "/records/:id/commission-payout",
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const record = await updateDirectorCommissionPayout({
+      recordId: req.params.id,
+      paid: req.body?.paid,
+      note: req.body?.note,
+      req,
+    });
+    if (!record) return res.status(404).json({ error: "Director outreach record not found." });
+    res.json({ ok: true, record });
   })
 );
 

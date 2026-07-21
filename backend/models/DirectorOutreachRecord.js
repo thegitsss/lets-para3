@@ -36,6 +36,10 @@ const directorOutreachRecordSchema = new Schema(
     commissionableMatterCount: { type: Number, min: 0, default: 0 },
     commissionEarnedCents: { type: Number, min: 0, default: 0 },
     commissionStatus: { type: String, enum: ["none", "accruing", "cap_reached"], default: "none", index: true },
+    commissionPayoutStatus: { type: String, enum: ["unpaid", "paid"], default: "unpaid", index: true },
+    commissionPaidAt: { type: Date, default: null },
+    commissionPaidByAdminId: { type: Types.ObjectId, ref: "User", default: null },
+    commissionPayoutNote: { type: String, trim: true, default: "", maxlength: 500 },
     source: { type: String, trim: true, default: "zoho_import", maxlength: 120 },
     suppressedAt: { type: Date, default: null },
     suppressedReason: { type: String, trim: true, default: "", maxlength: 500 },
@@ -52,6 +56,7 @@ const directorOutreachRecordSchema = new Schema(
 directorOutreachRecordSchema.index({ directorUserId: 1, attorneyEmail: 1 }, { unique: true });
 directorOutreachRecordSchema.index({ directorUserId: 1, state: 1, stage: 1, updatedAt: -1 });
 directorOutreachRecordSchema.index({ stage: 1, founderAttentionAt: -1 });
+directorOutreachRecordSchema.index({ commissionPayoutStatus: 1, commissionEarnedCents: -1, commissionPaidAt: -1 });
 
 module.exports =
   mongoose.models.DirectorOutreachRecord ||

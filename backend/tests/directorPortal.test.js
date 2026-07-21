@@ -804,4 +804,99 @@ describe("Director portal", () => {
     expect(csv.text).toContain("Director,Attorney Name,Attorney Email");
     expect(csv.text).toContain("audit@example-law.com");
   });
+
+  test("admin can mark commissionable director attorney records paid and unpaid", async () => {
+    const admin = await createAdmin();
+    const director = await createDirector();
+    const attorney = await User.create({
+      firstName: "Payable",
+      lastName: "Attorney",
+      email: "payable@example-law.com",
+      password: "Password123!",
+      role: "attorney",
+      status: "approved",
+      emailVerified: true,
+    });
+    const paralegal = await User.create({
+      firstName: "Payable",
+      lastName: "Para",
+      email: "payable.para@example.com",
+      password: "Password123!",
+      role: "paralegal",
+      status: "approved",
+      emailVerified: true,
+    });
+    const record = await DirectorOutreachRecord.create({
+      directorUserId: director._id,
+      directorEmail: director.email,
+      attorneyEmail: "payable@example-law.com",
+      attorneyName: "Payable Attorney",
+      firstOutreachSentAt: new Date("2026-06-01T12:00:00.000Z"),
+      firstMatterCompletedAt: new Date("2026-06-20T12:00:00.000Z"),
+      stage: "commission_complete",
+      commissionableMatterCount: 1,
+      commissionEarnedCents: 11000,
+      commissionStatus: "accruing",
+    });
+    const caseDoc = await Case.create({
+      attorney: attorney._id,
+      attorneyId: attorney._id,
+      paralegal: paralegal._id,
+      paralegalId: paralegal._id,
+      title: "Payable matter",
+      details: "Completed payable matter.",
+      status: "completed",
+      completedAt: new Date(),
+      totalAmount: 100000,
+      lockedTotalAmount: 100000,
+      feeAttorneyPct: 22,
+      feeAttorneyAmount: 22000,
+    });
+    await PlatformIncome.create({
+      caseId: caseDoc._id,
+      attorneyId: attorney._id,
+      paralegalId: paralegal._id,
+      feeAmount: 22000,
+      stripeMode: "test",
+    });
+
+    const paid = await request(app)
+      .patch(`/api/admin/directors/records/${record._id}/commission-payout`)
+      .set("Cookie", authCookieFor(admin))
+      .send({ paid: true, note: "ACH sent from LPC bank." });
+
+    expect(paid.status).toBe(200);
+    expect(paid.body.record).toEqual(
+      expect.objectContaining({
+        id: String(record._id),
+        commissionPayoutStatus: "paid",
+        commissionPayoutNote: "ACH sent from LPC bank.",
+      })
+    );
+    expect(paid.body.record.commissionPaidAt).toBeTruthy();
+
+    const directorView = await request(app)
+      .get("/api/director/records?rangeDays=90")
+      .set("Cookie", authCookieFor(director));
+    expect(directorView.status).toBe(200);
+    expect(directorView.body.records[0]).toEqual(
+      expect.objectContaining({
+        attorneyEmail: "payable@example-law.com",
+        commissionPayoutStatus: "paid",
+      })
+    );
+
+    const unpaid = await request(app)
+      .patch(`/api/admin/directors/records/${record._id}/commission-payout`)
+      .set("Cookie", authCookieFor(admin))
+      .send({ paid: false });
+
+    expect(unpaid.status).toBe(200);
+    expect(unpaid.body.record).toEqual(
+      expect.objectContaining({
+        commissionPayoutStatus: "unpaid",
+        commissionPaidAt: null,
+      })
+    );
+  });
 });

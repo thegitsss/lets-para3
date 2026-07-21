@@ -814,6 +814,8 @@ function serializeRecord(record = {}) {
     commissionableMatterCount: record.commissionableMatterCount || 0,
     commissionEarnedCents: record.commissionEarnedCents || 0,
     commissionStatus: record.commissionStatus || "none",
+    commissionPayoutStatus: record.commissionPayoutStatus || "unpaid",
+    commissionPaidAt: record.commissionPaidAt || null,
     updatedAt: record.updatedAt || null,
   };
 }

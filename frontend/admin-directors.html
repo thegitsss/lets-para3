@@ -130,7 +130,7 @@
     }
     .metric-grid {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 0.5rem;
     }
     .metric {
@@ -253,6 +253,16 @@
       color: var(--danger);
       border-color: rgba(185,77,98,0.28);
       background: #fff0f3;
+    }
+    .badge.success {
+      color: var(--green);
+      border-color: rgba(60,138,98,0.25);
+      background: rgba(60,138,98,0.08);
+    }
+    .badge.neutral {
+      color: var(--muted);
+      border-color: rgba(129,123,132,0.22);
+      background: rgba(129,123,132,0.08);
     }
     .text-btn {
       border: 0;
@@ -406,10 +416,21 @@
         <article class="metric"><span>Replies</span><strong id="metricReplies">0</strong></article>
         <article class="metric"><span>Failed Follow-Ups</span><strong id="metricFailures">0</strong></article>
         <article class="metric"><span>Commission</span><strong id="metricCommission">$0.00</strong></article>
+        <article class="metric"><span>Unpaid Commission</span><strong id="metricUnpaidCommission">$0.00</strong></article>
         <article class="metric"><span>Duplicates</span><strong id="metricDuplicates">0</strong></article>
       </section>
 
       <section class="director-list" id="directorList" aria-label="Directors"></section>
+
+      <section class="panel">
+        <h2>Commission Payables</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Director</th><th>Attorney</th><th>State</th><th>Completed</th><th>Commission</th><th>Payout</th><th>Audit</th></tr></thead>
+            <tbody id="commissionPayablesBody"></tbody>
+          </table>
+        </div>
+      </section>
 
       <section class="panel">
         <h2>Replies for Samantha</h2>
