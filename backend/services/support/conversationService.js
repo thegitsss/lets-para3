@@ -12,6 +12,9 @@ const {
 } = require("../../ai/supportAgent");
 const { generateSupportManagerReply } = require("../../ai/supportManagerAgent");
 const {
+  generateParalegalSupportManagerReply,
+} = require("../../ai/paralegalSupportManagerAgent");
+const {
   maybeLogAutonomousIncidentRouting,
   maybeLogAutonomousTicketEscalation,
   maybeLogAutonomousTicketReopen,
@@ -42,11 +45,20 @@ const {
   shouldEscalateTicketToIncident,
 } = require("../lpcEvents/supportRoutingService");
 const { assertCcoAutonomyHarnessEnabled } = require("../../utils/ccoAutonomyHarnessAccess");
-const { buildQuestionFamilySignal } = require("./attorneyReliabilityService");
+const {
+  buildQuestionFamilySignal: buildAttorneyQuestionFamilySignal,
+} = require("./attorneyReliabilityService");
+const {
+  buildParalegalQuestionFamilySignal,
+} = require("./paralegalReliabilityService");
 const {
   evaluateAttorneyManagerRollout,
   publicAttorneyRolloutTelemetry,
 } = require("./attorneyRolloutService");
+const {
+  evaluateParalegalManagerRollout,
+  publicParalegalRolloutTelemetry,
+} = require("./paralegalRolloutService");
 
 const SUPPORT_WELCOME_MESSAGE =
   "Hi — I can help with account questions, payouts, case activity, and platform issues.";
@@ -6879,6 +6891,7 @@ async function buildAssistantReply({
     });
   }
   const attorneyRolloutDecision = evaluateAttorneyManagerRollout(supportUser);
+  const paralegalRolloutDecision = evaluateParalegalManagerRollout(supportUser);
   if (
     String(supportUser.role || "").toLowerCase() === "attorney" &&
     ["percentage_not_enrolled", "missing_stable_account_key"].includes(attorneyRolloutDecision.reason)
@@ -6913,15 +6926,66 @@ async function buildAssistantReply({
       allowFallbackSuggestions: false,
     });
   }
-  const managerReply = await generateSupportManagerReply({
-    messageText: normalizedText,
-    user: supportUser,
-    conversationId: conversationContext.conversationId || "",
-    currentMessageId: conversationContext.currentMessageId || "",
-    pageContext,
-    conversationState: supportState,
-    safetyIdentifier: buildOpenAiSafetyIdentifier(supportUser),
-  });
+  if (
+    String(supportUser.role || "").toLowerCase() === "paralegal" &&
+    paralegalRolloutDecision.paralegalManagerEnabled === true &&
+    ["percentage_not_enrolled", "missing_stable_account_key"].includes(
+      paralegalRolloutDecision.reason
+    )
+  ) {
+    return buildLlmAssistantPayload({
+      reply: "The upgraded LPC assistant isn’t available for this account yet.",
+      suggestions: [],
+      navigation: null,
+      actions: [],
+      provider: "paralegal_manager_not_enrolled",
+      turnCount: Number(supportState.turnCount || 0) + 1,
+      category: "general_support",
+      categoryLabel: "LPC assistance",
+      confidence: "high",
+      urgency: "low",
+      needsEscalation: false,
+      supportFacts: { evidenceStatus: "not_applicable", capabilityIds: [] },
+      primaryAsk: "assistant_rollout_not_enrolled",
+      activeTask: "TROUBLESHOOT",
+      activeEntity: supportState.activeEntity || null,
+      verifiedEntities: supportState.verifiedEntities || [],
+      lastRequestedDimensions: supportState.lastRequestedDimensions || [],
+      awaitingField: "",
+      responseMode: "DIRECT_ANSWER",
+      detailLevel: "concise",
+      grounded: false,
+      telemetry: {
+        role: "paralegal",
+        reliabilityGap: "paralegal_rollout_not_enrolled",
+        managerAvailable: false,
+        rollout: publicParalegalRolloutTelemetry(paralegalRolloutDecision),
+        toolCalls: [],
+      },
+      allowFallbackActions: false,
+      allowFallbackSuggestions: false,
+    });
+  }
+  const managerReply =
+    String(supportUser.role || "").toLowerCase() === "paralegal"
+      ? await generateParalegalSupportManagerReply({
+          messageText: normalizedText,
+          user: supportUser,
+          conversationId: conversationContext.conversationId || "",
+          currentMessageId: conversationContext.currentMessageId || "",
+          pageContext,
+          conversationState: supportState,
+          safetyIdentifier: buildOpenAiSafetyIdentifier(supportUser),
+        })
+      : await generateSupportManagerReply({
+          messageText: normalizedText,
+          user: supportUser,
+          conversationId: conversationContext.conversationId || "",
+          currentMessageId: conversationContext.currentMessageId || "",
+          pageContext,
+          conversationState: supportState,
+          safetyIdentifier: buildOpenAiSafetyIdentifier(supportUser),
+        });
   if (managerReply?.reply) {
     return buildLlmAssistantPayload({
       reply: managerReply.reply,
@@ -6989,6 +7053,51 @@ async function buildAssistantReply({
         reliabilityGap: "attorney_manager_unavailable",
         managerAvailable: false,
         rollout: publicAttorneyRolloutTelemetry(attorneyRolloutDecision),
+        toolCalls: [],
+      },
+      allowFallbackActions: false,
+      allowFallbackSuggestions: false,
+    });
+  }
+  const paralegalLegacyFallbackEnabled = ["1", "true", "on", "enabled"].includes(
+    String(process.env.OPENAI_PARALEGAL_LEGACY_FALLBACK || "false").trim().toLowerCase()
+  );
+  if (
+    String(supportUser.role || "").toLowerCase() === "paralegal" &&
+    paralegalRolloutDecision.paralegalManagerEnabled === true &&
+    !paralegalLegacyFallbackEnabled
+  ) {
+    return buildLlmAssistantPayload({
+      reply:
+        "I’m having trouble accessing the verified LPC information needed to answer that. Please try again in a moment.",
+      suggestions: [],
+      navigation: null,
+      actions: [],
+      provider: "paralegal_manager_unavailable",
+      turnCount: Number(supportState.turnCount || 0) + 1,
+      category: "general_support",
+      categoryLabel: "LPC assistance",
+      confidence: "low",
+      urgency: "low",
+      needsEscalation: false,
+      supportFacts: {
+        evidenceStatus: "manager_unavailable",
+        capabilityIds: [],
+      },
+      primaryAsk: "assistant_temporarily_unavailable",
+      activeTask: "TROUBLESHOOT",
+      activeEntity: supportState.activeEntity || null,
+      verifiedEntities: supportState.verifiedEntities || [],
+      lastRequestedDimensions: supportState.lastRequestedDimensions || [],
+      awaitingField: "",
+      responseMode: "DIRECT_ANSWER",
+      detailLevel: "concise",
+      grounded: false,
+      telemetry: {
+        role: "paralegal",
+        reliabilityGap: "paralegal_manager_unavailable",
+        managerAvailable: false,
+        rollout: publicParalegalRolloutTelemetry(paralegalRolloutDecision),
         toolCalls: [],
       },
       allowFallbackActions: false,
@@ -7589,10 +7698,19 @@ async function createConversationMessage({
     pageContext: context.pageContext,
   });
   const supportState = getConversationPolicyState(conversation);
-  const isAttorneyConversation = String(user?.role || conversation?.role || "").toLowerCase() === "attorney";
+  const conversationRole = String(user?.role || conversation?.role || "").toLowerCase();
+  const isAttorneyConversation = conversationRole === "attorney";
+  const isParalegalConversation = conversationRole === "paralegal";
+  const reliabilityRole = isAttorneyConversation
+    ? "attorney"
+    : isParalegalConversation
+      ? "paralegal"
+      : "";
   const questionFamilySignal = isAttorneyConversation
-    ? buildQuestionFamilySignal(normalizedText)
-    : null;
+    ? buildAttorneyQuestionFamilySignal(normalizedText)
+    : isParalegalConversation
+      ? buildParalegalQuestionFamilySignal(normalizedText)
+      : null;
   const normalizedPromptAction = sanitizePromptAction(promptAction);
   const effectiveSupportState = normalizedPromptAction
     ? {
@@ -7650,6 +7768,14 @@ async function createConversationMessage({
         promptAction: normalizedPromptAction,
       },
     }));
+  const assistantTelemetry =
+    assistantReply.payload.telemetry && typeof assistantReply.payload.telemetry === "object"
+      ? assistantReply.payload.telemetry
+      : null;
+  const persistedTelemetry =
+    isParalegalConversation && assistantTelemetry
+      ? { ...assistantTelemetry, role: "paralegal" }
+      : assistantTelemetry;
 
   const assistantMessage = await SupportMessage.create({
     conversationId: conversation._id,
@@ -7664,26 +7790,27 @@ async function createConversationMessage({
       urgency: assistantReply.payload.urgency,
       confidence: assistantReply.payload.confidence,
       provider: assistantReply.payload.provider,
-      telemetry: assistantReply.payload.telemetry || null,
+      telemetry: persistedTelemetry,
       reliability: {
+        ...(isParalegalConversation ? { role: "paralegal" } : {}),
         evidenceStatus: trimString(assistantReply.payload.supportFacts?.evidenceStatus, 80),
         capabilityIds: Array.isArray(assistantReply.payload.supportFacts?.capabilityIds)
           ? assistantReply.payload.supportFacts.capabilityIds.map((value) => trimString(value, 120)).filter(Boolean).slice(0, 12)
           : [],
-        validationRetries: Number(assistantReply.payload.telemetry?.validationRetries || 0) || 0,
-        validationFailures: Array.isArray(assistantReply.payload.telemetry?.validationFailures)
-          ? assistantReply.payload.telemetry.validationFailures.map((value) => trimString(value, 120)).filter(Boolean).slice(0, 12)
+        validationRetries: Number(persistedTelemetry?.validationRetries || 0) || 0,
+        validationFailures: Array.isArray(persistedTelemetry?.validationFailures)
+          ? persistedTelemetry.validationFailures.map((value) => trimString(value, 120)).filter(Boolean).slice(0, 12)
           : [],
-        validationExhausted: assistantReply.payload.telemetry?.validationExhausted === true,
-        retryOutcome: trimString(assistantReply.payload.telemetry?.retryOutcome, 80),
-        reliabilityGap: trimString(assistantReply.payload.telemetry?.reliabilityGap, 120),
+        validationExhausted: persistedTelemetry?.validationExhausted === true,
+        retryOutcome: trimString(persistedTelemetry?.retryOutcome, 80),
+        reliabilityGap: trimString(persistedTelemetry?.reliabilityGap, 120),
         repeatedQuestion:
-          isAttorneyConversation &&
+          Boolean(reliabilityRole) &&
           Boolean(questionFamilySignal?.familyKey) &&
           questionFamilySignal.familyKey === supportState.lastQuestionFamilyKey,
-        questionFamilyKey: isAttorneyConversation ? trimString(questionFamilySignal?.familyKey, 80) : "",
+        questionFamilyKey: reliabilityRole ? trimString(questionFamilySignal?.familyKey, 80) : "",
         unknownQuestionCluster:
-          isAttorneyConversation &&
+          Boolean(reliabilityRole) &&
           !assistantReply.payload.supportFacts?.capabilityIds?.length &&
           !["CONVERSATION", "BOUNDARY", "CLARIFY"].includes(String(assistantReply.payload.activeTask || "")) &&
           !["assistant_temporarily_unavailable", "answer_validation_failed"].includes(
@@ -7768,7 +7895,7 @@ async function createConversationMessage({
       lastCapabilityIds: Array.isArray(assistantReply.payload.supportFacts?.capabilityIds)
         ? assistantReply.payload.supportFacts.capabilityIds.map((value) => trimString(value, 120)).filter(Boolean).slice(0, 12)
         : [],
-      lastQuestionFamilyKey: isAttorneyConversation
+      lastQuestionFamilyKey: reliabilityRole
         ? trimString(questionFamilySignal?.familyKey, 80)
         : supportState.lastQuestionFamilyKey || "",
       lastRequestedDimensions: Array.isArray(assistantReply.payload.lastRequestedDimensions)
@@ -8628,12 +8755,16 @@ async function restartConversation({
 }
 
 module.exports = {
+  SUPPORT_CONVERSATION_RETENTION_MS,
+  SUPPORT_INACTIVITY_RESTART_MS,
+  SUPPORT_RETENTION_PRUNE_INTERVAL_MS,
   SUPPORT_WELCOME_MESSAGE,
   createConversationMessage,
   escalateConversation,
   findConversationForUser,
   getOrCreateOpenConversation,
   listConversationMessages,
+  pruneExpiredSupportHistory,
   recordConversationMessageFeedback,
   restartConversation,
 };

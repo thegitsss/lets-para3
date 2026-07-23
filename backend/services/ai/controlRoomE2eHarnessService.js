@@ -20,6 +20,7 @@ const { assertControlRoomE2eHarnessEnabled } = require("../../utils/controlRoomE
 const DEFAULT_ADMIN_EMAIL = "control-room.e2e.admin@lets-paraconnect.dev";
 const DEFAULT_ADMIN_PASSWORD = "ControlRoomHarness123!";
 const DEFAULT_SUPPORT_ATTORNEY_EMAIL = "support.cr.e2e.attorney@lets-paraconnect.dev";
+const DEFAULT_SUPPORT_PARALEGAL_EMAIL = "support.cr.e2e.paralegal@lets-paraconnect.dev";
 const SUPPORT_USER_PASSWORD = "ControlRoomSupport123!";
 const APPLICANT_PASSWORD = "ControlRoomApplicant123!";
 const HARNESS_RUN_KEY_PATTERN = /^cr-e2e-/i;
@@ -52,6 +53,15 @@ function resolveSupportAttorneyCredentials() {
       .trim()
       .toLowerCase(),
     password: String(process.env.CONTROL_ROOM_E2E_SUPPORT_ATTORNEY_PASSWORD || SUPPORT_USER_PASSWORD),
+  };
+}
+
+function resolveSupportParalegalCredentials() {
+  return {
+    email: String(process.env.CONTROL_ROOM_E2E_SUPPORT_PARALEGAL_EMAIL || DEFAULT_SUPPORT_PARALEGAL_EMAIL)
+      .trim()
+      .toLowerCase(),
+    password: String(process.env.CONTROL_ROOM_E2E_SUPPORT_PARALEGAL_PASSWORD || SUPPORT_USER_PASSWORD),
   };
 }
 
@@ -174,6 +184,49 @@ async function upsertHarnessSupportAttorney(options = {}) {
   await attorney.save();
   return {
     attorney,
+    credentials,
+  };
+}
+
+async function upsertHarnessSupportParalegal() {
+  assertControlRoomE2eHarnessEnabled();
+  const credentials = resolveSupportParalegalCredentials();
+  let paralegal = await User.findOne({ email: credentials.email });
+
+  if (!paralegal) {
+    paralegal = new User({
+      firstName: "Parker",
+      lastName: "Harness",
+      email: credentials.email,
+      password: credentials.password,
+      role: "paralegal",
+      status: "approved",
+      state: "CA",
+      location: "California",
+      emailVerified: true,
+      termsAccepted: true,
+      approvedAt: new Date(),
+      twoFactorEnabled: false,
+    });
+  } else {
+    paralegal.firstName = paralegal.firstName || "Parker";
+    paralegal.lastName = paralegal.lastName || "Harness";
+    paralegal.password = credentials.password;
+    paralegal.role = "paralegal";
+    paralegal.status = "approved";
+    paralegal.state = paralegal.state || "CA";
+    paralegal.location = paralegal.location || "California";
+    paralegal.emailVerified = true;
+    paralegal.termsAccepted = true;
+    paralegal.approvedAt = paralegal.approvedAt || new Date();
+    paralegal.disabled = false;
+    paralegal.deleted = false;
+    paralegal.twoFactorEnabled = false;
+  }
+
+  await paralegal.save();
+  return {
+    paralegal,
     credentials,
   };
 }
@@ -752,7 +805,9 @@ module.exports = {
   DEFAULT_ADMIN_PASSWORD,
   resolveAdminCredentials,
   resolveSupportAttorneyCredentials,
+  resolveSupportParalegalCredentials,
   seedControlRoomFixtureSet,
   upsertHarnessAdmin,
   upsertHarnessSupportAttorney,
+  upsertHarnessSupportParalegal,
 };

@@ -9,9 +9,11 @@ const {
 const {
   resolveAdminCredentials,
   resolveSupportAttorneyCredentials,
+  resolveSupportParalegalCredentials,
   seedControlRoomFixtureSet,
   upsertHarnessAdmin,
   upsertHarnessSupportAttorney,
+  upsertHarnessSupportParalegal,
 } = require("../services/ai/controlRoomE2eHarnessService");
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -60,6 +62,28 @@ router.post(
       credentials: {
         email: credentials.email,
         passwordConfigured: Boolean(resolveSupportAttorneyCredentials().password),
+      },
+    });
+  })
+);
+
+router.post(
+  "/bootstrap-paralegal",
+  asyncHandler(async (_req, res) => {
+    const { paralegal, credentials } = await upsertHarnessSupportParalegal();
+    res.status(201).json({
+      ok: true,
+      paralegal: {
+        id: String(paralegal._id),
+        email: credentials.email,
+        role: paralegal.role,
+        status: paralegal.status,
+        approvedAt: paralegal.approvedAt,
+        lastLoginAt: paralegal.lastLoginAt,
+      },
+      credentials: {
+        email: credentials.email,
+        passwordConfigured: Boolean(resolveSupportParalegalCredentials().password),
       },
     });
   })

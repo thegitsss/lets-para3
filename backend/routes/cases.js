@@ -57,6 +57,11 @@ const {
   isAttorneyPaymentMethodRequired,
 } = require("../services/attorneyWorkflowPolicy");
 const {
+  evaluateInvitationEligibility: evaluateParalegalInvitationAcceptance,
+  evaluatePreEngagementSubmission,
+  evaluateWithdrawalEligibility,
+} = require("../services/paralegalWorkflowPolicy");
+const {
   decryptCaseFilePayload,
   decryptString,
   buildCaseFileNameQuery,
@@ -4454,6 +4459,23 @@ router.post(
         error: "Add at least one task before hiring a paralegal for this case.",
       });
     }
+    const acceptancePolicy = evaluateParalegalInvitationAcceptance({
+      user: { ...req.user, _id: req.user.id, role: "paralegal", status: "approved" },
+      caseDoc,
+      inviteStatus: inviteRecord.status,
+      stripeState: {
+        accountId: paralegal.stripeAccountId,
+        detailsSubmitted: paralegal.stripeOnboarded === true,
+        payoutsEnabled: paralegal.stripePayoutsEnabled === true,
+      },
+      blockedRelationship: false,
+    });
+    if (!acceptancePolicy.allowed) {
+      return res.status(400).json({
+        error: "This invitation cannot be accepted right now.",
+        blockers: acceptancePolicy.blockers,
+      });
+    }
     upsertInvite(caseDoc, req.user.id, { status: "accepted", respondedAt: new Date() });
     syncLegacyPendingFields(caseDoc);
     if (!Array.isArray(caseDoc.applicants)) caseDoc.applicants = [];
@@ -4687,6 +4709,16 @@ router.post(
     if (areAllScopeTasksComplete(caseDoc)) {
       return res.status(400).json({
         error: "All tasks are complete. Please coordinate with the attorney to release funds.",
+      });
+    }
+    const withdrawalPolicy = evaluateWithdrawalEligibility({
+      user: { ...req.user, _id: req.user.id, role: "paralegal" },
+      caseDoc,
+    });
+    if (!withdrawalPolicy.allowed) {
+      return res.status(400).json({
+        error: "This case cannot be withdrawn right now.",
+        blockers: withdrawalPolicy.blockers,
       });
     }
 
@@ -5149,6 +5181,16 @@ router.post(
       if (conflictsResponseType === "disclosure" && !conflictsDisclosureText.trim()) {
         return res.status(400).json({ error: "Enter your conflicts disclosure details." });
       }
+    }
+    const submissionPolicy = evaluatePreEngagementSubmission({
+      user: { ...req.user, _id: req.user.id, role: "paralegal" },
+      caseDoc,
+    });
+    if (!submissionPolicy.allowed) {
+      return res.status(400).json({
+        error: "These pre-engagement items cannot be submitted right now.",
+        blockers: submissionPolicy.blockers,
+      });
     }
 
     let paralegalConfidentialityDocument = preEngagement.paralegalConfidentialityDocument || null;

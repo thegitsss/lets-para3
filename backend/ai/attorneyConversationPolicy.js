@@ -90,12 +90,20 @@ function isAccountWideSubjectChange(messageText = "") {
 function prepareConversationState(messageText = "", state = {}) {
   const activeEntity = sanitizeEntity(state.activeEntity || {});
   const verifiedEntities = mergeVerifiedEntities(state.verifiedEntities || [], activeEntity);
+  const base = {
+    ...state,
+    activeEntity,
+    verifiedEntities,
+    correctionReference: false,
+    correctionAmbiguous: false,
+    subjectChanged: false,
+  };
   if (isCorrectionReference(messageText)) {
     const alternatives = verifiedEntities.filter(
       (entity) => !activeEntity || entity.type !== activeEntity.type || entity.id !== activeEntity.id
     );
     return {
-      ...state,
+      ...base,
       activeEntity: alternatives.length === 1 ? alternatives[0] : null,
       verifiedEntities,
       correctionReference: true,
@@ -103,9 +111,9 @@ function prepareConversationState(messageText = "", state = {}) {
     };
   }
   if (isAccountWideSubjectChange(messageText)) {
-    return { ...state, activeEntity: null, verifiedEntities, subjectChanged: true };
+    return { ...base, activeEntity: null, subjectChanged: Boolean(activeEntity) };
   }
-  return { ...state, activeEntity, verifiedEntities };
+  return base;
 }
 
 function addRequirement(list, key, reason) {
@@ -232,7 +240,26 @@ function buildAttorneyEvidencePlan({
     followUp,
     correction: isCorrectionReference(current),
     hasMatterContext,
+    refreshRequested: /\b(?:refresh|check again|recheck|updated now|latest right now)\b/i.test(current),
+    conversationState: prepareConversationState(current, conversationState),
   };
+}
+
+function selectReusableAttorneyEvidence(
+  plan = {},
+  priorToolOutputs = [],
+  { now = Date.now(), activeEntity = null } = {}
+) {
+  return selectReusableSupportEvidence(
+    evidenceToolNamesForPlan(plan),
+    priorToolOutputs,
+    {
+      now,
+      activeEntity: activeEntity || plan.conversationState?.activeEntity || null,
+      refreshRequested: plan.refreshRequested === true,
+      subjectChanged: plan.conversationState?.subjectChanged === true,
+    }
+  );
 }
 
 function auditAttorneyToolTrace(plan = {}, toolOutputs = []) {
@@ -295,4 +322,8 @@ module.exports = {
   mergeVerifiedEntities,
   prepareConversationState,
   sanitizeEntity,
+  selectReusableAttorneyEvidence,
 };
+const {
+  selectReusableSupportEvidence,
+} = require("./supportEvidenceFreshness");

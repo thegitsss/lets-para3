@@ -13,6 +13,7 @@ const {
   isCorrectionReference,
   mergeVerifiedEntities,
   prepareConversationState,
+  selectReusableAttorneyEvidence,
 } = require("./attorneyConversationPolicy");
 const {
   executeSupportManagerTool,
@@ -36,6 +37,9 @@ const {
   evaluateAttorneyManagerRollout,
   publicAttorneyRolloutTelemetry,
 } = require("../services/support/attorneyRolloutService");
+const {
+  priorToolEvidenceFromMessages,
+} = require("./supportEvidenceFreshness");
 
 const logger = createLogger("ai:support-manager");
 const MAX_AGENT_ITERATIONS = 6;
@@ -152,7 +156,9 @@ function sanitizeConversationState(state = {}) {
 }
 
 async function fetchHistory(conversationId = "", currentMessageId = "") {
-  if (!conversationId || !mongoose.isValidObjectId(conversationId)) return [];
+  if (!conversationId || !mongoose.isValidObjectId(conversationId)) {
+    return { history: [], priorToolOutputs: [] };
+  }
   const query = { conversationId };
   if (currentMessageId && mongoose.isValidObjectId(currentMessageId)) {
     query._id = { $ne: currentMessageId };
@@ -162,16 +168,19 @@ async function fetchHistory(conversationId = "", currentMessageId = "") {
       .sort({ createdAt: -1, _id: -1 })
       .limit(MAX_HISTORY_MESSAGES)
       .lean();
-    return messages
-      .reverse()
+    const chronological = messages.reverse();
+    return {
+      history: chronological
       .map((message) => ({
         role: message.sender === "user" ? "user" : "assistant",
         content: String(message.text || "").trim().slice(0, 6000),
       }))
-      .filter((message) => message.content);
+      .filter((message) => message.content),
+      priorToolOutputs: priorToolEvidenceFromMessages(chronological),
+    };
   } catch (error) {
     logger.warn("Unable to load manager-agent conversation history.", error?.message || error);
-    return [];
+    return { history: [], priorToolOutputs: [] };
   }
 }
 
@@ -199,7 +208,7 @@ function buildManagerInstructions(role = "unknown") {
     "- If a tool cannot resolve the request, ask one focused clarification. Do not pretend the data is unavailable until you have used the relevant tool.",
     "- You may make multiple tool calls. Stop as soon as you have enough evidence for a correct answer.",
     "- Reuse information that is already present, current, and sufficient. Call the same tool again only when the user changes the subject, identifies a different matter, explicitly requests refreshed information, or the earlier result failed or lacked the required facts.",
-    "- The application-provided evidencePlan is mandatory. Before answering, call exactly one offered tool from every evidencePlan requirement's anyOf list. If the plan has multiple requirements, call all of those tools, preferably in parallel, even when one result seems sufficient.",
+    "- The application-provided evidencePlan is mandatory. A requirement may be satisfied by application-provided reusableEvidence; otherwise call exactly one offered tool from its anyOf list. Never call a tool again when reusableEvidence already supplies current, complete evidence for it.",
     "- Do not answer until every evidencePlan requirement has either a successful result or an attempted relevant tool has reported absence, unavailability, or failure.",
     "- For a compound question, call every distinct source needed and answer every part in the order asked.",
     "- Approved knowledge can explain the product, but it can never override executable policy, live scoped data, or a historical transaction snapshot.",
@@ -865,9 +874,12 @@ function buildValidationSafeFallback({
       validationExhausted: true,
       retryOutcome: "safe_fallback",
       managerAvailable: true,
+      reusedEvidenceCount: toolOutputs.filter((entry) => entry.reused === true).length,
       rollout: publicAttorneyRolloutTelemetry(rolloutDecision),
       capabilityIds,
-      toolCalls: toolOutputs.map(summarizeManagerToolTrace),
+      toolCalls: toolOutputs
+        .filter((entry) => entry.reused !== true)
+        .map(summarizeManagerToolTrace),
     },
   };
 }
@@ -900,15 +912,27 @@ async function generateSupportManagerReply({
   const availableTools = getSupportManagerToolDefinitions(role);
   if (!openai || !availableTools.length || !openai.responses?.parse) return null;
 
-  const history = await fetchHistory(conversationId, currentMessageId);
+  const historyResult = await fetchHistory(conversationId, currentMessageId);
+  const history = historyResult.history;
   const preparedConversationState = prepareConversationState(safeMessage, sanitizeConversationState(conversationState));
   const evidencePlan = buildAttorneyEvidencePlan({
     messageText: safeMessage,
     conversationHistory: history,
     conversationState: preparedConversationState,
   });
-  const tools = selectManagerToolsForEvidencePlan(availableTools, evidencePlan);
-  if (!tools.length) return null;
+  const reuse = selectReusableAttorneyEvidence(
+    evidencePlan,
+    historyResult.priorToolOutputs,
+    {
+      activeEntity: preparedConversationState.activeEntity,
+    }
+  );
+  const requiredFreshTools = new Set(reuse.requiredToolNames);
+  const plannedToolNames = evidenceToolNamesForPlan(evidencePlan);
+  const plannedTools = selectManagerToolsForEvidencePlan(availableTools, evidencePlan);
+  const tools = plannedToolNames.length
+    ? plannedTools.filter((tool) => requiredFreshTools.has(String(tool?.name || "")))
+    : plannedTools;
   const input = [
     ...history,
     {
@@ -918,11 +942,18 @@ async function generateSupportManagerReply({
         pageContext: sanitizePageContext(pageContext),
         conversationState: preparedConversationState,
         evidencePlan,
+        reusableEvidence: reuse.reusable.map((entry) => ({
+          name: entry.name,
+          result: entry.result,
+        })),
         latestUserMessage: safeMessage,
       }),
     },
   ];
-  const toolOutputs = [];
+  const toolOutputs = reuse.reusable.map((entry) => ({
+    ...entry,
+    reused: true,
+  }));
   const startedAt = Date.now();
   let response = null;
   const usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
@@ -936,7 +967,7 @@ async function generateSupportManagerReply({
           model: AI_MODELS.support,
           instructions: buildManagerInstructions(role),
           input,
-          tools,
+          ...(tools.length ? { tools } : {}),
           tool_choice: "auto",
           parallel_tool_calls: true,
           text: { format: MANAGER_REPLY_FORMAT },
@@ -1041,15 +1072,36 @@ async function generateSupportManagerReply({
             validationExhausted: false,
             retryOutcome: validationRetries > 0 ? "corrected" : "not_needed",
             managerAvailable: true,
+            reusedEvidenceCount: toolOutputs.filter((entry) => entry.reused === true).length,
             rollout: publicAttorneyRolloutTelemetry(rolloutDecision),
             capabilityIds,
-            toolCalls: toolOutputs.map(summarizeManagerToolTrace),
+            toolCalls: toolOutputs
+              .filter((entry) => entry.reused !== true)
+              .map(summarizeManagerToolTrace),
           },
         };
       }
 
+      const offeredToolNames = new Set(tools.map((tool) => String(tool?.name || "")));
+      const completedToolNames = new Set(toolOutputs.map((entry) => String(entry?.name || "")));
+      const responseCallNames = new Set();
       const callOutputs = await Promise.all(
         calls.map(async (call, callIndex) => {
+          const callName = String(call?.name || "");
+          const blockedReason =
+            !offeredToolNames.has(callName)
+              ? "unrelated_tool_call_blocked"
+              : completedToolNames.has(callName) || responseCallNames.has(callName)
+                ? "repeated_tool_call_blocked"
+                : "";
+          responseCallNames.add(callName);
+          if (blockedReason) {
+            return {
+              type: "function_call_output",
+              call_id: call.call_id,
+              output: JSON.stringify({ ok: false, error: blockedReason }),
+            };
+          }
           const args = parseToolArguments(call);
           const toolStartedAt = Date.now();
           let result;

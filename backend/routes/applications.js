@@ -12,9 +12,9 @@ const stripe = require("../utils/stripe");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
 const {
   ATTORNEY_WORKFLOW_STAGES,
-  evaluateApplicationEligibility,
   isAttorneyPaymentMethodRequired,
 } = require("../services/attorneyWorkflowPolicy");
+const { evaluateApplicationEligibility } = require("../services/paralegalWorkflowPolicy");
 const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
   "samanthasider+attorney@gmail.com",
   "samanthasider+56@gmail.com",

@@ -1,8 +1,10 @@
 const router = require("express").Router();
-const { rateLimit } = require("express-rate-limit");
 
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
+const {
+  createSupportActionRateLimiter,
+} = require("../services/support/supportActionRateLimit");
 const {
   createConversationMessage,
   escalateConversation,
@@ -29,17 +31,10 @@ if (REQUIRE_CSRF) {
 }
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-const supportWriteLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  limit: 30,
-  standardHeaders: "draft-7",
-  legacyHeaders: false,
-  skip: () => process.env.NODE_ENV === "test",
-  keyGenerator: (req) => String(req.user?._id || req.user?.id || req.ip || "anonymous"),
-  handler: (_req, res) => {
-    res.status(429).json({ error: "Too many assistant requests. Please wait a moment and try again." });
-  },
-});
+// This middleware runs once per user-submitted write action. Everything after
+// the boundary—tools, model retries, validation, repair, fallback, and
+// telemetry—executes inside that single counted request.
+const supportWriteLimiter = createSupportActionRateLimiter();
 
 function readPageContext(req) {
   const bodyContext =

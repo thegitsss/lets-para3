@@ -32,6 +32,12 @@ jest.mock("../ai/supportManagerAgent", () => ({
   generateSupportManagerReply: (...args) => mockGenerateSupportManagerReply(...args),
 }));
 
+const mockGenerateParalegalSupportManagerReply = jest.fn().mockResolvedValue(null);
+jest.mock("../ai/paralegalSupportManagerAgent", () => ({
+  generateParalegalSupportManagerReply: (...args) =>
+    mockGenerateParalegalSupportManagerReply(...args),
+}));
+
 jest.mock("../ai/supportAgent", () => {
   const actual = jest.requireActual("../ai/supportAgent");
   const normalize = (value = "") => String(value || "").trim().toLowerCase();
@@ -8581,6 +8587,167 @@ describe("Support assistant API", () => {
     }));
   });
 
+  test("routes an enrolled paralegal through the independent hardened manager pipeline", async () => {
+    const originalEnabled = process.env.OPENAI_PARALEGAL_MANAGER_ENABLED;
+    const originalPercent = process.env.OPENAI_PARALEGAL_MANAGER_ROLLOUT_PERCENT;
+    const originalLegacy = process.env.OPENAI_PARALEGAL_LEGACY_FALLBACK;
+    process.env.OPENAI_PARALEGAL_MANAGER_ENABLED = "true";
+    process.env.OPENAI_PARALEGAL_MANAGER_ROLLOUT_PERCENT = "100";
+    process.env.OPENAI_PARALEGAL_LEGACY_FALLBACK = "false";
+    mockGenerateParalegalSupportManagerReply.mockResolvedValueOnce({
+      reply: "You have 3 active assigned matters.",
+      suggestions: [],
+      navigation: null,
+      provider: "openai_manager_paralegal",
+      confidence: "high",
+      grounded: true,
+      primaryAsk: "assigned_matter_overview",
+      activeTask: "FACT_LOOKUP",
+      activeEntity: null,
+      verifiedEntities: [],
+      requestedDimensions: ["status"],
+      awaitingField: "",
+      responseMode: "DIRECT_ANSWER",
+      detailLevel: "concise",
+      supportFacts: {
+        evidenceStatus: "verified",
+        capabilityIds: ["P01_assigned_overview"],
+      },
+      telemetry: {
+        role: "paralegal",
+        managerAvailable: true,
+        latencyMs: 12,
+        validationRetries: 0,
+        validationExhausted: false,
+        retryOutcome: "not_needed",
+        rollout: {
+          contractVersion: "2026-07-23.paralegal.package9.v1",
+          rolloutStage: "full",
+          rolloutPercent: 100,
+          rolloutBucket: 42,
+          enrollmentReason: "all_paralegals",
+        },
+        toolCalls: [],
+      },
+    });
+    try {
+      const paralegal = await createUser({
+        role: "paralegal",
+        email: "support-paralegal-package9-manager@lets-paraconnect.test",
+      });
+      const conversationRes = await createConversation(paralegal);
+      const response = await sendSupportMessage(
+        paralegal,
+        conversationRes.body.conversation.id,
+        { text: "How many active assigned matters do I have?" }
+      );
+      expect(response.status).toBe(201);
+      expect(response.body.assistantMessage.text).toBe(
+        "You have 3 active assigned matters."
+      );
+      expect(response.body.assistantReply).toEqual(
+        expect.objectContaining({
+          provider: "openai_manager_paralegal",
+          actions: [],
+          suggestedReplies: [],
+          grounded: true,
+          telemetry: expect.objectContaining({
+            role: "paralegal",
+            managerAvailable: true,
+            rollout: expect.objectContaining({
+              rolloutStage: "full",
+              rolloutPercent: 100,
+            }),
+          }),
+        })
+      );
+      expect(mockGenerateParalegalSupportManagerReply).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageText: "How many active assigned matters do I have?",
+          user: expect.objectContaining({ role: "paralegal" }),
+        })
+      );
+      expect(mockGenerateSupportManagerReply).not.toHaveBeenCalled();
+      const stored = await SupportMessage.findById(
+        response.body.assistantMessage.id
+      ).lean();
+      expect(stored.metadata.reliability).toEqual(
+        expect.objectContaining({
+          role: "paralegal",
+          evidenceStatus: "verified",
+          capabilityIds: ["P01_assigned_overview"],
+        })
+      );
+    } finally {
+      if (originalEnabled === undefined) delete process.env.OPENAI_PARALEGAL_MANAGER_ENABLED;
+      else process.env.OPENAI_PARALEGAL_MANAGER_ENABLED = originalEnabled;
+      if (originalPercent === undefined) {
+        delete process.env.OPENAI_PARALEGAL_MANAGER_ROLLOUT_PERCENT;
+      } else {
+        process.env.OPENAI_PARALEGAL_MANAGER_ROLLOUT_PERCENT = originalPercent;
+      }
+      if (originalLegacy === undefined) delete process.env.OPENAI_PARALEGAL_LEGACY_FALLBACK;
+      else process.env.OPENAI_PARALEGAL_LEGACY_FALLBACK = originalLegacy;
+    }
+  });
+
+  test("fails closed for an enrolled paralegal when the hardened manager is unavailable", async () => {
+    const originalEnabled = process.env.OPENAI_PARALEGAL_MANAGER_ENABLED;
+    const originalPercent = process.env.OPENAI_PARALEGAL_MANAGER_ROLLOUT_PERCENT;
+    const originalLegacy = process.env.OPENAI_PARALEGAL_LEGACY_FALLBACK;
+    process.env.OPENAI_PARALEGAL_MANAGER_ENABLED = "true";
+    process.env.OPENAI_PARALEGAL_MANAGER_ROLLOUT_PERCENT = "100";
+    process.env.OPENAI_PARALEGAL_LEGACY_FALLBACK = "false";
+    mockGenerateParalegalSupportManagerReply.mockResolvedValueOnce(null);
+    try {
+      const paralegal = await createUser({
+        role: "paralegal",
+        email: "support-paralegal-package9-unavailable@lets-paraconnect.test",
+      });
+      const conversationRes = await createConversation(paralegal);
+      const response = await sendSupportMessage(
+        paralegal,
+        conversationRes.body.conversation.id,
+        { text: "What is the status of my assigned matter?" }
+      );
+      expect(response.status).toBe(201);
+      expect(response.body.assistantReply).toEqual(
+        expect.objectContaining({
+          provider: "paralegal_manager_unavailable",
+          grounded: false,
+          actions: [],
+          suggestedReplies: [],
+          telemetry: expect.objectContaining({
+            role: "paralegal",
+            managerAvailable: false,
+            reliabilityGap: "paralegal_manager_unavailable",
+            toolCalls: [],
+            rollout: expect.objectContaining({
+              rolloutStage: "full",
+              rolloutPercent: 100,
+            }),
+          }),
+        })
+      );
+      expect(response.body.assistantMessage.text).toMatch(
+        /trouble accessing the verified LPC information/i
+      );
+      expect(response.body.assistantMessage.text).not.toMatch(
+        /sending this to the team|open billing/i
+      );
+    } finally {
+      if (originalEnabled === undefined) delete process.env.OPENAI_PARALEGAL_MANAGER_ENABLED;
+      else process.env.OPENAI_PARALEGAL_MANAGER_ENABLED = originalEnabled;
+      if (originalPercent === undefined) {
+        delete process.env.OPENAI_PARALEGAL_MANAGER_ROLLOUT_PERCENT;
+      } else {
+        process.env.OPENAI_PARALEGAL_MANAGER_ROLLOUT_PERCENT = originalPercent;
+      }
+      if (originalLegacy === undefined) delete process.env.OPENAI_PARALEGAL_LEGACY_FALLBACK;
+      else process.env.OPENAI_PARALEGAL_LEGACY_FALLBACK = originalLegacy;
+    }
+  });
+
   test("persists opaque attorney question-family and repeated-question reliability signals", async () => {
     const attorney = await createUser({
       role: "attorney",
@@ -8625,6 +8792,41 @@ describe("Support assistant API", () => {
     expect(JSON.stringify(generated.map((message) => message.metadata.reliability))).not.toContain(
       "How many matters"
     );
+  });
+
+  test("persists paralegal question families separately without storing question text", async () => {
+    const paralegal = await createUser({
+      role: "paralegal",
+      email: "support-paralegal-question-signal@lets-paraconnect.test",
+    });
+    const conversationRes = await createConversation(paralegal);
+    const conversationId = conversationRes.body.conversation.id;
+    await sendSupportMessage(paralegal, conversationId, {
+      text: "How many matters have I completed?",
+    });
+    await sendSupportMessage(paralegal, conversationId, {
+      text: "How many matters have I completed?",
+    });
+
+    const messages = await SupportMessage.find({
+      conversationId,
+      sender: "assistant",
+    }).sort({ createdAt: 1 }).lean();
+    const generated = messages.slice(-2);
+    expect(generated[0].metadata.reliability).toEqual(expect.objectContaining({
+      role: "paralegal",
+      repeatedQuestion: false,
+      questionFamilyKey: expect.stringMatching(/^paralegal-question:[a-f0-9]{16}$/),
+    }));
+    expect(generated[1].metadata.reliability).toEqual(expect.objectContaining({
+      role: "paralegal",
+      repeatedQuestion: true,
+      questionFamilyKey: generated[0].metadata.reliability.questionFamilyKey,
+    }));
+    expect(JSON.stringify(generated.map((message) => message.metadata.reliability)))
+      .not.toContain("How many matters");
+    expect(generated[0].metadata.reliability.questionFamilyKey)
+      .not.toMatch(/^question:/);
   });
 
   test("uses the manager's validation fallback without re-entering legacy guessed logic", async () => {

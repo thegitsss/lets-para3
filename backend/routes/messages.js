@@ -11,7 +11,8 @@ const AuditLog = require("../models/AuditLog"); // match filename
 const { notifyUser } = require("../utils/notifyUser");
 const { containsProfanity, maskProfanity } = require("../utils/badWords");
 const { CASE_STATE } = require("../utils/caseState");
-const { evaluateMessagingPermission } = require("../services/attorneyWorkflowPolicy");
+const { evaluateMessagingPermission: evaluatePlatformMessagingPermission } = require("../services/attorneyWorkflowPolicy");
+const { evaluateMessagingPermission: evaluateParalegalMessagingPermission } = require("../services/paralegalWorkflowPolicy");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
 const { publishCaseEvent } = require("../utils/caseEvents");
 const { publishNotificationEvent } = require("../utils/notificationEvents");
@@ -241,12 +242,20 @@ function assertMessagingOpen(req, res) {
   if (!caseDoc) {
     return res.status(400).json({ error: "Case not loaded" });
   }
-  const policy = evaluateMessagingPermission({
-    caseDoc,
-    viewerId: req.user?.id,
-    viewerRole: String(req.user?.role || "").toLowerCase(),
-    partiesBlocked: false,
-  });
+  const viewerRole = String(req.user?.role || "").toLowerCase();
+  const policy = viewerRole === "paralegal"
+    ? evaluateParalegalMessagingPermission({
+        caseDoc,
+        user: req.user,
+        viewerId: req.user?.id,
+        partiesBlocked: false,
+      })
+    : evaluatePlatformMessagingPermission({
+        caseDoc,
+        viewerId: req.user?.id,
+        viewerRole,
+        partiesBlocked: false,
+      });
   if (policy.blockers.includes("hire_required")) {
     return res.status(403).json({ error: "Messaging is available after hire" });
   }

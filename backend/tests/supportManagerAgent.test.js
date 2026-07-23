@@ -244,6 +244,69 @@ describe("support manager agent", () => {
     );
   });
 
+  test("reuses fresh complete attorney evidence without another tool call", async () => {
+    const conversationId = "507f1f77bcf86cd799439098";
+    jest.spyOn(SupportMessage, "find").mockReturnValue({
+      sort: () => ({
+        limit: () => ({
+          lean: async () => [
+            {
+              sender: "assistant",
+              text: "You have 4 matters.",
+              metadata: {
+                supportFacts: {
+                  toolEvidence: [
+                    {
+                      name: "get_my_case_overview",
+                      args: { status_scope: "completed" },
+                      result: {
+                        ok: true,
+                        available: true,
+                        totalCount: 4,
+                        evidenceState: "verified",
+                        evidence: {
+                          authorized: true,
+                          state: "verified",
+                          observedAt: new Date().toISOString(),
+                          facts: [{ key: "totalCount", value: 4 }],
+                          missingFacts: [],
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+            { sender: "user", text: "How many matters do I have?" },
+          ],
+        }),
+      }),
+    });
+    const parse = jest.fn().mockResolvedValue({
+      id: "reused_attorney_evidence",
+      output: [],
+      output_parsed: managerReply({
+        reply: "You have 4 matters.",
+        suggestions: [],
+      }),
+      usage: {},
+    });
+
+    const result = await generateSupportManagerReply({
+      messageText: "How many matters do I have?",
+      conversationId,
+      user: { _id: "507f1f77bcf86cd799439011", role: "attorney" },
+      client: { responses: { parse } },
+    });
+
+    expect(result.telemetry.validationFailures).toEqual([]);
+    expect(result.reply).toBe("You have 4 matters.");
+    expect(result.telemetry.reusedEvidenceCount).toBe(1);
+    expect(mockExecuteSupportManagerTool).not.toHaveBeenCalled();
+    expect(parse.mock.calls[0][0]).not.toHaveProperty("tools");
+    expect(parse.mock.calls[0][0].input.at(-1).content).toContain("reusableEvidence");
+  });
+
   test("rejects a factual direct answer that did not use a tool", async () => {
     const client = {
       responses: {
@@ -660,7 +723,7 @@ describe("support manager agent", () => {
     expect(instructions).toMatch(/do not draft legal documents/i);
     expect(instructions).toMatch(/call the smallest useful set of tools/i);
     expect(instructions).toMatch(/evidencePlan is mandatory/i);
-    expect(instructions).toMatch(/call exactly one offered tool from every evidencePlan requirement/i);
+    expect(instructions).toMatch(/otherwise call exactly one offered tool/i);
     expect(instructions).toMatch(/do not answer until every evidencePlan requirement/i);
     expect(instructions).toMatch(/semantic capability being answered/i);
     expect(instructions).toMatch(/Never turn policy into live state/i);
