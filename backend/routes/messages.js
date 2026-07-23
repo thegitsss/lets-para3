@@ -10,7 +10,8 @@ const User = require("../models/User");
 const AuditLog = require("../models/AuditLog"); // match filename
 const { notifyUser } = require("../utils/notifyUser");
 const { containsProfanity, maskProfanity } = require("../utils/badWords");
-const { CASE_STATE, normalizeCaseStatus, canUseWorkspace } = require("../utils/caseState");
+const { CASE_STATE } = require("../utils/caseState");
+const { evaluateMessagingPermission } = require("../services/attorneyWorkflowPolicy");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
 const { publishCaseEvent } = require("../utils/caseEvents");
 const { publishNotificationEvent } = require("../utils/notificationEvents");
@@ -240,20 +241,22 @@ function assertMessagingOpen(req, res) {
   if (!caseDoc) {
     return res.status(400).json({ error: "Case not loaded" });
   }
-  const escrowStatus = String(caseDoc.escrowStatus || "").toLowerCase();
-  const escrowFunded = !!caseDoc.escrowIntentId && escrowStatus === "funded";
-  const status = normalizeCaseStatus(caseDoc.status);
-  const hasParalegal = caseDoc.paralegal || caseDoc.paralegalId;
-  if (!hasParalegal) {
+  const policy = evaluateMessagingPermission({
+    caseDoc,
+    viewerId: req.user?.id,
+    viewerRole: String(req.user?.role || "").toLowerCase(),
+    partiesBlocked: false,
+  });
+  if (policy.blockers.includes("hire_required")) {
     return res.status(403).json({ error: "Messaging is available after hire" });
   }
-  if (!escrowFunded) {
+  if (policy.blockers.includes("funding_required")) {
     return res.status(403).json({ error: "Work begins once payment is secured." });
   }
-    if (!canUseWorkspace(caseDoc, { viewerId: req.user?.id })) {
-      if (["completed", "closed", "disputed"].includes(status)) {
-        return res.status(403).json({ error: "Messaging is closed for this case." });
-      }
+  if (policy.blockers.includes("messaging_closed") || policy.blockers.includes("case_read_only")) {
+    return res.status(403).json({ error: "Messaging is closed for this case." });
+  }
+  if (policy.blockers.includes("workspace_not_active")) {
     return res.status(403).json({ error: "Messaging unlocks once the case is funded and in progress." });
   }
   return null;

@@ -9,6 +9,9 @@ const { pathToFileURL } = require("url");
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || "support-assistant-test-secret";
 process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "sk_test_support_assistant";
+process.env.OPENAI_ATTORNEY_LEGACY_FALLBACK = "true";
+process.env.OPENAI_ATTORNEY_MANAGER_ENABLED = "true";
+process.env.OPENAI_ATTORNEY_MANAGER_ROLLOUT_PERCENT = "100";
 
 const mockStripe = {
   accounts: {
@@ -23,6 +26,11 @@ const mockStripe = {
 };
 
 jest.mock("../utils/stripe", () => mockStripe);
+
+const mockGenerateSupportManagerReply = jest.fn().mockResolvedValue(null);
+jest.mock("../ai/supportManagerAgent", () => ({
+  generateSupportManagerReply: (...args) => mockGenerateSupportManagerReply(...args),
+}));
 
 jest.mock("../ai/supportAgent", () => {
   const actual = jest.requireActual("../ai/supportAgent");
@@ -1913,8 +1921,10 @@ const Block = require("../models/Block");
 const Case = require("../models/Case");
 const Incident = require("../models/Incident");
 const { LpcAction } = require("../models/LpcAction");
+const Message = require("../models/Message");
 const Notification = require("../models/Notification");
 const Payout = require("../models/Payout");
+const SupportMessage = require("../models/SupportMessage");
 const SupportTicket = require("../models/SupportTicket");
 const User = require("../models/User");
 const { BLOCKED_MESSAGE } = require("../utils/blocks");
@@ -1991,6 +2001,9 @@ async function createCaseDoc({
   readOnly = false,
   pausedReason = null,
   paralegalAccessRevokedAt = null,
+  deadline = null,
+  tasks = [],
+  preEngagement = null,
 } = {}) {
   return Case.create({
     title,
@@ -2013,6 +2026,9 @@ async function createCaseDoc({
     readOnly,
     pausedReason,
     paralegalAccessRevokedAt,
+    deadline,
+    tasks,
+    preEngagement,
   });
 }
 
@@ -2071,6 +2087,13 @@ async function createConversation(user, query = {}) {
 async function sendSupportMessage(user, conversationId, payload = {}) {
   return request(app)
     .post(`/api/support/conversation/${conversationId}/messages`)
+    .set("Cookie", authCookieFor(user))
+    .send(payload);
+}
+
+async function sendSupportMessageFeedback(user, conversationId, messageId, payload = {}) {
+  return request(app)
+    .post(`/api/support/conversation/${conversationId}/messages/${messageId}/feedback`)
     .set("Cookie", authCookieFor(user))
     .send(payload);
 }
@@ -2154,6 +2177,44 @@ describe("Support assistant API", () => {
         text: "Hi — I can help with account questions, payouts, case activity, and platform issues.",
       }),
     ]);
+  });
+
+  test("stores helpfulness feedback only on an owned assistant message", async () => {
+    const paralegal = await createUser({
+      role: "paralegal",
+      email: "support-feedback@lets-paraconnect.test",
+    });
+    const otherParalegal = await createUser({
+      role: "paralegal",
+      email: "support-feedback-other@lets-paraconnect.test",
+    });
+    const conversationRes = await createConversation(paralegal);
+    const sendRes = await sendSupportMessage(paralegal, conversationRes.body.conversation.id, {
+      text: "Where can I see my applications?",
+    });
+    const assistantMessageId = sendRes.body.assistantMessage.id;
+
+    const feedbackRes = await sendSupportMessageFeedback(
+      paralegal,
+      conversationRes.body.conversation.id,
+      assistantMessageId,
+      { rating: "helpful" }
+    );
+    expect(feedbackRes.status).toBe(200);
+    expect(feedbackRes.body.message.metadata.feedback).toEqual(
+      expect.objectContaining({ rating: "helpful", submittedAt: expect.any(String) })
+    );
+
+    const stored = await SupportMessage.findById(assistantMessageId).lean();
+    expect(stored.metadata.feedback.rating).toBe("helpful");
+
+    const forbiddenRes = await sendSupportMessageFeedback(
+      otherParalegal,
+      conversationRes.body.conversation.id,
+      assistantMessageId,
+      { rating: "unhelpful" }
+    );
+    expect(forbiddenRes.status).toBe(404);
   });
 
   test("restarts the conversation into a fresh thread and closes the prior one", async () => {
@@ -3679,7 +3740,7 @@ describe("Support assistant API", () => {
 
     const conversationRes = await createConversation(attorney);
     const firstRes = await sendSupportMessage(attorney, conversationRes.body.conversation.id, {
-      text: "customer service",
+      text: "help",
       pageContext: {
         pathname: "/dashboard-attorney.html",
         viewName: "dashboard-attorney",
@@ -5673,6 +5734,48 @@ describe("Support assistant API", () => {
     expect(sendRes.body.assistantReply.needsEscalation).toBe(false);
   });
 
+  test.each([
+    ["human", "attorney", "human"],
+    ["representative", "paralegal", "Can I talk to a representative?"],
+    ["real-person", "admin", "I need to speak with a real person"],
+    ["someone", "attorney", "Can I talk to someone?"],
+    ["callback", "paralegal", "Can a team member call me?"],
+    ["direct", "admin", "I need to speak with you"],
+  ])("directs a %s human-contact request to Contact Us", async (scenario, role, text) => {
+    const user = await createUser({
+      role,
+      email: `support-human-contact-${role}-${scenario}@lets-paraconnect.test`,
+      firstName: "Human",
+      lastName: "Contact",
+    });
+    const conversationRes = await createConversation(user);
+    const sendRes = await sendSupportMessage(user, conversationRes.body.conversation.id, {
+      text,
+      pageContext: {
+        pathname: role === "admin" ? "/admin-dashboard.html" : `/dashboard-${role}.html`,
+        viewName: role === "admin" ? "admin-dashboard" : `dashboard-${role}`,
+      },
+    });
+
+    expect(sendRes.status).toBe(201);
+    expect(sendRes.body.assistantMessage.text).toMatch(/Contact Us/i);
+    expect(sendRes.body.assistantMessage.text).toMatch(/monitors those messages closely/i);
+    expect(sendRes.body.assistantReply).toEqual(
+      expect.objectContaining({
+        primaryAsk: "human_contact",
+        activeTask: "NAVIGATION",
+        needsEscalation: false,
+        manualReviewSuggested: false,
+        navigation: expect.objectContaining({
+          ctaLabel: "Contact Us",
+          ctaHref: "contact.html",
+          inlineLinkText: "Contact Us",
+        }),
+      })
+    );
+    expect(sendRes.body.assistantMessage.text).not.toMatch(/sent to the team|already contacted|handoff/i);
+  });
+
   test("treats 'can't find my profile settings' as navigation instead of escalation", async () => {
     const paralegal = await createUser({
       role: "paralegal",
@@ -7014,7 +7117,7 @@ describe("Support assistant API", () => {
     expect(sendRes.body.assistantMessage.text).not.toMatch(/released by LPC/i);
   });
 
-  test("resets a vague customer service prompt back to intake even after a responsiveness thread", async () => {
+  test("resets a vague support prompt back to intake even after a responsiveness thread", async () => {
     const attorney = await createUser({
       role: "attorney",
       email: "support-customer-service-intake-reset@lets-paraconnect.test",
@@ -7045,7 +7148,7 @@ describe("Support assistant API", () => {
     expect(firstRes.body.assistantReply.primaryAsk).toBe("responsiveness_issue");
 
     const secondRes = await sendSupportMessage(paralegal, conversationRes.body.conversation.id, {
-      text: "customer service",
+      text: "question",
       pageContext: {
         pathname: "/dashboard-paralegal.html",
         viewName: "dashboard-paralegal",
@@ -7060,7 +7163,9 @@ describe("Support assistant API", () => {
         needsEscalation: false,
       })
     );
-    expect(secondRes.body.assistantMessage.text).toBe("How can I help today?");
+    expect(secondRes.body.assistantMessage.text).toMatch(
+      /How can I help today\?|What do you need help with today\?/i
+    );
   });
 
   test("routes attorney billing-method update requests directly to billing", async () => {
@@ -7241,6 +7346,43 @@ describe("Support assistant API", () => {
     );
     expect(sendRes.body.assistantMessage.text).toMatch(/Approvals/i);
     expect(sendRes.body.assistantMessage.text).toMatch(/review queue/i);
+  });
+
+  test("gives admins a database-grounded read-only operations snapshot", async () => {
+    const admin = await createUser({
+      role: "admin",
+      email: "support-admin-operational-summary@lets-paraconnect.test",
+    });
+    await SupportTicket.create({
+      subject: "High-priority test ticket",
+      message: "A test support issue",
+      status: "open",
+      urgency: "high",
+      requesterRole: "attorney",
+      sourceSurface: "attorney",
+      routingSuggestion: { priority: "high", ownerKey: "support_ops", queueLabel: "Support Ops" },
+    });
+
+    const conversationRes = await createConversation(admin, {
+      sourcePage: "/admin-dashboard.html",
+      viewName: "admin-dashboard",
+    });
+    const sendRes = await sendSupportMessage(admin, conversationRes.body.conversation.id, {
+      text: "What is the operational status?",
+      pageContext: { pathname: "/admin-dashboard.html", viewName: "admin-dashboard" },
+    });
+
+    expect(sendRes.status).toBe(201);
+    expect(sendRes.body.assistantReply).toEqual(
+      expect.objectContaining({
+        provider: "admin_operational_data",
+        primaryAsk: "admin_operational_summary",
+        activeTask: "FACT_LOOKUP",
+        supportFacts: expect.objectContaining({ openTickets: 1, highPriorityTickets: 1 }),
+        navigation: expect.objectContaining({ ctaHref: "admin-dashboard.html#support-ops" }),
+      })
+    );
+    expect(sendRes.body.assistantMessage.text).toMatch(/1 open support ticket/i);
   });
 
   test("allows non-dashboard questions in the admin dashboard chat scope to use the normal assistant", async () => {
@@ -7456,6 +7598,231 @@ describe("Support assistant API", () => {
         expect(reply.provider).toBe(promptCase.expectProvider);
       }
     }
+  });
+
+  test("answers governed platform-fee questions directly for every role without noisy support controls", async () => {
+    const roleCases = [
+      {
+        role: "attorney",
+        email: "support-knowledge-fee-attorney@lets-paraconnect.test",
+        expected: /22% attorney platform fee/i,
+      },
+      {
+        role: "paralegal",
+        email: "support-knowledge-fee-paralegal@lets-paraconnect.test",
+        expected: /18% platform fee/i,
+      },
+      {
+        role: "admin",
+        email: "support-knowledge-fee-admin@lets-paraconnect.test",
+        expected: /attorneys a 22%.*paralegals an 18%/i,
+      },
+    ];
+
+    for (const roleCase of roleCases) {
+      const user = await createUser({
+        role: roleCase.role,
+        email: roleCase.email,
+        firstName: "Fee",
+        lastName: "Knowledge",
+      });
+      const conversationRes = await createConversation(user);
+      const response = await sendSupportMessage(user, conversationRes.body.conversation.id, {
+        text: "What is the platform fee?",
+        pageContext: {
+          pathname: roleCase.role === "admin" ? "/admin-dashboard.html" : `/dashboard-${roleCase.role}.html`,
+          viewName: roleCase.role === "admin" ? "admin-dashboard" : `dashboard-${roleCase.role}`,
+        },
+      });
+
+      expect(response.status).toBe(201);
+      expect(response.body.assistantMessage.text).toMatch(roleCase.expected);
+      expect(response.body.assistantReply).toEqual(
+        expect.objectContaining({
+          activeTask: "KNOWLEDGE",
+          primaryAsk: "platform_knowledge",
+          responseMode: "DIRECT_ANSWER",
+          needsEscalation: false,
+          actions: [],
+          suggestedReplies: [],
+        })
+      );
+    }
+  });
+
+  test("answers the next deadline from live case data without inheriting an earlier review offer", async () => {
+    const attorney = await createUser({
+      role: "attorney",
+      email: "support-next-deadline@lets-paraconnect.test",
+      firstName: "Della",
+      lastName: "Deadline",
+    });
+    const deadline = new Date(Date.now() + 1000 * 60 * 60 * 24 * 14);
+    const deadlineCase = await createCaseDoc({
+      attorney,
+      title: "Next Deadline Matter",
+      deadline,
+    });
+    await createCaseDoc({
+      attorney,
+      title: "Later Deadline Matter",
+      deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+    });
+    const conversationRes = await createConversation(attorney);
+    await SupportConversation.findByIdAndUpdate(conversationRes.body.conversation.id, {
+      $set: {
+        "metadata.support.escalationShown": true,
+        "metadata.support.escalationOffered": true,
+        "metadata.support.activeAsk": "general_support",
+      },
+    });
+
+    const response = await sendSupportMessage(attorney, conversationRes.body.conversation.id, {
+      text: "when is my next deadline",
+      pageContext: {
+        pathname: "/dashboard-attorney.html",
+        viewName: "dashboard-attorney",
+      },
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.assistantMessage.text).toMatch(/Your next recorded deadline is/i);
+    expect(response.body.assistantMessage.text).toMatch(/Next Deadline Matter/);
+    expect(response.body.assistantMessage.text).not.toMatch(/sending this to the team/i);
+    expect(response.body.assistantReply).toEqual(
+      expect.objectContaining({
+        activeTask: "FACT_LOOKUP",
+        primaryAsk: "deadline_lookup",
+        responseMode: "DIRECT_ANSWER",
+        needsEscalation: false,
+        suggestedReplies: [],
+      })
+    );
+    expect(response.body.assistantReply.actions).toEqual([
+      expect.objectContaining({
+        label: "Open case",
+        href: `case-detail.html?caseId=${deadlineCase._id}`,
+      }),
+    ]);
+  });
+
+  test("summarizes account-wide paralegal activity instead of asking the attorney for a case", async () => {
+    const attorney = await createUser({
+      role: "attorney",
+      email: "support-pending-paralegal-attorney@lets-paraconnect.test",
+      firstName: "Paula",
+      lastName: "Pending",
+    });
+    const paralegal = await createUser({
+      role: "paralegal",
+      email: "support-pending-paralegal-worker@lets-paraconnect.test",
+      firstName: "Perry",
+      lastName: "Paralegal",
+    });
+    const caseDoc = await createCaseDoc({
+      attorney,
+      paralegal,
+      title: "Pending Discovery Matter",
+      tasks: [
+        { title: "Draft discovery responses", completed: false },
+        { title: "Review production index", completed: true },
+      ],
+      preEngagement: {
+        status: "requested",
+        requestedParalegalId: paralegal._id,
+        requestedAt: new Date(),
+      },
+    });
+    await Message.create({
+      caseId: caseDoc._id,
+      senderId: attorney._id,
+      senderRole: "attorney",
+      type: "text",
+      text: "Please send the discovery draft when ready.",
+      readBy: [attorney._id],
+    });
+    const conversationRes = await createConversation(attorney);
+
+    const response = await sendSupportMessage(attorney, conversationRes.body.conversation.id, {
+      text: "am i waiting on anything from a paralegal?",
+      pageContext: {
+        pathname: "/dashboard-attorney.html",
+        viewName: "dashboard-attorney",
+      },
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.assistantMessage.text).toMatch(/Pending Discovery Matter/);
+    expect(response.body.assistantMessage.text).toMatch(/pre-engagement response/i);
+    expect(response.body.assistantMessage.text).not.toMatch(/incomplete task/i);
+    expect(response.body.assistantMessage.text).toMatch(/reply to your latest message/i);
+    expect(response.body.assistantMessage.text).not.toMatch(/share the case name|open billing|sending this to the team/i);
+    expect(response.body.assistantReply).toEqual(
+      expect.objectContaining({
+        activeTask: "FACT_LOOKUP",
+        primaryAsk: "paralegal_pending",
+        responseMode: "DIRECT_ANSWER",
+        needsEscalation: false,
+        suggestedReplies: [],
+      })
+    );
+    expect(response.body.assistantReply.actions).toEqual([
+      expect.objectContaining({
+        label: "Open case",
+        href: `case-detail.html?caseId=${caseDoc._id}`,
+      }),
+    ]);
+  });
+
+  test("says clearly when no recorded paralegal action is pending", async () => {
+    const attorney = await createUser({
+      role: "attorney",
+      email: "support-no-pending-paralegal-attorney@lets-paraconnect.test",
+      firstName: "Nora",
+      lastName: "NothingPending",
+    });
+    const paralegal = await createUser({
+      role: "paralegal",
+      email: "support-no-pending-paralegal-worker@lets-paraconnect.test",
+      firstName: "Riley",
+      lastName: "Replied",
+    });
+    const caseDoc = await createCaseDoc({
+      attorney,
+      paralegal,
+      title: "Current Matter",
+      tasks: [{ title: "Completed assignment", completed: true }],
+    });
+    await Message.create({
+      caseId: caseDoc._id,
+      senderId: paralegal._id,
+      senderRole: "paralegal",
+      type: "text",
+      text: "The assignment is complete.",
+      readBy: [paralegal._id],
+    });
+    const conversationRes = await createConversation(attorney);
+
+    const response = await sendSupportMessage(attorney, conversationRes.body.conversation.id, {
+      text: "Am I waiting on anything from a paralegal?",
+      pageContext: {
+        pathname: "/dashboard-attorney.html",
+        viewName: "dashboard-attorney",
+      },
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.assistantMessage.text).toBe(
+      "You’re not currently waiting on a recorded paralegal action across your active LPC matters."
+    );
+    expect(response.body.assistantReply).toEqual(
+      expect.objectContaining({
+        primaryAsk: "paralegal_pending",
+        needsEscalation: false,
+        actions: [],
+        suggestedReplies: [],
+      })
+    );
   });
 
   test("attorney prompt sweep stays coherent across 50 prompts", async () => {
@@ -7681,7 +8048,7 @@ describe("Support assistant API", () => {
         label: "customer service reset",
         prompt: "customer service",
         pageContext: { pathname: "/dashboard-attorney.html", viewName: "dashboard-attorney" },
-        check: "generic_intake",
+        check: "human_contact",
       },
       {
         label: "two topic split",
@@ -7888,7 +8255,7 @@ describe("Support assistant API", () => {
         label: "customer service punctuation variant",
         prompt: "customer service?",
         pageContext: { pathname: "/dashboard-attorney.html", viewName: "dashboard-attorney" },
-        check: "generic_intake",
+        check: "human_contact",
       },
       {
         label: "help punctuation variant",
@@ -8017,6 +8384,22 @@ describe("Support assistant API", () => {
         case "generic_intake":
           expect(reply.needsEscalation).toBe(false);
           expect(text).toMatch(/How can I help today\?|LPC attorney questions/i);
+          break;
+        case "human_contact":
+          expect(reply).toEqual(
+            expect.objectContaining({
+              primaryAsk: "human_contact",
+              activeTask: "NAVIGATION",
+              needsEscalation: false,
+              manualReviewSuggested: false,
+              navigation: expect.objectContaining({
+                ctaLabel: "Contact Us",
+                ctaHref: "contact.html",
+              }),
+            })
+          );
+          expect(text).toMatch(/Contact Us/i);
+          expect(text).not.toMatch(/sent to the team|already contacted|handoff/i);
           break;
         case "browse_paralegals":
           expect(reply.navigation).toEqual(
@@ -8155,5 +8538,323 @@ describe("Support assistant API", () => {
         throw error;
       }
     }
+  });
+
+  test("keeps a concise manager answer free of unrelated buttons, suggestions, and review cards", async () => {
+    const attorney = await createUser({
+      role: "attorney",
+      email: "support-manager-clean-response@lets-paraconnect.test",
+    });
+    mockGenerateSupportManagerReply.mockResolvedValueOnce({
+      reply: "LPC charges attorneys a 22% platform fee.",
+      suggestions: [],
+      navigation: null,
+      provider: "openai_manager",
+      confidence: "high",
+      grounded: true,
+      primaryAsk: "platform_fee",
+      activeTask: "EXPLAIN",
+      activeEntity: null,
+      verifiedEntities: [],
+      requestedDimensions: ["platform_knowledge"],
+      awaitingField: "",
+      responseMode: "DIRECT_ANSWER",
+      detailLevel: "concise",
+      supportFacts: { evidenceStatus: "verified", capabilityIds: ["A32_platform_knowledge"] },
+      telemetry: { validationRetries: 0, validationExhausted: false, retryOutcome: "not_needed" },
+    });
+
+    const conversationRes = await createConversation(attorney);
+    const response = await sendSupportMessage(attorney, conversationRes.body.conversation.id, {
+      text: "What is the platform fee?",
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.assistantMessage.text).toBe("LPC charges attorneys a 22% platform fee.");
+    expect(response.body.assistantReply).toEqual(expect.objectContaining({
+      provider: "openai_manager",
+      actions: [],
+      suggestedReplies: [],
+      needsEscalation: false,
+      escalation: expect.objectContaining({ available: false, requested: false }),
+      telemetry: expect.objectContaining({ retryOutcome: "not_needed" }),
+    }));
+  });
+
+  test("persists opaque attorney question-family and repeated-question reliability signals", async () => {
+    const attorney = await createUser({
+      role: "attorney",
+      email: "support-manager-question-signal@lets-paraconnect.test",
+    });
+    const reply = {
+      reply: "You have 4 completed matters.",
+      suggestions: [],
+      navigation: null,
+      provider: "openai_manager",
+      confidence: "high",
+      grounded: true,
+      primaryAsk: "completed_case_count",
+      activeTask: "FACT_LOOKUP",
+      activeEntity: null,
+      verifiedEntities: [],
+      requestedDimensions: ["case_overview"],
+      awaitingField: "",
+      responseMode: "DIRECT_ANSWER",
+      detailLevel: "concise",
+      supportFacts: { evidenceStatus: "verified", capabilityIds: ["A01_matter_overview"] },
+      telemetry: { managerAvailable: true, latencyMs: 10, toolCalls: [] },
+    };
+    mockGenerateSupportManagerReply.mockResolvedValue(reply);
+
+    const conversationRes = await createConversation(attorney);
+    const conversationId = conversationRes.body.conversation.id;
+    await sendSupportMessage(attorney, conversationId, { text: "How many matters have I completed?" });
+    await sendSupportMessage(attorney, conversationId, { text: "How many matters have I completed?" });
+
+    const messages = await SupportMessage.find({ conversationId, sender: "assistant" }).sort({ createdAt: 1 }).lean();
+    const generated = messages.slice(-2);
+    expect(generated[0].metadata.reliability).toEqual(expect.objectContaining({
+      repeatedQuestion: false,
+      questionFamilyKey: expect.stringMatching(/^question:[a-f0-9]{16}$/),
+      unknownQuestionCluster: "",
+    }));
+    expect(generated[1].metadata.reliability).toEqual(expect.objectContaining({
+      repeatedQuestion: true,
+      questionFamilyKey: generated[0].metadata.reliability.questionFamilyKey,
+    }));
+    expect(JSON.stringify(generated.map((message) => message.metadata.reliability))).not.toContain(
+      "How many matters"
+    );
+  });
+
+  test("uses the manager's validation fallback without re-entering legacy guessed logic", async () => {
+    const attorney = await createUser({
+      role: "attorney",
+      email: "support-manager-validation-fallback@lets-paraconnect.test",
+    });
+    mockGenerateSupportManagerReply.mockResolvedValueOnce({
+      reply: "I couldn’t produce a reliable answer from the verified LPC information. Please try again.",
+      suggestions: [],
+      navigation: null,
+      provider: "openai_manager_safe_fallback",
+      confidence: "low",
+      grounded: false,
+      primaryAsk: "answer_validation_failed",
+      activeTask: "TROUBLESHOOT",
+      activeEntity: null,
+      verifiedEntities: [],
+      requestedDimensions: ["case_workspace"],
+      awaitingField: "",
+      responseMode: "DIRECT_ANSWER",
+      detailLevel: "concise",
+      supportFacts: { evidenceStatus: "validation_failed", capabilityIds: [] },
+      telemetry: {
+        validationRetries: 2,
+        validationExhausted: true,
+        retryOutcome: "safe_fallback",
+        validationFailures: ["unsupported_date_claim"],
+      },
+    });
+
+    const conversationRes = await createConversation(attorney);
+    const response = await sendSupportMessage(attorney, conversationRes.body.conversation.id, {
+      text: "When is my next deadline?",
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.assistantMessage.text).toMatch(/couldn’t produce a reliable answer/i);
+    expect(response.body.assistantMessage.text).not.toMatch(/sending this to the team|open billing/i);
+    expect(response.body.assistantReply).toEqual(expect.objectContaining({
+      provider: "openai_manager_safe_fallback",
+      grounded: false,
+      actions: [],
+      suggestedReplies: [],
+      needsEscalation: false,
+      telemetry: expect.objectContaining({
+        validationExhausted: true,
+        retryOutcome: "safe_fallback",
+        validationFailures: ["unsupported_date_claim"],
+      }),
+    }));
+    const storedMessage = await SupportMessage.findById(response.body.assistantMessage.id).lean();
+    expect(storedMessage.metadata.reliability).toEqual(expect.objectContaining({
+      validationExhausted: true,
+      retryOutcome: "safe_fallback",
+      validationFailures: ["unsupported_date_claim"],
+    }));
+  });
+
+  test("safe-disable configuration returns only the concise attorney unavailable response", async () => {
+    const originalLegacyFallback = process.env.OPENAI_ATTORNEY_LEGACY_FALLBACK;
+    process.env.OPENAI_ATTORNEY_LEGACY_FALLBACK = "false";
+    mockGenerateSupportManagerReply.mockResolvedValueOnce(null);
+    try {
+      const attorney = await createUser({
+        role: "attorney",
+        email: "support-manager-safe-disabled@lets-paraconnect.test",
+      });
+      const conversationRes = await createConversation(attorney);
+      const response = await sendSupportMessage(attorney, conversationRes.body.conversation.id, {
+        text: "How many cases have I completed?",
+      });
+      expect(response.status).toBe(201);
+      expect(response.body.assistantReply).toEqual(expect.objectContaining({
+        provider: "attorney_manager_unavailable",
+        grounded: false,
+        actions: [],
+        suggestedReplies: [],
+        needsEscalation: false,
+        telemetry: expect.objectContaining({
+          managerAvailable: false,
+          toolCalls: [],
+          reliabilityGap: "attorney_manager_unavailable",
+          rollout: expect.objectContaining({ rolloutStage: "general", rolloutPercent: 100 }),
+        }),
+      }));
+      expect(response.body.assistantMessage.text).toMatch(/trouble accessing the verified LPC information/i);
+      expect(response.body.assistantMessage.text).not.toMatch(/you have|open billing|sending this to the team/i);
+    } finally {
+      process.env.OPENAI_ATTORNEY_LEGACY_FALLBACK = originalLegacyFallback;
+    }
+  });
+
+  test("keeps a non-enrolled attorney out of outage metrics and guessed legacy behavior", async () => {
+    const originalPercent = process.env.OPENAI_ATTORNEY_MANAGER_ROLLOUT_PERCENT;
+    process.env.OPENAI_ATTORNEY_MANAGER_ROLLOUT_PERCENT = "0";
+    try {
+      const attorney = await createUser({
+        role: "attorney",
+        email: "support-manager-not-enrolled@lets-paraconnect.test",
+      });
+      const conversationRes = await createConversation(attorney);
+      const response = await sendSupportMessage(attorney, conversationRes.body.conversation.id, {
+        text: "How many cases have I completed?",
+      });
+      expect(response.status).toBe(201);
+      expect(response.body.assistantReply).toEqual(expect.objectContaining({
+        provider: "attorney_manager_not_enrolled",
+        grounded: false,
+        actions: [],
+        suggestedReplies: [],
+        needsEscalation: false,
+        telemetry: expect.objectContaining({
+          reliabilityGap: "attorney_rollout_not_enrolled",
+          rollout: expect.objectContaining({ rolloutStage: "internal", rolloutPercent: 0 }),
+        }),
+      }));
+      expect(response.body.assistantMessage.text).toMatch(/isn’t available for this account yet/i);
+      expect(mockGenerateSupportManagerReply).not.toHaveBeenCalled();
+    } finally {
+      process.env.OPENAI_ATTORNEY_MANAGER_ROLLOUT_PERCENT = originalPercent;
+    }
+  });
+
+  test("creates one task-relevant button only from manager-authorized navigation", async () => {
+    const attorney = await createUser({
+      role: "attorney",
+      email: "support-manager-navigation-button@lets-paraconnect.test",
+    });
+    mockGenerateSupportManagerReply.mockResolvedValueOnce({
+      reply: "You can open Billing & Payments here.",
+      suggestions: [],
+      navigation: {
+        ctaLabel: "Billing & Payments",
+        ctaHref: "dashboard-attorney.html#billing",
+        ctaType: "deep_link",
+        inlineLinkText: "here",
+      },
+      provider: "openai_manager",
+      confidence: "high",
+      grounded: true,
+      primaryAsk: "navigation",
+      activeTask: "NAVIGATION",
+      activeEntity: null,
+      verifiedEntities: [],
+      requestedDimensions: ["navigation"],
+      awaitingField: "",
+      responseMode: "DIRECT_ANSWER",
+      detailLevel: "concise",
+      supportFacts: { evidenceStatus: "verified", capabilityIds: ["A31_navigation"] },
+      telemetry: { validationRetries: 0, validationExhausted: false, retryOutcome: "not_needed" },
+    });
+
+    const conversationRes = await createConversation(attorney);
+    const response = await sendSupportMessage(attorney, conversationRes.body.conversation.id, {
+      text: "Where is Billing & Payments?",
+    });
+
+    expect(response.status).toBe(201);
+    expect(response.body.assistantReply.actions).toEqual([{
+      label: "Billing & Payments",
+      href: "dashboard-attorney.html#billing",
+      type: "deep_link",
+    }]);
+    expect(response.body.assistantReply.suggestedReplies).toEqual([]);
+    expect(response.body.assistantReply.needsEscalation).toBe(false);
+  });
+
+  test("persists verified attorney entity memory for manager follow-ups and subject changes", async () => {
+    const attorney = await createUser({
+      role: "attorney",
+      email: "support-manager-memory-attorney@lets-paraconnect.test",
+    });
+    const smithId = new mongoose.Types.ObjectId();
+    const jonesId = new mongoose.Types.ObjectId();
+    const verifiedEntities = [
+      { type: "case", id: String(smithId), name: "Smith matter", source: "tool:get_case_details" },
+      { type: "case", id: String(jonesId), name: "Jones matter", source: "tool:get_case_details" },
+    ];
+    mockGenerateSupportManagerReply
+      .mockResolvedValueOnce({
+        reply: "The Smith matter is active.",
+        suggestions: [],
+        navigation: null,
+        provider: "openai_manager",
+        confidence: "high",
+        grounded: true,
+        primaryAsk: "matter_status",
+        activeTask: "FACT_LOOKUP",
+        activeEntity: verifiedEntities[0],
+        verifiedEntities,
+        requestedDimensions: ["case_details"],
+        awaitingField: "",
+        responseMode: "DIRECT_ANSWER",
+        detailLevel: "concise",
+        supportFacts: { evidenceStatus: "verified", capabilityIds: ["A02_matter_details"] },
+        telemetry: {},
+      })
+      .mockImplementationOnce(async ({ conversationState }) => ({
+        reply: "Your billing summary is available.",
+        suggestions: [],
+        navigation: null,
+        provider: "openai_manager",
+        confidence: "high",
+        grounded: true,
+        primaryAsk: "billing_summary",
+        activeTask: "FACT_LOOKUP",
+        activeEntity: null,
+        verifiedEntities: conversationState.verifiedEntities,
+        requestedDimensions: ["billing_summary"],
+        awaitingField: "",
+        responseMode: "DIRECT_ANSWER",
+        detailLevel: "concise",
+        supportFacts: { evidenceStatus: "verified", capabilityIds: ["A14_billing_summary"] },
+        telemetry: {},
+      }));
+
+    const conversationRes = await createConversation(attorney);
+    const conversationId = conversationRes.body.conversation.id;
+    const first = await sendSupportMessage(attorney, conversationId, { text: "What is the Smith matter status?" });
+    expect(first.status).toBe(201);
+    expect(first.body.conversation.supportState.activeEntity.id).toBe(String(smithId));
+    expect(first.body.conversation.supportState.verifiedEntities).toHaveLength(2);
+
+    const second = await sendSupportMessage(attorney, conversationId, { text: "Show my billing summary" });
+    expect(second.status).toBe(201);
+    expect(mockGenerateSupportManagerReply.mock.calls[1][0].conversationState.verifiedEntities)
+      .toEqual(expect.arrayContaining(verifiedEntities));
+    expect(second.body.conversation.supportState.activeEntity.id).toBe("");
+    expect(second.body.conversation.supportState.verifiedEntities).toHaveLength(2);
+    expect(second.body.conversation.supportState.lastRequestedDimensions).toEqual(["billing_summary"]);
   });
 });

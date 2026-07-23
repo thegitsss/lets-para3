@@ -5,15 +5,24 @@ const Message = require("../../models/Message");
 const Payout = require("../../models/Payout");
 const User = require("../../models/User");
 const stripe = require("../../utils/stripe");
-const { normalizeCaseStatus, canUseWorkspace } = require("../../utils/caseState");
+const { normalizeCaseStatus } = require("../../utils/caseState");
 const { BLOCKED_MESSAGE, isBlockedBetween } = require("../../utils/blocks");
+const {
+  EVIDENCE_STATES,
+  evaluateWorkspaceAccess,
+} = require("../attorneyWorkflowPolicy");
 
 const SUPPORT_CASE_FIELDS = [
   "_id",
   "title",
+  "practiceArea",
   "status",
+  "tasks",
+  "tasksLocked",
+  "files",
   "updatedAt",
   "createdAt",
+  "deadline",
   "pausedReason",
   "readOnly",
   "paralegalAccessRevokedAt",
@@ -22,16 +31,45 @@ const SUPPORT_CASE_FIELDS = [
   "paymentReleased",
   "paidOutAt",
   "completedAt",
+  "archived",
+  "archiveReadyAt",
+  "archiveZipKey",
+  "archiveDownloadedAt",
+  "purgeScheduledFor",
+  "purgedAt",
+  "disputeDeadlineAt",
   "payoutFinalizedAt",
   "payoutFinalizedType",
   "partialPayoutAmount",
   "remainingAmount",
+  "relistPending",
+  "relistRequestedAt",
+  "terminationStatus",
+  "terminationReason",
+  "terminationRequestedAt",
+  "zoomLink",
+  "moderationStatus",
+  "moderationFlaggedAt",
+  "moderationResolutionRequestedAt",
+  "disputes",
   "currency",
+  "totalAmount",
+  "lockedTotalAmount",
+  "amountLockedAt",
+  "paymentIntentId",
+  "feeAttorneyPct",
+  "feeAttorneyAmount",
+  "feeParalegalPct",
+  "feeParalegalAmount",
+  "disputeSettlement",
   "attorney",
   "attorneyId",
   "paralegal",
   "paralegalId",
+  "pendingParalegalId",
+  "pendingParalegalInvitedAt",
   "withdrawnParalegalId",
+  "invites",
   "preEngagement",
   "applicants",
   "hiredAt",
@@ -127,6 +165,7 @@ function buildBaseCaseSnapshot(overrides = {}) {
     status: "",
     normalizedStatus: "",
     pausedReason: "",
+    deadline: null,
     readOnly: false,
     paralegalAccessRevokedAt: null,
     paymentReleased: false,
@@ -173,6 +212,7 @@ function buildCaseSnapshotFromDoc(caseDoc, user, overrides = {}) {
     status: String(caseDoc.status || ""),
     normalizedStatus: normalizeCaseStatus(caseDoc.status),
     pausedReason: String(caseDoc.pausedReason || ""),
+    deadline: asDate(caseDoc.deadline),
     readOnly: caseDoc.readOnly === true,
     paralegalAccessRevokedAt: asDate(caseDoc.paralegalAccessRevokedAt),
     paymentReleased: caseDoc.paymentReleased === true,
@@ -387,28 +427,26 @@ async function resolveSupportCaseEntity({
         source: "page_context",
       };
     }
+    return {
+      caseId: "",
+      caseDoc: null,
+      source: "page_context",
+      found: Boolean(caseDoc),
+      reason: caseDoc ? "access_denied" : "case_not_found",
+    };
   }
 
   const previousCaseId = normalizeId(previousState?.activeEntity?.id || "");
-  if (
-    previousCaseId &&
-    task !== "NAVIGATION" &&
-    isObjectId(previousCaseId)
-  ) {
-    const caseDoc = await Case.findById(previousCaseId).select(SUPPORT_CASE_FIELDS).lean();
-    if (caseDoc && canAccessCase(caseDoc, user)) {
-      return {
-        caseId: String(caseDoc._id),
-        caseDoc,
-        source: "memory",
-      };
-    }
-  }
-
+  const messageText = String(message || "").trim();
+  const isReferential = /^(?:and\s+)?(?:it|that|this|there|both|yes|no|why|how much|same one|same case|same matter)[?.!\s]*$/i.test(
+    messageText
+  );
+  const previousName = String(previousState?.activeEntity?.name || "").trim().toLowerCase();
+  const referenceMatchesMemory = Boolean(previousName && messageText.toLowerCase().includes(previousName));
   const shouldResolveByName =
     previousState?.awaiting === "case" ||
-    /\b(case|matter|workspace)\b/i.test(String(message || "")) ||
-    tokenizeSupportText(message).length >= 2;
+    /\b(case|matter|workspace)\b/i.test(messageText) ||
+    tokenizeSupportText(messageText).length >= 1;
 
   if (shouldResolveByName) {
     const query = buildUserCaseParticipantQuery(user);
@@ -418,7 +456,7 @@ async function resolveSupportCaseEntity({
         .sort({ updatedAt: -1, hiredAt: -1, createdAt: -1, _id: -1 })
         .limit(12)
         .lean();
-      const tokens = tokenizeSupportText(message);
+      const tokens = tokenizeSupportText(messageText);
 
       const ranked = candidates
         .map((caseDoc) => {
@@ -432,17 +470,49 @@ async function resolveSupportCaseEntity({
           return (asDate(right.caseDoc.updatedAt)?.getTime() || 0) - (asDate(left.caseDoc.updatedAt)?.getTime() || 0);
         });
 
-      if (ranked[0]?.caseDoc) {
+      const topScore = ranked[0]?.tokenMatches || 0;
+      const topMatches = ranked.filter((entry) => entry.tokenMatches === topScore);
+      if (topMatches.length === 1 && ranked[0]?.caseDoc) {
         return {
           caseId: String(ranked[0].caseDoc._id),
           caseDoc: ranked[0].caseDoc,
           source: "case_name_match",
         };
       }
+      if (topMatches.length > 1) {
+        return {
+          caseId: "",
+          caseDoc: null,
+          source: "ambiguous_case_name",
+          reason: "case_reference_ambiguous",
+          candidates: topMatches.slice(0, 3).map((entry) => ({
+            id: String(entry.caseDoc._id),
+            title: String(entry.caseDoc.title || "Untitled matter"),
+          })),
+        };
+      }
     }
   }
 
-  if (task === "TROUBLESHOOT") {
+  if (
+    previousCaseId &&
+    task !== "NAVIGATION" &&
+    isObjectId(previousCaseId) &&
+    previousState?.correctionAmbiguous !== true &&
+    previousState?.subjectChanged !== true &&
+    (isReferential || referenceMatchesMemory || previousState?.correctionReference === true)
+  ) {
+    const caseDoc = await Case.findById(previousCaseId).select(SUPPORT_CASE_FIELDS).lean();
+    if (caseDoc && canAccessCase(caseDoc, user)) {
+      return {
+        caseId: String(caseDoc._id),
+        caseDoc,
+        source: "memory",
+      };
+    }
+  }
+
+  if (task === "TROUBLESHOOT" && previousState?.authoritativeManager !== true) {
     const inferred = await inferCaseForMessaging(user);
     if (inferred.caseDoc) {
       return {
@@ -453,7 +523,7 @@ async function resolveSupportCaseEntity({
     }
   }
 
-  if (task === "FACT_LOOKUP") {
+  if (task === "FACT_LOOKUP" && previousState?.authoritativeManager !== true) {
     const inferred = await inferCaseForSupport(user);
     if (inferred.caseDoc) {
       return {
@@ -565,6 +635,15 @@ async function getStripeConnectSnapshot(user = {}) {
   };
 }
 
+function billingEvidenceState(source = "none", hasMethod = false) {
+  if (["lookup_failed", "stripe_unconfigured"].includes(source)) {
+    return EVIDENCE_STATES.TEMPORARILY_UNAVAILABLE;
+  }
+  if (["stored_missing", "live_none"].includes(source)) return EVIDENCE_STATES.ABSENT;
+  if (hasMethod) return EVIDENCE_STATES.VERIFIED;
+  return EVIDENCE_STATES.UNKNOWN;
+}
+
 function normalizeBillingMethodSnapshot(paymentMethod = null, source = "none") {
   const brand = String(paymentMethod?.brand || paymentMethod?.type || "").trim();
   const last4 = String(paymentMethod?.last4 || "").trim();
@@ -576,8 +655,10 @@ function normalizeBillingMethodSnapshot(paymentMethod = null, source = "none") {
   const isExpired =
     Boolean(expMonth && expYear) && (expYear < currentYear || (expYear === currentYear && expMonth < currentMonth));
 
+  const hasMethod = Boolean(brand || last4 || expMonth || expYear);
   return {
-    available: Boolean(brand || last4 || expMonth || expYear),
+    available: hasMethod,
+    evidenceState: billingEvidenceState(source, hasMethod),
     source,
     brand,
     last4,
@@ -605,7 +686,7 @@ async function getBillingMethodSnapshot(user = {}, pageContext = {}) {
     return normalizeBillingMethodSnapshot(null, "none");
   }
   if (!process.env.STRIPE_SECRET_KEY || !stripe?.customers?.retrieve || !stripe?.paymentMethods?.retrieve) {
-    return normalizeBillingMethodSnapshot(null, "none");
+    return normalizeBillingMethodSnapshot(null, "stripe_unconfigured");
   }
 
   const customerId = String(user?.stripeCustomerId || "").trim();
@@ -733,6 +814,129 @@ async function getCaseSnapshot(user = {}, pageContext = {}) {
   });
 }
 
+async function getNextCaseDeadlineSnapshot(user = {}) {
+  const role = String(user?.role || "").toLowerCase();
+  const userId = normalizeId(user?._id || user?.id);
+  if (!userId || !["attorney", "paralegal"].includes(role)) {
+    return buildBaseCaseSnapshot({ reason: "deadline_not_available_for_role" });
+  }
+
+  const participantQuery =
+    role === "attorney"
+      ? { $or: [{ attorney: userId }, { attorneyId: userId }] }
+      : { $or: [{ paralegal: userId }, { paralegalId: userId }] };
+  const caseDoc = await Case.findOne({
+    ...participantQuery,
+    deadline: { $gte: new Date() },
+    archived: { $ne: true },
+    status: { $nin: ["completed", "closed", "cancelled", "canceled", "archived"] },
+  })
+    .select(SUPPORT_CASE_FIELDS)
+    .sort({ deadline: 1, updatedAt: -1, _id: 1 })
+    .lean();
+
+  if (!caseDoc) {
+    return buildBaseCaseSnapshot({ reason: "no_upcoming_deadline" });
+  }
+  return buildCaseSnapshotFromDoc(caseDoc, user, {
+    requestedCaseId: String(caseDoc._id),
+    inferred: true,
+    inferenceSource: "next_upcoming_deadline",
+  });
+}
+
+async function getAttorneyPendingParalegalSnapshot(user = {}) {
+  const role = String(user?.role || "").toLowerCase();
+  const userId = normalizeId(user?._id || user?.id);
+  if (role !== "attorney" || !userId) {
+    return {
+      available: false,
+      checkedCaseCount: 0,
+      pendingCaseCount: 0,
+      totalPendingSignals: 0,
+      items: [],
+      reason: "attorney_access_required",
+    };
+  }
+
+  const cases = await Case.find({
+    $or: [{ attorney: userId }, { attorneyId: userId }],
+    archived: { $ne: true },
+    status: { $nin: ["completed", "closed"] },
+  })
+    .select(SUPPORT_CASE_FIELDS)
+    .sort({ deadline: 1, updatedAt: -1, _id: 1 })
+    .lean();
+  const caseIds = cases.map((caseDoc) => caseDoc._id).filter(Boolean);
+  const latestMessages = caseIds.length
+    ? await Message.aggregate([
+        {
+          $match: {
+            caseId: { $in: caseIds },
+            deleted: { $ne: true },
+            type: { $ne: "system" },
+          },
+        },
+        { $sort: { createdAt: -1, _id: -1 } },
+        {
+          $group: {
+            _id: "$caseId",
+            senderRole: { $first: "$senderRole" },
+            senderId: { $first: "$senderId" },
+            createdAt: { $first: "$createdAt" },
+          },
+        },
+      ])
+    : [];
+  const latestMessageByCaseId = new Map(latestMessages.map((message) => [String(message._id), message]));
+
+  const items = cases
+    .map((caseDoc) => {
+      const reasons = [];
+      const paralegalId = normalizeId(caseDoc.paralegalId || caseDoc.paralegal);
+      const pendingParalegalId = normalizeId(caseDoc.pendingParalegalId);
+      const pendingInvites = (caseDoc.invites || []).filter((invite) => String(invite?.status || "").toLowerCase() === "pending");
+      const preEngagementStatus = String(caseDoc.preEngagement?.status || "").toLowerCase();
+      const latestMessage = latestMessageByCaseId.get(String(caseDoc._id));
+
+      if (["requested", "changes_requested"].includes(preEngagementStatus)) {
+        reasons.push("a pre-engagement response");
+      }
+      if (pendingParalegalId || pendingInvites.length) {
+        reasons.push("an invitation response");
+      }
+      if (
+        (paralegalId || pendingParalegalId) &&
+        latestMessage &&
+        String(latestMessage.senderRole || "").toLowerCase() === "attorney"
+      ) {
+        reasons.push("a reply to your latest message");
+      }
+
+      if (!reasons.length) return null;
+      return {
+        caseId: String(caseDoc._id),
+        title: String(caseDoc.title || "Untitled matter"),
+        status: String(caseDoc.status || ""),
+        deadline: asDate(caseDoc.deadline),
+        reasons: uniqueStrings(reasons),
+        incompleteTaskCount: null,
+        taskResponsibilityState: "not_represented",
+        latestMessageAt: asDate(latestMessage?.createdAt),
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    available: true,
+    checkedCaseCount: cases.length,
+    pendingCaseCount: items.length,
+    totalPendingSignals: items.reduce((total, item) => total + item.reasons.length, 0),
+    items,
+    reason: items.length ? "pending_paralegal_activity_found" : "no_pending_paralegal_activity",
+  };
+}
+
 function resolveWorkspaceGate(caseDoc, user) {
   if (!caseDoc) {
     return {
@@ -746,13 +950,12 @@ function resolveWorkspaceGate(caseDoc, user) {
   const blockers = [];
   const nextSteps = [];
   const normalizedStatus = normalizeCaseStatus(caseDoc.status);
-  const hasParalegal = !!(caseDoc.paralegal || caseDoc.paralegalId);
-  const escrowFunded =
-    !!caseDoc.escrowIntentId && String(caseDoc.escrowStatus || "").toLowerCase() === "funded";
-  const workspaceActive = canUseWorkspace(caseDoc, {
-    viewerId: normalizeId(user?._id || user?.id),
-  });
   const role = String(user?.role || "").toLowerCase();
+  const workspacePolicy = evaluateWorkspaceAccess({
+    caseDoc,
+    viewerId: normalizeId(user?._id || user?.id),
+    viewerRole: role,
+  });
 
   if (role === "paralegal" && caseDoc.paralegalAccessRevokedAt) {
     blockers.push("workspace_access_revoked");
@@ -767,7 +970,7 @@ function resolveWorkspaceGate(caseDoc, user) {
     };
   }
 
-  if (!hasParalegal) {
+  if (workspacePolicy.blockers.includes("hire_required")) {
     blockers.push("hire_required");
     nextSteps.push("Messaging and workspace access open after a paralegal is hired.");
     return {
@@ -780,7 +983,7 @@ function resolveWorkspaceGate(caseDoc, user) {
     };
   }
 
-  if (!escrowFunded) {
+  if (workspacePolicy.blockers.includes("funding_required")) {
     blockers.push("funding_required");
     nextSteps.push("Workspace access opens once payment is secured and escrow is funded.");
     return {
@@ -793,7 +996,7 @@ function resolveWorkspaceGate(caseDoc, user) {
     };
   }
 
-  if (!workspaceActive) {
+  if (workspacePolicy.blockers.includes("workspace_not_active")) {
     if (["completed", "closed", "disputed"].includes(normalizedStatus)) {
       blockers.push("workspace_closed");
       return {
@@ -1167,7 +1370,9 @@ async function getSupportContextSnapshot({ user = {}, pageContext = {}, category
 }
 
 module.exports = {
+  getAttorneyPendingParalegalSnapshot,
   getBillingMethodSnapshot,
+  getNextCaseDeadlineSnapshot,
   getCaseSnapshot,
   getCaseParticipantSnapshot,
   getMessagingSnapshot,

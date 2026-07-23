@@ -16,7 +16,7 @@ Working product standard: `docs/LPC_PREMIUM_PRODUCT_UPGRADE_SPEC.md` defines wha
 | Security hardening | In progress | Medium | Route security inventory complete; remaining exemptions documented | 220 mutating routes inventoried; 206 verified protected; 14 exempt/exemption-review; 0 open |
 | Payment/escrow readiness | In progress | High | Money-flow matrix and high-risk route verification | Focused payment/lifecycle tests passed after first hardening pass |
 | Case lifecycle readiness | In progress | High | State transition matrix and attorney/paralegal next actions | Case summary fix completed; lifecycle tests passed in focused run |
-| AI implementation | Not started | Medium | Permission boundaries and fallback review | Pending |
+| AI implementation | In progress | High | Attorney pre-deployment hardening complete; paralegal/admin remain frozen | 561/561 generated cases, 172/172 live routing runs, 34/34 live full-pipeline runs, 15 suites/210 tests, and 4/4 support-drawer scenarios pass; production staged observation remains blocked until deployment |
 | Testing/verification | In progress | High | Focused tests after each high-risk fix | `securityEdgeCases`, `lifecycleTransitions`, `jobEscrow` passed |
 | Mobile/responsive | Not started | Medium | Attorney critical screens first | Pending screenshot pass |
 | Production operations | In progress | High | Scheduler safety, monitoring, runbooks | API no-store fixed; scheduler review pending |
@@ -114,6 +114,8 @@ CSRF exemptions / exemption-review items:
 - Done: Created detailed premium readiness definition.
 - Done: Created this execution tracker.
 - Done: Created premium product upgrade spec with concrete acceptance criteria for the formerly vague upgrade language.
+- Done: Created the attorney-assistant hardening checklist that controls the nine-package implementation, evidence requirements, exit gates, and final reconciliation audit.
+- Done: Completed attorney-assistant Package 1 source-of-truth and response-contract inventory without changing runtime assistant behavior.
 
 Evidence:
 
@@ -122,6 +124,13 @@ Evidence:
 - `docs/LPC_PREMIUM_READINESS_DEFINITION.md`
 - `docs/LPC_PREMIUM_EXECUTION_TRACKER.md`
 - `docs/LPC_PREMIUM_PRODUCT_UPGRADE_SPEC.md`
+- `docs/ATTORNEY_ASSISTANT_HARDENING_CHECKLIST.md`
+- `docs/attorney-assistant/SOURCE_OF_TRUTH_MATRIX.md`
+- `docs/attorney-assistant/WORKFLOW_POLICY_INVENTORY.md`
+- `docs/attorney-assistant/DATA_PERMISSION_MATRIX.md`
+- `docs/attorney-assistant/RESPONSE_CONTRACT.md`
+- `docs/attorney-assistant/RISK_REGISTER.md`
+- `docs/attorney-assistant/EVALUATION_SPEC.md`
 
 ## Active Critical Backlog
 
@@ -248,13 +257,46 @@ Status: Not started
 
 ### AI Boundaries
 
-Status: Not started
+Status: In progress
 
-- Inventory AI-assisted workflows.
-- Confirm AI cannot bypass role/case/payment/admin permissions.
+- Done: Replaced the primary attorney intent-rewrite path with a bounded Responses API manager loop that selects live LPC tools from natural-language requests.
+- Done: Limited the manager rollout to attorneys by default. Paralegal and admin remain on the existing deterministic assistant until their dedicated implementation and evaluation passes.
+- Done: Added an explicit 32-family attorney contract covering matters, deadlines, tasks, deliverables/files, applications/hiring, messages, pending paralegal work, charges/payouts/receipts, billing, attorney profile/account/security state, attention summaries, posting/funding readiness, disputes/withdrawals/termination, archives/download readiness, product knowledge, navigation, troubleshooting, and legal-work boundaries.
+- Done: Added authenticated attorney read-only tools for the complete capability contract, including a unified matter-workspace snapshot, exact financial/receipt evidence, and safe account/profile state.
+- Done: Added one executable attorney workflow policy shared by case/job posting, application, hiring/funding enforcement, and the assistant. The assistant now joins those rules with live billing state instead of relying on retrieved help copy.
+- Done: Added a required workflow-readiness tool and answer validator for prerequisite questions. Replies that omit authoritative workflow evidence, claim the rule is unavailable, or contradict the payment prerequisite are rejected and retried.
+- Done: Added server-side role allowlists, safe result projections, exact navigation allowlists, numeric-claim grounding, structured output validation, tool-call limits, and trace metadata.
+- Done: Made the manager the single normal attorney reasoning path. The legacy attorney engine is available only behind the explicit `OPENAI_ATTORNEY_LEGACY_FALLBACK` emergency/test flag and is off by default.
+- Done: Added internal answer correction: invalid numeric claims, false action/legal claims, malformed structured output, and evidence-contradicting unavailable-data responses retry internally before display.
+- Done: Added durable case-entity memory derived from verified tool results, so follow-ups such as “it,” “that,” and “both” retain the correct matter without trusting model-only memory.
+- Done: Added per-message reliability metadata for evidence status, capability coverage, validation retries/failures, tool traces, and manager-availability gaps.
+- Done: Added a read-only production reliability report that aggregates manager availability, unhelpful feedback, validation retries, tool failures, capability usage, and failure samples against explicit thresholds.
+- Done: Completed Package 8 privacy-conscious reliability operations: allowlisted manager/tool/evidence telemetry, opaque repeated/unknown-question clustering, independent per-capability metrics, zero-tolerance validator gates, synthetic alerts, and a safe-disable runbook that forbids guessed legacy fallback.
+- Done: Verified the complete Package 2–8 attorney regression at 14/14 suites and 272/272 tests, the synthetic 120-message reliability dashboard with no breaches, and 4/4 attorney support-drawer Playwright scenarios.
+- Done: Added Package 9 attorney-only rollout controls: an attorney kill switch, stable percentage cohorts, exact allowlist enrollment, fail-closed invalid configuration, non-identifying rollout telemetry, and explicit exclusion from outage metrics.
+- Done: Added and passed an 11-scenario curated attorney acceptance command covering database facts, money, processor states, ownership, multi-turn context, dependency failure, legal boundaries, role isolation, UI restraint, and kill switches.
+- Blocked: The July 22 privacy-safe 30-day production report failed the release gate (13 manager messages, 3 safe fallbacks, 4 critical validator classifications, and 11 messages missing current telemetry). The posting/product-knowledge cluster received an evidence-plan tool-filter regression, but deployment plus a fresh staged observation window is required before Package 9 can close.
+- Done: Package 9 deterministic verification passed at 15/15 suites and 284/284 tests; curated acceptance passed 11/11; generated evaluation remained 558/558; the attorney drawer passed 4/4. A flaky numeric-grounding defect found by the full run was fixed so digits embedded in record IDs cannot support factual number claims.
+- Done: Generated 558 versioned single-turn, paraphrase, typo, shorthand, multi-turn, state, failure, adversarial, and production-regression attorney evaluation cases across all 32 capability families, eliminating dependence on ad hoc manual prompt invention.
+- Done: Corrected the localhost paralegal-payout timing defect across planning, shared executable policy, tool evidence, validation, deterministic fallback, and route messaging. PD007 is permanent; current verification is 13/13 curated acceptance, 559/559 generated cases, and 15/15 suites with 297/297 tests. No deployment was performed.
+- Done: Corrected the localhost post-hire lifecycle fallback across shared hire/workspace/completion policy, planning, tool evidence, validation, and deterministic fallback. PD008 is permanent; that checkpoint passed 15/15 curated acceptance, 560/560 generated cases, and 15/15 suites with 304/304 tests. No deployment was performed.
+- Done: Replaced the later general-hiring regex branch with semantic capability/tool selection, registered PD009 for the raw-evidence leak, and completed final pre-deployment verification: 561/561 generated cases, 172/172 repeated live routing runs, 34/34 repeated live full-pipeline runs, 15/15 suites with 207/207 current tests, 15/15 curated acceptance, and 4/4 Playwright cases. The historical 304 count was reconciled to the structural 189 baseline plus 18 new structural tests; no current tests were skipped or excluded. No deployment was performed.
+- Done: Added verified Contact Us routing for attorney, paralegal, and admin requests to reach a human or representative. The response promises prompt attention without claiming a handoff; 136/136 support API tests, the updated 15/15-suite attorney gate with 210/210 current tests, and 4/4 support-drawer scenarios pass. The current total is the 189 structural baseline plus 21 structural tests. No deployment was performed.
+- Done: Fixed real Responses API continuation handling by removing SDK-only parsed tool arguments before replaying function calls.
+- Done: Verified 21/21 live attorney capability routes, including multi-turn entity references and a live legal-drafting boundary response.
+- Done: Verified 12/12 real manager/tool/validator and database scenarios against isolated synthetic LPC records, including lifecycle, money, processor failures, ownership isolation, persisted entity memory, navigation, and safe failures.
+- Done: Verified the Package 2–6 regression at 10/10 suites and 242/242 tests, plus 4/4 attorney support-drawer Playwright scenarios.
+- Done: Ran the initial 30-day reliability report: zero manager-unavailable events, zero unhelpful feedback, and zero tool failures among recorded manager traffic. Older messages predate the new reliability metadata and remain labeled unknown rather than inferred.
+- Inventory remaining AI-assisted workflows beyond the support drawer.
+- Confirm every future AI tool cannot bypass role/case/payment/admin permissions.
 - Confirm risky AI actions require authorized human confirmation.
-- Confirm AI fallback behavior when unavailable.
 - Confirm AI logs do not store unnecessary sensitive data.
+- Future implementation: attorney-supervised paralegal work-product assistant.
+  - Limit use to paralegals assigned to an authorized matter and acting from attorney-provided instructions.
+  - Support document organization and indexing, neutral chronologies, extraction of names/dates/deadlines, workspace summaries, and clearly labeled draft outlines.
+  - Keep every output editable, visibly marked as draft work product, and routed to the supervising attorney for review and explicit approval.
+  - Do not provide legal advice, choose legal strategy, reach legal conclusions, create unsupervised final legal documents, file anything, or communicate externally as the attorney.
+  - Preserve matter-level permissions, confidentiality, audit history, source references, and human confirmation before any saved or shared result.
 
 ### Mobile/Responsive
 

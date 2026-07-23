@@ -11,6 +11,12 @@ const applicationsRouter = require("./applications");
 const { cleanTitle, cleanText, cleanBudget } = require("../utils/sanitize");
 const { getBlockedUserIds } = require("../utils/blocks");
 const stripe = require("../utils/stripe");
+const {
+  ATTORNEY_WORKFLOW_STAGES,
+  MIN_MATTER_AMOUNT_CENTS,
+  evaluateMatterPosting,
+  isAttorneyPaymentMethodRequired,
+} = require("../services/attorneyWorkflowPolicy");
 const createApplicationForJob = applicationsRouter?.createApplicationForJob;
 const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
   "samanthasider+attorney@gmail.com",
@@ -97,7 +103,7 @@ async function linkJobToCase(caseDoc, jobId) {
 router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) => {
   try {
     const hasPaymentMethod = await attorneyHasPaymentMethod(req.user._id || req.user.id);
-    if (!hasPaymentMethod) {
+    if (isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.POST_MATTER) && !hasPaymentMethod) {
       return res
         .status(403)
         .json({ error: "Connect Stripe and add a payment method before posting a job." });
@@ -152,9 +158,23 @@ router.post("/", ...mutatingGuards, requireRole("attorney"), async (req, res) =>
 
     let budget;
     try {
-      budget = cleanBudget(req.body.budget, { min: 0.01, max: 30000 });
+      budget = cleanBudget(req.body.budget, { min: MIN_MATTER_AMOUNT_CENTS / 100, max: 30000 });
     } catch (err) {
       return res.status(400).json({ error: err.message });
+    }
+    const postingPolicy = evaluateMatterPosting({
+      paymentMethodSaved: hasPaymentMethod,
+      title,
+      details: description,
+      practiceArea: practiceAreaValue,
+      amountCents: Math.round(budget * 100),
+      deadlineProvided: false,
+      deadlineValid: true,
+      attorneyStateRequired: true,
+      attorneyState,
+    });
+    if (!postingPolicy.ready) {
+      return res.status(400).json({ error: "This job is not ready to publish.", blockers: postingPolicy.blockers });
     }
 
     const jobPayload = {

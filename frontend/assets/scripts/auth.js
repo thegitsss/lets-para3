@@ -263,6 +263,11 @@ function wireLogoutDelegation() {
 
 function loadPageEnhancements() {
   const path = String(window.location?.pathname || "").toLowerCase();
+  import("./utils/support-drawer.js")
+    .then(({ scanSupportLaunchers }) => scanSupportLaunchers())
+    .catch((err) => {
+      console.warn("Unable to load the LPC assistant", err);
+    });
   if (path.endsWith("/browse-paralegals.html") || path.endsWith("browse-paralegals.html")) {
     import("./browse-paralegals-state-multiselect.js").catch((err) => {
       console.warn("Unable to load browse paralegal state multi-select", err);

@@ -27,6 +27,10 @@ const { generateArchiveZip, buildReceiptPdfBuffer, uploadPdfToS3, getReceiptKey 
 const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
 const { currentStripeMode, pickStripeMode, stripeModeFromLivemode } = require("../utils/stripeMode");
 const {
+  DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT,
+  DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT,
+} = require("../services/platformFeePolicy");
+const {
   BLOCKED_MESSAGE,
   buildBlockLookup,
   getBlockedUserIds,
@@ -36,6 +40,22 @@ const {
   normalizeId,
 } = require("../utils/blocks");
 const { addSubscriber, publishCaseEvent } = require("../utils/caseEvents");
+const {
+  ATTORNEY_WORKFLOW_STAGES,
+  calculateArchivePurgeAt,
+  MIN_MATTER_AMOUNT_CENTS,
+  WITHDRAWAL_REVIEW_WINDOW_MS,
+  evaluateCompletionEligibility,
+  evaluateArchiveReadiness,
+  evaluateHiringEligibility,
+  evaluateInvitationEligibility,
+  evaluateMatterPosting,
+  evaluatePreEngagementRequest,
+  evaluateTerminationEligibility,
+  evaluateWithdrawalAndRelist,
+  getAttorneyWorkflowPolicy,
+  isAttorneyPaymentMethodRequired,
+} = require("../services/attorneyWorkflowPolicy");
 const {
   decryptCaseFilePayload,
   decryptString,
@@ -78,9 +98,9 @@ const isObjId = (id) => mongoose.isValidObjectId(id);
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const FILE_STATUS = ["pending_review", "approved", "attorney_revision"];
 const PRE_ENGAGEMENT_MAX_FILE_BYTES = 10 * 1024 * 1024;
-const MIN_CASE_AMOUNT_CENTS = 40000;
+const MIN_CASE_AMOUNT_CENTS = MIN_MATTER_AMOUNT_CENTS;
 const MIN_CASE_AMOUNT_MESSAGE = "Budget must be at least $400.";
-const DISPUTE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const DISPUTE_WINDOW_MS = WITHDRAWAL_REVIEW_WINDOW_MS;
 const PRACTICE_AREAS = [
   "administrative law",
   "antitrust law",
@@ -249,12 +269,8 @@ async function ensureBypassConnectAccount(paralegal) {
 }
 const IN_PROGRESS_STATUS = "in progress";
 const LEGACY_IN_PROGRESS_STATUS = "in_progress";
-const PLATFORM_FEE_ATTORNEY_PERCENT = Number(
-  process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 22
-);
-const PLATFORM_FEE_PARALEGAL_PERCENT = Number(
-  process.env.PLATFORM_FEE_PARALEGAL_PERCENT || 18
-);
+const PLATFORM_FEE_ATTORNEY_PERCENT = DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT;
+const PLATFORM_FEE_PARALEGAL_PERCENT = DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT;
 const WORK_STARTED_STATUSES = new Set([
   IN_PROGRESS_STATUS,
   LEGACY_IN_PROGRESS_STATUS,
@@ -1727,6 +1743,9 @@ async function ensureFundsReleased(req, caseDoc) {
   const payoutDisplay = `$${(payout / 100).toFixed(2)}`;
   try {
     const link = "dashboard-paralegal.html#cases-completed";
+    const payoutPolicy = getAttorneyWorkflowPolicy()[ATTORNEY_WORKFLOW_STAGES.COMPLETE_AND_RELEASE];
+    const depositMinimum = Number(payoutPolicy.bankDepositEstimateBusinessDays.minimum);
+    const depositMaximum = Number(payoutPolicy.bankDepositEstimateBusinessDays.maximum);
     const payload = {
       caseId: String(caseDoc._id),
       caseTitle: caseDoc.title || "Case",
@@ -1734,7 +1753,7 @@ async function ensureFundsReleased(req, caseDoc) {
       link,
       receiptUrl: `/api/payments/receipt/paralegal/${encodeURIComponent(caseDoc._id)}`,
       message:
-        "Funds are being sent to your connected bank account via Stripe. Deposit timing typically ranges from 3–5 business days, depending on your bank.",
+        `Funds are being sent to your connected bank account via Stripe. Deposit timing typically ranges from ${depositMinimum}–${depositMaximum} business days, depending on your bank.`,
     };
     const alreadySent = await hasCaseNotification(paralegalObjectId, "payout_released", caseDoc, payload);
     if (!alreadySent) {
@@ -2335,7 +2354,8 @@ router.post(
       }
     }
     const caseAttorneyId = resolveCaseAttorneyIds(caseDoc)[0] || null;
-    if (caseAttorneyId && (await isBlockedBetween(caseAttorneyId, paralegal._id))) {
+    const partiesBlocked = Boolean(caseAttorneyId && (await isBlockedBetween(caseAttorneyId, paralegal._id)));
+    if (partiesBlocked) {
       return res.status(403).json({ error: BLOCKED_MESSAGE });
     }
     if (caseDoc.paralegalId) {
@@ -2353,6 +2373,21 @@ router.post(
       if (existingInvite.status === "accepted") {
         return res.status(400).json({ error: "This paralegal has already accepted." });
       }
+    }
+    const invitationPolicy = evaluateInvitationEligibility({
+      caseDoc,
+      ownerAuthorized: role === "admin" || isCaseAttorneyUser(caseDoc, req.user.id),
+      targetSelected: true,
+      paralegalApproved:
+        String(paralegal.role || "").toLowerCase() === "paralegal" &&
+        String(paralegal.status || "").toLowerCase() === "approved",
+      payoutSetupReady:
+        bypassStripe || Boolean(paralegal.stripeAccountId && paralegal.stripeOnboarded && paralegal.stripePayoutsEnabled),
+      partiesBlocked,
+      existingInviteStatus: String(existingInvite?.status || "").toLowerCase(),
+    });
+    if (!invitationPolicy.ready) {
+      return res.status(400).json({ error: "This invitation is not ready to send.", blockers: invitationPolicy.blockers });
     }
 
     upsertInvite(caseDoc, paralegal._id, { status: "pending", invitedAt: new Date(), respondedAt: null });
@@ -2579,9 +2614,11 @@ router.post(
   csrfProtection,
   asyncHandler(async (req, res) => {
     const role = String(req.user?.role || "").toLowerCase();
+    let postingPaymentMethodSaved = role !== "attorney";
     if (role === "attorney") {
       const hasPaymentMethod = await attorneyHasPaymentMethod(req.user.id || req.user._id);
-      if (!hasPaymentMethod) {
+      postingPaymentMethodSaved = hasPaymentMethod;
+      if (isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.POST_MATTER) && !hasPaymentMethod) {
         return res
           .status(403)
           .json({ error: "Connect Stripe and add a payment method before posting a case." });
@@ -2637,6 +2674,19 @@ router.post(
     }
 
     const normalizedTasks = normalizeScopeTasks(tasks);
+    const postingPolicy = evaluateMatterPosting({
+      paymentMethodSaved: postingPaymentMethodSaved,
+      title: safeTitle,
+      details: narrative,
+      practiceArea: normalizedPractice,
+      amountCents,
+      deadlineProvided: Boolean(deadline),
+      deadlineValid: !deadline || Boolean(deadlineDate),
+      attorneyStateRequired: false,
+    });
+    if (!postingPolicy.ready) {
+      return res.status(400).json({ error: "This matter is not ready to publish.", blockers: postingPolicy.blockers });
+    }
     const created = await Case.create({
       title: safeTitle,
       practiceArea: normalizedPractice,
@@ -3551,16 +3601,16 @@ router.post(
       .populate("attorney", "firstName lastName email role avatarURL")
       .populate("terminationRequestedBy", "firstName lastName email role");
     if (!doc) return res.status(404).json({ error: "Case not found." });
-
-    if (!doc.paralegal) {
-      return res.status(400).json({ error: "No paralegal is currently assigned to this case." });
-    }
-    const normalizedStatus = normalizeCaseStatusValue(doc.status);
-    if (normalizedStatus === "closed") {
-      return res.status(400).json({ error: "This case is already closed." });
-    }
-    if (doc.terminationStatus && !["none", "resolved"].includes(doc.terminationStatus)) {
-      return res.status(400).json({ error: "A termination request is already in progress." });
+    const terminationPolicy = evaluateTerminationEligibility({
+      caseDoc: doc,
+      ownerAuthorized: req.acl?.isAttorney === true,
+      adminAuthorized: req.acl?.isAdmin === true,
+    });
+    if (!terminationPolicy.ready) {
+      return res.status(400).json({
+        error: "This matter is not ready for a termination request.",
+        blockers: terminationPolicy.blockers,
+      });
     }
 
     const reason = cleanMessage(req.body?.reason || "", { len: 2000 });
@@ -3918,7 +3968,10 @@ router.post(
       return res.status(403).json({ error: BLOCKED_MESSAGE });
     }
     const attorneyReady = await attorneyHasPaymentMethod(caseAttorneyId);
-    if (!attorneyReady) {
+    if (
+      isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.RECEIVE_APPLICATIONS) &&
+      !attorneyReady
+    ) {
       return res
         .status(403)
         .json({ error: "This attorney must connect Stripe before applications can be submitted." });
@@ -4859,18 +4912,12 @@ router.post(
       console.warn("[cases] dispute window finalize failed", err?.message || err);
     }
 
-    const statusKey = normalizeCaseStatusValue(doc.status);
-    if (statusKey === "disputed") {
-      return res.status(400).json({ error: "This case is locked and cannot be relisted yet." });
-    }
-    if (doc.pausedReason !== "paralegal_withdrew") {
-      return res.status(400).json({ error: "Only withdrawn cases can be relisted." });
-    }
-    if (!doc.payoutFinalizedAt) {
-      return res.status(400).json({ error: "Payout must be finalized before relisting this case." });
-    }
-    if (isDisputeWindowActive(doc)) {
-      return res.status(400).json({ error: "Relisting is locked during the 24-hour hold." });
+    const relistPolicy = evaluateWithdrawalAndRelist({ caseDoc: doc }).relist;
+    if (!relistPolicy.ready) {
+      return res.status(400).json({
+        error: "This matter is not ready to relist.",
+        blockers: relistPolicy.blockers,
+      });
     }
 
     const now = new Date();
@@ -4963,6 +5010,22 @@ router.post(
     }
     if (confidentialityAgreementRequired && !req.file) {
       return res.status(400).json({ error: "A confidentiality agreement file is required." });
+    }
+    const preEngagementPolicy = evaluatePreEngagementRequest({
+      caseDoc: selectedCase,
+      ownerAuthorized: attorneyOnCase === String(req.user.id),
+      targetSelected: true,
+      partiesBlocked: false,
+      confidentialityRequired: confidentialityAgreementRequired,
+      conflictsCheckRequired,
+      conflictsDetails,
+      confidentialityDocumentReady: Boolean(req.file),
+    });
+    if (!preEngagementPolicy.ready) {
+      return res.status(400).json({
+        error: "This pre-engagement request is not ready.",
+        blockers: preEngagementPolicy.blockers,
+      });
     }
 
     let confidentialityDocument = null;
@@ -5326,7 +5389,7 @@ router.post(
       String(selectedCase.escrowStatus || "").toLowerCase() === "funded";
 
     const paralegal = await User.findById(paralegalId).select(
-      "firstName lastName email role stripeAccountId stripeOnboarded stripePayoutsEnabled"
+      "firstName lastName email role status stripeAccountId stripeOnboarded stripePayoutsEnabled"
     );
     if (!paralegal) return res.status(404).json({ error: "Paralegal not found" });
     if (await isBlockedBetween(attorneyOnCase, paralegal._id)) {
@@ -5520,8 +5583,26 @@ router.post(
 
     const customerId = await ensureStripeCustomer(attorney);
     const defaultPaymentMethodId = await fetchDefaultPaymentMethodId(customerId);
-    if (!defaultPaymentMethodId) {
+    if (
+      isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.HIRE_AND_FUND) &&
+      !defaultPaymentMethodId
+    ) {
       return res.status(400).json({ error: "Add a payment method before hiring." });
+    }
+    const hiringPolicy = evaluateHiringEligibility({
+      caseDoc: selectedCase,
+      ownerAuthorized: attorneyOnCase === String(req.user.id),
+      targetSelected: true,
+      partiesBlocked: false,
+      paralegalApproved:
+        String(paralegal.role || "").toLowerCase() === "paralegal" &&
+        String(paralegal.status || "").toLowerCase() === "approved",
+      paralegalPayoutSetupReady:
+        bypassStripe || Boolean(paralegal.stripeAccountId && paralegal.stripeOnboarded && paralegal.stripePayoutsEnabled),
+      paymentMethodSaved: Boolean(defaultPaymentMethodId),
+    });
+    if (!hiringPolicy.ready) {
+      return res.status(400).json({ error: "This matter is not ready to hire and fund.", blockers: hiringPolicy.blockers });
     }
 
     let paymentIntent = null;
@@ -6075,8 +6156,15 @@ router.post(
         archiveReadyAt: doc.archiveReadyAt,
       });
     }
-    if (!doc.paralegal) {
-      return res.status(400).json({ error: "Assign a paralegal before completing the case." });
+    const completionPolicy = evaluateCompletionEligibility({
+      caseDoc: doc,
+      ownerAuthorized: req.acl?.isAttorney === true || req.acl?.isAdmin === true,
+    });
+    if (completionPolicy.applicable && !completionPolicy.ready) {
+      return res.status(400).json({
+        error: "This matter is not ready to complete and release.",
+        blockers: completionPolicy.blockers,
+      });
     }
     if (doc.readOnly) {
       if (!doc.archiveZipKey) {
@@ -6097,12 +6185,6 @@ router.post(
         purgeScheduledFor: doc.purgeScheduledFor,
         archiveReadyAt: doc.archiveReadyAt,
         alreadyClosed: true,
-      });
-    }
-
-    if (!areAllScopeTasksComplete(doc)) {
-      return res.status(400).json({
-        error: "All tasks must be checked off before releasing funds.",
       });
     }
 
@@ -6129,9 +6211,7 @@ router.post(
     doc.attorneyNameSnapshot =
       doc.attorneyNameSnapshot ||
       `${doc.attorney?.firstName || ""} ${doc.attorney?.lastName || ""}`.trim();
-    const purgeAt = new Date(now);
-    purgeAt.setMonth(purgeAt.getMonth() + 6);
-    doc.purgeScheduledFor = purgeAt;
+    doc.purgeScheduledFor = calculateArchivePurgeAt(now);
     doc.archiveDownloadedAt = null;
     doc.downloadUrl = [];
     doc.applicants = [];
@@ -6653,6 +6733,10 @@ router.get(
     if (!doc) {
       return res.status(404).json({ error: "Archive not available" });
     }
+    const archiveLifecyclePolicy = evaluateArchiveReadiness({ caseDoc: doc, storageChecked: false });
+    if (!archiveLifecyclePolicy.applicable) {
+      return res.status(400).json({ error: "Archive downloads are available after completion or archival." });
+    }
     let archiveKey = doc.archiveZipKey || "";
     let generatedOnDemand = false;
     if (!archiveKey || !String(archiveKey).includes("archive-v2.zip")) {
@@ -6679,6 +6763,14 @@ router.get(
     } catch (err) {
       console.error("[cases] archive fetch error", err);
       return res.status(404).json({ error: "Archive not found" });
+    }
+    const archivePolicy = evaluateArchiveReadiness({
+      caseDoc: { ...doc, archiveZipKey: archiveKey },
+      storageChecked: true,
+      storageObjectExists: true,
+    });
+    if (!archivePolicy.ready) {
+      return res.status(409).json({ error: "Archive is not available.", blockers: archivePolicy.blockers });
     }
 
     res.setHeader("Content-Type", "application/zip");

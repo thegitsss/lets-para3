@@ -67,9 +67,22 @@ Thumbs.db
 coverage/
 lib/
 backend/node_modules/
+backend/test-results/
+backend/tests/playwright/.auth/
 
 # --- AI CHAT HELPERS (bottom-corner widgets only) ---
 backend/ai/
+!backend/ai/
+backend/ai/*
+!backend/ai/supportAgentTools.js
+!backend/ai/supportManagerAgent.js
+!backend/ai/attorneySupportCapabilities.js
+!backend/ai/attorneyConversationPolicy.js
+!backend/ai/attorneyEvidenceContract.js
+!backend/ai/attorneyResponseValidator.js
+!backend/ai/attorneySupportEvalCorpus.js
+!backend/ai/attorneySupportLiveEval.js
+!backend/ai/attorneySupportProductionDefects.js
 backend/routes/aiChat.js
 frontend/assets/scripts/ai-chat.js
 frontend/assets/scripts/public-concierge.js

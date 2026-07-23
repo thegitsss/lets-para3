@@ -1,11 +1,16 @@
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 
 const Incident = require("../../models/Incident");
 const SupportConversation = require("../../models/SupportConversation");
 const SupportMessage = require("../../models/SupportMessage");
 const SupportTicket = require("../../models/SupportTicket");
 const User = require("../../models/User");
-const { generateSupportConversationReply } = require("../../ai/supportAgent");
+const {
+  classifySupportIssueWithRules,
+  generateSupportConversationReply,
+} = require("../../ai/supportAgent");
+const { generateSupportManagerReply } = require("../../ai/supportManagerAgent");
 const {
   maybeLogAutonomousIncidentRouting,
   maybeLogAutonomousTicketEscalation,
@@ -13,7 +18,9 @@ const {
 } = require("../ai/ccoAutonomyService");
 const { linkTicketToIncident, updateTicketStatus } = require("./ticketService");
 const {
+  getAttorneyPendingParalegalSnapshot,
   getBillingMethodSnapshot,
+  getNextCaseDeadlineSnapshot,
   getCaseParticipantSnapshot,
   getCaseSnapshot,
   getMessagingSnapshot,
@@ -22,6 +29,7 @@ const {
   getWorkspaceAccessSnapshot,
   resolveSupportCaseEntity,
 } = require("./contextResolverService");
+const { retrieveSupportKnowledge } = require("../knowledge/retrievalService");
 const { publishConversationEvent } = require("./liveUpdateService");
 const { createIncidentFromSupportSignal } = require("../incidents/intakeService");
 const { notifyFounderSupportEngineeringIssue } = require("../incidents/notificationService");
@@ -34,6 +42,11 @@ const {
   shouldEscalateTicketToIncident,
 } = require("../lpcEvents/supportRoutingService");
 const { assertCcoAutonomyHarnessEnabled } = require("../../utils/ccoAutonomyHarnessAccess");
+const { buildQuestionFamilySignal } = require("./attorneyReliabilityService");
+const {
+  evaluateAttorneyManagerRollout,
+  publicAttorneyRolloutTelemetry,
+} = require("./attorneyRolloutService");
 
 const SUPPORT_WELCOME_MESSAGE =
   "Hi — I can help with account questions, payouts, case activity, and platform issues.";
@@ -180,9 +193,7 @@ function sanitizePageContext(value = {}) {
         }
       : null;
   const next = {
-    href: trimString(value.href),
     pathname: trimString(value.pathname, 280),
-    search: trimString(value.search, 240),
     hash: trimString(value.hash, 160),
     title: trimString(value.title, 220),
     label: trimString(value.label || value.pageLabel, 180),
@@ -206,15 +217,12 @@ function sanitizePageContext(value = {}) {
 
 function deriveSourcePage(pageContext = {}, fallback = "") {
   const pathname = trimString(pageContext.pathname, 280);
-  const search = trimString(pageContext.search, 240);
   const hash = trimString(pageContext.hash, 160);
   if (pathname) {
-    return trimString(`${pathname}${search || ""}${hash || ""}`, MAX_SOURCE_PAGE_LENGTH);
+    return trimString(`${pathname}${hash || ""}`, MAX_SOURCE_PAGE_LENGTH);
   }
-  return trimString(
-    fallback || pageContext.href || pageContext.label || pageContext.title || "",
-    MAX_SOURCE_PAGE_LENGTH
-  );
+  const fallbackValue = trimString(fallback || pageContext.label || pageContext.title || "", MAX_SOURCE_PAGE_LENGTH);
+  return trimString(fallbackValue.replace(/\?[^#]*/, ""), MAX_SOURCE_PAGE_LENGTH);
 }
 
 function resolveSurface(role = "") {
@@ -470,6 +478,7 @@ function formatCategoryLabel(category = "") {
     payment: "Payments",
     stripe_onboarding: "Payout setup",
     account_approval: "Verification",
+    platform_knowledge: "LPC information",
     product_guidance: "Product guidance",
     unknown: "General support",
   };
@@ -491,6 +500,35 @@ function formatDate(value) {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function buildPlatformKnowledgeReply(cards = [], role = "", text = "") {
+  const safeCards = Array.isArray(cards) ? cards.filter((card) => card?.answer) : [];
+  if (!safeCards.length) return "";
+  const normalizedRole = String(role || "").trim().toLowerCase();
+  const normalizedText = String(text || "");
+  if (normalizedRole === "admin" && /\b(platform fee|platform fees|fees?|pricing|cost)\b/i.test(normalizedText)) {
+    const attorneyCard = safeCards.find((card) => card.key === "objection_platform_fee_attorney");
+    const paralegalCard = safeCards.find((card) => card.key === "objection_paralegal_fee");
+    if (attorneyCard && paralegalCard) {
+      return "LPC charges attorneys a 22% platform fee on completed, paid projects and charges paralegals an 18% platform fee on completed, paid work. Stripe processing fees also apply to attorney payment transactions.";
+    }
+  }
+  return trimString(safeCards[0].answer, MAX_REPLY_LENGTH);
+}
+
+function buildPlatformKnowledgeFacts(cards = [], role = "") {
+  return {
+    userRole: String(role || "").trim().toLowerCase(),
+    platformKnowledge: (Array.isArray(cards) ? cards : []).slice(0, 3).map((card) => ({
+      key: trimString(card.key, 160),
+      title: trimString(card.title, 240),
+      domain: trimString(card.domain, 120),
+      answer: trimString(card.answer, 1200),
+      sourceKey: trimString(card.sourceKey, 160),
+      citations: Array.isArray(card.citations) ? card.citations.slice(0, 3) : [],
+    })),
+  };
 }
 
 function formatMoneyCents(value, currency = "USD") {
@@ -1304,6 +1342,20 @@ function buildNavigationPayload({
   };
 }
 
+function isHumanContactRequest(message = "") {
+  const text = trimString(message, MAX_MESSAGE_LENGTH).toLowerCase().replace(/\s+/g, " ").trim();
+  if (!text) return false;
+  const humanTarget =
+    "(?:human|person|real person|actual person|live person|representative|agent|live agent|support agent|customer support agent|customer service|live support|someone|somebody|team member|staff member|(?:your|the) team|someone from (?:your|the) team|(?:site |business )?owner|founder)";
+  if (new RegExp(`^(?:a |an |the )?${humanTarget}(?: please)?[.!?]*$`, "i").test(text)) return true;
+  return [
+    new RegExp(`\\b(?:speak|talk|chat|connect|contact|reach|call|email)\\s+(?:with|to)?\\s*(?:a |an |the )?(?:${humanTarget}|you)\\b`, "i"),
+    new RegExp(`\\b(?:want|need|prefer|request)(?:\\s+to)?\\s+(?:speak|talk|chat|connect)?\\s*(?:with|to)?\\s*(?:a |an |the )?${humanTarget}\\b`, "i"),
+    new RegExp(`\\b(?:get|put|transfer|send)\\s+me\\s+(?:to|through to|in touch with)?\\s*(?:a |an |the )?${humanTarget}\\b`, "i"),
+    new RegExp(`\\b${humanTarget}\\s+(?:call|contact|email|message|reach)\\s+me\\b`, "i"),
+  ].some((pattern) => pattern.test(text));
+}
+
 function buildActionPayload({ label = "", href = "", type = "deep_link" } = {}) {
   const nextLabel = trimString(label, 120);
   const nextHref = trimString(href, 500);
@@ -1383,6 +1435,108 @@ function buildAdminDashboardSupportReply({ text = "" } = {}) {
   return null;
 }
 
+async function buildAdminOperationalSupportReply({ text = "" } = {}) {
+  const normalized = String(text || "").trim().toLowerCase();
+  const referenceMatch = normalized.match(/\bsup-([a-f0-9]{6})\b/i);
+  if (referenceMatch) {
+    const recentTickets = await SupportTicket.find({})
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .limit(250)
+      .lean();
+    const suffix = referenceMatch[1].toLowerCase();
+    const ticket = recentTickets.find((entry) => normalizeId(entry._id).toLowerCase().endsWith(suffix));
+    if (!ticket) {
+      return buildLlmAssistantPayload({
+        reply: `I couldn't find ${referenceMatch[0].toUpperCase()} in the recent support queue. Open Support Ops to search the full queue.`,
+        navigation: buildNavigationPayload({
+          ctaLabel: "Support Ops",
+          ctaHref: "admin-dashboard.html#support-ops",
+          ctaType: "deep_link",
+        }),
+        provider: "admin_operational_data",
+        category: "unknown",
+        categoryLabel: "Admin support lookup",
+        primaryAsk: "admin_ticket_lookup",
+        activeTask: "FACT_LOOKUP",
+        responseMode: "DIRECT_ANSWER",
+        confidence: "medium",
+        urgency: "low",
+        grounded: true,
+        supportFacts: { ticketReference: referenceMatch[0].toUpperCase(), found: false },
+      });
+    }
+    const reference = formatSupportTicketReference(ticket._id);
+    const queue = trimString(ticket.routingSuggestion?.queueLabel, 120) || "Support Ops";
+    const owner = trimString(ticket.routingSuggestion?.ownerKey, 80).replace(/_/g, " ") || "support ops";
+    const updatedLabel = formatDate(ticket.updatedAt || ticket.createdAt);
+    const incidentCount = Array.isArray(ticket.linkedIncidentIds) ? ticket.linkedIncidentIds.length : 0;
+    return buildLlmAssistantPayload({
+      reply: `${reference} is ${String(ticket.status || "open").replace(/_/g, " ")} with ${String(
+        ticket.urgency || "medium"
+      )} urgency. It is routed to ${queue} (${owner})${incidentCount ? ` and linked to ${incidentCount} incident${incidentCount === 1 ? "" : "s"}` : ""}${
+        updatedLabel ? `; last updated ${updatedLabel}` : ""
+      }.`,
+      navigation: buildNavigationPayload({
+        ctaLabel: "Open Support Ops",
+        ctaHref: "admin-dashboard.html#support-ops",
+        ctaType: "deep_link",
+      }),
+      provider: "admin_operational_data",
+      category: "unknown",
+      categoryLabel: "Admin support lookup",
+      primaryAsk: "admin_ticket_lookup",
+      activeTask: "FACT_LOOKUP",
+      responseMode: "DIRECT_ANSWER",
+      confidence: "high",
+      urgency: String(ticket.urgency || "medium"),
+      grounded: true,
+      supportFacts: {
+        ticketReference: reference,
+        status: ticket.status || "open",
+        urgency: ticket.urgency || "medium",
+        queue,
+        owner,
+        incidentCount,
+        updatedAt: ticket.updatedAt || ticket.createdAt || null,
+      },
+    });
+  }
+
+  if (!/\b(how many|count|queue status|operational status|what needs attention|urgent tickets?|open incidents?)\b/i.test(normalized)) {
+    return null;
+  }
+  const [openTickets, highPriorityTickets, waitingOnUser, activeIncidents] = await Promise.all([
+    SupportTicket.countDocuments({ status: { $in: OPEN_TICKET_STATUSES } }),
+    SupportTicket.countDocuments({
+      status: { $in: OPEN_TICKET_STATUSES },
+      $or: [{ urgency: "high" }, { "routingSuggestion.priority": "high" }],
+    }),
+    SupportTicket.countDocuments({ status: { $in: ["waiting_on_user", "waiting_on_info"] } }),
+    Incident.countDocuments({ state: { $nin: INCIDENT_TERMINAL_STATES } }),
+  ]);
+  return buildLlmAssistantPayload({
+    reply: `The live operations snapshot shows ${openTickets} open support ticket${openTickets === 1 ? "" : "s"}, ${highPriorityTickets} high-priority ticket${
+      highPriorityTickets === 1 ? "" : "s"
+    }, ${waitingOnUser} waiting on user information, and ${activeIncidents} active engineering incident${activeIncidents === 1 ? "" : "s"}.`,
+    navigation: buildNavigationPayload({
+      ctaLabel: "Open Support Ops",
+      ctaHref: "admin-dashboard.html#support-ops",
+      ctaType: "deep_link",
+    }),
+    suggestions: ["Review approvals", "Open incidents", "View activity logs"],
+    provider: "admin_operational_data",
+    category: "unknown",
+    categoryLabel: "Admin operations",
+    primaryAsk: "admin_operational_summary",
+    activeTask: "FACT_LOOKUP",
+    responseMode: "DIRECT_ANSWER",
+    confidence: "high",
+    urgency: highPriorityTickets > 0 ? "high" : "low",
+    grounded: true,
+    supportFacts: { openTickets, highPriorityTickets, waitingOnUser, activeIncidents },
+  });
+}
+
 function buildSelfServiceActions({
   category = "",
   primaryAsk = "",
@@ -1394,6 +1548,19 @@ function buildSelfServiceActions({
 } = {}) {
   if (navigation?.ctaHref && navigation?.ctaLabel) {
     return [buildActionPayload({ label: navigation.ctaLabel, href: navigation.ctaHref, type: "deep_link" })].filter(Boolean);
+  }
+
+  if (primaryAsk === "paralegal_pending") {
+    const pendingItems = Array.isArray(supportFacts.pendingParalegalState?.items)
+      ? supportFacts.pendingParalegalState.items
+      : [];
+    if (pendingItems.length === 1 && pendingItems[0]?.caseId) {
+      return [buildActionPayload({ label: "Open case", href: buildCaseHref(pendingItems[0].caseId) })].filter(Boolean);
+    }
+    if (pendingItems.length > 1) {
+      return [buildActionPayload({ label: "View cases", href: "dashboard-attorney.html#cases" })].filter(Boolean);
+    }
+    return [];
   }
 
   if (category === "payment" && paymentSubIntent === "billing_method") {
@@ -1426,7 +1593,7 @@ function buildSelfServiceActions({
   }
   if (
     ["case_posting", "unknown"].includes(category) &&
-    ["help_with_case", "case_status", "participant_lookup", "workspace_access"].includes(primaryAsk) &&
+    ["help_with_case", "case_status", "participant_lookup", "workspace_access", "deadline_lookup"].includes(primaryAsk) &&
     supportFacts.caseState?.caseId
   ) {
     return [
@@ -1630,6 +1797,12 @@ function getPrimaryTask(message = "", previousState = {}) {
   if (hasExplainLead(lowered)) {
     return "EXPLAIN";
   }
+  if (detectFactLookupIntent(normalized) === "paralegal_pending") {
+    return "FACT_LOOKUP";
+  }
+  if (/\b(deadline|due date|due dates|due next|next due)\b/i.test(normalized)) {
+    return "FACT_LOOKUP";
+  }
   if (/\b(who|what(?:'s| is)? the status|status|who is|who's|what is stripe|what's stripe)\b/i.test(normalized)) {
     return "FACT_LOOKUP";
   }
@@ -1648,6 +1821,13 @@ function getPrimaryTask(message = "", previousState = {}) {
 
 function detectFactLookupIntent(message = "") {
   const normalized = String(message || "");
+  if (
+    /\b(?:am i|are we|anything|what).{0,40}\bwait(?:ing)?\b.{0,40}\b(?:paralegal|from them|from her|from him)\b/i.test(normalized) ||
+    /\b(?:paralegal|they|them|she|he)\b.{0,40}\b(?:owe|owes|pending|outstanding|due|waiting on)\b/i.test(normalized)
+  ) {
+    return "paralegal_pending";
+  }
+  if (/\b(deadline|due date|due dates|due next|next due)\b/i.test(normalized)) return "deadline";
   if (/\bwho(?:'s| is)?\b.*\b(attorney|paralegal)\b/i.test(normalized)) return "participant";
   if (/\b(status|paused|relisted|archived)\b/i.test(normalized)) return "status";
   if (/\b(what is stripe|what's stripe|what does stripe do|why stripe)\b/i.test(normalized)) return "stripe";
@@ -1683,6 +1863,7 @@ function detectTroubleshootIntent(message = "", role = "") {
 
 async function getActiveEntity(message = "", pageContext = {}, previousState = {}, options = {}) {
   const task = String(options.task || "").toUpperCase();
+  if (task === "FACT_LOOKUP" && detectFactLookupIntent(message) === "paralegal_pending") return null;
   const taskNeedsCase = ["FACT_LOOKUP", "TROUBLESHOOT", "HUMAN_ISSUE"].includes(task);
   if (!taskNeedsCase) return null;
 
@@ -1736,6 +1917,20 @@ async function fetchTaskFacts({
   }
 
   if (task === "FACT_LOOKUP") {
+    if (factLookupIntent === "paralegal_pending") {
+      return {
+        userRole: role,
+        pendingParalegalState: await getAttorneyPendingParalegalSnapshot(user),
+        factLookupIntent,
+      };
+    }
+    if (factLookupIntent === "deadline") {
+      return {
+        userRole: role,
+        caseState: await getNextCaseDeadlineSnapshot(user),
+        factLookupIntent,
+      };
+    }
     if (factLookupIntent === "stripe") {
       return {
         userRole: role,
@@ -2589,6 +2784,9 @@ function detectPaymentSubIntent({ text = "", analysis = {}, supportFacts = {}, p
 
 function mapPrimaryAskToCategory(primaryAsk = "", fallbackCategory = "unknown") {
   const ask = String(primaryAsk || "").trim().toLowerCase();
+  if (ask === "platform_knowledge") return "platform_knowledge";
+  if (ask === "paralegal_pending") return "case_posting";
+  if (ask === "deadline_lookup") return "case_posting";
   if (["billing_payment_method", "payment_clarify", "payout_question", "case_payment"].includes(ask)) return "payment";
   if (ask === "stripe_onboarding") return "stripe_onboarding";
   if (["participant_lookup", "case_status", "help_with_case", "workspace_access"].includes(ask)) return "case_posting";
@@ -2721,10 +2919,15 @@ function detectPrimaryAsk({
   }
   if (task === "FACT_LOOKUP") {
     const lookupIntent = detectFactLookupIntent(normalized);
+    if (lookupIntent === "paralegal_pending") return "paralegal_pending";
+    if (lookupIntent === "deadline") return "deadline_lookup";
     if (lookupIntent === "participant") return "participant_lookup";
     if (lookupIntent === "status") return "case_status";
     if (lookupIntent === "stripe") return "stripe_onboarding";
     return "help_with_case";
+  }
+  if (task === "KNOWLEDGE") {
+    return "platform_knowledge";
   }
   if (task === "TROUBLESHOOT") {
     const troubleshootIntent = detectTroubleshootIntent(normalized, supportFacts.userRole || "");
@@ -2913,6 +3116,24 @@ function resolveActiveEntity({
 }
 
 function selectRelevantSupportFacts(primaryAsk = "", supportFacts = {}) {
+  if (primaryAsk === "platform_knowledge") {
+    return {
+      userRole: supportFacts.userRole,
+      platformKnowledge: supportFacts.platformKnowledge,
+    };
+  }
+  if (primaryAsk === "paralegal_pending") {
+    return {
+      userRole: supportFacts.userRole,
+      pendingParalegalState: supportFacts.pendingParalegalState,
+    };
+  }
+  if (primaryAsk === "deadline_lookup") {
+    return {
+      userRole: supportFacts.userRole,
+      caseState: supportFacts.caseState,
+    };
+  }
   if (primaryAsk === "participant_lookup") {
     return {
       userRole: supportFacts.userRole,
@@ -3014,9 +3235,6 @@ function chooseResponseMode({
     primaryAsk === "responsiveness_issue" &&
     (conversationState.escalationOffered === true || /\b(still|again|nothing|yet|same)\b/i.test(String(text || "")))
   ) {
-    return "ESCALATE";
-  }
-  if (escalation.needsEscalation && conversationState.escalationOffered === true) {
     return "ESCALATE";
   }
   return "DIRECT_ANSWER";
@@ -3291,6 +3509,44 @@ function buildCaseStatusReply(facts = {}) {
     return `${caseState.title || "This case"} is currently ${statusLabel}. It's paused for ${String(caseState.pausedReason).replace(/_/g, " ")}.`;
   }
   return `${caseState.title || "This case"} is currently ${statusLabel}.`;
+}
+
+function buildDeadlineReply(facts = {}) {
+  const caseState = facts.caseState || {};
+  if (!caseState.caseId || !caseState.deadline) {
+    return "You don’t have an upcoming case deadline recorded in LPC right now.";
+  }
+  const deadlineLabel = formatDate(caseState.deadline);
+  if (!deadlineLabel) {
+    return "I found an upcoming deadline, but I can’t verify its date right now.";
+  }
+  return `Your next recorded deadline is ${deadlineLabel} for ${caseState.title || "your case"}.`;
+}
+
+function joinPendingReasons(reasons = []) {
+  const safeReasons = (Array.isArray(reasons) ? reasons : []).map((reason) => String(reason || "").trim()).filter(Boolean);
+  if (safeReasons.length <= 1) return safeReasons[0] || "pending activity";
+  if (safeReasons.length === 2) return `${safeReasons[0]} and ${safeReasons[1]}`;
+  return `${safeReasons.slice(0, -1).join(", ")}, and ${safeReasons[safeReasons.length - 1]}`;
+}
+
+function buildPendingParalegalReply(facts = {}) {
+  const state = facts.pendingParalegalState || {};
+  if (state.available !== true) {
+    return "I can only check attorney matters for pending paralegal activity from an attorney account.";
+  }
+  const items = Array.isArray(state.items) ? state.items : [];
+  if (!items.length) {
+    return "You’re not currently waiting on a recorded paralegal action across your active LPC matters.";
+  }
+  const visibleItems = items.slice(0, 3);
+  const details = visibleItems
+    .map((item) => `${item.title || "Untitled matter"}: ${joinPendingReasons(item.reasons)}`)
+    .join("; ");
+  const additionalCount = Math.max(0, items.length - visibleItems.length);
+  return `Yes. I found pending paralegal activity on ${items.length} matter${items.length === 1 ? "" : "s"}: ${details}${
+    additionalCount ? `; and ${additionalCount} more` : ""
+  }.`;
 }
 
 function buildResolvedReply(options = {}) {
@@ -4220,6 +4476,8 @@ function deriveConfidence(category = "", facts = {}) {
   const messagingCount = Number(facts.messagingState?.totalMessages || 0) > 0;
   const explainIntent = String(facts.explainIntent || "").toLowerCase();
 
+  if (category === "platform_knowledge" && Array.isArray(facts.platformKnowledge) && facts.platformKnowledge.length) return "high";
+  if (facts.pendingParalegalState?.available === true) return "high";
   if (category === "payment" && (payoutActivity || hasStripe)) return "high";
   if (category === "stripe_onboarding" && hasStripe) return "high";
   if ((category === "messaging" || category === "case_posting") && hasCase) return "high";
@@ -4242,7 +4500,7 @@ function deriveEscalation({ category = "", facts = {}, confidence = "medium", op
   const followUpAttempted = options.followUpAttempted === true;
   const normalizedText = String(options.text || "").toLowerCase();
 
-  if (primaryAsk === "product_guidance") {
+  if (["product_guidance", "platform_knowledge", "paralegal_pending", "deadline_lookup"].includes(primaryAsk)) {
     return { needsEscalation: false, escalationReason: "" };
   }
 
@@ -4318,7 +4576,11 @@ function deriveEscalation({ category = "", facts = {}, confidence = "medium", op
     return { needsEscalation: false, escalationReason: "" };
   }
 
-  if (["dashboard_load", "profile_save", "profile_photo_upload", "unknown"].includes(category)) {
+  if (category === "unknown") {
+    return { needsEscalation: false, escalationReason: "" };
+  }
+
+  if (["dashboard_load", "profile_save", "profile_photo_upload"].includes(category)) {
     if (options.primaryAsk === "navigation") {
       return { needsEscalation: false, escalationReason: "" };
     }
@@ -4660,6 +4922,9 @@ function getConversationPolicyState(conversation = {}) {
     activeIntent: trimString(support.activeIntent, 120),
     intentConfidence: trimString(support.intentConfidence, 40),
     activeEntity: normalizeSupportEntity(support.activeEntity || {}),
+    verifiedEntities: Array.isArray(support.verifiedEntities)
+      ? support.verifiedEntities.map((entity) => normalizeSupportEntity(entity || {})).filter((entity) => entity?.id).slice(0, 6)
+      : [],
     awaiting: trimString(support.awaiting, 40) || trimString(support.awaitingField, 80),
     awaitingField: trimString(support.awaitingField, 80),
     lastResponseType: trimString(support.lastResponseType, 40) || trimString(support.lastResponseMode, 40),
@@ -4688,6 +4953,14 @@ function getConversationPolicyState(conversation = {}) {
       : [],
     lastNavigationLabel: trimString(support.lastNavigationLabel, 120),
     lastNavigationHref: trimString(support.lastNavigationHref, 500),
+    lastEvidenceStatus: trimString(support.lastEvidenceStatus, 80),
+    lastCapabilityIds: Array.isArray(support.lastCapabilityIds)
+      ? support.lastCapabilityIds.map((value) => trimString(value, 120)).filter(Boolean).slice(0, 12)
+      : [],
+    lastQuestionFamilyKey: trimString(support.lastQuestionFamilyKey, 80),
+    lastRequestedDimensions: Array.isArray(support.lastRequestedDimensions)
+      ? support.lastRequestedDimensions.map((value) => trimString(value, 120)).filter(Boolean).slice(0, 8)
+      : [],
     turnCount: Number(support.turnCount || 0) || 0,
     welcomePrompt: trimString(support.welcomePrompt, 320),
     proactivePrompt: sanitizeProactivePrompt(support.proactivePrompt || null),
@@ -5179,6 +5452,15 @@ function buildGroundedReply({ analysis = {}, facts = {}, pageContext = {}, optio
 
   if (orchestration.responseMode === "ESCALATE") {
     return buildEscalationReply(primaryAsk);
+  }
+  if (primaryAsk === "platform_knowledge") {
+    return buildPlatformKnowledgeReply(facts.platformKnowledge, facts.userRole, options.text);
+  }
+  if (primaryAsk === "paralegal_pending") {
+    return buildPendingParalegalReply(facts);
+  }
+  if (primaryAsk === "deadline_lookup") {
+    return buildDeadlineReply(facts);
   }
   if (primaryAsk === "issue_resolved") {
     return buildResolvedReply({ text: options.text });
@@ -5964,6 +6246,14 @@ function serializeMessage(message = {}) {
       awaitingField: message.metadata?.awaitingField || "",
       responseMode: message.metadata?.responseMode || "",
       escalation: message.metadata?.escalation || null,
+      feedback:
+        message.metadata?.feedback && typeof message.metadata.feedback === "object"
+          ? {
+              rating: message.metadata.feedback.rating || "",
+              note: message.metadata.feedback.note || "",
+              submittedAt: message.metadata.feedback.submittedAt || null,
+            }
+          : null,
     },
     createdAt: message.createdAt || null,
     updatedAt: message.updatedAt || null,
@@ -6243,18 +6533,25 @@ function sanitizeActionLikePayload(action = {}) {
   if (!label) return null;
   if (type === "invoke") {
     const invokeAction = trimString(action.action, 120);
-    if (!invokeAction) return null;
+    if (!["start_stripe_onboarding", "request_password_reset"].includes(invokeAction)) return null;
     return buildInvokeActionPayload({
       label,
       action: invokeAction,
-      payload: action.payload && typeof action.payload === "object" && !Array.isArray(action.payload) ? action.payload : {},
+      payload: {},
     });
   }
-  return buildActionPayload({
-    label,
-    href: trimString(action.href || action.ctaHref, 500),
-    type,
-  });
+  const href = trimString(action.href || action.ctaHref, 500);
+  if (
+    !href ||
+    /^(?:javascript|data|vbscript|blob|https?):/i.test(href) ||
+    href.startsWith("//") ||
+    /\s/.test(href) ||
+    !/^(?:\/)?[A-Za-z0-9._~!$&'()*+,;=:@/?#%-]+$/.test(href) ||
+    (!href.includes(".html") && !href.startsWith("#"))
+  ) {
+    return null;
+  }
+  return buildActionPayload({ label, href, type });
 }
 
 function buildLlmAssistantPayload({
@@ -6277,6 +6574,7 @@ function buildLlmAssistantPayload({
   primaryAsk = "",
   activeTask = "",
   activeEntity = null,
+  verifiedEntities = [],
   awaitingField = "",
   responseMode = "",
   sentiment = "",
@@ -6297,6 +6595,10 @@ function buildLlmAssistantPayload({
   intakeMode = false,
   detailLevel = "",
   paymentSubIntent = "",
+  telemetry = null,
+  lastRequestedDimensions = [],
+  allowFallbackActions = true,
+  allowFallbackSuggestions = true,
 } = {}) {
   const brevityAdjustedReply = enforceSupportReplyBrevity(reply, {
     category,
@@ -6331,6 +6633,9 @@ function buildLlmAssistantPayload({
     activeEntity && typeof activeEntity === "object" && !Array.isArray(activeEntity)
       ? normalizeSupportEntity(activeEntity)
       : null;
+  const safeVerifiedEntities = Array.isArray(verifiedEntities)
+    ? verifiedEntities.map((entity) => normalizeSupportEntity(entity || {})).filter((entity) => entity?.id).slice(0, 6)
+    : [];
   const resolvedPaymentSubIntent = trimString(paymentSubIntent, 80).toLowerCase();
   const resolvedNeedsEscalation = needsEscalation === true;
   const providedActions = Array.isArray(actions)
@@ -6339,26 +6644,38 @@ function buildLlmAssistantPayload({
   const fallbackActions =
     providedActions.length > 0
       ? providedActions
-      : buildSelfServiceActions({
+      : allowFallbackActions
+      ? buildSelfServiceActions({
           category: resolvedCategory,
           primaryAsk: resolvedPrimaryAsk,
           paymentSubIntent: resolvedPaymentSubIntent,
           navigation: safeNavigation,
           supportFacts: safeSupportFacts,
           needsEscalation: resolvedNeedsEscalation,
-        });
+        })
+      : safeNavigation
+      ? [
+          buildActionPayload({
+            label: safeNavigation.ctaLabel,
+            href: safeNavigation.ctaHref,
+            type: safeNavigation.ctaType,
+          }),
+        ].filter(Boolean)
+      : [];
   const safeActions = fallbackActions.slice(0, 4);
   const fallbackSuggestions =
     safeSuggestions.length > 0
       ? safeSuggestions
-      : buildSuggestedReplies({
+      : allowFallbackSuggestions
+      ? buildSuggestedReplies({
           primaryAsk: resolvedPrimaryAsk,
           awaitingField: resolvedAwaitingField,
           paymentSubIntent: resolvedPaymentSubIntent,
           supportFacts: safeSupportFacts,
           selectionTopics,
           navigation: safeNavigation,
-        });
+        })
+      : [];
   const resolvedResponseMode =
     trimString(responseMode, 80).toUpperCase() ||
     (resolvedNeedsEscalation ? "ESCALATE" : resolvedAwaitingField ? "CLARIFY_ONCE" : "DIRECT_ANSWER");
@@ -6400,6 +6717,10 @@ function buildLlmAssistantPayload({
       activeTask: resolvedActiveTask,
       paymentSubIntent: resolvedPaymentSubIntent,
       activeEntity: safeActiveEntity,
+      verifiedEntities: safeVerifiedEntities,
+      lastRequestedDimensions: Array.isArray(lastRequestedDimensions)
+        ? lastRequestedDimensions.map((value) => trimString(value, 120)).filter(Boolean).slice(0, 8)
+        : [],
       awaiting: resolvedAwaitingField || null,
       awaitingField: resolvedAwaitingField,
       responseMode: resolvedResponseMode,
@@ -6431,9 +6752,70 @@ function buildLlmAssistantPayload({
       awaitingClarification: safeAwaitingClarification,
       intakeMode: safeIntakeMode,
       detailLevel: resolvedDetailLevel,
-      aiEnabled: provider === "openai",
+      aiEnabled: String(provider || "").startsWith("openai"),
+      telemetry: telemetry && typeof telemetry === "object" ? telemetry : null,
     },
     internalSummary: navigationAdjustedReply,
+  };
+}
+
+function buildOpenAiSafetyIdentifier(user = {}) {
+  const userId = normalizeId(user?._id || user?.id);
+  if (!userId) return "";
+  const secret = String(
+    process.env.OPENAI_SAFETY_SALT ||
+      process.env.JWT_SECRET ||
+      "lpc-support-safety-identifier"
+  );
+  return `lpc_${crypto.createHmac("sha256", secret).update(userId).digest("hex").slice(0, 48)}`;
+}
+
+function sanitizeModelGroundingValue(value, depth = 0) {
+  if (value === null || value === undefined) return value ?? null;
+  if (depth > 5) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map((item) => sanitizeModelGroundingValue(item, depth + 1));
+  }
+  if (typeof value === "string") return trimString(value, 1000);
+  if (["number", "boolean"].includes(typeof value)) return value;
+  if (typeof value !== "object") return null;
+
+  const deniedKeys = new Set([
+    "caseDoc",
+    "email",
+    "stripeCustomerId",
+    "stripeAccountId",
+    "accountId",
+    "paymentMethodId",
+    "transferId",
+    "clientSecret",
+  ]);
+  return Object.entries(value).reduce((result, [key, entry]) => {
+    if (deniedKeys.has(key)) return result;
+    result[key] = sanitizeModelGroundingValue(entry, depth + 1);
+    return result;
+  }, {});
+}
+
+function buildModelServerDecision(reply = {}) {
+  const payload = reply?.payload || {};
+  return {
+    canonicalReply: trimString(reply?.text, MAX_REPLY_LENGTH),
+    category: trimString(payload.category, 120),
+    categoryLabel: trimString(payload.categoryLabel, 120),
+    primaryAsk: trimString(payload.primaryAsk, 80),
+    activeTask: trimString(payload.activeTask, 80),
+    responseMode: trimString(payload.responseMode, 80),
+    awaitingField: trimString(payload.awaitingField, 120),
+    paymentSubIntent: trimString(payload.paymentSubIntent, 80),
+    urgency: trimString(payload.urgency, 40),
+    confidence: trimString(payload.confidence, 40),
+    needsEscalation: payload.needsEscalation === true,
+    escalationReason: trimString(payload.escalationReason, 160),
+    navigation: payload.navigation || null,
+    allowedActions: Array.isArray(payload.actions) ? payload.actions : [],
+    requiredSuggestions: Array.isArray(payload.suggestedReplies) ? payload.suggestedReplies : [],
   };
 }
 
@@ -6458,55 +6840,295 @@ async function buildAssistantReply({
   if (!supportUser) {
     throw new Error("Support user not found.");
   }
+  const normalizedText = trimString(text, MAX_MESSAGE_LENGTH);
+  const supportState = conversationContext.supportState || {};
+  if (isHumanContactRequest(normalizedText)) {
+    return buildLlmAssistantPayload({
+      reply:
+        "Absolutely—please use Contact Us to reach a real person. Our team monitors those messages closely and responds as promptly as possible.",
+      suggestions: [],
+      navigation: buildNavigationPayload({
+        ctaLabel: "Contact Us",
+        ctaHref: "contact.html",
+        ctaType: "deep_link",
+        inlineLinkText: "Contact Us",
+      }),
+      actions: [],
+      provider: "verified_human_contact",
+      turnCount: Number(supportState.turnCount || 0) + 1,
+      category: "general_support",
+      categoryLabel: "Contact LPC",
+      confidence: "high",
+      urgency: "low",
+      needsEscalation: false,
+      supportFacts: {
+        evidenceStatus: "verified",
+        destination: "contact",
+      },
+      primaryAsk: "human_contact",
+      activeTask: "NAVIGATION",
+      activeEntity: supportState.activeEntity || null,
+      verifiedEntities: supportState.verifiedEntities || [],
+      lastRequestedDimensions: supportState.lastRequestedDimensions || [],
+      awaitingField: "",
+      responseMode: "DIRECT_ANSWER",
+      detailLevel: "concise",
+      grounded: true,
+      allowFallbackActions: false,
+      allowFallbackSuggestions: false,
+    });
+  }
+  const attorneyRolloutDecision = evaluateAttorneyManagerRollout(supportUser);
+  if (
+    String(supportUser.role || "").toLowerCase() === "attorney" &&
+    ["percentage_not_enrolled", "missing_stable_account_key"].includes(attorneyRolloutDecision.reason)
+  ) {
+    return buildLlmAssistantPayload({
+      reply: "The upgraded LPC assistant isn’t available for this account yet.",
+      suggestions: [],
+      navigation: null,
+      actions: [],
+      provider: "attorney_manager_not_enrolled",
+      turnCount: Number(supportState.turnCount || 0) + 1,
+      category: "general_support",
+      categoryLabel: "LPC assistance",
+      confidence: "high",
+      urgency: "low",
+      needsEscalation: false,
+      supportFacts: { evidenceStatus: "not_applicable", capabilityIds: [] },
+      primaryAsk: "assistant_rollout_not_enrolled",
+      activeTask: "TROUBLESHOOT",
+      activeEntity: supportState.activeEntity || null,
+      verifiedEntities: supportState.verifiedEntities || [],
+      lastRequestedDimensions: supportState.lastRequestedDimensions || [],
+      awaitingField: "",
+      responseMode: "DIRECT_ANSWER",
+      detailLevel: "concise",
+      grounded: false,
+      telemetry: {
+        reliabilityGap: "attorney_rollout_not_enrolled",
+        rollout: publicAttorneyRolloutTelemetry(attorneyRolloutDecision),
+      },
+      allowFallbackActions: false,
+      allowFallbackSuggestions: false,
+    });
+  }
+  const managerReply = await generateSupportManagerReply({
+    messageText: normalizedText,
+    user: supportUser,
+    conversationId: conversationContext.conversationId || "",
+    currentMessageId: conversationContext.currentMessageId || "",
+    pageContext,
+    conversationState: supportState,
+    safetyIdentifier: buildOpenAiSafetyIdentifier(supportUser),
+  });
+  if (managerReply?.reply) {
+    return buildLlmAssistantPayload({
+      reply: managerReply.reply,
+      suggestions: managerReply.suggestions,
+      navigation: managerReply.navigation,
+      actions: [],
+      provider: managerReply.provider || "openai_manager",
+      turnCount: Number(supportState.turnCount || 0) + 1,
+      category: "unknown",
+      categoryLabel: "LPC assistance",
+      confidence: managerReply.confidence || "high",
+      urgency: "low",
+      needsEscalation: false,
+      supportFacts: managerReply.supportFacts,
+      primaryAsk: managerReply.primaryAsk || "general_support",
+      activeTask: managerReply.activeTask || "ANSWER",
+      activeEntity: Object.prototype.hasOwnProperty.call(managerReply, "activeEntity")
+        ? managerReply.activeEntity
+        : supportState.activeEntity || null,
+      verifiedEntities: managerReply.verifiedEntities || supportState.verifiedEntities || [],
+      lastRequestedDimensions: managerReply.requestedDimensions || [],
+      awaitingField: managerReply.awaitingField || "",
+      responseMode: managerReply.responseMode || "DIRECT_ANSWER",
+      sentiment: "neutral",
+      frustrationScore: 0,
+      escalationPriority: "normal",
+      detailLevel: managerReply.detailLevel || "concise",
+      grounded: managerReply.grounded !== false,
+      telemetry: managerReply.telemetry,
+      allowFallbackActions: false,
+      allowFallbackSuggestions: false,
+    });
+  }
+  const attorneyLegacyFallbackEnabled = ["1", "true", "on", "enabled"].includes(
+    String(process.env.OPENAI_ATTORNEY_LEGACY_FALLBACK || "false").trim().toLowerCase()
+  );
+  if (String(supportUser.role || "").toLowerCase() === "attorney" && !attorneyLegacyFallbackEnabled) {
+    return buildLlmAssistantPayload({
+      reply:
+        "I’m having trouble accessing the verified LPC information needed to answer that. Please try again in a moment.",
+      suggestions: [],
+      navigation: null,
+      actions: [],
+      provider: "attorney_manager_unavailable",
+      turnCount: Number(supportState.turnCount || 0) + 1,
+      category: "general_support",
+      categoryLabel: "LPC assistance",
+      confidence: "low",
+      urgency: "low",
+      needsEscalation: false,
+      supportFacts: {
+        evidenceStatus: "manager_unavailable",
+        capabilityIds: [],
+      },
+      primaryAsk: "assistant_temporarily_unavailable",
+      activeTask: "TROUBLESHOOT",
+      activeEntity: supportState.activeEntity || null,
+      verifiedEntities: supportState.verifiedEntities || [],
+      lastRequestedDimensions: supportState.lastRequestedDimensions || [],
+      awaitingField: "",
+      responseMode: "DIRECT_ANSWER",
+      detailLevel: "concise",
+      grounded: false,
+      telemetry: {
+        reliabilityGap: "attorney_manager_unavailable",
+        managerAvailable: false,
+        rollout: publicAttorneyRolloutTelemetry(attorneyRolloutDecision),
+        toolCalls: [],
+      },
+      allowFallbackActions: false,
+      allowFallbackSuggestions: false,
+    });
+  }
+  const analysis = classifySupportIssueWithRules(normalizedText);
+  const inferredTask = getPrimaryTask(normalizedText, supportState);
+  const retrievedPlatformKnowledge = await retrieveSupportKnowledge({
+    query: normalizedText,
+    role: supportUser.role || "",
+    limit: String(supportUser.role || "").toLowerCase() === "admin" ? 3 : 1,
+  });
+  const platformKnowledge =
+    inferredTask === "UNKNOWN" ||
+    (/\bplatform fees?\b/i.test(normalizedText) && Number(retrievedPlatformKnowledge[0]?.score || 0) >= 8)
+      ? retrievedPlatformKnowledge
+      : [];
+  const task = platformKnowledge.length ? "KNOWLEDGE" : inferredTask;
+  const resolution = {};
+  const activeEntity = await getActiveEntity(normalizedText, pageContext, supportState, {
+    task,
+    user: supportUser,
+    captureResolution: resolution,
+  });
+  const compoundExplainIntent =
+    detectCompoundExplainIntent(normalizedText, supportUser.role || "") ||
+    detectExplainIntentOverride(normalizedText, supportUser.role || "", supportState);
+  const verifiedSupportFacts = platformKnowledge.length
+    ? buildPlatformKnowledgeFacts(platformKnowledge, supportUser.role || "")
+    : await fetchTaskFacts({
+        task,
+        message: normalizedText,
+        analysis,
+        user: supportUser,
+        pageContext,
+        previousState: supportState,
+        activeEntity,
+        activeEntitySource: resolution.source || "",
+        compoundExplainIntent,
+      });
+  const issueLifecycle = await loadConversationIssueLifecycle({
+    conversationId: conversationContext.conversationId || "",
+    userId: normalizeId(supportUser._id || supportUser.id),
+    preferredTicketId:
+      trimString(conversationContext.promptAction?.ticketId, 120) ||
+      trimString(supportState.proactiveTicketId, 120) ||
+      trimString(conversationContext.ticketId, 120),
+  });
+  const splitTopicOptions = detectOverloadedSupportRequest(normalizedText)
+    ? detectSupportTopics(normalizedText).slice(0, 3)
+    : [];
+  const serverReply = buildReplyPayload({
+    analysis,
+    pageContext,
+    supportFacts: verifiedSupportFacts,
+    text: normalizedText,
+    conversationContext: {
+      ...conversationContext,
+      supportState,
+      task,
+      resolvedCaseId: resolution.caseId || activeEntity || "",
+      resolvedCaseSource: resolution.source || "",
+      issueLifecycle,
+      splitTopicOptions,
+    },
+  });
+
+  if (
+    ["platform_knowledge", "paralegal_pending", "deadline_lookup"].includes(
+      String(serverReply.payload.primaryAsk || "").toLowerCase()
+    )
+  ) {
+    return serverReply;
+  }
+
   const llmReply = await generateSupportConversationReply({
-    messageText: trimString(text, MAX_MESSAGE_LENGTH),
+    messageText: normalizedText,
     userRole: supportUser.role || "",
     conversationId: conversationContext.conversationId || "",
     currentMessageId: conversationContext.currentMessageId || "",
     pageContext,
+    verifiedSupportFacts: sanitizeModelGroundingValue(verifiedSupportFacts),
+    serverDecision: buildModelServerDecision(serverReply),
+    conversationState: sanitizeModelGroundingValue(supportState),
+    issueLifecycle: sanitizeModelGroundingValue(issueLifecycle),
+    safetyIdentifier: buildOpenAiSafetyIdentifier(supportUser),
   });
   if (!llmReply?.reply) {
-    return buildSupportFallbackPayload({ user: supportUser, text });
+    return serverReply;
   }
 
+  const groundedFacts =
+    llmReply.supportFacts && typeof llmReply.supportFacts === "object" && !Array.isArray(llmReply.supportFacts)
+      ? llmReply.supportFacts
+      : verifiedSupportFacts;
   return buildLlmAssistantPayload({
     reply: llmReply.reply,
     suggestions: llmReply.suggestions,
-    navigation: llmReply.navigation,
-    actions: llmReply.actions,
+    navigation: llmReply.navigation || serverReply.payload.navigation,
+    actions: Array.isArray(llmReply.actions) && llmReply.actions.length
+      ? llmReply.actions
+      : serverReply.payload.actions,
     provider: llmReply.provider || "openai",
-    turnCount: Number(conversationContext.supportState?.turnCount || 0) + 1,
-    category: llmReply.category,
-    categoryLabel: llmReply.categoryLabel,
-    confidence: llmReply.confidence,
-    urgency: llmReply.urgency,
+    turnCount: Number(supportState.turnCount || 0) + 1,
+    category: llmReply.category || serverReply.payload.category,
+    categoryLabel: llmReply.categoryLabel || serverReply.payload.categoryLabel,
+    confidence: llmReply.confidence || serverReply.payload.confidence,
+    urgency: llmReply.urgency || serverReply.payload.urgency,
     needsEscalation: llmReply.needsEscalation === true,
-    escalationReason: llmReply.escalationReason,
-    paymentSubIntent: llmReply.paymentSubIntent,
-    supportFacts: llmReply.supportFacts,
-    primaryAsk: llmReply.primaryAsk,
-    activeTask: llmReply.activeTask,
-    activeEntity: llmReply.activeEntity,
-    awaitingField: llmReply.awaitingField,
-    responseMode: llmReply.responseMode,
-    sentiment: llmReply.sentiment,
-    frustrationScore: llmReply.frustrationScore,
-    escalationPriority: llmReply.escalationPriority,
-    currentIssueLabel: llmReply.currentIssueLabel,
-    currentIssueSummary: llmReply.currentIssueSummary,
-    compoundIntent: llmReply.compoundIntent,
-    lastCompoundBranch: llmReply.lastCompoundBranch,
-    selectionTopics: llmReply.selectionTopics,
-    lastSelectionTopic: llmReply.lastSelectionTopic,
-    topicKey: llmReply.topicKey,
-    topicLabel: llmReply.topicLabel,
-    topicMode: llmReply.topicMode,
-    turnKind: llmReply.turnKind,
-    recentTopics: llmReply.recentTopics,
+    escalationReason:
+      llmReply.needsEscalation === true
+        ? llmReply.escalationReason || serverReply.payload.escalationReason
+        : "",
+    paymentSubIntent: llmReply.paymentSubIntent || serverReply.payload.paymentSubIntent,
+    supportFacts: groundedFacts,
+    primaryAsk: llmReply.primaryAsk || serverReply.payload.primaryAsk,
+    activeTask: llmReply.activeTask || serverReply.payload.activeTask,
+    activeEntity: llmReply.activeEntity || serverReply.payload.activeEntity,
+    awaitingField: llmReply.awaitingField || "",
+    responseMode: llmReply.responseMode || serverReply.payload.responseMode,
+    sentiment: llmReply.sentiment || serverReply.payload.sentiment,
+    frustrationScore: llmReply.frustrationScore ?? serverReply.payload.frustrationScore,
+    escalationPriority: llmReply.escalationPriority || serverReply.payload.escalationPriority,
+    currentIssueLabel: llmReply.currentIssueLabel || serverReply.payload.currentIssueLabel,
+    currentIssueSummary: llmReply.currentIssueSummary || serverReply.payload.currentIssueSummary,
+    compoundIntent: llmReply.compoundIntent || serverReply.payload.compoundIntent,
+    lastCompoundBranch: llmReply.lastCompoundBranch || serverReply.payload.lastCompoundBranch,
+    selectionTopics: llmReply.selectionTopics || serverReply.payload.selectionTopics,
+    lastSelectionTopic: llmReply.lastSelectionTopic || serverReply.payload.lastSelectionTopic,
+    topicKey: llmReply.topicKey || serverReply.payload.topicKey,
+    topicLabel: llmReply.topicLabel || serverReply.payload.topicLabel,
+    topicMode: llmReply.topicMode || serverReply.payload.topicMode,
+    turnKind: llmReply.turnKind || serverReply.payload.turnKind,
+    recentTopics: llmReply.recentTopics || serverReply.payload.recentTopics,
     awaitingClarification: llmReply.awaitingClarification === true,
     intakeMode: llmReply.intakeMode === true,
-    detailLevel: llmReply.detailLevel,
-    grounded: llmReply.grounded !== false,
+    detailLevel: llmReply.detailLevel || serverReply.payload.detailLevel,
+    grounded: true,
+    telemetry: llmReply.telemetry,
   });
 }
 
@@ -6615,6 +7237,41 @@ async function listConversationMessages({ conversationId, userId } = {}) {
     conversation: serializeConversation(conversation.toObject ? conversation.toObject() : conversation),
     messages: messages.map(serializeMessage),
   };
+}
+
+async function recordConversationMessageFeedback({
+  conversationId,
+  messageId,
+  userId,
+  rating = "",
+  note = "",
+} = {}) {
+  const normalizedRating = trimString(rating, 20).toLowerCase();
+  if (!["helpful", "unhelpful"].includes(normalizedRating)) {
+    const error = new Error("Feedback rating must be helpful or unhelpful.");
+    error.statusCode = 400;
+    throw error;
+  }
+  const conversation = await findConversationForUser(conversationId, userId);
+  if (!conversation || !mongoose.Types.ObjectId.isValid(messageId)) return null;
+
+  const message = await SupportMessage.findOne({
+    _id: messageId,
+    conversationId: conversation._id,
+    sender: "assistant",
+  });
+  if (!message) return null;
+
+  message.metadata = {
+    ...(message.metadata || {}),
+    feedback: {
+      rating: normalizedRating,
+      note: trimString(note, 500),
+      submittedAt: new Date(),
+    },
+  };
+  await message.save();
+  return serializeMessage(message.toObject ? message.toObject() : message);
 }
 
 async function syncEscalatedTicketFromConversation({
@@ -6891,6 +7548,23 @@ async function reopenConversationIssue({
   };
 }
 
+const AUTO_ESCALATION_REASONS = new Set([
+  "payment_released_bank_timing_unconfirmed",
+  "payout_finalized_without_release_record",
+  "stripe_ready_but_user_reports_blocker",
+  "workspace_access_needs_review",
+  "messaging_should_be_available",
+  "case_requires_review",
+  "interaction_responsiveness_review",
+]);
+
+function shouldAutoEscalateAssistantReply(assistantReply = {}) {
+  const payload = assistantReply?.payload || {};
+  if (payload.needsEscalation !== true) return false;
+  if (String(payload.primaryAsk || "").trim().toLowerCase() === "request_human_help") return true;
+  return AUTO_ESCALATION_REASONS.has(String(payload.escalationReason || "").trim().toLowerCase());
+}
+
 async function createConversationMessage({
   conversationId,
   user = {},
@@ -6915,6 +7589,10 @@ async function createConversationMessage({
     pageContext: context.pageContext,
   });
   const supportState = getConversationPolicyState(conversation);
+  const isAttorneyConversation = String(user?.role || conversation?.role || "").toLowerCase() === "attorney";
+  const questionFamilySignal = isAttorneyConversation
+    ? buildQuestionFamilySignal(normalizedText)
+    : null;
   const normalizedPromptAction = sanitizePromptAction(promptAction);
   const effectiveSupportState = normalizedPromptAction
     ? {
@@ -6942,14 +7620,14 @@ async function createConversationMessage({
     },
   });
 
-  const adminDashboardReply = isAdminDashboardSupportScope({
+  const inAdminDashboardScope = isAdminDashboardSupportScope({
     user,
     pageContext: context.pageContext,
     sourcePage: context.sourcePage,
-  })
-    ? buildAdminDashboardSupportReply({
-        text: normalizedText,
-      })
+  });
+  const adminDashboardReply = inAdminDashboardScope
+    ? (await buildAdminOperationalSupportReply({ text: normalizedText })) ||
+      buildAdminDashboardSupportReply({ text: normalizedText })
     : null;
 
   const assistantReply =
@@ -6986,6 +7664,34 @@ async function createConversationMessage({
       urgency: assistantReply.payload.urgency,
       confidence: assistantReply.payload.confidence,
       provider: assistantReply.payload.provider,
+      telemetry: assistantReply.payload.telemetry || null,
+      reliability: {
+        evidenceStatus: trimString(assistantReply.payload.supportFacts?.evidenceStatus, 80),
+        capabilityIds: Array.isArray(assistantReply.payload.supportFacts?.capabilityIds)
+          ? assistantReply.payload.supportFacts.capabilityIds.map((value) => trimString(value, 120)).filter(Boolean).slice(0, 12)
+          : [],
+        validationRetries: Number(assistantReply.payload.telemetry?.validationRetries || 0) || 0,
+        validationFailures: Array.isArray(assistantReply.payload.telemetry?.validationFailures)
+          ? assistantReply.payload.telemetry.validationFailures.map((value) => trimString(value, 120)).filter(Boolean).slice(0, 12)
+          : [],
+        validationExhausted: assistantReply.payload.telemetry?.validationExhausted === true,
+        retryOutcome: trimString(assistantReply.payload.telemetry?.retryOutcome, 80),
+        reliabilityGap: trimString(assistantReply.payload.telemetry?.reliabilityGap, 120),
+        repeatedQuestion:
+          isAttorneyConversation &&
+          Boolean(questionFamilySignal?.familyKey) &&
+          questionFamilySignal.familyKey === supportState.lastQuestionFamilyKey,
+        questionFamilyKey: isAttorneyConversation ? trimString(questionFamilySignal?.familyKey, 80) : "",
+        unknownQuestionCluster:
+          isAttorneyConversation &&
+          !assistantReply.payload.supportFacts?.capabilityIds?.length &&
+          !["CONVERSATION", "BOUNDARY", "CLARIFY"].includes(String(assistantReply.payload.activeTask || "")) &&
+          !["assistant_temporarily_unavailable", "answer_validation_failed"].includes(
+            String(assistantReply.payload.primaryAsk || "")
+          )
+            ? trimString(questionFamilySignal?.familyKey, 80)
+            : "",
+      },
       manualReviewSuggested: assistantReply.payload.manualReviewSuggested,
       needsEscalation: assistantReply.payload.needsEscalation,
       escalationReason: assistantReply.payload.escalationReason,
@@ -6998,6 +7704,7 @@ async function createConversationMessage({
       supportFacts: assistantReply.payload.supportFacts,
       primaryAsk: assistantReply.payload.primaryAsk || "",
       activeEntity: assistantReply.payload.activeEntity || null,
+      verifiedEntities: assistantReply.payload.verifiedEntities || [],
       awaitingField: assistantReply.payload.awaitingField || "",
       responseMode: assistantReply.payload.responseMode || "",
       escalation: assistantReply.payload.escalation,
@@ -7024,6 +7731,9 @@ async function createConversationMessage({
       activeIntent: assistantReply.payload.category || "",
       intentConfidence: assistantReply.payload.confidence || "",
       activeEntity: assistantReply.payload.activeEntity || null,
+      verifiedEntities: Array.isArray(assistantReply.payload.verifiedEntities)
+        ? assistantReply.payload.verifiedEntities
+        : supportState.verifiedEntities || [],
       awaiting: assistantReply.payload.awaiting || null,
       awaitingField: assistantReply.payload.awaitingField || "",
       lastResponseType: assistantReply.payload.responseType || assistantReply.payload.responseMode || "",
@@ -7054,6 +7764,16 @@ async function createConversationMessage({
         : supportState.recentTopics || [],
       lastNavigationLabel: assistantReply.payload.lastNavigationLabel || supportState.lastNavigationLabel || "",
       lastNavigationHref: assistantReply.payload.lastNavigationHref || supportState.lastNavigationHref || "",
+      lastEvidenceStatus: trimString(assistantReply.payload.supportFacts?.evidenceStatus, 80),
+      lastCapabilityIds: Array.isArray(assistantReply.payload.supportFacts?.capabilityIds)
+        ? assistantReply.payload.supportFacts.capabilityIds.map((value) => trimString(value, 120)).filter(Boolean).slice(0, 12)
+        : [],
+      lastQuestionFamilyKey: isAttorneyConversation
+        ? trimString(questionFamilySignal?.familyKey, 80)
+        : supportState.lastQuestionFamilyKey || "",
+      lastRequestedDimensions: Array.isArray(assistantReply.payload.lastRequestedDimensions)
+        ? assistantReply.payload.lastRequestedDimensions
+        : [],
       turnCount: assistantReply.payload.turnCount || Number(supportState.turnCount || 0) + 1,
       awaitingMessagingClarification: assistantReply.payload.awaitingClarification === true,
       lastMessagingClarificationAt: assistantReply.payload.awaitingClarification === true ? new Date() : null,
@@ -7100,10 +7820,7 @@ async function createConversationMessage({
     syncedTicket = reopenResult?.ticketDoc || null;
     updatedConversation = reopenResult?.conversation || conversation;
     updatedAssistantMessage = reopenResult?.assistantMessage || assistantMessage;
-  } else if (
-    assistantReply.payload.needsEscalation === true &&
-    String(assistantReply.payload.primaryAsk || "").trim().toLowerCase() === "request_human_help"
-  ) {
+  } else if (shouldAutoEscalateAssistantReply(assistantReply)) {
     try {
       const escalationResult = await ensureConversationEscalated({
         conversation,
@@ -7917,5 +8634,6 @@ module.exports = {
   findConversationForUser,
   getOrCreateOpenConversation,
   listConversationMessages,
+  recordConversationMessageFeedback,
   restartConversation,
 };

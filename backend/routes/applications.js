@@ -10,6 +10,11 @@ const { requireApproved, requireRole } = require("../utils/authz");
 const { shapeParalegalSnapshot } = require("../utils/profileSnapshots");
 const stripe = require("../utils/stripe");
 const { BLOCKED_MESSAGE, getBlockedUserIds, isBlockedBetween } = require("../utils/blocks");
+const {
+  ATTORNEY_WORKFLOW_STAGES,
+  evaluateApplicationEligibility,
+  isAttorneyPaymentMethodRequired,
+} = require("../services/attorneyWorkflowPolicy");
 const STRIPE_PAYMENT_METHOD_BYPASS_EMAILS = new Set([
   "samanthasider+attorney@gmail.com",
   "samanthasider+56@gmail.com",
@@ -186,12 +191,16 @@ async function createApplicationForJob(jobId, user, coverLetter) {
   }
   const attorneyId = job.attorneyId?._id || job.attorneyId || null;
   const attorneyReady = await attorneyHasPaymentMethod(attorneyId);
-  if (!attorneyReady) {
+  if (
+    isAttorneyPaymentMethodRequired(ATTORNEY_WORKFLOW_STAGES.RECEIVE_APPLICATIONS) &&
+    !attorneyReady
+  ) {
     const err = new Error("This attorney must connect Stripe before applications can be submitted.");
     err.status = 403;
     throw err;
   }
-  if (attorneyId && (await isBlockedBetween(user._id, attorneyId))) {
+  const partiesBlocked = Boolean(attorneyId && (await isBlockedBetween(user._id, attorneyId)));
+  if (partiesBlocked) {
     const err = new Error(BLOCKED_MESSAGE);
     err.status = 403;
     throw err;
@@ -276,6 +285,28 @@ async function createApplicationForJob(jobId, user, coverLetter) {
         throw err;
       }
     }
+  }
+
+  const applicationPolicy = evaluateApplicationEligibility({
+    attorneyPaymentMethodSaved: attorneyReady,
+    applicantApproved: String(user.status || "").toLowerCase() === "approved",
+    partiesBlocked,
+    caseStatus: caseDoc?.status || job.status,
+    jobStatus: job.status,
+    archived: caseDoc?.archived === true,
+    paralegalAssigned: Boolean(caseDoc?.paralegal || caseDoc?.paralegalId),
+    relistRequestedAt: caseDoc?.relistRequestedAt,
+    payoutFinalizedAt: caseDoc?.payoutFinalizedAt,
+    duplicateApplication: Boolean(existingCount && !allowReapply),
+    profilePhotoReady: Boolean(applicant.profileImage || applicant.avatarURL),
+    payoutSetupReady:
+      bypassStripe || Boolean(applicant.stripeAccountId && applicant.stripeOnboarded && applicant.stripePayoutsEnabled),
+  });
+  if (!applicationPolicy.ready) {
+    const err = new Error("This application is not ready to submit.");
+    err.status = 400;
+    err.blockers = applicationPolicy.blockers;
+    throw err;
   }
 
   if (allowReapply && existingCount) {

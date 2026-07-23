@@ -1,4 +1,5 @@
 const router = require("express").Router();
+const { rateLimit } = require("express-rate-limit");
 
 const verifyToken = require("../utils/verifyToken");
 const { requireApproved, requireRole } = require("../utils/authz");
@@ -8,6 +9,7 @@ const {
   findConversationForUser,
   getOrCreateOpenConversation,
   listConversationMessages,
+  recordConversationMessageFeedback,
   restartConversation,
 } = require("../services/support/conversationService");
 const { subscribeToConversationEvents } = require("../services/support/liveUpdateService");
@@ -27,6 +29,17 @@ if (REQUIRE_CSRF) {
 }
 
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+const supportWriteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
+  keyGenerator: (req) => String(req.user?._id || req.user?.id || req.ip || "anonymous"),
+  handler: (_req, res) => {
+    res.status(429).json({ error: "Too many assistant requests. Please wait a moment and try again." });
+  },
+});
 
 function readPageContext(req) {
   const bodyContext =
@@ -129,6 +142,7 @@ router.get(
 
 router.post(
   "/conversation/:id/messages",
+  supportWriteLimiter,
   csrfProtection,
   asyncHandler(async (req, res) => {
     const text = typeof req.body?.text === "string" ? req.body.text : "";
@@ -151,7 +165,31 @@ router.post(
 );
 
 router.post(
+  "/conversation/:id/messages/:messageId/feedback",
+  supportWriteLimiter,
+  csrfProtection,
+  asyncHandler(async (req, res) => {
+    const rating = String(req.body?.rating || "").trim().toLowerCase();
+    if (!["helpful", "unhelpful"].includes(rating)) {
+      return res.status(400).json({ error: "Feedback rating must be helpful or unhelpful." });
+    }
+    const message = await recordConversationMessageFeedback({
+      conversationId: req.params.id,
+      messageId: req.params.messageId,
+      userId: req.user._id,
+      rating,
+      note: req.body?.note,
+    });
+    if (!message) {
+      return res.status(404).json({ error: "Assistant message not found." });
+    }
+    res.json({ ok: true, message });
+  })
+);
+
+router.post(
   "/conversation/:id/restart",
+  supportWriteLimiter,
   csrfProtection,
   asyncHandler(async (req, res) => {
     const payload = await restartConversation({
@@ -168,6 +206,7 @@ router.post(
 
 router.post(
   "/conversation/:id/escalate",
+  supportWriteLimiter,
   csrfProtection,
   asyncHandler(async (req, res) => {
     const payload = await escalateConversation({

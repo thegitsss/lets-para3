@@ -226,7 +226,7 @@ const SOURCE_REGISTRY = Object.freeze([
             "Use this when an attorney asks how LPC charges for completed work. Keep the explanation factual, restrained, and inclusive of Stripe processing.",
           objection: "Why is there a platform fee?",
           approvedResponse:
-            "Let’s-ParaConnect charges a 22% platform fee on completed, paid projects. Stripe processing fees apply as part of the Stripe payment transaction.",
+            "For an initial hire, Let’s-ParaConnect charges the matter amount plus a 22% attorney platform fee through Stripe when the attorney confirms the hire. Stripe processing fees apply as part of the Stripe payment transaction.",
           supportingPoints: [
             "Keep the fee explanation factual and restrained.",
             "Do not hide Stripe processing from the explanation.",
@@ -239,7 +239,7 @@ const SOURCE_REGISTRY = Object.freeze([
             filePath: "frontend/attorney-faq.html",
             locator: "Question 8",
             excerpt:
-              "Let’s-ParaConnect charges a 22% platform fee on completed, paid projects. Stripe processing fees apply as part of the Stripe payment transaction.",
+              "For an initial hire, Let’s-ParaConnect charges the matter amount plus a 22% attorney platform fee through Stripe when the attorney confirms the hire. Stripe processing fees apply as part of the Stripe payment transaction.",
           },
         ],
       },

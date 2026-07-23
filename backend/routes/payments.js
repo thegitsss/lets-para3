@@ -20,6 +20,15 @@ const { notifyUser } = require("../utils/notifyUser");
 const Message = require("../models/Message");
 const CaseFile = require("../models/CaseFile");
 const { currentStripeMode, pickStripeMode, stripeModeFromLivemode } = require("../utils/stripeMode");
+const {
+  ATTORNEY_WORKFLOW_STAGES,
+  MIN_MATTER_AMOUNT_CENTS,
+  getAttorneyWorkflowPolicy,
+} = require("../services/attorneyWorkflowPolicy");
+const {
+  DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT,
+  DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT,
+} = require("../services/platformFeePolicy");
 
 // ----------------------------------------
 // Helpers
@@ -37,8 +46,12 @@ const STRIPE_PAYOUT_BYPASS_EMAILS = new Set([
   "game4funwithme1+1@gmail.com",
   "game4funwithme1@gmail.com",
 ]);
-const MIN_CASE_AMOUNT_CENTS = 40000;
+const MIN_CASE_AMOUNT_CENTS = MIN_MATTER_AMOUNT_CENTS;
 const MIN_CASE_AMOUNT_MESSAGE = "Amount must be at least $400.";
+const payoutDepositTiming = getAttorneyWorkflowPolicy()[ATTORNEY_WORKFLOW_STAGES.COMPLETE_AND_RELEASE]
+  .bankDepositEstimateBusinessDays;
+const PAYOUT_DEPOSIT_TIMING_MESSAGE =
+  `Funds are being sent to your connected bank account via Stripe. Deposit timing typically ranges from ${payoutDepositTiming.minimum}–${payoutDepositTiming.maximum} business days, depending on your bank.`;
 
 function buildFundingFingerprint({ caseId, amount, currency = "usd", mode = "escrow" }) {
   return [mode, String(caseId || ""), String(amount || 0), String(currency || "usd").toLowerCase()].join(":");
@@ -247,12 +260,8 @@ const { returnUrl: CONNECT_RETURN_URL, refreshUrl: CONNECT_REFRESH_URL } = resol
 const CONNECT_COUNTRY = process.env.STRIPE_CONNECT_COUNTRY || "US";
 const { Types } = mongoose;
 
-const PLATFORM_FEE_ATTORNEY_PERCENT = Number(
-  process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 22
-);
-const PLATFORM_FEE_PARALEGAL_PERCENT = Number(
-  process.env.PLATFORM_FEE_PARALEGAL_PERCENT || 18
-);
+const PLATFORM_FEE_ATTORNEY_PERCENT = DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT;
+const PLATFORM_FEE_PARALEGAL_PERCENT = DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT;
 const MAX_HISTORY_ROWS = Number(process.env.BILLING_HISTORY_LIMIT || 500);
 const MAX_EXPORT_ROWS = Number(process.env.BILLING_EXPORT_LIMIT || 2000);
 
@@ -1632,8 +1641,7 @@ router.post(
         amount: payoutDisplay,
         link,
         receiptUrl: `/api/payments/receipt/paralegal/${encodeURIComponent(c._id)}`,
-        message:
-          "Funds are being sent to your connected bank account via Stripe. Deposit timing typically ranges from 3–5 business days, depending on your bank.",
+        message: PAYOUT_DEPOSIT_TIMING_MESSAGE,
       };
       const alreadySent = await hasCaseNotification(paralegalObjectId, "payout_released", c, payload);
       if (!alreadySent) {
@@ -2297,8 +2305,7 @@ router.post(
         amount: payoutDisplay,
         link,
         receiptUrl: `/api/payments/receipt/paralegal/${encodeURIComponent(c._id)}`,
-        message:
-          "Funds are being sent to your connected bank account via Stripe. Deposit timing typically ranges from 3–5 business days, depending on your bank.",
+        message: PAYOUT_DEPOSIT_TIMING_MESSAGE,
       };
       const alreadySent = await hasCaseNotification(paralegalId, "payout_released", c, payload);
       if (!alreadySent) {

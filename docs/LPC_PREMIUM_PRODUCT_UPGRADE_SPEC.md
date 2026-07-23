@@ -331,6 +331,7 @@ Upgrade requirements:
 - Task generator from case description.
 - Budget/scope completeness review.
 - Paralegal profile polish assistant.
+- Attorney-supervised paralegal work-product assistant for authorized matters: document organization/indexing, neutral chronologies, fact/date/deadline extraction, workspace summaries, and clearly labeled draft outlines routed to the attorney for review and explicit approval.
 - Admin risk summarizer.
 - Dispute/case timeline summarizer.
 - AI output always editable and confirm-before-save.

@@ -1,5 +1,10 @@
 import { getStoredSession, secureFetch } from "../auth.js";
 import { buildSupportInlineSegments, isSafeSupportHref } from "./support-message-links.mjs";
+import {
+  getAssistantActionLimit,
+  getAssistantSuggestionLimit,
+  isSupportedEscalationMetadata,
+} from "./support-response-ui.mjs";
 import { startStripeOnboarding } from "./stripe-connect.js";
 
 const SUPPORT_STYLESHEET_ID = "lpc-support-drawer-styles";
@@ -86,16 +91,19 @@ function getRoleAwareQuickPrompts(role = "") {
 }
 
 function getDrawerSubtitle(role = "") {
-  const session = getSupportSession();
-  const firstName = String(
-    session?.user?.firstName ||
-      session?.user?.name ||
-      ""
-  )
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)[0];
-  return `Hi ${firstName || "there"}, how can I help you with Let's-ParaConnect? The more details you provide, the better.`;
+  const normalizedRole = String(role || "").trim().toLowerCase();
+  if (normalizedRole === "attorney") return "Matters, billing, messages, and account help.";
+  if (normalizedRole === "paralegal") return "Cases, applications, payouts, and account help.";
+  if (normalizedRole === "admin") return "Operations, tickets, incidents, and admin tools.";
+  return "Account and workflow help across LPC.";
+}
+
+function getDrawerTitle(role = "") {
+  const normalizedRole = String(role || "").trim().toLowerCase();
+  if (normalizedRole === "attorney") return "Attorney Assistant";
+  if (normalizedRole === "paralegal") return "Paralegal Assistant";
+  if (normalizedRole === "admin") return "Admin Assistant";
+  return "LPC Assistant";
 }
 
 function isInitialAssistantGreeting(message = {}, index = 0) {
@@ -121,6 +129,7 @@ const state = {
   conversation: null,
   messages: [],
   error: "",
+  failedMessageText: "",
   launchers: [],
   lastFocusedLauncher: null,
   drawer: null,
@@ -140,8 +149,8 @@ const state = {
   composerPromptIndex: 0,
   composerPromptTimer: null,
   composerPromptTransitionTimer: null,
-  composerPromptPaused: false,
   escalatingMessageId: "",
+  feedbackSubmittingIds: new Set(),
   pollTimer: null,
   eventSource: null,
   eventSourceConversationId: "",
@@ -367,12 +376,34 @@ function buildMenuIcon() {
 
 function buildAssistantMarkIcon() {
   return `
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M12 3l1.65 5.35L19 10l-5.35 1.65L12 17l-1.65-5.35L5 10l5.35-1.65L12 3Z"></path>
-      <path d="M19 15l.72 2.28L22 18l-2.28.72L19 21l-.72-2.28L16 18l2.28-.72L19 15Z"></path>
-      <path d="M4.5 4l.48 1.52L6.5 6l-1.52.48L4.5 8l-.48-1.52L2.5 6l1.52-.48L4.5 4Z"></path>
+    <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12.25 3.25c.48 5.4 3.1 8.02 8.5 8.5-5.4.48-8.02 3.1-8.5 8.5-.48-5.4-3.1-8.02-8.5-8.5 5.4-.48 8.02-3.1 8.5-8.5Z"></path>
+      <path d="M21.75 17.25c.2 2.2 1.3 3.3 3.5 3.5-2.2.2-3.3 1.3-3.5 3.5-.2-2.2-1.3-3.3-3.5-3.5 2.2-.2 3.3-1.3 3.5-3.5Z"></path>
     </svg>
   `;
+}
+
+function buildShieldCheckIcon() {
+  return `
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M10 2.3 16 4.8v4.4c0 3.8-2.4 6.8-6 8.5-3.6-1.7-6-4.7-6-8.5V4.8L10 2.3Z"></path>
+      <path d="m7.2 9.9 1.8 1.8 3.8-4"></path>
+    </svg>
+  `;
+}
+
+function buildUtilityIcon(type = "") {
+  if (type === "copy") {
+    return `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="6.5" width="9" height="9" rx="2"></rect><path d="M13.5 6.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6.5a2 2 0 0 0 2 2h1.5"></path></svg>`;
+  }
+  if (type === "helpful") {
+    return `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.2 8.3 9.1 3a1.5 1.5 0 0 1 2.8.9v3h3.2a2 2 0 0 1 1.9 2.6l-1.5 5A2.2 2.2 0 0 1 13.4 16H6.2"></path><path d="M3 8.3h3.2V16H3z"></path></svg>`;
+  }
+  return `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6.2 11.7 2.9 5.3a1.5 1.5 0 0 0 2.8-.9v-3h3.2A2 2 0 0 0 17 10.5l-1.5-5A2.2 2.2 0 0 0 13.4 4H6.2"></path><path d="M3 4h3.2v7.7H3z"></path></svg>`;
+}
+
+function buildArrowIcon() {
+  return `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h11"></path><path d="m11 6 4 4-4 4"></path></svg>`;
 }
 
 function createDrawerMarkup() {
@@ -394,9 +425,13 @@ function createDrawerMarkup() {
       <div class="support-drawer-heading">
         <div class="support-drawer-title-row">
           <span class="support-drawer-mark">${buildAssistantMarkIcon()}</span>
-          <h2 class="support-drawer-title" id="supportDrawerTitle">Assistant</h2>
+          <div class="support-drawer-title-copy">
+            <div class="support-drawer-title-line">
+              <h2 class="support-drawer-title" id="supportDrawerTitle" data-support-title>LPC Assistant</h2>
+            </div>
+            <p class="support-drawer-subtitle" data-support-subtitle></p>
+          </div>
         </div>
-        <p class="support-drawer-subtitle" data-support-subtitle></p>
       </div>
       <div class="support-drawer-actions">
         <div class="support-drawer-menu" data-support-menu>
@@ -434,7 +469,7 @@ function createDrawerMarkup() {
           ${buildSendIcon()}
         </button>
       </div>
-      <p class="support-composer-hint">AI may make mistakes. Verify important information.</p>
+      <p class="support-composer-hint"><span class="support-composer-hint-icon">${buildShieldCheckIcon()}</span><span>Uses your authorized LPC context. Verify important details.</span></p>
     </form>
   `;
 
@@ -484,15 +519,6 @@ function createDrawerMarkup() {
     syncComposerState();
     syncComposerPrompt();
     renderThread();
-  });
-  state.textarea?.addEventListener("focus", () => {
-    state.composerPromptPaused = true;
-    stopComposerPromptRotation();
-    syncComposerPrompt();
-  });
-  state.textarea?.addEventListener("blur", () => {
-    state.composerPromptPaused = false;
-    syncComposerPrompt();
   });
   state.textarea?.addEventListener("keydown", async (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -640,7 +666,7 @@ function syncComposerPrompt() {
   }
   const shouldShow = shouldShowComposerPrompt();
   state.composerPrompt.classList.toggle("is-hidden", !shouldShow);
-  if (!shouldShow || state.composerPromptPaused) {
+  if (!shouldShow) {
     stopComposerPromptRotation();
     return;
   }
@@ -799,7 +825,17 @@ function getMessageVariant(message = {}) {
 }
 
 function appendMessageBubbleContent(bubble, message = {}) {
-  const segments = buildSupportInlineSegments(message.text || "", message.metadata?.navigation || null);
+  const actionHrefs = new Set(
+    (Array.isArray(message.metadata?.actions) ? message.metadata.actions : [])
+      .map((action) => String(action?.href || "").trim())
+      .filter((href) => isSafeSupportHref(href))
+  );
+  const navigation = message.metadata?.navigation || null;
+  const navigationHref = String(navigation?.ctaHref || "").trim();
+  const segments = buildSupportInlineSegments(
+    message.text || "",
+    navigationHref && actionHrefs.has(navigationHref) ? null : navigation
+  );
   if (!segments.length) {
     bubble.textContent = "";
     return;
@@ -807,7 +843,7 @@ function appendMessageBubbleContent(bubble, message = {}) {
   const fragment = document.createDocumentFragment();
   segments.forEach((segment) => {
     if (!segment?.text) return;
-    if (segment.type === "link") {
+    if (segment.type === "link" && !actionHrefs.has(String(segment.href || "").trim())) {
       const anchor = document.createElement("a");
       anchor.className = "support-inline-link";
       anchor.href = segment.href;
@@ -828,6 +864,19 @@ function createMessageElement(message = {}) {
     message.metadata?.kind === "ticket_status_notice" ? " support-message--status-notice" : ""
   }`;
 
+  if (!message.loading && ["assistant", "team"].includes(variant)) {
+    const identity = document.createElement("div");
+    identity.className = "support-message-identity";
+    const mark = document.createElement("span");
+    mark.className = "support-message-identity-mark";
+    mark.innerHTML = buildAssistantMarkIcon();
+    const label = document.createElement("span");
+    label.className = "support-message-identity-label";
+    label.textContent = variant === "team" ? message.metadata?.teamLabel || "LPC Team" : "LPC Assistant";
+    identity.append(mark, label);
+    item.appendChild(identity);
+  }
+
   const bubble = document.createElement("div");
   bubble.className = "support-message-bubble";
 
@@ -843,6 +892,17 @@ function createMessageElement(message = {}) {
   }
 
   item.append(bubble);
+
+  if (!message.loading && message.createdAt) {
+    const timestamp = new Date(message.createdAt);
+    if (!Number.isNaN(timestamp.getTime())) {
+      const meta = document.createElement("time");
+      meta.className = "support-message-meta";
+      meta.dateTime = timestamp.toISOString();
+      meta.textContent = timestamp.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      item.appendChild(meta);
+    }
+  }
 
   const actionBar = createMessageActions(message);
   if (actionBar) {
@@ -903,14 +963,52 @@ async function runSupportAction(action = {}) {
   await navigateFromSupport(href);
 }
 
+async function copySupportMessage(message = {}) {
+  const text = String(message?.text || "").trim();
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    appendLocalNotice("Assistant response copied.");
+  } catch (_error) {
+    state.error = "Couldn't copy that response. Please select the text and copy it manually.";
+  }
+  render();
+}
+
+async function submitMessageFeedback(message = {}, rating = "") {
+  if (!state.conversation?.id || !message?.id || state.feedbackSubmittingIds.has(message.id)) return;
+  state.feedbackSubmittingIds.add(message.id);
+  state.error = "";
+  render();
+  try {
+    const response = await secureFetch(
+      `/api/support/conversation/${encodeURIComponent(state.conversation.id)}/messages/${encodeURIComponent(
+        message.id
+      )}/feedback`,
+      {
+        method: "POST",
+        headers: { Accept: "application/json" },
+        body: { rating },
+      }
+    );
+    if (!response.ok) throw new Error("Couldn't save that feedback.");
+    const payload = await response.json();
+    replaceMessageInState(payload.message);
+  } catch (error) {
+    state.error = error?.message || "Couldn't save that feedback.";
+  } finally {
+    state.feedbackSubmittingIds.delete(message.id);
+    render();
+  }
+}
+
 function createMessageActions(message = {}) {
   if (message.loading || getMessageVariant(message) !== "assistant") return null;
   const actions = Array.isArray(message.metadata?.actions) ? message.metadata.actions.filter(Boolean) : [];
-  if (!actions.length) return null;
 
   const bar = document.createElement("div");
   bar.className = "support-message-actions";
-  actions.slice(0, 2).forEach((action) => {
+  actions.slice(0, getAssistantActionLimit(message.metadata)).forEach((action) => {
     const isInvoke = String(action?.type || "").trim().toLowerCase() === "invoke";
     if (!isInvoke && !isSafeSupportHref(action?.href || "")) return;
     const button = document.createElement("button");
@@ -923,6 +1021,34 @@ function createMessageActions(message = {}) {
     });
     bar.appendChild(button);
   });
+
+  const utilityBar = document.createElement("div");
+  utilityBar.className = "support-message-utilities";
+  const copyButton = document.createElement("button");
+  copyButton.type = "button";
+  copyButton.className = "support-message-utility";
+  copyButton.setAttribute("aria-label", "Copy");
+  copyButton.title = "Copy response";
+  copyButton.innerHTML = buildUtilityIcon("copy");
+  copyButton.addEventListener("click", () => copySupportMessage(message));
+  utilityBar.appendChild(copyButton);
+
+  [
+    ["helpful", "Helpful"],
+    ["unhelpful", "Not helpful"],
+  ].forEach(([rating, label]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "support-message-utility";
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    button.innerHTML = buildUtilityIcon(rating);
+    button.setAttribute("aria-pressed", message.metadata?.feedback?.rating === rating ? "true" : "false");
+    button.disabled = state.feedbackSubmittingIds.has(message.id);
+    button.addEventListener("click", () => submitMessageFeedback(message, rating));
+    utilityBar.appendChild(button);
+  });
+  bar.appendChild(utilityBar);
   return bar.childElementCount ? bar : null;
 }
 
@@ -933,7 +1059,9 @@ function createSuggestedReplies(message = {}) {
   if (state.dismissedSuggestedReplyIds.has(message.id)) return null;
   if (state.sending || state.loadingConversation) return null;
   const replies = Array.isArray(message.metadata?.suggestedReplies)
-    ? message.metadata.suggestedReplies.filter(Boolean).slice(0, 3)
+    ? message.metadata.suggestedReplies
+        .filter(Boolean)
+        .slice(0, getAssistantSuggestionLimit(message.metadata))
     : [];
   if (!replies.length) return null;
 
@@ -957,7 +1085,7 @@ function createEscalationCard(message = {}) {
   const variant = getMessageVariant(message);
   const escalation = message.metadata?.escalation || null;
   const requested = escalation?.requested === true;
-  const available = escalation?.available === true || message.metadata?.needsEscalation === true;
+  const available = isSupportedEscalationMetadata(message.metadata);
   const alreadyAutoEscalating = /\bsending (this|that|the .*issue) to (the team|engineering) now\b/i.test(
     String(message.text || "")
   );
@@ -994,7 +1122,8 @@ function createEscalationCard(message = {}) {
   card.appendChild(copy);
 
   if (requested) {
-    return null;
+    card.classList.add("is-sent");
+    return card;
   }
 
   if (alreadyAutoEscalating) {
@@ -1057,35 +1186,20 @@ function renderPrompts() {
     state.subtitle.textContent = subtitle;
     state.subtitle.hidden = false;
   }
+  const title = state.drawer?.querySelector("[data-support-title]");
+  if (title) title.textContent = getDrawerTitle(getSupportRole());
   if (!shouldShowQuickPrompts()) return;
-
-  const supportState = state.conversation?.supportState || {};
-  if (supportState.proactivePrompt?.text) {
-    const copy = document.createElement("div");
-    copy.className = "support-proactive-copy";
-    copy.textContent = supportState.proactivePrompt.text || "";
-    if (copy.textContent) {
-      state.prompts.appendChild(copy);
-    }
-    if (supportState.proactivePrompt?.message) {
-      const proactiveButton = document.createElement("button");
-      proactiveButton.type = "button";
-      proactiveButton.className = "support-quick-prompt support-quick-prompt--primary";
-      proactiveButton.textContent = supportState.proactivePrompt.actionText || "Get help";
-      proactiveButton.addEventListener("click", async () => {
-        await sendSupportMessage(supportState.proactivePrompt.message, {
-          promptAction: supportState.proactivePrompt,
-        });
-      });
-      state.prompts.appendChild(proactiveButton);
-    }
-  }
 
   getRoleAwareQuickPrompts(getSupportRole()).forEach((promptText) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "support-quick-prompt";
-    button.textContent = promptText;
+    const label = document.createElement("span");
+    label.textContent = promptText;
+    const arrow = document.createElement("span");
+    arrow.className = "support-quick-prompt-arrow";
+    arrow.innerHTML = buildArrowIcon();
+    button.append(label, arrow);
     button.disabled = state.sending || state.loadingConversation || state.restartingConversation;
     button.addEventListener("click", async () => {
       await sendSupportMessage(promptText);
@@ -1104,7 +1218,22 @@ function renderStatus() {
   }
   state.status.classList.add("is-visible");
   state.status.classList.remove("is-info");
-  state.status.textContent = state.error;
+  const label = document.createElement("span");
+  label.textContent = state.error;
+  state.status.replaceChildren(label);
+  if (state.failedMessageText) {
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "support-status-retry";
+    retry.textContent = "Retry";
+    retry.disabled = state.sending;
+    retry.addEventListener("click", async () => {
+      const failedText = state.failedMessageText;
+      state.failedMessageText = "";
+      await sendSupportMessage(failedText);
+    });
+    state.status.appendChild(retry);
+  }
 }
 
 function scrollThreadToBottom() {
@@ -1381,6 +1510,7 @@ async function sendSupportMessage(rawText, options = {}) {
 
   state.sending = true;
   state.error = "";
+  state.failedMessageText = "";
   if (state.textarea) {
     state.textarea.value = "";
   }
@@ -1424,6 +1554,7 @@ async function sendSupportMessage(rawText, options = {}) {
       (message) => message.id !== optimisticUser.id && message.id !== optimisticAssistant.id
     );
     state.error = error?.message || "Your message didn't send. Please try again.";
+    state.failedMessageText = text;
     if (state.textarea && !state.textarea.value.trim()) {
       state.textarea.value = previousDraft || text;
     }
@@ -1635,12 +1766,23 @@ export function scanSupportLaunchers() {
     return;
   }
   ensureDrawer();
-  document.querySelectorAll("[data-notification-center]").forEach((root) => {
+  const roots = [...document.querySelectorAll("[data-notification-center]")];
+  if (roots.length) {
+    document.querySelectorAll(".support-launcher--floating").forEach((launcher) => launcher.remove());
+    state.launchers = state.launchers.filter((launcher) => launcher?.isConnected);
+  }
+  roots.forEach((root) => {
     if (!(root instanceof HTMLElement)) return;
     if (root.dataset.boundSupportLauncher === "true") return;
     root.dataset.boundSupportLauncher = "true";
     insertLauncher(root);
   });
+  if (!roots.length && !document.querySelector(".support-launcher--floating")) {
+    const launcher = createLauncher();
+    launcher.classList.add("support-launcher--floating");
+    document.body.appendChild(launcher);
+    state.launchers.push(launcher);
+  }
   syncLauncherState();
 }
 

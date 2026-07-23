@@ -24,12 +24,12 @@ const APPLICANT_STATUS = ["pending", "accepted", "rejected"];
 const FILE_STATUS = ["pending_review", "approved", "attorney_revision"];
 
 const ZOOM_REGEX = /^https:\/\/.*zoom\.us\/[^\s]+$/i;
-const DEFAULT_ATTORNEY_FEE_PCT = Number(
-  process.env.PLATFORM_FEE_ATTORNEY_PERCENT || process.env.PLATFORM_FEE_PERCENT || 22
-);
-const DEFAULT_PARALEGAL_FEE_PCT = Number(
-  process.env.PLATFORM_FEE_PARALEGAL_PERCENT || 18
-);
+const {
+  DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT,
+  DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT,
+} = require("../services/platformFeePolicy");
+const DEFAULT_ATTORNEY_FEE_PCT = DEFAULT_ATTORNEY_PLATFORM_FEE_PERCENT;
+const DEFAULT_PARALEGAL_FEE_PCT = DEFAULT_PARALEGAL_PLATFORM_FEE_PERCENT;
 
 function cents(n) {
   if (n == null) return 0;

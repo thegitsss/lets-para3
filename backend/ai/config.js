@@ -99,9 +99,67 @@ async function createJsonChatCompletion({ systemPrompt, userPrompt, model, tempe
   return parsed;
 }
 
+async function createStructuredResponse({
+  model,
+  instructions,
+  input,
+  textFormat,
+  reasoningEffort = "low",
+  safetyIdentifier = "",
+  metadata = {},
+  timeoutMs = 30000,
+  maxOutputTokens = 1800,
+} = {}) {
+  if (!openAIClient) {
+    const err = new Error("AI is not enabled");
+    err.code = "AI_DISABLED";
+    throw err;
+  }
+  if (!textFormat) {
+    const err = new Error("A structured response format is required");
+    err.code = "AI_SCHEMA_REQUIRED";
+    throw err;
+  }
+
+  const startedAt = Date.now();
+  const response = await openAIClient.responses.parse(
+    {
+      model: model || AI_MODELS.support,
+      instructions: String(instructions || ""),
+      input,
+      text: { format: textFormat },
+      reasoning: { effort: reasoningEffort },
+      max_output_tokens: Math.max(256, Number(maxOutputTokens) || 1800),
+      store: false,
+      ...(safetyIdentifier ? { safety_identifier: safetyIdentifier } : {}),
+      ...(metadata && Object.keys(metadata).length ? { metadata } : {}),
+    },
+    { timeout: Math.max(1000, Number(timeoutMs) || 30000) }
+  );
+
+  if (!response?.output_parsed) {
+    const err = new Error("AI returned no schema-valid response");
+    err.code = "AI_BAD_RESPONSE";
+    throw err;
+  }
+
+  return {
+    data: response.output_parsed,
+    telemetry: {
+      responseId: String(response.id || ""),
+      model: String(response.model || model || AI_MODELS.support),
+      latencyMs: Date.now() - startedAt,
+      inputTokens: Number(response.usage?.input_tokens || 0),
+      outputTokens: Number(response.usage?.output_tokens || 0),
+      totalTokens: Number(response.usage?.total_tokens || 0),
+    },
+  };
+}
+
 module.exports = {
   AI_MODELS,
   createJsonChatCompletion,
+  createStructuredResponse,
   getAiStatus,
   getOpenAIClient,
   isAiEnabled,
