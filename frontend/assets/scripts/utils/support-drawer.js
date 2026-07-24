@@ -13,6 +13,7 @@ const SUPPORT_DRAWER_ID = "supportDrawer";
 const SUPPORT_THREAD_ID = "supportThread";
 const SUPPORT_CONTEXT_STORAGE_KEY = "lpc-support-context";
 const SUPPORT_SESSION_USER_KEY = "lpc_support_session_user";
+const SUPPORT_PIN_STORAGE_KEY = "lpc_support_drawer_pin";
 const SUPPORT_CONTEXT_WINDOW_MS = 1000 * 60 * 60 * 4;
 const COMPOSER_PROMPT_INTERVAL_MS = 3200;
 const COMPOSER_PROMPT_TRANSITION_MS = 220;
@@ -92,8 +93,8 @@ function getRoleAwareQuickPrompts(role = "") {
 
 function getDrawerSubtitle(role = "") {
   const normalizedRole = String(role || "").trim().toLowerCase();
-  if (normalizedRole === "attorney") return "Matters, billing, messages, and account help.";
-  if (normalizedRole === "paralegal") return "Cases, applications, payouts, and account help.";
+  if (normalizedRole === "attorney") return "";
+  if (normalizedRole === "paralegal") return "";
   if (normalizedRole === "admin") return "Operations, tickets, incidents, and admin tools.";
   return "Account and workflow help across LPC.";
 }
@@ -118,6 +119,8 @@ function isInitialAssistantGreeting(message = {}, index = 0) {
 
 const state = {
   open: false,
+  pinned: false,
+  restoringPinned: false,
   bootstrapped: false,
   stylesReady: false,
   loadingConversation: false,
@@ -144,6 +147,9 @@ const state = {
   menuPanel: null,
   restartButton: null,
   closeButton: null,
+  pinButton: null,
+  sidebarCollapseTab: null,
+  sidebarClassObserver: null,
   composerPrompt: null,
   composerPromptText: null,
   composerPromptIndex: 0,
@@ -165,6 +171,103 @@ function getSupportSession() {
 function getSupportSessionUserId() {
   const session = getSupportSession();
   return String(session?.user?._id || session?.user?.id || "").trim();
+}
+
+function readPinnedSupportDrawer() {
+  if (typeof window === "undefined") return false;
+  try {
+    const saved = JSON.parse(window.sessionStorage.getItem(SUPPORT_PIN_STORAGE_KEY) || "null");
+    return Boolean(saved?.pinned && saved?.userId && saved.userId === getSupportSessionUserId());
+  } catch (_error) {
+    return false;
+  }
+}
+
+function persistPinnedSupportDrawer(pinned = false) {
+  if (typeof window === "undefined") return;
+  try {
+    if (pinned && getSupportSessionUserId()) {
+      window.sessionStorage.setItem(
+        SUPPORT_PIN_STORAGE_KEY,
+        JSON.stringify({ pinned: true, userId: getSupportSessionUserId() })
+      );
+    } else {
+      window.sessionStorage.removeItem(SUPPORT_PIN_STORAGE_KEY);
+    }
+  } catch (_error) {
+    // Ignore storage failures.
+  }
+}
+
+function canPinSupportDrawer() {
+  return typeof window === "undefined" || !window.matchMedia || window.matchMedia("(min-width: 681px)").matches;
+}
+
+function canCollapseDashboardSidebar() {
+  return typeof window === "undefined" || !window.matchMedia || window.matchMedia("(min-width: 1025px)").matches;
+}
+
+function isCompactSidebarLayout() {
+  return typeof window !== "undefined" && Boolean(window.matchMedia?.("(max-width: 1024px)").matches);
+}
+
+function syncSidebarCollapseTab() {
+  const tab = state.sidebarCollapseTab;
+  if (!tab) return;
+  if (isCompactSidebarLayout()) {
+    if (document.body.classList.contains("support-sidebar-collapsed")) {
+      document.body.classList.remove("support-sidebar-collapsed");
+    }
+    const isOpen = document.body.classList.contains("nav-open");
+    tab.setAttribute("aria-expanded", String(isOpen));
+    tab.setAttribute("aria-label", isOpen ? "Hide navigation" : "Show navigation");
+    tab.title = isOpen ? "Hide navigation" : "Show navigation";
+    return;
+  }
+  if (!canCollapseDashboardSidebar()) {
+    document.body.classList.remove("support-sidebar-collapsed");
+    tab.setAttribute("aria-expanded", "true");
+    tab.setAttribute("aria-label", "Hide navigation");
+    tab.title = "Hide navigation";
+    return;
+  }
+  const isCollapsed = document.body.classList.contains("support-sidebar-collapsed");
+  tab.setAttribute("aria-expanded", String(!isCollapsed));
+  tab.setAttribute("aria-label", isCollapsed ? "Show navigation" : "Hide navigation");
+  tab.title = isCollapsed ? "Show navigation" : "Hide navigation";
+}
+
+function ensureSidebarCollapseTab() {
+  if (typeof document === "undefined" || state.sidebarCollapseTab?.isConnected) return;
+  const sidebar = document.querySelector("#sidebarNav.sidebar");
+  if (!(sidebar instanceof HTMLElement)) return;
+  const tab = document.createElement("button");
+  tab.type = "button";
+  tab.className = "support-sidebar-collapse-tab";
+  tab.setAttribute("aria-controls", "sidebarNav");
+  tab.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="m14.5 6-6 6 6 6"></path>
+    </svg>
+  `;
+  tab.addEventListener("click", () => {
+    if (isCompactSidebarLayout()) {
+      document.body.classList.toggle("nav-open");
+      syncSidebarCollapseTab();
+      return;
+    }
+    if (!canCollapseDashboardSidebar()) return;
+    document.body.classList.toggle("support-sidebar-collapsed");
+    syncSidebarCollapseTab();
+  });
+  document.body.appendChild(tab);
+  state.sidebarCollapseTab = tab;
+  if (typeof MutationObserver !== "undefined") {
+    state.sidebarClassObserver?.disconnect?.();
+    state.sidebarClassObserver = new MutationObserver(syncSidebarCollapseTab);
+    state.sidebarClassObserver.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  }
+  syncSidebarCollapseTab();
 }
 
 function readSupportSessionMarker() {
@@ -374,6 +477,16 @@ function buildMenuIcon() {
   `;
 }
 
+function buildPinIcon() {
+  return `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M6 3h12"></path>
+      <path d="M7 3v6l-2.5 4h15L17 9V3"></path>
+      <path d="M12 13v8"></path>
+    </svg>
+  `;
+}
+
 function buildAssistantMarkIcon() {
   return `
     <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -451,6 +564,16 @@ function createDrawerMarkup() {
             </button>
           </div>
         </div>
+        <button
+          class="support-drawer-pin"
+          type="button"
+          data-support-pin
+          aria-label="Pin assistant while you browse"
+          aria-pressed="false"
+          title="Pin assistant"
+        >
+          ${buildPinIcon()}
+        </button>
         <button class="support-drawer-close" type="button" data-support-close aria-label="Close assistant">
           ${buildCloseIcon()}
         </button>
@@ -485,6 +608,7 @@ function createDrawerMarkup() {
   state.menuButton = drawer.querySelector("[data-support-menu-trigger]");
   state.menuPanel = drawer.querySelector("[data-support-menu-panel]");
   state.restartButton = drawer.querySelector("[data-support-restart]");
+  state.pinButton = drawer.querySelector("[data-support-pin]");
   state.closeButton = drawer.querySelector("[data-support-close]");
   state.composerPrompt = drawer.querySelector("[data-support-composer-prompt]");
   state.composerPromptText = drawer.querySelector("[data-support-composer-prompt-text]");
@@ -498,6 +622,9 @@ function createDrawerMarkup() {
   state.restartButton?.addEventListener("click", async () => {
     closeSupportMenu();
     await restartSupportConversation();
+  });
+  state.pinButton?.addEventListener("click", () => {
+    setSupportDrawerPinned(!state.pinned);
   });
   state.closeButton?.addEventListener("click", () => closeSupportDrawer());
   state.form?.addEventListener("submit", async (event) => {
@@ -824,6 +951,18 @@ function getMessageVariant(message = {}) {
   return "assistant";
 }
 
+function removeRedundantActionBubbleReference(text = "", navigation = null) {
+  const messageText = String(text || "");
+  const inlineLinkText = String(navigation?.inlineLinkText || "").trim();
+  if (!messageText || inlineLinkText.toLowerCase() !== "here") return messageText;
+
+  return messageText
+    .replace(/\s+here(?=\s*[.,;:!?]|\s*$)/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([.,;:!?])/g, "$1")
+    .trim();
+}
+
 function appendMessageBubbleContent(bubble, message = {}) {
   const actionHrefs = new Set(
     (Array.isArray(message.metadata?.actions) ? message.metadata.actions : [])
@@ -832,9 +971,10 @@ function appendMessageBubbleContent(bubble, message = {}) {
   );
   const navigation = message.metadata?.navigation || null;
   const navigationHref = String(navigation?.ctaHref || "").trim();
+  const actionDuplicatesNavigation = Boolean(navigationHref && actionHrefs.has(navigationHref));
   const segments = buildSupportInlineSegments(
-    message.text || "",
-    navigationHref && actionHrefs.has(navigationHref) ? null : navigation
+    actionDuplicatesNavigation ? removeRedundantActionBubbleReference(message.text || "", navigation) : message.text || "",
+    actionDuplicatesNavigation ? null : navigation
   );
   if (!segments.length) {
     bubble.textContent = "";
@@ -864,16 +1004,13 @@ function createMessageElement(message = {}) {
     message.metadata?.kind === "ticket_status_notice" ? " support-message--status-notice" : ""
   }`;
 
-  if (!message.loading && ["assistant", "team"].includes(variant)) {
+  if (!message.loading && variant === "team") {
     const identity = document.createElement("div");
     identity.className = "support-message-identity";
-    const mark = document.createElement("span");
-    mark.className = "support-message-identity-mark";
-    mark.innerHTML = buildAssistantMarkIcon();
     const label = document.createElement("span");
     label.className = "support-message-identity-label";
-    label.textContent = variant === "team" ? message.metadata?.teamLabel || "LPC Team" : "LPC Assistant";
-    identity.append(mark, label);
+    label.textContent = message.metadata?.teamLabel || "LPC Team";
+    identity.append(label);
     item.appendChild(identity);
   }
 
@@ -1181,16 +1318,18 @@ function shouldShowQuickPrompts() {
 function renderPrompts() {
   if (!state.prompts) return;
   state.prompts.innerHTML = "";
+  const supportRole = getSupportRole();
+  if (state.drawer) state.drawer.dataset.supportRole = supportRole;
   if (state.subtitle) {
-    const subtitle = getDrawerSubtitle(getSupportRole());
+    const subtitle = getDrawerSubtitle(supportRole);
     state.subtitle.textContent = subtitle;
-    state.subtitle.hidden = false;
+    state.subtitle.hidden = !subtitle;
   }
   const title = state.drawer?.querySelector("[data-support-title]");
-  if (title) title.textContent = getDrawerTitle(getSupportRole());
+  if (title) title.textContent = getDrawerTitle(supportRole);
   if (!shouldShowQuickPrompts()) return;
 
-  getRoleAwareQuickPrompts(getSupportRole()).forEach((promptText) => {
+  getRoleAwareQuickPrompts(supportRole).forEach((promptText) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "support-quick-prompt";
@@ -1687,8 +1826,28 @@ async function sendCurrentDraft() {
   await sendSupportMessage(state.textarea.value);
 }
 
+function syncPinnedSupportDrawer() {
+  const isPinned = Boolean(state.open && state.pinned);
+  document.documentElement.classList.toggle("support-drawer-pinned", isPinned);
+  document.body.classList.toggle("support-drawer-pinned", isPinned);
+  state.drawer?.classList.toggle("is-pinned", isPinned);
+  state.drawer?.setAttribute("aria-modal", isPinned ? "false" : "true");
+  state.pinButton?.setAttribute("aria-pressed", isPinned ? "true" : "false");
+  state.pinButton?.setAttribute("aria-label", isPinned ? "Unpin assistant" : "Pin assistant while you browse");
+  if (state.pinButton) state.pinButton.title = isPinned ? "Unpin assistant" : "Pin assistant";
+}
+
+function setSupportDrawerPinned(pinned = false) {
+  if (pinned && !canPinSupportDrawer()) return;
+  state.pinned = Boolean(pinned);
+  persistPinnedSupportDrawer(state.pinned);
+  if (state.pinned) closeSupportMenu();
+  syncPinnedSupportDrawer();
+}
+
 export function closeSupportDrawer({ restoreFocus = true } = {}) {
   if (!state.open) return;
+  if (state.pinned) setSupportDrawerPinned(false);
   state.open = false;
   stopLiveUpdates();
   stopComposerPromptRotation();
@@ -1696,15 +1855,18 @@ export function closeSupportDrawer({ restoreFocus = true } = {}) {
   document.documentElement.classList.remove("support-drawer-open");
   document.body.classList.remove("support-drawer-open");
   state.drawer?.setAttribute("aria-hidden", "true");
+  syncPinnedSupportDrawer();
   syncLauncherState();
   if (restoreFocus && state.lastFocusedLauncher?.focus) {
     state.lastFocusedLauncher.focus();
   }
 }
 
-export async function openSupportDrawer({ launcher = null } = {}) {
+export async function openSupportDrawer({ launcher = null, focusComposer = true } = {}) {
   if (!isSupportSessionAllowed()) return;
+  if (!state.open) state.pinned = readPinnedSupportDrawer() && canPinSupportDrawer();
   ensureDrawer();
+  ensureSidebarCollapseTab();
   if (!state.drawer) return;
   await ensureStylesheet();
   revealDrawerShell();
@@ -1717,11 +1879,12 @@ export async function openSupportDrawer({ launcher = null } = {}) {
   document.documentElement.classList.add("support-drawer-open");
   document.body.classList.add("support-drawer-open");
   state.drawer.setAttribute("aria-hidden", "false");
+  syncPinnedSupportDrawer();
   render();
   await ensureConversationLoaded();
   syncLiveUpdates();
   syncComposerPrompt();
-  if (state.textarea) {
+  if (focusComposer && state.textarea) {
     state.textarea.focus();
   }
 }
@@ -1766,6 +1929,7 @@ export function scanSupportLaunchers() {
     return;
   }
   ensureDrawer();
+  ensureSidebarCollapseTab();
   const roots = [...document.querySelectorAll("[data-notification-center]")];
   if (roots.length) {
     document.querySelectorAll(".support-launcher--floating").forEach((launcher) => launcher.remove());
@@ -1784,6 +1948,12 @@ export function scanSupportLaunchers() {
     state.launchers.push(launcher);
   }
   syncLauncherState();
+  if (readPinnedSupportDrawer() && !state.open && !state.restoringPinned && canPinSupportDrawer()) {
+    state.restoringPinned = true;
+    void openSupportDrawer({ focusComposer: false }).finally(() => {
+      state.restoringPinned = false;
+    });
+  }
 }
 
 if (typeof document !== "undefined") {
@@ -1800,4 +1970,5 @@ if (typeof window !== "undefined") {
   window.scanSupportLaunchers = scanSupportLaunchers;
   window.closeSupportDrawer = closeSupportDrawer;
   window.openSupportDrawer = openSupportDrawer;
+  window.addEventListener("resize", syncSidebarCollapseTab);
 }

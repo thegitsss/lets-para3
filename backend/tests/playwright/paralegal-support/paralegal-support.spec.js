@@ -40,11 +40,11 @@ test("paralegal drawer renders a concise manager answer, one action, and working
   };
   const responseMessage = assistantReply({
     id: "p6-paralegal-answer",
-    text: "Open Completed cases.",
+    text: "Start by browsing open cases here. Review the case details, then submit an application for work that matches your experience.",
     navigation: {
       ctaLabel: "Completed cases",
       ctaHref: "dashboard-paralegal.html#cases-completed",
-      inlineLinkText: "Completed cases",
+      inlineLinkText: "here",
     },
     actions: [
       { label: "Duplicate action", href: "dashboard-paralegal.html#cases-completed" },
@@ -90,15 +90,17 @@ test("paralegal drawer renders a concise manager answer, one action, and working
   const drawer = page.locator("#supportDrawer");
   await expect(drawer).toBeVisible();
   await expect(drawer.locator("[data-support-title]")).toHaveText("Paralegal Assistant");
-  await expect(drawer.locator("[data-support-subtitle]")).toContainText(
-    "Cases, applications, payouts, and account help."
-  );
+  await expect(drawer.locator("[data-support-subtitle]")).toBeHidden();
 
   await drawer.locator("[data-support-textarea]").fill("Where can I see completed cases?");
   await drawer.locator("[data-support-submit]").click();
 
   const answer = drawer.locator(".support-message--assistant").last();
-  await expect(answer.locator(".support-message-bubble")).toHaveText("Open Completed cases.");
+  await expect(answer.locator(".support-message-identity")).toHaveCount(0);
+  await expect(answer.locator(".support-message-identity-mark")).toHaveCount(0);
+  await expect(answer.locator(".support-message-bubble")).toHaveText(
+    "Start by browsing open cases. Review the case details, then submit an application for work that matches your experience."
+  );
   await expect(answer.locator("[data-support-inline-link]")).toHaveCount(0);
   await expect(answer.locator(".support-message-action")).toHaveCount(1);
   await expect(answer.locator(".support-message-action")).toHaveText("Duplicate action");
@@ -112,6 +114,16 @@ test("paralegal drawer renders a concise manager answer, one action, and working
     "aria-pressed",
     "true"
   );
+});
+
+test("desktop sidebar tab collapses and restores the paralegal navigation", async ({ page }) => {
+  await page.goto("/dashboard-paralegal.html", { waitUntil: "domcontentloaded" });
+  const sidebarTab = page.locator(".support-sidebar-collapse-tab");
+  await expect(sidebarTab).toBeVisible();
+  await sidebarTab.click();
+  await expect(page.locator("body")).toHaveClass(/support-sidebar-collapsed/);
+  await sidebarTab.click();
+  await expect(page.locator("body")).not.toHaveClass(/support-sidebar-collapsed/);
 });
 
 test("paralegal drawer renders the safe fallback without links, actions, suggestions, or review cards", async ({ page }) => {

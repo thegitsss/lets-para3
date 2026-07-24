@@ -256,6 +256,7 @@ function buildManagerInstructions(role = "unknown") {
     "- Do not add generic help cards, manual-review language, or unrelated quick actions.",
     "- Suggestions are optional and should usually be zero or one. Add one only for a likely, available next action; never fill UI space or suggest unrelated billing, posting, browsing, or account work.",
     "- A navigation object is allowed only when find_navigation_destination returned that exact href in this run.",
+    "- When providing navigation, write the destination naturally. Do not use 'here' as a stand-in because the interface supplies one action button.",
     "- If the user asks to speak with a human, representative, support agent, or another real person, use find_navigation_destination with contact. Direct them to Contact Us, say the team monitors those messages and responds promptly, and do not claim a handoff or message has already been sent.",
     "- Use responseMode CLARIFY_ONCE only when one missing detail truly blocks an accurate answer; otherwise use DIRECT_ANSWER.",
     "- Use activeTask CONVERSATION only for greetings, thanks, or a brief LPC-scoped conversational response that requires no factual claim.",

@@ -35,6 +35,16 @@
     } catch (_) {}
   })();
 </script>
+<style>
+  html.js body:not(.sidebar-layout-ready) #sidebarNav {
+    visibility: hidden;
+  }
+</style>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    document.body.classList.add("sidebar-layout-ready");
+  }, { once: true });
+</script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Admin Dashboard – Let’s-ParaConnect</title>
@@ -1363,7 +1373,7 @@ padding:.5rem .25rem;
 }
 
 @media (max-width: 1024px){
-body{flex-direction:column;}
+body{flex-direction:row;}
 .main{overflow-x:hidden;}
 .main #section-user-management.visible{
 display:flex;
@@ -1531,9 +1541,6 @@ font-size:.95rem;
 
 <body class="is-loading">
   <a class="skip-link" href="#main">Skip to main content</a>
-  <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
-    <img class="sidebar-toggle-icon" src="sidebar-4.png" alt="" aria-hidden="true" />
-  </button>
 <aside class="sidebar" id="sidebarNav">
 <div class="logo">Admin Panel</div>
 <nav>

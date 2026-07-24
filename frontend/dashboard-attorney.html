@@ -21,6 +21,16 @@
   <script>
     document.documentElement.classList.add("js");
   </script>
+  <style>
+    html.js body:not(.sidebar-layout-ready) #sidebarNav {
+      visibility: hidden;
+    }
+  </style>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      document.body.classList.add("sidebar-layout-ready");
+    }, { once: true });
+  </script>
   <script>
     (function preselectDashboardView() {
       const params = new URLSearchParams(window.location.search);
@@ -4668,7 +4678,7 @@
 
     @media (max-width: 1024px) {
       body {
-        flex-direction: column;
+        flex-direction: row;
       }
 
       .sidebar {
@@ -5058,13 +5068,6 @@
   <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
   <main id="main" tabindex="-1" class="main">
     <div class="topbar">
-      <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-controls="sidebarNav" aria-expanded="false">
-        <span class="sidebar-toggle-glyph" aria-hidden="true">
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--top"></span>
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--middle"></span>
-          <span class="sidebar-toggle-bar sidebar-toggle-bar--bottom"></span>
-        </span>
-      </button>
       <div class="topbar-header-slot" data-attorney-header>
         <div class="header-skeleton" aria-hidden="true">
           <div class="skeleton-circle"></div>

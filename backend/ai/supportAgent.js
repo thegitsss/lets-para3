@@ -531,7 +531,7 @@ function buildSupportConversationSystemPrompt({ userRole = "", caseId = "" } = {
     '- Never ask "which case?" for general navigation questions.',
     "- Handle typos and misspellings gracefully.",
     "- Never trigger a bug report, escalation, or engineering report because a user made a typo.",
-    '- If you include a navigation object, the reply should naturally contain the word "here" so the UI can inline the link.',
+    "- If you include a navigation object, name the destination naturally. Do not use 'here' as a stand-in because the interface supplies one action button.",
     "- Suggestions must be 2 or 3 short contextual quick-reply labels.",
     "- Only use the navigation paths listed above. Never invent external URLs.",
     "- If no direct navigation link is needed, set navigation to null.",

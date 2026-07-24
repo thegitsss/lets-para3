@@ -36,11 +36,32 @@ test("attorney can open the support drawer and send a support message", async ({
   await expect(drawer).toBeVisible();
   await expect(textarea).toBeFocused();
   await expect(drawer.locator("[data-support-title]")).toHaveText("Attorney Assistant");
-  await expect(drawer.locator("[data-support-subtitle]")).toContainText(
-    "Matters, billing, messages, and account help."
-  );
+  await expect(drawer.locator("[data-support-subtitle]")).toBeHidden();
+  await expect(drawer).toHaveAttribute("data-support-role", "attorney");
   await expect(drawer.locator(".support-grounded-badge")).toHaveCount(0);
   await expect(drawer.locator("[data-support-composer-hint]")).toHaveCount(0);
+  const pinButton = drawer.locator("[data-support-pin]");
+  await expect(pinButton).toHaveAttribute("aria-pressed", "false");
+  await pinButton.click();
+  await expect(pinButton).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("body")).toHaveClass(/support-drawer-pinned/);
+  await expect(drawer).toHaveAttribute("aria-modal", "false");
+  await expect(page.locator("[data-support-backdrop]")).toBeHidden();
+  await page.waitForTimeout(350);
+  const dockLayout = await page.evaluate(() => {
+    const main = document.querySelector("main.main, main");
+    const drawer = document.querySelector("#supportDrawer");
+    if (!main || !drawer) return null;
+    const mainBounds = main.getBoundingClientRect();
+    const drawerBounds = drawer.getBoundingClientRect();
+    return { mainRight: mainBounds.right, drawerLeft: drawerBounds.left };
+  });
+  expect(dockLayout).not.toBeNull();
+  expect(dockLayout.mainRight).toBeLessThanOrEqual(dockLayout.drawerLeft + 1);
+  await pinButton.click();
+  await expect(pinButton).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator("body")).not.toHaveClass(/support-drawer-pinned/);
+  await expect(drawer).toHaveAttribute("aria-modal", "true");
   await expect(drawer.locator(".support-quick-prompt")).toHaveText([
     "Where is Billing & Payments?",
     "Where can I see my cases?",
@@ -49,6 +70,23 @@ test("attorney can open the support drawer and send a support message", async ({
   ]);
   await expect(drawer.locator(".support-composer-prompt-text")).toContainText("Ask about");
   await expect(textarea).not.toHaveAttribute("placeholder", /.+/);
+  const composerAlignment = await drawer.evaluate((element) => {
+    const textarea = element.querySelector("[data-support-textarea]");
+    const prompt = element.querySelector("[data-support-composer-prompt]");
+    if (!textarea || !prompt) return null;
+    const textareaBounds = textarea.getBoundingClientRect();
+    const promptBounds = prompt.getBoundingClientRect();
+    const textareaStyles = getComputedStyle(textarea);
+    return {
+      textX: textareaBounds.left + parseFloat(textareaStyles.paddingLeft || "0"),
+      textY: textareaBounds.top + parseFloat(textareaStyles.paddingTop || "0"),
+      promptX: promptBounds.left,
+      promptY: promptBounds.top,
+    };
+  });
+  expect(composerAlignment).not.toBeNull();
+  expect(Math.abs(composerAlignment.textX - composerAlignment.promptX)).toBeLessThanOrEqual(1);
+  expect(Math.abs(composerAlignment.textY - composerAlignment.promptY)).toBeLessThanOrEqual(1);
 
   const postMessage = page.waitForResponse(
     (response) =>
@@ -69,6 +107,8 @@ test("attorney can open the support drawer and send a support message", async ({
 
   await expect(drawer.locator(".support-message--user").last()).toContainText("where can i browse paralegals");
   const assistantMessage = drawer.locator(".support-message--assistant").last();
+  await expect(assistantMessage.locator(".support-message-identity")).toHaveCount(0);
+  await expect(assistantMessage.locator(".support-message-identity-mark")).toHaveCount(0);
   await expect(assistantMessage).toBeVisible();
   await expect(assistantMessage.locator(".support-message-meta")).toBeVisible();
   await expect(assistantMessage.getByRole("button", { name: "Copy", exact: true })).toBeVisible();
@@ -106,6 +146,37 @@ test("attorney can open the support drawer and send a support message", async ({
   await expect(humanContactMessage.locator("[data-support-inline-link]")).toHaveCount(0);
   await expect(humanContactMessage.getByRole("button", { name: "Contact Us", exact: true })).toBeVisible();
   await expect(humanContactMessage.locator(".support-escalation-card")).toHaveCount(0);
+});
+
+test("desktop sidebar tab collapses and restores the attorney navigation", async ({ page }) => {
+  await page.goto("/dashboard-attorney.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("body")).toHaveClass(/sidebar-layout-ready/);
+  await expect(page.locator("#sidebarNav")).toBeVisible();
+  const sidebarTab = page.locator(".support-sidebar-collapse-tab");
+  await expect(sidebarTab).toBeVisible();
+  await sidebarTab.click();
+  await expect(page.locator("body")).toHaveClass(/support-sidebar-collapsed/);
+  await expect(sidebarTab).toHaveAttribute("aria-label", "Show navigation");
+  await sidebarTab.click();
+  await expect(page.locator("body")).not.toHaveClass(/support-sidebar-collapsed/);
+  await expect(sidebarTab).toHaveAttribute("aria-label", "Hide navigation");
+
+  await page.setViewportSize({ width: 900, height: 720 });
+  await expect(page.locator("#sidebarToggle")).toHaveCount(0);
+  await expect(sidebarTab).toBeVisible();
+  await expect(sidebarTab).toHaveAttribute("aria-label", "Show navigation");
+  await sidebarTab.click();
+  await expect(page.locator("body")).toHaveClass(/nav-open/);
+  await expect(sidebarTab).toHaveAttribute("aria-label", "Hide navigation");
+});
+
+test("profile settings never falls back to the legacy top-stacked sidebar", async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 720 });
+  await page.goto("/profile-settings.html", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("body")).toHaveClass(/sidebar-layout-ready/);
+  await expect(page.locator("#sidebarToggle")).toHaveCount(0);
+  const bodyDirection = await page.locator("body").evaluate((element) => getComputedStyle(element).flexDirection);
+  expect(bodyDirection).toBe("row");
 });
 
 test("attorney drawer renders a concise manager answer, verified link, relevant suggestions, and feedback", async ({ page }) => {
